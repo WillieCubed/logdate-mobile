@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">LogDate</string>
+    <string name="title_recording">Voice Entry Recording</string>
+    <string name="title_textentry">Text Entry</string>
+</resources>
