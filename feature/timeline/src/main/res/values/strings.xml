@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="period_this_week">This Week</string>
+    <string name="period_last_week">Last Week</string>
+    <string name="period_weeks_ago">%1$s weeks ago</string>
+    <string name="period_months_ago">%1$s months ago</string>
+</resources>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+  <background android:drawable="@drawable/ic_launcher_background" />
+  <foreground>
+    <!-- TODO: Fix need to use inset with padding in drawable -->
+    <inset
+        android:drawable="@drawable/ic_launcher_foreground"
+        android:inset="20%" />
+  </foreground>
+  <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
+</adaptive-icon>

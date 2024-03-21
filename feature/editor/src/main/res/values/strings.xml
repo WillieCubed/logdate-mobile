@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="action_note_create_cancel">Cancel</string>
+    <string name="action_note_create_discard">Discard</string>
+    <string name="action_note_create_discard_confirmation_description">Are you sure you want to discard your changes?</string>
+    <string name="action_note_create_discard_confirmation_title">Discard changes?</string>
+    <string name="text_placeholder_start_writing">Start writing...</string>
+</resources>
