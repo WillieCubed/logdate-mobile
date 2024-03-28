@@ -20,7 +20,6 @@ import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
-import com.google.android.gms.tasks.Task
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -29,9 +28,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
-import kotlin.coroutines.suspendCoroutine
 
 class FusedWorldProvider @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -46,8 +42,20 @@ class FusedWorldProvider @Inject constructor(
 
     private lateinit var cachedActivity: LogdateActivity
     private lateinit var cachedLastLocation: Location
+    private lateinit var currentPlace: UserPlace
+
+    private val locationCallback = object : LocationCallback() {
+        override fun onLocationResult(locationResult: LocationResult) {
+            runCatching {
+                locationResult.lastLocation?.let {
+                    cachedLastLocation = it
+                }
+            }.getOrDefault(false)
+        }
+    }
 
     private companion object {
+
         val transitions: List<ActivityTransition> = listOf(
             ActivityTransition.Builder()
                 .setActivityType(DetectedActivity.STILL)
@@ -74,7 +82,6 @@ class FusedWorldProvider @Inject constructor(
                 .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_EXIT)
                 .build(),
         )
-
         const val UPDATE_INTERVAL_MILLISECONDS = 30_000L // 30 seconds
     }
 
@@ -93,45 +100,12 @@ class FusedWorldProvider @Inject constructor(
         subscribeToActivityUpdates()
     }
 
-    private fun subscribeToActivityUpdates() {
-        if (ActivityCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACTIVITY_RECOGNITION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
-        val request = ActivityTransitionRequest(transitions)
-        activityCallbackIntent?.let { activityClient.requestActivityTransitionUpdates(request, it) }
-    }
-
-    private fun endActivityUpdates() { // TODO: Find more elegant way to handle this
-        if (ActivityCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACTIVITY_RECOGNITION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
-        activityCallbackIntent?.let { activityClient.removeActivityTransitionUpdates(it) }
-    }
-
     override fun updateActivity(activity: LogdateActivity) {
         cachedActivity = activity
     }
 
     override fun getCurrentLocation(): Location {
         return cachedLastLocation
-    }
-
-    private val locationCallback = object : LocationCallback() {
-        override fun onLocationResult(locationResult: LocationResult) {
-            runCatching {
-                locationResult.lastLocation?.let {
-                    cachedLastLocation = it
-                }
-            }.getOrDefault(false)
-        }
     }
 
     @Throws(SecurityException::class)
@@ -157,26 +131,56 @@ class FusedWorldProvider @Inject constructor(
         locationClient.removeLocationUpdates(locationCallback)
     }
 
-    override fun resolvePlace(latitude: Double, longitude: Double): List<UserPlace> {
-        return listOf()
-    }
-
-    override fun getNearbyPlaces(place: UserPlace): List<UserPlace> {
-        return listOf()
-    }
-
-    override fun getNearbyPlaces(latitude: Double, longitude: Double): List<UserPlace> {
-        return listOf()
-    }
-}
-
-suspend fun <TResult : Any> Task<TResult>.toCoroutine(): TResult {
-    return suspendCoroutine { continuation ->
-        addOnSuccessListener { result ->
-            continuation.resume(result)
+    private fun subscribeToActivityUpdates() {
+        if (ActivityCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACTIVITY_RECOGNITION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
         }
-        addOnFailureListener { exception ->
-            continuation.resumeWithException(exception)
+        val request = ActivityTransitionRequest(transitions)
+        activityCallbackIntent?.let { activityClient.requestActivityTransitionUpdates(request, it) }
+    }
+
+    private fun endActivityUpdates() { // TODO: Find more elegant way to handle this
+        if (ActivityCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACTIVITY_RECOGNITION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
         }
+        activityCallbackIntent?.let { activityClient.removeActivityTransitionUpdates(it) }
+    }
+
+    override fun observeCurrentPlace(): Flow<UserPlace> {
+        TODO("Not yet implemented")
+    }
+
+    @Throws(SecurityException::class)
+    override suspend fun refreshCurrentPlace() {
+        // TODO: Get current location
+        val location = locationClient.lastLocation.await()
+        if (location != null) {
+            val result = resolvePlace(location.latitude, location.longitude).firstOrNull()
+            // TODO: Take into account confidence threshold
+            if (result != null) {
+                currentPlace = result.place
+            }
+        }
+        return
+    }
+
+    override fun resolvePlace(latitude: Double, longitude: Double): List<UserPlaceResult> {
+        return listOf()
+    }
+
+    override fun getNearbyPlaces(place: UserPlace): List<UserPlaceResult> {
+        return listOf()
+    }
+
+    override fun getNearbyPlaces(latitude: Double, longitude: Double): List<UserPlaceResult> {
+        return listOf()
     }
 }
