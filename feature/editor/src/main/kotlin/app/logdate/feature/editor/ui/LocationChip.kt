@@ -32,8 +32,8 @@ fun LocationChip(
             .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.tertiaryContainer)
             .border(2.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.large)
-            .padding(horizontal = Spacing.sm, vertical = Spacing.xs)
-            .clickable(enabled = enabled, onClick = onClick),
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
