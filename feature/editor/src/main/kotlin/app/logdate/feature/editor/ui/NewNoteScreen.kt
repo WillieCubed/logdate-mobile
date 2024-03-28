@@ -1,5 +1,6 @@
 package app.logdate.feature.editor.ui
 
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -63,7 +64,6 @@ import kotlinx.datetime.Instant
 fun NewNoteRoute(
     onClose: () -> Unit,
     onNoteSaved: () -> Unit,
-    initialNote: String = "",
     viewModel: NoteCreationViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -71,14 +71,16 @@ fun NewNoteRoute(
     if (state !is NoteCreationUiState.Success) {
         return
     }
-    val success = state as NoteCreationUiState.Success
-    NoteCreationScreen(
-        onClose = onClose,
-        onAddNote = { viewModel.addNote(it, onNoteSaved) },
-        currentLocation = success.currentLocation,
-        onRefreshLocation = { },
-        initialTextContent = initialNote,
-    )
+    with(state as NoteCreationUiState.Success) {
+        NoteCreationScreen(
+            onClose = onClose,
+            onAddNote = { viewModel.addNote(it, onNoteSaved) },
+            currentLocation = currentLocation,
+            onRefreshLocation = { },
+            initialTextContent = initialContent?.text ?: "",
+            initialAttachments = initialContent?.media ?: emptyList(),
+        )
+    }
 }
 
 // TODO: Probably move this to a feature module
@@ -90,6 +92,7 @@ fun NoteCreationScreen(
     onRefreshLocation: () -> Unit,
     currentLocation: UserPlace? = null,
     initialTextContent: String = "",
+    initialAttachments: List<Uri> = emptyList(),
 ) {
     var showDismissDialog by rememberSaveable { mutableStateOf(false) }
     var noteContent: String by rememberSaveable { mutableStateOf(initialTextContent) }

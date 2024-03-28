@@ -49,11 +49,11 @@ fun NavGraphBuilder.noteCreationRoute(
                 mimeType = "image/*"
             },
         ),
-    ) { backStackEntry ->
+    ) {
         NewNoteRoute(
             onClose = onClose,
             onNoteSaved = onNoteSaved,
-            initialNote = backStackEntry.arguments?.getString(Intent.EXTRA_TEXT) ?: "",
         )
     }
 }
+
