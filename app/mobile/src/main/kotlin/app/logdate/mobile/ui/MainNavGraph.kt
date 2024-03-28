@@ -19,19 +19,22 @@ fun NavGraphBuilder.mainNavGraph(
     onCreateEntry: () -> Unit,
     onViewPreviousRewinds: () -> Unit,
     onClose: () -> Unit,
+    onCreateJournal: () -> Unit,
     onOpenJournal: JournalOpenCallback,
+    onJournalCreated: (String) -> Unit,
+    onJournalDeleted: () -> Unit,
     onNavigateBack: () -> Unit,
 ) {
     navigation(
         startDestination = RouteDestination.Home.route,
         route = RouteDestination.Base.route,
     ) {
-        // Home route
         composable(RouteDestination.Home.route) {
             HomeRoute(
                 appState = appState,
                 onCreateEntry = onCreateEntry,
                 onViewPreviousRewinds = onViewPreviousRewinds,
+                onCreateJournal = onCreateJournal,
                 onOpenJournal = onOpenJournal,
             )
         }
@@ -50,6 +53,8 @@ fun NavGraphBuilder.mainNavGraph(
             onGoBack = {
                 onNavigateBack()
             },
+            onJournalCreated = onJournalCreated,
+            onJournalDeleted = onJournalDeleted
         )
     }
 }

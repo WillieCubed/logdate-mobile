@@ -8,7 +8,12 @@ interface JournalRepository {
 
     fun observeJournalById(id: String): Flow<Journal>
 
-    suspend fun create(journal: Journal)
+    /**
+     * Creates a new journal.
+     *
+     * @return The ID of the created journal.
+     */
+    suspend fun create(journal: Journal): String
 
     suspend fun delete(journalId: String)
 }

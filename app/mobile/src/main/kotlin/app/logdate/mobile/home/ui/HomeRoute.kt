@@ -22,6 +22,7 @@ fun HomeRoute(
     appState: MainAppState,
     onViewPreviousRewinds: () -> Unit,
     onCreateEntry: () -> Unit,
+    onCreateJournal: () -> Unit,
     onOpenJournal: JournalOpenCallback,
 ) {
     var currentDestination: HomeRouteData by rememberSaveable { mutableStateOf(HomeRouteData.Timeline) }
@@ -32,6 +33,7 @@ fun HomeRoute(
             currentDestination = it
         },
         onViewPreviousRewinds = onViewPreviousRewinds,
+        onNewJournal = onCreateJournal,
         onOpenJournal = onOpenJournal,
         onCreateEntry = onCreateEntry,
         shouldShowBottomBar = appState.shouldShowBottomBar,

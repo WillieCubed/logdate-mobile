@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
@@ -58,5 +59,13 @@ class JournalDetailViewModel @Inject constructor(
 
     fun selectJournal(journalId: String) {
         savedStateHandle["id"] = journalId
+    }
+
+    fun deleteJournal(onDelete: () -> Unit) {
+        val journalId = savedStateHandle.get<String>(JOURNAL_ID_ARG) ?: return
+        viewModelScope.launch {
+            repository.delete(journalId)
+        }
+        onDelete()
     }
 }

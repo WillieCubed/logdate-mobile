@@ -10,25 +10,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation.NavController
-import app.logdate.model.Journal
 import app.logdate.ui.theme.Spacing
-
-fun NavController.navigateToJournal(journalId: String) {
-    navigate("journal/${journalId}")
-}
-
-fun NavController.navigateToJournal(journal: Journal) {
-    navigate("journal/${journal.id}")
-}
 
 @Composable
 fun JournalDetailRoute(
     onGoBack: () -> Unit,
+    onJournalDeleted: () -> Unit,
     viewModel: JournalDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
-    JournalDetailScreen(state = state, onGoBack = onGoBack, onAddContent = { })
+    JournalDetailScreen(
+        state = state,
+        onGoBack = onGoBack,
+        onAddContent = { },
+        onDeleteJournal = {
+            viewModel.deleteJournal(onJournalDeleted)
+        },
+    )
 }
 
 @Composable

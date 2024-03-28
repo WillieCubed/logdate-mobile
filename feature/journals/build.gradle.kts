@@ -9,11 +9,12 @@ android {
 }
 
 dependencies {
-    implementation(project(":data"))
+    implementation(project(":core:data"))
     implementation(project(":core:ui"))
     implementation(project(":core:model"))
 
     // Compose in logdate.compose build logic
+    implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(project(":core:util"))
 }

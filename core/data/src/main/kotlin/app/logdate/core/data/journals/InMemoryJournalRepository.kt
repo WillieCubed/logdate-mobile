@@ -1,5 +1,6 @@
-package app.logdate.core.data
+package app.logdate.core.data.journals
 
+import app.logdate.core.data.JournalRepository
 import app.logdate.model.Journal
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,7 +17,7 @@ class DefaultJournalRepository @Inject constructor(): JournalRepository {
     override val allJournalsObserved: Flow<List<Journal>>
         get() = allItems
 
-    override suspend fun create(journal: Journal) {
+    override suspend fun create(journal: Journal): String {
         TODO("Not yet implemented")
     }
 

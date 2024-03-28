@@ -1,10 +1,11 @@
 package app.logdate.feature.editor.ui
 
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.core.data.notes.JournalNotesRepository
-import app.logdate.core.world.LogdateLocationProvider
+import app.logdate.core.world.PlacesProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,12 +18,12 @@ import javax.inject.Inject
 @HiltViewModel
 class NoteCreationViewModel @Inject constructor(
     private val repository: JournalNotesRepository,
-    private val locationProvider: LogdateLocationProvider,
+    private val locationProvider: PlacesProvider,
 ) : ViewModel() {
 
     // TODO: Load recent media
     val uiState: StateFlow<NoteCreationUiState> =
-        locationProvider.observeLocation()
+        locationProvider.observeCurrentPlace()
             .combine(repository.allNotesObserved) { location, notes -> location to notes }
             // TODO: Actually do something with the notes
             .map { (location, notes) ->
@@ -38,13 +39,20 @@ class NoteCreationViewModel @Inject constructor(
             )
 
     fun addNote(newEntryContent: NewEntryContent) {
-        // TODO: Add note to repository
         viewModelScope.launch {
+            repository.create(newEntryContent.toNewTextNote())
+            Log.d("NoteCreationViewModel", "Added note")
             // TODO: Notify on failure
         }
     }
 
     fun addMediaAttachment(uri: Uri) {
 
+    }
+
+    fun refreshLocation() {
+        viewModelScope.launch {
+            locationProvider.refreshCurrentPlace()
+        }
     }
 }

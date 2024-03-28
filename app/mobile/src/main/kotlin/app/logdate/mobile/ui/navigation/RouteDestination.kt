@@ -14,6 +14,7 @@ sealed class RouteDestination(
     data object NewNote : RouteDestination("main/new_note")
 
     data object JournalDetails : RouteDestination("journals")
+    data object NewJournal : RouteDestination("journals/new")
     data object RewindList : RouteDestination("rewind")
     data object RewindDetails : RouteDestination("rewind/$REWIND_ID_ARG")
 

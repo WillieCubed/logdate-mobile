@@ -9,17 +9,30 @@ import javax.inject.Inject
 class InMemoryJournalNotesRepository @Inject constructor(
     private val journalRepository: JournalRepository,
 ) : JournalNotesRepository {
-    private val allItems: MutableStateFlow<List<JournalNote>> = MutableStateFlow(TEST_NOTES)
 
-    override val allNotesObserved: Flow<List<JournalNote>> = allItems
+    private val notes = TEST_NOTES.toMutableList()
+
+    override val allNotesObserved: Flow<List<JournalNote>> = MutableStateFlow(notes)
 
     override fun observeNotesInJournal(journalId: String): Flow<List<JournalNote>> {
         TODO("Not yet implemented")
     }
 
+    override suspend fun create(note: JournalNote) {
+        notes.add(note)
+    }
+
     override suspend fun create(note: String, journalId: String) {
         // TODO: Verify journal exists
         TODO("Not yet implemented")
+    }
+
+    override suspend fun remove(note: JournalNote) {
+        notes.remove(note)
+    }
+
+    override suspend fun removeById(noteId: String) {
+        notes.removeIf { it.uid == noteId }
     }
 
     override suspend fun removeFromJournal(noteId: String, journalId: String) {

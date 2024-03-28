@@ -4,8 +4,10 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import app.logdate.core.database.dao.ImageNoteDao
+import app.logdate.core.database.dao.JournalDao
 import app.logdate.core.database.dao.TextNoteDao
 import app.logdate.core.database.model.ImageNoteEntity
+import app.logdate.core.database.model.JournalEntity
 import app.logdate.core.database.model.TextNoteEntity
 import app.logdate.core.database.util.InstantConverter
 
@@ -16,6 +18,7 @@ import app.logdate.core.database.util.InstantConverter
     entities = [
         TextNoteEntity::class,
         ImageNoteEntity::class,
+        JournalEntity::class,
     ],
     version = 1,
     exportSchema = true,
@@ -24,4 +27,5 @@ import app.logdate.core.database.util.InstantConverter
 abstract class AppDatabase : RoomDatabase() {
     abstract fun textNoteDao(): TextNoteDao
     abstract fun imageNoteDao(): ImageNoteDao
+    abstract fun journalsDao(): JournalDao
 }

@@ -1,11 +1,11 @@
 package app.logdate.core.di
 
-import app.logdate.core.data.DefaultJournalRepository
 import app.logdate.core.data.InMemoryLibraryContentRepository
 import app.logdate.core.data.JournalRepository
 import app.logdate.core.data.LibraryContentRepository
-import app.logdate.core.data.notes.InMemoryJournalNotesRepository
+import app.logdate.core.data.journals.OfflineFirstJournalRepository
 import app.logdate.core.data.notes.JournalNotesRepository
+import app.logdate.core.data.notes.OfflineFirstJournalNotesRepository
 import app.logdate.core.data.rewind.DefaultUserRewindRepository
 import app.logdate.core.data.rewind.RewindRepository
 import app.logdate.core.data.timeline.DefaultTimelineRepository
@@ -23,10 +23,10 @@ internal abstract class DataModule {
     abstract fun bindTimelineRepository(repository: DefaultTimelineRepository): TimelineRepository
 
     @Binds
-    abstract fun bindJournalRepository(repository: DefaultJournalRepository): JournalRepository
+    abstract fun bindJournalRepository(repository: OfflineFirstJournalRepository): JournalRepository
 
     @Binds
-    abstract fun bindJournalNotesRepository(repository: InMemoryJournalNotesRepository): JournalNotesRepository
+    abstract fun bindJournalNotesRepository(repository: OfflineFirstJournalNotesRepository): JournalNotesRepository
 
     @Binds
     abstract fun bindLibraryContentRepository(repository: InMemoryLibraryContentRepository): LibraryContentRepository

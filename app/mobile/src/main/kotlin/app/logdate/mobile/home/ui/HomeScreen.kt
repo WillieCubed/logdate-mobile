@@ -45,6 +45,7 @@ import app.logdate.ui.theme.LogDateTheme
 fun HomeScreen(
     currentDestination: HomeRouteData,
     onUpdateDestination: (HomeRouteData) -> Unit,
+    onNewJournal: () -> Unit,
     onOpenJournal: JournalOpenCallback,
     onCreateEntry: () -> Unit,
     onViewPreviousRewinds: () -> Unit,
@@ -60,6 +61,10 @@ fun HomeScreen(
         when (currentDestination) {
             HomeRouteData.Timeline -> {
                 onCreateEntry()
+            }
+
+            HomeRouteData.Journals -> {
+                onNewJournal()
             }
 
             else -> {
@@ -203,7 +208,8 @@ fun HomeScreenPreview_Phone() {
             onUpdateDestination = { },
             onCreateEntry = { },
             onViewPreviousRewinds = { },
-            onOpenJournal = {},
+            onOpenJournal = { },
+            onNewJournal = { },
         )
     }
 }
@@ -221,6 +227,7 @@ fun HomeScreenPreview_Tablet() {
             shouldShowNavRail = true,
             isLargeDevice = true,
             onOpenJournal = { },
+            onNewJournal = { },
         )
     }
 }

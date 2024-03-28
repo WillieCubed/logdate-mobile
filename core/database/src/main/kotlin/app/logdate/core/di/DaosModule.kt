@@ -10,7 +10,11 @@ import dagger.hilt.components.SingletonComponent
 @InstallIn(SingletonComponent::class)
 internal object DaosModule {
     @Provides
-    fun bindTextNoteDao(database: AppDatabase) = database.textNoteDao()
+    fun provideTextNoteDao(database: AppDatabase) = database.textNoteDao()
+
     @Provides
-    fun bindImageNoteDao(database: AppDatabase) = database.imageNoteDao()
+    fun provideImageNoteDao(database: AppDatabase) = database.imageNoteDao()
+
+    @Provides
+    fun provideJournalDao(database: AppDatabase) = database.journalsDao()
 }
