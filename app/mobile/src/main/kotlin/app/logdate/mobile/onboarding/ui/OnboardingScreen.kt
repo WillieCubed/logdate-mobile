@@ -14,12 +14,18 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
 import app.logdate.ui.theme.Spacing
 
 @Composable
 fun OnboardingScreen(
     onFinish: () -> Unit,
+    viewModel: OnboardingViewModel = hiltViewModel(),
 ) {
+    fun handleFinish() {
+        viewModel.finishOnboarding(onFinish)
+    }
+
     Scaffold { innerPadding ->
         Column(
             modifier = Modifier
@@ -38,7 +44,7 @@ fun OnboardingScreen(
                     style = MaterialTheme.typography.headlineMedium,
                 )
                 ExtendedFloatingActionButton(
-                    onClick = { onFinish() },
+                    onClick = ::handleFinish,
                     text = { Text("Get started") },
                     icon = { Icon(Icons.Outlined.Star, contentDescription = "") },
                 )

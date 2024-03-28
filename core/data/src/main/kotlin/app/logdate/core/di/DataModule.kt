@@ -10,6 +10,8 @@ import app.logdate.core.data.rewind.DefaultUserRewindRepository
 import app.logdate.core.data.rewind.RewindRepository
 import app.logdate.core.data.timeline.DefaultTimelineRepository
 import app.logdate.core.data.timeline.TimelineRepository
+import app.logdate.core.data.user.OfflineFirstUserStateRepository
+import app.logdate.core.data.user.UserStateRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -33,4 +35,7 @@ internal abstract class DataModule {
 
     @Binds
     abstract fun bindRewindRepository(repository: DefaultUserRewindRepository): RewindRepository
+
+    @Binds
+    abstract fun bindUserStateRepository(repository: OfflineFirstUserStateRepository): UserStateRepository
 }

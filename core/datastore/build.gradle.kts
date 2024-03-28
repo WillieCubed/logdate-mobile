@@ -9,6 +9,8 @@ android {
 
 dependencies {
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(project(":core:coroutines"))
 
     // Unit testing
     testImplementation(libs.junit)
