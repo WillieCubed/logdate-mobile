@@ -63,6 +63,7 @@ import kotlinx.datetime.Instant
 fun NewNoteRoute(
     onClose: () -> Unit,
     onNoteSaved: () -> Unit,
+    initialNote: String = "",
     viewModel: NoteCreationViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -76,6 +77,7 @@ fun NewNoteRoute(
         onAddNote = { viewModel.addNote(it, onNoteSaved) },
         currentLocation = success.currentLocation,
         onRefreshLocation = { },
+        initialTextContent = initialNote,
     )
 }
 
@@ -87,9 +89,10 @@ fun NoteCreationScreen(
     onAddNote: (note: NewEntryContent) -> Unit,
     onRefreshLocation: () -> Unit,
     currentLocation: UserPlace? = null,
+    initialTextContent: String = "",
 ) {
     var showDismissDialog by rememberSaveable { mutableStateOf(false) }
-    var noteContent: String by rememberSaveable { mutableStateOf("") }
+    var noteContent: String by rememberSaveable { mutableStateOf(initialTextContent) }
     var currentDate: Instant by remember { mutableStateOf(Clock.System.now()) }
     // TODO: Allow user to change log time (maybe? depending on desired UX)
 

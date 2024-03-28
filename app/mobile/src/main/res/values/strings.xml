@@ -3,4 +3,7 @@
     <string name="action_write_in_journal">Write in journal</string>
     <string name="action_create_journal">Create journal</string>
     <string name="action_add_to_library">Add to library</string>
+    <string name="shortcut_label_new_note_short">New note</string>
+    <string name="shortcut_label_new_note_long">Create a new note</string>
+    <string name="shortcut_label_new_note_disabled">Can\'t create new note</string>
 </resources>

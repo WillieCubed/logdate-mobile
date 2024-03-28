@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/note_stack_add"
+        android:shortcutDisabledMessage="@string/shortcut_label_new_note_disabled"
+        android:shortcutId="new_note"
+        android:shortcutLongLabel="@string/shortcut_label_new_note_long"
+        android:shortcutShortLabel="@string/shortcut_label_new_note_short">
+        <intent
+            android:action="android.intent.action.SEND"
+            android:targetClass="app.logdate.mobile.MainActivity"
+            android:targetPackage="app.logdate.mobile" />
+        <capability-binding android:key="actions.intent.CREATE_THING" />
+        <capability-binding android:key="actions.intent.CREATE_DIGITAL_DOCUMENT" />
+    </shortcut>
+</shortcuts>

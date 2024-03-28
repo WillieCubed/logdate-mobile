@@ -1,11 +1,13 @@
 package app.logdate.feature.editor.navigation
 
+import android.content.Intent
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
 import androidx.navigation.compose.composable
+import androidx.navigation.navDeepLink
 import app.logdate.feature.editor.ui.NewNoteRoute
 
 const val ROUTE_NEW_NOTE = "main/new_note"
@@ -33,8 +35,25 @@ fun NavGraphBuilder.noteCreationRoute(
                 animationSpec = tween(200),
             )
         },
-        // TODO: Support deep link with prefilled content
-    ) {
-        NewNoteRoute(onClose = onClose, onNoteSaved = onNoteSaved)
+        deepLinks = listOf(
+            navDeepLink {
+                action = Intent.ACTION_SEND
+                mimeType = "text/*"
+            },
+            navDeepLink {
+                action = Intent.ACTION_SEND
+                mimeType = "image/*"
+            },
+            navDeepLink {
+                action = Intent.ACTION_SEND_MULTIPLE
+                mimeType = "image/*"
+            },
+        ),
+    ) { backStackEntry ->
+        NewNoteRoute(
+            onClose = onClose,
+            onNoteSaved = onNoteSaved,
+            initialNote = backStackEntry.arguments?.getString(Intent.EXTRA_TEXT) ?: "",
+        )
     }
 }
