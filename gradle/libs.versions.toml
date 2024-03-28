@@ -70,8 +70,9 @@ kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-t
 kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutines" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
 androidx-material3-window-sizeclass-android = { group = "androidx.compose.material3", name = "material3-window-size-class-android", version.ref = "material3WindowSizeClassAndroid" }
+androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "roomKtx" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "roomKtx" }
-play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+androidx-room-testing = { group = "androidx.room", name = "room-testing", version.ref = "roomKtx" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
