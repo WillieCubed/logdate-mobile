@@ -60,7 +60,6 @@ internal fun RewindScreen(
                 }
 
                 is RewindUiState.Loaded -> {
-
                     val titleText = getRewindFlavorText(state.ready)
                     val textStyle = if (state.ready) {
                         MaterialTheme.typography.headlineLarge
@@ -106,6 +105,16 @@ fun RewindScreenPreview() {
                 issueDate = Clock.System.now(),
             ),
         ),
+        onViewPreviousRewinds = { },
+        onOpenRewind = { },
+    )
+}
+
+@Preview
+@Composable
+fun RewindScreenPreview_Loading() {
+    RewindScreen(
+        state = RewindUiState.Loading,
         onViewPreviousRewinds = { },
         onOpenRewind = { },
     )
