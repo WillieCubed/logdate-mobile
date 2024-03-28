@@ -5,4 +5,7 @@
     <string name="action_note_create_discard_confirmation_description">Are you sure you want to discard your changes?</string>
     <string name="action_note_create_discard_confirmation_title">Discard changes?</string>
     <string name="text_placeholder_start_writing">Start writing...</string>
+    <string name="new_note_action_finish">Finish</string>
+    <string name="text_placeholder_location">Unknown location</string>
+    <string name="location_chip_content_description">Current location</string>
 </resources>

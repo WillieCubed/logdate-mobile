@@ -5,6 +5,7 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.daysUntil
 import kotlinx.datetime.format
 import kotlinx.datetime.format.MonthNames
 import kotlinx.datetime.format.Padding
@@ -15,6 +16,20 @@ import java.time.ZoneId
 import java.time.temporal.WeekFields
 import java.util.Locale
 
+fun LocalDateTime.toReadableDateShort(): String = format(LocalDateTime.Format {
+    monthName(MonthNames.ENGLISH_FULL)
+    char(' ')
+    dayOfMonth(Padding.SPACE)
+    if (year != Clock.System.now()
+            .toLocalDateTime(TimeZone.currentSystemDefault()).year
+    ) {
+        // TODO: Add support for multiple locales
+        char(',')
+        char(' ')
+        year()
+    }
+})
+
 /**
  * Converts an [Instant] into a short readable form
  *
@@ -22,17 +37,7 @@ import java.util.Locale
  */
 fun Instant.toReadableDateShort(): String {
     val localDatetime = toLocalDateTime(TimeZone.currentSystemDefault())
-    return localDatetime
-        .format(LocalDateTime.Format {
-            monthName(MonthNames.ENGLISH_FULL)
-            char(' ')
-            dayOfMonth(Padding.SPACE)
-            if (localDatetime.year != Clock.System.now()
-                    .toLocalDateTime(TimeZone.currentSystemDefault()).year
-            ) {
-                year()
-            }
-        })
+    return localDatetime.toReadableDateShort()
 }
 
 val Instant.localTime: String
@@ -71,3 +76,22 @@ val Instant.weekOfYear: Int
     get() {
         return toLocalDateTime(TimeZone.currentSystemDefault()).weekOfYear
     }
+
+/**
+ * Returns the number of calendar days between this [Instant] and the current time.
+ */
+val Instant.daysUntilNow: Int
+    get() {
+        return this.daysUntil(Clock.System.now(), TimeZone.currentSystemDefault())
+    }
+
+/**
+ * Returns the number of weeks between this [Instant] and the current time.
+ *
+ * Rounds down to the nearest week.
+ */
+fun Instant.weeksAgo(): Int {
+    val now = Clock.System.now()
+    val days = (now.epochSeconds - this.epochSeconds) / (60 * 60 * 24)
+    return (days / 7).toInt()
+}

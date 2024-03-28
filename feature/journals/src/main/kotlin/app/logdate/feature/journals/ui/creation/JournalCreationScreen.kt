@@ -1,4 +1,4 @@
-package app.logdate.feature.journals.ui
+package app.logdate.feature.journals.ui.creation
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

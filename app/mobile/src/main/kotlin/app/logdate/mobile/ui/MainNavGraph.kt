@@ -3,11 +3,11 @@ package app.logdate.mobile.ui
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
+import app.logdate.feature.editor.navigation.noteCreationRoute
 import app.logdate.feature.journals.navigation.journalsRoute
 import app.logdate.feature.journals.ui.JournalOpenCallback
 import app.logdate.mobile.home.ui.HomeRoute
 import app.logdate.mobile.ui.common.MainAppState
-import app.logdate.mobile.ui.common.noteCreationRoute
 import app.logdate.mobile.ui.navigation.RouteDestination
 import app.logdate.mobile.ui.navigation.rewindRoute
 
@@ -23,6 +23,7 @@ fun NavGraphBuilder.mainNavGraph(
     onOpenJournal: JournalOpenCallback,
     onJournalCreated: (String) -> Unit,
     onJournalDeleted: () -> Unit,
+    onNoteSaved: () -> Unit,
     onNavigateBack: () -> Unit,
 ) {
     navigation(
@@ -42,6 +43,7 @@ fun NavGraphBuilder.mainNavGraph(
             onClose = {
                 onNavigateBack()
             },
+            onNoteSaved = onNoteSaved,
         )
         rewindRoute(
             onGoBack = {

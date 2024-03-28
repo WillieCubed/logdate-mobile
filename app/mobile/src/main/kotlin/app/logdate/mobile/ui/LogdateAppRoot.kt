@@ -4,12 +4,12 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
+import app.logdate.feature.editor.navigation.navigateToNoteCreation
 import app.logdate.feature.journals.navigation.navigateFromNew
 import app.logdate.feature.journals.navigation.navigateToJournal
 import app.logdate.mobile.onboarding.onboardingNavGraph
 import app.logdate.mobile.settings.ui.settingsGraph
 import app.logdate.mobile.ui.common.MainAppState
-import app.logdate.mobile.ui.common.navigateToNoteCreation
 import app.logdate.mobile.ui.navigation.RouteDestination
 import app.logdate.mobile.ui.navigation.navigateToRewindList
 
@@ -71,7 +71,12 @@ fun LogdateAppRoot(
                 navController.navigate(RouteDestination.Home.route) {
                     popUpTo(RouteDestination.Base.route) { inclusive = true }
                 }
-            }
+            },
+            onNoteSaved = {
+                navController.navigate(RouteDestination.Home.route) {
+                    popUpTo(RouteDestination.Base.route) { inclusive = true }
+                }
+            },
         )
         settingsGraph()
     }

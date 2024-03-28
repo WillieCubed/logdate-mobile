@@ -1,6 +1,5 @@
 package app.logdate.feature.editor.ui
 
-import android.location.Location
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -9,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.Close
@@ -42,11 +43,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import app.logdate.feature.editor.R
+import app.logdate.model.UserPlace
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.localTime
@@ -54,10 +59,10 @@ import app.logdate.util.toReadableDateShort
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 
-
 @Composable
 fun NewNoteRoute(
     onClose: () -> Unit,
+    onNoteSaved: () -> Unit,
     viewModel: NoteCreationViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -67,9 +72,10 @@ fun NewNoteRoute(
     }
     val success = state as NoteCreationUiState.Success
     NoteCreationScreen(
-        onClose = { onClose() },
-        onAddNote = viewModel::addNote,
+        onClose = onClose,
+        onAddNote = { viewModel.addNote(it, onNoteSaved) },
         currentLocation = success.currentLocation,
+        onRefreshLocation = { },
     )
 }
 
@@ -77,18 +83,15 @@ fun NewNoteRoute(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NoteCreationScreen(
-    currentLocation: Location, // TODO: Use domain-layer location
     onClose: () -> Unit,
     onAddNote: (note: NewEntryContent) -> Unit,
+    onRefreshLocation: () -> Unit,
+    currentLocation: UserPlace? = null,
 ) {
     var showDismissDialog by rememberSaveable { mutableStateOf(false) }
     var noteContent: String by rememberSaveable { mutableStateOf("") }
     var currentDate: Instant by remember { mutableStateOf(Clock.System.now()) }
     // TODO: Allow user to change log time (maybe? depending on desired UX)
-
-    val noteData: NewEntryContent by remember {
-        mutableStateOf(NewEntryContent())
-    }
 
     fun handleRecordVideo() {
 
@@ -103,7 +106,8 @@ fun NoteCreationScreen(
     }
 
     fun handleAddNote() {
-        onAddNote(noteData)
+        // TODO: Add user location
+        onAddNote(NewEntryContent(noteContent))
     }
 
     val canExitCleanly = noteContent.isEmpty()
@@ -115,6 +119,8 @@ fun NoteCreationScreen(
             showDismissDialog = true
         }
     }
+
+    val allowCreation = noteContent.isNotEmpty()
 
     BackHandler(enabled = !canExitCleanly) {
         showDismissDialog = true
@@ -144,12 +150,11 @@ fun NoteCreationScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
             Column {
-
                 WritingEntryBlock(
                     creationTime = currentDate,
                     entryContents = noteContent,
                     onNoteUpdate = { noteContent = it },
-                    location = currentLocation.toString(),
+                    location = currentLocation,
                     modifier = Modifier,
                 )
                 LazyVerticalGrid(
@@ -191,7 +196,7 @@ fun NoteCreationScreen(
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                             ) {
-                                Icon(Icons.Default.Mic, contentDescription = "")
+                                Icon(Icons.Default.Mic, contentDescription = null)
                                 Text("New voice note")
                             }
                         }
@@ -200,13 +205,14 @@ fun NoteCreationScreen(
 
             }
             Button(
+                enabled = allowCreation,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.lg),
                 shape = MaterialTheme.shapes.small,
                 onClick = ::handleAddNote,
             ) {
-                Text("Finish")
+                Text(stringResource(R.string.new_note_action_finish))
             }
         }
     }
@@ -237,24 +243,27 @@ internal fun SheetDismissDialog(
     )
 }
 
-@Preview()
+@Preview
 @Composable
 private fun NewNoteRoutePreview() {
     LogDateTheme {
-        NewNoteRoute(onClose = {})
+        NewNoteRoute(onClose = {}, onNoteSaved = { })
     }
 }
 
 @Composable
 fun WritingEntryBlock(
     creationTime: Instant,
-    location: String,
+    location: UserPlace?,
     entryContents: String,
     onNoteUpdate: (newContent: String) -> Unit,
     modifier: Modifier = Modifier,
+    onLocationClick: () -> Unit = {},
 ) {
-    val lineColor = MaterialTheme.colorScheme.onSurfaceVariant
     val expanded by rememberSaveable { mutableStateOf(false) }
+    val lineColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val locationText =
+        location?.metadata?.name ?: stringResource(R.string.text_placeholder_location)
     Column(
         modifier.padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -271,6 +280,9 @@ fun WritingEntryBlock(
                 drawCircle(lineColor, center = center, radius = size.width / 2f)
             }
             Text(creationTime.localTime, style = MaterialTheme.typography.titleMedium)
+
+            Spacer(modifier = Modifier.weight(1f))
+            LocationChip(location = locationText, onClick = onLocationClick)
         }
         EditorField(
             expanded = expanded,
@@ -278,7 +290,6 @@ fun WritingEntryBlock(
             onNoteUpdate = onNoteUpdate,
             placeholder = stringResource(R.string.text_placeholder_start_writing)
         )
-        LocationChip(location = location)
     }
 }
 
@@ -306,7 +317,14 @@ fun EditorField(
                 .imePadding(),
             value = contents,
             onValueChange = onNoteUpdate,
-            textStyle = MaterialTheme.typography.bodyLarge,
+            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                color = MaterialTheme.colorScheme.onSurface,
+                lineBreak = LineBreak.Paragraph,
+            ),
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Sentences,
+            ),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurfaceVariant),
         )
         if (contents.isEmpty()) {
             Text(

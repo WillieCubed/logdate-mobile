@@ -1,7 +1,6 @@
 package app.logdate.core.database.dao
 
 import androidx.room.Dao
-import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -13,32 +12,38 @@ import kotlinx.coroutines.flow.Flow
 interface ImageNoteDao {
 
     /**
-     * Retrieves an observable [TextNoteEntity] by the given ID.
+     * Retrieves an observable [ImageNoteEntity] by the given ID.
      */
-    @Query("SELECT * FROM text_notes WHERE uid = :uid")
+    @Query("SELECT * FROM image_notes WHERE uid = :uid")
     fun getNote(uid: Int): Flow<ImageNoteEntity>
 
     /**
-     * Fetches a non-observable [TextNoteEntity] by its ID.
+     * Fetches a non-observable [ImageNoteEntity] by its ID.
      */
-    @Query("SELECT * FROM text_notes WHERE uid = :uid")
+    @Query("SELECT * FROM image_notes WHERE uid = :uid")
     fun getNoteOneOff(uid: Int): ImageNoteEntity
 
     /**
      * Returns a flow of all [TextNoteEntity]s.
      */
-    @Query("SELECT * FROM text_notes")
+    @Query("SELECT * FROM image_notes")
     fun getAllNotes(): Flow<List<ImageNoteEntity>>
 
     /**
      * Inserts a [note] into the DB if it doesn't exist, and ignores it if it does.
      */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    fun addNote(note: ImageNoteEntity)
+    suspend fun addNote(note: ImageNoteEntity)
 
     /**
      * Removes the given note from the DB.
      */
-    @Delete
-    fun removeNote(noteIds: List<Int>)
+    @Query("DELETE FROM text_notes WHERE uid = :noteId")
+    suspend fun removeNote(noteId: Int)
+
+    /**
+     * Removes the given note from the DB.
+     */
+    @Query("DELETE FROM text_notes WHERE uid IN (:noteIds)")
+    suspend fun removeNote(noteIds: List<Int>)
 }

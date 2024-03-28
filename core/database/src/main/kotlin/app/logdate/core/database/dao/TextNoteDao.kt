@@ -1,7 +1,6 @@
 package app.logdate.core.database.dao
 
 import androidx.room.Dao
-import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -33,11 +32,17 @@ interface TextNoteDao {
      * Inserts the [note] into the DB if it doesn't already exist and ignores it if it does.
      */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    fun addNote(note: TextNoteEntity)
+    suspend fun addNote(note: TextNoteEntity)
 
     /**
      * Removes the given note from the DB.
      */
-    @Delete
-    fun removeNote(noteIds: List<Int>)
+    @Query("DELETE FROM text_notes WHERE uid = :noteId")
+    suspend fun removeNote(noteId: Int)
+
+    /**
+     * Removes the given notes from the DB.
+     */
+    @Query("DELETE FROM text_notes WHERE uid IN (:noteIds)")
+    suspend fun removeNote(noteIds: List<Int>)
 }

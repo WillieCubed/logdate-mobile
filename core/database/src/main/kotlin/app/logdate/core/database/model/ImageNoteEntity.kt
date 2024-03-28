@@ -1,6 +1,7 @@
 package app.logdate.core.database.model
 
 import androidx.room.Entity
+import androidx.room.PrimaryKey
 import kotlinx.datetime.Instant
 
 @Entity(
@@ -8,7 +9,8 @@ import kotlinx.datetime.Instant
 )
 data class ImageNoteEntity(
     val contentUri: String,
+    @PrimaryKey(autoGenerate = true)
     override val uid: Int,
     override val lastUpdated: Instant,
     override val created: Instant,
-) : GenericNote()
+) : GenericNoteData()

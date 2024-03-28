@@ -1,4 +1,4 @@
-package app.logdate.feature.journals.ui
+package app.logdate.feature.journals.ui.detail
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel

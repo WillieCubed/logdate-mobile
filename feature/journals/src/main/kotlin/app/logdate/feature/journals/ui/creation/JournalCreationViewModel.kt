@@ -1,4 +1,4 @@
-package app.logdate.feature.journals.ui
+package app.logdate.feature.journals.ui.creation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

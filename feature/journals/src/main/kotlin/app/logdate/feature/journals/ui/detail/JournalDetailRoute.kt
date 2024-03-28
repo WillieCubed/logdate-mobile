@@ -1,4 +1,4 @@
-package app.logdate.feature.journals.ui
+package app.logdate.feature.journals.ui.detail
 
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize

@@ -13,8 +13,9 @@ dependencies {
     implementation(project(":core:ui"))
     implementation(project(":core:model"))
     implementation(project(":core:util"))
+    implementation(project(":core:world"))
 
     // Compose in logdate.compose build logic
+    implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.hilt.navigation.compose)
-    implementation(project(":core:world"))
 }

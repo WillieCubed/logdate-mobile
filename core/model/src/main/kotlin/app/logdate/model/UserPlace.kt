@@ -22,7 +22,6 @@ data class PlaceMetadata(
      */
     val name: String,
     val description: String,
-    val location: UserPlace,
     val address: String,
     val city: String,
     val country: String,

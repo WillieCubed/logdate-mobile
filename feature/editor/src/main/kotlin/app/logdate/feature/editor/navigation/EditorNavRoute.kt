@@ -1,4 +1,4 @@
-package app.logdate.mobile.ui.common
+package app.logdate.feature.editor.navigation
 
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
@@ -7,21 +7,20 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
 import androidx.navigation.compose.composable
 import app.logdate.feature.editor.ui.NewNoteRoute
-import app.logdate.mobile.ui.navigation.RouteDestination
 
+const val ROUTE_NEW_NOTE = "main/new_note"
 
 fun NavController.navigateToNoteCreation(navOptions: NavOptions) =
-    navigate(RouteDestination.NewNote.route, navOptions)
+    navigate(ROUTE_NEW_NOTE, navOptions)
 
-fun NavController.navigateToNoteCreation() = navigate(
-    RouteDestination.NewNote.route,
-)
+fun NavController.navigateToNoteCreation() = navigate(ROUTE_NEW_NOTE)
 
 fun NavGraphBuilder.noteCreationRoute(
     onClose: () -> Unit,
+    onNoteSaved: () -> Unit,
 ) {
     composable(
-        route = RouteDestination.NewNote.route,
+        route = ROUTE_NEW_NOTE,
         enterTransition = {
             slideIntoContainer(
                 AnimatedContentTransitionScope.SlideDirection.Up,
@@ -36,6 +35,6 @@ fun NavGraphBuilder.noteCreationRoute(
         },
         // TODO: Support deep link with prefilled content
     ) {
-        NewNoteRoute(onClose = onClose)
+        NewNoteRoute(onClose = onClose, onNoteSaved = onNoteSaved)
     }
 }

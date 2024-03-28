@@ -1,4 +1,4 @@
-package app.logdate.feature.journals.ui
+package app.logdate.feature.journals.ui.detail
 
 sealed interface JournalDetailUiState {
     data object Loading : JournalDetailUiState
