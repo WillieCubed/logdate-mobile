@@ -1,5 +1,10 @@
 package app.logdate.feature.journals.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -28,10 +33,14 @@ internal fun JournalsScreen(
     onOpenJournal: JournalOpenCallback,
     modifier: Modifier = Modifier
 ) {
-    when (state) {
-        JournalsUiState.Loading -> JournalListPlaceholder()
-        is JournalsUiState.Success -> {
-            if (state.journals.isEmpty()) {
+    Box {
+        JournalListPlaceholder(isVisible = state is JournalsUiState.Loading)
+        AnimatedVisibility(
+            visible = state is JournalsUiState.Success,
+            enter = fadeIn(animationSpec = tween(200)),
+            exit = fadeOut(animationSpec = tween(200)),
+        ) {
+            if ((state as JournalsUiState.Success).journals.isEmpty()) {
                 NoJournalsScreen()
             } else {
                 JournalList(state.journals, onOpenJournal, modifier)
