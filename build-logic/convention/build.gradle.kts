@@ -28,6 +28,7 @@ java {
 dependencies {
     compileOnly(libs.android.tools.build.gradle.plugin)
     compileOnly(libs.kotlin.gradle.plugin)
+    compileOnly(libs.firebase.perf.plugin)
 }
 
 gradlePlugin {

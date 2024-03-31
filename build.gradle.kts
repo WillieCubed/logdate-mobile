@@ -21,4 +21,7 @@ plugins {
     alias(libs.plugins.logdate.jvm.library) apply false
     alias(libs.plugins.logdate.compose) apply false
     alias(libs.plugins.logdate.dynamic) apply false
+    alias(libs.plugins.firebase.crashlytics) apply false
+    alias(libs.plugins.firebase.perf) apply false
+    alias(libs.plugins.google.gms) apply false
 }
