@@ -8,6 +8,8 @@ interface JournalNotesRepository {
 
     fun observeNotesInJournal(journalId: String): Flow<List<JournalNote>>
 
+    fun observeNotesInRange(start: Instant, end: Instant): Flow<List<JournalNote>>
+
     /**
      * Creates a new note.
      */

@@ -4,6 +4,7 @@ import app.logdate.core.data.JournalRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import javax.inject.Inject
 
 class InMemoryJournalNotesRepository @Inject constructor(
@@ -15,6 +16,10 @@ class InMemoryJournalNotesRepository @Inject constructor(
     override val allNotesObserved: Flow<List<JournalNote>> = MutableStateFlow(notes)
 
     override fun observeNotesInJournal(journalId: String): Flow<List<JournalNote>> {
+        TODO("Not yet implemented")
+    }
+
+    override fun observeNotesInRange(start: Instant, end: Instant): Flow<List<JournalNote>> {
         TODO("Not yet implemented")
     }
 

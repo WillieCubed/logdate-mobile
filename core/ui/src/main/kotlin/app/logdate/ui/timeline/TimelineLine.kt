@@ -1,8 +1,7 @@
-package app.logdate.feature.timeline.ui
+package app.logdate.ui.timeline
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -11,25 +10,30 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
-val DOT_SIZE = 16.dp
+private val DOT_SIZE = 16.dp
 
 @Composable
-internal fun TimelineLine(
+fun TimelineLine(
     modifier: Modifier = Modifier,
     showLine: Boolean = true,
 ) {
     val color = MaterialTheme.colorScheme.primary
     Canvas(
         modifier = modifier
-            .fillMaxHeight()
             .width(DOT_SIZE)
-            .heightIn(min = DOT_SIZE)
+            .fillMaxHeight()
     ) {
-        drawCircle(color, radius = size.width / 2)
+        val halfWidth = size.width / 2
+        drawCircle(
+            center = Offset(x = halfWidth, y = halfWidth),
+            color = color,
+            radius = halfWidth,
+        )
         if (showLine) {
             drawLine(
-                start = Offset(x = (DOT_SIZE / 2).toPx(), y = 0f),
-                end = Offset(x = (DOT_SIZE / 2).toPx(), y = size.height),
+                start = Offset(x = halfWidth, y = (DOT_SIZE + 8.dp).toPx()),
+                // TODO: Fix this obvious hack of a solution and fix measured height
+                end = Offset(x = halfWidth, y = size.height),
                 strokeWidth = 2.dp.toPx(),
                 color = color,
             )
@@ -39,6 +43,6 @@ internal fun TimelineLine(
 
 @Preview
 @Composable
-fun TimelineLinePreview() {
+private fun TimelineLinePreview() {
     TimelineLine()
 }

@@ -11,8 +11,11 @@ import kotlinx.datetime.format.MonthNames
 import kotlinx.datetime.format.Padding
 import kotlinx.datetime.format.char
 import kotlinx.datetime.toJavaInstant
+import kotlinx.datetime.toJavaLocalDateTime
 import kotlinx.datetime.toLocalDateTime
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.time.temporal.WeekFields
 import java.util.Locale
 
@@ -20,9 +23,7 @@ fun LocalDateTime.toReadableDateShort(): String = format(LocalDateTime.Format {
     monthName(MonthNames.ENGLISH_FULL)
     char(' ')
     dayOfMonth(Padding.SPACE)
-    if (year != Clock.System.now()
-            .toLocalDateTime(TimeZone.currentSystemDefault()).year
-    ) {
+    if (year != Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).year) {
         // TODO: Add support for multiple locales
         char(',')
         char(' ')
@@ -95,3 +96,9 @@ fun Instant.weeksAgo(): Int {
     val days = (now.epochSeconds - this.epochSeconds) / (60 * 60 * 24)
     return (days / 7).toInt()
 }
+
+val Instant.asTime: String
+    get() = toLocalDateTime(TimeZone.currentSystemDefault())
+        .toJavaLocalDateTime()
+        .toLocalTime()
+        .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT))

@@ -7,6 +7,8 @@ import app.logdate.core.database.dao.ImageNoteDao
 import app.logdate.core.database.dao.TextNoteDao
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filter
+import kotlinx.datetime.Instant
 import javax.inject.Inject
 
 class OfflineFirstJournalNotesRepository @Inject constructor(
@@ -15,13 +17,23 @@ class OfflineFirstJournalNotesRepository @Inject constructor(
     private val journalRepository: JournalRepository,
 ) : JournalNotesRepository {
 
-    override val allNotesObserved: Flow<List<JournalNote>> = textNoteDao.getAllNotes()
-        .combine(imageNoteDao.getAllNotes()) { textNotes, imageNotes ->
+    override val allNotesObserved: Flow<List<JournalNote>> =
+        textNoteDao.getAllNotes().combine(imageNoteDao.getAllNotes()) { textNotes, imageNotes ->
             textNotes.map { it.toModel() } + imageNotes.map { it.toModel() }
         }
 
     override fun observeNotesInJournal(journalId: String): Flow<List<JournalNote>> {
-        TODO("Need to create a new DAO method to get notes by journal ID.")
+        return journalRepository.observeJournalById(journalId)
+            .combine(allNotesObserved) { _, notes ->
+                notes.filter { it.uid == journalId }
+            }
+        // TODO: Handle journal not found
+    }
+
+    override fun observeNotesInRange(start: Instant, end: Instant): Flow<List<JournalNote>> {
+        return allNotesObserved.filter {
+            it.any { note -> note.creationTimestamp in start..end }
+        }
     }
 
     override suspend fun create(note: JournalNote) {

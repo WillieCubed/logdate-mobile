@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -32,16 +33,23 @@ fun LocationChip(
             .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.tertiaryContainer)
             .border(2.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.large)
-            .clickable(enabled = enabled, onClick = onClick)
+            .clickable(onClick = onClick)
             .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
+        val icon = if (enabled) {
+            Icons.Default.LocationOn
+        } else {
+            Icons.Default.LocationOff
+        }
         Icon(
-            imageVector = Icons.Default.LocationOn,
+            imageVector = icon,
             contentDescription = stringResource(R.string.location_chip_content_description),
             modifier = Modifier.size(20.dp),
         )
-        Text(location, style = MaterialTheme.typography.labelSmall)
+        if (enabled) {
+            Text(location, style = MaterialTheme.typography.labelSmall)
+        }
     }
 }

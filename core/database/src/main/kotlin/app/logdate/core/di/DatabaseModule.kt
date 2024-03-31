@@ -1,7 +1,6 @@
 package app.logdate.core.di
 
 import android.content.Context
-import androidx.room.Room
 import app.logdate.core.database.AppDatabase
 import dagger.Module
 import dagger.Provides
@@ -20,11 +19,5 @@ internal object DatabaseModule {
     @Provides
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
-        Room.databaseBuilder(
-            context,
-            AppDatabase::class.java,
-            "logdate",
-        )
-            .fallbackToDestructiveMigration()
-            .build()
+        AppDatabase.buildDatabase(context)
 }

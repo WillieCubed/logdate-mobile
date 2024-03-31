@@ -21,6 +21,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.timeline.R
 import app.logdate.ui.theme.Spacing
+import app.logdate.ui.timeline.TimelineLine
 import app.logdate.util.daysUntilNow
 import app.logdate.util.toReadableDateShort
 import kotlinx.datetime.Instant

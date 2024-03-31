@@ -4,7 +4,10 @@ import app.logdate.model.UserPlace
 import kotlinx.coroutines.flow.Flow
 
 interface PlacesProvider {
-    fun observeCurrentPlace(): Flow<UserPlace>
+    /**
+     * Observing the current place will refresh by default.
+     */
+    fun observeCurrentPlace(refresh: Boolean = true): Flow<UserPlace>
 
     /**
      * Manually refreshes the current place.
@@ -18,19 +21,19 @@ interface PlacesProvider {
      *
      * Ranked in decreasing order of confidence.
      */
-    fun resolvePlace(latitude: Double, longitude: Double): List<UserPlaceResult>
+    suspend fun resolvePlace(latitude: Double, longitude: Double): List<UserPlaceResult>
 
     /**
      * Returns a list of places that are near the given place.
      *
      * Ranked in decreasing order of confidence.
      */
-    fun getNearbyPlaces(place: UserPlace): List<UserPlaceResult>
+    suspend fun getNearbyPlaces(place: UserPlace): List<UserPlaceResult>
 
     /**
      * Returns a list of places near the given coordinates.
      *
      * Ranked in decreasing order of confidence.
      */
-    fun getNearbyPlaces(latitude: Double, longitude: Double): List<UserPlaceResult>
+    suspend fun getNearbyPlaces(latitude: Double, longitude: Double): List<UserPlaceResult>
 }

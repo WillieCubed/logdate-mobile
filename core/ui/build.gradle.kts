@@ -9,7 +9,9 @@ android {
 }
 
 dependencies {
+    implementation(libs.kotlinx.datetime)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.ui.tooling.preview)
+    implementation(project(":core:util"))
 }

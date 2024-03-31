@@ -1,64 +1,69 @@
 package app.logdate.feature.editor.ui
 
+import android.Manifest
 import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
+import app.logdate.core.data.notes.JournalNote
 import app.logdate.feature.editor.R
 import app.logdate.model.UserPlace
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.localTime
 import app.logdate.util.toReadableDateShort
+import coil.compose.AsyncImage
+import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import java.io.File
 
 @Composable
 fun NewNoteRoute(
@@ -67,44 +72,88 @@ fun NewNoteRoute(
     viewModel: NoteCreationViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
-    // TODO: Load state components in parallel
-    if (state !is NoteCreationUiState.Success) {
-        return
-    }
-    with(state as NoteCreationUiState.Success) {
+    with(state) {
         NoteCreationScreen(
             onClose = onClose,
+            previousEntries = recentNotes,
             onAddNote = { viewModel.addNote(it, onNoteSaved) },
-            currentLocation = currentLocation,
-            onRefreshLocation = { },
+            currentLocation = if (locationUiState is LocationUiState.Enabled) {
+                locationUiState.currentPlace
+            } else {
+                null
+            },
+            onRefreshLocation = viewModel::refreshLocation,
             initialTextContent = initialContent?.text ?: "",
             initialAttachments = initialContent?.media ?: emptyList(),
+            onLocationPermissionResult = viewModel::handleLocationPermissionResult,
+            userMessage = userMessage,
         )
     }
 }
 
-// TODO: Probably move this to a feature module
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NoteCreationScreen(
     onClose: () -> Unit,
+    previousEntries: List<JournalNote>,
     onAddNote: (note: NewEntryContent) -> Unit,
     onRefreshLocation: () -> Unit,
+    onLocationPermissionResult: (granted: Boolean) -> Unit,
     currentLocation: UserPlace? = null,
     initialTextContent: String = "",
     initialAttachments: List<Uri> = emptyList(),
+    userMessage: UserMessage? = null,
 ) {
     var showDismissDialog by rememberSaveable { mutableStateOf(false) }
     var noteContent: String by rememberSaveable { mutableStateOf(initialTextContent) }
-    var currentDate: Instant by remember { mutableStateOf(Clock.System.now()) }
-    // TODO: Allow user to change log time (maybe? depending on desired UX)
+    var creationTimestamp: Instant by remember { mutableStateOf(Clock.System.now()) }
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val cacheDir = LocalContext.current.cacheDir
+    val tempFile = File.createTempFile("logdate_last_photo_", ".jpg", cacheDir).toUri()
+    var lastPhoto by rememberSaveable { mutableStateOf<Uri?>(null) }
+    val cameraLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { successful ->
+            if (successful) {
+                Log.d("NewNoteRoute", "Photo taken: $tempFile")
+                lastPhoto = tempFile
+            }
+        }
+    val locationPermissionRequester =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            when {
+                permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) -> {
+                    onLocationPermissionResult(true)
+                }
+
+                permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false) -> {
+                    // Only approximate location access granted.
+                    onLocationPermissionResult(true)
+                }
+
+                else -> {
+                    // No location access granted.
+                    onLocationPermissionResult(false)
+                }
+            }
+        }
+    val scrollableContainerState = rememberLazyListState()
+
+    fun ensureLocationPermission() {
+        locationPermissionRequester.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+            )
+        )
+    }
 
     fun handleRecordVideo() {
 
     }
 
     fun handleTakePhoto() {
-
+        cameraLauncher.launch(tempFile)
     }
 
     fun handleRecordVoiceNote() {
@@ -113,7 +162,7 @@ fun NoteCreationScreen(
 
     fun handleAddNote() {
         // TODO: Add user location
-        onAddNote(NewEntryContent(noteContent))
+        onAddNote(NewEntryContent(noteContent, creationTimestamp = creationTimestamp))
     }
 
     val canExitCleanly = noteContent.isEmpty()
@@ -126,7 +175,33 @@ fun NoteCreationScreen(
         }
     }
 
+    fun refreshTimestamp() {
+        creationTimestamp = Clock.System.now()
+    }
+
     val allowCreation = noteContent.isNotEmpty()
+
+    LaunchedEffect(userMessage) {
+        if (userMessage == null) return@LaunchedEffect
+        scope.launch {
+            val actionResult = snackbarHostState.showSnackbar(
+                message = userMessage.text,
+                actionLabel = userMessage.actionLabel,
+                duration = SnackbarDuration.Short,
+                withDismissAction = false,
+            )
+            if (actionResult == SnackbarResult.ActionPerformed) {
+                ensureLocationPermission()
+            }
+        }
+    }
+
+    LaunchedEffect(
+        currentLocation,
+    ) {
+        // TODO: Only request on click
+        ensureLocationPermission() // Check for permission on start
+    }
 
     BackHandler(enabled = !canExitCleanly) {
         showDismissDialog = true
@@ -141,112 +216,144 @@ fun NoteCreationScreen(
             },
         )
     }
-    Scaffold(modifier = Modifier.padding(bottom = Spacing.lg), topBar = {
-        TopAppBar(
-            title = { Text(currentDate.toReadableDateShort()) },
-            navigationIcon = {
-                IconButton(onClick = { closeScreen() }) {
-                    Icon(Icons.Default.Close, contentDescription = "Close")
-                }
-            },
-        )
-    }) { paddingValues ->
-        Column(
-            Modifier.padding(paddingValues),
+    Scaffold(
+        modifier = Modifier.padding(bottom = Spacing.lg),
+        topBar = {
+            TopAppBar(
+                title = { Text(creationTimestamp.toReadableDateShort()) },
+                navigationIcon = {
+                    IconButton(onClick = { closeScreen() }) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
+                },
+            )
+        },
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
+        },
+    ) { paddingValues ->
+        LazyColumn(
+            state = scrollableContainerState,
+            contentPadding = paddingValues,
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
-            Column {
+//            items(previousEntries, JournalNote::uid) { entry ->
+//                NewTimelineItem(
+//                    metadata = {},
+//                    expandedView = {},
+//                    summaryView = {
+//                        when (entry) {
+//                            is JournalNote.Text -> {
+//                                Text(entry.content)
+//                            }
+//
+//                            is JournalNote.Image -> {
+//                                AsyncImage(
+//                                    entry.mediaRef,
+//                                    contentDescription = "Image note",
+//                                    modifier = Modifier.size(128.dp),
+//                                )
+//                            }
+//
+//                            is JournalNote.Audio -> {
+//                                Text("Audio note")
+//                            }
+//
+//                            is JournalNote.Video -> {
+//                                Text("Video note")
+//                            }
+//                        }
+//                    },
+//                    detailLevel = ItemDetailLevel.MIN,
+//                    title = entry.creationTimestamp.toReadableDateShort(),
+//                    showOptions = false,
+//                )
+//            }
+            item {
                 WritingEntryBlock(
-                    creationTime = currentDate,
+                    creationTime = creationTimestamp,
+                    onCreationTimeClick = ::refreshTimestamp,
                     entryContents = noteContent,
                     onNoteUpdate = { noteContent = it },
                     location = currentLocation,
+                    locationEnabled = currentLocation != null,
                     modifier = Modifier,
+                    onLocationClick = onRefreshLocation,
+                    onRequestLocationUpdate = {
+                        ensureLocationPermission()
+                    },
                 )
-                LazyVerticalGrid(
-                    contentPadding = PaddingValues(horizontal = Spacing.lg),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    columns = GridCells.Adaptive(minSize = 172.dp),
+                LazyRow(
+                    contentPadding = PaddingValues(vertical = Spacing.lg),
                 ) {
-                    item {
-                        FilledTonalButton(
-                            shape = MaterialTheme.shapes.small,
-                            onClick = ::handleRecordVideo,
-                        ) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                            ) {
-                                Icon(Icons.Default.Videocam, contentDescription = "")
-                                Text("Record video")
-                            }
-                        }
-                    }
-                    item {
-                        FilledTonalButton(
-                            shape = MaterialTheme.shapes.small,
-                            onClick = ::handleTakePhoto,
-                        ) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                            ) {
-                                Icon(Icons.Default.AddAPhoto, contentDescription = "")
-                                Text("Add photo")
-                            }
-                        }
-                    }
-                    item {
-                        FilledTonalButton(
-                            shape = MaterialTheme.shapes.small,
-                            onClick = ::handleRecordVoiceNote
-                        ) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                            ) {
-                                Icon(Icons.Default.Mic, contentDescription = null)
-                                Text("New voice note")
-                            }
+                    if (lastPhoto != null) {
+                        item {
+                            AsyncImage(
+                                lastPhoto,
+                                contentDescription = "Last photo taken",
+                                modifier = Modifier.size(96.dp),
+                            )
                         }
                     }
                 }
-
-            }
-            Button(
-                enabled = allowCreation,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.lg),
-                shape = MaterialTheme.shapes.small,
-                onClick = ::handleAddNote,
-            ) {
-                Text(stringResource(R.string.new_note_action_finish))
+//                LazyVerticalGrid(
+//                    contentPadding = PaddingValues(horizontal = Spacing.lg),
+//                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+//                    columns = GridCells.Adaptive(minSize = 172.dp),
+//                ) {
+//                    item {
+//                        FilledTonalButton(
+//                            shape = MaterialTheme.shapes.small,
+//                            onClick = ::handleRecordVideo,
+//                        ) {
+//                            Row(
+//                                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+//                            ) {
+//                                Icon(Icons.Default.Videocam, contentDescription = null)
+//                                Text(stringResource(R.string.new_note_action_record_video))
+//                            }
+//                        }
+//                    }
+//                    item {
+//                        FilledTonalButton(
+//                            shape = MaterialTheme.shapes.small,
+//                            onClick = ::handleTakePhoto,
+//                        ) {
+//                            Row(
+//                                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+//                            ) {
+//                                Icon(Icons.Default.AddAPhoto, contentDescription = null)
+//                                Text(stringResource(R.string.new_note_action_add_photo))
+//                            }
+//                        }
+//                    }
+//                    item {
+//                        FilledTonalButton(
+//                            shape = MaterialTheme.shapes.small,
+//                            onClick = ::handleRecordVoiceNote
+//                        ) {
+//                            Row(
+//                                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+//                            ) {
+//                                Icon(Icons.Default.Mic, contentDescription = null)
+//                                Text(stringResource(R.string.new_note_action_add_voice_note))
+//                            }
+//                        }
+//                    }
+//                }
+                Button(
+                    enabled = allowCreation,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.lg),
+                    shape = MaterialTheme.shapes.small,
+                    onClick = ::handleAddNote,
+                ) {
+                    Text(stringResource(R.string.new_note_action_finish))
+                }
             }
         }
     }
-}
-
-/**
- * A dialog that informs the user if they have unsaved changes and allows them to dismiss the screen.
- */
-@Composable
-internal fun SheetDismissDialog(
-    onCancel: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    AlertDialog(
-        title = { Text(stringResource(R.string.action_note_create_discard_confirmation_title)) },
-        text = { Text(stringResource(R.string.action_note_create_discard_confirmation_description)) },
-        onDismissRequest = onCancel,
-        dismissButton = {
-            TextButton(onClick = onCancel) {
-                Text(stringResource(R.string.action_note_create_cancel))
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(stringResource(R.string.action_note_create_discard))
-            }
-        },
-    )
 }
 
 @Preview
@@ -263,13 +370,21 @@ fun WritingEntryBlock(
     location: UserPlace?,
     entryContents: String,
     onNoteUpdate: (newContent: String) -> Unit,
+    onRequestLocationUpdate: () -> Unit,
     modifier: Modifier = Modifier,
+    locationEnabled: Boolean = false,
     onLocationClick: () -> Unit = {},
+    onCreationTimeClick: () -> Unit,
 ) {
     val expanded by rememberSaveable { mutableStateOf(false) }
     val lineColor = MaterialTheme.colorScheme.onSurfaceVariant
     val locationText =
         location?.metadata?.name ?: stringResource(R.string.text_placeholder_location)
+
+    fun handleLocationClick() {
+        onRequestLocationUpdate()
+    }
+
     Column(
         modifier.padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -277,18 +392,30 @@ fun WritingEntryBlock(
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Canvas(
-                Modifier
-                    .size(16.dp)
-                    .padding(top = Spacing.sm),
+                Modifier.size(16.dp),
             ) {
                 drawCircle(lineColor, center = center, radius = size.width / 2f)
             }
-            Text(creationTime.localTime, style = MaterialTheme.typography.titleMedium)
+            Text(
+                creationTime.localTime,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier
+                    .clip(MaterialTheme.shapes.small)
+                    .clickable { onCreationTimeClick() }
+                    .padding(
+                        horizontal = Spacing.sm, vertical = Spacing.xs,
+                    ),
+            )
 
             Spacer(modifier = Modifier.weight(1f))
-            LocationChip(location = locationText, onClick = onLocationClick)
+            LocationChip(
+                location = locationText,
+                enabled = locationEnabled,
+                onClick = ::handleLocationClick
+            )
         }
         EditorField(
             expanded = expanded,
@@ -296,49 +423,6 @@ fun WritingEntryBlock(
             onNoteUpdate = onNoteUpdate,
             placeholder = stringResource(R.string.text_placeholder_start_writing)
         )
-    }
-}
-
-@Composable
-fun EditorField(
-    modifier: Modifier = Modifier,
-    expanded: Boolean = false,
-    contents: String = "",
-    placeholder: String = "",
-    onNoteUpdate: (newContent: String) -> Unit,
-) {
-    val edgePadding =
-        Spacing.lg // Convenience so that placeholder text is aligned with the text field content
-    Box {
-        BasicTextField(
-            modifier = modifier
-                .fillMaxWidth()
-                .applyExpandedHeight(expanded)
-                .sizeIn(minHeight = 144.dp) // TODO: Handle smaller screen heights
-                .background(
-                    MaterialTheme.colorScheme.surfaceContainer,
-                    MaterialTheme.shapes.medium,
-                )
-                .padding(edgePadding)
-                .imePadding(),
-            value = contents,
-            onValueChange = onNoteUpdate,
-            textStyle = MaterialTheme.typography.bodyLarge.copy(
-                color = MaterialTheme.colorScheme.onSurface,
-                lineBreak = LineBreak.Paragraph,
-            ),
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Sentences,
-            ),
-            cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurfaceVariant),
-        )
-        if (contents.isEmpty()) {
-            Text(
-                modifier = Modifier.padding(edgePadding),
-                text = placeholder,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
     }
 }
 
@@ -353,11 +437,6 @@ fun Modifier.applyExpandedHeight(
 }
 
 @Composable
-fun ContainerButton(modifier: Modifier) {
-    Row(
-        modifier.background(MaterialTheme.colorScheme.surfaceContainer),
-    ) {
+fun PreviewJournalNoteTimeline(note: JournalNote) {
 
-    }
 }
-

@@ -17,4 +17,7 @@ internal object DaosModule {
 
     @Provides
     fun provideJournalDao(database: AppDatabase) = database.journalsDao()
+
+    @Provides
+    fun provideJournalNotesDao(database: AppDatabase) = database.journalNotesDao()
 }

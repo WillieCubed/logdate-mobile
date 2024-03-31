@@ -1,8 +1,11 @@
 package app.logdate.feature.timeline.ui
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -17,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -27,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.core.data.notes.JournalNote
 import app.logdate.feature.timeline.R
 import app.logdate.ui.theme.Spacing
+import app.logdate.ui.timeline.TimelineLine
 import app.logdate.util.toReadableDateShort
 import app.logdate.util.weeksAgo
 import kotlinx.datetime.Clock
@@ -44,7 +49,8 @@ internal fun Timeline(
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
-        modifier
+        modifier = modifier,
+        contentPadding = PaddingValues(top = Spacing.xl)
     ) {
         constructTimeline(items = timelineItems, onItemSelected = onItemSelected)
         item {
@@ -72,9 +78,30 @@ private fun TimelineContentHeader(title: String) {
     }
 }
 
+enum class TimeDetail {
+    /**
+     *
+     */
+    DAY,
+
+    /**
+     *
+     */
+    HOUR,
+}
+
 @Composable
-private fun TimelineContentItem(item: JournalNote, onItemSelected: (uid: String) -> Unit) {
+private fun TimelineContentItem(
+    item: JournalNote,
+    timeDetail: TimeDetail = TimeDetail.DAY,
+    onItemSelected: (uid: String) -> Unit,
+) {
     var showOptions by rememberSaveable { mutableStateOf(false) }
+    val headerStyle = if (timeDetail == TimeDetail.DAY) {
+
+    } else {
+
+    }
     Row(
         modifier = Modifier
             .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
@@ -82,16 +109,15 @@ private fun TimelineContentItem(item: JournalNote, onItemSelected: (uid: String)
         horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         TimelineLine(
-            modifier = Modifier.padding(top = Spacing.lg),
+            modifier = Modifier
+                .padding(top = Spacing.lg)
+                .fillMaxHeight(),
         )
         Column(
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) { // Content container
             Row(
-                modifier = Modifier
-//                    .heightIn(min = 72.dp)
-//                    .padding(vertical = Spacing.sm)
-                    .fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
                 verticalAlignment = Alignment.CenterVertically,
             ) {// Header block
@@ -180,6 +206,21 @@ private fun determineTitle(date: Instant): String {
     }
 }
 
+enum class ZoomLevel {
+    /**
+     * Group by day
+     */
+    DEFAULT,
+
+    /**
+     * Show every note under a separate header.
+     *
+     * If there are multiple entries under the same day, the date will only appear once, and each
+     * item should have its own recorded time.
+     */
+    DETAILED,
+}
+
 /**
  * Converts a sequential list of [TimelineItem]s into a timeline view.
  * This creates a list of [TimelineContentItem]s and [TimelineContentHeader]s
@@ -188,22 +229,52 @@ private fun determineTitle(date: Instant): String {
 fun LazyListScope.constructTimeline(
     items: List<JournalNote>,
     onItemSelected: (uid: String) -> Unit,
+    zoomLevel: ZoomLevel = ZoomLevel.DETAILED,
 ) {
     // Sort items in reverse order, grouping them by weeks before this week, adding headers for each week.
-    val groupedItems = items.sortedByDescending { it.creationTimestamp }.groupBy {
+    val itemsGroupedByWeek = items.sortedByDescending { it.creationTimestamp }.groupBy {
         val weeksBeforeNow = it.creationTimestamp.weeksAgo()
         weeksBeforeNow
     }
 
+    // Group items by day, sort in reverse order of created
+
+
     // Now we have a map of week number to list of items for that week.
-    groupedItems.forEach { (week, items) ->
+    itemsGroupedByWeek.forEach { (week, items) ->
         item {
             TimelineContentHeader(determineHeaderTitle(date = items.first().creationTimestamp))
         }
-        items.forEach { item ->
-            item {
-                TimelineContentItem(item, onItemSelected)
+        items.forEachIndexed { index, item ->
+            when (zoomLevel) {
+                ZoomLevel.DETAILED -> {
+                    item {
+                        TimelineContentItem(item, TimeDetail.DAY, onItemSelected)
+                    }
+                }
+
+                ZoomLevel.DEFAULT -> {
+
+                }
             }
         }
     }
+}
+
+
+@Composable
+fun PinchableContainer(
+    defaultContent: @Composable () -> Unit,
+    expandedContent: @Composable () -> Unit,
+    label: String = "Pinchable Container"
+) {
+    var expanded by remember { mutableStateOf(false) }
+    AnimatedContent(targetState = expanded, label = label) { isExpanded ->
+        if (isExpanded) {
+            expandedContent()
+        } else {
+            defaultContent()
+        }
+    }
+
 }

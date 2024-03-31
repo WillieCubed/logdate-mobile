@@ -4,7 +4,11 @@ import android.Manifest
 import android.app.PendingIntent
 import android.content.Context
 import android.content.pm.PackageManager
+import android.location.Address
+import android.location.Geocoder
 import android.location.Location
+import android.os.Build
+import android.util.Log
 import androidx.core.app.ActivityCompat
 import app.logdate.core.coroutines.AppDispatcher.Default
 import app.logdate.core.coroutines.Dispatcher
@@ -28,6 +32,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 class FusedWorldProvider @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -43,6 +49,7 @@ class FusedWorldProvider @Inject constructor(
     private lateinit var cachedActivity: LogdateActivity
     private lateinit var cachedLastLocation: Location
     private lateinit var currentPlace: UserPlace
+    private val cachedPlaces: MutableList<UserPlaceResult> = mutableListOf()
 
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(locationResult: LocationResult) {
@@ -154,8 +161,14 @@ class FusedWorldProvider @Inject constructor(
         activityCallbackIntent?.let { activityClient.removeActivityTransitionUpdates(it) }
     }
 
-    override fun observeCurrentPlace(): Flow<UserPlace> {
-        TODO("Not yet implemented")
+    override fun observeCurrentPlace(refresh: Boolean): Flow<UserPlace> {
+        return channelFlow {
+            if (refresh) {
+                refreshCurrentPlace()
+            }
+            send(currentPlace)
+            awaitClose()
+        }
     }
 
     @Throws(SecurityException::class)
@@ -172,15 +185,49 @@ class FusedWorldProvider @Inject constructor(
         return
     }
 
-    override fun resolvePlace(latitude: Double, longitude: Double): List<UserPlaceResult> {
+    override suspend fun resolvePlace(latitude: Double, longitude: Double): List<UserPlaceResult> =
+        suspendCoroutine {
+            val geocoder = Geocoder(context)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val listener = object : Geocoder.GeocodeListener {
+                    override fun onGeocode(addresses: MutableList<Address>) {
+                        cachedPlaces.clear()
+                        addresses.forEach { address ->
+                            val place = UserPlace.Unknown
+                            val result = UserPlaceResult(place, 1)
+                            cachedPlaces.add(result)
+                        }
+                        it.resume(cachedPlaces)
+                    }
+
+                    override fun onError(errorMessage: String?) {
+                        super.onError(errorMessage)
+                        Log.e("FusedWorldProvider", "Error resolving place: $errorMessage")
+                    }
+                }
+                geocoder.getFromLocation(latitude, longitude, 5, listener)
+            } else {
+                @Suppress("DEPRECATION") val addresses =
+                    geocoder.getFromLocation(latitude, longitude, 5)
+                cachedPlaces.clear()
+                addresses?.forEach { address ->
+                    val place = UserPlace.Unknown
+                    val result = UserPlaceResult(place, 1)
+                    cachedPlaces.add(result)
+                }
+                it.resume(cachedPlaces)
+            }
+
+        }
+
+    override suspend fun getNearbyPlaces(place: UserPlace): List<UserPlaceResult> {
         return listOf()
     }
 
-    override fun getNearbyPlaces(place: UserPlace): List<UserPlaceResult> {
-        return listOf()
-    }
-
-    override fun getNearbyPlaces(latitude: Double, longitude: Double): List<UserPlaceResult> {
+    override suspend fun getNearbyPlaces(
+        latitude: Double,
+        longitude: Double
+    ): List<UserPlaceResult> {
         return listOf()
     }
 }

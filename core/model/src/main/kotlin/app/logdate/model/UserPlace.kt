@@ -1,6 +1,6 @@
 package app.logdate.model
 
-data class UserPlace(
+sealed class UserPlace(
     val uid: String,
     val latitude: Double,
     val longitude: Double,
@@ -12,7 +12,25 @@ data class UserPlace(
      */
     val plusCode: String,
     val metadata: PlaceMetadata,
-)
+) {
+    /**
+     * A companion object that represents an unknown place.
+     */
+    companion object Unknown : UserPlace(
+        uid = "unknown",
+        latitude = 0.0,
+        longitude = 0.0,
+        altitude = 0.0,
+        plusCode = "",
+        metadata = PlaceMetadata(
+            name = "Unknown",
+            description = "Unknown place",
+            address = "Unknown",
+            city = "Unknown",
+            country = "Unknown",
+        ),
+    )
+}
 
 data class PlaceMetadata(
     /**
