@@ -21,6 +21,7 @@ fun NavController.navigateToTimeline() = navigate(
 fun HomeRoute(
     appState: MainAppState,
     onViewPreviousRewinds: () -> Unit,
+    onOpenSettings: () -> Unit,
     onCreateEntry: () -> Unit,
     onCreateJournal: () -> Unit,
     onOpenJournal: JournalOpenCallback,
@@ -36,8 +37,9 @@ fun HomeRoute(
         onNewJournal = onCreateJournal,
         onOpenJournal = onOpenJournal,
         onCreateEntry = onCreateEntry,
+        onOpenSettings = onOpenSettings,
         shouldShowBottomBar = appState.shouldShowBottomBar,
-        isLargeDevice = appState.isLargeDevice,
         shouldShowNavRail = appState.shouldShowNavRail,
+        isLargeDevice = appState.isLargeDevice,
     )
 }

@@ -25,6 +25,7 @@ fun NavGraphBuilder.mainNavGraph(
     onJournalDeleted: () -> Unit,
     onNoteSaved: () -> Unit,
     onNavigateBack: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     navigation(
         startDestination = RouteDestination.Home.route,
@@ -37,6 +38,7 @@ fun NavGraphBuilder.mainNavGraph(
                 onViewPreviousRewinds = onViewPreviousRewinds,
                 onCreateJournal = onCreateJournal,
                 onOpenJournal = onOpenJournal,
+                onOpenSettings = onOpenSettings,
             )
         }
         noteCreationRoute(

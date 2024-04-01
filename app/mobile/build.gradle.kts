@@ -30,6 +30,8 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.kotlinx.datetime)
     implementation(libs.google.play.services.instantapps)
+
+    implementation(project(":feature:onboarding"))
     implementation(project(":feature:timeline"))
     implementation(project(":feature:library"))
     implementation(project(":feature:journals"))

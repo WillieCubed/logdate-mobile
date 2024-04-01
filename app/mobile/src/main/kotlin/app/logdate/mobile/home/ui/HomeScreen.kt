@@ -1,6 +1,5 @@
 package app.logdate.mobile.home.ui
 
-import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
@@ -15,22 +14,29 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.LibraryAdd
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFloatingActionButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.feature.journals.ui.JournalOpenCallback
@@ -49,10 +55,13 @@ fun HomeScreen(
     onOpenJournal: JournalOpenCallback,
     onCreateEntry: () -> Unit,
     onViewPreviousRewinds: () -> Unit,
+    onOpenSettings: () -> Unit,
     shouldShowBottomBar: Boolean = true,
     shouldShowNavRail: Boolean = false,
     isLargeDevice: Boolean = false,
 ) {
+    var showOptionsDropdown by rememberSaveable { mutableStateOf(false) }
+
     fun handleNavUpdate(newDestination: HomeRouteData) {
         onUpdateDestination(newDestination)
     }
@@ -92,6 +101,28 @@ fun HomeScreen(
             CenterAlignedTopAppBar(
                 title = { Text(currentDestination.label) },
                 scrollBehavior = scrollBehavior,
+                actions = {
+                    IconButton(onClick = {
+                        showOptionsDropdown = true
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "Options"
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = showOptionsDropdown,
+                        onDismissRequest = { showOptionsDropdown = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Settings") },
+                            onClick = {
+                                showOptionsDropdown = false
+                                onOpenSettings()
+                            },
+                        )
+                    }
+                }
             )
         },
         floatingActionButtonPosition = fabPosition,
@@ -192,7 +223,7 @@ fun HomeScreen(
                 }
 
                 HomeRouteData.Library -> {
-                    Toast.makeText(LocalContext.current, "Coming soon!", Toast.LENGTH_SHORT).show()
+
                 }
             }
         }
@@ -210,6 +241,7 @@ fun HomeScreenPreview_Phone() {
             onViewPreviousRewinds = { },
             onOpenJournal = { },
             onNewJournal = { },
+            onOpenSettings = { },
         )
     }
 }
@@ -228,6 +260,7 @@ fun HomeScreenPreview_Tablet() {
             isLargeDevice = true,
             onOpenJournal = { },
             onNewJournal = { },
+            onOpenSettings = { },
         )
     }
 }

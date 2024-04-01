@@ -6,4 +6,11 @@
     <string name="shortcut_label_new_note_short">New note</string>
     <string name="shortcut_label_new_note_long">Create a new note</string>
     <string name="shortcut_label_new_note_disabled">Can\'t create new note</string>
+    <string name="screen_title_settings">Settings</string>
+    <string name="settings_reset_app_title">Reset app</string>
+    <string name="action_reset_app_long">Reset App</string>
+    <string name="action_reset_app">Reset</string>
+    <string name="settings_reset_app_description">This resets the app and removes all data.</string>
+    <string name="dialog_reset_app_description">This will remove all LogDate data from this device and can\'t be undone. Are you sure you want to continue?</string>
+    <string name="dialog_reset_app_title">Reset App?</string>
 </resources>
