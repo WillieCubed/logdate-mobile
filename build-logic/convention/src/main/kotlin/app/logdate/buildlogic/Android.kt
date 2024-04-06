@@ -26,6 +26,11 @@ internal fun Project.configureAndroid(commonExtension: CommonExtension<*, *, *, 
             targetCompatibility = JavaVersion.VERSION_17
         }
 
+        packaging {
+            resources {
+                excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            }
+        }
     }
     configureKotlin()
 }
@@ -51,10 +56,6 @@ private fun Project.configureKotlin() {
     tasks.withType<KotlinJvmCompile>().configureEach {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
-            freeCompilerArgs.add(
-                // Enable experimental coroutines APIs, including Flow
-                "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
-            )
             val treatWarningsAsErrors: String? by project
             // Treat all Kotlin warnings as errors (disabled by default)
             // Override by setting warningsAsErrors=true in your ~/.gradle/gradle.properties
