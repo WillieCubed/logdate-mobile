@@ -1,4 +1,3 @@
-@Suppress("DSL_SCOPE_VIOLATION") // Remove when fixed https://youtrack.jetbrains.com/issue/KTIJ-19369
 plugins {
     alias(libs.plugins.logdate.android.application)
     alias(libs.plugins.logdate.compose)
@@ -9,6 +8,8 @@ android {
 
     defaultConfig {
         applicationId = "app.logdate.mobile"
+        versionCode = 1
+        versionName = "0.1.0"
     }
 
     dynamicFeatures += setOf(":dynamic")
