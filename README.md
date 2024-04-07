@@ -16,3 +16,20 @@ The project is divided into several modules:
 - `:feature:list` - Android library for the list feature.
 - `:feature:wear:home` - Android library for the wear home feature.
 - `:test:navigation` - Test-only module for navigation testing.
+
+## Setup
+
+Open the project in Android Studio and let it sync the project.
+
+This project currently uses some Firebase APIs for analytics and performance monitoring. To set up
+Firebase, follow the instructions in
+the [Firebase documentation](https://firebase.google.com/docs/android/setup).
+
+This project also requires a Meta app ID for some features. To get a Meta app ID, follow the
+instructions in
+the [Meta developer documentation](https://developers.facebook.com/docs/android/getting-started#app-id).
+Once you have the Meta app ID, add it to your `local.properties` file:
+
+```properties
+metaAppId="<your-meta-app-id>"
+```
