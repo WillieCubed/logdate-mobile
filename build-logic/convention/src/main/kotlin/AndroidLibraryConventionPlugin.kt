@@ -1,5 +1,6 @@
 
 import app.logdate.buildlogic.configureAndroid
+import app.logdate.buildlogic.configureBuildConfig
 import com.android.build.gradle.LibraryExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -21,6 +22,7 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
 
             extensions.configure<LibraryExtension> {
                 configureAndroid(this)
+                configureBuildConfig(this)
             }
 
             val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")

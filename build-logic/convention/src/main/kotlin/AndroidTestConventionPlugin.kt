@@ -1,12 +1,13 @@
-import com.android.build.gradle.TestExtension
+
 import app.logdate.buildlogic.configureAndroid
+import app.logdate.buildlogic.configureBuildConfig
+import com.android.build.gradle.TestExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.VersionCatalogsExtension
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.getByType
-import org.jetbrains.kotlin.gradle.plugin.KaptExtension
 
 class AndroidTestConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) {
@@ -19,6 +20,7 @@ class AndroidTestConventionPlugin : Plugin<Project> {
 
             extensions.configure<TestExtension> {
                 configureAndroid(this)
+                configureBuildConfig(this)
             }
 
             val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
@@ -29,11 +31,6 @@ class AndroidTestConventionPlugin : Plugin<Project> {
                 "implementation"(libs.findLibrary("hilt.android.testing").get())
                 "ksp"(libs.findLibrary("hilt.compiler").get())
             }
-
-//            val kaptExtension = extensions.getByType<KaptExtension>()
-//            kaptExtension.apply {
-//                correctErrorTypes = true
-//            }
         }
     }
 }

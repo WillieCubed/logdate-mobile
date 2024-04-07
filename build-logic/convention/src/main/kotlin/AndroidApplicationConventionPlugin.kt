@@ -1,5 +1,5 @@
-
 import app.logdate.buildlogic.configureAndroid
+import app.logdate.buildlogic.configureAndroidApp
 import app.logdate.buildlogic.configureFirebasePerf
 import com.android.build.gradle.internal.dsl.BaseAppModuleExtension
 import org.gradle.api.Plugin
@@ -25,6 +25,7 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
 
             extensions.configure<BaseAppModuleExtension> {
                 configureAndroid(commonExtension = this)
+                configureAndroidApp(commonExtension = this)
                 configureFirebasePerf(commonExtension = this)
             }
 
