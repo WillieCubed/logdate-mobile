@@ -4,8 +4,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.core.data.JournalRepository
+import app.logdate.core.sharing.SharingLauncher
 import app.logdate.feature.journals.navigation.JOURNAL_ID_ARG
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
@@ -19,9 +21,11 @@ import javax.inject.Inject
 @HiltViewModel
 class JournalDetailViewModel @Inject constructor(
     private val repository: JournalRepository,
+    private val sharingLauncher: SharingLauncher,
     private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<JournalDetailUiState> =
         savedStateHandle.getStateFlow<String?>(JOURNAL_ID_ARG, null)
             .filterNotNull()
@@ -57,8 +61,12 @@ class JournalDetailViewModel @Inject constructor(
                 JournalDetailUiState.Loading
             )
 
-    fun selectJournal(journalId: String) {
-        savedStateHandle["id"] = journalId
+    /**
+     * Shares the current journal.
+     */
+    fun shareCurrentJournal() {
+        val journalId = savedStateHandle.get<String>(JOURNAL_ID_ARG) ?: return
+        sharingLauncher.shareJournalToInstagram(journalId)
     }
 
     fun deleteJournal(onDelete: () -> Unit) {
