@@ -2,6 +2,7 @@ package app.logdate.feature.editor.ui
 
 import android.Manifest
 import android.net.Uri
+import android.os.Parcelable
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -34,6 +35,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -41,11 +43,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -63,6 +67,7 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.parcelize.Parcelize
 import java.io.File
 
 @Composable
@@ -91,6 +96,16 @@ fun NewNoteRoute(
     }
 }
 
+@Parcelize
+data class TimestampContainer(
+    val timestamp: Long,
+) : Parcelable
+
+val InstantSaver = Saver<Instant, Long>(
+    save = { it.toEpochMilliseconds() },
+    restore = { Instant.fromEpochMilliseconds(it) }
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NoteCreationScreen(
@@ -106,7 +121,11 @@ fun NoteCreationScreen(
 ) {
     var showDismissDialog by rememberSaveable { mutableStateOf(false) }
     var noteContent: String by rememberSaveable { mutableStateOf(initialTextContent) }
-    var creationTimestamp: Instant by remember { mutableStateOf(Clock.System.now()) }
+    var creationTimestamp: Instant by rememberSaveable(
+        stateSaver = InstantSaver,
+    ) { mutableStateOf(Clock.System.now()) }
+    val topAppBarScrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val cacheDir = LocalContext.current.cacheDir
@@ -217,7 +236,9 @@ fun NoteCreationScreen(
         )
     }
     Scaffold(
-        modifier = Modifier.padding(bottom = Spacing.lg),
+        modifier = Modifier
+            .padding(bottom = Spacing.lg)
+            .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
                 title = { Text(creationTimestamp.toReadableDateShort()) },
@@ -226,6 +247,7 @@ fun NoteCreationScreen(
                         Icon(Icons.Default.Close, contentDescription = "Close")
                     }
                 },
+                scrollBehavior = topAppBarScrollBehavior,
             )
         },
         snackbarHost = {
@@ -360,7 +382,13 @@ fun NoteCreationScreen(
 @Composable
 private fun NewNoteRoutePreview() {
     LogDateTheme {
-        NewNoteRoute(onClose = {}, onNoteSaved = { })
+        NoteCreationScreen(
+            onClose = {},
+            previousEntries = emptyList(),
+            onAddNote = {},
+            onRefreshLocation = {},
+            onLocationPermissionResult = {},
+        )
     }
 }
 
