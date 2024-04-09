@@ -15,6 +15,10 @@ class OfflineFirstUserStateRepository @Inject constructor(
         localDataSource.setShouldHideOnboarding(isComplete)
     }
 
+    override suspend fun setBiometricEnabled(isEnabled: Boolean) {
+        localDataSource.setShouldShowBiometric(isEnabled)
+    }
+
     override suspend fun addFavoriteNote(vararg noteId: String) {
         TODO("Not yet implemented")
     }
