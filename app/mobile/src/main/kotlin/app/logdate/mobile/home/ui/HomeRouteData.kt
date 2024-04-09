@@ -41,6 +41,12 @@ sealed class HomeRouteData(
 
     companion object {
         // Use lazy because this will be null otherwise at static initialization
-        val ALL by lazy { listOf(Timeline, Rewind, Journals, Library) }
+        val ALL by lazy {
+            listOf(
+                Timeline, Rewind, Journals,
+                // TODO: Re-enable library once available
+                // Library
+            )
+        }
     }
 }

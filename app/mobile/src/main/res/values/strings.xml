@@ -13,4 +13,6 @@
     <string name="settings_reset_app_description">This resets the app and removes all data.</string>
     <string name="dialog_reset_app_description">This will remove all LogDate data from this device and can\'t be undone. Are you sure you want to continue?</string>
     <string name="dialog_reset_app_title">Reset App?</string>
+    <string name="settings_biometric_label">Require biometrics</string>
+    <string name="settings_biometric_description">Fingerprint, face unlock, or device code is required to open the app.</string>
 </resources>

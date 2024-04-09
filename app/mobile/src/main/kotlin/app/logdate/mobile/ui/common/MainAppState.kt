@@ -21,6 +21,9 @@ fun rememberMainAppState(
     navController: NavHostController = rememberNavController(),
     coroutineScope: CoroutineScope = rememberCoroutineScope(),
 ): MainAppState {
+//    var isAuthenticationRequired by remember {
+//        mutableStateOf(false)
+//    }
     return remember(
         navController,
         coroutineScope,

@@ -1,24 +1,23 @@
 package app.logdate.mobile
 
+import android.app.DirectAction
+import android.app.assist.AssistContent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import android.os.CancellationSignal
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
-import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.lifecycle.Lifecycle
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
+import app.logdate.core.assist.AssistantActionsProvider
+import app.logdate.core.assist.AssistantContextProvider
+import app.logdate.core.assist.toDirectAction
 import app.logdate.mobile.ui.AppViewModel
 import app.logdate.mobile.ui.LaunchAppUiState
 import app.logdate.mobile.ui.LogdateAppRoot
@@ -27,10 +26,32 @@ import app.logdate.ui.theme.LogDateTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import java.util.function.Consumer
+import javax.inject.Inject
 
+/**
+ * The main app activity.
+ *
+ * This activity is the entry point of the app and is responsible for setting up the app's UI and
+ * handling the app's lifecycle.
+ *
+ * On load, this activity will display a splash screen until the app's UI is ready to be displayed.
+ * If the user has not onboarded yet, the app will display the onboarding flow. Otherwise, the app
+ * will display the main app UI.
+ *
+ * This activity is also responsible for providing the app's assist content and direct actions.
+ */
 @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
+    // Use FragmentActivity because we need to show the biometric prompt
+
+    @Inject
+    lateinit var assistantContextProvider: AssistantContextProvider
+
+    @Inject
+    lateinit var assistantActionsProvider: AssistantActionsProvider
+
     private val viewModel by viewModels<AppViewModel>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -39,24 +60,29 @@ class MainActivity : ComponentActivity() {
 
         var uiState: LaunchAppUiState by mutableStateOf(LaunchAppUiState.Loading)
 
+        enableEdgeToEdge()
         lifecycleScope.launch {
-            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.uiState.onEach {
-                    uiState = it
-                }.collect {
-                    when (it) {
-                        is LaunchAppUiState.Loaded ->
-                            setContent {
-                                val appState = rememberMainAppState(
-                                    windowSizeClass = calculateWindowSizeClass(this@MainActivity),
-                                )
-                                LogDateTheme {
-                                    LogdateAppRoot(appState, onboarded = it.isOnboarded)
-                                }
-                            }
-
-                        LaunchAppUiState.Loading -> {}
+            viewModel.uiState.onEach {
+                uiState = it
+            }.collect {
+                when (it) {
+                    is LaunchAppUiState.Loaded -> setContent {
+                        val appState = rememberMainAppState(
+                            windowSizeClass = calculateWindowSizeClass(this@MainActivity),
+                        )
+                        LogDateTheme {
+                            LogdateAppRoot(
+                                appState,
+                                onboarded = it.isOnboarded,
+                            )
+                        }
+                        if (it.isOnboarded && it.isBiometricEnabled) {
+                            // TODO: Handle back navigation when the user cancels the biometric prompt
+                            viewModel.showBiometricPrompt(this@MainActivity)
+                        }
                     }
+
+                    LaunchAppUiState.Loading -> {}
                 }
             }
         }
@@ -68,30 +94,25 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        enableEdgeToEdge()
     }
-}
 
-@OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
-@Preview(showBackground = true, name = "App Preview - Phone")
-@Composable
-fun AppPreview_Mobile() {
-    LogDateTheme {
-        val appState = rememberMainAppState(
-            windowSizeClass = WindowSizeClass.calculateFromSize(DpSize(412.dp, 918.dp)),
-        )
-        LogdateAppRoot(appState)
+    override fun onProvideAssistContent(assistContent: AssistContent) {
+        super.onProvideAssistContent(assistContent)
+        assistContent.apply {
+            val assistData = assistantContextProvider.jsonData
+            structuredData = assistData
+            clipData = assistantContextProvider.clipData
+        }
     }
-}
 
-@OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
-@Preview(showBackground = true, name = "App Preview - Tablet", device = "id:pixel_tablet")
-@Composable
-fun AppPreview_Tablet() {
-    LogDateTheme {
-        val appState = rememberMainAppState(
-            windowSizeClass = WindowSizeClass.calculateFromSize(DpSize(1280.dp, 720.dp)),
-        )
-        LogdateAppRoot(appState)
+    override fun onGetDirectActions(
+        cancellationSignal: CancellationSignal, callback: Consumer<MutableList<DirectAction>>
+    ) {
+        if (voiceInteractor == null) {
+            super.onGetDirectActions(cancellationSignal, callback)
+            return
+        }
+        callback.accept(assistantActionsProvider.supportedActions.map { it.toDirectAction() }
+            .toMutableList())
     }
 }
