@@ -11,6 +11,8 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:coroutines"))
     implementation(project(":core:data"))
+    implementation(project(":core:assets"))
+
     // Unit testing
     testImplementation(libs.junit)
 }

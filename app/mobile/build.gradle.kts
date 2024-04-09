@@ -40,6 +40,7 @@ dependencies {
     implementation(project(":feature:journals"))
     implementation(project(":feature:rewind"))
     implementation(project(":feature:editor"))
+    implementation(project(":core:assets"))
     implementation(project(":core:util"))
     implementation(project(":core:ui"))
     implementation(project(":core:assist"))
