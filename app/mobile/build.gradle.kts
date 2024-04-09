@@ -45,6 +45,7 @@ dependencies {
     implementation(project(":core:ui"))
     implementation(project(":core:assist"))
     implementation(project(":core:data"))
+    implementation(project(":core:notifications"))
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
