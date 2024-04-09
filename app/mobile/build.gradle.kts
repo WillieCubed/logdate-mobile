@@ -32,7 +32,7 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.biometric)
     implementation(libs.kotlinx.datetime)
-    implementation(libs.google.play.services.instantapps)
+    implementation(libs.play.services.instantapps)
 
     implementation(project(":feature:onboarding"))
     implementation(project(":feature:timeline"))
