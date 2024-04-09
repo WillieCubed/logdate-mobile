@@ -42,6 +42,7 @@ dependencies {
     implementation(project(":feature:editor"))
     implementation(project(":core:util"))
     implementation(project(":core:ui"))
+    implementation(project(":core:assist"))
     implementation(project(":core:data"))
 
     testImplementation(libs.junit)
