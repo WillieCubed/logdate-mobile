@@ -36,7 +36,7 @@ fun AppNavigationRail(
     shouldShowFab: Boolean = true,
 ) {
     NavigationRail(
-        modifier = modifier,
+        modifier = modifier.fillMaxHeight(),
         header = {
             if (shouldShowFab) {
                 when (selectedItem) {
@@ -87,7 +87,6 @@ fun AppNavigationRail(
             Modifier.fillMaxHeight(),
             verticalArrangement = itemsArrangement,
         ) {
-
             HomeRouteData.ALL.forEach { route ->
                 NavigationRailItem(
                     selected = selectedItem == route,
