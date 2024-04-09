@@ -12,7 +12,7 @@ fun TextNoteEntity.toModel() = JournalNote.Text(
 )
 
 fun JournalNote.Text.toEntity() = TextNoteEntity(
-    uid = uid.toInt(),
+    uid = if (uid.isBlank()) 0 else uid.toInt(),
     content = content,
     created = creationTimestamp,
     lastUpdated = lastUpdated,
@@ -26,7 +26,7 @@ fun ImageNoteEntity.toModel() = JournalNote.Image(
 )
 
 fun JournalNote.Image.toEntity() = ImageNoteEntity(
-    uid = uid.toInt(),
+    uid = if (uid.isBlank()) 0 else uid.toInt(),
     contentUri = mediaRef,
     created = creationTimestamp,
     lastUpdated = lastUpdated,
