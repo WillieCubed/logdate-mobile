@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="onboarding_action_sign_in">Sign into LogDate Cloud</string>
+    <string name="section_title_backup_sync">Backup and sync</string>
+    <string name="action_onboarding_continue">Continue</string>
+    <string name="onboarding_welcome_back_description_streak_reset">Your streak has been reset.</string>
+    <string name="onboarding_welcome_back_title">Welcome back, %1$s!</string>
 </resources>

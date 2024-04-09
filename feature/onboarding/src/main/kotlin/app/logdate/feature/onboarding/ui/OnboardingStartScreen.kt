@@ -40,6 +40,7 @@ fun OnboardingStartScreen(
     onNext: () -> Unit,
     onStartFromBackup: () -> Unit,
     modifier: Modifier = Modifier,
+    useLargerTextSizes: Boolean = false,
 ) {
     var shouldShowMain by remember { mutableStateOf(false) }
 
@@ -62,7 +63,8 @@ fun OnboardingStartScreen(
             if (target) {
                 OnboardingLandingContent(
                     onGetStarted = onNext,
-                    onStartFromBackup = onStartFromBackup
+                    onStartFromBackup = onStartFromBackup,
+                    useLargerTextSizes = useLargerTextSizes,
                 )
             } else {
                 OnboardingSplashContent()
@@ -99,6 +101,7 @@ private fun OnboardingSplashContent() {
                 Text(
                     "No need to imagine anymore.",
                     style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     textAlign = TextAlign.Center,
                 )
             }
@@ -110,6 +113,7 @@ private fun OnboardingSplashContent() {
 private fun OnboardingLandingContent(
     onGetStarted: () -> Unit,
     onStartFromBackup: () -> Unit,
+    useLargerTextSizes: Boolean = false,
 ) {
     Column(
         modifier = Modifier
@@ -118,8 +122,7 @@ private fun OnboardingLandingContent(
         verticalArrangement = Arrangement.Center,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(96.dp, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -130,13 +133,21 @@ private fun OnboardingLandingContent(
             ) {
                 Text(
                     "Welcome to LogDate.",
-                    style = MaterialTheme.typography.headlineLarge,
+                    style = if (useLargerTextSizes) {
+                        MaterialTheme.typography.displaySmall
+                    } else {
+                        MaterialTheme.typography.headlineLarge
+                    },
                     color = MaterialTheme.colorScheme.onPrimary,
                     textAlign = TextAlign.Center,
                 )
                 Text(
                     "A new home for your memories.",
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = if (useLargerTextSizes) {
+                        MaterialTheme.typography.headlineSmall
+                    } else {
+                        MaterialTheme.typography.headlineMedium
+                    },
                     color = MaterialTheme.colorScheme.onPrimary,
                     textAlign = TextAlign.Center,
                 )
@@ -166,7 +177,7 @@ private fun OnboardingLandingContent(
 
 }
 
-@Preview
+@Preview(name = "Splash Screen - Size Compact", group = "Compact Devices")
 @Composable
 fun OnboardingStartScreenPreview() {
     LogDateTheme {
@@ -174,10 +185,25 @@ fun OnboardingStartScreenPreview() {
     }
 }
 
-@Preview
+@Preview(name = "Splash Screen Loaded - Size Compact", group = "Compact Devices")
 @Composable
 fun OnboardingSplashContentPreview() {
     LogDateTheme {
         OnboardingLandingContent(onGetStarted = {}, onStartFromBackup = {})
+    }
+}
+
+@Preview(
+    device = "spec:id=reference_tablet,shape=Normal,width=1280,height=800,unit=dp,dpi=240",
+    name = "Splash Screen Loaded - Size Medium"
+)
+@Composable
+fun OnboardingSplashContentPreview_Medium() {
+    LogDateTheme {
+        OnboardingLandingContent(
+            onGetStarted = {},
+            onStartFromBackup = {},
+            useLargerTextSizes = true,
+        )
     }
 }

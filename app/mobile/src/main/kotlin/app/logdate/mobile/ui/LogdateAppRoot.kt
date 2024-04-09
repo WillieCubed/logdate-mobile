@@ -65,7 +65,8 @@ fun LogdateAppRoot(
                 // Navigate to base route after onboarding is complete, making sure
                 // to clear the back stack.
                 navController.navigate(RouteDestination.Base.route) {
-                    popUpTo(RouteDestination.Onboarding.route) { inclusive = true }
+                    // TODO: Figure out why this breaks stuff
+//                    popUpTo(RouteDestination.Onboarding.route) { inclusive = true }
                 }
             }
         )
