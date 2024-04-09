@@ -52,11 +52,6 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                     }
                 }
             }
-//            val kaptExtension = extensions.getByType<KaptExtension>()
-//            kaptExtension.apply {
-//                correctErrorTypes = true
-//            }
-
 //            packaging {
 //                resources {
 //                    excludes += "/META-INF/{AL2.0,LGPL2.1}"
