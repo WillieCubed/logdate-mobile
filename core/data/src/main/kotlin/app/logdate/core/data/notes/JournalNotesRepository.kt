@@ -63,24 +63,24 @@ sealed class JournalNote(
      * Text notes can constitute simple statements or
      */
     data class Text(
-        val content: String,
         override val uid: String,
         override val creationTimestamp: Instant,
         override val lastUpdated: Instant,
+        val content: String,
     ) : JournalNote(NoteType.TEXT)
 
     data class Image(
-        val mediaRef: String,
         override val uid: String,
         override val creationTimestamp: Instant,
         override val lastUpdated: Instant,
+        val mediaRef: String,
     ) : JournalNote(NoteType.IMAGE)
 
     data class Video(
-        val mediaRef: String,
         override val uid: String,
         override val creationTimestamp: Instant,
         override val lastUpdated: Instant,
+        val mediaRef: String,
     ) : JournalNote(NoteType.VIDEO)
 
     data class Audio(

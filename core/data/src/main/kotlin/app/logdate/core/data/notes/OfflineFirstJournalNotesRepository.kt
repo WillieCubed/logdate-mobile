@@ -68,12 +68,11 @@ class OfflineFirstJournalNotesRepository @Inject constructor(
 
     override suspend fun removeById(noteId: String) {
         // TODO: Properly handle deletes, probably need a metadata table just to store the type of note.
-        TODO("Not yet implemented")
-
+        textNoteDao.removeNote(noteId.toInt())
     }
 
     override suspend fun create(note: String, journalId: String) {
-        TODO("Not yet implemented")
+
     }
 
     override suspend fun removeFromJournal(noteId: String, journalId: String) {
