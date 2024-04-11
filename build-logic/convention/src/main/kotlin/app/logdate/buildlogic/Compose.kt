@@ -17,21 +17,23 @@ internal fun Project.configureCompose(commonExtension: BaseExtension) {
 
         val libs: VersionCatalog = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
-        composeOptions {
-            kotlinCompilerExtensionVersion =
-                libs.findVersion("androidxComposeCompiler").get().toString()
-        }
+        with(libs) {
+            composeOptions {
+                kotlinCompilerExtensionVersion =
+                    findVersion("androidxComposeCompiler").get().toString()
+            }
 
-        dependencies {
-            "implementation"(platform(libs.findLibrary("androidx.compose.bom").get()))
-            "implementation"(libs.findLibrary("androidx.compose.ui").get())
-            "implementation"(libs.findLibrary("androidx.compose.material3").get())
-            "implementation"(libs.findLibrary("androidx.ui.tooling.preview").get())
-            // TODO: probably reconsider bundling icons in all Compose-enabled features
-            "implementation"(libs.findLibrary("androidx.compose.icons.extended").get())
-            "debugImplementation"(libs.findLibrary("androidx.ui.tooling").get())
-            "androidTestImplementation"(libs.findLibrary("androidx.compose.ui.test.junit4").get())
-            "androidTestImplementation"(project(":core:testing"))
+            dependencies {
+                "implementation"(platform(findLibrary("androidx.compose.bom").get()))
+                "implementation"(findLibrary("androidx.compose.ui").get())
+                "implementation"(findLibrary("androidx.compose.material3").get())
+                "implementation"(findLibrary("androidx.ui.tooling.preview").get())
+                // TODO: probably reconsider bundling icons in all Compose-enabled features
+                "implementation"(findLibrary("androidx.compose.material.icons.extended").get())
+                "debugImplementation"(findLibrary("androidx.ui.tooling").get())
+                "androidTestImplementation"(findLibrary("androidx.compose.ui.test.junit4").get())
+                "androidTestImplementation"(project(":core:testing"))
+            }
         }
     }
 }

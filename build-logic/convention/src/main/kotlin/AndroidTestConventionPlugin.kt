@@ -25,7 +25,7 @@ class AndroidTestConventionPlugin : Plugin<Project> {
 
             val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
             dependencies {
-                "implementation"(libs.findLibrary("androidx.test.core").get())
+                "implementation"(libs.findLibrary("androidx.test.core.ktx").get())
                 "implementation"(libs.findLibrary("androidx.compose.ui.test.junit4").get())
                 "implementation"(libs.findLibrary("hilt.android").get())
                 "implementation"(libs.findLibrary("hilt.android.testing").get())

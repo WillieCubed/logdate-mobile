@@ -1,5 +1,6 @@
 import app.logdate.buildlogic.configureAndroid
 import app.logdate.buildlogic.configureAndroidApp
+import app.logdate.buildlogic.configureFirebaseDeps
 import app.logdate.buildlogic.configureFirebasePerf
 import com.android.build.gradle.internal.dsl.BaseAppModuleExtension
 import org.gradle.api.Plugin
@@ -26,19 +27,17 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
             extensions.configure<BaseAppModuleExtension> {
                 configureAndroid(commonExtension = this)
                 configureAndroidApp(commonExtension = this)
+                configureFirebaseDeps(commonExtension = this)
                 configureFirebasePerf(commonExtension = this)
             }
 
-            val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
-            dependencies {
-                "implementation"(libs.findLibrary("hilt.android").get())
-                "ksp"(libs.findLibrary("hilt.compiler").get())
-                "androidTestImplementation"(libs.findLibrary("hilt.android.testing").get())
-                "kspAndroidTest"(libs.findLibrary("hilt.android.compiler").get())
-                "implementation"(platform(libs.findLibrary("firebase.bom").get()))
-                "implementation"(libs.findLibrary("firebase.crashlytics").get())
-                "implementation"(libs.findLibrary("firebase.analytics").get())
-                "implementation"(libs.findLibrary("firebase.perf").get())
+            with(extensions.getByType<VersionCatalogsExtension>().named("libs")) {
+                dependencies {
+                    "implementation"(findLibrary("hilt.android").get())
+                    "ksp"(findLibrary("hilt.compiler").get())
+                    "androidTestImplementation"(findLibrary("hilt.android.testing").get())
+                    "kspAndroidTest"(findLibrary("hilt.android.compiler").get())
+                }
             }
 
             extensions.configure<BaseAppModuleExtension> {
@@ -52,11 +51,6 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                     }
                 }
             }
-//            packaging {
-//                resources {
-//                    excludes += "/META-INF/{AL2.0,LGPL2.1}"
-//                }
-//            }
         }
     }
 }

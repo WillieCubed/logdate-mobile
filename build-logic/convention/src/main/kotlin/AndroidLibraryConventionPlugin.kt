@@ -1,4 +1,3 @@
-
 import app.logdate.buildlogic.configureAndroid
 import app.logdate.buildlogic.configureBuildConfig
 import com.android.build.gradle.LibraryExtension
@@ -25,12 +24,13 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
                 configureBuildConfig(this)
             }
 
-            val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
-            dependencies {
-                "implementation"(libs.findLibrary("hilt.android").get())
-                "ksp"(libs.findLibrary("hilt.compiler").get())
-                "androidTestImplementation"(libs.findLibrary("hilt.android.testing").get())
-                "kspAndroidTest"(libs.findLibrary("hilt.android.compiler").get())
+            with(extensions.getByType<VersionCatalogsExtension>().named("libs")) {
+                dependencies {
+                    "implementation"(findLibrary("hilt.android").get())
+                    "ksp"(findLibrary("hilt.compiler").get())
+                    "androidTestImplementation"(findLibrary("hilt.android.testing").get())
+                    "kspAndroidTest"(findLibrary("hilt.android.compiler").get())
+                }
             }
         }
     }
