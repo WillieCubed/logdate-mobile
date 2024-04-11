@@ -15,7 +15,7 @@ dependencies {
     implementation(project(":core:billing"))
     implementation(project(":core:data"))
     implementation(libs.accompanist.permissions)
-    implementation(libs.androidx.material3.window.sizeclass.android)
+    implementation(libs.androidx.compose.material3.windowsizeclass.android)
 
     // Compose in logdate.compose build logic
     implementation(libs.androidx.navigation.compose)
