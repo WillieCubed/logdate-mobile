@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -30,7 +29,6 @@ fun RewindRoute(
     RewindScreen(state, onViewPreviousRewinds, onOpenRewind, modifier)
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun RewindScreen(
     state: RewindUiState,
@@ -50,21 +48,22 @@ internal fun RewindScreen(
             when (state) {
                 is RewindUiState.Loading -> {
                     Text(
-                        "Still working on the rewind",
-                        style = MaterialTheme.typography.headlineLarge,
-                        modifier = Modifier.padding(horizontal = Spacing.lg)
+                        getRewindFlavorText(),
+                        style = MaterialTheme.typography.headlineSmall,
                     )
                     RewindCardPlaceholder(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
                     )
                 }
 
                 is RewindUiState.Loaded -> {
                     val titleText = getRewindFlavorText(state.ready)
                     val textStyle = if (state.ready) {
-                        MaterialTheme.typography.headlineLarge
-                    } else {
                         MaterialTheme.typography.headlineMedium
+                    } else {
+                        MaterialTheme.typography.headlineSmall
                     }
                     Text(
                         titleText,
@@ -75,9 +74,12 @@ internal fun RewindScreen(
                         state.data.label,
                         state.data.title,
                         onOpenRewind,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
                     )
                 }
+
             }
             OutlinedButton(
                 modifier = Modifier.fillMaxWidth(),

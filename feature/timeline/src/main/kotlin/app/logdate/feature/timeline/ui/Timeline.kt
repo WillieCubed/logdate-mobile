@@ -1,6 +1,7 @@
 package app.logdate.feature.timeline.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -98,14 +99,17 @@ private fun TimelineContentItem(
 ) {
     var showOptions by rememberSaveable { mutableStateOf(false) }
     val headerStyle = if (timeDetail == TimeDetail.DAY) {
-
+        MaterialTheme.typography.titleSmall
     } else {
-
+        MaterialTheme.typography.titleLarge
     }
     Row(
         modifier = Modifier
             .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
-            .fillMaxWidth(),
+            .fillMaxWidth()
+            .clickable {
+                onItemSelected(item.uid)
+            },
         horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         TimelineLine(
@@ -125,7 +129,7 @@ private fun TimelineContentItem(
                 Text(
                     item.creationTimestamp.toReadableDateShort(),
                     modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleLarge
+                    style = headerStyle,
                 )
                 IconButton(onClick = { showOptions = !showOptions }) {
                     Icon(imageVector = Icons.Default.MoreVert, contentDescription = "More")
@@ -241,11 +245,11 @@ fun LazyListScope.constructTimeline(
 
 
     // Now we have a map of week number to list of items for that week.
-    itemsGroupedByWeek.forEach { (week, items) ->
+    itemsGroupedByWeek.forEach { (_, items) ->
         item {
             TimelineContentHeader(determineHeaderTitle(date = items.first().creationTimestamp))
         }
-        items.forEachIndexed { index, item ->
+        items.forEachIndexed { _, item ->
             when (zoomLevel) {
                 ZoomLevel.DETAILED -> {
                     item {

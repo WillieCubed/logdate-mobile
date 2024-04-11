@@ -124,7 +124,7 @@ fun RewindCardPlaceholder(
                         MaterialTheme.shapes.small,
                     )
                     .padding(Spacing.sm)
-                    .height(36.dp)
+                    .height(32.dp)
                     .width(240.dp)
             )
         }
