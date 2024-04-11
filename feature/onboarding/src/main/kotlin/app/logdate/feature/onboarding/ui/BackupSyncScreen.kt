@@ -24,6 +24,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.navigation.compose.hiltViewModel
 import app.logdate.core.billing.model.BackupPlanOption
 import app.logdate.feature.onboarding.R
+import app.logdate.ui.AdaptiveLayout
 import app.logdate.ui.theme.Spacing
 
 @Composable
