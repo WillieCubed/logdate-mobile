@@ -34,6 +34,7 @@ splashscreen = "1.1.0-rc01"
 credentials = "1.2.2"
 cameraCore = "1.3.2"
 activityKtx = "1.8.2"
+billingKtx = "6.2.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -93,6 +94,7 @@ firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashly
 firebase-perf = { group = "com.google.firebase", name = "firebase-perf" }
 firebase-perf-plugin = { group = "com.google.firebase", name = "perf-plugin", version.ref = "perfPlugin" }
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
+billing-ktx = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "billingKtx" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
