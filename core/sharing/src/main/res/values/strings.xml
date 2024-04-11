@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="share_title_share_journal">Share journal</string>
+    <string name="action_label_share_qr_code">Share QR code</string>
+    <string name="action_label_add_to_journal">Add to journal</string>
+</resources>
