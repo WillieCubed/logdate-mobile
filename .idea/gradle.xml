@@ -43,6 +43,7 @@
             <option value="$PROJECT_DIR$/core/sharing" />
             <option value="$PROJECT_DIR$/core/sync" />
             <option value="$PROJECT_DIR$/core/testing" />
+            <option value="$PROJECT_DIR$/core/theme" />
             <option value="$PROJECT_DIR$/core/ui" />
             <option value="$PROJECT_DIR$/core/util" />
             <option value="$PROJECT_DIR$/core/world" />

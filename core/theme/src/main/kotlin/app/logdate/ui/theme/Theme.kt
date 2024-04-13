@@ -14,13 +14,12 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
-)
-
-private val LightColorScheme = lightColorScheme(
+/**
+ * The default light color scheme for the LogDate app.
+ *
+ * This should be used when dynamic color scheme is not available on Android 12+ devices.
+ */
+val LightColorScheme = lightColorScheme(
     primary = Purple40,
     secondary = PurpleGrey40,
     tertiary = Pink40
@@ -36,11 +35,32 @@ private val LightColorScheme = lightColorScheme(
     */
 )
 
+/**
+ * The default dark color scheme for the LogDate app.
+ *
+ * This should be used when dynamic color scheme is not available on Android 12+ devices.
+ */
+val DarkColorScheme = darkColorScheme(
+    primary = Purple80,
+    secondary = PurpleGrey80,
+    tertiary = Pink80
+)
+
+/**
+ * A theme for the LogDate app.
+ *
+ * The LogDate theme uses Material You's dynamic color scheme on Android 12+ devices. When dynamic
+ * color is not available, a default dark or light color scheme is used based on the system's dark
+ * theme setting.
+ *
+ * @param dynamicColor Whether to use dynamic color scheme on Android 12+ devices.
+ * @param darkTheme Whether the theme should be dark.
+ * @param content The content of the theme.
+ */
 @Composable
 fun LogDateTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
     dynamicColor: Boolean = true,
+    darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {

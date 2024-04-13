@@ -33,8 +33,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import app.logdate.feature.onboarding.R
-import app.logdate.ui.theme.LogDateTheme
-import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
 
 /**
@@ -106,14 +104,14 @@ private fun CompletionStreakContent(
         ) {
             Column(
                 modifier = Modifier
-                    .padding(Spacing.lg)
+                    .padding(app.logdate.ui.theme.Spacing.lg)
                     .widthIn(max = 320.dp),
                 verticalArrangement = Arrangement.spacedBy(48.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text("One more thing...", style = MaterialTheme.typography.headlineMedium)
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(Spacing.xl),
+                    verticalArrangement = Arrangement.spacedBy(app.logdate.ui.theme.Spacing.xl),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
 
@@ -132,7 +130,7 @@ private fun CompletionStreakContent(
                 onContinue,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(Spacing.lg)
+                    .padding(app.logdate.ui.theme.Spacing.lg)
                     .fillMaxWidth()
             ) {
                 Text(stringResource(R.string.action_onboarding_continue))
@@ -181,7 +179,7 @@ private fun CompletionFinalContent() {
 @Preview(name = "Onboarding Final Screen 1")
 @Composable
 private fun PreviewCompletionStreakContent() {
-    LogDateTheme {
+    app.logdate.ui.theme.LogDateTheme {
         CompletionStreakContent(onContinue = {})
     }
 }
@@ -189,7 +187,7 @@ private fun PreviewCompletionStreakContent() {
 @Preview(name = "Onboarding Final Screen 2")
 @Composable
 private fun PreviewCompletionFinalContent() {
-    LogDateTheme {
+    app.logdate.ui.theme.LogDateTheme {
         CompletionFinalContent()
     }
 }

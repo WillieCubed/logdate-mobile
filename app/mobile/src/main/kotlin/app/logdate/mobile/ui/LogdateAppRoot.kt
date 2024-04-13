@@ -22,7 +22,6 @@ import app.logdate.mobile.ui.common.MainAppState
 import app.logdate.mobile.ui.common.rememberMainAppState
 import app.logdate.mobile.ui.navigation.RouteDestination
 import app.logdate.mobile.ui.navigation.navigateToRewindList
-import app.logdate.ui.theme.LogDateTheme
 
 /**
  * Main wrapper for app UI and navigation.
@@ -126,7 +125,7 @@ fun LogdateAppRoot(
 @Preview(showBackground = true, name = "App Preview - Phone")
 @Composable
 fun AppPreview_Mobile() {
-    LogDateTheme {
+    app.logdate.ui.theme.LogDateTheme {
         val appState = rememberMainAppState(
             windowSizeClass = WindowSizeClass.calculateFromSize(DpSize(412.dp, 918.dp)),
         )
@@ -138,7 +137,7 @@ fun AppPreview_Mobile() {
 @Preview(showBackground = true, name = "App Preview - Tablet", device = "id:pixel_tablet")
 @Composable
 fun AppPreview_Tablet() {
-    LogDateTheme {
+    app.logdate.ui.theme.LogDateTheme {
         val appState = rememberMainAppState(
             windowSizeClass = WindowSizeClass.calculateFromSize(DpSize(1280.dp, 720.dp)),
         )

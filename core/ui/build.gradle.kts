@@ -12,4 +12,5 @@ dependencies {
     // Compose in logdate.compose build logic
     implementation(libs.kotlinx.datetime)
     implementation(project(":core:util"))
+    api(project(":core:theme"))
 }

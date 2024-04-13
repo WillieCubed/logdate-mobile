@@ -20,7 +20,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.R
-import app.logdate.ui.theme.Spacing
 
 @Composable
 fun LocationChip(
@@ -34,9 +33,12 @@ fun LocationChip(
             .background(MaterialTheme.colorScheme.tertiaryContainer)
             .border(2.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.large)
             .clickable(onClick = onClick)
-            .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+            .padding(
+                horizontal = app.logdate.ui.theme.Spacing.sm,
+                vertical = app.logdate.ui.theme.Spacing.xs
+            ),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+        horizontalArrangement = Arrangement.spacedBy(app.logdate.ui.theme.Spacing.xs),
     ) {
         val icon = if (enabled) {
             Icons.Default.LocationOn

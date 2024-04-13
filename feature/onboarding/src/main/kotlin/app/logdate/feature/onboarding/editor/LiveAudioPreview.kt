@@ -12,7 +12,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import app.logdate.ui.theme.Spacing
 import java.util.concurrent.TimeUnit
 
 data class AudioPreviewData(
@@ -39,7 +38,7 @@ fun LiveAudioPreview(
 ) {
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(app.logdate.ui.theme.Spacing.sm),
     ) {
         if (audioPreviewData.canUseAudio) {
             Column(
@@ -77,14 +76,14 @@ private fun WaveformBlock(
         shape = MaterialTheme.shapes.medium,
     ) {
         Column(
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            modifier = Modifier.padding(Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(app.logdate.ui.theme.Spacing.sm),
+            modifier = Modifier.padding(app.logdate.ui.theme.Spacing.md),
         ) {
             // Show a recording indicator if the audio is playing
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(
-                    Spacing.sm, Alignment.CenterHorizontally
+                    app.logdate.ui.theme.Spacing.sm, Alignment.CenterHorizontally
                 ),
             ) {
                 Text(
