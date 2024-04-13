@@ -1,5 +1,6 @@
 [versions]
 androidGradlePlugin = "8.3.2"
+dokkaGradlePlugin = "1.5.0"
 kotlin = "1.9.23"
 kotlinxDatetime = "0.6.0-RC.2"
 kotlinxCoroutines = "1.8.0"
@@ -35,6 +36,7 @@ billingKtx = "6.2.0"
 # Core
 android-tools-build-gradle-plugin = { group = "com.android.tools.build", name = "gradle", version.ref = "androidGradlePlugin" }
 kotlin-gradle-plugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
+dokka-gradle-plugin = { module = "org.jetbrains.dokka:dokka-gradle-plugin", version.ref = "dokkaGradlePlugin" }
 
 # AndroidX libraries
 ## Core
@@ -123,3 +125,4 @@ logdate-android-test = { id = "logdate.android.test", version = "unspecified" }
 logdate-jvm-library = { id = "logdate.jvm.library", version = "unspecified" }
 logdate-compose = { id = "logdate.compose", version = "unspecified" }
 logdate-dynamic = { id = "logdate.dynamic", version = "unspecified" }
+logdate-documentation = { id = "logdate.documentation", version = "unspecified" }

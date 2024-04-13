@@ -8,6 +8,7 @@ buildscript {
         classpath(libs.android.tools.build.gradle.plugin)
         classpath(libs.kotlin.gradle.plugin)
         classpath(libs.hilt.gradle.plugin)
+        classpath(libs.dokka.gradle.plugin)
     }
 }
 
@@ -21,6 +22,7 @@ plugins {
     alias(libs.plugins.logdate.jvm.library) apply false
     alias(libs.plugins.logdate.compose) apply false
     alias(libs.plugins.logdate.dynamic) apply false
+    alias(libs.plugins.logdate.documentation) apply false
     alias(libs.plugins.firebase.crashlytics) apply false
     alias(libs.plugins.firebase.perf) apply false
     alias(libs.plugins.google.gms) apply false

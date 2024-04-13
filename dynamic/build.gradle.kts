@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.logdate.dynamic)
+    alias(libs.plugins.logdate.documentation)
 }
 
 android {

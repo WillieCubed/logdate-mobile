@@ -33,3 +33,13 @@ Once you have the Meta app ID, add it to your `local.properties` file:
 ```properties
 metaAppId="<your-meta-app-id>"
 ```
+
+## Generating Documentation
+
+TODO: Figure out why documentation task fails
+
+To generate the documentation for all modules for this project, run the following command:
+
+```shell
+./gradlew dokkaHtmlMultiModule
+```

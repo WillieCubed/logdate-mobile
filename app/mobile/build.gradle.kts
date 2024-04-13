@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.logdate.android.application)
     alias(libs.plugins.logdate.compose)
+    alias(libs.plugins.logdate.documentation)
 }
 
 android {
@@ -36,12 +37,14 @@ dependencies {
     implementation(project(":feature:journals"))
     implementation(project(":feature:rewind"))
     implementation(project(":feature:editor"))
+    implementation(project(":feature:widgets"))
     implementation(project(":core:assets"))
     implementation(project(":core:util"))
     implementation(project(":core:ui"))
     implementation(project(":core:assist"))
     implementation(project(":core:data"))
     implementation(project(":core:notifications"))
+    implementation(project(":core:theme"))
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
