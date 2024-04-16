@@ -30,6 +30,7 @@ androidxTestExt = "1.1.5"
 androidxTestRunner = "1.5.2"
 accompanist = "0.35.0-alpha"
 playServicesLocation = "21.2.0"
+playInstallReferrer = "2.2"
 billingKtx = "6.2.0"
 
 [libraries]
@@ -83,6 +84,7 @@ androidx-datastore-preferences = { group = "androidx.datastore", name = "datasto
 # Google Play Services
 play-services-instantapps = { module = "com.google.android.gms:play-services-instantapps", version = "18.0.1" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+play-install-referrer = { group = "com.android.installreferrer", name = "installreferrer", version.ref = "playInstallReferrer" }
 
 # Dependency injection with Hilt
 hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
