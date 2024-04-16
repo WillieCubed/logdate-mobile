@@ -1,5 +1,6 @@
 package app.logdate.mobile.home.ui
 
+import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
@@ -46,6 +47,7 @@ import app.logdate.feature.timeline.ui.TimelineRoute
 import app.logdate.mobile.R
 import app.logdate.ui.theme.LogDateTheme
 
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -127,7 +129,7 @@ fun HomeScreen(
         },
         floatingActionButtonPosition = fabPosition,
         floatingActionButton = {
-            if (shouldShowNavRail) {
+            if (isLargeDevice) {
                 // No need to render duplicate FAB if the nav rail is showing
                 return@Scaffold
             }
@@ -180,18 +182,17 @@ fun HomeScreen(
         Row(
             Modifier
                 .fillMaxSize()
-                .padding(it)
                 .consumeWindowInsets(it)
+                .padding(it)
                 .windowInsetsPadding(
                     WindowInsets.safeDrawing.only(
                         WindowInsetsSides.Horizontal,
                     ),
                 ),
         ) {
-            // TODO: Maybe reconsider, maybe just center if FAB is not shown
             if (shouldShowNavRail) {
                 val itemPosition = if (isLargeDevice) {
-                    NavigationItemsPosition.CENTER
+                    NavigationItemsPosition.BOTTOM
                 } else {
                     NavigationItemsPosition.TOP
                 }
@@ -200,6 +201,7 @@ fun HomeScreen(
                     ::handleNavUpdate,
                     ::handleFabAction,
                     itemsPosition = itemPosition,
+                    shouldShowFab = isLargeDevice,
                 )
             }
             when (currentDestination) {
@@ -242,6 +244,24 @@ fun HomeScreenPreview_Phone() {
             onOpenJournal = { },
             onNewJournal = { },
             onOpenSettings = { },
+        )
+    }
+}
+
+@Preview(device = "spec:parent=pixel_5,orientation=landscape")
+@Composable
+fun HomeScreenPreview_Phone_Landscape() {
+    LogDateTheme {
+        HomeScreen(
+            currentDestination = HomeRouteData.Timeline,
+            onUpdateDestination = { },
+            onCreateEntry = { },
+            onViewPreviousRewinds = { },
+            onOpenJournal = { },
+            onNewJournal = { },
+            onOpenSettings = { },
+            shouldShowBottomBar = false,
+            shouldShowNavRail = true,
         )
     }
 }

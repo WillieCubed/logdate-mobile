@@ -14,7 +14,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import app.logdate.core.assist.AssistantActionsProvider
 import app.logdate.core.assist.AssistantContextProvider
 import app.logdate.core.assist.toDirectAction
@@ -60,30 +62,11 @@ class MainActivity : FragmentActivity() {
 
         var uiState: LaunchAppUiState by mutableStateOf(LaunchAppUiState.Loading)
 
-        enableEdgeToEdge()
         lifecycleScope.launch {
-            viewModel.uiState.onEach {
-                uiState = it
-            }.collect {
-                when (it) {
-                    is LaunchAppUiState.Loaded -> setContent {
-                        val appState = rememberMainAppState(
-                            windowSizeClass = calculateWindowSizeClass(this@MainActivity),
-                        )
-                        LogDateTheme {
-                            LogdateAppRoot(
-                                appState,
-                                onboarded = it.isOnboarded,
-                            )
-                        }
-                        if (it.isOnboarded && it.isBiometricEnabled) {
-                            // TODO: Handle back navigation when the user cancels the biometric prompt
-                            viewModel.showBiometricPrompt(this@MainActivity)
-                        }
-                    }
-
-                    LaunchAppUiState.Loading -> {}
-                }
+            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState
+                    .onEach { uiState = it }
+                    .collect {}
             }
         }
 
@@ -94,6 +77,17 @@ class MainActivity : FragmentActivity() {
             }
         }
 
+        enableEdgeToEdge()
+        setContent {
+            val appState = rememberMainAppState(
+                windowSizeClass = calculateWindowSizeClass(this@MainActivity),
+            )
+            LogDateTheme {
+                LogdateAppRoot(
+                    appState,
+                )
+            }
+        }
     }
 
     override fun onProvideAssistContent(assistContent: AssistContent) {

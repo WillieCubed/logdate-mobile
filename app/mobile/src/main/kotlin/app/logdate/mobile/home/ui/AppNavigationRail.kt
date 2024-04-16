@@ -19,8 +19,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.mobile.R
 
 enum class NavigationItemsPosition {
-    TOP,
-    CENTER,
+    TOP, CENTER, BOTTOM,
 }
 
 /**
@@ -32,7 +31,7 @@ fun AppNavigationRail(
     onNavigationUpdate: (route: HomeRouteData) -> Unit,
     onFabAction: () -> Unit,
     modifier: Modifier = Modifier,
-    itemsPosition: NavigationItemsPosition = NavigationItemsPosition.CENTER,
+    itemsPosition: NavigationItemsPosition = NavigationItemsPosition.TOP,
     shouldShowFab: Boolean = true,
 ) {
     NavigationRail(
@@ -75,13 +74,9 @@ fun AppNavigationRail(
         },
     ) {
         val itemsArrangement = when (itemsPosition) {
-            NavigationItemsPosition.TOP -> {
-                Arrangement.Top
-            }
-
-            NavigationItemsPosition.CENTER -> {
-                Arrangement.Center
-            }
+            NavigationItemsPosition.TOP -> Arrangement.Top
+            NavigationItemsPosition.CENTER -> Arrangement.Center
+            NavigationItemsPosition.BOTTOM -> Arrangement.Bottom
         }
         Column(
             Modifier.fillMaxHeight(),

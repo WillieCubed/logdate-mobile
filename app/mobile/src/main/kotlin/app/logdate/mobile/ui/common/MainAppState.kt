@@ -50,9 +50,12 @@ class MainAppState(
             else -> false
         }
 
-    val isLargeDevice: Boolean =
-        windowSizeClass.heightSizeClass == WindowHeightSizeClass.Medium
-                || windowSizeClass.heightSizeClass == WindowHeightSizeClass.Expanded
+    val isLargeDevice: Boolean = when {
+        windowSizeClass.heightSizeClass != WindowHeightSizeClass.Compact &&
+                windowSizeClass.widthSizeClass != WindowWidthSizeClass.Compact -> true
+
+        else -> false
+    }
 
     val shouldShowMainAppBar: Boolean
         @Composable get() = isAtTopLevelRoute
@@ -61,7 +64,7 @@ class MainAppState(
         get() = windowSizeClass.widthSizeClass == WindowWidthSizeClass.Compact
 
     val shouldShowNavRail: Boolean
-        @Composable get() = !shouldShowBottomBar && isAtTopLevelRoute
+        @Composable get() = !shouldShowBottomBar
 
 
 }
