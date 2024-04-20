@@ -2,6 +2,8 @@ import app.logdate.buildlogic.configureAndroid
 import app.logdate.buildlogic.configureAndroidApp
 import app.logdate.buildlogic.configureFirebaseDeps
 import app.logdate.buildlogic.configureFirebasePerf
+import app.logdate.buildlogic.configureFlavors
+import app.logdate.buildlogic.configureHilt
 import com.android.build.gradle.internal.dsl.BaseAppModuleExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -29,6 +31,8 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                 configureAndroidApp(commonExtension = this)
                 configureFirebaseDeps(commonExtension = this)
                 configureFirebasePerf(commonExtension = this)
+                configureHilt()
+                configureFlavors(this)
             }
 
             with(extensions.getByType<VersionCatalogsExtension>().named("libs")) {

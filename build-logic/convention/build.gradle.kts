@@ -12,6 +12,7 @@ java {
 dependencies {
     compileOnly(libs.android.tools.build.gradle.plugin)
     compileOnly(libs.kotlin.gradle.plugin)
+    compileOnly(libs.hilt.gradle.plugin)
     compileOnly(libs.firebase.perf.plugin)
     compileOnly(libs.dokka.gradle.plugin)
 }

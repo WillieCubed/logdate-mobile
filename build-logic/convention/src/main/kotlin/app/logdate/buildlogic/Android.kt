@@ -2,6 +2,7 @@ package app.logdate.buildlogic
 
 import com.android.build.api.dsl.CommonExtension
 import com.android.build.gradle.internal.dsl.BaseAppModuleExtension
+import dagger.hilt.android.plugin.HiltExtension
 import org.gradle.api.JavaVersion
 import org.gradle.api.Project
 import org.gradle.api.plugins.JavaPluginExtension
@@ -88,8 +89,18 @@ internal fun Project.configureAndroid(commonExtension: CommonExtension<*, *, *, 
                 excludes += "/META-INF/{AL2.0,LGPL2.1}"
             }
         }
+
     }
     configureKotlin()
+}
+
+/**
+ * Configures the Hilt plugin for the project.
+ */
+internal fun Project.configureHilt() {
+    extensions.configure<HiltExtension> {
+        enableAggregatingTask = true
+    }
 }
 
 /**
