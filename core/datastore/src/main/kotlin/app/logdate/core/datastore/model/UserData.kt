@@ -11,7 +11,16 @@ data class UserData(
     val onboardedDate: Instant,
     val securityLevel: AppSecurityLevel,
     val favoriteNotes: List<String>,
-)
+) {
+    companion object {
+        val DEFAULT = UserData(
+            isOnboarded = false,
+            onboardedDate = Instant.DISTANT_PAST,
+            securityLevel = AppSecurityLevel.NONE,
+            favoriteNotes = emptyList(),
+        )
+    }
+}
 
 /**
  * The level of security for interacting with the app.

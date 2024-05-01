@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -84,11 +85,11 @@ internal fun TimelineOriginItem(
             ) {
                 Text(
                     stringResource(R.string.timeline_origin_day_birthday_message),
-                    style = MaterialTheme.typography.headlineMedium
+                    style = MaterialTheme.typography.headlineMedium,
                 )
                 Text(
-                    stringResource(R.string.timeline_origin_day_counter, originDate.daysUntilNow),
-                    style = MaterialTheme.typography.headlineSmall
+                    pluralStringResource(R.plurals.timeline_origin_day_counter, originDate.daysUntilNow),
+                    style = MaterialTheme.typography.headlineSmall,
                 )
             }
         }

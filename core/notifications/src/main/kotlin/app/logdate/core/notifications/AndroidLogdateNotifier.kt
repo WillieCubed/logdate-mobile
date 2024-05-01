@@ -8,6 +8,7 @@ import android.graphics.drawable.Icon
 import androidx.annotation.DrawableRes
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationManagerCompat
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.datetime.Instant
 import javax.inject.Inject
 
@@ -15,7 +16,7 @@ import javax.inject.Inject
  * A notification manager for Android devices.
  */
 class AndroidLogdateNotifier @Inject constructor(
-    private val context: Context,
+    @ApplicationContext private val context: Context,
 ) : Notifier {
 
     private val notificationManager = NotificationManagerCompat.from(context)

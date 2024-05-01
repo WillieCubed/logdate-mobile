@@ -1,6 +1,6 @@
+
 import app.logdate.buildlogic.configureAndroid
 import app.logdate.buildlogic.configureBuildConfig
-import app.logdate.buildlogic.configureFlavors
 import app.logdate.buildlogic.configureHilt
 import com.android.build.gradle.LibraryExtension
 import org.gradle.api.Plugin
@@ -25,7 +25,7 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
                 configureAndroid(this)
                 configureHilt()
                 configureBuildConfig(this)
-                configureFlavors(this)
+//                configureFlavors(this)
             }
 
             with(extensions.getByType<VersionCatalogsExtension>().named("libs")) {

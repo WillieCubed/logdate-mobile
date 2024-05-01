@@ -21,4 +21,6 @@ dependencies {
     // Compose in logdate.compose build logic
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation(project(":feature:editor"))
+    implementation(project(":core:notifications")) // TODO: Remove this once editor UI is refactored into separate module
 }

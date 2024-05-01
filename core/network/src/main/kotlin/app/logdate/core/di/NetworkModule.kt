@@ -12,7 +12,7 @@ import javax.inject.Singleton
  */
 @Module
 @InstallIn(SingletonComponent::class)
-internal abstract class NetworkModule {
+internal object NetworkModule {
     @Provides
     @Singleton
     fun providesNetworkJson(): Json = Json {

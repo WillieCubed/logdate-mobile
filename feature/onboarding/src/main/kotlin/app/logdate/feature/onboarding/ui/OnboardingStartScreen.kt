@@ -84,6 +84,7 @@ private fun OnboardingSplashContent() {
     }
 
     Column(
+        modifier = Modifier.widthIn(max = 444.dp),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg * 4, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -122,6 +123,7 @@ private fun OnboardingLandingContent(
         verticalArrangement = Arrangement.Center,
     ) {
         Column(
+            // TODO: Reduce spacing between buttons and title block on screens with less height
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(96.dp, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally,

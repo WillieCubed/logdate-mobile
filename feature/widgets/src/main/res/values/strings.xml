@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_error_no_account_title">Sign in to continue</string>
+    <string name="widget_error_no_account_description">This feature requires LogDate Cloud to use. Tap to sign in.</string>
+    <string name="widget_error_no_photos_title">No photos</string>
+    <string name="widget_error_no_photos_description">Looks like you need some memories. Tap to configure.</string>
+    <string name="widget_error_unknown_title">Uh oh!</string>
+    <string name="widget_error_unknown_description">Something went wrong. Try removing and re-adding this widget.</string>
+    <string name="photo_widget_description">A widget that displays a photo from your library.</string>
+    <string name="photo_widget_name">Photo App Widget</string>
+</resources>

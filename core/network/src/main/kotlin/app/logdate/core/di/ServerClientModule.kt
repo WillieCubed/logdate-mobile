@@ -9,8 +9,8 @@ import dagger.hilt.components.SingletonComponent
 
 @InstallIn(SingletonComponent::class)
 @Module
-abstract class ServerClientModule {
+internal object ServerClientModule {
     // TODO: Fetch domain from configuration
     @Provides
-    fun bindLogdateServerClient(): LogdateServerBaseClient = LogdateServerClient("logdate.app")
+    fun provideLogdateServerClient(): LogdateServerBaseClient = LogdateServerClient("logdate.app")
 }

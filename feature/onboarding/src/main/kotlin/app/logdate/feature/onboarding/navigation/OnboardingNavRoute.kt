@@ -1,10 +1,13 @@
 package app.logdate.feature.onboarding.navigation
 
 import androidx.compose.animation.scaleOut
+import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import app.logdate.feature.onboarding.ui.EntryCreationScreenWrapper
 import app.logdate.feature.onboarding.ui.OnboardingCompletionScreen
+import app.logdate.feature.onboarding.ui.OnboardingNotificationConfirmationScreen
+import app.logdate.feature.onboarding.ui.OnboardingNotificationScreen
 import app.logdate.feature.onboarding.ui.OnboardingOverviewScreen
 import app.logdate.feature.onboarding.ui.OnboardingStartScreen
 import app.logdate.feature.onboarding.ui.WelcomeBackScreen
@@ -17,10 +20,25 @@ const val ONBOARDING_SIGN_IN_2FA = "onboarding/2fa"
 const val ONBOARDING_NEW_ENTRY = "onboarding/new_entry"
 const val ONBOARDING_NEW_ENTRY_REVIEW = "onboarding/new_entry_review"
 const val ONBOARDING_IMPORT_MEMORIES = "onboarding/import"
+const val ONBOARDING_ENABLE_NOTIFICATIONS = "onboarding/notification_enable"
+const val ONBOARDING_NOTIFICATIONS_CONFIRMATION = "onboarding/notification_confirmation"
 const val ONBOARDING_BACKUP_SYNC_CONFIGURE = "onboarding/backup_sync_configure"
 const val ONBOARDING_BACKUP_SYNC_REVIEW = "onboarding/backup_sync_review"
 const val ONBOARDING_LAST = "onboarding/last"
 const val ONBOARDING_WELCOME_BACK = "onboarding/welcome_back"
+
+/**
+ * Launches the onboarding flow.
+ *
+ * This navigate the user to the onboarding flow, clearing any previous screens.
+ */
+fun NavController.launchOnboarding() {
+    navigate(ONBOARDING_ROUTE) {
+        popUpTo(ONBOARDING_ROUTE) {
+            inclusive = true
+        }
+    }
+}
 
 fun NavGraphBuilder.onboardingGraph(
     useCompactLayout: Boolean = true,
@@ -57,12 +75,33 @@ fun NavGraphBuilder.onboardingGraph(
         EntryCreationScreenWrapper(
             onBack = onNavigateBack,
             onNext = {
-                onGoToItem(ONBOARDING_LAST)
+                onGoToItem(ONBOARDING_ENABLE_NOTIFICATIONS)
             },
             useCompactLayout = useCompactLayout,
         )
     }
     composable(route = ONBOARDING_NEW_ENTRY_REVIEW) {
+    }
+    composable(route = ONBOARDING_ENABLE_NOTIFICATIONS) {
+        OnboardingNotificationScreen(
+            onBack = {
+                onNavigateBack()
+            },
+            onNext = {
+                onGoToItem(ONBOARDING_NOTIFICATIONS_CONFIRMATION)
+            },
+            useCompactLayout = useCompactLayout,
+        )
+    }
+    composable(route = ONBOARDING_NOTIFICATIONS_CONFIRMATION) {
+        OnboardingNotificationConfirmationScreen(
+            // TODO: Skip ONBOARDING_ENABLE_NOTIFICATIONS if notifications are already enabled
+            onBack = onNavigateBack,
+            onNext = {
+                onGoToItem(ONBOARDING_LAST)
+            },
+            useCompactLayout = useCompactLayout,
+        )
     }
     composable(route = ONBOARDING_IMPORT_MEMORIES) {
     }

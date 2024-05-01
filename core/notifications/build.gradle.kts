@@ -7,9 +7,11 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:coroutines"))
+    implementation(project(":core:network"))
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.datetime)
-    implementation(project(":core:coroutines"))
+    implementation(libs.firebase.messaging.ktx)
 
     // Unit testing
     testImplementation(libs.junit)

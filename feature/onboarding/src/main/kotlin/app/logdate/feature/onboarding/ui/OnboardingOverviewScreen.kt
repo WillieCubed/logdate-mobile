@@ -3,7 +3,10 @@ package app.logdate.feature.onboarding.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -23,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +34,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
@@ -42,12 +47,21 @@ fun OnboardingOverviewScreen(
     onNext: () -> Unit,
     useSplitScreen: Boolean = false,
 ) {
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val scrollState = rememberTopAppBarState()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(scrollState)
 
     Scaffold(
         topBar = {
             LargeTopAppBar(
-                title = { Text("Here's how this works.") },
+                title = {
+                    Text(
+                        if (scrollState.collapsedFraction > 0.6f) {
+                            "Overview"
+                        } else {
+                            "Here's how this works."
+                        }, // TODO: Localize this
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "Back")
@@ -61,11 +75,15 @@ fun OnboardingOverviewScreen(
         if (!useSplitScreen) {
             LazyColumn(
                 modifier = Modifier
-                    .padding(contentPadding)
                     .fillMaxHeight()
                     .widthIn(max = 444.dp)
-                    .padding(Spacing.lg)
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
+                contentPadding = PaddingValues(
+                    top = contentPadding.calculateTopPadding() + Spacing.lg,
+                    bottom = contentPadding.calculateBottomPadding() + Spacing.lg,
+                    start = contentPadding.calculateStartPadding(LayoutDirection.Ltr) + Spacing.lg,
+                    end = contentPadding.calculateEndPadding(LayoutDirection.Ltr) + Spacing.lg,
+                ),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -84,8 +102,7 @@ fun OnboardingOverviewScreen(
                         description = "Create a journal for the people you care about - whether your climbing buddies, your crochet club, or your family. Even if they don’t use LogDate, they can still join in and add stuff.",
                         icon = {
                             Icon(
-                                painterResource(coreR.drawable.book_open),
-                                contentDescription = null
+                                painterResource(coreR.drawable.book_open), contentDescription = null
                             )
                         },
                     )
@@ -168,7 +185,7 @@ private fun OnboardingOverviewScreenPreview() {
 @Composable
 private fun OnboardingOverviewScreenPreview_Compact_Landscape() {
     LogDateTheme {
-        OnboardingOverviewScreen(onBack = {}, onNext = {})
+        OnboardingOverviewScreen(onBack = {}, onNext = {}, useSplitScreen = true)
     }
 }
 
@@ -176,6 +193,6 @@ private fun OnboardingOverviewScreenPreview_Compact_Landscape() {
 @Composable
 private fun OnboardingOverviewScreenPreview_Medium_Landscape() {
     LogDateTheme {
-        OnboardingOverviewScreen(onBack = {}, onNext = {})
+        OnboardingOverviewScreen(onBack = {}, onNext = {}, useSplitScreen = true)
     }
 }

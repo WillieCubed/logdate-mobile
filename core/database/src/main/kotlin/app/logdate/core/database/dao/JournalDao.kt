@@ -7,13 +7,20 @@ import androidx.room.Upsert
 import app.logdate.core.database.model.JournalEntity
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Data access object for journals.
+ */
 @Dao
 interface JournalDao {
+
     @Query("SELECT * FROM journals WHERE id = :id")
     fun observeJournalById(id: String): Flow<JournalEntity>
 
     @Query("SELECT * FROM journals")
     fun observeAll(): Flow<List<JournalEntity>>
+
+    @Query("SELECT * FROM journals")
+    suspend fun getAll(): List<JournalEntity>
 
     /**
      * Creates a new journal.

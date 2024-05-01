@@ -30,21 +30,27 @@
             <option value="$PROJECT_DIR$/core/assets" />
             <option value="$PROJECT_DIR$/core/assist" />
             <option value="$PROJECT_DIR$/core/audiorecorder" />
+            <option value="$PROJECT_DIR$/core/backup" />
             <option value="$PROJECT_DIR$/core/billing" />
             <option value="$PROJECT_DIR$/core/camera" />
             <option value="$PROJECT_DIR$/core/coroutines" />
             <option value="$PROJECT_DIR$/core/data" />
             <option value="$PROJECT_DIR$/core/database" />
             <option value="$PROJECT_DIR$/core/datastore" />
+            <option value="$PROJECT_DIR$/core/install-referrer" />
             <option value="$PROJECT_DIR$/core/lib" />
             <option value="$PROJECT_DIR$/core/media" />
             <option value="$PROJECT_DIR$/core/model" />
+            <option value="$PROJECT_DIR$/core/network" />
             <option value="$PROJECT_DIR$/core/notifications" />
+            <option value="$PROJECT_DIR$/core/prompter" />
             <option value="$PROJECT_DIR$/core/sharing" />
+            <option value="$PROJECT_DIR$/core/status" />
             <option value="$PROJECT_DIR$/core/sync" />
             <option value="$PROJECT_DIR$/core/testing" />
             <option value="$PROJECT_DIR$/core/theme" />
             <option value="$PROJECT_DIR$/core/ui" />
+            <option value="$PROJECT_DIR$/core/updater" />
             <option value="$PROJECT_DIR$/core/util" />
             <option value="$PROJECT_DIR$/core/world" />
             <option value="$PROJECT_DIR$/dynamic" />
@@ -56,8 +62,7 @@
             <option value="$PROJECT_DIR$/feature/onboarding" />
             <option value="$PROJECT_DIR$/feature/rewind" />
             <option value="$PROJECT_DIR$/feature/timeline" />
-            <option value="$PROJECT_DIR$/test" />
-            <option value="$PROJECT_DIR$/test/navigation" />
+            <option value="$PROJECT_DIR$/feature/widgets" />
           </set>
         </option>
         <option name="resolveExternalAnnotations" value="false" />

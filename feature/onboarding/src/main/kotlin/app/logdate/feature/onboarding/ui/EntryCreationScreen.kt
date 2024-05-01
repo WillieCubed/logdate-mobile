@@ -60,9 +60,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import app.logdate.core.camera.LensDirection
 import app.logdate.core.camera.LiveCameraPreview
-import app.logdate.feature.onboarding.editor.AudioPreviewData
+import app.logdate.feature.editor.ui.AudioPreviewData
 import app.logdate.feature.onboarding.editor.LiveAudioPreview
 import app.logdate.ui.AdaptiveLayout
+import app.logdate.ui.ButtonType
+import app.logdate.ui.FunButton
 import app.logdate.ui.conditional
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
@@ -101,21 +103,21 @@ fun EntryCreationScreenWrapper(
     onNext: () -> Unit,
     viewModel: OnboardingViewModel = hiltViewModel(),
 ) {
+    val uiState by viewModel.uiState.collectAsState()
+
     val permissionStateHolder = PermissionStateHolder(
         audioPermissionState = rememberPermissionState(Manifest.permission.RECORD_AUDIO),
         photoPermissionState = rememberPermissionState(Manifest.permission.CAMERA),
     )
-
-    val uiState by viewModel.uiState.collectAsState()
 
     EntryCreationScreen(
         useCompactLayout = useCompactLayout,
         onBack = onBack,
         onNext = onNext,
         audioPreviewData = AudioPreviewData(
-            currentText = uiState.newEntryData.transcribedSpeech,
+            currentText = uiState.newEntryData.recorderState.currentTranscription.transcription,
             currentDuration = 0,
-            isPlaying = uiState.newEntryData.isRecordingAudio,
+            isPlaying = uiState.newEntryData.recorderState.isRecording,
             canUseAudio = permissionStateHolder.audioPermissionGranted,
         ),
         permissionStateHolder = permissionStateHolder,
@@ -366,7 +368,7 @@ internal fun EntryCreationContent(
     fun handleCreateEntry() {
         onCreateEntry(
             NewEntryData(
-                recordedTimestamp = entryRecordTime,
+                timestamp = entryRecordTime,
                 textContent = textContent,
             )
         )

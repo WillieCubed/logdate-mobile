@@ -13,6 +13,7 @@ import androidx.navigation.compose.rememberNavController
 import app.logdate.feature.editor.navigation.navigateToNoteCreation
 import app.logdate.feature.journals.navigation.navigateFromNew
 import app.logdate.feature.journals.navigation.navigateToJournal
+import app.logdate.feature.onboarding.navigation.launchOnboarding
 import app.logdate.feature.onboarding.navigation.onboardingGraph
 import app.logdate.mobile.settings.ui.settingsGraph
 import app.logdate.mobile.ui.common.MainAppState
@@ -30,21 +31,28 @@ fun LogdateAppRoot(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    val startDestination = RouteDestination.Onboarding.route
     val context = LocalContext.current
 
     LaunchedEffect(
         uiState
     ) {
         val state = uiState as? LaunchAppUiState.Loaded
-        if (state is LaunchAppUiState.Loaded && state.isBiometricEnabled) {
+        if (state !is LaunchAppUiState.Loaded) {
+            return@LaunchedEffect
+        }
+        // Ensure that onboarding is completed before proceeding
+        if (!state.isOnboarded) {
+            navController.launchOnboarding()
+            return@LaunchedEffect
+        }
+        if (state.isBiometricEnabled) {
             viewModel.showBiometricPrompt(context as FragmentActivity)
         }
     }
 
     NavHost(
         navController = navController,
-        startDestination = startDestination,
+        startDestination = RouteDestination.Base.route,
     ) {
         onboardingGraph(
             onNavigateBack = {

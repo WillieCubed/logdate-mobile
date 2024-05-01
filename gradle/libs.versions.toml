@@ -25,13 +25,21 @@ androidxDatastorePreferences = "1.0.0"
 androidxLifecycle = "2.7.0"
 androidxNavigation = "2.8.0-alpha07"
 androidxRoomKtx = "2.6.1"
+androidxGlance = "1.0.0"
 androidxTestCore = "1.5.0"
 androidxTestExt = "1.1.5"
 androidxTestRunner = "1.5.2"
 accompanist = "0.35.0-alpha"
 playServicesLocation = "21.2.0"
 playInstallReferrer = "2.2"
+playAppUpdate = "2.1.0"
 billingKtx = "6.2.0"
+workRuntimeKtx = "2.9.0"
+kotlinxSerialization = "1.6.0"
+workTesting = "2.9.0"
+firebaseMessagingKtx = "23.4.1"
+playServicesAuthBlockstore = "16.2.0"
+firebaseFirestoreKtx = "24.11.1"
 
 [libraries]
 # Core
@@ -68,23 +76,32 @@ androidx-room-testing = { group = "androidx.room", name = "room-testing", versio
 androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "androidxHilt" }
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "androidxNavigation" }
 ## Android testing
-androidx-test-core-ktx = { module = "androidx.test:core", version.ref = "androidxTestCore" } # Used in AndroidApplicationConventionPlugin
+androidx-test-core-ktx = { group = "androidx.test", name = "core", version.ref = "androidxTestCore" } # Used in AndroidApplicationConventionPlugin
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunner" }
 androidx-test-ext-junit-ktx = { module = "androidx.test.ext:junit", version.ref = "androidxTestExt" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+## Glance
+androidx-glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "androidxGlance" }
+androidx-glance-material3 = { group = "androidx.glance", name = "glance-material3", version.ref = "androidxGlance" }
 ## Other AndroidX
+androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workRuntimeKtx" }
+androidx-work-testing = { group = "androidx.work", name = "work-testing", version.ref = "workTesting" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "androidxActivityKtx" }
 androidx-biometric = { group = "androidx.biometric", name = "biometric-ktx", version.ref = "androidxBiometric" }
 androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "androidxCameraCore" }
 androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "androidxCredentials" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "androidxDatastorePreferences" }
+androidx-hilt-common = { group = "androidx.hilt", name = "hilt-common", version.ref = "androidxHilt" }
+androidx-hilt-work = { group = "androidx.hilt", name = "hilt-work", version.ref = "androidxHilt" }
 
 # Google Play Services
 play-services-instantapps = { module = "com.google.android.gms:play-services-instantapps", version = "18.0.1" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+play-services-auth-blockstore = { group = "com.google.android.gms", name = "play-services-auth-blockstore", version.ref = "playServicesAuthBlockstore" }
 play-install-referrer = { group = "com.android.installreferrer", name = "installreferrer", version.ref = "playInstallReferrer" }
+play-app-update-ktx = { group = "com.google.android.play", name = "app-update-ktx", version.ref = "playAppUpdate" }
 
 # Dependency injection with Hilt
 hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
@@ -98,6 +115,7 @@ kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutine
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "kotlinxCoroutines" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 
 # Firebase
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" } # Firebase used in AndroidApplicationConventionPlugin
@@ -105,12 +123,14 @@ firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics
 firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" } # Firebase used in AndroidApplicationConventionPlugin
 firebase-perf = { group = "com.google.firebase", name = "firebase-perf" } # Firebase used in AndroidApplicationConventionPlugin
 firebase-perf-plugin = { group = "com.google.firebase", name = "perf-plugin", version.ref = "perfPlugin" }
+firebase-messaging-ktx = { group = "com.google.firebase", name = "firebase-messaging-ktx", version.ref = "firebaseMessagingKtx" }
 
 # Other libraries
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 billing-ktx = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "billingKtx" }
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version = "2.6.0" }
+firebase-firestore-ktx = { group = "com.google.firebase", name = "firebase-firestore-ktx", version.ref = "firebaseFirestoreKtx" }
 
 [plugins]
 kotlin-parcelize = { id = "org.jetbrains.kotlin.plugin.parcelize", version.ref = "kotlin" }

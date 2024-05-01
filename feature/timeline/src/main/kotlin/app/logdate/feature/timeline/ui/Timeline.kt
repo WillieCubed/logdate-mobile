@@ -26,6 +26,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.unit.dp
@@ -105,11 +107,13 @@ private fun TimelineContentItem(
     }
     Row(
         modifier = Modifier
-            .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
-            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
             .clickable {
                 onItemSelected(item.uid)
-            },
+            }
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+        ,
         horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         TimelineLine(
@@ -171,12 +175,12 @@ private fun determineHeaderTitle(date: Instant): String {
         // If the date is within the last month, show the number of weeks ago
         in today.date.minus(DatePeriod(days = 30))..today.date -> {
             val weeksAgo = (today.date.dayOfYear - localDateTime.date.dayOfYear) / 7
-            stringResource(R.string.period_weeks_ago, weeksAgo)
+            pluralStringResource(R.plurals.period_weeks_ago, weeksAgo, weeksAgo)
         }
         // If the date was more than five weeks ago, show the number of months ago
         in today.date.minus(DatePeriod(days = 365))..today.date -> {
             val monthsAgo = (today.date.dayOfYear - localDateTime.date.dayOfYear) / 30
-            stringResource(R.string.period_months_ago, monthsAgo)
+            pluralStringResource(R.plurals.period_months_ago, monthsAgo, monthsAgo)
         }
         // If the date was more than a year ago, show the number of years ago
         else -> {

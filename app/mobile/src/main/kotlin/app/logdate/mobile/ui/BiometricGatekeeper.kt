@@ -11,6 +11,10 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import dagger.Component
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
@@ -49,6 +53,30 @@ interface BiometricGatekeeper {
     fun requestEnrollment(activity: FragmentActivity)
     // TODO: Decouple this interface from Android-specific APIs
 }
+
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface SyncComponentDependencies {
+    fun getBiometricActivity(): FragmentActivity
+}
+
+@Component(dependencies = [SyncComponentDependencies::class])
+interface BiometricGatekeeperComponent {
+    fun inject(biometricActivity: FragmentActivity)
+}
+
+interface BiometricActivityProvider {
+    fun provideBiometricActivity(): FragmentActivity
+}
+
+//fun getBiometricActivity(context: Context): FragmentActivity {
+//    val hiltEntryPoint = EntryPointAccessors.fromApplication(
+//        context, BiometricGatekeeperEntryPoint::class.java
+//    )
+//
+//    return hiltEntryPoint.getBiometricGatekeeper()
+//}
 
 /**
  * An implementation of [BiometricGatekeeper] that uses the Android Biometric API.
@@ -100,9 +128,7 @@ class AndroidBiometricGatekeeper @Inject constructor(
             BiometricManager.BIOMETRIC_SUCCESS -> {
                 Log.d("BiometricGatekeeper", "App can authenticate using biometrics.")
                 BiometricPrompt(activity, executor, biometricRequestCallback).authenticate(
-                    BiometricPrompt.PromptInfo.Builder()
-                        .setTitle(title)
-                        .setSubtitle(subtitle)
+                    BiometricPrompt.PromptInfo.Builder().setTitle(title).setSubtitle(subtitle)
                         .apply {
                             if (description != null) {
                                 setDescription(description)
@@ -112,12 +138,12 @@ class AndroidBiometricGatekeeper @Inject constructor(
                         .setConfirmationRequired(requireConfirmation)
                         // TODO: Only apply negative button text if device credential authentication is allowed
 //                        .setNegativeButtonText(cancelLabel)
-                        .build()
-                )
+                        .build())
             }
 
-            BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE ->
-                Log.e("BiometricGatekeeper", "Biometric features are currently unavailable.")
+            BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> Log.e(
+                "BiometricGatekeeper", "Biometric features are currently unavailable."
+            )
 
             BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> {
                 _authState.value = AppAuthState.REQUEST_ENROLLMENT
@@ -128,7 +154,8 @@ class AndroidBiometricGatekeeper @Inject constructor(
 
             BiometricManager.BIOMETRIC_ERROR_SECURITY_UPDATE_REQUIRED,
             BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE,
-            BiometricManager.BIOMETRIC_ERROR_UNSUPPORTED -> {
+            BiometricManager.BIOMETRIC_ERROR_UNSUPPORTED,
+            -> {
                 Log.d(
                     "BiometricGatekeeper",
                     "Biometric authentication is not supported on this device."

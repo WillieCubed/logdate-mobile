@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.conditional
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.asTime
 import kotlinx.datetime.Clock
@@ -56,7 +57,10 @@ fun NewTimelineItem(
         modifier
             .animateContentSize()
             .fillMaxWidth()
-            .padding(start = Spacing.sm),
+            .conditional(detailLevel != ItemDetailLevel.MIN) {
+                height(56.dp)
+                padding(start = Spacing.sm)
+            },
         horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         TimelineLine(
@@ -105,19 +109,6 @@ fun NewTimelineItem(
             }
         }
     }
-}
-
-
-enum class ItemDetailLevel {
-    /**
-     * An expanded view showing all details.
-     */
-    MAX,
-
-    /**
-     * A minimized view showing only the title.
-     */
-    MIN,
 }
 
 

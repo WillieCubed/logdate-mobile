@@ -12,23 +12,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import app.logdate.feature.editor.ui.AudioPreviewData
 import java.util.concurrent.TimeUnit
 
-data class AudioPreviewData(
-    val currentText: String,
-    val isPlaying: Boolean,
-    val canUseAudio: Boolean,
-    val currentDuration: Long,
-) {
-    companion object {
-        val Empty = AudioPreviewData(
-            currentText = "",
-            isPlaying = false,
-            canUseAudio = false,
-            currentDuration = 0L,
-        )
-    }
-}
 
 @Composable
 fun LiveAudioPreview(

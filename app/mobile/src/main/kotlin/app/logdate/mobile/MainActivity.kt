@@ -21,6 +21,8 @@ import app.logdate.core.assist.AssistantActionsProvider
 import app.logdate.core.assist.AssistantContextProvider
 import app.logdate.core.assist.toDirectAction
 import app.logdate.mobile.ui.AppViewModel
+import app.logdate.mobile.ui.BiometricActivityProvider
+import app.logdate.mobile.ui.BiometricGatekeeperComponent
 import app.logdate.mobile.ui.LaunchAppUiState
 import app.logdate.mobile.ui.LogdateAppRoot
 import app.logdate.mobile.ui.common.rememberMainAppState
@@ -54,11 +56,19 @@ class MainActivity : FragmentActivity() {
     @Inject
     lateinit var assistantActionsProvider: AssistantActionsProvider
 
+    lateinit var biometricGatekeeperComponent: FragmentActivity
+
     private val viewModel by viewModels<AppViewModel>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+
+
+        biometricGatekeeperComponent = (applicationContext as BiometricActivityProvider)
+            .provideBiometricActivity()
+
+        biometricGatekeeperComponent.inject(this)
 
         var uiState: LaunchAppUiState by mutableStateOf(LaunchAppUiState.Loading)
 

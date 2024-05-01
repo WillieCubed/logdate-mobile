@@ -48,9 +48,14 @@ data class SystemNotification(
      */
     val bodyContent: String,
     /**
-     * The time at which the notification should be shown, in milliseconds since the Unix epoch.
+     * A relevant time for this notification in milliseconds since the Unix epoch.
+     *
+     * This time need not be the time the notification is shown to the user. It can be used as an
+     * additional form of metadata for the notification. For example, it could be the time at which
+     * the event being notified about occurred, especially if there is a noticeable delay between
+     * the event and the notification.
      */
-    val time: Long,
+    val time: Long? = null,
     /**
      * The URI of the image to display in the notification.
      */

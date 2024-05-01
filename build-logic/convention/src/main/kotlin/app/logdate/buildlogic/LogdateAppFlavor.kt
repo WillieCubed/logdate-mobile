@@ -17,7 +17,9 @@ enum class LogdateAppFlavor(
     /**
      * A demo version that can be used for testing without real data.
      */
-    DEMO(FlavorDimension.contentType, applicationIdSuffix = ".demo"),
+    DEMO(FlavorDimension.contentType,
+//        applicationIdSuffix = ".demo"
+    ),
 
     /**
      * The production version of the app that uses LogDate Cloud by default.

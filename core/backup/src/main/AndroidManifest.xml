@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application android:allowBackup="true"
+        android:backupAgent=".LogdateBackupAgent">
+        <meta-data android:name="com.google.android.backup.api_key"
+            android:value="unused" />
+    </application>
+
+</manifest>

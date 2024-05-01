@@ -14,6 +14,7 @@ dependencies {
     api(project(":core:datastore"))
     implementation(project(":core:util"))
     implementation(project(":core:coroutines"))
+    implementation(libs.firebase.firestore.ktx)
 
     // Unit testing
     testImplementation(libs.junit)

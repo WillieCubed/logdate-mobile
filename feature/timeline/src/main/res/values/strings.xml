@@ -2,9 +2,19 @@
 <resources>
     <string name="period_this_week">This Week</string>
     <string name="period_last_week">Last Week</string>
-    <string name="period_weeks_ago">%1$s weeks ago</string>
-    <string name="period_months_ago">%1$s months ago</string>
-    <string name="timeline_origin_day_counter">It\'s been %1$s days.</string>
     <string name="timeline_origin_day_birthday_message">Happy actual birthday!</string>
     <string name="period_years_ago">%1$s years ago</string>
+    <plurals name="period_weeks_ago">
+        <item quantity="one">%1$s week ago</item>
+        <item quantity="other">%1$s weeks ago</item>
+    </plurals>
+    <plurals name="period_months_ago">
+        <item quantity="one">%1$s month ago</item>
+        <item quantity="other">%1$s months ago</item>
+    </plurals>
+    <plurals name="timeline_origin_day_counter">
+        <item quantity="one">It\'s been a day.</item>
+        <item quantity="other">It\'s been %1$s days.</item>
+    </plurals>
+
 </resources>

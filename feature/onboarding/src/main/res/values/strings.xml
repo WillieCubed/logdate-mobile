@@ -5,4 +5,6 @@
     <string name="action_onboarding_continue">Continue</string>
     <string name="onboarding_welcome_back_description_streak_reset">Your streak has been reset.</string>
     <string name="onboarding_welcome_back_title">Welcome back, %1$s!</string>
+    <string name="onboarding_notifications_confirmation_title">Notifications enabled</string>
+    <string name="onboarding_notifications_confirmation_content">You\'ll now get notifications when it\'s time to write in your journal.</string>
 </resources>

@@ -7,22 +7,25 @@ import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Photo
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -39,6 +42,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,11 +63,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import app.logdate.core.data.notes.JournalNote
 import app.logdate.feature.editor.R
 import app.logdate.model.UserPlace
+import app.logdate.ui.ButtonType
+import app.logdate.ui.FunButton
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.localTime
 import app.logdate.util.toReadableDateShort
-import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -101,10 +106,19 @@ data class TimestampContainer(
     val timestamp: Long,
 ) : Parcelable
 
-val InstantSaver = Saver<Instant, Long>(
-    save = { it.toEpochMilliseconds() },
-    restore = { Instant.fromEpochMilliseconds(it) }
-)
+val InstantSaver = Saver<Instant, Long>(save = { it.toEpochMilliseconds() },
+    restore = { Instant.fromEpochMilliseconds(it) })
+
+/**
+ * Caches a temp file for the camera to use.
+ */
+@Composable
+internal fun rememberTempFile(): Uri {
+    val context = LocalContext.current
+    return remember {
+        File.createTempFile("logdate_last_photo_", ".jpg", context.cacheDir).toUri()
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -128,8 +142,7 @@ fun NoteCreationScreen(
 
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    val cacheDir = LocalContext.current.cacheDir
-    val tempFile = File.createTempFile("logdate_last_photo_", ".jpg", cacheDir).toUri()
+    val tempFile = rememberTempFile()
     var lastPhoto by rememberSaveable { mutableStateOf<Uri?>(null) }
     val cameraLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { successful ->
@@ -157,6 +170,7 @@ fun NoteCreationScreen(
             }
         }
     val scrollableContainerState = rememberLazyListState()
+    val isInDefaultState = noteContent.isEmpty() && lastPhoto == null
 
     fun ensureLocationPermission() {
         locationPermissionRequester.launch(
@@ -198,7 +212,19 @@ fun NoteCreationScreen(
         creationTimestamp = Clock.System.now()
     }
 
-    val allowCreation = noteContent.isNotEmpty()
+    val allowCreation by remember { derivedStateOf { noteContent.isNotEmpty() } }
+
+    fun transitionToTextEntry() {
+
+    }
+
+    fun transitionToAudioEntry() {
+
+    }
+
+    fun transitionToPhotoEntry() {
+
+    }
 
     LaunchedEffect(userMessage) {
         if (userMessage == null) return@LaunchedEffect
@@ -235,10 +261,8 @@ fun NoteCreationScreen(
             },
         )
     }
+
     Scaffold(
-        modifier = Modifier
-            .padding(bottom = Spacing.lg)
-            .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
                 title = { Text(creationTimestamp.toReadableDateShort()) },
@@ -255,42 +279,13 @@ fun NoteCreationScreen(
         },
     ) { paddingValues ->
         LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
             state = scrollableContainerState,
             contentPadding = paddingValues,
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
-//            items(previousEntries, JournalNote::uid) { entry ->
-//                NewTimelineItem(
-//                    metadata = {},
-//                    expandedView = {},
-//                    summaryView = {
-//                        when (entry) {
-//                            is JournalNote.Text -> {
-//                                Text(entry.content)
-//                            }
-//
-//                            is JournalNote.Image -> {
-//                                AsyncImage(
-//                                    entry.mediaRef,
-//                                    contentDescription = "Image note",
-//                                    modifier = Modifier.size(128.dp),
-//                                )
-//                            }
-//
-//                            is JournalNote.Audio -> {
-//                                Text("Audio note")
-//                            }
-//
-//                            is JournalNote.Video -> {
-//                                Text("Video note")
-//                            }
-//                        }
-//                    },
-//                    detailLevel = ItemDetailLevel.MIN,
-//                    title = entry.creationTimestamp.toReadableDateShort(),
-//                    showOptions = false,
-//                )
-//            }
             item {
                 WritingEntryBlock(
                     creationTime = creationTimestamp,
@@ -303,75 +298,80 @@ fun NoteCreationScreen(
                     onLocationClick = onRefreshLocation,
                     onRequestLocationUpdate = {
                         ensureLocationPermission()
+                        onRefreshLocation()
                     },
                 )
-                LazyRow(
-                    contentPadding = PaddingValues(vertical = Spacing.lg),
-                ) {
-                    if (lastPhoto != null) {
-                        item {
-                            AsyncImage(
-                                lastPhoto,
-                                contentDescription = "Last photo taken",
-                                modifier = Modifier.size(96.dp),
+            }
+//            item {
+//                LazyRow(
+//                    contentPadding = PaddingValues(vertical = Spacing.lg),
+//                ) {
+//                    if (lastPhoto != null) {
+//                        item {
+//                            AsyncImage(
+//                                lastPhoto,
+//                                contentDescription = "Last photo taken",
+//                                modifier = Modifier.size(96.dp),
+//                            )
+//                        }
+//                    }
+//                }
+//            }
+            item {
+                AnimatedVisibility(visible = isInDefaultState) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    ) {// Actions
+                        FunButton(
+                            onClick = ::transitionToTextEntry,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(
+                                Icons.Rounded.Edit,
+                                contentDescription = "Write",
+                                Modifier.size(40.dp)
+                            )
+                        }
+                        FunButton(
+                            onClick = ::transitionToAudioEntry,
+                            type = ButtonType.SECONDARY,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(
+                                Icons.Rounded.Mic,
+                                contentDescription = "Speak",
+                                Modifier.size(40.dp)
+                            )
+                        }
+                        FunButton(
+                            onClick = ::transitionToPhotoEntry,
+                            type = ButtonType.SECONDARY,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(
+                                Icons.Rounded.Photo,
+                                contentDescription = "Take a photo",
+                                Modifier.size(40.dp)
                             )
                         }
                     }
                 }
-//                LazyVerticalGrid(
-//                    contentPadding = PaddingValues(horizontal = Spacing.lg),
-//                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-//                    columns = GridCells.Adaptive(minSize = 172.dp),
-//                ) {
-//                    item {
-//                        FilledTonalButton(
-//                            shape = MaterialTheme.shapes.small,
-//                            onClick = ::handleRecordVideo,
-//                        ) {
-//                            Row(
-//                                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-//                            ) {
-//                                Icon(Icons.Default.Videocam, contentDescription = null)
-//                                Text(stringResource(R.string.new_note_action_record_video))
-//                            }
-//                        }
-//                    }
-//                    item {
-//                        FilledTonalButton(
-//                            shape = MaterialTheme.shapes.small,
-//                            onClick = ::handleTakePhoto,
-//                        ) {
-//                            Row(
-//                                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-//                            ) {
-//                                Icon(Icons.Default.AddAPhoto, contentDescription = null)
-//                                Text(stringResource(R.string.new_note_action_add_photo))
-//                            }
-//                        }
-//                    }
-//                    item {
-//                        FilledTonalButton(
-//                            shape = MaterialTheme.shapes.small,
-//                            onClick = ::handleRecordVoiceNote
-//                        ) {
-//                            Row(
-//                                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-//                            ) {
-//                                Icon(Icons.Default.Mic, contentDescription = null)
-//                                Text(stringResource(R.string.new_note_action_add_voice_note))
-//                            }
-//                        }
-//                    }
-//                }
-                Button(
-                    enabled = allowCreation,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg),
-                    shape = MaterialTheme.shapes.small,
-                    onClick = ::handleAddNote,
-                ) {
-                    Text(stringResource(R.string.new_note_action_finish))
+            }
+            // Only show finish button if there is content
+            item {
+                AnimatedVisibility(allowCreation) {
+
+                    Button(
+                        enabled = allowCreation,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Spacing.lg),
+                        shape = MaterialTheme.shapes.small,
+                        onClick = ::handleAddNote,
+                    ) {
+                        Text(stringResource(R.string.new_note_action_finish))
+                    }
                 }
             }
         }
@@ -440,9 +440,7 @@ fun WritingEntryBlock(
 
             Spacer(modifier = Modifier.weight(1f))
             LocationChip(
-                location = locationText,
-                enabled = locationEnabled,
-                onClick = ::handleLocationClick
+                location = locationText, enabled = locationEnabled, onClick = ::handleLocationClick
             )
         }
         EditorField(
@@ -462,9 +460,4 @@ fun Modifier.applyExpandedHeight(
     } else {
         this
     }
-}
-
-@Composable
-fun PreviewJournalNoteTimeline(note: JournalNote) {
-
 }
