@@ -33,7 +33,7 @@ fun TimelineLine(
             drawLine(
                 start = Offset(x = halfWidth, y = (DOT_SIZE + 8.dp).toPx()),
                 // TODO: Fix this obvious hack of a solution and fix measured height
-                end = Offset(x = halfWidth, y = size.height),
+                end = Offset(x = halfWidth, y = size.height + 100000),
                 strokeWidth = 2.dp.toPx(),
                 color = color,
             )
