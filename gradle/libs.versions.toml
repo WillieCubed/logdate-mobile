@@ -1,45 +1,51 @@
 [versions]
-androidGradlePlugin = "8.5.0"
+androidGradlePlugin = "8.5.2"
 dokkaGradlePlugin = "1.9.20"
 kotlin = "1.9.23"
 kotlinxDatetime = "0.6.0-RC.2"
-kotlinxCoroutines = "1.8.0"
+kotlinxCoroutines = "1.8.1"
 ksp = "1.9.23-1.0.19"
 hilt = "2.50"
 junit = "4.13.2"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
-activityCompose = "1.9.0"
-composeBom = "2024.06.00"
-firebaseBom = "33.1.1"
+activityCompose = "1.9.1"
+composeBom = "2024.08.00"
+firebaseBom = "33.2.0"
 perfPlugin = "1.4.2"
 androidxComposeCompiler = "1.5.11" # Used in ComposeConventionPlugin
 androidxHilt = "1.2.0"
-androidxActivityKtx = "1.9.0"
+androidxActivityKtx = "1.9.1"
 androidxBiometric = "1.2.0-alpha05"
-androidxCameraCore = "1.3.4"
 androidxCoreKtx = "1.13.1"
 androidxCoreSplashScreen = "1.1.0-rc01"
 androidxCredentials = "1.2.2"
 androidxDatastorePreferences = "1.1.1"
-androidxLifecycle = "2.8.3"
-androidxNavigation = "2.8.0-beta04"
+androidxLifecycle = "2.8.4"
+androidxNavigation = "2.8.0-rc01"
 androidxRoomKtx = "2.6.1"
 androidxGlance = "1.1.0"
 androidxTestCore = "1.6.1"
 androidxTestExt = "1.2.1"
-androidxTestRunner = "1.6.1"
+androidxTestRunner = "1.6.2"
 accompanist = "0.35.0-alpha"
 playServicesLocation = "21.3.0"
+playServicesMaps = "19.0.0"
 playInstallReferrer = "2.2"
 playAppUpdate = "2.1.0"
+googleMapsPlaces = "3.5.0"
 billingKtx = "7.0.0"
-workRuntimeKtx = "2.9.0"
+workRuntimeKtx = "2.9.1"
 kotlinxSerialization = "1.6.3"
-workTesting = "2.9.0"
-firebaseMessagingKtx = "24.0.0"
-playServicesAuthBlockstore = "16.3.0"
-firebaseFirestoreKtx = "25.0.0"
+workTesting = "2.9.1"
+firebaseMessagingKtx = "24.0.1"
+playServicesAuthBlockstore = "16.4.0"
+firebaseFirestoreKtx = "25.1.0"
+firebaseInstallationsKtx = "18.0.0"
+uuid = "0.0.26"
+androidxCamera = "1.3.4"
+adaptiveLayoutAndroid = "1.0.0-rc01"
+multiplatformMarkdownRenderer = "0.25.0"
 
 [libraries]
 # Core
@@ -64,21 +70,30 @@ androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-toolin
 androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" } # Used in ComposeConventionPlugin
+androidx-adaptive = { group = "androidx.compose.material3.adaptive", name = "adaptive", version.ref = "adaptiveLayoutAndroid" }
+androidx-adaptive-layout = { group = "androidx.compose.material3.adaptive", name = "adaptive-layout", version.ref = "adaptiveLayoutAndroid" }
+androidx-adaptive-navigation = { group = "androidx.compose.material3.adaptive", name = "adaptive-navigation", version.ref = "adaptiveLayoutAndroid" }
 ## Material libraries
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" } # Used in ComposeConventionPlugin
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+androidx-compose-material3-carousel = { group = "androidx.compose.material3", name = "material3-carousel" }
 androidx-compose-material3-windowsizeclass-android = { group = "androidx.compose.material3", name = "material3-window-size-class-android" }
 ## Room
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "androidxRoomKtx" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "androidxRoomKtx" }
 androidx-room-testing = { group = "androidx.room", name = "room-testing", version.ref = "androidxRoomKtx" }
+## CameraX
+androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "androidxCamera" }
+androidx-camera-video = { group = "androidx.camera", name = "camera-video", version.ref = "androidxCamera" }
+androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "androidxCamera" }
+androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "androidxCamera" }
+guava = { group = "com.google.guava", name = "guava", version = "32.0.1-android" }
 ## Jetpack navigation
 androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "androidxHilt" }
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "androidxNavigation" }
 ## Android testing
 androidx-test-core-ktx = { group = "androidx.test", name = "core", version.ref = "androidxTestCore" } # Used in AndroidApplicationConventionPlugin
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunner" }
-androidx-test-ext-junit-ktx = { module = "androidx.test.ext:junit", version.ref = "androidxTestExt" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 ## Glance
@@ -90,8 +105,9 @@ androidx-work-testing = { group = "androidx.work", name = "work-testing", versio
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "androidxActivityKtx" }
 androidx-biometric = { group = "androidx.biometric", name = "biometric-ktx", version.ref = "androidxBiometric" }
-androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "androidxCameraCore" }
+#noinspection CredentialDependency
 androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "androidxCredentials" }
+androidx-credentials-playservicesauth = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "androidxCredentials" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "androidxDatastorePreferences" }
 androidx-hilt-common = { group = "androidx.hilt", name = "hilt-common", version.ref = "androidxHilt" }
 androidx-hilt-work = { group = "androidx.hilt", name = "hilt-work", version.ref = "androidxHilt" }
@@ -99,9 +115,12 @@ androidx-hilt-work = { group = "androidx.hilt", name = "hilt-work", version.ref 
 # Google Play Services
 play-services-instantapps = { module = "com.google.android.gms:play-services-instantapps", version = "18.1.0" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+play-services-maps = { group = "com.google.android.gms", name = "play-services-maps", version.ref = "playServicesMaps" }
 play-services-auth-blockstore = { group = "com.google.android.gms", name = "play-services-auth-blockstore", version.ref = "playServicesAuthBlockstore" }
 play-install-referrer = { group = "com.android.installreferrer", name = "installreferrer", version.ref = "playInstallReferrer" }
 play-app-update-ktx = { group = "com.google.android.play", name = "app-update-ktx", version.ref = "playAppUpdate" }
+google-maps-places = { group = "com.google.android.libraries.places", name = "places", version.ref = "googleMapsPlaces" }
+google-maps-compose = { group = "com.google.maps.android", name = "maps-compose", version = "6.1.0" }
 
 # Dependency injection with Hilt
 hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
@@ -131,6 +150,9 @@ billing-ktx = { group = "com.android.billingclient", name = "billing-ktx", versi
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version = "2.6.0" }
 firebase-firestore-ktx = { group = "com.google.firebase", name = "firebase-firestore-ktx", version.ref = "firebaseFirestoreKtx" }
+firebase-installations-ktx = { group = "com.google.firebase", name = "firebase-installations-ktx", version.ref = "firebaseInstallationsKtx" }
+kotlinx-uuid = { group = "app.softwork", name = "kotlinx-uuid-core", version.ref = "uuid" }
+multiplatform-markdown-renderer = { module = "com.mikepenz:multiplatform-markdown-renderer-m3", version.ref = "multiplatformMarkdownRenderer" }
 
 [plugins]
 kotlin-parcelize = { id = "org.jetbrains.kotlin.plugin.parcelize", version.ref = "kotlin" }
@@ -148,3 +170,4 @@ logdate-jvm-library = { id = "logdate.jvm.library", version = "unspecified" }
 logdate-compose = { id = "logdate.compose", version = "unspecified" }
 logdate-dynamic = { id = "logdate.dynamic", version = "unspecified" }
 logdate-documentation = { id = "logdate.documentation", version = "unspecified" }
+logdate-secrets = { id = "logdate.secrets", version = "unspecified" }
