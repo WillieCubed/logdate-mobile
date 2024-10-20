@@ -1,6 +1,6 @@
 package app.logdate.core.data
 
-import app.logdate.core.data.timeline.DefaultTimelineRepository
+import app.logdate.core.data.timeline.OfflineFirstActivityTimelineRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -12,7 +12,7 @@ class DefaultMyModelRepositoryTest {
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `ensure item is bookmarked`() = runTest {
-        val repository = DefaultTimelineRepository()
+        val repository = OfflineFirstActivityTimelineRepository()
         val items = repository.allItemsObserved.first()
 //        assert(repository.allItemsObserved.first().none { item -> item.isFavorited })
         val firstItemId = items.first().uid

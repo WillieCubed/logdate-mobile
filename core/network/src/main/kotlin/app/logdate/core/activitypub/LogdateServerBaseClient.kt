@@ -1,4 +1,4 @@
-package app.logdate.core.network
+package app.logdate.core.activitypub
 
 import javax.inject.Inject
 

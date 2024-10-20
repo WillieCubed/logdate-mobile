@@ -1,4 +1,4 @@
-package app.logdate.core.data
+package app.logdate.core.data.journals
 
 import app.logdate.model.Journal
 import kotlinx.coroutines.flow.Flow

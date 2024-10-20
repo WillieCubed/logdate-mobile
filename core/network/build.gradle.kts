@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.logdate.android.library)
     alias(libs.plugins.logdate.documentation)
-    kotlin("plugin.serialization") version "1.9.23"
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -13,6 +13,12 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.datetime)
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.android)
+    implementation(libs.ktor.client.logging)
+    api(libs.ktor.client.content.negotiation)
+    api(libs.ktor.client.serialization)
+    api(libs.ktor.serialization.kotlinx.json)
 
     // Unit testing
     testImplementation(libs.junit)

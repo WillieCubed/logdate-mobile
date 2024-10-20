@@ -7,6 +7,7 @@ import kotlinx.datetime.Instant
  * User metadata.
  */
 data class UserData(
+    val birthday: Instant,
     val isOnboarded: Boolean,
     val onboardedDate: Instant,
     val securityLevel: AppSecurityLevel,
@@ -14,6 +15,7 @@ data class UserData(
 ) {
     companion object {
         val DEFAULT = UserData(
+            birthday = Instant.DISTANT_PAST,
             isOnboarded = false,
             onboardedDate = Instant.DISTANT_PAST,
             securityLevel = AppSecurityLevel.NONE,

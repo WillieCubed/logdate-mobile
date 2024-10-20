@@ -2,7 +2,6 @@ package app.logdate.core.data.journals
 
 import app.logdate.core.coroutines.AppDispatcher.IO
 import app.logdate.core.coroutines.Dispatcher
-import app.logdate.core.data.JournalRepository
 import app.logdate.core.data.journals.util.toEntity
 import app.logdate.core.data.journals.util.toModel
 import app.logdate.core.database.dao.JournalDao

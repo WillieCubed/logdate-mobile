@@ -20,11 +20,12 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "se
  * A local data source for user preferences.
  */
 class LogdatePreferencesDataSource @Inject constructor(
-    private val userPreferences: DataStore<Preferences>
+    private val userPreferences: DataStore<Preferences>,
 ) {
 
     // TODO: Migrate to datastore-proto
     companion object {
+        val BIRTHDAY = longPreferencesKey("birthday")
         val IS_ONBOARDED = booleanPreferencesKey("is_onboarded")
         val ONBOARDED_TIMESTAMP = longPreferencesKey("onboarded_timestamp")
         val SECURITY_LEVEL = stringPreferencesKey("security_level")
@@ -32,7 +33,8 @@ class LogdatePreferencesDataSource @Inject constructor(
 
     val userData: Flow<UserData> = userPreferences.data.map {
         UserData(
-            isOnboarded = it[IS_ONBOARDED] ?: false,
+            birthday = Instant.fromEpochMilliseconds(it[BIRTHDAY] ?: 0),
+            isOnboarded = it[IS_ONBOARDED] == true,
             onboardedDate = Instant.fromEpochMilliseconds(it[ONBOARDED_TIMESTAMP] ?: 0),
             securityLevel = AppSecurityLevel.valueOf(
                 it[SECURITY_LEVEL] ?: AppSecurityLevel.NONE.name
@@ -58,6 +60,14 @@ class LogdatePreferencesDataSource @Inject constructor(
                 putAll(
                     SECURITY_LEVEL to if (value) AppSecurityLevel.BIOMETRIC.name else AppSecurityLevel.NONE.name
                 )
+            }
+        }
+    }
+
+    suspend fun setBirthdate(birthday: Instant) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                putAll(BIRTHDAY to birthday.toEpochMilliseconds())
             }
         }
     }

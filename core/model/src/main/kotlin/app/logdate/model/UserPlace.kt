@@ -1,5 +1,11 @@
 package app.logdate.model
 
+sealed class Place(
+    val latitude: Double,
+    val longitude: Double,
+    val altitude: Double,
+)
+
 sealed class UserPlace(
     val uid: String,
     val latitude: Double,
@@ -13,10 +19,12 @@ sealed class UserPlace(
     val plusCode: String,
     val metadata: PlaceMetadata,
 ) {
+
+
     /**
      * A companion object that represents an unknown place.
      */
-    companion object Unknown : UserPlace(
+    companion object Unresolved : UserPlace(
         uid = "unknown",
         latitude = 0.0,
         longitude = 0.0,

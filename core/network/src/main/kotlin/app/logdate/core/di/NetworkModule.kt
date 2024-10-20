@@ -1,10 +1,11 @@
 package app.logdate.core.di
 
+import app.logdate.core.network.httpClient
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import kotlinx.serialization.json.Json
+import io.ktor.client.HttpClient
 import javax.inject.Singleton
 
 /**
@@ -15,7 +16,5 @@ import javax.inject.Singleton
 internal object NetworkModule {
     @Provides
     @Singleton
-    fun providesNetworkJson(): Json = Json {
-        ignoreUnknownKeys = true
-    }
+    fun provideNetworkHttpClient(): HttpClient = httpClient
 }

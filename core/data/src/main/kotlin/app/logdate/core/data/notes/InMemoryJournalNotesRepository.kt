@@ -1,6 +1,6 @@
 package app.logdate.core.data.notes
 
-import app.logdate.core.data.JournalRepository
+import app.logdate.core.data.journals.JournalRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.datetime.Clock

@@ -2,6 +2,7 @@ package app.logdate.core.data.notes
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.datetime.Instant
+import kotlinx.serialization.Serializable
 
 interface JournalNotesRepository {
     val allNotesObserved: Flow<List<JournalNote>>
@@ -50,6 +51,7 @@ enum class NoteType {
  *
  * TODO: Choose a better name for this type.
  */
+@Serializable
 sealed class JournalNote(
     val type: NoteType,
 ) {
@@ -62,6 +64,7 @@ sealed class JournalNote(
      *
      * Text notes can constitute simple statements or
      */
+    @Serializable
     data class Text(
         override val uid: String,
         override val creationTimestamp: Instant,
@@ -69,6 +72,7 @@ sealed class JournalNote(
         val content: String,
     ) : JournalNote(NoteType.TEXT)
 
+    @Serializable
     data class Image(
         override val uid: String,
         override val creationTimestamp: Instant,
@@ -76,6 +80,7 @@ sealed class JournalNote(
         val mediaRef: String,
     ) : JournalNote(NoteType.IMAGE)
 
+    @Serializable
     data class Video(
         override val uid: String,
         override val creationTimestamp: Instant,
@@ -83,6 +88,7 @@ sealed class JournalNote(
         val mediaRef: String,
     ) : JournalNote(NoteType.VIDEO)
 
+    @Serializable
     data class Audio(
         val mediaRef: String,
         override val uid: String,

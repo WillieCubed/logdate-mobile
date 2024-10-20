@@ -6,10 +6,15 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import app.logdate.core.database.migrations.MIGRATION_1_2
+import app.logdate.core.database.migrations.MIGRATION_2_3
+import app.logdate.core.database.migrations.MIGRATION_3_4
 import app.logdate.core.database.model.ImageNoteEntity
 import app.logdate.core.database.model.JournalEntity
 import app.logdate.core.database.model.JournalNoteCrossRef
+import app.logdate.core.database.model.LocationLogEntity
 import app.logdate.core.database.model.TextNoteEntity
+import app.logdate.core.database.model.UserDeviceEntity
+import app.logdate.core.database.model.media.MediaImageEntity
 import app.logdate.core.database.util.InstantConverter
 import java.io.File
 
@@ -22,8 +27,12 @@ import java.io.File
         ImageNoteEntity::class,
         JournalEntity::class,
         JournalNoteCrossRef::class,
+        LocationLogEntity::class,
+        UserDeviceEntity::class,
+        MediaImageEntity::class,
+//        JournalContentEntityLink::class,
     ],
-    version = 2,
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(InstantConverter::class)
@@ -42,7 +51,11 @@ abstract class AppDatabase : RoomDatabase(), LogdateDatabase, BackupableDatabase
             AppDatabase::class.java,
             DB_NAME,
         )
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+            )
             .build()
 
     }

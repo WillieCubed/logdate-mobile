@@ -1,7 +1,7 @@
 package app.logdate.core.di
 
-import app.logdate.core.network.LogdateServerBaseClient
-import app.logdate.core.network.LogdateServerClient
+import app.logdate.core.activitypub.LogdateServerBaseClient
+import app.logdate.core.activitypub.LogdateServerClient
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

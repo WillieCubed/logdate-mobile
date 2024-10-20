@@ -1,6 +1,6 @@
 package app.logdate.core.data.notes
 
-import app.logdate.core.data.JournalRepository
+import app.logdate.core.data.journals.JournalRepository
 import app.logdate.core.data.notes.util.toEntity
 import app.logdate.core.data.notes.util.toModel
 import app.logdate.core.database.dao.ImageNoteDao
@@ -8,14 +8,22 @@ import app.logdate.core.database.dao.TextNoteDao
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import java.io.File
 import javax.inject.Inject
 
 class OfflineFirstJournalNotesRepository @Inject constructor(
     private val textNoteDao: TextNoteDao,
     private val imageNoteDao: ImageNoteDao,
     private val journalRepository: JournalRepository,
-) : JournalNotesRepository {
+) : JournalNotesRepository, ExportableJournalContentRepository {
 
     override val allNotesObserved: Flow<List<JournalNote>> =
         textNoteDao.getAllNotes().combine(imageNoteDao.getAllNotes()) { textNotes, imageNotes ->
@@ -72,10 +80,39 @@ class OfflineFirstJournalNotesRepository @Inject constructor(
     }
 
     override suspend fun create(note: String, journalId: String) {
-
+        TODO("Not yet implemented")
     }
 
     override suspend fun removeFromJournal(noteId: String, journalId: String) {
         TODO("Not yet implemented")
     }
+
+    override suspend fun exportContentToFile(
+        destination: String,
+        overwrite: Boolean,
+        startTimestamp: Instant,
+        endTimestamp: Instant,
+    ) {
+        val textNotes = runBlocking {
+            textNoteDao.getAllNotes().map {
+                it.filter { note -> note.created in startTimestamp..endTimestamp }
+            }.toList().flatten().map { it.toModel() }
+        }
+        val backup = JournalContentBackup(textNotes)
+
+        val json = Json.encodeToString(backup)
+
+        val file = File(destination)
+        if (file.exists() && !overwrite) {
+            throw IllegalStateException("File already exists and overwrite is set to false.")
+        }
+
+        file.writeText(json)
+    }
 }
+
+@Serializable
+data class JournalContentBackup(
+    val notes: List<JournalNote>,
+    val generated: Instant = Clock.System.now(),
+)

@@ -1,4 +1,4 @@
-package app.logdate.core.network
+package app.logdate.core.activitypub
 
 import app.logdate.core.activitystream.OrderedCollection
 

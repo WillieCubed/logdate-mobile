@@ -3,6 +3,7 @@ package app.logdate.core.data.user
 import app.logdate.core.datastore.LogdatePreferencesDataSource
 import app.logdate.core.datastore.model.UserData
 import kotlinx.coroutines.flow.Flow
+import kotlinx.datetime.Instant
 import javax.inject.Inject
 
 class OfflineFirstUserStateRepository @Inject constructor(
@@ -10,6 +11,10 @@ class OfflineFirstUserStateRepository @Inject constructor(
 ) : UserStateRepository {
     override val userData: Flow<UserData>
         get() = localDataSource.userData
+
+    override suspend fun setBirthday(birthday: Instant) {
+        localDataSource.setBirthdate(birthday)
+    }
 
     override suspend fun setIsOnboardingComplete(isComplete: Boolean) {
         localDataSource.setShouldHideOnboarding(isComplete)

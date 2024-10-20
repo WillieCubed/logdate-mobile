@@ -1,6 +1,5 @@
 package app.logdate.core.data.journals
 
-import app.logdate.core.data.JournalRepository
 import app.logdate.model.Journal
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -8,7 +7,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.datetime.Clock
 import javax.inject.Inject
 
-class DefaultJournalRepository @Inject constructor(): JournalRepository {
+class DefaultJournalRepository @Inject constructor() : JournalRepository {
 
     private val allItems: MutableStateFlow<List<Journal>> = MutableStateFlow(
         TEST_JOURNALS

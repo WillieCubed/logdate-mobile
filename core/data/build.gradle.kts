@@ -15,6 +15,8 @@ dependencies {
     implementation(project(":core:util"))
     implementation(project(":core:coroutines"))
     implementation(libs.firebase.firestore.ktx)
+    implementation(libs.firebase.installations.ktx)
+    implementation(libs.kotlinx.serialization.json)
 
     // Unit testing
     testImplementation(libs.junit)

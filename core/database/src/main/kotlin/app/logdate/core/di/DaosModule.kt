@@ -20,4 +20,13 @@ internal object DaosModule {
 
     @Provides
     fun provideJournalNotesDao(database: AppDatabase) = database.journalNotesDao()
+
+    @Provides
+    fun provideUserDevicesDao(database: AppDatabase) = database.userDevicesDao()
+
+    @Provides
+    fun provideLocationLogDao(database: AppDatabase) = database.locationHistoryDao()
+
+    @Provides
+    fun provideMediaImageDao(database: AppDatabase) = database.mediaImageDao()
 }
