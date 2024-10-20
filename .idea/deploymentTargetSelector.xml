@@ -4,10 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="Launch App">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2024-08-18T00:53:42.334940Z">
+        <DropdownSelection timestamp="2024-10-20T00:36:42.113227Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="LocalEmulator" identifier="path=/Users/williecubed/.android/avd/Pixel_6_on_Android_13.avd" />
+              <DeviceId pluginId="LocalEmulator" identifier="path=/Users/williecubed/.android/avd/Test_Pixel_8_Pro_API_35.avd" />
             </handle>
           </Target>
         </DropdownSelection>
@@ -19,6 +19,17 @@
           <Target type="DEFAULT_BOOT">
             <handle>
               <DeviceId pluginId="LocalEmulator" identifier="path=/Users/williecubed/.android/avd/Pixel_Fold_API_35.avd" />
+            </handle>
+          </Target>
+        </DropdownSelection>
+        <DialogSelection />
+      </SelectionState>
+      <SelectionState runConfigName="SuggestedEntryBlockPreview">
+        <option name="selectionMode" value="DROPDOWN" />
+        <DropdownSelection timestamp="2024-10-18T20:21:28.487427Z">
+          <Target type="DEFAULT_BOOT">
+            <handle>
+              <DeviceId pluginId="PhysicalDevice" identifier="serial=38191FDJG00FNY" />
             </handle>
           </Target>
         </DropdownSelection>

@@ -16,6 +16,7 @@
             </builds>
           </compositeBuild>
         </compositeConfiguration>
+        <option name="testRunner" value="CHOOSE_PER_TEST" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
         <option name="gradleJvm" value="#GRADLE_LOCAL_JAVA_HOME" />
         <option name="modules">
@@ -38,6 +39,7 @@
             <option value="$PROJECT_DIR$/core/database" />
             <option value="$PROJECT_DIR$/core/datastore" />
             <option value="$PROJECT_DIR$/core/install-referrer" />
+            <option value="$PROJECT_DIR$/core/intelligence" />
             <option value="$PROJECT_DIR$/core/lib" />
             <option value="$PROJECT_DIR$/core/media" />
             <option value="$PROJECT_DIR$/core/model" />
