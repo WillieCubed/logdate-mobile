@@ -31,7 +31,7 @@ class AICacheLocalDataSource @Inject constructor(
     }
 
     operator fun set(key: String, summary: GenerativeAICacheEntry) {
-        val file = File(cacheDir, key)
+        val file = File(getGenerativeCacheDir(), getRealFilename(key))
         file.writeText(summary.content)
         file.setLastModified(summary.lastUpdated.epochSeconds * 1000)
     }
