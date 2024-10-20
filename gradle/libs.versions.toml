@@ -1,30 +1,32 @@
 [versions]
-androidGradlePlugin = "8.5.2"
+androidGradlePlugin = "8.7.1"
 dokkaGradlePlugin = "1.9.20"
-kotlin = "1.9.23"
-kotlinxDatetime = "0.6.0-RC.2"
-kotlinxCoroutines = "1.8.1"
-ksp = "1.9.23-1.0.19"
-hilt = "2.50"
+kotlin = "2.0.20"
+kotlinxDatetime = "0.6.1"
+kotlinxCoroutines = "1.9.0"
+ksp = "2.0.20-1.0.25"
+ktor = "3.0.0"
+hilt = "2.52"
 junit = "4.13.2"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
-activityCompose = "1.9.1"
-composeBom = "2024.08.00"
-firebaseBom = "33.2.0"
+activityCompose = "1.9.3"
+composeBom = "2024.10.00"
+firebaseBom = "33.4.0"
 perfPlugin = "1.4.2"
-androidxComposeCompiler = "1.5.11" # Used in ComposeConventionPlugin
+androidxComposeCompiler = "1.5.15" # Used in ComposeConventionPlugin
 androidxHilt = "1.2.0"
-androidxActivityKtx = "1.9.1"
+androidxActivityKtx = "1.9.3"
 androidxBiometric = "1.2.0-alpha05"
 androidxCoreKtx = "1.13.1"
 androidxCoreSplashScreen = "1.1.0-rc01"
-androidxCredentials = "1.2.2"
+androidxCredentials = "1.3.0"
 androidxDatastorePreferences = "1.1.1"
-androidxLifecycle = "2.8.4"
-androidxNavigation = "2.8.0-rc01"
+androidxLifecycle = "2.8.6"
+androidxNavigation = "2.8.3"
 androidxRoomKtx = "2.6.1"
-androidxGlance = "1.1.0"
+androidxTransition = "1.5.1"
+androidxGlance = "1.1.1"
 androidxTestCore = "1.6.1"
 androidxTestExt = "1.2.1"
 androidxTestRunner = "1.6.2"
@@ -33,23 +35,30 @@ playServicesLocation = "21.3.0"
 playServicesMaps = "19.0.0"
 playInstallReferrer = "2.2"
 playAppUpdate = "2.1.0"
-googleMapsPlaces = "3.5.0"
-billingKtx = "7.0.0"
+googleMapsPlaces = "4.0.0"
+billingKtx = "7.1.1"
 workRuntimeKtx = "2.9.1"
-kotlinxSerialization = "1.6.3"
+kotlinxSerialization = "1.7.3"
 workTesting = "2.9.1"
-firebaseMessagingKtx = "24.0.1"
+firebaseMessagingKtx = "24.0.2"
 playServicesAuthBlockstore = "16.4.0"
 firebaseFirestoreKtx = "25.1.0"
 firebaseInstallationsKtx = "18.0.0"
 uuid = "0.0.26"
-androidxCamera = "1.3.4"
-adaptiveLayoutAndroid = "1.0.0-rc01"
+androidxCamera = "1.4.0-rc04"
+adaptiveLayoutAndroid = "1.1.0-alpha05"
+adaptiveNavigationSuite = "1.3.0"
 multiplatformMarkdownRenderer = "0.25.0"
+firebaseVertexai = "16.0.0-beta06"
+coil = "3.0.0-rc01"
+agp = "8.7.1"
+appcompat = "1.7.0"
+material = "1.12.0"
 
 [libraries]
 # Core
 android-tools-build-gradle-plugin = { group = "com.android.tools.build", name = "gradle", version.ref = "androidGradlePlugin" }
+firebase-vertexai = { module = "com.google.firebase:firebase-vertexai", version.ref = "firebaseVertexai" }
 kotlin-gradle-plugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
 dokka-gradle-plugin = { module = "org.jetbrains.dokka:dokka-gradle-plugin", version.ref = "dokkaGradlePlugin" }
 
@@ -70,24 +79,28 @@ androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-toolin
 androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" } # Used in ComposeConventionPlugin
-androidx-adaptive = { group = "androidx.compose.material3.adaptive", name = "adaptive", version.ref = "adaptiveLayoutAndroid" }
-androidx-adaptive-layout = { group = "androidx.compose.material3.adaptive", name = "adaptive-layout", version.ref = "adaptiveLayoutAndroid" }
-androidx-adaptive-navigation = { group = "androidx.compose.material3.adaptive", name = "adaptive-navigation", version.ref = "adaptiveLayoutAndroid" }
+
 ## Material libraries
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" } # Used in ComposeConventionPlugin
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
-androidx-compose-material3-carousel = { group = "androidx.compose.material3", name = "material3-carousel" }
 androidx-compose-material3-windowsizeclass-android = { group = "androidx.compose.material3", name = "material3-window-size-class-android" }
+androidx-adaptive = { group = "androidx.compose.material3.adaptive", name = "adaptive", version.ref = "adaptiveLayoutAndroid" }
+androidx-adaptive-layout = { group = "androidx.compose.material3.adaptive", name = "adaptive-layout", version.ref = "adaptiveLayoutAndroid" }
+androidx-adaptive-navigation = { group = "androidx.compose.material3.adaptive", name = "adaptive-navigation", version.ref = "adaptiveLayoutAndroid" }
+androidx-adaptive-navigation-suite = { group = "androidx.compose.material3", name = "material3-adaptive-navigation-suite-android", version.ref = "adaptiveNavigationSuite" }
+
 ## Room
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "androidxRoomKtx" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "androidxRoomKtx" }
 androidx-room-testing = { group = "androidx.room", name = "room-testing", version.ref = "androidxRoomKtx" }
 ## CameraX
-androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "androidxCamera" }
+androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "androidxCamera" }
+androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "androidxCamera" }
 androidx-camera-video = { group = "androidx.camera", name = "camera-video", version.ref = "androidxCamera" }
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "androidxCamera" }
-androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "androidxCamera" }
-guava = { group = "com.google.guava", name = "guava", version = "32.0.1-android" }
+androidx-camera-extensions = { group = "androidx.camera", name = "camera-extensions", version.ref = "androidxCamera" }
+guava = { group = "com.google.guava", name = "guava", version = "33.3.0-android" }
+
 ## Jetpack navigation
 androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "androidxHilt" }
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "androidxNavigation" }
@@ -111,6 +124,7 @@ androidx-credentials-playservicesauth = { group = "androidx.credentials", name =
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "androidxDatastorePreferences" }
 androidx-hilt-common = { group = "androidx.hilt", name = "hilt-common", version.ref = "androidxHilt" }
 androidx-hilt-work = { group = "androidx.hilt", name = "hilt-work", version.ref = "androidxHilt" }
+androidx-transition = { group = "androidx.transition", name = "transition-ktx", version.ref = "androidxTransition" }
 
 # Google Play Services
 play-services-instantapps = { module = "com.google.android.gms:play-services-instantapps", version = "18.1.0" }
@@ -148,15 +162,29 @@ firebase-messaging-ktx = { group = "com.google.firebase", name = "firebase-messa
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 billing-ktx = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "billingKtx" }
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
-coil-compose = { group = "io.coil-kt", name = "coil-compose", version = "2.6.0" }
+coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
+coil-network-ktor3 = { group = "io.coil-kt.coil3", name = "coil-network-ktor3", version.ref = "coil" }
 firebase-firestore-ktx = { group = "com.google.firebase", name = "firebase-firestore-ktx", version.ref = "firebaseFirestoreKtx" }
 firebase-installations-ktx = { group = "com.google.firebase", name = "firebase-installations-ktx", version.ref = "firebaseInstallationsKtx" }
 kotlinx-uuid = { group = "app.softwork", name = "kotlinx-uuid-core", version.ref = "uuid" }
 multiplatform-markdown-renderer = { module = "com.mikepenz:multiplatform-markdown-renderer-m3", version.ref = "multiplatformMarkdownRenderer" }
 
+# Ktor
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-serialization = { module = "io.ktor:ktor-client-serialization", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
+ktor-client-android = { module = "io.ktor:ktor-client-android", version.ref = "ktor" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+
 [plugins]
 kotlin-parcelize = { id = "org.jetbrains.kotlin.plugin.parcelize", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 firebase-crashlytics = { id = "com.google.firebase.crashlytics", version = "3.0.2" }
 firebase-perf = { id = "com.google.firebase.firebase-perf", version.ref = "perfPlugin" }

@@ -8,7 +8,7 @@ android {
     namespace = "app.logdate.mobile"
 
     defaultConfig {
-        applicationId = "app.logdate.mobile"
+        applicationId = "co.reasonabletech.logdate"
         versionCode = 1
         versionName = "0.1.0"
     }
@@ -48,7 +48,6 @@ dependencies {
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.test.ext.junit.ktx)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)

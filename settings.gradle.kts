@@ -1,3 +1,5 @@
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
+
 pluginManagement {
     includeBuild("build-logic")
     repositories {
@@ -50,6 +52,8 @@ include(":core:theme")
 include(":core:backup")
 include(":core:testing")
 include(":core:updater")
+include(":core:permission")
+include(":core:intelligence")
 include(":core:sync")
 include(":core:install-referrer")
 include(":dynamic")

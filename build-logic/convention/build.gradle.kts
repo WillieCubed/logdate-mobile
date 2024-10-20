@@ -50,5 +50,9 @@ gradlePlugin {
             id = "logdate.documentation"
             implementationClass = "DokkaConventionPlugin"
         }
+        register("logdateSecrets") {
+            id = "logdate.secrets"
+            implementationClass = "LocalSecretsPlugin"
+        }
     }
 }

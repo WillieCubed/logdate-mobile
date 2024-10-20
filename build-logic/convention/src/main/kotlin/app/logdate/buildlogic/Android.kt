@@ -21,7 +21,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 internal fun configureAndroidApp(commonExtension: BaseAppModuleExtension) {
     commonExtension.apply {
         defaultConfig {
-            targetSdk = 34
+            targetSdk = 35
         }
 
         buildTypes {
@@ -38,41 +38,11 @@ internal fun configureAndroidApp(commonExtension: BaseAppModuleExtension) {
     }
 }
 
-/**
- * Loads local build properties from the local.properties file and adds them to the build config.
- */
-internal fun Project.configureBuildConfig(commonExtension: CommonExtension<*, *, *, *, *, *>) {
-    val properties = PropertiesLoader.loadProperties(this)
-    commonExtension.apply {
-        buildFeatures {
-            buildConfig = true
-        }
-
-        buildTypes {
-            getByName("debug") {
-                buildConfigField(
-                    "String",
-                    "META_APP_ID",
-                    "\"${properties.getProperty("metaAppId")}\""
-                )
-            }
-            // Check if release build type is present
-            findByName("release")?.apply {
-                buildConfigField(
-                    "String",
-                    "META_APP_ID",
-                    "\"${properties.getProperty("metaAppId")}\""
-                )
-            }
-        }
-    }
-}
-
 internal fun Project.configureAndroid(commonExtension: CommonExtension<*, *, *, *, *, *>) {
     commonExtension.apply {
-        namespace = "app.logdate.mobile"
+        namespace = "co.reasonabletech.logdate"
 
-        compileSdk = 34
+        compileSdk = 35
 
         defaultConfig {
             minSdk = 29
@@ -80,8 +50,8 @@ internal fun Project.configureAndroid(commonExtension: CommonExtension<*, *, *, 
         }
 
         compileOptions {
-            sourceCompatibility = JavaVersion.VERSION_17
-            targetCompatibility = JavaVersion.VERSION_17
+            sourceCompatibility = JavaVersion.VERSION_21
+            targetCompatibility = JavaVersion.VERSION_21
         }
 
         packaging {
@@ -108,8 +78,8 @@ internal fun Project.configureHilt() {
  */
 internal fun Project.configureKotlinJvm() {
     extensions.configure<JavaPluginExtension> {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
     configureKotlin()
@@ -122,7 +92,7 @@ private fun Project.configureKotlin() {
     // Use withType to workaround https://youtrack.jetbrains.com/issue/KT-55947
     tasks.withType<KotlinJvmCompile>().configureEach {
         compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_17)
+            jvmTarget.set(JvmTarget.JVM_21)
             val treatWarningsAsErrors: String? by project
             // Treat all Kotlin warnings as errors (disabled by default)
             // Override by setting warningsAsErrors=true in your ~/.gradle/gradle.properties

@@ -1,6 +1,6 @@
-
 import app.logdate.buildlogic.configureAndroid
 import app.logdate.buildlogic.configureAndroidApp
+import app.logdate.buildlogic.configureBuildConfig
 import app.logdate.buildlogic.configureFirebaseDeps
 import app.logdate.buildlogic.configureFirebasePerf
 import app.logdate.buildlogic.configureHilt
@@ -28,6 +28,7 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
 
             extensions.configure<BaseAppModuleExtension> {
                 configureAndroid(commonExtension = this)
+                configureBuildConfig(commonExtension = this)
                 configureAndroidApp(commonExtension = this)
                 configureFirebaseDeps(commonExtension = this)
                 configureFirebasePerf(commonExtension = this)

@@ -8,7 +8,6 @@ import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.getByType
 import org.gradle.kotlin.dsl.project
 
-@Suppress("UnstableApiUsage")
 internal fun Project.configureCompose(commonExtension: BaseExtension) {
     commonExtension.apply {
         buildFeatures.apply {
@@ -18,9 +17,8 @@ internal fun Project.configureCompose(commonExtension: BaseExtension) {
         val libs: VersionCatalog = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
         with(libs) {
-            composeOptions {
-                kotlinCompilerExtensionVersion =
-                    findVersion("androidxComposeCompiler").get().toString()
+            with(pluginManager) {
+                apply("org.jetbrains.kotlin.plugin.compose")
             }
 
             dependencies {
