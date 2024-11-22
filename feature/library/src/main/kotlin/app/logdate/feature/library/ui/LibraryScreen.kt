@@ -17,6 +17,7 @@ import coil3.compose.AsyncImage
 
 @Composable
 fun LibraryScreen(
+    onGoToItem: (String) -> Unit,
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()

@@ -2,7 +2,7 @@ package app.logdate.feature.library
 
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import app.logdate.feature.library.ui.LibraryRoute
+import app.logdate.feature.library.ui.LibraryScreen
 import app.logdate.testing.HiltActivity
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
@@ -22,7 +22,8 @@ class ListFeatureTest {
     fun testItemIsDisplayed() {
         // TODO: Test that library items are actually displayed
         composeTestRule.setContent {
-            LibraryRoute(onGoToItem = { /* no-op */ })
+            // TODO: Use the LibraryScreen composable
+            LibraryScreen(onGoToItem = { /* no-op */ })
         }
         composeTestRule.onNodeWithTag("item_1").assertExists()
     }

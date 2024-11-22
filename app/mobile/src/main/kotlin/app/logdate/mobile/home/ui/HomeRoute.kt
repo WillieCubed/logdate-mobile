@@ -82,7 +82,9 @@ internal fun HomeScreenContent(
             }
 
             HomeRouteDestination.Library -> {
-                LibraryScreen()
+                LibraryScreen(
+                    onGoToItem = {},
+                )
             }
 
             else -> {

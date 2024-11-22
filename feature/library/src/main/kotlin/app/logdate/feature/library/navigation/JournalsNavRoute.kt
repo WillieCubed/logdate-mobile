@@ -17,6 +17,8 @@ fun NavGraphBuilder.libraryRoute(
         route = LIBRARY_ROUTE,
         // TODO: Support deep link
     ) {
-        LibraryScreen()
+        LibraryScreen(
+            onGoToItem = onGoToItem,
+        )
     }
 }
