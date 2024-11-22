@@ -1,6 +1,7 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package app.logdate.feature.rewind.ui
 
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,10 +14,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.navigation.compose.hiltViewModel
+import app.logdate.feature.rewind.ui.overview.RewindOverviewViewModel
 import app.logdate.ui.theme.Spacing
-import kotlinx.datetime.Clock
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.plus
+import kotlinx.datetime.toLocalDateTime
+import kotlin.uuid.ExperimentalUuidApi
 
 @Composable
 fun RewindRoute(
@@ -26,15 +31,15 @@ fun RewindRoute(
     viewModel: RewindOverviewViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
-    RewindScreen(state, onViewPreviousRewinds, onOpenRewind, modifier)
+//    OldRewindScreen(state, onViewPreviousRewinds, onOpenRewind, modifier)
 }
 
 @Composable
-internal fun RewindScreen(
+internal fun OldRewindScreen(
     state: RewindUiState,
     onViewPreviousRewinds: () -> Unit,
     onOpenRewind: RewindOpenCallback,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
@@ -70,10 +75,13 @@ internal fun RewindScreen(
                         style = textStyle,
                     )
                     RewindCard(
-                        state.data.label, // TODO: Fix this ID
-                        state.data.label,
-                        state.data.title,
-                        onOpenRewind,
+                        id = state.data.id,
+                        label = state.data.label, // TODO: Fix this ID
+                        title = state.data.title,
+                        start = state.data.issueDate.toLocalDateTime(TimeZone.UTC).date,
+                        end = state.data.issueDate.toLocalDateTime(TimeZone.UTC).date
+                            .plus(1, DateTimeUnit.WEEK),
+                        onOpenRewind = onOpenRewind,
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),
@@ -92,35 +100,35 @@ internal fun RewindScreen(
     }
 }
 
-@Preview
-@Composable
-fun RewindScreenPreview() {
-    RewindScreen(
-        state = RewindUiState.Loaded(
-            ready = false,
-            data = RewindData(
-                title = "Taking care of business",
-                label = "Rewind 2024#01",
-                media = listOf(Uri.EMPTY, Uri.EMPTY),
-                places = emptyList(),
-                people = emptyList(),
-                issueDate = Clock.System.now(),
-            ),
-        ),
-        onViewPreviousRewinds = { },
-        onOpenRewind = { },
-    )
-}
-
-@Preview
-@Composable
-fun RewindScreenPreview_Loading() {
-    RewindScreen(
-        state = RewindUiState.Loading,
-        onViewPreviousRewinds = { },
-        onOpenRewind = { },
-    )
-}
+//@Preview
+//@Composable
+//fun RewindScreenPreview() {
+//    OldRewindScreen(
+//        state = RewindUiState.Loaded(
+//            ready = false,
+//            data = RewindData(
+//                title = "Taking care of business",
+//                label = "Rewind 2024#01",
+//                media = listOf(Uri.EMPTY, Uri.EMPTY),
+//                places = emptyList(),
+//                people = emptyList(),
+//                issueDate = Clock.System.now(),
+//            ),
+//        ),
+//        onViewPreviousRewinds = { },
+//        onOpenRewind = { },
+//    )
+//}
+//
+//@Preview
+//@Composable
+//fun RewindScreenPreview_Loading() {
+//    OldRewindScreen(
+//        state = RewindUiState.Loading,
+//        onViewPreviousRewinds = { },
+//        onOpenRewind = { },
+//    )
+//}
 
 internal fun getRewindFlavorText(ready: Boolean = false): String {
     // TODO: Generate flavor text dynamically depending on the state and content of the rewind

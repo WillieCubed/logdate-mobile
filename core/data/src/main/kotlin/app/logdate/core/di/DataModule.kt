@@ -2,12 +2,14 @@ package app.logdate.core.di
 
 import app.logdate.core.data.journals.JournalRepository
 import app.logdate.core.data.journals.OfflineFirstJournalRepository
+import app.logdate.core.data.location.LocationHistoryRepository
+import app.logdate.core.data.location.OfflineFirstLocationHistoryRepository
 import app.logdate.core.data.media.InMemoryLibraryContentRepository
 import app.logdate.core.data.media.LibraryContentRepository
 import app.logdate.core.data.notes.ExportableJournalContentRepository
 import app.logdate.core.data.notes.JournalNotesRepository
 import app.logdate.core.data.notes.OfflineFirstJournalNotesRepository
-import app.logdate.core.data.rewind.DefaultUserRewindRepository
+import app.logdate.core.data.rewind.OfflineFirstRewindRepository
 import app.logdate.core.data.rewind.RewindRepository
 import app.logdate.core.data.timeline.ActivityTimelineRepository
 import app.logdate.core.data.timeline.OfflineFirstActivityTimelineRepository
@@ -41,7 +43,7 @@ internal abstract class DataModule {
     abstract fun bindLibraryContentRepository(repository: InMemoryLibraryContentRepository): LibraryContentRepository
 
     @Binds
-    abstract fun bindRewindRepository(repository: DefaultUserRewindRepository): RewindRepository
+    abstract fun bindRewindRepository(repository: OfflineFirstRewindRepository): RewindRepository
 
     @Binds
     abstract fun bindUserStateRepository(repository: OfflineFirstUserStateRepository): UserStateRepository
@@ -57,4 +59,7 @@ internal abstract class DataModule {
 
     @Binds
     abstract fun bindGenerativeAICache(cache: OfflineGenerativeAICache): GenerativeAICache
+
+    @Binds
+    abstract fun bindLocationHistoryRepository(repository: OfflineFirstLocationHistoryRepository): LocationHistoryRepository
 }

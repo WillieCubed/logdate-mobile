@@ -17,3 +17,12 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 }
+
+// TODO: Extract to build plugin
+kotlin {
+    sourceSets {
+        all {
+            languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
+        }
+    }
+}

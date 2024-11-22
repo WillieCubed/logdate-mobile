@@ -27,8 +27,8 @@ enum class NavigationItemsPosition {
  */
 @Composable
 fun AppNavigationRail(
-    selectedItem: HomeRouteData,
-    onNavigationUpdate: (route: HomeRouteData) -> Unit,
+    selectedItem: HomeRouteDestination,
+    onNavigationUpdate: (route: HomeRouteDestination) -> Unit,
     onFabAction: () -> Unit,
     modifier: Modifier = Modifier,
     itemsPosition: NavigationItemsPosition = NavigationItemsPosition.TOP,
@@ -39,7 +39,7 @@ fun AppNavigationRail(
         header = {
             if (shouldShowFab) {
                 when (selectedItem) {
-                    HomeRouteData.Timeline -> {
+                    HomeRouteDestination.Timeline -> {
                         FloatingActionButton(onClick = { onFabAction() }) {
                             Icon(
                                 Icons.Default.Edit,
@@ -48,7 +48,7 @@ fun AppNavigationRail(
                         }
                     }
 
-                    HomeRouteData.Journals -> {
+                    HomeRouteDestination.Journals -> {
                         FloatingActionButton(onClick = { onFabAction() }) {
                             Icon(
                                 Icons.Outlined.Add,
@@ -57,7 +57,7 @@ fun AppNavigationRail(
                         }
                     }
 
-                    HomeRouteData.Library -> {
+                    HomeRouteDestination.Library -> {
                         FloatingActionButton(onClick = { onFabAction() }) {
                             Icon(
                                 Icons.Outlined.LibraryAdd,
@@ -82,7 +82,7 @@ fun AppNavigationRail(
             Modifier.fillMaxHeight(),
             verticalArrangement = itemsArrangement,
         ) {
-            HomeRouteData.ALL.forEach { route ->
+            HomeRouteDestination.ALL.forEach { route ->
                 NavigationRailItem(
                     selected = selectedItem == route,
                     onClick = { onNavigationUpdate(route) },
@@ -108,7 +108,7 @@ fun AppNavigationRail(
 @Composable
 fun AppNavigationRailPreview_Landscape() {
     AppNavigationRail(
-        selectedItem = HomeRouteData.Journals,
+        selectedItem = HomeRouteDestination.Journals,
         onNavigationUpdate = { },
         onFabAction = { },
     )
@@ -123,7 +123,7 @@ fun AppNavigationRailPreview_Landscape() {
 @Composable
 fun AppNavigationRailPreview_Portrait() {
     AppNavigationRail(
-        selectedItem = HomeRouteData.Journals,
+        selectedItem = HomeRouteDestination.Journals,
         onNavigationUpdate = { },
         onFabAction = { },
     )

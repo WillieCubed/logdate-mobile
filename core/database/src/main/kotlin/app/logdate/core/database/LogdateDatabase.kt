@@ -7,6 +7,7 @@ import app.logdate.core.database.dao.LocationHistoryDao
 import app.logdate.core.database.dao.TextNoteDao
 import app.logdate.core.database.dao.UserDevicesDao
 import app.logdate.core.database.dao.UserMediaDao
+import app.logdate.core.database.dao.rewind.CachedRewindDao
 
 /**
  * A database that contains all the tables used by the LogDate app.
@@ -19,5 +20,7 @@ interface LogdateDatabase {
     fun userDevicesDao(): UserDevicesDao
     fun locationHistoryDao(): LocationHistoryDao
     fun mediaImageDao(): UserMediaDao
-//    fun journalContentDao(): JournalContentDao
+
+    //    fun journalContentDao(): JournalContentDao
+    fun cachedRewindDao(): CachedRewindDao
 }

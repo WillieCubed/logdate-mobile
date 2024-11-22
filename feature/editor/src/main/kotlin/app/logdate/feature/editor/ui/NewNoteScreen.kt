@@ -2,7 +2,6 @@ package app.logdate.feature.editor.ui
 
 import android.Manifest
 import android.net.Uri
-import android.os.Parcelable
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -47,7 +46,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -72,7 +70,6 @@ import app.logdate.util.toReadableDateShort
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
-import kotlinx.parcelize.Parcelize
 import java.io.File
 
 @Composable
@@ -83,31 +80,20 @@ fun NewNoteRoute(
 ) {
     val state by viewModel.uiState.collectAsState()
     with(state) {
-        NoteCreationScreen(
+        NoteCreationEditScreen(
             onClose = onClose,
             previousEntries = recentNotes,
-            onAddNote = { viewModel.addNote(it, onNoteSaved) },
-            currentLocation = if (locationUiState is LocationUiState.Enabled) {
-                locationUiState.currentPlace
-            } else {
-                null
+            onAddNote = {
+                viewModel.addNote(
+                    it.toNewEntryContent(),
+                    onNoteSaved,
+                )
             },
             onRefreshLocation = viewModel::refreshLocation,
-            initialTextContent = initialContent?.text ?: "",
-            initialAttachments = initialContent?.media ?: emptyList(),
-            onLocationPermissionResult = viewModel::handleLocationPermissionResult,
-            userMessage = userMessage,
+            onLocationPermissionResult = viewModel::handleLocationPermissionResult
         )
     }
 }
-
-@Parcelize
-data class TimestampContainer(
-    val timestamp: Long,
-) : Parcelable
-
-val InstantSaver = Saver<Instant, Long>(save = { it.toEpochMilliseconds() },
-    restore = { Instant.fromEpochMilliseconds(it) })
 
 /**
  * Caches a temp file for the camera to use.
@@ -223,7 +209,7 @@ fun NoteCreationScreen(
     }
 
     fun transitionToPhotoEntry() {
-
+//        handleTakePhoto()
     }
 
     LaunchedEffect(userMessage) {
@@ -407,7 +393,7 @@ fun WritingEntryBlock(
     val expanded by rememberSaveable { mutableStateOf(false) }
     val lineColor = MaterialTheme.colorScheme.onSurfaceVariant
     val locationText =
-        location?.metadata?.name ?: stringResource(R.string.text_placeholder_location)
+        location?.longitude?.toString() ?: stringResource(R.string.text_placeholder_location)
 
     fun handleLocationClick() {
         onRequestLocationUpdate()
@@ -440,7 +426,7 @@ fun WritingEntryBlock(
 
             Spacer(modifier = Modifier.weight(1f))
             LocationChip(
-                location = locationText, enabled = locationEnabled, onClick = ::handleLocationClick
+                location = locationText, enabled = locationEnabled, onClick = ::handleLocationClick,
             )
         }
         EditorField(
@@ -453,7 +439,7 @@ fun WritingEntryBlock(
 }
 
 fun Modifier.applyExpandedHeight(
-    expanded: Boolean
+    expanded: Boolean,
 ): Modifier {
     return if (expanded) {
         then(Modifier.fillMaxHeight())

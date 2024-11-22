@@ -1,12 +1,19 @@
 package app.logdate.mobile.home.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import app.logdate.feature.journals.ui.JournalOpenCallback
+import app.logdate.feature.journals.ui.JournalClickCallback
+import app.logdate.feature.library.ui.LibraryScreen
+import app.logdate.feature.rewind.ui.RewindOpenCallback
+import app.logdate.feature.rewind.ui.RewindScreen
+import app.logdate.feature.rewind.ui.overview.RewindOverviewViewModel
+import app.logdate.feature.timeline.ui.TimelineViewModel
 import app.logdate.mobile.ui.common.MainAppState
 import app.logdate.mobile.ui.navigation.RouteDestination
 
@@ -24,22 +31,62 @@ fun HomeRoute(
     onOpenSettings: () -> Unit,
     onCreateEntry: () -> Unit,
     onCreateJournal: () -> Unit,
-    onOpenJournal: JournalOpenCallback,
+    onOpenJournal: JournalClickCallback,
 ) {
-    var currentDestination: HomeRouteData by rememberSaveable { mutableStateOf(HomeRouteData.Timeline) }
-
-    HomeScreen(
-        currentDestination = currentDestination,
-        onUpdateDestination = {
-            currentDestination = it
-        },
-        onViewPreviousRewinds = onViewPreviousRewinds,
-        onNewJournal = onCreateJournal,
-        onOpenJournal = onOpenJournal,
+    HomeScreenContent(
         onCreateEntry = onCreateEntry,
-        onOpenSettings = onOpenSettings,
-        shouldShowBottomBar = appState.shouldShowBottomBar,
-        shouldShowNavRail = appState.shouldShowNavRail,
-        isLargeDevice = appState.isLargeDevice,
+        onOpenRewind = { },
     )
+}
+
+@Composable
+internal fun HomeScreenContent(
+    onCreateEntry: () -> Unit,
+    onOpenRewind: RewindOpenCallback,
+    timelineViewModel: TimelineViewModel = hiltViewModel<TimelineViewModel>(),
+    rewindViewModel: RewindOverviewViewModel = hiltViewModel(),
+) {
+    val timelineState by timelineViewModel.uiState.collectAsState()
+    val rewindState by rewindViewModel.uiState.collectAsState()
+
+    var showFab by remember { mutableStateOf(true) }
+
+    fun handleFabClick(currentDestination: HomeRouteDestination) = when (currentDestination) {
+        HomeRouteDestination.Timeline -> onCreateEntry()
+        else -> Unit
+    }
+
+    HomeScaffoldWrapper(
+        showFab = showFab,
+        onFabClick = ::handleFabClick,
+    ) { currentDestination ->
+        when (currentDestination) {
+            HomeRouteDestination.Timeline -> {
+                TimelineScreenContent(
+                    uiState = timelineState,
+                    onCreateEntry = onCreateEntry,
+                    onUpdateFabVisibility = { isVisible ->
+                        showFab = isVisible
+                    },
+                    onOpenDay = timelineViewModel::selectItem,
+                    onExitDetails = { timelineViewModel.selectItem(null) },
+                    onOpenEvent = {},
+                )
+            }
+
+            HomeRouteDestination.Rewind -> {
+                RewindScreen(
+                    state = rewindState,
+                    onOpenRewind = onOpenRewind
+                )
+            }
+
+            HomeRouteDestination.Library -> {
+                LibraryScreen()
+            }
+
+            else -> {
+            }
+        }
+    }
 }

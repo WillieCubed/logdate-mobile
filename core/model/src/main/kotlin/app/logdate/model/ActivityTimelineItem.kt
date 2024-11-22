@@ -1,6 +1,20 @@
 package app.logdate.model
 
 import kotlinx.datetime.Instant
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+
+
+sealed interface ActivityUpdate {
+    data class NoteUpdate(
+        val noteId: String,
+        val content: String,
+    ) : ActivityUpdate
+
+    data class LocationUpdate(
+        val location: Place,
+    ) : ActivityUpdate
+}
 
 /**
  * A single activity in a timeline.
@@ -8,10 +22,11 @@ import kotlinx.datetime.Instant
  * Examples:
  * - User shares a photo
  */
+@OptIn(ExperimentalUuidApi::class)
 data class ActivityTimelineItem(
-    val uid: String,
-    val date: Instant,
-    val location: UserPlace,
+    val uid: Uuid,
+    val timestamp: Instant,
+    val location: Location,
 )
 
 /**

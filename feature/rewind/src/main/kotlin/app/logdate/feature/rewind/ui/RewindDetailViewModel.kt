@@ -3,8 +3,9 @@ package app.logdate.feature.rewind.ui
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.logdate.core.data.JournalRepository
+import app.logdate.core.data.journals.JournalRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
@@ -17,9 +18,10 @@ import javax.inject.Inject
 @HiltViewModel
 class RewindDetailViewModel @Inject constructor(
     private val repository: JournalRepository,
-    private val savedStateHandle: SavedStateHandle
+    private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<RewindDetailUiState> =
         savedStateHandle.getStateFlow<String?>("id", null)
             .filterNotNull()

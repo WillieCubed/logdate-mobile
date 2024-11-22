@@ -16,17 +16,17 @@ import app.logdate.core.coroutines.AppDispatcher
 import app.logdate.core.coroutines.Dispatcher
 import app.logdate.core.notifications.service.RemoteNotificationProvider
 import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
-import javax.inject.Inject
 import kotlin.reflect.KClass
 
 @HiltWorker
-internal class LogdateSyncWorker @Inject constructor(
+internal class LogdateSyncWorker @AssistedInject constructor(
     @Assisted private val appContext: Context,
     @Assisted workerParams: WorkerParameters,
     @Dispatcher(AppDispatcher.IO) private val ioDispatcher: CoroutineDispatcher,
@@ -83,7 +83,7 @@ internal class LogdateSyncWorker @Inject constructor(
     }
 
     override suspend fun doWork(): Result = withContext(ioDispatcher) {
-        remoteNotificationProvider.subscribe()
+//        remoteNotificationProvider.subscribe()
         Result.success()
     }
 }

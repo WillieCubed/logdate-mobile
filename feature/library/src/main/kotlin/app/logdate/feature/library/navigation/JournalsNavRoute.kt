@@ -4,7 +4,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
 import androidx.navigation.compose.composable
-import app.logdate.feature.library.ui.LibraryRoute
+import app.logdate.feature.library.ui.LibraryScreen
 
 const val LIBRARY_ROUTE = "library"
 
@@ -17,6 +17,6 @@ fun NavGraphBuilder.libraryRoute(
         route = LIBRARY_ROUTE,
         // TODO: Support deep link
     ) {
-        LibraryRoute(onGoToItem)
+        LibraryScreen()
     }
 }

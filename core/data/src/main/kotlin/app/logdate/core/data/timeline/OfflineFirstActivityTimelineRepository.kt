@@ -5,7 +5,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
 class OfflineFirstActivityTimelineRepository @Inject constructor() : ActivityTimelineRepository {
 
     private val allItems: MutableStateFlow<List<ActivityTimelineItem>> = MutableStateFlow(
@@ -14,7 +17,7 @@ class OfflineFirstActivityTimelineRepository @Inject constructor() : ActivityTim
 
     override val allItemsObserved: Flow<List<ActivityTimelineItem>> = allItems
 
-    override fun observeModelById(id: String): Flow<ActivityTimelineItem> =
+    override fun observeModelById(id: Uuid): Flow<ActivityTimelineItem> =
         allItemsObserved.map { items ->
             items.firstOrNull { model -> model.uid == id }
                 ?: throw NoSuchElementException("$id not found")

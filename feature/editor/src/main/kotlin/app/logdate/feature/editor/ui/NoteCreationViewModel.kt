@@ -9,8 +9,9 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavController
 import app.logdate.core.data.notes.JournalNote
 import app.logdate.core.data.notes.JournalNotesRepository
-import app.logdate.core.media.MediaManager
 import app.logdate.core.world.PlacesProvider
+import app.logdate.feature.editor.domain.AddNoteUseCase
+import app.logdate.feature.editor.domain.FetchTodayNotesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,13 +22,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
-import kotlinx.datetime.toLocalDateTime
 import javax.inject.Inject
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 
 /**
@@ -48,31 +46,11 @@ class FetchNotesForDayUseCase @Inject constructor(
     }
 }
 
-/**
- * Fetches notes for the current day.
- *
- * This use case is used to populate the list of recent notes in the note creation screen.
- * It includes a buffer to include
- */
-class FetchTodayNotesUseCase @Inject constructor(
-    private val repository: JournalNotesRepository,
-) {
-    operator fun invoke(buffer: Duration = 4.hours): Flow<List<JournalNote>> {
-        val start =
-            Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.atStartOfDayIn(
-                TimeZone.currentSystemDefault()
-            )
-        val end = start + 24.hours
-        return repository.observeNotesInRange(start - buffer, end)
-    }
-}
-
 @HiltViewModel
 class NoteCreationViewModel @Inject constructor(
-    private val repository: JournalNotesRepository,
-    private val mediaManager: MediaManager,
     private val locationProvider: PlacesProvider,
     fetchNotesUseCase: FetchTodayNotesUseCase,
+    private val addNoteUseCase: AddNoteUseCase,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -80,13 +58,13 @@ class NoteCreationViewModel @Inject constructor(
         savedStateHandle.getStateFlow(NavController.KEY_DEEP_LINK_INTENT, Intent())
     private val _userMessage = MutableStateFlow<UserMessage?>(null)
     private val _locationState = locationProvider.observeCurrentPlace().catch {
-        _userMessage.emit(
-            UserMessage(
-                text = "Please enable location access in settings to use this feature.",
-                actionLabel = "Settings",
-                actionHandler = { /* TODO: Request location permission */ },
-            )
-        )
+//        _userMessage.emit(
+//            UserMessage(
+//                text = "Please enable location access in settings to use this feature.",
+//                actionLabel = "Settings",
+//                actionHandler = { /* TODO: Request location permission */ },
+//            )
+//        )
         LocationUiState.Disabled
     }.map {
         LocationUiState.Enabled(currentPlace = it)
@@ -120,9 +98,9 @@ class NoteCreationViewModel @Inject constructor(
     internal fun handleLocationPermissionResult(granted: Boolean) {
         if (granted) {
             refreshLocation()
-            _userMessage.value = UserMessage(
-                text = "Location updated.",
-            )
+//            _userMessage.value = UserMessage(
+//                text = "Location updated.",
+//            )
         } else {
             // TODO: Show error message
             _userMessage.value = UserMessage(
@@ -133,10 +111,15 @@ class NoteCreationViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Saves a note to the user's records.
+     */
     fun addNote(newEntryContent: NewEntryContent, onNoteSaved: () -> Unit) {
         viewModelScope.launch {
             try {
-                repository.create(newEntryContent.toNewTextNote())
+                addNoteUseCase(newEntryContent.toNewTextNote(), newEntryContent.mediaAttachments)
+                // Save location
+
             } catch (e: Exception) {
                 _userMessage.value = UserMessage(
                     text = "Failed to save note.",
@@ -147,14 +130,9 @@ class NoteCreationViewModel @Inject constructor(
         }
     }
 
-    fun addMediaAttachment(uri: Uri) {
-
-    }
-
     fun refreshLocation() = viewModelScope.launch {
         locationProvider.refreshCurrentPlace()
     }
-
 }
 
 internal fun Intent.parseNewEntryContent(): ShareIntentData? {

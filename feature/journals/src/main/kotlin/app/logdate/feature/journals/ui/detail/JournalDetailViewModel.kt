@@ -3,7 +3,7 @@ package app.logdate.feature.journals.ui.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.logdate.core.data.JournalRepository
+import app.logdate.core.data.journals.JournalRepository
 import app.logdate.core.sharing.SharingLauncher
 import app.logdate.feature.journals.navigation.JOURNAL_ID_ARG
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,7 +22,7 @@ import javax.inject.Inject
 class JournalDetailViewModel @Inject constructor(
     private val repository: JournalRepository,
     private val sharingLauncher: SharingLauncher,
-    private val savedStateHandle: SavedStateHandle
+    private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
     @OptIn(ExperimentalCoroutinesApi::class)

@@ -1,9 +1,9 @@
 package app.logdate.core.notifications.service
 
+import app.logdate.core.activitypub.DeviceRegistrationClient
 import app.logdate.core.coroutines.AppDispatcher
 import app.logdate.core.coroutines.Dispatcher
 import app.logdate.core.di.ApplicationScope
-import app.logdate.core.network.DeviceRegistrationClient
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.FirebaseMessagingService

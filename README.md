@@ -31,7 +31,8 @@ the [Meta developer documentation](https://developers.facebook.com/docs/android/
 Once you have the Meta app ID, add it to your `local.properties` file:
 
 ```properties
-metaAppId="<your-meta-app-id>"
+metaAppId=<your-meta-app-id> # META_APP_ID
+apiKeys.googleMaps=<your-meta-app-id> # GOOGLE_MAPS_PLACES_API_KEY
 ```
 
 ## Generating Documentation

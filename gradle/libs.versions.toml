@@ -1,29 +1,30 @@
 [versions]
-androidGradlePlugin = "8.7.1"
+androidGradlePlugin = "8.7.2"
 dokkaGradlePlugin = "1.9.20"
-kotlin = "2.0.20"
+kotlin = "2.0.21"
 kotlinxDatetime = "0.6.1"
 kotlinxCoroutines = "1.9.0"
-ksp = "2.0.20-1.0.25"
-ktor = "3.0.0"
+ksp = "2.0.21-1.0.27"
+ktor = "3.0.1"
 hilt = "2.52"
 junit = "4.13.2"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
 activityCompose = "1.9.3"
-composeBom = "2024.10.00"
-firebaseBom = "33.4.0"
+composeBom = "2024.11.00"
+firebaseBom = "33.6.0"
+pagingRuntime = "3.3.4"
 perfPlugin = "1.4.2"
 androidxComposeCompiler = "1.5.15" # Used in ComposeConventionPlugin
 androidxHilt = "1.2.0"
 androidxActivityKtx = "1.9.3"
 androidxBiometric = "1.2.0-alpha05"
-androidxCoreKtx = "1.13.1"
+androidxCoreKtx = "1.15.0"
 androidxCoreSplashScreen = "1.1.0-rc01"
 androidxCredentials = "1.3.0"
 androidxDatastorePreferences = "1.1.1"
-androidxLifecycle = "2.8.6"
-androidxNavigation = "2.8.3"
+androidxLifecycle = "2.8.7"
+androidxNavigation = "2.8.4"
 androidxRoomKtx = "2.6.1"
 androidxTransition = "1.5.1"
 androidxGlance = "1.1.1"
@@ -35,22 +36,22 @@ playServicesLocation = "21.3.0"
 playServicesMaps = "19.0.0"
 playInstallReferrer = "2.2"
 playAppUpdate = "2.1.0"
-googleMapsPlaces = "4.0.0"
+googleMapsPlaces = "4.1.0"
 billingKtx = "7.1.1"
-workRuntimeKtx = "2.9.1"
+workRuntimeKtx = "2.10.0"
 kotlinxSerialization = "1.7.3"
-workTesting = "2.9.1"
-firebaseMessagingKtx = "24.0.2"
+workTesting = "2.10.0"
+firebaseMessagingKtx = "24.1.0"
 playServicesAuthBlockstore = "16.4.0"
-firebaseFirestoreKtx = "25.1.0"
+firebaseFirestoreKtx = "25.1.1"
 firebaseInstallationsKtx = "18.0.0"
 uuid = "0.0.26"
-androidxCamera = "1.4.0-rc04"
-adaptiveLayoutAndroid = "1.1.0-alpha05"
-adaptiveNavigationSuite = "1.3.0"
+androidxCamera = "1.4.0"
+adaptiveLayoutAndroid = "1.1.0-alpha07"
+adaptiveNavigationSuite = "1.3.1"
 multiplatformMarkdownRenderer = "0.25.0"
-firebaseVertexai = "16.0.0-beta06"
-coil = "3.0.0-rc01"
+firebaseVertexai = "16.0.2"
+coil = "3.0.2"
 agp = "8.7.1"
 appcompat = "1.7.0"
 material = "1.12.0"
@@ -84,15 +85,21 @@ androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-te
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" } # Used in ComposeConventionPlugin
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-compose-material3-windowsizeclass-android = { group = "androidx.compose.material3", name = "material3-window-size-class-android" }
+androidx-compose-material3-adaptive-navigation-suite = { group = "androidx.compose.material3", name = "material3-adaptive-navigation-suite-android", version.ref = "adaptiveNavigationSuite" }
 androidx-adaptive = { group = "androidx.compose.material3.adaptive", name = "adaptive", version.ref = "adaptiveLayoutAndroid" }
 androidx-adaptive-layout = { group = "androidx.compose.material3.adaptive", name = "adaptive-layout", version.ref = "adaptiveLayoutAndroid" }
 androidx-adaptive-navigation = { group = "androidx.compose.material3.adaptive", name = "adaptive-navigation", version.ref = "adaptiveLayoutAndroid" }
-androidx-adaptive-navigation-suite = { group = "androidx.compose.material3", name = "material3-adaptive-navigation-suite-android", version.ref = "adaptiveNavigationSuite" }
 
 ## Room
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "androidxRoomKtx" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "androidxRoomKtx" }
 androidx-room-testing = { group = "androidx.room", name = "room-testing", version.ref = "androidxRoomKtx" }
+
+## Paging
+androidx-paging-common = { module = "androidx.paging:paging-common", version.ref = "pagingRuntime" }
+androidx-paging-compose = { module = "androidx.paging:paging-compose", version.ref = "pagingRuntime" }
+androidx-paging-runtime = { module = "androidx.paging:paging-runtime", version.ref = "pagingRuntime" }
+
 ## CameraX
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "androidxCamera" }
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "androidxCamera" }

@@ -2,6 +2,8 @@ package app.logdate.core.data.timeline
 
 import app.logdate.model.ActivityTimelineItem
 import kotlinx.coroutines.flow.Flow
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
  * A repository that exposes the default user's activity timeline.
@@ -16,10 +18,11 @@ import kotlinx.coroutines.flow.Flow
  *
  * @see ActivityTimelineItem
  */
+@OptIn(ExperimentalUuidApi::class)
 interface ActivityTimelineRepository {
     val allItemsObserved: Flow<List<ActivityTimelineItem>>
 
-    fun observeModelById(id: String): Flow<ActivityTimelineItem>
+    fun observeModelById(id: Uuid): Flow<ActivityTimelineItem>
 
     /**
      * Adds a new activity to the timeline.

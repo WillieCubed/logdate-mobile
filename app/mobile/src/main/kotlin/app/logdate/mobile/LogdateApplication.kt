@@ -7,10 +7,13 @@ import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
 class LogdateApplication : Application(), BiometricActivityProvider {
-    val appComponent = DaggerApplicationComponent.create()
+//    val appComponent = DaggerApplicationComponent.create()
 
     override fun provideBiometricActivity(): FragmentActivity {
         TODO()
     }
 
+    override fun onCreate() {
+        super.onCreate()
+    }
 }

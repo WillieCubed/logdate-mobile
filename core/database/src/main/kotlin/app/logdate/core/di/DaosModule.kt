@@ -29,4 +29,7 @@ internal object DaosModule {
 
     @Provides
     fun provideMediaImageDao(database: AppDatabase) = database.mediaImageDao()
+
+    @Provides
+    fun provideCachedRewindDao(database: AppDatabase) = database.cachedRewindDao()
 }

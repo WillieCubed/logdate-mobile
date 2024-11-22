@@ -5,9 +5,11 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import app.logdate.core.database.dao.rewind.RewindEntity
 import app.logdate.core.database.migrations.MIGRATION_1_2
 import app.logdate.core.database.migrations.MIGRATION_2_3
 import app.logdate.core.database.migrations.MIGRATION_3_4
+import app.logdate.core.database.migrations.MIGRATION_4_5
 import app.logdate.core.database.model.ImageNoteEntity
 import app.logdate.core.database.model.JournalEntity
 import app.logdate.core.database.model.JournalNoteCrossRef
@@ -15,7 +17,8 @@ import app.logdate.core.database.model.LocationLogEntity
 import app.logdate.core.database.model.TextNoteEntity
 import app.logdate.core.database.model.UserDeviceEntity
 import app.logdate.core.database.model.media.MediaImageEntity
-import app.logdate.core.database.util.InstantConverter
+import app.logdate.core.database.util.InstantConverters
+import app.logdate.core.database.util.UuidConverters
 import java.io.File
 
 /**
@@ -31,11 +34,17 @@ import java.io.File
         UserDeviceEntity::class,
         MediaImageEntity::class,
 //        JournalContentEntityLink::class,
+        RewindEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
+    autoMigrations = [
+    ],
 )
-@TypeConverters(InstantConverter::class)
+@TypeConverters(
+    InstantConverters::class,
+    UuidConverters::class,
+)
 abstract class AppDatabase : RoomDatabase(), LogdateDatabase, BackupableDatabase {
 
     companion object {
@@ -55,6 +64,7 @@ abstract class AppDatabase : RoomDatabase(), LogdateDatabase, BackupableDatabase
                 MIGRATION_1_2,
                 MIGRATION_2_3,
                 MIGRATION_3_4,
+                MIGRATION_4_5,
             )
             .build()
 

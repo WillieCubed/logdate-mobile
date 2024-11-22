@@ -1,6 +1,6 @@
 package app.logdate.core.status
 
-import app.logdate.core.network.LogdateServerBaseClient
+import app.logdate.core.activitypub.LogdateServerClient
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -10,7 +10,9 @@ class UserStatusTest {
     @Test
     fun `ensure status can be set online`() = runTest {
         // Given
-        val logdateServerClient = LogdateServerBaseClient()
+        val logdateServerClient = LogdateServerClient(
+            domain = "logdate.app"
+        )
         val presenceProvider = DefaultPresenceProvider(logdateServerClient)
 
         // When
@@ -23,7 +25,9 @@ class UserStatusTest {
 
     @Test
     fun `ensure status can be reset after being set`() = runTest {
-        val logdateServerClient = LogdateServerBaseClient()
+        val logdateServerClient = LogdateServerClient(
+            domain = "logdate.app"
+        )
         val presenceProvider = DefaultPresenceProvider(logdateServerClient)
 
         presenceProvider.setIsOnline(true)

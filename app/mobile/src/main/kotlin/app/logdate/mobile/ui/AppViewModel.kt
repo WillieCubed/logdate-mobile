@@ -4,6 +4,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.core.data.user.UserStateRepository
+import app.logdate.core.data.user.devices.UserDeviceRepository
 import app.logdate.core.datastore.model.AppSecurityLevel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,6 +20,7 @@ import javax.inject.Inject
 class AppViewModel @Inject constructor(
     userStateRepository: UserStateRepository,
     private val biometricGatekeeper: BiometricGatekeeper,
+    private val userDeviceRepository: UserDeviceRepository,
 ) : ViewModel() {
 
     private val biometricState = biometricGatekeeper.authState
@@ -35,6 +37,10 @@ class AppViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = LaunchAppUiState.Loading,
         )
+
+    fun ensureDeviceRegistered() {
+        userDeviceRepository.currentDevice
+    }
 
     /**
      * Show the biometric prompt to the user.

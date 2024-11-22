@@ -1,9 +1,9 @@
 package app.logdate.mobile
 
-import android.app.DirectAction
+//import app.logdate.mobile.ui.BiometricActivityProvider
+//import app.logdate.mobile.ui.BiometricGatekeeperComponent
 import android.app.assist.AssistContent
 import android.os.Bundle
-import android.os.CancellationSignal
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -19,10 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import app.logdate.core.assist.AssistantActionsProvider
 import app.logdate.core.assist.AssistantContextProvider
-import app.logdate.core.assist.toDirectAction
 import app.logdate.mobile.ui.AppViewModel
-import app.logdate.mobile.ui.BiometricActivityProvider
-import app.logdate.mobile.ui.BiometricGatekeeperComponent
 import app.logdate.mobile.ui.LaunchAppUiState
 import app.logdate.mobile.ui.LogdateAppRoot
 import app.logdate.mobile.ui.common.rememberMainAppState
@@ -30,7 +27,6 @@ import app.logdate.ui.theme.LogDateTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import java.util.function.Consumer
 import javax.inject.Inject
 
 /**
@@ -56,7 +52,7 @@ class MainActivity : FragmentActivity() {
     @Inject
     lateinit var assistantActionsProvider: AssistantActionsProvider
 
-    lateinit var biometricGatekeeperComponent: FragmentActivity
+//    lateinit var biometricGatekeeperComponent: BiometricGatekeeperComponent
 
     private val viewModel by viewModels<AppViewModel>()
 
@@ -64,11 +60,8 @@ class MainActivity : FragmentActivity() {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
 
-
-        biometricGatekeeperComponent = (applicationContext as BiometricActivityProvider)
-            .provideBiometricActivity()
-
-        biometricGatekeeperComponent.inject(this)
+//        biometricGatekeeperComponent = (applicationContext as BiometricGatekeeperComponent)
+//        biometricGatekeeperComponent.inject(this)
 
         var uiState: LaunchAppUiState by mutableStateOf(LaunchAppUiState.Loading)
 
@@ -109,14 +102,15 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    override fun onGetDirectActions(
-        cancellationSignal: CancellationSignal, callback: Consumer<MutableList<DirectAction>>
-    ) {
-        if (voiceInteractor == null) {
-            super.onGetDirectActions(cancellationSignal, callback)
-            return
-        }
-        callback.accept(assistantActionsProvider.supportedActions.map { it.toDirectAction() }
-            .toMutableList())
-    }
+    // TODO: Ensure assistant can get actions
+//    override fun onGetDirectActions(
+//        cancellationSignal: CancellationSignal, callback: Consumer<MutableList<DirectAction>>
+//    ) {
+//        if (voiceInteractor == null) {
+//            super.onGetDirectActions(cancellationSignal, callback)
+//            return
+//        }
+//        callback.accept(assistantActionsProvider.supportedActions.map { it.toDirectAction() }
+//            .toMutableList())
+//    }
 }

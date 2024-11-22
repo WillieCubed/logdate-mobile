@@ -15,4 +15,6 @@
     <string name="dialog_reset_app_title">Reset App?</string>
     <string name="settings_biometric_label">Require biometrics</string>
     <string name="settings_biometric_description">Fingerprint, face unlock, or device code is required to open the app.</string>
+    <string name="settings_export_entries_label">Export data</string>
+    <string name="settings_export_entries_description">Export all journal entries to a JSON file</string>
 </resources>

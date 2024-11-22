@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.logdate.android.library)
+    alias(libs.plugins.logdate.compose)
     alias(libs.plugins.logdate.documentation)
 }
 
@@ -26,4 +27,13 @@ dependencies {
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
     implementation(libs.androidx.work.runtime.ktx)
+}
+
+// TODO: Extract to build plugin
+kotlin {
+    sourceSets {
+        all {
+            languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
+        }
+    }
 }

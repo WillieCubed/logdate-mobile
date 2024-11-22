@@ -7,9 +7,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 
 @Composable
-fun HomeBottomNavigation(selectedItem: HomeRouteData, onNavigationUpdate: (route: HomeRouteData) -> Unit) {
+fun HomeBottomNavigation(
+    selectedItem: HomeRouteDestination,
+    onNavigationUpdate: (route: HomeRouteDestination) -> Unit,
+) {
     NavigationBar {
-        HomeRouteData.ALL.forEach { route ->
+        HomeRouteDestination.ALL.forEach { route ->
             NavigationBarItem(
                 icon = {
                     Icon(

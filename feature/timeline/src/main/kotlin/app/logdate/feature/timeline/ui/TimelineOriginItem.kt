@@ -88,7 +88,11 @@ internal fun TimelineOriginItem(
                     style = MaterialTheme.typography.headlineMedium,
                 )
                 Text(
-                    pluralStringResource(R.plurals.timeline_origin_day_counter, originDate.daysUntilNow),
+                    pluralStringResource(
+                        R.plurals.timeline_origin_day_counter,
+                        originDate.daysUntilNow,
+                        originDate.daysUntilNow
+                    ),
                     style = MaterialTheme.typography.headlineSmall,
                 )
             }

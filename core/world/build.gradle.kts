@@ -9,10 +9,13 @@ android {
 
 dependencies {
     implementation(project(":core:coroutines"))
+    implementation(project(":core:model"))
+    implementation(project(":core:permission"))
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.play.services.location)
-    implementation(project(":core:model"))
+    implementation(libs.play.services.maps)
+    implementation(libs.google.maps.places)
 
     // Unit testing
     testImplementation(libs.junit)

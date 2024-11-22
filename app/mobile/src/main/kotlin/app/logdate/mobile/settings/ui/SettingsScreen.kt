@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -57,9 +58,27 @@ fun SettingsScreen(
                 onReset = onReset,
                 appSettings = (state as SettingsUiState.Loaded).userData,
                 onSetBiometricsEnabled = viewModel::setBiometricEnabled,
+                onExportContent = viewModel::exportContent,
             )
         }
     }
+}
+
+@Composable
+private fun UpdateBirthdayDialog(
+    selectedDate: String,
+    onDateSelected: (String) -> Unit,
+    onDismissRequest: () -> Unit,
+) {
+//        DatePickerDialog(
+//            onDateSelected = { date ->
+//                selectedDate = date
+//                showDialog = false
+//            },
+//            onDismissRequest = {
+//                showDialog = false
+//            }
+//        )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,10 +87,12 @@ private fun SettingsContent(
     onBack: () -> Unit,
     onReset: () -> Unit,
     onSetBiometricsEnabled: (enabled: Boolean) -> Unit,
+    onExportContent: () -> Unit,
     appSettings: UserData,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     var showResetDialog by rememberSaveable { mutableStateOf(false) }
+    val birthdayFieldState = rememberDatePickerState()
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -92,6 +113,19 @@ private fun SettingsContent(
             contentPadding = it,
         ) {
             item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(Spacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    Text(
+                        "Your info",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+            }
+            item {
                 ListItem(
                     headlineContent = { Text(stringResource(R.string.settings_biometric_label)) },
                     supportingContent = { Text(stringResource(R.string.settings_biometric_description)) },
@@ -103,6 +137,14 @@ private fun SettingsContent(
                             },
                         )
                     },
+                )
+            }
+            item {
+                ListItem(
+                    modifier = Modifier.padding(top = Spacing.sm),
+                    headlineContent = { Text(stringResource(R.string.settings_export_entries_label)) },
+                    supportingContent = { Text(stringResource(R.string.settings_export_entries_description)) },
+//                    onClick = onExportContent,
                 )
             }
             item {
@@ -176,11 +218,13 @@ private fun PreviewSettingsScreen() {
         onBack = {},
         onReset = {},
         appSettings = UserData(
+            birthday = Clock.System.now(),
             isOnboarded = true,
             onboardedDate = Clock.System.now(),
             securityLevel = AppSecurityLevel.BIOMETRIC,
             favoriteNotes = emptyList(),
         ),
         onSetBiometricsEnabled = {},
+        onExportContent = {},
     )
 }

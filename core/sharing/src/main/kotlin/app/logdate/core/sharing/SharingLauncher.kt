@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.core.net.toUri
-import app.logdate.core.data.JournalRepository
+import app.logdate.core.data.journals.JournalRepository
 import app.logdate.core.di.ApplicationScope
 import app.logdate.core.media.MediaManager
 import dagger.hilt.android.qualifiers.ApplicationContext

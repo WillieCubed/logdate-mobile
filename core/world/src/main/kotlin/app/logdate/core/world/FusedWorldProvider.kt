@@ -24,6 +24,8 @@ import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
+import com.google.android.libraries.places.api.Places
+import com.google.android.libraries.places.api.net.PlacesClient
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -37,9 +39,10 @@ import kotlin.coroutines.suspendCoroutine
 
 class FusedWorldProvider @Inject constructor(
     @ApplicationContext private val context: Context,
-    @Dispatcher(Default) private val dispatcher: CoroutineDispatcher = Dispatchers.Default
+    @Dispatcher(Default) private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ActivityLocationProvider, PlacesProvider {
 
+    private lateinit var placesClient: PlacesClient
     private val activityClient = ActivityRecognition.getClient(context)
     private val locationClient: FusedLocationProviderClient =
         LocationServices.getFusedLocationProviderClient(context)
@@ -90,6 +93,11 @@ class FusedWorldProvider @Inject constructor(
                 .build(),
         )
         const val UPDATE_INTERVAL_MILLISECONDS = 30_000L // 30 seconds
+    }
+
+    init {
+        Places.initializeWithNewPlacesApiEnabled(context, BuildConfig.GOOGLE_MAPS_PLACES_API_KEY)
+        placesClient = Places.createClient(context)
     }
 
     override fun getCurrentActivity(): LogdateActivity {
@@ -193,7 +201,7 @@ class FusedWorldProvider @Inject constructor(
                     override fun onGeocode(addresses: MutableList<Address>) {
                         cachedPlaces.clear()
                         addresses.forEach { address ->
-                            val place = UserPlace.Unknown
+                            val place = UserPlace.Unresolved
                             val result = UserPlaceResult(place, 1)
                             cachedPlaces.add(result)
                         }
@@ -211,7 +219,7 @@ class FusedWorldProvider @Inject constructor(
                     geocoder.getFromLocation(latitude, longitude, 5)
                 cachedPlaces.clear()
                 addresses?.forEach { address ->
-                    val place = UserPlace.Unknown
+                    val place = UserPlace.Unresolved
                     val result = UserPlaceResult(place, 1)
                     cachedPlaces.add(result)
                 }

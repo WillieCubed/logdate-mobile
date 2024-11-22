@@ -9,8 +9,26 @@ android {
 }
 
 dependencies {
+    api(projects.core.theme)
+    implementation(projects.core.util)
+    implementation(projects.core.model)
     // Compose in logdate.compose build logic
     implementation(libs.kotlinx.datetime)
-    implementation(project(":core:util"))
-    api(project(":core:theme"))
+    implementation(libs.coil.compose)
+    implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.google.maps.compose)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.adaptive)
+    implementation(libs.androidx.adaptive.layout)
+    implementation(libs.androidx.adaptive.navigation)
+    implementation(libs.multiplatform.markdown.renderer)
+}
+
+// TODO: Extract to build plugin
+kotlin {
+    sourceSets {
+        all {
+            languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
+        }
+    }
 }

@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Instant
 import javax.inject.Inject
 
 /**
@@ -77,6 +78,12 @@ class OnboardingViewModel @Inject constructor(
                 label = "",
                 bodyContent = "It's time to write.",
             ))
+        }
+    }
+
+    fun updateBirthday(birthday: Instant) {
+        viewModelScope.launch {
+            userStateRepository.setBirthday(birthday)
         }
     }
 

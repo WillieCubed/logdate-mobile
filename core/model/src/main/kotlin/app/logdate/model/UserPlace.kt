@@ -1,11 +1,12 @@
 package app.logdate.model
 
-sealed class Place(
-    val latitude: Double,
-    val longitude: Double,
-    val altitude: Double,
+@Deprecated(
+    "Use Place instead",
+    replaceWith = ReplaceWith(
+        "UserPlace",
+        "app.logdate.model.Place"
+    )
 )
-
 sealed class UserPlace(
     val uid: String,
     val latitude: Double,

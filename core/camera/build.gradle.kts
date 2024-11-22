@@ -13,7 +13,7 @@ dependencies {
     implementation(project(":core:media"))
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.accompanist.permissions)
-    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
 
     // Unit testing
     testImplementation(libs.junit)

@@ -22,3 +22,12 @@ dependencies {
     testImplementation(libs.androidx.room.testing)
     testImplementation(libs.kotlinx.coroutines.test)
 }
+
+// TODO: Extract to build plugin
+kotlin {
+    sourceSets {
+        all {
+            languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
+        }
+    }
+}

@@ -20,15 +20,23 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.activity.ktx)
     implementation(libs.androidx.ui.graphics)
+    implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material3.windowsizeclass.android)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.biometric)
     implementation(libs.kotlinx.datetime)
     implementation(libs.play.services.instantapps)
+    implementation(libs.androidx.adaptive)
+    implementation(libs.androidx.adaptive.layout)
+    implementation(libs.androidx.adaptive.navigation)
+    implementation(libs.androidx.compose.material3.adaptive.navigation.suite)
+    implementation(libs.androidx.transition)
+//    implementation(libs.androidx.material3.adaptive.navigation.suite.android)
 
     implementation(project(":feature:onboarding"))
     implementation(project(":feature:account"))
@@ -53,4 +61,13 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+}
+
+// TODO: Extract to build plugin
+kotlin {
+    sourceSets {
+        all {
+            languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
+        }
+    }
 }

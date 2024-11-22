@@ -115,7 +115,7 @@ private fun OnboardingNotificationContent(
                     ) {
                         item {
                             Text(
-                                "LogDate works best when ",
+                                "LogDate works best when you write about what's going on in the moment. Enable notifications to get smart reminders when to write.",
                                 style = MaterialTheme.typography.bodyLarge
                             )
                         }
@@ -157,7 +157,7 @@ private fun OnboardingNotificationContent(
                         ) {
                             item {
                                 Text(
-                                    "LogDate works best when ",
+                                    "LogDate works best when you write about what's going on in the moment. Enable notifications to get smart reminders when to write.",
                                     style = MaterialTheme.typography.bodyLarge
                                 )
                             }
@@ -179,12 +179,14 @@ private fun OnboardingNotificationContent(
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     LazyColumn(
-                        Modifier.weight(1f).widthIn(max = 444.dp),
+                        Modifier
+                            .weight(1f)
+                            .widthIn(max = 444.dp),
                         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
                         item {
                             Text(
-                                "LogDate works best when ",
+                                "LogDate works best when you write about what's going on in the moment. Enable notifications to get smart reminders when to write.",
                                 style = MaterialTheme.typography.bodyLarge
                             )
                         }

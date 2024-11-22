@@ -2,7 +2,7 @@ package app.logdate.feature.library.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.logdate.core.data.LibraryContentRepository
+import app.logdate.core.data.media.LibraryContentRepository
 import app.logdate.feature.library.ui.LibraryUiState.Success
 import app.logdate.model.LibraryItem
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -14,7 +14,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
-    repository: LibraryContentRepository
+    repository: LibraryContentRepository,
 ) : ViewModel() {
 
     val uiState: StateFlow<LibraryUiState> = repository

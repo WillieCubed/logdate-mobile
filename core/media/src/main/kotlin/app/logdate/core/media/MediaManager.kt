@@ -2,6 +2,7 @@ package app.logdate.core.media
 
 import android.net.Uri
 import kotlinx.coroutines.flow.Flow
+import kotlinx.datetime.Instant
 
 interface MediaManager {
     /**
@@ -22,37 +23,59 @@ interface MediaManager {
      * This consists of all images and videos that have been added to the app recently.
      */
     suspend fun getRecentMedia(): Flow<List<MediaObject>>
+
+    /**
+     * Retrieves all media objects between the given [start] and [end] timestamps.
+     *
+     * @param start The start timestamp (inclusive)
+     * @param end The end timestamp (exclusive)
+     */
+    suspend fun queryMediaByDate(start: Instant, end: Instant): Flow<List<MediaObject>>
+
+    /**
+     * Adds the media object with the given [uri] to the default collection.
+     *
+     * If the media object already exists in the default collection, it will not be added again.
+     *
+     * @param uri The URI of the on-device media object to add to the default collection
+     */
+    suspend fun addToDefaultCollection(uri: String)
 }
 
-sealed class MediaObject {
+sealed interface MediaObject {
+    // TODO: Support multiplatform URI
     /**
      * The URI of this media object.
      */
-    abstract val uri: Uri
+    val uri: Uri
 
     /**
      * The file name of this media object.
      */
-    abstract val name: String
+    val name: String
 
     /**
      * The size of the media object in bytes.
      */
-    abstract val size: Int
+    val size: Int
+
+    val timestamp: Instant
 
     data class Image(
         override val uri: Uri,
         override val size: Int,
         override val name: String,
-    ) : MediaObject()
+        override val timestamp: Instant,
+    ) : MediaObject
 
     data class Video(
         override val name: String,
         override val uri: Uri,
         override val size: Int,
+        override val timestamp: Instant,
         /**
          * The duration of the video in milliseconds.
          */
         val duration: Long,
-    ) : MediaObject()
+    ) : MediaObject
 }

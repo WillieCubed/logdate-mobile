@@ -14,7 +14,7 @@ data class NoteCreationUiState(
 
 sealed class LocationUiState {
     data class Enabled(
-        val currentPlace: UserPlace = UserPlace.Unknown,
+        val currentPlace: UserPlace = UserPlace.Unresolved,
     ) : LocationUiState()
 
     data object Disabled : LocationUiState()

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package app.logdate.feature.rewind.ui
 
 import android.net.Uri
@@ -11,9 +13,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.material3.MaterialTheme
@@ -26,12 +30,17 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
+import kotlinx.datetime.LocalDate
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 @Composable
 internal fun RewindCard(
-    id: String,
+    id: Uuid,
     label: String,
     title: String,
+    start: LocalDate,
+    end: LocalDate,
     onOpenRewind: RewindOpenCallback,
     modifier: Modifier = Modifier,
     isReady: Boolean = false,
@@ -42,7 +51,8 @@ internal fun RewindCard(
                 MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.shapes.medium
             )
             .padding(Spacing.lg)
-            .clickable(isReady) { onOpenRewind(id) },
+            .clickable(isReady) { onOpenRewind(id) }
+            .widthIn(min = 360.dp),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
         horizontalAlignment = Alignment.Start,
     ) {
@@ -58,6 +68,16 @@ internal fun RewindCard(
                 text = title,
                 style = MaterialTheme.typography.headlineMedium,
             )
+            Row {
+                // TODO: Add start and end dates
+                // Format to be like "November 4
+//                Text(
+//                    text = start.format(DateTimeFormatBuilder)
+//                )
+                // If the month is different, display month.
+                // If the year is different from the start, display the year.
+                // Otherwise, just display the date.
+            }
         }
         LazyHorizontalGrid(rows = GridCells.Adaptive(minSize = 100.dp)) {
         }
@@ -69,10 +89,12 @@ internal fun RewindCard(
 private fun RewindCardPreview() {
     LogDateTheme {
         RewindCard(
-            id = "2024#01",
+            id = Uuid.random(),
             label = "Rewind 2024#01",
             title = "Just another week",
             onOpenRewind = { },
+            start = LocalDate(2024, 11, 4),
+            end = LocalDate(2024, 11, 4),
         )
     }
 }
@@ -148,7 +170,7 @@ enum class RewindBlockType {
 }
 
 sealed class RewindCardBlock(
-    val type: RewindBlockType
+    val type: RewindBlockType,
 ) {
     data class ImageBlock(val uri: Uri) : RewindCardBlock(RewindBlockType.Image)
     data class PlaceBlock(val place: String) : RewindCardBlock(RewindBlockType.Place)
@@ -169,4 +191,5 @@ fun GridItem(block: RewindCardBlock) {
 /**
  * Callback for when a rewind is opened.
  */
-typealias RewindOpenCallback = (rewindId: String) -> Unit
+@OptIn(ExperimentalUuidApi::class)
+typealias RewindOpenCallback = (rewindId: Uuid) -> Unit

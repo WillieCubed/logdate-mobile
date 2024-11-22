@@ -11,10 +11,6 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
-import dagger.Component
-import dagger.hilt.EntryPoint
-import dagger.hilt.InstallIn
-import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
@@ -55,16 +51,17 @@ interface BiometricGatekeeper {
 }
 
 
-@EntryPoint
-@InstallIn(SingletonComponent::class)
-interface SyncComponentDependencies {
-    fun getBiometricActivity(): FragmentActivity
-}
+//@EntryPoint
+//@InstallIn(SingletonComponent::class)
+//interface BiometricGatekeeperComponentDependencies {
+//    fun getBiometricActivity(): FragmentActivity
+//}
 
-@Component(dependencies = [SyncComponentDependencies::class])
-interface BiometricGatekeeperComponent {
-    fun inject(biometricActivity: FragmentActivity)
-}
+//@Component(dependencies = [BiometricGatekeeperComponentDependencies::class])
+//interface BiometricGatekeeperComponent {
+//    fun inject(biometricActivity: FragmentActivity)
+//    fun provideBiometricActivity(): FragmentActivity
+//}
 
 interface BiometricActivityProvider {
     fun provideBiometricActivity(): FragmentActivity
@@ -155,7 +152,7 @@ class AndroidBiometricGatekeeper @Inject constructor(
             BiometricManager.BIOMETRIC_ERROR_SECURITY_UPDATE_REQUIRED,
             BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE,
             BiometricManager.BIOMETRIC_ERROR_UNSUPPORTED,
-            -> {
+                -> {
                 Log.d(
                     "BiometricGatekeeper",
                     "Biometric authentication is not supported on this device."

@@ -2,6 +2,7 @@ package app.logdate.util
 
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
@@ -20,6 +21,18 @@ import java.time.temporal.WeekFields
 import java.util.Locale
 
 fun LocalDateTime.toReadableDateShort(): String = format(LocalDateTime.Format {
+    monthName(MonthNames.ENGLISH_FULL)
+    char(' ')
+    dayOfMonth(Padding.SPACE)
+    if (year != Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).year) {
+        // TODO: Add support for multiple locales
+        char(',')
+        char(' ')
+        year()
+    }
+})
+
+fun LocalDate.toReadableDateShort(): String = format(LocalDate.Format {
     monthName(MonthNames.ENGLISH_FULL)
     char(' ')
     dayOfMonth(Padding.SPACE)

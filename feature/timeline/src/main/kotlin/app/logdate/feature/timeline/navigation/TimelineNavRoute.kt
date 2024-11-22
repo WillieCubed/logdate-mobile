@@ -16,6 +16,9 @@ fun NavGraphBuilder.timelineRoute(onOpenTimelineItem: (id: String) -> Unit) {
         route = TIMELINE_ROUTE,
         // TODO: Support deep link
     ) {
-        TimelineRoute(onOpenTimelineItem = onOpenTimelineItem)
+        TimelineRoute(
+            onOpenTimelineItem = onOpenTimelineItem,
+            onNewEntry = { },
+        )
     }
 }

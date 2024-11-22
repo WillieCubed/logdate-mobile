@@ -2,7 +2,7 @@ package app.logdate.feature.journals.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.logdate.core.data.JournalRepository
+import app.logdate.core.data.journals.JournalRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

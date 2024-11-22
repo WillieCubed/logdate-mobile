@@ -5,6 +5,7 @@ import app.logdate.core.billing.model.BackupPlanOption
 import app.logdate.core.coroutines.AppDispatcher
 import app.logdate.core.coroutines.Dispatcher
 import com.android.billingclient.api.BillingClient
+import com.android.billingclient.api.PendingPurchasesParams
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.QueryProductDetailsParams
 import com.android.billingclient.api.queryProductDetails
@@ -28,8 +29,7 @@ class DefaultSubscriptionBiller @Inject constructor(
             val productList = listOf(
                 QueryProductDetailsParams.Product.newBuilder()
                     .setProductId("logdate_backup_plan_basic")
-                    .setProductType(BillingClient.ProductType.SUBS)
-                    .build()
+                    .setProductType(BillingClient.ProductType.SUBS).build()
             )
             val params = QueryProductDetailsParams.newBuilder()
             params.setProductList(productList)
@@ -48,17 +48,14 @@ class DefaultSubscriptionBiller @Inject constructor(
         TODO("Not yet implemented")
     }
 
-    private val purchasesUpdatedListener =
-        PurchasesUpdatedListener { billingResult, purchases ->
-            // To be implemented in a later section.
-        }
-
-    private val billingClient = BillingClient.newBuilder(context)
-        .setListener(purchasesUpdatedListener)
-        .enablePendingPurchases()
-        .build()
-
-    init {
-
+    private val purchasesUpdatedListener = PurchasesUpdatedListener { billingResult, purchases ->
+        // To be implemented in a later section.
     }
+
+    private val billingClient =
+        BillingClient.newBuilder(context).setListener(purchasesUpdatedListener)
+            .enablePendingPurchases(
+                PendingPurchasesParams.newBuilder().enableOneTimeProducts().build()
+            ).build()
+
 }

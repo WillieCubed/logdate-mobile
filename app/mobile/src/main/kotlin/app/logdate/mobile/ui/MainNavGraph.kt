@@ -5,7 +5,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import app.logdate.feature.editor.navigation.noteCreationRoute
 import app.logdate.feature.journals.navigation.journalsRoute
-import app.logdate.feature.journals.ui.JournalOpenCallback
+import app.logdate.feature.journals.ui.JournalClickCallback
 import app.logdate.mobile.home.ui.HomeRoute
 import app.logdate.mobile.ui.common.MainAppState
 import app.logdate.mobile.ui.navigation.RouteDestination
@@ -20,7 +20,7 @@ fun NavGraphBuilder.mainNavGraph(
     onViewPreviousRewinds: () -> Unit,
     onClose: () -> Unit,
     onCreateJournal: () -> Unit,
-    onOpenJournal: JournalOpenCallback,
+    onOpenJournal: JournalClickCallback,
     onJournalCreated: (String) -> Unit,
     onJournalDeleted: () -> Unit,
     onNoteSaved: () -> Unit,

@@ -10,6 +10,7 @@ android {
 dependencies {
     implementation(project(":core:model"))
     implementation(libs.kotlinx.coroutines.android)
+    implementation(project(":core:coroutines"))
 
     // Unit testing
     testImplementation(libs.junit)

@@ -24,3 +24,12 @@ dependencies {
     implementation(project(":feature:editor"))
     implementation(project(":core:notifications")) // TODO: Remove this once editor UI is refactored into separate module
 }
+
+// TODO: Extract to build plugin
+kotlin {
+    sourceSets {
+        all {
+            languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
+        }
+    }
+}

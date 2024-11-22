@@ -1,6 +1,6 @@
 package app.logdate.core.status
 
-import app.logdate.core.network.LogdateServerBaseClient
+import app.logdate.core.activitypub.LogdateServerBaseClient
 import app.logdate.core.status.model.PresenceStatus
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow

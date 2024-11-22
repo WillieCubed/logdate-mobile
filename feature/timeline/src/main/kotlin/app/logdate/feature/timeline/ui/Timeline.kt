@@ -3,6 +3,7 @@ package app.logdate.feature.timeline.ui
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -10,10 +11,18 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Note
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.PeopleAlt
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -29,7 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.unit.dp
 import app.logdate.core.data.notes.JournalNote
 import app.logdate.feature.timeline.R
@@ -37,6 +45,8 @@ import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.TimelineLine
 import app.logdate.util.toReadableDateShort
 import app.logdate.util.weeksAgo
+import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.m3.markdownTypography
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.Instant
@@ -44,18 +54,35 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Duration.Companion.hours
+
+
+/**
+ * Checks that there is an entry within the past eight hours.
+ */
+internal fun hasEntryFromToday(timelineItems: List<JournalNote>): Boolean {
+    val now = Clock.System.now()
+    val eightHoursAgo = now.minus(8.hours)
+    return timelineItems.any { it.creationTimestamp > eightHoursAgo }
+}
 
 @Composable
 internal fun Timeline(
     timelineItems: List<JournalNote>,
     onItemSelected: (uid: String) -> Unit,
+    onItemDeleted: (uid: String) -> Unit,
+    onNewEntry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
-        modifier = modifier,
-        contentPadding = PaddingValues(top = Spacing.xl)
+        modifier = modifier, contentPadding = PaddingValues(top = Spacing.xl)
     ) {
-        constructTimeline(items = timelineItems, onItemSelected = onItemSelected)
+        constructTimeline(
+            items = timelineItems,
+            onItemSelected = onItemSelected,
+            onItemDeleted = onItemDeleted,
+            onNewEntry = onNewEntry,
+        )
         item {
             // TODO: Fetch origin date from user data
             // TODO: Display birthday if there are items before date of first onboarding, "journey begins"
@@ -75,9 +102,6 @@ private fun TimelineContentHeader(title: String) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(title, style = MaterialTheme.typography.headlineMedium)
-        IconButton(onClick = { /*TODO*/ }) {
-            Icon(imageVector = Icons.Default.MoreVert, contentDescription = "More")
-        }
     }
 }
 
@@ -93,18 +117,114 @@ enum class TimeDetail {
     HOUR,
 }
 
+/**
+ * A dropdown menu that displays options for a timeline entry.
+ */
+@Composable
+private fun EntryDropdownMenu(
+    isExpanded: Boolean,
+    onDismiss: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    DropdownMenu(
+        expanded = isExpanded, onDismissRequest = onDismiss,
+        modifier = modifier,
+    ) {
+        // TODO: Re-enable edit functionality when editing is implemented
+//        DropdownMenuItem(
+//            text = {
+//                Text("Edit")
+//            },
+//            onClick = onEdit,
+//            leadingIcon = {
+//                Icon(imageVector = Icons.Default.Edit, contentDescription = null)
+//            },
+//        )
+        DropdownMenuItem(
+            text = {
+                Text("Delete")
+            },
+            onClick = onDelete,
+            leadingIcon = {
+                Icon(imageVector = Icons.Default.Delete, contentDescription = null)
+            },
+        )
+    }
+}
+
+data class TimelineItemMetadata(
+    val peopleSeen: Int = 0,
+    val placesVisited: Int = 0,
+    val notesRecorded: Int = 0,
+)
+
+@Composable
+private fun TimelineItemMetadataBlock(
+    metadata: TimelineItemMetadata,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        if (metadata.peopleSeen > 0) {
+            MetadataItem(
+                text = "${metadata.peopleSeen} people",
+                icon = {
+                    Icon(imageVector = Icons.Outlined.PeopleAlt, contentDescription = "People")
+                },
+            )
+        }
+        if (metadata.placesVisited > 0) {
+            MetadataItem(
+                text = "${metadata.placesVisited} places",
+                icon = {
+                    Icon(imageVector = Icons.Default.LocationOn, contentDescription = "Places")
+                },
+            )
+        }
+        if (metadata.notesRecorded > 0) {
+            MetadataItem(
+                text = "${metadata.notesRecorded} notes",
+                icon = {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Default.Note,
+                        contentDescription = "Notes"
+                    )
+                },
+            )
+        }
+    }
+}
+
+
+@Composable
+internal fun MetadataItem(
+    text: String,
+    icon: @Composable () -> Unit,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
+        Box(modifier = Modifier.size(20.dp))
+        {
+            icon()
+        }
+        Text(text = text)
+    }
+}
+
 @Composable
 private fun TimelineContentItem(
     item: JournalNote,
+    metadata: TimelineItemMetadata,
     timeDetail: TimeDetail = TimeDetail.DAY,
     onItemSelected: (uid: String) -> Unit,
+    onDeleteItem: (uid: String) -> Unit = {},
 ) {
     var showOptions by rememberSaveable { mutableStateOf(false) }
-    val headerStyle = if (timeDetail == TimeDetail.DAY) {
-        MaterialTheme.typography.titleSmall
-    } else {
-        MaterialTheme.typography.titleLarge
-    }
     Row(
         modifier = Modifier
             .clip(MaterialTheme.shapes.medium)
@@ -112,8 +232,7 @@ private fun TimelineContentItem(
                 onItemSelected(item.uid)
             }
             .fillMaxWidth()
-            .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
-        ,
+            .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
         horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         TimelineLine(
@@ -122,32 +241,62 @@ private fun TimelineContentItem(
                 .fillMaxHeight(),
         )
         Column(
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) { // Content container
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
                 verticalAlignment = Alignment.CenterVertically,
-            ) {// Header block
-                // TODO: Add metadata row
-                Text(
-                    item.creationTimestamp.toReadableDateShort(),
-                    modifier = Modifier.weight(1f),
-                    style = headerStyle,
-                )
-                IconButton(onClick = { showOptions = !showOptions }) {
-                    Icon(imageVector = Icons.Default.MoreVert, contentDescription = "More")
+            ) { // Header block
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(vertical = Spacing.sm),
+                ) {
+                    Text(
+                        item.creationTimestamp.toReadableDateShort(),
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    TimelineItemMetadataBlock(metadata = metadata)
+                }
+                Box(
+                    modifier = Modifier
+                        .wrapContentSize(Alignment.TopEnd),
+                ) {
+                    EntryDropdownMenu(
+                        isExpanded = showOptions,
+                        onDismiss = { showOptions = false },
+                        onEdit = {
+                            showOptions = false
+                        },
+                        onDelete = {
+                            showOptions = false
+                            onDeleteItem(item.uid)
+                        },
+                    )
+                    IconButton(onClick = { showOptions = true }) {
+                        Icon(imageVector = Icons.Default.MoreVert, contentDescription = "More")
+                    }
                 }
             }
             // Actual content
             when (item) {
                 is JournalNote.Text -> {
-                    Text(
-                        item.content,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            lineBreak = LineBreak.Paragraph,
-                        ),
+                    Markdown(
+                        content = item.content,
+                        typography = markdownTypography(
+                            text = MaterialTheme.typography.bodyMedium.copy(
+                                lineBreak = MaterialTheme.typography.bodyMedium.lineBreak,
+                            )
+                        )
                     )
+//                    Text(
+//                        item.content,
+//                        style = MaterialTheme.typography.bodyMedium.copy(
+//                            lineBreak = LineBreak.Paragraph,
+//                        ),
+//                    )
                 }
 
                 else -> {
@@ -236,7 +385,9 @@ enum class ZoomLevel {
  */
 fun LazyListScope.constructTimeline(
     items: List<JournalNote>,
+    onNewEntry: () -> Unit,
     onItemSelected: (uid: String) -> Unit,
+    onItemDeleted: (uid: String) -> Unit,
     zoomLevel: ZoomLevel = ZoomLevel.DETAILED,
 ) {
     // Sort items in reverse order, grouping them by weeks before this week, adding headers for each week.
@@ -253,11 +404,27 @@ fun LazyListScope.constructTimeline(
         item {
             TimelineContentHeader(determineHeaderTitle(date = items.first().creationTimestamp))
         }
+        // If there is no entry from today, show the default new entry block
+        if (!hasEntryFromToday(items)) {
+            item {
+                DefaultNewEntryBlock(
+                    onNewEntry = onNewEntry,
+                    message = "No notes from today yet!",
+                )
+            }
+        }
         items.forEachIndexed { _, item ->
             when (zoomLevel) {
                 ZoomLevel.DETAILED -> {
                     item {
-                        TimelineContentItem(item, TimeDetail.DAY, onItemSelected)
+                        TimelineContentItem(
+                            item,
+                            metadata = TimelineItemMetadata(
+                                notesRecorded = 1,
+                            ),
+                            onItemSelected = onItemSelected,
+                            onDeleteItem = onItemDeleted,
+                        )
                     }
                 }
 
@@ -274,7 +441,7 @@ fun LazyListScope.constructTimeline(
 fun PinchableContainer(
     defaultContent: @Composable () -> Unit,
     expandedContent: @Composable () -> Unit,
-    label: String = "Pinchable Container"
+    label: String = "Pinchable Container",
 ) {
     var expanded by remember { mutableStateOf(false) }
     AnimatedContent(targetState = expanded, label = label) { isExpanded ->

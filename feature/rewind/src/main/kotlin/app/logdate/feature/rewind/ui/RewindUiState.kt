@@ -2,6 +2,7 @@ package app.logdate.feature.rewind.ui
 
 import android.net.Uri
 import kotlinx.datetime.Instant
+import kotlin.uuid.Uuid
 
 sealed interface RewindUiState {
     data class Loaded(
@@ -14,10 +15,11 @@ sealed interface RewindUiState {
 }
 
 data class RewindListUiState(
-    val items: List<RewindData>
+    val items: List<RewindData>,
 )
 
 data class RewindData(
+    val id: Uuid,
     val title: String,
     val label: String,
     val media: List<Uri>,
