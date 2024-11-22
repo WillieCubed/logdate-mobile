@@ -12,7 +12,13 @@ import jakarta.inject.Inject
 class ExtractPeopleUseCase @Inject constructor(
     private val peopleExtractor: PeopleExtractor,
 ) {
-    suspend operator fun invoke(text: String): List<Person> {
-        return peopleExtractor.extractPeople(text)
+    /**
+     * Extracts people's names from the given text.
+     *
+     * @param documentId An ID used to identify and cache the response.
+     * @param text The text to extract people's names from.
+     */
+    suspend operator fun invoke(documentId: String, text: String): List<Person> {
+        return peopleExtractor.extractPeople(documentId, text)
     }
 }

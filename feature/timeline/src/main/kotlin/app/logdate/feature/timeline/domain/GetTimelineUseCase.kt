@@ -1,5 +1,6 @@
 package app.logdate.feature.timeline.domain
 
+import app.logdate.core.data.notes.JournalNote
 import app.logdate.core.data.notes.JournalNotesRepository
 import app.logdate.model.Person
 import app.logdate.ui.profiles.PersonUiState
@@ -31,7 +32,6 @@ class GetTimelineUseCase @Inject constructor(
                 val notesByDay =
                     it.groupBy { note -> note.creationTimestamp.toLocalDateTime(TimeZone.currentSystemDefault()).date }
                         .toSortedMap(compareByDescending { it })
-                val people = extractPeopleUseCase(it.joinToString("\n"))
                 val summarizedEntries = notesByDay.map { (date, entries) ->
                     val summary = when (val result = summarizeJournalEntriesUseCase(entries)) {
                         SummarizeJournalEntriesResult.NetworkUnavailable -> "Summary currently not available."
@@ -42,6 +42,13 @@ class GetTimelineUseCase @Inject constructor(
                         SummarizeJournalEntriesResult.SummaryUnavailable -> "No summary available."
                     }
                     val mediaUris = getMediaUrisUseCase(date)
+                    val people = extractPeopleUseCase(
+                        documentId = "people_summary_" + date.toEpochDays()
+                            .toString(), // TODO: Make sure this is not smelly
+                        text = entries.map {
+                            if (it is JournalNote.Text) it.content else ""
+                        }.joinToString("\n")
+                    )
                     TimelineDay(
                         tldr = summary,
                         date = date,

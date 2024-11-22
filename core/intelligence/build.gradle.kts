@@ -12,6 +12,7 @@ dependencies {
     implementation(projects.core.model)
     implementation(projects.core.coroutines)
     implementation(projects.core.network)
+    implementation(projects.core.data)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.ktor.client.core)
