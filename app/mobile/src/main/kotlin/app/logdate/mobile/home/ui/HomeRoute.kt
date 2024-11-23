@@ -1,5 +1,6 @@
 package app.logdate.mobile.home.ui
 
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -49,6 +50,8 @@ internal fun HomeScreenContent(
     val timelineState by timelineViewModel.uiState.collectAsState()
     val rewindState by rewindViewModel.uiState.collectAsState()
 
+    val timelineListState = rememberLazyListState()
+
     var showFab by remember { mutableStateOf(true) }
 
     fun handleFabClick(currentDestination: HomeRouteDestination) = when (currentDestination) {
@@ -71,6 +74,7 @@ internal fun HomeScreenContent(
                     onOpenDay = timelineViewModel::selectItem,
                     onExitDetails = { timelineViewModel.selectItem(null) },
                     onOpenEvent = {},
+                    timelineListState = timelineListState,
                 )
             }
 
