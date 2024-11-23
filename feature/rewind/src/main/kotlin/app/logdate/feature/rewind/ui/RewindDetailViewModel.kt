@@ -3,60 +3,39 @@ package app.logdate.feature.rewind.ui
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.logdate.core.data.journals.JournalRepository
+import androidx.navigation.toRoute
+import app.logdate.core.data.rewind.RewindRepository
+import app.logdate.feature.rewind.navigation.RewindDetailRoute
+import app.logdate.model.Rewind
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 @HiltViewModel
 class RewindDetailViewModel @Inject constructor(
-    private val repository: JournalRepository,
-    private val savedStateHandle: SavedStateHandle,
+    repository: RewindRepository, // TODO: Use UseCase instead
+    savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
+
+    private val rewindData = savedStateHandle.toRoute<RewindDetailRoute>()
+
+    private val rewindUiState: Flow<Rewind> = repository.getRewind(rewindData.id)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<RewindDetailUiState> =
-        savedStateHandle.getStateFlow<String?>("id", null)
-            .filterNotNull()
-            .flatMapLatest { id ->
-                repository.observeJournalById(id)
-            }
-            .catch {
-                when (it) {
-                    is IllegalStateException -> {
-                        RewindDetailUiState.Error(
-                            "unknown",
-                            "Could not load this journal. Try again later."
-                        )
-                    }
-
-                    else -> {
-                        RewindDetailUiState.Error(
-                            "journal-not-exist",
-                            "Could not load this journal. It has an unknown or invalid journal ID."
-                        )
-                    }
-                }
-            }
+        rewindUiState
             .map {
-                RewindDetailUiState.Success(
-                    listOf() // TODO: Replace with actual contents
-                )
+                // TODO: Populate panels
+                RewindDetailUiState.Success()
             }
             .stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(5000),
                 RewindDetailUiState.Loading
             )
-
-    fun selectJournal(journalId: String) {
-        savedStateHandle["id"] = journalId
-    }
 }

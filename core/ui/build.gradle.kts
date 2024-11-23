@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.logdate.android.library)
     alias(libs.plugins.logdate.compose)
     alias(libs.plugins.logdate.documentation)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -15,6 +16,9 @@ dependencies {
     // Compose in logdate.compose build logic
     implementation(libs.kotlinx.datetime)
     implementation(libs.coil.compose)
+    // TODO: Move this to proper shared module
+    api(libs.kotlinx.serialization.core)
+    api(libs.kotlinx.serialization.json)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.google.maps.compose)
     implementation(libs.androidx.navigation.compose)

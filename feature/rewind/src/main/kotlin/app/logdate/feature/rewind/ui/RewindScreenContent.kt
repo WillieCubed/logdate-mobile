@@ -24,7 +24,7 @@ import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalUuidApi::class)
 @Composable
-fun RewindScreen(
+fun RewindScreenContent(
     state: RewindOverviewScreenUiState,
     onOpenRewind: RewindOpenCallback,
 ) {
@@ -117,6 +117,15 @@ data class SupportingPaneUiState(
     val rewinds: List<RewindHistoryUiState>,
 )
 
+internal fun getRewindFlavorText(ready: Boolean = false): String {
+    // TODO: Generate flavor text dynamically depending on the state and content of the rewind
+    return if (ready) {
+        "Quite the adventurous one, aren't you?"
+    } else {
+        "Still working on the Rewind. Go touch some grass in the meantime."
+    }
+}
+
 @OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalUuidApi::class)
 @Composable
 internal fun ThreePaneScaffoldScope.RewindOverviewSupportingPanel(
@@ -136,7 +145,7 @@ internal fun ThreePaneScaffoldScope.RewindOverviewSupportingPanel(
 @Preview
 private fun RewindScreenPreview() {
     val lastId = Uuid.random()
-    RewindScreen(
+    RewindScreenContent(
         state = RewindOverviewScreenUiState.Loaded(
             pastRewinds = listOf(
                 RewindHistoryUiState(Uuid.random(), "Rewind 1"),

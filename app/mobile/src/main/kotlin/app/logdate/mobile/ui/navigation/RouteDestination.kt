@@ -20,8 +20,6 @@ sealed class RouteDestination(
 
     data object JournalDetails : RouteDestination(ROUTE_JOURNAL_BASE)
     data object NewJournal : RouteDestination(JOURNAL_NEW_ROUTE)
-    data object RewindList : RouteDestination("rewind")
-    data object RewindDetails : RouteDestination("rewind/$REWIND_ID_ARG")
 
     data object Settings : RouteDestination(ROUTE_SETTINGS)
 

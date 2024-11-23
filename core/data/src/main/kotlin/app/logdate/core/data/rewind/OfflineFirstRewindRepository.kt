@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.datetime.Instant
+import kotlin.uuid.Uuid
 
 class OfflineFirstRewindRepository @Inject constructor(
     private val rewindGenerator: RewindGenerator,
@@ -23,7 +24,7 @@ class OfflineFirstRewindRepository @Inject constructor(
         emit(emptyList())
     }
 
-    override fun getRewind(uid: String): Flow<Rewind> {
+    override fun getRewind(uid: Uuid): Flow<Rewind> {
         return emptyFlow()
     }
 

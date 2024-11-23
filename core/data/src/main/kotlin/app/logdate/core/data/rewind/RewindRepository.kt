@@ -4,6 +4,7 @@ import app.logdate.model.Rewind
 import kotlinx.coroutines.flow.Flow
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlin.uuid.Uuid
 
 /**
  * A repository for managing Rewind data.
@@ -17,7 +18,7 @@ interface RewindRepository {
     /**
      * Retrieves a Rewind by its unique identifier.
      */
-    fun getRewind(uid: String): Flow<Rewind>
+    fun getRewind(uid: Uuid): Flow<Rewind>
 
     /**
      * Retrieves a Rewind for a given time period.

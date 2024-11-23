@@ -11,7 +11,7 @@ import androidx.navigation.NavController
 import app.logdate.feature.journals.ui.JournalClickCallback
 import app.logdate.feature.library.ui.LibraryScreen
 import app.logdate.feature.rewind.ui.RewindOpenCallback
-import app.logdate.feature.rewind.ui.RewindScreen
+import app.logdate.feature.rewind.ui.RewindScreenContent
 import app.logdate.feature.rewind.ui.overview.RewindOverviewViewModel
 import app.logdate.feature.timeline.ui.TimelineViewModel
 import app.logdate.mobile.ui.common.MainAppState
@@ -75,7 +75,7 @@ internal fun HomeScreenContent(
             }
 
             HomeRouteDestination.Rewind -> {
-                RewindScreen(
+                RewindScreenContent(
                     state = rewindState,
                     onOpenRewind = onOpenRewind
                 )

@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.logdate.android.application)
     alias(libs.plugins.logdate.compose)
     alias(libs.plugins.logdate.documentation)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
