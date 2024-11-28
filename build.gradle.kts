@@ -1,31 +1,39 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
+import org.jetbrains.dokka.gradle.DokkaMultiModuleTask
+import org.jetbrains.dokka.gradle.DokkaTaskPartial
+
+plugins {
+    // this is necessary to avoid the plugins to be loaded multiple times
+    // in each subproject's classloader
+    alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.kotlin.multiplatform) apply false
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.composeMultiplatform) apply false
+    alias(libs.plugins.compose.compiler) apply false
+    alias(libs.plugins.dokka) apply false
+}
+
+subprojects {
+    apply {
+        // TODO: Migrate to version catalog
+        plugin("org.jetbrains.dokka")
     }
+
+    val dokkaPlugin by configurations
     dependencies {
-        classpath(libs.android.tools.build.gradle.plugin)
-        classpath(libs.kotlin.gradle.plugin)
-        classpath(libs.hilt.gradle.plugin)
-        classpath(libs.dokka.gradle.plugin)
+        // TODO: Figure out how to migrate to version catalog in build configuration
+        //noinspection UseTomlInstead
+        dokkaPlugin("org.jetbrains.dokka:versioning-plugin:1.9.20")
     }
 }
 
-plugins {
-    alias(libs.plugins.kotlin.jvm) apply false
-    alias(libs.plugins.kotlin.parcelize) apply false
-    alias(libs.plugins.kotlin.serialization) apply false
-    alias(libs.plugins.ksp) apply false
-    alias(libs.plugins.compose.compiler) apply false
-    alias(libs.plugins.logdate.android.application) apply false
-    alias(libs.plugins.logdate.android.library) apply false
-    alias(libs.plugins.logdate.android.test) apply false
-    alias(libs.plugins.logdate.jvm.library) apply false
-    alias(libs.plugins.logdate.compose) apply false
-    alias(libs.plugins.logdate.dynamic) apply false
-    alias(libs.plugins.logdate.documentation) apply false
-    alias(libs.plugins.firebase.crashlytics) apply false
-    alias(libs.plugins.firebase.perf) apply false
-    alias(libs.plugins.google.gms) apply false
+tasks.withType<DokkaTaskPartial>().configureEach {
+    dokkaSourceSets.configureEach {
+        outputDirectory.set(layout.buildDirectory.dir("dokka/${name}"))
+    }
+}
+
+tasks.withType<DokkaMultiModuleTask>().configureEach {
+    moduleName.set(project.name)
+    outputDirectory.set(layout.buildDirectory.dir("dokka/$name"))
 }

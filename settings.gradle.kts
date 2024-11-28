@@ -1,68 +1,67 @@
+@file:Suppress("UnstableApiUsage")
+
+rootProject.name = "LogDate"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {
-    includeBuild("build-logic")
     repositories {
         google {
-            content {
-                includeGroupByRegex("com\\.google.*")
-                includeGroupByRegex("app\\.logdate.*")
-                includeGroupByRegex("androidx.*")
+            mavenContent {
+                includeGroupAndSubgroups("androidx")
+                includeGroupAndSubgroups("com.android")
+                includeGroupAndSubgroups("com.google")
             }
         }
         mavenCentral()
         gradlePluginPortal()
     }
 }
+
 dependencyResolutionManagement {
-    // TODO: Remove suppress once stable
-    @Suppress("UnstableApiUsage")
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    @Suppress("UnstableApiUsage")
     repositories {
-        google()
+        google {
+            mavenContent {
+                includeGroupAndSubgroups("androidx")
+                includeGroupAndSubgroups("com.android")
+                includeGroupAndSubgroups("com.google")
+            }
+        }
         mavenCentral()
     }
 }
 
-rootProject.name = "LogDate"
-include(":app:mobile")
-include(":core:model")
-include(":core:data")
-include(":core:ui")
-include(":core:assets")
-include(":core:database")
-include(":core:datastore")
-include(":core:camera")
-include(":core:media")
-include(":core:account")
-include(":core:lib")
-include(":core:sharing")
-include(":core:prompter")
-include(":core:audiorecorder")
-include(":core:util")
-include(":core:notifications")
-include(":core:coroutines")
-include(":core:billing")
-include(":core:network")
-include(":core:world")
-include(":core:assist")
-include(":core:status")
-include(":core:theme")
-include(":core:backup")
-include(":core:testing")
-include(":core:updater")
-include(":core:permission")
-include(":core:intelligence")
-include(":core:sync")
-include(":core:install-referrer")
-include(":dynamic")
-include(":feature:onboarding")
-include(":feature:editor")
-include(":feature:account")
-include(":feature:journals")
-include(":feature:timeline")
-include(":feature:rewind")
-include(":feature:library")
-include(":feature:widgets")
-// TODO: Re-add integration testing module
+// End build targets
+include(":app:compose-main")
+include(":app:wear")
+// Core client modules
+include(":client:data")
+include(":client:ui")
+include(":client:theme")
+include(":client:domain")
+include(":client:repository")
+include(":client:database")
+include(":client:datastore")
+include(":client:networking")
+include(":client:intelligence")
+include(":client:location")
+include(":client:sensor")
+include(":client:media")
+include(":client:device")
+include(":client:sharing")
+include(":client:permissions")
+include(":client:util")
+include(":client:billing")
+include(":client:sync")
+// Client Features
+include(":client:feature:core")
+include(":client:feature:editor")
+include(":client:feature:journal")
+include(":client:feature:rewind")
+include(":client:feature:timeline")
+include(":client:feature:onboarding")
+// Shared cross-platform modules
+include(":shared:activitypub")
+include(":shared:config")
+include(":shared:model")
+// Server-specific modules
+include(":server")

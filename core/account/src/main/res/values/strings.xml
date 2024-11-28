@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="label_logdate_account">LogDate Cloud</string>
-    <string name="asset_statements" translatable="false">
-        [{
-            \"include\": \"https://auth.logdate.app/.well-known/assetlinks.json\"\
-        }]
-    </string>
-</resources>

@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-    android:configure="app.logdate.feature.widgets.ui.WidgetConfigurationActivity"
-    android:description="@string/photo_widget_description"
-    android:initialLayout="@layout/glance_default_loading_layout"
-    android:minWidth="160dp"
-    android:minHeight="120dp"
-    android:widgetFeatures="reconfigurable" />
