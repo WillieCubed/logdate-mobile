@@ -10,6 +10,7 @@ import androidx.room.RoomDatabaseConstructor
  *
  * @see [LogDateDatabase]
  */
+@Suppress("NO_ACTUAL_FOR_EXPECT")
 expect object LogDateDatabaseConstructor : RoomDatabaseConstructor<LogDateDatabase> {
     override fun initialize(): LogDateDatabase
 }
