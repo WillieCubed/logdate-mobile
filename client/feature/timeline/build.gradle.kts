@@ -76,6 +76,7 @@ kotlin {
 
         androidMain.dependencies {
             implementation(compose.preview)
+            implementation(libs.koin.android)
             implementation(libs.google.maps.compose)
             implementation(libs.accompanist.permissions)
 //    implementation(libs.firebase.vertexai)

@@ -11,14 +11,21 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import java.lang.ref.WeakReference
 
 /**
  * An implementation of [BiometricGatekeeper] that uses the Android Biometric API.
  */
 class AndroidBiometricGatekeeper(
     // TODO: Load whether biometric authentication is enabled from the user datastore
-    private val activity: FragmentActivity,
+//    private val activity: FragmentActivity,
 ) : BiometricGatekeeper {
+
+    private var activityRef = WeakReference<FragmentActivity>(null)
+
+    private val activity: FragmentActivity
+        get() = activityRef.get()
+            ?: throw IllegalStateException("Activity reference must be initialized using setActivity(FragmentActivity).")
 
     private val _authState = MutableStateFlow(AppAuthState.NO_PROMPT_NEEDED)
 
@@ -52,7 +59,6 @@ class AndroidBiometricGatekeeper(
         requestEnrollmentIfNecessary: Boolean,
         description: String?,
     ) {
-        // TODO: Do activity injection properly
         val biometricManager = BiometricManager.from(activity)
         val executor = ContextCompat.getMainExecutor(activity)
         when (biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)) {
@@ -110,6 +116,18 @@ class AndroidBiometricGatekeeper(
             // TODO: Handle the result
         }
         request.launch(Unit)
+    }
+
+    /**
+     * Sets the [FragmentActivity] that will be used to launch the biometric prompt.
+     *
+     * This must be called before calling [authenticate] or [requestEnrollment].
+     */
+    fun setActivity(
+        fragmentActivity: FragmentActivity,
+    ) {
+        activityRef.clear()
+        activityRef = WeakReference(fragmentActivity)
     }
 }
 

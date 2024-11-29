@@ -2,6 +2,7 @@ package app.logdate.client.device
 
 import com.google.firebase.installations.FirebaseInstallations
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
@@ -13,7 +14,7 @@ import kotlinx.coroutines.tasks.await
 class AndroidInstanceIdProvider(
     private val firebaseInstallations: FirebaseInstallations,
     // TODO: Probably just scrap the external scope and use suspend functions
-    private val externalScope: CoroutineScope,
+    private val externalScope: CoroutineScope = CoroutineScope(Dispatchers.Default),
 ) : InstanceIdProvider {
     private val _currentInstanceId = MutableSharedFlow<String>()
 

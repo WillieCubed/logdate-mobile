@@ -15,7 +15,9 @@ import org.koin.dsl.module
 actual val coreFeatureModule: Module = module {
     includes(domainModule)
     // TODO: Refactor to separate auth module
-    single<BiometricGatekeeper> { AndroidBiometricGatekeeper(get()) }
+    single<BiometricGatekeeper> { AndroidBiometricGatekeeper() }
+    // Provide AndroidBiometricGatekeeper so it can be injected manually in activity
+    single { get<BiometricGatekeeper>() as AndroidBiometricGatekeeper }
 
     viewModel { AppViewModel(get(), get(), get()) }
     viewModel { SettingsViewModel(get(), get()) }

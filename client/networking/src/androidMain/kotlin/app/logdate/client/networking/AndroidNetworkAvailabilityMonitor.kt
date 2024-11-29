@@ -8,6 +8,7 @@ import android.net.NetworkRequest
 import androidx.core.content.getSystemService
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
@@ -20,7 +21,7 @@ import kotlinx.datetime.Clock
  */
 class AndroidNetworkAvailabilityMonitor(
     context: Context,
-    private val applicationScope: CoroutineScope,
+    private val applicationScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 ) : NetworkAvailabilityMonitor {
     private val networkState = MutableSharedFlow<NetworkState>()
     private val connectivityManager = context.getSystemService() as ConnectivityManager?

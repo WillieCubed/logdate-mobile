@@ -23,8 +23,8 @@ import kotlinx.coroutines.withContext
 class OfflineFirstJournalRepository(
     private val journalDao: JournalDao,
     private val remoteDataSource: RemoteJournalDataSource,
-    private val externalScope: CoroutineScope,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val externalScope: CoroutineScope = CoroutineScope(dispatcher),
 ) : JournalRepository {
 
     override val allJournalsObserved: Flow<List<Journal>>

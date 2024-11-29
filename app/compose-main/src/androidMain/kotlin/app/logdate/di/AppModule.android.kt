@@ -1,6 +1,6 @@
 package app.logdate.di
 
-import android.content.Context
+import android.app.Application
 import app.logdate.client.data.di.dataModule
 import app.logdate.client.networking.di.networkingModule
 import org.koin.android.ext.koin.androidContext
@@ -18,7 +18,7 @@ actual val appModule: Module = module {
 /**
  * Initializes global Koin context with the application module.
  */
-internal fun Context.initializeKoin() {
+internal fun Application.initializeKoin() {
     startKoin {
         androidLogger()
         androidContext(this@initializeKoin)

@@ -30,10 +30,12 @@ subprojects {
 tasks.withType<DokkaTaskPartial>().configureEach {
     dokkaSourceSets.configureEach {
         outputDirectory.set(layout.buildDirectory.dir("dokka/${name}"))
+        includes.from("README.md")
     }
 }
 
 tasks.withType<DokkaMultiModuleTask>().configureEach {
     moduleName.set(project.name)
     outputDirectory.set(layout.buildDirectory.dir("dokka/$name"))
+    includes.from("docs")
 }

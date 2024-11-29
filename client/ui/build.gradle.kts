@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlinx.serialization)
+    // TODO: Re-enable once we can figure out why Modifier is an unresolved reference
     alias(libs.plugins.dokka)
 }
 

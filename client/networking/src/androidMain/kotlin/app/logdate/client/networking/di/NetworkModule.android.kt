@@ -8,5 +8,5 @@ import org.koin.dsl.module
 
 actual val networkingModule: Module = module {
     single { httpClient }
-    single<NetworkAvailabilityMonitor> { AndroidNetworkAvailabilityMonitor(get(), get()) }
+    single<NetworkAvailabilityMonitor> { AndroidNetworkAvailabilityMonitor(get()) }
 }

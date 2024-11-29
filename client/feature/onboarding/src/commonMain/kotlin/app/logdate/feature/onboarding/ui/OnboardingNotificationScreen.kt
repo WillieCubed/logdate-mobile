@@ -39,7 +39,7 @@ data class NotificationPermissionUiState(
 fun OnboardingNotificationScreen(
     onBack: () -> Unit,
     onNext: () -> Unit,
-    useCompactLayout: Boolean = false,
+    useCompactLayout: Boolean = true,
     viewModel: OnboardingViewModel = koinViewModel(),
 ) {
     val notificationPermissionUiState: NotificationPermissionUiState
@@ -57,6 +57,8 @@ fun OnboardingNotificationScreen(
 //        } else {
 //            notificationPermissionUiState.launchPermissionRequest()
 //        }
+        // TODO: Re-implement notification permission handling
+        onNext()
     }
 
     OnboardingNotificationContent(

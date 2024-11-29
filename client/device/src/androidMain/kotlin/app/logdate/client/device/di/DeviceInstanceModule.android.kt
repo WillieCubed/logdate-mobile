@@ -22,10 +22,5 @@ actual val deviceInstanceModule: Module = module {
     single { FirebaseInstallations.getInstance() }
 
     // Inject the InstanceIdProvider with the application-scoped coroutine scope
-    single<InstanceIdProvider> {
-        AndroidInstanceIdProvider(
-            firebaseInstallations = get<FirebaseInstallations>(),
-            externalScope = get<CoroutineScope>()
-        )
-    }
+    single<InstanceIdProvider> { AndroidInstanceIdProvider(get()) }
 }

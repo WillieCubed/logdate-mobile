@@ -4,6 +4,7 @@ kotlin = "2.0.21"
 dokkaGradlePlugin = "1.9.20"
 compose-multiplatform = "1.7.0"
 agp = "8.7.2"
+googleServicesPlugin = "4.4.2"
 
 # Android Build Versions
 android-compileSdk = "35"
@@ -187,3 +188,4 @@ ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokkaGradlePlugin" }
 room = { id = "androidx.room", version.ref = "room" }
+googleServices = { id = "com.google.gms.google-services", version.ref = "googleServicesPlugin" }

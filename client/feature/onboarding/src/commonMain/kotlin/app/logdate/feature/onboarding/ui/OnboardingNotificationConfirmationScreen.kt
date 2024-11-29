@@ -36,9 +36,8 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 fun OnboardingNotificationConfirmationScreen(
     onBack: () -> Unit,
     onNext: () -> Unit,
-    useCompactLayout: Boolean = false,
+    useCompactLayout: Boolean = true,
 ) {
-
     OnboardingNotificationConfirmationContent(
         onBack = onBack,
         onNext = onNext,

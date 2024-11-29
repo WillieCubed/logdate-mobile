@@ -1,7 +1,6 @@
 package app.logdate.client
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
@@ -10,14 +9,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import app.logdate.client.ui.LogDateAppRoot
+import app.logdate.feature.core.AndroidBiometricGatekeeper
 import app.logdate.feature.core.AppViewModel
 import app.logdate.feature.core.GlobalAppUiState
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
 /**
@@ -32,13 +34,17 @@ import org.koin.androidx.viewmodel.ext.android.viewModel
  *
  * This activity is also responsible for providing the app's assist content and direct actions.
  */
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
+
+    private val androidBiometricGatekeeper: AndroidBiometricGatekeeper by inject()
 
     private val viewModel by viewModel<AppViewModel>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+
+        androidBiometricGatekeeper.setActivity(this)
 
         // TODO: Maybe reconsider sealed class approach to uiState loading
         var uiState: GlobalAppUiState by mutableStateOf(GlobalAppUiState())

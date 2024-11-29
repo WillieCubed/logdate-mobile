@@ -8,6 +8,14 @@ import androidx.sqlite.SQLiteDriver
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import app.logdate.client.database.converters.TimestampConverter
 import app.logdate.client.database.converters.UuidConverter
+import app.logdate.client.database.dao.ImageNoteDao
+import app.logdate.client.database.dao.JournalDao
+import app.logdate.client.database.dao.JournalNotesDao
+import app.logdate.client.database.dao.LocationHistoryDao
+import app.logdate.client.database.dao.TextNoteDao
+import app.logdate.client.database.dao.UserDevicesDao
+import app.logdate.client.database.dao.UserMediaDao
+import app.logdate.client.database.dao.rewind.CachedRewindDao
 import app.logdate.client.database.dao.rewind.RewindEntity
 import app.logdate.client.database.entities.ImageNoteEntity
 import app.logdate.client.database.entities.JournalEntity
@@ -52,6 +60,15 @@ import kotlinx.coroutines.IO
 )
 @ConstructedBy(LogDateDatabaseConstructor::class)
 abstract class LogDateDatabase : RoomDatabase() {
+    abstract fun textNoteDao(): TextNoteDao
+    abstract fun imageNoteDao(): ImageNoteDao
+    abstract fun journalDao(): JournalDao
+    abstract fun journalNotesDao(): JournalNotesDao
+//    abstract fun journalContentDao(): JournalContentDao
+    abstract fun rewindDao(): CachedRewindDao
+    abstract fun locationHistoryDao(): LocationHistoryDao
+    abstract fun userDevicesDao(): UserDevicesDao
+    abstract fun userMediaDao(): UserMediaDao
 }
 
 /**

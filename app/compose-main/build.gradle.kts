@@ -10,6 +10,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.dokka)
+    alias(libs.plugins.googleServices)
 }
 
 kotlin {
@@ -131,16 +132,19 @@ compose.desktop {
             windows {
                 console = true
                 perUserInstall = true
+                iconFile.set(project.file("app/compose-main/src/commonMain/composeResources/drawable/ic_launcher_google_play.png"))
             }
 
             macOS {
                 bundleID = "app.logdate"
                 dockName = "LogDate"
                 appCategory = "public.app-category.lifestyle"
+                iconFile.set(project.file("app/compose-main/src/commonMain/composeResources/drawable/ic_launcher_google_play.png"))
             }
 
             linux {
                 debMaintainer = "contact@logdate.app"
+                iconFile.set(project.file("app/compose-main/src/commonMain/composeResources/drawable/ic_launcher_google_play.png"))
             }
         }
     }
