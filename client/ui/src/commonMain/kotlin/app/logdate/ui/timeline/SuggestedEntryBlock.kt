@@ -1,4 +1,4 @@
-package app.logdate.feature.timeline.ui.blocks
+package app.logdate.ui.timeline
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,7 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import app.logdate.feature.timeline.ui.MediaObjectUiState
+import app.logdate.ui.common.PeopleMetadataChip
 import app.logdate.ui.theme.Spacing
 import coil3.compose.AsyncImage
 import org.jetbrains.compose.ui.tooling.preview.Preview

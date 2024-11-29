@@ -1,4 +1,6 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class,
+    ExperimentalSharedTransitionApi::class
+)
 
 package app.logdate.feature.editor.ui
 
@@ -35,7 +37,6 @@ import app.logdate.feature.editor.ui.editor.EditorUiState
 import app.logdate.feature.editor.ui.editor.EntryBlockData
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.feature.editor.ui.editor.rememberEditorState
-import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
@@ -57,8 +58,8 @@ fun EntryEditorScreen(
 //                editorState.blocks = (uiState as EditorUiState.Success).blocks
             }
 
-            is EditorUiState.Error -> TODO()
-            EditorUiState.Loading -> TODO()
+            is EditorUiState.Error -> {}
+            EditorUiState.Loading -> {}
         }
     }
 
@@ -107,8 +108,9 @@ private fun EditorContent(
     val sharedTransitionScope =
         LocalSharedTransitionScope.current ?: error("No shared transition scope found")
     // TODO: Use AnimatedVisibilityScope of screen itself
-    val animatedVisibilityScope =
-        LocalNavAnimatedVisibilityScope.current ?: error("No animated visibility scope found")
+//    val animatedVisibilityScope =
+//        LocalNavAnimatedVisibilityScope.current ?: error("No animated visibility scope found")
+
     with(sharedTransitionScope) {
         LazyColumn(
             modifier = modifier.fillMaxSize(),

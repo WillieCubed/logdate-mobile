@@ -2,7 +2,9 @@ package app.logdate.feature.editor.di
 
 import app.logdate.client.domain.di.domainModule
 import app.logdate.client.media.di.mediaModule
+import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import org.koin.core.module.Module
+import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
 /**
@@ -11,4 +13,6 @@ import org.koin.dsl.module
 val editorFeatureModule: Module = module {
     includes(domainModule)
     includes(mediaModule)
+
+    viewModel { EntryEditorViewModel(get(), /*get(), get()*/) }
 }

@@ -7,6 +7,8 @@ import androidx.compose.ui.window.Window
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.client.ui.LogDateAppRoot
 import app.logdate.feature.core.AppViewModel
+import app.logdate.feature.core.GlobalAppUiLoadedState
+import app.logdate.feature.core.GlobalAppUiLoadingState
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -35,9 +37,12 @@ private fun MainWindowContent(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    if (uiState is GlobalAppUiLoadingState) {
+        return
+    }
     LogDateAppRoot(
         // TODO: Allow new window editor to be opened
-        uiState,
+        uiState as GlobalAppUiLoadedState,
         onShowUnlockPrompt = viewModel::showNativeUnlockPrompt,
     )
 }

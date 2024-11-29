@@ -22,9 +22,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.LayoutDirection
-import app.logdate.feature.timeline.ui.ImageNoteUiState
-import app.logdate.feature.timeline.ui.TextNoteUiState
-import app.logdate.feature.timeline.ui.TimelineDayUiState
+import app.logdate.ui.timeline.ImageNoteUiState
+import app.logdate.ui.timeline.TextNoteUiState
+import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateShort

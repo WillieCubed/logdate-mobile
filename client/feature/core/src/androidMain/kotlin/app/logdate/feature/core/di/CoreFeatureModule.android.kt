@@ -4,6 +4,7 @@ import app.logdate.client.domain.di.domainModule
 import app.logdate.feature.core.AndroidBiometricGatekeeper
 import app.logdate.feature.core.AppViewModel
 import app.logdate.feature.core.BiometricGatekeeper
+import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.feature.core.settings.ui.SettingsViewModel
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModel
@@ -21,4 +22,5 @@ actual val coreFeatureModule: Module = module {
 
     viewModel { AppViewModel(get(), get(), get()) }
     viewModel { SettingsViewModel(get(), get()) }
+    viewModel { HomeViewModel(get()) }
 }

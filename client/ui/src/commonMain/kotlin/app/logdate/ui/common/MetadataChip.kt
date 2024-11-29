@@ -1,4 +1,4 @@
-package app.logdate.feature.timeline.ui.blocks
+package app.logdate.ui.common
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement

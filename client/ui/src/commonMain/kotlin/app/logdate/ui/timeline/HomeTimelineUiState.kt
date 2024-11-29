@@ -1,4 +1,4 @@
-package app.logdate.feature.timeline.ui
+package app.logdate.ui.timeline
 
 import app.logdate.ui.profiles.PersonUiState
 import kotlinx.datetime.Instant
@@ -7,11 +7,6 @@ import kotlinx.datetime.LocalDate
 data class HomeTimelineUiState(
     val items: List<TimelineDayUiState> = emptyList(),
     val selectedItem: TimelineDaySelection = TimelineDaySelection.NotSelected,
-)
-
-data class MediaObjectUiState(
-    val uid: String,
-    val uri: String,
 )
 
 data class TimelineDayUiState(

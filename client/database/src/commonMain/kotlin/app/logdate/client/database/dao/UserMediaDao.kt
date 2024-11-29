@@ -17,5 +17,5 @@ interface UserMediaDao {
      * Removes a media item given its URI.
      */
     @Query("DELETE FROM media_images WHERE uri = :uri")
-    fun removeImageMedia(uri: String): Int
+    suspend fun removeImageMedia(uri: String): Int
 }

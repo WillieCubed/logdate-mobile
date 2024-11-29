@@ -42,6 +42,9 @@ kotlin {
 
             implementation(libs.napier)
         }
+        androidMain.dependencies {
+            implementation(libs.koin.android)
+        }
     }
 }
 

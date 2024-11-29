@@ -1,4 +1,4 @@
-package app.logdate.feature.core.settings.navigation
+package app.logdate.feature.core.navigation
 
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder

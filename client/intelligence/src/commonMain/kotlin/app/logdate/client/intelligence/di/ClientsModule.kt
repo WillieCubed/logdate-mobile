@@ -9,5 +9,9 @@ import org.koin.dsl.module
  * Module that provides AI client libraries.
  */
 val clientsModule: Module = module {
-    single<GenerativeAIChatClient> { OpenAiClient(get(), get()) }
+    single<GenerativeAIChatClient> {
+        // TODO: Load API key from configuration
+        val apiKey = ""
+        OpenAiClient(apiKey, get())
+    }
 }

@@ -71,6 +71,7 @@ internal fun hasEntryFromToday(timelineItems: List<JournalNote>): Boolean {
     return timelineItems.any { it.creationTimestamp > eightHoursAgo }
 }
 
+// TODO: Move to :client:ui
 @Composable
 internal fun Timeline(
     timelineItems: List<JournalNote>,

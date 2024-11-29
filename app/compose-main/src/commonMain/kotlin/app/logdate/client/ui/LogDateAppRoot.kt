@@ -10,6 +10,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.compose.rememberNavController
 import app.logdate.client.ui.navigation.LogDateNavHost
 import app.logdate.feature.core.GlobalAppUiLoadedState
+import app.logdate.feature.core.main.navigateHome
 import app.logdate.feature.core.requiresUnlock
 import app.logdate.feature.onboarding.navigation.startOnboarding
 import app.logdate.ui.LocalSharedTransitionScope
@@ -32,6 +33,7 @@ fun LogDateAppRoot(
             onShowUnlockPrompt()
             return@LaunchedEffect
         }
+        navController.navigateHome()
     }
 
     LogDateTheme {

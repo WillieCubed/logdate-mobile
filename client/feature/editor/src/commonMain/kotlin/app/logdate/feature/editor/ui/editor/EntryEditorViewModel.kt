@@ -3,8 +3,6 @@ package app.logdate.feature.editor.ui.editor
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.notes.AddNoteUseCase
-import app.logdate.client.domain.notes.FetchTodayNotesUseCase
-import app.logdate.client.location.places.PlacesProvider
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.shared.model.AltitudeUnit
 import app.logdate.shared.model.Location
@@ -25,8 +23,9 @@ import kotlinx.datetime.Clock
  * state for editing. If no entries exist, it will create a new entry.
  */
 class EntryEditorViewModel(
-    private val locationProvider: PlacesProvider,
-    fetchNotesUseCase: FetchTodayNotesUseCase,
+    // TODO: Re-enable location
+//    private val locationProvider: PlacesProvider,
+//    fetchNotesUseCase: FetchTodayNotesUseCase,
     private val addNoteUseCase: AddNoteUseCase,
 ) : ViewModel() {
 

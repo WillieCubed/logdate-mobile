@@ -1,4 +1,4 @@
-package app.logdate.feature.timeline.ui.blocks
+package app.logdate.ui.common
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Group

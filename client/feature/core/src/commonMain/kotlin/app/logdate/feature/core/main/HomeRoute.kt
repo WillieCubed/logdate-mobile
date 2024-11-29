@@ -10,7 +10,12 @@ import kotlin.uuid.Uuid
 data object HomeRoute
 
 fun NavHostController.navigateHome() {
-    navigate(HomeRoute)
+    // Ensure you can't go back
+    navigate(HomeRoute) {
+        popUpTo(HomeRoute) {
+            inclusive = true
+        }
+    }
 }
 
 /**
@@ -22,6 +27,9 @@ fun NavGraphBuilder.homeGraph(
     onOpenSettings: () -> Unit,
 ) {
     composable<HomeRoute> {
+        HomeScreen(
+            onNewEntry = onCreateNote,
+        )
 //            mainNavGraph(
 //                appState = appState,
 //                onCreateEntry = {

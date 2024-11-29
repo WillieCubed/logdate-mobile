@@ -17,7 +17,7 @@ interface JournalNotesDao {
      */
     @Transaction
     @Query("SELECT * FROM journals")
-    fun getAll(): List<JournalWithNotes>
+    suspend fun getAll(): List<JournalWithNotes>
 
     /**
      * Observes all journals and their notes.
@@ -38,13 +38,13 @@ interface JournalNotesDao {
      */
     @Transaction
     @Query("INSERT INTO journal_notes (id, uid) VALUES (:journalId, :noteId)")
-    fun addNoteToJournal(journalId: Int, noteId: Int)
+    suspend fun addNoteToJournal(journalId: Int, noteId: Int)
 
     /**
      * Removes a note from the journal with the given ID.
      */
     @Query("DELETE FROM journal_notes WHERE id = :journalId AND uid = :noteId")
-    fun removeNoteFromJournal(journalId: Int, noteId: Int)
+    suspend fun removeNoteFromJournal(journalId: Int, noteId: Int)
 
     /**
      * Removes a note from all journals.
@@ -53,5 +53,5 @@ interface JournalNotesDao {
      * reference it.
      */
     @Query("DELETE FROM journal_notes WHERE uid = :noteId")
-    fun deleteNoteFromAllJournals(noteId: Int)
+    suspend fun deleteNoteFromAllJournals(noteId: Int)
 }

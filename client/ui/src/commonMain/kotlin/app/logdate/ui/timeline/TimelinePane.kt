@@ -1,4 +1,4 @@
-package app.logdate.feature.timeline.ui
+package app.logdate.ui.timeline
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -32,8 +32,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import app.logdate.feature.timeline.ui.blocks.SuggestedEntryBlock
-import app.logdate.feature.timeline.ui.blocks.SuggestedEntryBlockUiState
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate

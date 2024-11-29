@@ -21,7 +21,7 @@ interface ImageNoteDao {
      * Fetches a non-observable [ImageNoteEntity] by its ID.
      */
     @Query("SELECT * FROM image_notes WHERE uid = :uid")
-    fun getNoteOneOff(uid: Int): ImageNoteEntity
+    suspend fun getNoteOneOff(uid: Int): ImageNoteEntity
 
     /**
      * Returns a flow of all [TextNoteEntity]s.

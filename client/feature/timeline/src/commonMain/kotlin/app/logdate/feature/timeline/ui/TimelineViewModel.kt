@@ -8,6 +8,10 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.shared.model.Person
 import app.logdate.ui.profiles.toUiState
+import app.logdate.ui.timeline.HomeTimelineUiState
+import app.logdate.ui.timeline.TextNoteUiState
+import app.logdate.ui.timeline.TimelineDaySelection
+import app.logdate.ui.timeline.TimelineDayUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -86,10 +90,3 @@ class TimelineViewModel(
     }
 }
 
-sealed class TimelineDaySelection {
-    data object NotSelected : TimelineDaySelection()
-    data class Selected(
-        val id: String,
-        val day: LocalDate,
-    ) : TimelineDaySelection()
-}

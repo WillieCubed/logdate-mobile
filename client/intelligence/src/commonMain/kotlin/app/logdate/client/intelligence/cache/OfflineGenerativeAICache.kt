@@ -1,6 +1,8 @@
 package app.logdate.client.intelligence.cache
 
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 
@@ -9,7 +11,7 @@ import kotlinx.datetime.Clock
  */
 class OfflineGenerativeAICache(
     private val dataSource: AICacheLocalDataSource,
-    private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : GenerativeAICache {
 
     override suspend fun getEntry(key: String): GenerativeAICacheEntry? {

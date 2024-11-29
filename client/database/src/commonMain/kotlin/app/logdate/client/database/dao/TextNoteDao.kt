@@ -20,7 +20,7 @@ interface TextNoteDao {
      * Fetches a non-observable [TextNoteEntity] by its ID.
      */
     @Query("SELECT * FROM text_notes WHERE uid = :uid")
-    fun getNoteOneOff(uid: Int): TextNoteEntity
+    suspend fun getNoteOneOff(uid: Int): TextNoteEntity
 
     /**
      * Returns a flow of all [TextNoteEntity]s.

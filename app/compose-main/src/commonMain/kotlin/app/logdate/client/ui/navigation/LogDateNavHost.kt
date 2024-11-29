@@ -6,8 +6,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
 import app.logdate.feature.core.main.homeGraph
 import app.logdate.feature.core.main.navigateHome
-import app.logdate.feature.core.settings.navigation.BaseRoute
-import app.logdate.feature.core.settings.navigation.landingDestination
+import app.logdate.feature.core.navigation.BaseRoute
+import app.logdate.feature.core.navigation.landingDestination
 import app.logdate.feature.core.settings.navigation.navigateToSettings
 import app.logdate.feature.core.settings.navigation.settingsDestination
 import app.logdate.feature.editor.navigation.editorDestination
