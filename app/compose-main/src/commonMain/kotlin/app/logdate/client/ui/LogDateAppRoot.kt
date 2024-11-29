@@ -9,7 +9,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.compose.rememberNavController
 import app.logdate.client.ui.navigation.LogDateNavHost
-import app.logdate.feature.core.GlobalAppUiState
+import app.logdate.feature.core.GlobalAppUiLoadedState
 import app.logdate.feature.core.requiresUnlock
 import app.logdate.feature.onboarding.navigation.startOnboarding
 import app.logdate.ui.LocalSharedTransitionScope
@@ -18,7 +18,7 @@ import app.logdate.ui.theme.LogDateTheme
 
 @Composable
 fun LogDateAppRoot(
-    appUiState: GlobalAppUiState,
+    appUiState: GlobalAppUiLoadedState,
     onShowUnlockPrompt: () -> Unit,
 ) {
     val navController = rememberNavController()
@@ -37,7 +37,7 @@ fun LogDateAppRoot(
     LogDateTheme {
         SharedTransitionLayout {
             CompositionLocalProvider(
-                LocalSharedTransitionScope provides this
+                LocalSharedTransitionScope provides this,
             ) {
                 LogDateNavHost(
                     navController = navController,

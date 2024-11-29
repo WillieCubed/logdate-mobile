@@ -16,6 +16,8 @@ import androidx.lifecycle.repeatOnLifecycle
 import app.logdate.client.ui.LogDateAppRoot
 import app.logdate.feature.core.AndroidBiometricGatekeeper
 import app.logdate.feature.core.AppViewModel
+import app.logdate.feature.core.GlobalAppUiLoadedState
+import app.logdate.feature.core.GlobalAppUiLoadingState
 import app.logdate.feature.core.GlobalAppUiState
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -47,7 +49,7 @@ class MainActivity : FragmentActivity() {
         androidBiometricGatekeeper.setActivity(this)
 
         // TODO: Maybe reconsider sealed class approach to uiState loading
-        var uiState: GlobalAppUiState by mutableStateOf(GlobalAppUiState())
+        var uiState: GlobalAppUiState by mutableStateOf(GlobalAppUiLoadingState)
 
         // Update the uiState
         lifecycleScope.launch {
@@ -59,15 +61,18 @@ class MainActivity : FragmentActivity() {
         }
 
         splashScreen.setKeepOnScreenCondition {
-            uiState.isLoaded
+            uiState is GlobalAppUiLoadingState
         }
 
         enableEdgeToEdge()
         setContent {
-            LogDateAppRoot(
-                appUiState = uiState,
-                onShowUnlockPrompt = viewModel::showNativeUnlockPrompt,
-            )
+            val state = uiState
+            if (state is GlobalAppUiLoadedState) {
+                LogDateAppRoot(
+                    appUiState = state,
+                    onShowUnlockPrompt = viewModel::showNativeUnlockPrompt,
+                )
+            }
         }
     }
 
@@ -97,7 +102,7 @@ class MainActivity : FragmentActivity() {
 @Composable
 fun AppAndroidPreview() {
     LogDateAppRoot(
-        appUiState = GlobalAppUiState(),
+        appUiState = GlobalAppUiLoadedState(),
         onShowUnlockPrompt = {},
     )
 }

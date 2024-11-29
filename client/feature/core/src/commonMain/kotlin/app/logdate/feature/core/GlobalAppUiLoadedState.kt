@@ -1,9 +1,11 @@
 package app.logdate.feature.core
 
+sealed interface GlobalAppUiState
+
 /**
  * UI state for properties that span the entire client app UX.
  */
-data class GlobalAppUiState(
+data class GlobalAppUiLoadedState(
     val isLoaded: Boolean = false,
     /**
      * Indicates whether the app is currently connected to the internet.
@@ -22,11 +24,13 @@ data class GlobalAppUiState(
      * If this is false, the user will be prompted to set up the app when they first open it.
      */
     val isOnboarded: Boolean = false,
-)
+) : GlobalAppUiState
 
-val GlobalAppUiState.requiresUnlock: Boolean
+data object GlobalAppUiLoadingState : GlobalAppUiState
+
+val GlobalAppUiLoadedState.requiresUnlock: Boolean
     get() = authState == AppAuthState.REQUIRE_PROMPT
 
-val GlobalAppUiState.isAppUnlocked: Boolean
+val GlobalAppUiLoadedState.isAppUnlocked: Boolean
     // TODO: Test that other app states don't break the app
     get() = authState == AppAuthState.NO_PROMPT_NEEDED || authState == AppAuthState.AUTHENTICATED

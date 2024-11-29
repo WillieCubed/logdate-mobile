@@ -32,17 +32,16 @@ class AppViewModel(
         biometricState,
         networkState,
     ) { userState, authState, networkState ->
-        GlobalAppUiState(
+        GlobalAppUiLoadedState(
             isOnboarded = userState.isOnboarded,
             authState = authState,
             isOnline = networkState is NetworkState.Connected,
-            isLoaded = true,
         )
     }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
-            initialValue = GlobalAppUiState(),
+            initialValue = GlobalAppUiLoadingState,
         )
 
     /**

@@ -2,10 +2,10 @@ package app.logdate.feature.onboarding.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.billing.model.LogDateBackupPlanOption
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.user.UserStateRepository
-import app.logdate.client.billing.model.LogDateBackupPlanOption
 import app.logdate.feature.onboarding.editor.AudioEntryRecorder
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,7 +58,10 @@ class OnboardingViewModel(
             _uiState.update {
                 it.copy(entrySubmitted = true)
             }
-            Napier.d( tag= "OnboardingViewModel", message =  "Successfully added entry: $newEntryData")
+            Napier.d(
+                tag = "OnboardingViewModel",
+                message = "Successfully added entry: $newEntryData"
+            )
         }
     }
 
