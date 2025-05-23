@@ -1,64 +1,235 @@
 # LogDate: A Home for Your Memories
 
-This is a Kotlin Multiplatform project targeting Android, iOS, Desktop, Server.
+This is a Kotlin Multiplatform project targeting Android, iOS, Desktop, and Server platforms. LogDate is a comprehensive journaling application that combines modern UI design with intelligent features and cross-platform synchronization.
 
-## Modules Overview
+## 🏗️ Architecture Overview
 
-The project is divided into several modules:
+LogDate follows clean architecture principles with a modular, feature-based design:
 
-- `:app:mobile` - Android app module for phone devices.
-- `:app:wear` - Android app module for wearable devices.
-- `:build:logic:convention` - Conventions plugins for managing build configurations.
-- `:core:testing` - Android library containing testing utilities.
-- `:core:ui` - Android library with common Jetpack Compose UI widgets.
-- `:core:util` - Kotlin-only module containing utility functions (not an Android library).
-- `:data` - Android library for the data layer.
-- `:dynamic` - Dynamic delivery module
-- `:feature:details` - Android library for the details feature.
-- `:feature:list` - Android library for the list feature.
-- `:feature:wear:home` - Android library for the wear home feature.
-- `:test:navigation` - Test-only module for navigation testing.
-
-* `/composeApp` is for code that will be shared across your Compose Multiplatform applications.
-  It contains several subfolders:
-  - `commonMain` is for code that’s common for all targets.
-  - Other folders are for Kotlin code that will be compiled for only the platform indicated in the folder name.
-    For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-    `iosMain` would be the right folder for such calls.
-
-* `/iosApp` contains iOS applications. Even if you’re sharing your UI with Compose Multiplatform,
-  you need this entry point for your iOS app. This is also where you should add SwiftUI code for your project.
-
-* `/server` is for the Ktor server application.
-
-* `/shared` is for the code that will be shared between all targets in the project.
-  The most important subfolder is `commonMain`. If preferred, you can add code to the platform-specific folders here too.
-
-## Setup
-
-Open the project in Android Studio and let it sync the project.
-
-This project currently uses some Firebase APIs for analytics and performance monitoring. To set up
-Firebase, follow the instructions in
-the [Firebase documentation](https://firebase.google.com/docs/android/setup).
-
-This project also requires a Meta app ID for some features. To get a Meta app ID, follow the
-instructions in
-the [Meta developer documentation](https://developers.facebook.com/docs/android/getting-started#app-id).
-Once you have the Meta app ID, add it to your `local.properties` file:
-
-```properties
-metaAppId=<your-meta-app-id> # META_APP_ID
-apiKeys.googleMaps=<your-meta-app-id> # GOOGLE_MAPS_PLACES_API_KEY
+```
+LogDate Project
+├── 📱 App Targets
+│   ├── compose-main (Android, iOS, Desktop)
+│   └── wear (Wear OS)
+├── 🔧 Client Infrastructure
+│   ├── data, database, networking
+│   ├── sync, intelligence, location
+│   └── ui, theme, util
+├── 🎯 Client Features
+│   ├── editor, timeline, journal
+│   └── rewind, onboarding, core
+├── 🌐 Shared Libraries
+│   ├── model, config
+│   └── activitypub
+└── 🖥️ Server
+    └── Ktor-based backend
 ```
 
-## Generating Documentation
+## 🚀 Key Features
 
-To generate the documentation for all modules for this project, run the following command at the
-root of the project:
+- **Cross-Platform**: Native apps for Android, iOS, Desktop, and Wear OS
+- **Offline-First**: Full functionality without internet connection
+- **AI-Powered**: Intelligent content analysis and insights
+- **Block-Based Editor**: Flexible content creation with text, images, and media
+- **Real-Time Sync**: Seamless synchronization across all devices
+- **Privacy-Focused**: Local-first approach with optional cloud sync
 
-```shell
+## 📋 Module Documentation
+
+Each module contains detailed documentation in its respective `README.md` file:
+
+### App Modules
+- [`:app:compose-main`](app/compose-main/README.md) - Main cross-platform application
+- [`:app:wear`](app/wear/README.md) - Wear OS companion app
+
+### Client Infrastructure
+- [`:client:database`](client/database/README.md) - Local data persistence with Room
+- [`:client:data`](client/data/README.md) - Data layer with repository pattern
+- [`:client:networking`](client/networking/README.md) - HTTP client and network management
+- [`:client:sync`](client/sync/README.md) - Cross-device data synchronization
+- [`:client:intelligence`](client/intelligence/README.md) - AI and ML features
+- [`:client:location`](client/location/README.md) - Location services and context
+- [`:client:datastore`](client/datastore/README.md) - Preferences and settings storage
+
+### Client Features
+- [`:client:feature:editor`](client/feature/editor/README.md) - Entry creation and editing
+- [`:client:feature:timeline`](client/feature/timeline/README.md) - Timeline browsing and search
+- [`:client:feature:journal`](client/feature/journal/README.md) - Journal management
+- [`:client:feature:rewind`](client/feature/rewind/README.md) - Memory recall features
+- [`:client:feature:onboarding`](client/feature/onboarding/README.md) - User onboarding flows
+- [`:client:feature:core`](client/feature/core/README.md) - Core app features
+
+### Shared Libraries
+- [`:shared:model`](shared/model/README.md) - Shared data models
+- [`:shared:config`](shared/config/README.md) - Configuration and constants
+- [`:shared:activitypub`](shared/activitypub/README.md) - ActivityPub protocol implementation
+
+### Server
+- [`:server`](server/README.md) - Ktor-based backend API
+
+## 🛠️ Technology Stack
+
+### Frontend
+- **Kotlin Multiplatform**: Cross-platform business logic
+- **Compose Multiplatform**: Modern UI framework
+- **Room Database**: Local data persistence
+- **Ktor Client**: HTTP networking
+- **Koin**: Dependency injection
+
+### Backend
+- **Ktor Server**: Web framework
+- **PostgreSQL**: Primary database
+- **Firebase**: Analytics and cloud services
+- **Docker**: Containerization
+
+### AI & Intelligence
+- **OpenAI API**: Content analysis and summarization
+- **On-device ML**: Privacy-focused processing (planned)
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Android Studio (latest stable)
+- JDK 17 or higher
+- Xcode (for iOS development)
+
+### Setup
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/your-org/logdate.git
+   cd logdate
+   ```
+
+2. **Configure API keys**
+   Create a `local.properties` file in the project root:
+   ```properties
+   metaAppId=<your-meta-app-id>
+   apiKeys.googleMaps=<your-google-maps-api-key>
+   ```
+
+3. **Firebase Setup**
+   - Follow the [Firebase documentation](https://firebase.google.com/docs/android/setup)
+   - Add your `google-services.json` to `app/compose-main/`
+
+4. **Open in Android Studio**
+   - Open the project in Android Studio
+   - Let Gradle sync complete
+   - Select your target platform and run
+
+## 🏗️ Build Commands
+
+From the project root, you can use these Gradle tasks:
+
+### Building
+```bash
+# Build Android app
+./gradlew :app:compose-main:assembleDebug
+
+# Build and install Android app
+./gradlew :app:compose-main:installDebug
+
+# Run Desktop app
+./gradlew :app:compose-main:run
+```
+
+### Testing
+```bash
+# Run all tests
+./gradlew test
+
+# Run specific module tests
+./gradlew :client:database:test
+
+# Run tests for specific class
+./gradlew :client:domain:test --tests "GetJournalsUseCaseTest"
+```
+
+### Code Quality
+```bash
+# Run linting
+./gradlew lint
+
+# Generate documentation
 ./gradlew dokkaHtmlMultiModule
 ```
 
-This will generate the documentation in the `dokka` directory at the project root.
+## 📖 Documentation
+
+### API Documentation
+Generate comprehensive API documentation:
+```bash
+./gradlew dokkaHtmlMultiModule
+```
+Documentation will be available in the `build/dokka/` directory.
+
+### Module Documentation
+Each module contains detailed documentation covering:
+- Architecture and design decisions
+- Key components and responsibilities
+- Usage patterns and examples
+- TODOs and future plans
+
+## 🏛️ Architecture Principles
+
+### Clean Architecture
+- **Separation of Concerns**: Clear boundaries between UI, domain, and data layers
+- **Dependency Inversion**: High-level modules don't depend on low-level modules
+- **Single Responsibility**: Each module has a single, well-defined purpose
+
+### Offline-First
+- **Local Data Priority**: All features work offline
+- **Background Sync**: Automatic synchronization when online
+- **Conflict Resolution**: Intelligent handling of data conflicts
+
+### Privacy by Design
+- **Local Processing**: Sensitive operations performed on-device
+- **Minimal Data Collection**: Only collect necessary information
+- **User Control**: Granular privacy settings and data management
+
+### Platform-Specific Optimization
+- **Native Feel**: Platform-appropriate UI and interactions
+- **Performance**: Optimized for each platform's constraints
+- **Integration**: Deep integration with platform services
+
+## 🔄 Data Flow
+
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│     UI      │◄──►│   Domain    │◄──►│    Data     │
+│   Layer     │    │   Layer     │    │   Layer     │
+└─────────────┘    └─────────────┘    └─────────────┘
+       │                   │                   │
+       ▼                   ▼                   ▼
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│  Compose    │    │ Use Cases   │    │ Repository  │
+│   Views     │    │ & Entities  │    │    Impl     │
+└─────────────┘    └─────────────┘    └─────────────┘
+                                             │
+                          ┌─────────────────────┼─────────────────────┐
+                          ▼                     ▼                     ▼
+                   ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+                   │   Local     │    │   Remote    │    │    Cache    │
+                   │  Database   │    │     API     │    │   Layer     │
+                   └─────────────┘    └─────────────┘    └─────────────┘
+```
+
+## 🤝 Contributing
+
+Please read each module's README for specific contribution guidelines. General principles:
+
+1. Follow the existing code style and architecture patterns
+2. Write comprehensive tests for new functionality
+3. Update documentation for any API changes
+4. Ensure all platforms build and tests pass
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Built with [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatform.html)
+- UI powered by [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/)
+- Backend services with [Ktor](https://ktor.io/)
+- Local storage with [Room](https://developer.android.com/training/data-storage/room)
