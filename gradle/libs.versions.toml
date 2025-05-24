@@ -1,15 +1,21 @@
 [versions]
 # Build Plugin Versions
-kotlin = "2.0.21"
+filekitCompose = "0.8.8"
+kotlin = "2.0.21" # TODO: Upgrade to 2.1.0 once KSP support is stable
 dokkaGradlePlugin = "1.9.20"
 compose-multiplatform = "1.7.0"
-agp = "8.7.2"
+agp = "8.9.3"
 googleServicesPlugin = "4.4.2"
 
 # Android Build Versions
 android-compileSdk = "35"
 android-minSdk = "30"
 android-targetSdk = "35"
+
+# Android Test Versions
+androidx-test-ext-junit = "1.2.1"
+androidx-test-runner = "1.6.2"
+androidx-test-core = "1.6.1"
 
 # Common (Multiplatform) Dependencies
 ksp = "2.0.21-1.0.27"
@@ -28,33 +34,38 @@ koin-annotations-bom = "1.4.0"
 material3-adaptive = "1.0.0"
 adaptiveNavigationSuite = "1.3.1"
 
-room = "2.7.0-alpha11"
-sqlite = "2.5.0-alpha11"
-datastore = "1.1.1"
-paging = "3.3.4"
+room = "2.7.1"
+sqlite = "2.5.1"
+datastore = "1.1.7"
+paging = "3.3.6"
 
 napier = "2.7.1"
 
 multiplatformMarkdownRenderer = "0.25.0"
+webauthn4j = "0.29.2.RELEASE"
+jwtKt = "1.1.0"
 
 # Android Dependencies
-androidx-activityCompose = "1.9.3"
+androidx-activityCompose = "1.10.1"
 androidx-lifecycle = "2.8.4"
-androidxCamera = "1.4.0"
+androidxCamera = "1.5.0-beta01"
+androidxCameraViewfinderCompose = "1.0.0-alpha02"
 androidxBiometric = "1.2.0-alpha05"
 androidxCoreSplashScreen = "1.0.1"
+androidxWork = "2.10.1"
 
 playServicesLocation = "21.3.0"
-playServicesMaps = "19.0.0"
+playServicesMaps = "19.2.0"
 playInstallReferrer = "2.2"
 playAppUpdate = "2.1.0"
 playServicesInstantApps = "18.1.0"
 billingKtx = "7.1.1"
-googleMapsPlaces = "4.1.0"
+googleMapsPlaces = "4.2.0"
 googleMapsCompose = "6.1.0"
+androidxCredentials = "1.5.0"
 
 accompanist = "0.36.0"
-firebase-bom = "33.6.0"
+firebase-bom = "33.14.0"
 firebase-perf-plugin = "1.4.2"
 
 # Others
@@ -62,6 +73,7 @@ versioningPlugin = "1.9.20"
 
 
 [libraries]
+filekit-compose = { module = "io.github.vinceglb:filekit-compose", version.ref = "filekitCompose" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -74,7 +86,7 @@ androidx-navigation-compose = { group = "org.jetbrains.androidx.navigation", nam
 
 # Coroutines
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
-kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name ="kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-swing = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
@@ -94,6 +106,7 @@ ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "k
 ktor-client-android = { module = "io.ktor:ktor-client-android", version.ref = "ktor" }
 ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
 ktor-client-js = { module = "io.ktor:ktor-client-js", version.ref = "ktor" }
+ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 
 # Koin
 koin-bom = { group = "io.insert-koin", name = "koin-bom", version.ref = "koin" }
@@ -123,7 +136,7 @@ androidx-datastore-preferences = { group = "androidx.datastore", name = "datasto
 ## Paging
 androidx-paging-common = { group = "androidx.paging", name = "paging-common", version.ref = "paging" }
 androidx-paging-testing = { group = "androidx.paging", name = "paging-testing", version.ref = "paging" }
-androidx-paging-compose = { group = "androidx.paging", name = "paging-compose", version = "3.3.4" }
+androidx-paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "paging" }
 
 # Coil
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
@@ -133,17 +146,34 @@ napier = { group = "io.github.aakira", name = "napier", version.ref = "napier" }
 
 multiplatform-markdown-renderer = { module = "com.mikepenz:multiplatform-markdown-renderer-m3", version.ref = "multiplatformMarkdownRenderer" }
 
+# WebAuthn
+webauthn4j = { group = "com.webauthn4j", name = "webauthn4j-core", version.ref = "webauthn4j" }
+
+# JWT (Kotlin Multiplatform)
+jwtKt = { group = "com.appstractive", name = "jwt-kt", version.ref = "jwtKt" }
+
 # Android Dependencies
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "androidxCoreSplashScreen" }
 
 ## AndroidX Camera
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "androidxCamera" }
+androidx-camera-compose = { group = "androidx.camera", name = "camera-compose", version.ref = "androidxCamera" }
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "androidxCamera" }
 androidx-camera-video = { group = "androidx.camera", name = "camera-video", version.ref = "androidxCamera" }
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "androidxCamera" }
+androidx-camera-viewfinder-compose = { group = "androidx.camera", name = "camera-viewfinder-compose", version.ref = "androidxCameraViewfinderCompose" }
 androidx-camera-extensions = { group = "androidx.camera", name = "camera-extensions", version.ref = "androidxCamera" }
 androidx-biometric = { group = "androidx.biometric", name = "biometric-ktx", version.ref = "androidxBiometric" }
+
+## AndroidX Work
+androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "androidxWork" }
+androidx-work-testing = { group = "androidx.work", name = "work-testing", version.ref = "androidxWork" }
+
+## AndroidX Test
+androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidx-test-ext-junit" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidx-test-runner" }
+androidx-test-core = { group = "androidx.test", name = "core", version.ref = "androidx-test-core" }
 
 ## Firebase
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebase-bom" }
@@ -173,7 +203,13 @@ accompanist-permissions = { group = "com.google.accompanist", name = "accompanis
 logback = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 ktor-server-core = { module = "io.ktor:ktor-server-core-jvm", version.ref = "ktor" }
 ktor-server-netty = { module = "io.ktor:ktor-server-netty-jvm", version.ref = "ktor" }
+ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation-jvm", version.ref = "ktor" }
 ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
+
+# Android Credentials
+androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "androidxCredentials" }
+androidx-credentials-play-services = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "androidxCredentials" }
+
 versioning-plugin = { module = "org.jetbrains.dokka:versioning-plugin", version.ref = "versioningPlugin" }
 
 [plugins]
