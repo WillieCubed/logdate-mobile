@@ -1,13 +1,15 @@
 package app.logdate.client.networking
 
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.datetime.Clock
 
 /**
  * A [NetworkAvailabilityMonitor] that functions on desktop (JVM) platforms.
  */
 class DesktopNetworkAvailabilityMonitor : NetworkAvailabilityMonitor {
-    private val networkState = MutableSharedFlow<NetworkState>()
+    private val _networkState =
+        MutableStateFlow<NetworkState>(NetworkState.NotConnected(Clock.System.now()))
 
     // TODO: Implement this
     override fun isNetworkAvailable(): Boolean {
@@ -15,6 +17,6 @@ class DesktopNetworkAvailabilityMonitor : NetworkAvailabilityMonitor {
     }
 
     override fun observeNetwork(): SharedFlow<NetworkState> {
-        return networkState
+        return _networkState
     }
 }

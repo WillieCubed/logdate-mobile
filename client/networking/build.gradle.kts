@@ -50,8 +50,10 @@ kotlin {
         }
         commonTest.dependencies {
             // Unit testing
-            implementation(libs.junit)
+            implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.ktor.client.mock)
+            implementation(libs.koin.test)
         }
         androidMain.dependencies {
             implementation(libs.kotlinx.coroutines.android)

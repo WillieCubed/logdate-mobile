@@ -13,6 +13,7 @@ import io.ktor.client.plugins.logging.Logging
  * Logging is enabled by default.
  */
 actual val httpClient: HttpClient = HttpClient(Android) {
+    configureClientDefaults()
     install(Logging) {
         logger = Logger.ANDROID
         level = LogLevel.ALL
