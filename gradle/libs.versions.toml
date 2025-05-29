@@ -1,7 +1,7 @@
 [versions]
 # Build Plugin Versions
 filekitCompose = "0.8.8"
-kotlin = "2.0.21" # TODO: Upgrade to 2.1.0 once KSP support is stable
+kotlin = "2.1.21"
 dokkaGradlePlugin = "1.9.20"
 compose-multiplatform = "1.7.0"
 agp = "8.9.3"
@@ -18,7 +18,7 @@ androidx-test-runner = "1.6.2"
 androidx-test-core = "1.6.1"
 
 # Common (Multiplatform) Dependencies
-ksp = "2.0.21-1.0.27"
+ksp = "2.1.21-2.0.1"
 junit = "4.13.2"
 kotlinx-coroutines = "1.9.0"
 kotlinx-serialization = "1.7.3"
@@ -60,7 +60,7 @@ playInstallReferrer = "2.2"
 playAppUpdate = "2.1.0"
 playServicesInstantApps = "18.1.0"
 billingKtx = "7.1.1"
-googleMapsPlaces = "4.2.0"
+googleMapsPlaces = "4.3.1"
 googleMapsCompose = "6.1.0"
 androidxCredentials = "1.5.0"
 
@@ -70,6 +70,21 @@ firebase-perf-plugin = "1.4.2"
 
 # Others
 versioningPlugin = "1.9.20"
+playServicesWearable = "19.0.0"
+composeBom = "2025.05.01"
+composeMaterial = "1.4.1"
+composeFoundation = "1.4.1"
+wearToolingPreview = "1.0.0"
+wearComposeMaterial3 = "1.5.0-beta02"
+wearComposeFoundation = "1.5.0-beta02"
+wearComposeNavigation = "1.5.0-beta02"
+tiles = "1.4.1"
+tilesMaterial = "1.4.1"
+tilesTooling = "1.4.1"
+tilesToolingPreview = "1.4.1"
+horologistComposeTools = "0.6.17"
+horologistTiles = "0.6.17"
+watchfaceComplicationsDataSourceKtx = "1.2.1"
 
 
 [libraries]
@@ -211,6 +226,26 @@ androidx-credentials = { group = "androidx.credentials", name = "credentials", v
 androidx-credentials-play-services = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "androidxCredentials" }
 
 versioning-plugin = { module = "org.jetbrains.dokka:versioning-plugin", version.ref = "versioningPlugin" }
+play-services-wearable = { group = "com.google.android.gms", name = "play-services-wearable", version.ref = "playServicesWearable" }
+androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+androidx-ui = { group = "androidx.compose.ui", name = "ui" }
+androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-compose-material = { group = "androidx.wear.compose", name = "compose-material", version.ref = "composeMaterial" }
+androidx-wear-material3 = { group = "androidx.wear.compose", name = "compose-material3", version.ref = "wearComposeMaterial3" }
+androidx-wear-foundation = { group = "androidx.wear.compose", name = "compose-foundation", version.ref = "wearComposeFoundation" }
+androidx-wear-navigation = { group = "androidx.wear.compose", name = "compose-navigation", version.ref = "wearComposeNavigation" }
+androidx-wear-tooling-preview = { group = "androidx.wear", name = "wear-tooling-preview", version.ref = "wearToolingPreview" }
+androidx-tiles = { group = "androidx.wear.tiles", name = "tiles", version.ref = "tiles" }
+androidx-tiles-material = { group = "androidx.wear.tiles", name = "tiles-material", version.ref = "tilesMaterial" }
+androidx-tiles-tooling = { group = "androidx.wear.tiles", name = "tiles-tooling", version.ref = "tilesTooling" }
+androidx-tiles-tooling-preview = { group = "androidx.wear.tiles", name = "tiles-tooling-preview", version.ref = "tilesToolingPreview" }
+horologist-compose-tools = { group = "com.google.android.horologist", name = "horologist-compose-tools", version.ref = "horologistComposeTools" }
+horologist-tiles = { group = "com.google.android.horologist", name = "horologist-tiles", version.ref = "horologistTiles" }
+androidx-watchface-complications-data-source-ktx = { group = "androidx.wear.watchface", name = "watchface-complications-data-source-ktx", version.ref = "watchfaceComplicationsDataSourceKtx" }
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
@@ -225,3 +260,4 @@ ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokkaGradlePlugin" }
 room = { id = "androidx.room", version.ref = "room" }
 googleServices = { id = "com.google.gms.google-services", version.ref = "googleServicesPlugin" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }

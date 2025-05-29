@@ -8,7 +8,23 @@ Companion application for Wear OS devices that provides quick journaling capabil
 
 ## Current Status
 
-**⚠️ Development Phase**: Build directory exists but implementation appears minimal. This module is planned for future development.
+**🚀 Active Development**: Basic functionality implemented with modern Material 3 for Wear OS.
+
+## Technology Stack
+
+- **Material 3 for Wear OS**: Modern, expressive UI components designed specifically for wearables
+- **Compose for Wear OS**: Declarative UI framework optimized for watch form factors
+- **Dynamic Color**: Adapts to watch faces and system themes for cohesive visual integration
+
+## Getting Started
+
+To build and run the Wear OS app:
+
+```bash
+./gradlew :app:wear:installDebug
+```
+
+To test on the emulator, ensure you've set up a Wear OS emulator in Android Studio.
 
 ## Planned Features
 
@@ -72,7 +88,8 @@ Wear App
 ## Implementation TODOs
 
 ### Phase 1: Basic Functionality
-- [ ] Set up Compose for Wear UI framework
+- [x] Set up Compose for Wear UI framework
+- [x] Implement Material 3 theming
 - [ ] Implement basic note creation screen
 - [ ] Add voice-to-text integration
 - [ ] Create simple entry list view
