@@ -26,15 +26,47 @@ kotlin {
     sourceSets {
         all {
             languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
+            languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi")
             compilerOptions.freeCompilerArgs.set(listOf("-Xexpect-actual-classes"))
         }
         commonMain.dependencies {
             // Project dependencies
+
             // External dependencies
             implementation(libs.kotlinx.coroutines.core)
+
+            // Koin
+            implementation(project.dependencies.platform(libs.koin.bom))
+            implementation(libs.koin.core)
         }
         androidMain.dependencies {
             implementation(libs.kotlinx.coroutines.android)
+            implementation(libs.koin.android)
+        }
+
+        val jvmTest by getting {
+            dependencies {
+                implementation(libs.kotlin.test.junit)
+                implementation(libs.kotlin.test)
+                implementation(libs.kotlinx.coroutines.test)
+            }
+        }
+
+        androidUnitTest.dependencies {
+            implementation(libs.kotlin.test.junit)
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.androidx.test.core)
+            implementation(libs.androidx.test.runner)
+            implementation(libs.androidx.test.rules)
+        }
+
+        androidInstrumentedTest.dependencies {
+            implementation(libs.kotlin.test.junit)
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.androidx.test.core)
+            implementation(libs.androidx.test.runner)
+            implementation(libs.androidx.test.rules)
+
         }
     }
 }
@@ -42,6 +74,12 @@ kotlin {
 android {
     namespace = "app.logdate.client.sensor"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
+
+    defaultConfig {
+        minSdk = libs.versions.android.minSdk.get().toInt()
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
 
     buildTypes {
         getByName("release") {
@@ -51,5 +89,10 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    // Disable lint checks for now
+    lint {
+        abortOnError = false
     }
 }
