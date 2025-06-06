@@ -22,7 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.unit.dp
-import app.logdate.ui.conditional
+import app.logdate.ui.common.conditional
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.asTime
 import kotlinx.datetime.Clock

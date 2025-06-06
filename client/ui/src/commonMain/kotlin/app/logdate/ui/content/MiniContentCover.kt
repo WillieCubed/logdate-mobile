@@ -3,6 +3,7 @@ package app.logdate.ui.content
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
+import app.logdate.ui.common.AspectRatios
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -15,6 +16,17 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
+
+@Composable
+fun JournalContentCover(
+    modifier: Modifier = Modifier,
+    imageUri: String? = null,
+) {
+    MiniContentCover(
+        shape = CoverShape.JOURNAL,
+        size = CoverSize.SMALL,
+    )
+}
 
 @Composable
 fun ImageContentCover(
@@ -79,10 +91,10 @@ private fun Modifier.applyCoverSize(shape: CoverShape, size: CoverSize): Modifie
             when (shape) {
                 CoverShape.STORY,
                 CoverShape.JOURNAL,
-                    -> width(30.dp).aspectRatio(3 / 4f)
+                    -> width(30.dp).aspectRatio(AspectRatios.RATIO_3_4)
 
-                CoverShape.PROFILE -> width(32.dp).aspectRatio(1f)
-                CoverShape.SQUARE -> width(32.dp).aspectRatio(1f)
+                CoverShape.PROFILE -> width(32.dp).aspectRatio(AspectRatios.SQUARE)
+                CoverShape.SQUARE -> width(32.dp).aspectRatio(AspectRatios.SQUARE)
             }
         }
 
@@ -90,10 +102,10 @@ private fun Modifier.applyCoverSize(shape: CoverShape, size: CoverSize): Modifie
             when (shape) {
                 CoverShape.STORY,
                 CoverShape.JOURNAL,
-                    -> width(40.dp).aspectRatio(3 / 4f)
+                    -> width(40.dp).aspectRatio(AspectRatios.RATIO_3_4)
 
-                CoverShape.PROFILE -> width(40.dp).aspectRatio(1f)
-                CoverShape.SQUARE -> width(40.dp).aspectRatio(1f)
+                CoverShape.PROFILE -> width(40.dp).aspectRatio(AspectRatios.SQUARE)
+                CoverShape.SQUARE -> width(40.dp).aspectRatio(AspectRatios.SQUARE)
             }
         }
     }

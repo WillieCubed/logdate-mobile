@@ -12,6 +12,7 @@ import app.logdate.ui.content.audience.MiniProfileIcons
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.theme.Spacing
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import kotlin.uuid.Uuid
 
 
 @Composable
@@ -52,13 +53,13 @@ private fun JournalMetadataBlockPreview() {
         title = "Climbing Buddies",
         audience = listOf(
             PersonUiState(
-                personId = "1",
+                uid = Uuid.random(),
                 name = "Margaret Belford",
                 photoUri = null,
             ),
             PersonUiState(
-                personId = "2",
-                name = "Willie Chalmers",
+                uid = Uuid.random(),
+                name = "Willie Chalmers III",
                 photoUri = null,
             ),
         ),

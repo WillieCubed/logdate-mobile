@@ -9,15 +9,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.common.conditional
 
 @Composable
 fun AdaptiveLayout(
     useCompactLayout: Boolean,
     supplementalContent: @Composable () -> Unit,
     mainContent: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainer),
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainer),
     ) {
         if (!useCompactLayout) {
             Box(
