@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.dokka)
+    alias(libs.plugins.kover)
 }
 
 kotlin {
@@ -35,6 +36,8 @@ kotlin {
         }
         commonMain.dependencies {
             // Project dependencies
+            implementation(project(":shared:model"))
+            implementation(project(":shared:config"))
             // External dependencies
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.json)

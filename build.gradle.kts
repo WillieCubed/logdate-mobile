@@ -11,6 +11,8 @@ plugins {
     alias(libs.plugins.composeMultiplatform) apply false
     alias(libs.plugins.compose.compiler) apply false
     alias(libs.plugins.dokka) apply false
+    alias(libs.plugins.kotlin.android) apply false
+    alias(libs.plugins.kover)
 }
 
 subprojects {
@@ -38,4 +40,49 @@ tasks.withType<DokkaMultiModuleTask>().configureEach {
     moduleName.set(project.name)
     outputDirectory.set(layout.buildDirectory.dir("dokka/$name"))
     includes.from("docs")
+}
+
+// Kover configuration for test coverage
+kover {
+    reports {
+        total {
+            html {
+                onCheck = true
+                htmlDir = layout.buildDirectory.dir("reports/kover/html")
+            }
+            xml {
+                onCheck = true
+                xmlFile = layout.buildDirectory.file("reports/kover/coverage.xml")
+            }
+            verify {
+                rule {
+                    minBound(70) // 70% minimum coverage threshold
+                }
+            }
+        }
+        filters {
+            excludes {
+                // Exclude generated code and build configuration
+                classes(
+                    "*.BuildConfig*",
+                    "*.*Test*",
+                    "*.test.*",
+                    "*.*_Impl*", // Room generated DAOs
+                    "*.*_Factory*", // Koin generated factories
+                    "*.di.*Module*", // DI modules
+                    "*ComposableSingletons*", // Compose generated code
+                    "*.*\$WhenMappings*" // Kotlin when expression mappings
+                )
+                packages(
+                    "*.di", // All DI packages
+                    "*.test", // Test packages
+                    "*.generated" // Generated code packages
+                )
+                annotatedBy(
+                    "androidx.compose.runtime.Composable", // Exclude Composable functions
+                    "org.koin.core.annotation.Module" // Exclude Koin modules
+                )
+            }
+        }
+    }
 }

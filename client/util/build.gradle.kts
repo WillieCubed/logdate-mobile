@@ -1,6 +1,7 @@
-@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
+@file:OptIn(ExperimentalKotlinGradlePluginApi::class, ExperimentalWasmDsl::class)
 
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -23,6 +24,10 @@ kotlin {
 
     jvm()
 
+    wasmJs {
+        browser()
+    }
+
     sourceSets {
         all {
             languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
@@ -31,6 +36,12 @@ kotlin {
         commonMain.dependencies {
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.core)
+        }
+        
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(libs.kotlinx.serialization.json)
+            implementation(libs.kotlinx.datetime)
         }
     }
 }

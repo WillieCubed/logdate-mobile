@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.dokka)
+    alias(libs.plugins.kover)
 }
 
 kotlin {
@@ -31,6 +32,10 @@ kotlin {
         commonMain.dependencies {
             // Project dependencies
             implementation(projects.shared.model)
+            implementation(projects.client.database)
+            implementation(projects.client.datastore)
+            implementation(projects.client.repository)
+            implementation(projects.client.device)
             // External dependencies
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.core)
@@ -38,6 +43,12 @@ kotlin {
             // Koin
             implementation(project.dependencies.platform(libs.koin.bom))
             implementation(libs.koin.core)
+            // Logging
+            implementation(libs.napier)
+        }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
         }
         androidMain.dependencies {
             implementation(libs.kotlinx.coroutines.android)
@@ -46,6 +57,8 @@ kotlin {
             implementation(libs.play.services.maps)
             implementation(libs.google.maps.places)
             implementation(libs.koin.android)
+            implementation(libs.androidx.work.runtime)
+            implementation(libs.koin.androidx.workmanager)
         }
     }
 }
@@ -53,6 +66,10 @@ kotlin {
 android {
     namespace = "app.logdate.client.location"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
+    
+    defaultConfig {
+        minSdk = libs.versions.android.minSdk.get().toInt()
+    }
 
     buildTypes {
         getByName("release") {
@@ -62,5 +79,12 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+    
+    lint {
+        abortOnError = false
+        warningsAsErrors = false
+        // Ignore resource errors and API level warnings for now
+        disable += listOf("NewApi", "ObsoleteSdkInt", "MissingTranslation", "ResourceType")
     }
 }

@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.dokka)
+    alias(libs.plugins.kover)
 }
 
 kotlin {
@@ -44,6 +45,11 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.koin.android)
+        }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.koin.test)
         }
     }
 }

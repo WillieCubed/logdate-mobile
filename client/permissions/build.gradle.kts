@@ -10,6 +10,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.dokka)
+    alias(libs.plugins.kover)
 }
 
 kotlin {
@@ -32,9 +33,23 @@ kotlin {
         }
         commonMain.dependencies {
             implementation(compose.runtime)
+            implementation(compose.foundation)
+            implementation(compose.material3)
+            implementation(compose.materialIconsExtended)
+            implementation(compose.ui)
+            implementation(projects.shared.model)
+            implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.serialization.json)
+            implementation(project.dependencies.platform(libs.koin.bom))
+            implementation(libs.koin.core)
+            implementation(libs.napier)
         }
         androidMain.dependencies {
             implementation(libs.accompanist.permissions)
+            implementation(libs.androidx.credentials)
+            implementation(libs.androidx.credentials.play.services)
+            implementation(libs.androidx.activity.compose)
+            implementation(libs.koin.android)
         }
     }
 }

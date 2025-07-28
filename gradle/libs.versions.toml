@@ -7,6 +7,7 @@ compose-multiplatform = "1.7.0"
 agp = "8.9.3"
 googleServicesPlugin = "4.4.2"
 buildConfigPlugin = "5.3.5"
+kover = "0.8.3"
 
 # Android Build Versions
 android-compileSdk = "36"
@@ -51,6 +52,12 @@ multiplatformMarkdownRenderer = "0.25.0"
 webauthn4j = "0.29.2.RELEASE"
 jwtKt = "1.1.0"
 
+# Database Dependencies
+exposed = "0.57.0"
+postgresql = "42.7.4"
+hikariCP = "6.0.0"
+flyway = "10.21.0"
+
 # Android Dependencies
 androidx-activityCompose = "1.10.1"
 androidx-lifecycle = "2.9.0"
@@ -59,6 +66,7 @@ androidxCameraViewfinderCompose = "1.0.0-alpha02"
 androidxBiometric = "1.2.0-alpha05"
 androidxCoreSplashScreen = "1.0.1"
 androidxWork = "2.10.1"
+healthConnect = "1.1.0-rc02"
 
 playServicesLocation = "21.3.0"
 playServicesMaps = "19.2.0"
@@ -71,7 +79,7 @@ googleMapsCompose = "6.1.0"
 androidxCredentials = "1.5.0"
 
 accompanist = "0.36.0"
-firebase-bom = "33.14.0"
+firebase-bom = "33.15.0"
 firebase-perf-plugin = "1.4.2"
 
 # Others
@@ -92,6 +100,8 @@ horologistComposeTools = "0.6.17"
 horologistTiles = "0.6.17"
 watchfaceComplicationsDataSourceKtx = "1.2.1"
 uiAndroid = "1.8.2"
+composeIcons = "1.8.2"
+kotlinxUuid = "0.0.15"
 
 
 [libraries]
@@ -125,6 +135,9 @@ kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.
 # Serialization
 kotlinx-serialization-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+
+# UUID
+kotlinx-uuid-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-uuid-core", version.ref = "kotlinxUuid" }
 
 # Ktor
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
@@ -182,6 +195,16 @@ webauthn4j = { group = "com.webauthn4j", name = "webauthn4j-core", version.ref =
 # JWT (Kotlin Multiplatform)
 jwtKt = { group = "com.appstractive", name = "jwt-kt", version.ref = "jwtKt" }
 
+# Database Libraries
+exposed-core = { group = "org.jetbrains.exposed", name = "exposed-core", version.ref = "exposed" }
+exposed-jdbc = { group = "org.jetbrains.exposed", name = "exposed-jdbc", version.ref = "exposed" }
+exposed-dao = { group = "org.jetbrains.exposed", name = "exposed-dao", version.ref = "exposed" }
+exposed-kotlin-datetime = { group = "org.jetbrains.exposed", name = "exposed-kotlin-datetime", version.ref = "exposed" }
+postgresql = { group = "org.postgresql", name = "postgresql", version.ref = "postgresql" }
+hikariCP = { group = "com.zaxxer", name = "HikariCP", version.ref = "hikariCP" }
+flyway-core = { group = "org.flywaydb", name = "flyway-core", version.ref = "flyway" }
+flyway-database-postgresql = { group = "org.flywaydb", name = "flyway-database-postgresql", version.ref = "flyway" }
+
 # Android Dependencies
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "androidxCoreSplashScreen" }
@@ -197,8 +220,11 @@ androidx-camera-extensions = { group = "androidx.camera", name = "camera-extensi
 androidx-biometric = { group = "androidx.biometric", name = "biometric-ktx", version.ref = "androidxBiometric" }
 
 ## AndroidX Work
-androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "androidxWork" }
+androidx-work-runtime = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "androidxWork" }
 androidx-work-testing = { group = "androidx.work", name = "work-testing", version.ref = "androidxWork" }
+
+# Health Connect
+androidx-health-connect = { group = "androidx.health.connect", name = "connect-client", version.ref = "healthConnect" }
 
 ## AndroidX Test
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidx-test-ext-junit" }
@@ -251,6 +277,7 @@ androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-toolin
 androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-material = { group = "androidx.wear.compose", name = "compose-material", version.ref = "composeMaterial" }
+androidx-compose-material-iconsExtended = { group = "androidx.compose.material", name = "material-icons-extended", version.ref = "composeIcons" }
 androidx-wear-material3 = { group = "androidx.wear.compose", name = "compose-material3", version.ref = "wearComposeMaterial3" }
 androidx-wear-foundation = { group = "androidx.wear.compose", name = "compose-foundation", version.ref = "wearComposeFoundation" }
 androidx-wear-navigation = { group = "androidx.wear.compose", name = "compose-navigation", version.ref = "wearComposeNavigation" }
@@ -279,3 +306,4 @@ room = { id = "androidx.room", version.ref = "room" }
 googleServices = { id = "com.google.gms.google-services", version.ref = "googleServicesPlugin" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 buildConfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildConfigPlugin" }
+kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }

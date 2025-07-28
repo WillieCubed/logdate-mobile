@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.ksp)
     alias(libs.plugins.room)
+    alias(libs.plugins.kover)
 }
 
 kotlin {
@@ -35,9 +36,24 @@ kotlin {
             implementation(libs.koin.core)
             implementation(libs.room.runtime)
             implementation(libs.sqlite.bundled)
+            implementation(libs.napier)
         }
         androidMain.dependencies {
             implementation(libs.koin.android)
+        }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.room.testing)
+        }
+        androidInstrumentedTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.room.testing)
+            implementation(libs.junit)
+            implementation(libs.androidx.test.ext.junit)
+            implementation(libs.androidx.test.runner)
+            implementation(libs.androidx.test.core)
         }
     }
 }
@@ -55,8 +71,12 @@ dependencies {
 }
 
 android {
-    namespace = "app.logdate.client.datastore"
+    namespace = "app.logdate.client.database"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
+
+    defaultConfig {
+        minSdk = libs.versions.android.minSdk.get().toInt()
+    }
 
     buildTypes {
         getByName("release") {

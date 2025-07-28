@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.dokka)
+    alias(libs.plugins.kover)
 }
 
 kotlin {
@@ -28,6 +29,13 @@ kotlin {
             languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
             compilerOptions.freeCompilerArgs.set(listOf("-Xexpect-actual-classes"))
         }
+        
+        androidMain.dependencies {
+            // Android Health Connect dependencies
+            implementation(libs.androidx.health.connect)
+            implementation(libs.kotlinx.coroutines.android)
+            implementation(libs.koin.android)
+        }
         commonMain.dependencies {
             // Project dependencies
             implementation(projects.shared.model)
@@ -36,6 +44,9 @@ kotlin {
             implementation(projects.client.location)
             implementation(projects.client.intelligence)
             implementation(projects.client.networking)
+            implementation(projects.client.device)
+            implementation(projects.client.datastore)
+            implementation(projects.client.healthConnect)
             // External dependencies
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.core)
@@ -44,6 +55,12 @@ kotlin {
             // Koin
             implementation(project.dependencies.platform(libs.koin.bom))
             implementation(libs.koin.core)
+        }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.koin.test)
+            implementation(libs.ktor.client.mock)
         }
     }
 }
