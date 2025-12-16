@@ -6,10 +6,14 @@ import kotlinx.datetime.Instant
 import kotlin.uuid.Uuid
 
 @Entity(
-    tableName = "image_notes"
+    tableName = "video_notes"
 )
-data class ImageNoteEntity(
+data class VideoNoteEntity(
     val contentUri: String,
+    /**
+     * Duration of the video in milliseconds.
+     */
+    val durationMs: Long? = null,
     @PrimaryKey
     override val uid: Uuid = Uuid.random(),
     override val lastUpdated: Instant,

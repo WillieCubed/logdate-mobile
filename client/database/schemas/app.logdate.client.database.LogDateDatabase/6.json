@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 5,
-    "identityHash": "2571763e5f19d9044f803dc53711728f",
+    "version": 6,
+    "identityHash": "f03011fae18fd5bea590ddef7cbd3074",
     "entities": [
       {
         "tableName": "text_notes",
@@ -322,9 +322,15 @@
         }
       },
       {
-        "tableName": "JournalContentEntityLink",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`content_id` TEXT NOT NULL)",
+        "tableName": "journal_content_links",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`journal_id` TEXT NOT NULL, `content_id` TEXT NOT NULL, PRIMARY KEY(`journal_id`, `content_id`), FOREIGN KEY(`journal_id`) REFERENCES `journals`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
+          {
+            "fieldPath": "journalId",
+            "columnName": "journal_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
           {
             "fieldPath": "contentId",
             "columnName": "content_id",
@@ -334,8 +340,44 @@
         ],
         "primaryKey": {
           "autoGenerate": false,
-          "columnNames": []
-        }
+          "columnNames": [
+            "journal_id",
+            "content_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_journal_content_links_journal_id",
+            "unique": false,
+            "columnNames": [
+              "journal_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_journal_content_links_journal_id` ON `${TABLE_NAME}` (`journal_id`)"
+          },
+          {
+            "name": "index_journal_content_links_content_id",
+            "unique": false,
+            "columnNames": [
+              "content_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_journal_content_links_content_id` ON `${TABLE_NAME}` (`content_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "journals",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "journal_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
       },
       {
         "tableName": "rewinds",
@@ -358,7 +400,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '2571763e5f19d9044f803dc53711728f')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f03011fae18fd5bea590ddef7cbd3074')"
     ]
   }
 }
