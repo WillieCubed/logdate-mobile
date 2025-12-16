@@ -1,39 +1,31 @@
 package app.logdate.client.location.places
 
-import app.logdate.shared.model.UserPlace
-import kotlinx.coroutines.flow.Flow
+import app.logdate.shared.model.Location
 
-interface PlacesProvider {
+/**
+ * Provider for external place data sources (e.g., Google Places API).
+ * 
+ * This is a fallback data source for place suggestions when user-defined
+ * places don't match the current location.
+ */
+interface ExternalPlacesProvider {
     /**
-     * Observing the current place will refresh by default.
+     * Searches for places near the given coordinates using external APIs.
+     * 
+     * @return List of place suggestions with confidence scores (0-100)
      */
-    fun observeCurrentPlace(refresh: Boolean = true): Flow<UserPlace>
-
-    /**
-     * Manually refreshes the current place.
-     *
-     * Note that a [PlacesProvider] may automatically refresh the current place.
-     */
-    suspend fun refreshCurrentPlace()
-
-    /**
-     * Returns a list of places that match the given query.
-     *
-     * Ranked in decreasing order of confidence.
-     */
-    suspend fun resolvePlace(latitude: Double, longitude: Double): List<UserPlaceResult>
-
-    /**
-     * Returns a list of places that are near the given place.
-     *
-     * Ranked in decreasing order of confidence.
-     */
-    suspend fun getNearbyPlaces(place: UserPlace): List<UserPlaceResult>
-
-    /**
-     * Returns a list of places near the given coordinates.
-     *
-     * Ranked in decreasing order of confidence.
-     */
-    suspend fun getNearbyPlaces(latitude: Double, longitude: Double): List<UserPlaceResult>
+    suspend fun searchNearbyPlaces(location: Location): List<PlaceSuggestion>
 }
+
+/**
+ * A place suggestion from an external provider with metadata.
+ */
+data class PlaceSuggestion(
+    val name: String,
+    val address: String,
+    val latitude: Double,
+    val longitude: Double,
+    val confidence: Int,
+    val category: String? = null,
+    val externalId: String? = null
+)
