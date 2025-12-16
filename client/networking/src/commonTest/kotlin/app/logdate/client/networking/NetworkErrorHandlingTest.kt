@@ -16,6 +16,7 @@ import io.ktor.utils.io.ByteReadChannel
 import kotlinx.io.IOException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.Clock
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -73,8 +74,11 @@ class NetworkErrorHandlingTest {
             engine {
                 addHandler { request ->
                     if (delayMs > 0) {
-                        // Simulate network delay
-                        Thread.sleep(delayMs)
+                        // Simulate network delay using a blocking delay for all platforms
+                        val startTime = Clock.System.now()
+                        while ((Clock.System.now() - startTime).inWholeMilliseconds < delayMs) {
+                            // Busy wait (not ideal but works cross-platform for tests)
+                        }
                     }
                     respond(
                         content = responseBody,
