@@ -260,7 +260,7 @@ class StubEndpointsE2ETest {
         
         // Test sync status
         val statusResponse = client.get("/api/v1/sync/status")
-        assertEquals(HttpStatusCode.NotImplemented, statusResponse.status)
+        assertEquals(HttpStatusCode.OK, statusResponse.status)
         
         // Test sync operation with various sync types
         val fullSyncResponse = client.post("/api/v1/sync/") {
@@ -273,7 +273,7 @@ class StubEndpointsE2ETest {
                 }
             """.trimIndent())
         }
-        assertEquals(HttpStatusCode.NotImplemented, fullSyncResponse.status)
+        assertEquals(HttpStatusCode.OK, fullSyncResponse.status)
         
         val incrementalSyncResponse = client.post("/api/v1/sync/") {
             contentType(ContentType.Application.Json)
@@ -285,7 +285,7 @@ class StubEndpointsE2ETest {
                 }
             """.trimIndent())
         }
-        assertEquals(HttpStatusCode.NotImplemented, incrementalSyncResponse.status)
+        assertEquals(HttpStatusCode.OK, incrementalSyncResponse.status)
     }
     
     @Test

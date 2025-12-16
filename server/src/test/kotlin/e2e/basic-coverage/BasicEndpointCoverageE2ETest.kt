@@ -255,7 +255,7 @@ class BasicEndpointCoverageE2ETest {
         }
         
         val response = client.get("/api/v1/sync/status")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.OK, response.status)
     }
     
     @Test
@@ -265,7 +265,7 @@ class BasicEndpointCoverageE2ETest {
         }
         
         val response = client.post("/api/v1/sync/")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.OK, response.status)
     }
     
     // AI routes tests
