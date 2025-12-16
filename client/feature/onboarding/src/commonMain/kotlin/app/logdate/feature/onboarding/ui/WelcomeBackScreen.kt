@@ -27,9 +27,10 @@ import org.koin.compose.viewmodel.koinViewModel
  * A screen shown to returning users after app setup.
  */
 @Composable
-internal fun WelcomeBackScreen(
+fun WelcomeBackScreen(
     onFinish: () -> Unit,
     viewModel: WelcomeBackViewModel = koinViewModel(),
+    modifier: Modifier = Modifier,
 ) {
     // I can't believe we have to use a view model for this
     val name by viewModel.nameState.collectAsState()
@@ -42,7 +43,7 @@ internal fun WelcomeBackScreen(
     }
 
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         WelcomeBackScreenContent(name = name)

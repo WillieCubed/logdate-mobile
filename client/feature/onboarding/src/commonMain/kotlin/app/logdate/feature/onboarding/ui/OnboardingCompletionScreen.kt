@@ -42,9 +42,10 @@ import org.koin.compose.viewmodel.koinViewModel
  * This displays a message to the user about their streak and the completion of the onboarding flow.
  */
 @Composable
-internal fun OnboardingCompletionScreen(
+fun OnboardingCompletionScreen(
     onFinish: () -> Unit,
     viewModel: OnboardingViewModel = koinViewModel(),
+    modifier: Modifier = Modifier,
 ) {
     var shouldShowFinish by remember { mutableStateOf(false) }
 
@@ -55,12 +56,16 @@ internal fun OnboardingCompletionScreen(
             viewModel.completeOnboarding()
             onFinish()
         },
+        modifier = modifier,
     )
 }
 
 @Composable
 private fun OnboardingCompletionContent(
-    shouldShowFinish: Boolean, onContinue: () -> Unit, onFinish: () -> Unit,
+    shouldShowFinish: Boolean, 
+    onContinue: () -> Unit, 
+    onFinish: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     LaunchedEffect(shouldShowFinish) {
         if (shouldShowFinish) {
@@ -70,7 +75,8 @@ private fun OnboardingCompletionContent(
     }
 
     AnimatedContent(
-        shouldShowFinish,
+        targetState = shouldShowFinish,
+        modifier = modifier,
         transitionSpec = {
             fadeIn(
                 animationSpec = tween(3000)

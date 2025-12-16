@@ -1,17 +1,25 @@
 package app.logdate.feature.onboarding.navigation
 
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.navigation
+import app.logdate.feature.core.account.CloudAccountOnboardingScreen
+import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
+import app.logdate.feature.onboarding.ui.MemoriesImportInfoScreen
+import app.logdate.feature.onboarding.ui.MemorySelectionScreen
+import app.logdate.feature.onboarding.ui.MemorySelectionViewModel
 import app.logdate.feature.onboarding.ui.OnboardingCompletionScreen
 import app.logdate.feature.onboarding.ui.OnboardingNotificationConfirmationScreen
 import app.logdate.feature.onboarding.ui.OnboardingNotificationScreen
 import app.logdate.feature.onboarding.ui.OnboardingOverviewScreen
 import app.logdate.feature.onboarding.ui.OnboardingStartScreen
+import app.logdate.feature.onboarding.ui.PersonalIntroScreen
 import app.logdate.feature.onboarding.ui.WelcomeBackScreen
 import kotlinx.serialization.Serializable
+import org.koin.compose.viewmodel.koinViewModel
 
 sealed interface OnboardingBaseRoute
 
@@ -25,6 +33,9 @@ data object OnboardingRoute : OnboardingBaseRoute
 data object OnboardingStart : OnboardingBaseRoute
 
 @Serializable
+data object PersonalIntro : OnboardingBaseRoute
+
+@Serializable
 data object AppOverview : OnboardingBaseRoute
 
 @Serializable
@@ -35,6 +46,12 @@ data object CloudSync : OnboardingBaseRoute
 
 @Serializable
 data object MemoryImport : OnboardingBaseRoute
+
+@Serializable
+data object MemorySelection : OnboardingBaseRoute
+
+@Serializable
+data object AccountCreation : OnboardingBaseRoute
 
 @Serializable
 data object SignIn : OnboardingBaseRoute
@@ -80,18 +97,26 @@ fun NavGraphBuilder.onboardingGraph(
         composable<OnboardingStart> {
             OnboardingStartScreen(
                 onNext = {
-                    onGoToItem(AppOverview)
+                    onGoToItem(PersonalIntro)
                 },
                 onStartFromBackup = {
                     onGoToItem(OnboardingComplete)
                 },
             )
         }
+        composable<PersonalIntro> {
+            PersonalIntroScreen(
+                onNext = {
+                    onGoToItem(AppOverview)
+                },
+                onBack = onNavigateBack
+            )
+        }
         composable<AppOverview> {
             OnboardingOverviewScreen(
                 onBack = onNavigateBack,
                 onNext = {
-                    onGoToItem(FirstEntry)
+                    onGoToItem(MemoryImport)
                 },
             )
 
@@ -110,7 +135,39 @@ fun NavGraphBuilder.onboardingGraph(
             }
         }
         composable<CloudSync> { }
-        composable<MemoryImport> { }
+        composable<MemoryImport> {
+            MemoriesImportInfoScreen(
+                onBack = onNavigateBack,
+                onContinue = {
+                    onGoToItem(MemorySelection)
+                },
+            )
+        }
+        composable<MemorySelection> {
+            val viewModel = koinViewModel<MemorySelectionViewModel>()
+            MemorySelectionScreen(
+                uiState = viewModel.uiState.collectAsState().value,
+                onBack = onNavigateBack,
+                onContinue = {
+                    viewModel.processSelectedMemories()
+                    onGoToItem(AccountCreation)
+                },
+                onToggleMemorySelection = viewModel::toggleMemorySelection,
+                onLoadMoreMemories = viewModel::loadMoreMemories,
+            )
+        }
+        composable<AccountCreation> {
+            // Use the existing CloudAccountOnboardingScreen from core feature
+            CloudAccountOnboardingScreen(
+                viewModel = koinViewModel<CloudAccountOnboardingViewModel>(),
+                onAccountCreated = {
+                    onGoToItem(OnboardingPreferences)
+                },
+                onSkipOnboarding = {
+                    onGoToItem(OnboardingPreferences)
+                }
+            )
+        }
         composable<OnboardingPreferences> {
             OnboardingNotificationScreen(
                 onBack = {

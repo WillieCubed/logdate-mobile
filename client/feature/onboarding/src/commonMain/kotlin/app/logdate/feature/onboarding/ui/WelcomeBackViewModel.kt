@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 /**
  * A view model that exposes state for the [WelcomeBackScreen].
  */
-internal class WelcomeBackViewModel(
+class WelcomeBackViewModel(
     // TODO: Use repository to get user's actual name
 ) : ViewModel() {
     private val _nameState = MutableStateFlow("user")

@@ -49,7 +49,6 @@ class OnboardingViewModel(
             // TODO: Support non-text entry types
             journalNotesRepository.create(
                 JournalNote.Text(
-                    uid = "",
                     content = newEntryData.textContent,
                     creationTimestamp = newEntryData.timestamp,
                     lastUpdated = newEntryData.timestamp,
