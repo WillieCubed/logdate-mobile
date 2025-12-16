@@ -42,6 +42,6 @@ class JournalCreationViewModel(
 
 data class JournalCreationUiState(
     val created: Boolean = false,
-    val journalId: String = "",
+    val journalId: kotlin.uuid.Uuid? = null,
     val title: String = "",
 )

@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlin.uuid.Uuid
 
 class JournalsOverviewViewModel(
     private val repository: JournalRepository,
@@ -17,16 +18,17 @@ class JournalsOverviewViewModel(
 
     val uiState: StateFlow<JournalsOverviewUiState> = repository
         .allJournalsObserved
-        .map {
-            JournalsOverviewUiState(
-                journals = it.map { journal ->
-                    JournalListItemUiState(journal)
-                }
-            )
+        .map { journals ->
+            val journalItems = journals.map { journal ->
+                JournalListItemUiState.ExistingJournal(journal)
+            }
+            val allItems = journalItems + JournalListItemUiState.CreateJournalPlaceholder
+            
+            JournalsOverviewUiState(journals = allItems)
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), JournalsOverviewUiState())
 
-    fun removeJournal(journalId: String) {
+    fun removeJournal(journalId: Uuid) {
         viewModelScope.launch {
             repository.delete(journalId)
         }

@@ -1,9 +1,13 @@
+@file:OptIn(ExperimentalSharedTransitionApi::class)
+
 package app.logdate.feature.journals.ui
 
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,14 +19,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.shared.model.Journal
+import app.logdate.ui.LocalNavAnimatedVisibilityScope
+import app.logdate.ui.LocalSharedTransitionScope
+import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateShort
 import kotlinx.datetime.Clock
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import kotlin.uuid.Uuid
 
 /**
  * A journal cover that displays basic information about a journal.
@@ -37,53 +47,88 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @Composable
 fun JournalCover(
     journal: Journal,
-    onClick: JournalClickCallback,
     modifier: Modifier = Modifier,
+    onClick: JournalClickCallback? = null,
     enabled: Boolean = true,
     backgroundColor: Color = MaterialTheme.colorScheme.tertiaryContainer,
+    elevation: Dp = 0.dp,
 ) {
-    Box(
-        modifier = modifier
-            .aspectRatio(9f / 16f)
-            .background(
-                color = backgroundColor,
-                shape = JournalShape,
-            )
-            .clickable(enabled) { onClick(journal.id) }
-            .widthIn(max = 256.dp)
-        // TODO: Replace background with image
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomStart)
-                .padding(Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.Bottom),
-            horizontalAlignment = Alignment.Start,
-        ) { // Actual content
-            Text(
-                text = journal.title,
-                modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                "Last updated ${journal.lastUpdated.toReadableDateShort()}",
-                modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.labelSmall,
-            )
-            // TODO: Include people label
+    // Get scopes for shared transitions, gracefully handling when they're not available
+    val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    
+    // Use a standard Box without shared transitions when scopes aren't available
+    val baseModifier = modifier
+        .aspectRatio(AspectRatios.JOURNAL_COVER)
+        .shadow(
+            elevation = elevation,
+            shape = JournalShape
+        )
+        .background(
+            color = backgroundColor,
+            shape = JournalShape,
+        )
+        .let { mod ->
+            if (onClick != null) {
+                mod.clickable(enabled) { onClick(journal.id) }
+            } else {
+                mod
+            }
+        }
+        .widthIn(max = 256.dp)
+    
+    // Apply shared element transition only when both scopes are available
+    if (animatedVisibilityScope != null && sharedTransitionScope != null) {
+        with(sharedTransitionScope) {
+            Box(
+                modifier = baseModifier
+                    .sharedElement(
+                        sharedContentState = sharedTransitionScope.rememberSharedContentState("journal-container-${journal.id}"),
+                        animatedVisibilityScope = animatedVisibilityScope,
+                    )
+            ) {
+                JournalCoverContent(journal)
+            }
+        }
+    } else {
+        // Fallback when shared transitions aren't available
+        Box(modifier = baseModifier) {
+            JournalCoverContent(journal)
         }
     }
 }
 
+@Composable
+private fun BoxScope.JournalCoverContent(journal: Journal) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .align(Alignment.BottomStart)
+            .padding(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.Bottom),
+        horizontalAlignment = Alignment.Start,
+    ) { // Actual content
+        Text(
+            text = journal.title,
+            modifier = Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            "Last updated ${journal.lastUpdated.toReadableDateShort()}",
+            modifier = Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.labelSmall,
+        )
+        // TODO: Include people label
+    }
+}
 
 @Preview
 @Composable
 fun JournalCoverPreview() {
     LogDateTheme {
         JournalCover(
-            Journal(
-                id = "journal-1",
+            journal = Journal(
+                id = Uuid.random(),
                 title = "Diary",
                 description = "Description",
                 created = Clock.System.now(),
@@ -91,6 +136,7 @@ fun JournalCoverPreview() {
                 lastUpdated = Clock.System.now(),
             ),
             modifier = Modifier.width(180.dp),
+            elevation = 2.dp,
             onClick = {},
         )
     }

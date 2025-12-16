@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddPhotoAlternate
@@ -26,10 +28,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.journal.generated.resources.Res
@@ -41,7 +49,8 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun JournalCreationScreen(
     onGoBack: () -> Unit,
-    onJournalCreated: (journalId: String) -> Unit,
+    onJournalCreated: (journalId: kotlin.uuid.Uuid) -> Unit,
+    modifier: Modifier = Modifier,
     viewModel: JournalCreationViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -50,13 +59,15 @@ fun JournalCreationScreen(
         onGoBack = onGoBack,
         onNewJournal = viewModel::createJournal,
         initialTitle = uiState.title,
+        modifier = modifier,
     )
 
     LaunchedEffect(
         uiState.journalId,
     ) {
-        if (uiState.created) {
-            onJournalCreated(uiState.journalId)
+        val journalId = uiState.journalId
+        if (uiState.created && journalId != null) {
+            onJournalCreated(journalId)
         }
     }
 }
@@ -67,11 +78,15 @@ fun JournalCreationScreenContent(
     onGoBack: () -> Unit,
     onNewJournal: (data: NewJournalRequest) -> Unit,
     initialTitle: String = "",
+    modifier: Modifier = Modifier,
 ) {
     var title by rememberSaveable { mutableStateOf(initialTitle) }
     var contentDescription by rememberSaveable { mutableStateOf("") }
 
     val canFinish = title.isNotBlank()
+    val focusManager = LocalFocusManager.current
+    val titleFocusRequester = remember { FocusRequester() }
+    val descriptionFocusRequester = remember { FocusRequester() }
 
     fun handleNewJournal() {
         onNewJournal(NewJournalRequest(title, contentDescription))
@@ -84,8 +99,13 @@ fun JournalCreationScreenContent(
     fun handleSelectTextNotes() {
 
     }
+    
+    LaunchedEffect(Unit) {
+        titleFocusRequester.requestFocus()
+    }
 
     Scaffold(
+        modifier = modifier,
         topBar = {
             TopAppBar(
                 title = { Text("New Journal") },
@@ -113,20 +133,32 @@ fun JournalCreationScreenContent(
 
                 OutlinedTextField(
                     textStyle = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(titleFocusRequester),
                     value = title,
                     label = { Text("Add a title") },
                     onValueChange = {
                         title = it
                     },
                     singleLine = false,
+                    keyboardOptions = KeyboardOptions(
+                        imeAction = ImeAction.Next
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onNext = { 
+                            focusManager.moveFocus(FocusDirection.Down)
+                        }
+                    ),
                 )
                 Column {
                     Text("What is this for?", style = MaterialTheme.typography.bodyMedium)
                     OutlinedTextField(
                         textStyle = MaterialTheme.typography.bodyLarge,
                         minLines = 3,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(descriptionFocusRequester),
                         value = contentDescription,
                         placeholder = { Text("Description") },
                         label = { },
@@ -134,6 +166,17 @@ fun JournalCreationScreenContent(
                             contentDescription = it
                         },
                         singleLine = false,
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                focusManager.clearFocus()
+                                if (canFinish) {
+                                    handleNewJournal()
+                                }
+                            }
+                        ),
                     )
                 }
                 Column(
@@ -184,6 +227,7 @@ fun JournalCreationScreenPreview() {
             initialTitle = "The Willie Diaries",
             onGoBack = { },
             onNewJournal = { },
+            modifier = Modifier,
         )
     }
 }

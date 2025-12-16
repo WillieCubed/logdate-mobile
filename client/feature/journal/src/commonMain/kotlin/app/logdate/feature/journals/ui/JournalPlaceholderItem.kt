@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
+import app.logdate.ui.common.AspectRatios
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -39,7 +40,7 @@ fun JournalPlaceholderItem() {
     )
     Box(
         modifier = Modifier
-            .aspectRatio(9f / 16f)
+            .aspectRatio(AspectRatios.JOURNAL_COVER)
             .background(
                 color = MaterialTheme.colorScheme.primaryContainer,
                 shape = JournalShape,

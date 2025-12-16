@@ -7,9 +7,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -25,23 +28,39 @@ import logdate.client.feature.journal.generated.resources.action_browse_journals
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
+import kotlin.uuid.Uuid
 
 
 @Composable
-internal fun JournalsOverviewScreen(
+fun JournalsOverviewScreen(
     onOpenJournal: JournalClickCallback,
     onBrowseJournals: () -> Unit,
+    onCreateJournal: () -> Unit,
+    onNavigationClick: () -> Unit = {},
+    modifier: Modifier = Modifier,
     viewModel: JournalsOverviewViewModel = koinViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    // TODO: Add UI for larger screens
-    JournalListPanel(
-        journals = state.journals,
-        onOpenJournal = onOpenJournal,
-        onBrowseJournals = onBrowseJournals,
-        showLoading = false,
-    )
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+            JournalSearchToolbar(
+                onNavigationClick = onNavigationClick,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    ) { paddingValues ->
+        // Apply the padding from the scaffold to the content
+        JournalListPanel(
+            journals = state.journals,
+            onOpenJournal = onOpenJournal,
+            onBrowseJournals = onBrowseJournals,
+            onCreateJournal = onCreateJournal,
+            showLoading = false,
+            modifier = Modifier.padding(paddingValues)
+        )
+    }
 }
 
 // TODO: Move to :client:ui
@@ -50,10 +69,12 @@ fun JournalListPanel(
     journals: List<JournalListItemUiState>,
     onOpenJournal: JournalClickCallback,
     onBrowseJournals: () -> Unit,
+    onCreateJournal: () -> Unit,
     modifier: Modifier = Modifier,
     showLoading: Boolean = false,
 ) {
     Surface(
+        modifier = modifier,
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = MaterialTheme.shapes.medium,
@@ -74,6 +95,7 @@ fun JournalListPanel(
                     JournalCoverFlowCarousel(
                         journals = journals,
                         onOpenJournal = onOpenJournal,
+                        onCreateJournal = onCreateJournal,
                         modifier = modifier.fillMaxHeight(),
                     )
                     TextButton(onClick = onBrowseJournals) {
@@ -92,6 +114,9 @@ private fun JournalsScreenPreview() {
         JournalsOverviewScreen(
             onOpenJournal = {},
             onBrowseJournals = {},
+            onCreateJournal = {},
+            onNavigationClick = {},
+            modifier = Modifier
         )
     }
 }
@@ -104,6 +129,7 @@ private fun JournalsScreenPreview_Empty() {
             journals = emptyList(),
             onOpenJournal = {},
             onBrowseJournals = {},
+            onCreateJournal = {},
         )
     }
 }
@@ -116,4 +142,4 @@ internal val JournalShape = RoundedCornerShape(
     bottomEnd = 16.dp,
 )
 
-typealias JournalClickCallback = (journalId: String) -> Unit
+typealias JournalClickCallback = (journalId: Uuid) -> Unit
