@@ -7,8 +7,22 @@ import kotlin.uuid.Uuid
  * A rewind for a user's memories.
  */
 data class Rewind(
+    /**
+     * A universally-unique identifier for the rewind.
+     */
     val uid: Uuid,
-    val date: Instant,
+    /**
+     * The start date of the time period for this Rewind.
+     */
+    val startDate: Instant,
+    /**
+     * The end date of the time period for this Rewind.
+     */
+    val endDate: Instant,
+    /**
+     * When this Rewind was generated.
+     */
+    val generationDate: Instant,
     /**
      * A short label for the rewind.
      *
@@ -23,4 +37,8 @@ data class Rewind(
      * A user-friendly title for the rewind.
      */
     val title: String,
+    /**
+     * Content included in this rewind.
+     */
+    val content: List<RewindContent> = emptyList()
 )

@@ -12,6 +12,14 @@ data class UserData(
     val onboardedDate: Instant = Instant.DISTANT_PAST,
     val securityLevel: AppSecurityLevel = AppSecurityLevel.NONE,
     val favoriteNotes: List<String> = emptyList(),
+    
+    // Profile data
+    val displayName: String = "",
+    val profilePhotoUri: String? = null,
+    val bio: String? = null,
+    val originalBio: String? = null,
+    val profileCreatedAt: Instant = Instant.DISTANT_PAST,
+    val profileLastUpdatedAt: Instant = Instant.DISTANT_PAST
 )
 
 /**
