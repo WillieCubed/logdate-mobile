@@ -1,6 +1,7 @@
 package app.logdate.ui.timeline
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,6 +20,7 @@ fun TimelineTopAppBar(
     scrollBehavior: TopAppBarScrollBehavior,
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit = {},
+    onHistoryClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     TopAppBar(
@@ -29,6 +31,12 @@ fun TimelineTopAppBar(
             )
         },
         actions = {
+            IconButton(onClick = onHistoryClick) {
+                Icon(
+                    imageVector = Icons.Default.History,
+                    contentDescription = "Location History"
+                )
+            }
             IconButton(onClick = onSearchClick) {
                 Icon(
                     imageVector = Icons.Default.Search,

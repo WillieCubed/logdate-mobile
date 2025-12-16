@@ -54,6 +54,7 @@ fun TimelinePane(
     onSearchClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onAddToMemory: (memoryId: String) -> Unit = {},
+    onHistoryClick: () -> Unit = {},
     birthday: Instant? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -79,7 +80,8 @@ fun TimelinePane(
             TimelineTopAppBar(
                 scrollBehavior = scrollBehavior,
                 onSearchClick = onSearchClick,
-                onSettingsClick = onProfileClick
+                onSettingsClick = onProfileClick,
+                onHistoryClick = onHistoryClick
             )
         }
     ) { paddingValues ->

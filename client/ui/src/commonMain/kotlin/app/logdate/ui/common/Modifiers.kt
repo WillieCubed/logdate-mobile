@@ -80,3 +80,18 @@ fun Modifier.applyScreenStyles(): Modifier {
     return this
         .clip(MaterialTheme.shapes.extraLarge)
 }
+
+/**
+ * Applies standard content width constraints to the composable.
+ * 
+ * This ensures content doesn't get too wide on large screens while maintaining
+ * good readability and layout consistency.
+ * 
+ * @return A modifier with the standard content width applied
+ */
+@Composable
+fun Modifier.applyStandardContentWidth(): Modifier {
+    return this
+        .padding(horizontal = 16.dp)
+}
+

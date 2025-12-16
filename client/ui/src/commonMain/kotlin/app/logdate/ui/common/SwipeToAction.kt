@@ -133,81 +133,74 @@ fun SwipeToAction(
         }
     }
     
+    // Use a Box with clipToBounds to contain all elements and prevent them from being visible outside container
     Box(
         modifier = modifier
             .onSizeChanged { containerHeightPx = it.height }
             // Apply height animation when removing
             .height(containerHeight * removeAnimation.value)
     ) {
-        // The main row container that holds both content and action
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Main content surface - takes all available width minus action button width if visible
+        // Action button positioned absolutely in the box, becomes visible as content slides away
+        if (offsetX < 0) {
+            // Position the action button at the end, stays fixed in place
             Surface(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .offset { IntOffset(animatedOffsetX.value.roundToInt(), 0) }
-                    .pointerInput(enabled) {
-                        if (enabled) {
-                            detectHorizontalDragGestures(
-                                onDragEnd = {
-                                    scope.launch {
-                                        // Snap behavior
-                                        offsetX = if (abs(offsetX) < thresholdPx) {
-                                            // Snap back to original position
-                                            0f
-                                        } else {
-                                            // Stay at threshold position to show delete button
-                                            -thresholdPx
-                                        }
-                                    }
-                                }
-                            ) { _, dragAmount ->
-                                // Only allow left swipe and limit the distance
-                                val newOffset = (offsetX + dragAmount).coerceIn(-maxSwipePx, 0f)
-                                offsetX = newOffset
-                            }
+                onClick = {
+                    if (enabled) {
+                        scope.launch {
+                            isBeingRemoved = true
                         }
-                    },
-                shape = contentShape,
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = if (offsetX < 0) 4.dp else 0.dp
-            ) {
-                // Content
-                content()
-            }
-            
-            // Only show spacing and action button if we've swiped at all
-            if (offsetX < 0) {
-                // Spacing between content and action
-                Spacer(modifier = Modifier.width(spacing))
-                
-                // Action button - fixed height matching the container
-                Surface(
-                    onClick = {
-                        if (enabled) {
-                            scope.launch {
-                                isBeingRemoved = true
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .width(actionButtonWidth)
-                        .fillMaxHeight(),
-                    shape = actionShape,
-                    color = actionBackgroundColor
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        actionLabel()
                     }
+                },
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .width(actionButtonWidth)
+                    .fillMaxHeight()
+                    .padding(end = spacing),
+                shape = actionShape,
+                color = actionBackgroundColor
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    actionLabel()
                 }
             }
+        }
+        
+        // Main content surface - positioned absolutely and slides over
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .offset { IntOffset(animatedOffsetX.value.roundToInt(), 0) }
+                .pointerInput(enabled) {
+                    if (enabled) {
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                scope.launch {
+                                    // Snap behavior
+                                    offsetX = if (abs(offsetX) < thresholdPx) {
+                                        // Snap back to original position
+                                        0f
+                                    } else {
+                                        // Stay at threshold position to show delete button
+                                        -thresholdPx
+                                    }
+                                }
+                            }
+                        ) { _, dragAmount ->
+                            // Only allow left swipe and limit the distance
+                            val newOffset = (offsetX + dragAmount).coerceIn(-maxSwipePx, 0f)
+                            offsetX = newOffset
+                        }
+                    }
+                },
+            shape = contentShape,
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = if (offsetX < 0) 4.dp else 0.dp
+        ) {
+            // Content
+            content()
         }
     }
 }
