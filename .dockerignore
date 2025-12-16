@@ -1,0 +1,91 @@
+# Build artifacts and caches
+**/build/
+**/target/
+**/.gradle/
+**/.idea/
+**/.vscode/
+**/node_modules/
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+# Documentation (not needed for runtime)
+README.md
+docs/
+*.md
+
+# IDE files
+**/*.iml
+**/*.ipr
+**/*.iws
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Environment and config files (secrets should come from env vars)
+.env
+.env.local
+.env.development
+.env.production
+**/*.local
+
+# Testing
+**/test-results/
+**/coverage/
+**/*.log
+
+# Android specific (not needed for server)
+app/
+client/
+**/*.apk
+**/*.aab
+**/proguard/
+**/release/
+
+# iOS specific (not needed for server)
+**/*.xcodeproj/
+**/*.xcworkspace/
+**/DerivedData/
+**/build/
+
+# Kotlin Native (not needed for server)
+**/*.kexe
+**/*.klib
+
+# Gradle wrapper (keep gradlew and gradle-wrapper.jar but not gradle directory cache)
+.gradle/
+
+# Keep only server-related files and shared dependencies
+!gradle/
+!gradlew
+!gradlew.bat
+!gradle.properties
+!settings.gradle.kts
+!build.gradle.kts
+!gradle/libs.versions.toml
+!server/
+!shared/
+!client/util/
+
+# Exclude non-essential server files
+server/src/test/
+server/build/
+server/**/*.log
+
+# Docker files (not needed inside the container)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
