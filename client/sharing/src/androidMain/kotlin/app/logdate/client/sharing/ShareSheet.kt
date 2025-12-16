@@ -12,6 +12,7 @@ import app.logdate.shared.model.Journal
 import logdate.client.sharing.generated.resources.Res
 import logdate.client.sharing.generated.resources.action_label_add_to_journal
 import logdate.client.sharing.generated.resources.rounded_add_24
+import kotlin.uuid.Uuid
 
 /**
  * Shares a journal link using the system share sheet.
@@ -92,7 +93,7 @@ internal fun createChooserIntent(
 
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 private fun Context.getJournalShareCustomOptions(
-    journalId: String,
+    journalId: Uuid,
 ): Array<ChooserAction> {
     return arrayOf(
         ChooserAction.Builder(
@@ -104,7 +105,7 @@ private fun Context.getJournalShareCustomOptions(
                 this,
                 1,
                 Intent(CustomIntents.ACTION_GENERATE_QR_CODE).apply {
-                    putExtra(CustomIntents.EXTRA_JOURNAL_ID, journalId)
+                    putExtra(CustomIntents.EXTRA_JOURNAL_ID, journalId.toString())
                 },
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_CANCEL_CURRENT,
             )

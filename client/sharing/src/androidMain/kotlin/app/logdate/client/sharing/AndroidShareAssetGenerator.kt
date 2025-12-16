@@ -3,8 +3,9 @@ package app.logdate.client.sharing
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
 import app.logdate.shared.model.Journal
 
@@ -12,7 +13,6 @@ import app.logdate.shared.model.Journal
 private const val JOURNAL_CORNER_RADIUS = 16f
 private const val JOURNAL_COVER_HEIGHT = 320f
 private const val JOURNAL_COVER_WIDTH = 180f
-
 
 /**
  * A utility that generates assets for sharing content to external apps.
@@ -30,13 +30,13 @@ class AndroidShareAssetGenerator(
      * in the cache directory and can be shared with other apps.
      */
     override fun generateBackgroundLayer(journal: Journal, shareTheme: ShareTheme): String {
-        if (cachedJournalId == journal.id) {
+        if (cachedJournalId == journal.id.toString()) {
             return context.cacheDir.resolve("shared_journal_background_${journal.id}.png").toUri().toString()
         }
         val bitmap = generateBackgroundLayer(shareTheme)
         val file = context.cacheDir.resolve("shared_journal_background_${journal.id}.png")
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, file.outputStream())
-        cachedJournalId = journal.id
+        cachedJournalId = journal.id.toString()
         return file.toUri().toString()
     }
 
@@ -48,24 +48,24 @@ class AndroidShareAssetGenerator(
      * may have a transparent background.
      */
     override fun generateStickerLayer(journal: Journal, theme: ShareTheme): String {
-        if (cachedJournalId == journal.id) {
+        if (cachedJournalId == journal.id.toString()) {
             return context.cacheDir.resolve("shared_journal_cover_${journal.id}.png").toUri().toString()
         }
         val bitmap = generateJournalCover(journal.title, theme)
         val file = context.cacheDir.resolve("shared_journal_cover_${journal.id}.png")
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, file.outputStream())
-        cachedJournalId = journal.id
+        cachedJournalId = journal.id.toString()
         return file.toUri().toString()
     }
 
     private fun generateBackgroundLayer(shareTheme: ShareTheme): Bitmap {
-        val bitmap = Bitmap.createBitmap(1080, 1920, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(1080, 1920)
         with(Canvas(bitmap)) {
             val paint = Paint().apply {
                 color = if (shareTheme == ShareTheme.Dark) {
-                    Color.parseColor("#11140f") // Surface dark
+                    "#11140f".toColorInt() // Surface dark
                 } else {
-                    Color.parseColor("#f7fbf1") // Surface light
+                    "#f7fbf1".toColorInt() // Surface light
                 }
             }
             drawRect(0f, 0f, 1080f, 1920f, paint)
@@ -77,13 +77,13 @@ class AndroidShareAssetGenerator(
         journalName: String,
         theme: ShareTheme,
     ): Bitmap {
-        val bitmap = Bitmap.createBitmap(180, JOURNAL_COVER_HEIGHT.toInt(), Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(180, JOURNAL_COVER_HEIGHT.toInt())
         with(Canvas(bitmap)) {
             val paint = Paint().apply {
                 color = if (theme == ShareTheme.Light) {
-                    Color.parseColor("#bcebef")
+                    "#bcebef".toColorInt()
                 } else {
-                    Color.parseColor("#1E4D51")
+                    "#1E4D51".toColorInt()
                 }
 
                 textSize = 20f
@@ -109,7 +109,7 @@ class AndroidShareAssetGenerator(
                 paint
             )
             val titlePaint = Paint().apply {
-                color = Color.parseColor("#002022")
+                color = "#002022".toColorInt()
                 textSize = 20f
             }
             // TODO: Handle truncating text if it doesn't fit

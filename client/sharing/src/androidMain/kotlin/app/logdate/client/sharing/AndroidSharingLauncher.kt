@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+import kotlin.uuid.Uuid
 
 
 /**
@@ -19,7 +20,7 @@ class AndroidSharingLauncher(
     private val context: Context,
     private val mediaManager: MediaManager,
     private val journalRepository: JournalRepository,
-    private val shareAssetGenerator: AndroidShareAssetGenerator,
+    private val shareAssetGenerator: ShareAssetInterface,
     private val coroutineScope: CoroutineScope = GlobalScope, // TODO: Use app-bound scope
 ) : SharingLauncher {
     /**
@@ -27,8 +28,9 @@ class AndroidSharingLauncher(
      *
      * @param journalId The ID of the journal to share. If the journal does not exist, an exception
      * will be thrown.
+     * @param theme The theme to use for the shared content
      */
-    override fun shareJournalToInstagram(journalId: String, theme: ShareTheme) {
+    override fun shareJournalToInstagram(journalId: Uuid, theme: ShareTheme) {
         coroutineScope.launch {
             val journal = journalRepository.observeJournalById(journalId).firstOrNull()
                 ?: throw IllegalArgumentException("Journal with ID $journalId does not exist")
@@ -40,12 +42,30 @@ class AndroidSharingLauncher(
             context.startActivity(createInstagramStoryIntent(cover.toUri(), background.toUri()))
         }
     }
+    
+    /**
+     * Shares a journal using the system share sheet.
+     *
+     * @param journalId The ID of the journal to share. If the journal does not exist, an exception
+     * will be thrown.
+     */
+    override fun shareJournalLink(journalId: Uuid) {
+        coroutineScope.launch {
+            val journal = journalRepository.observeJournalById(journalId).firstOrNull()
+                ?: throw IllegalArgumentException("Journal with ID $journalId does not exist")
+            
+            // Use the shareJournalLink extension function from ShareSheet.kt
+            context.shareJournalLink(journal)
+        }
+    }
 
     /**
      * Triggers the app to share a photo to Instagram.
      *
-     * This method will trigger the Instagram app to open and share the video. The given video ID
+     * This method will trigger the Instagram app to open and share the photo. The given photo ID
      * must exist. If the image does not exist, an exception will be thrown.
+     *
+     * @param photoId The ID of the photo to share
      */
     override fun sharePhotoToInstagramFeed(photoId: String) {
         coroutineScope.launch {
@@ -66,6 +86,7 @@ class AndroidSharingLauncher(
      * This method will trigger the Instagram app to open and share the video. The given video ID
      * must exist. If the video does not exist, an exception will be thrown.
      *
+     * @param videoId The ID of the video to share
      */
     override fun shareVideoToInstagramFeed(videoId: String) {
         coroutineScope.launch {
