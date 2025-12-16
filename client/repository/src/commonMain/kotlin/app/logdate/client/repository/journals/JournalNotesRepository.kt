@@ -1,20 +1,38 @@
 package app.logdate.client.repository.journals
 
+import app.logdate.util.UuidSerializer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.datetime.Instant
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.uuid.Uuid
 
 interface JournalNotesRepository {
     val allNotesObserved: Flow<List<JournalNote>>
 
-    fun observeNotesInJournal(journalId: String): Flow<List<JournalNote>>
+    fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>>
 
     fun observeNotesInRange(start: Instant, end: Instant): Flow<List<JournalNote>>
 
     /**
+     * Observes notes in pages for efficient loading.
+     */
+    fun observeNotesPage(pageSize: Int, offset: Int): Flow<List<JournalNote>>
+
+    /**
+     * Observes notes in a streaming fashion, emitting results as they become available.
+     */
+    fun observeNotesStream(pageSize: Int = 50): Flow<List<JournalNote>>
+
+    /**
+     * Fast query for recent notes to enable immediate timeline display.
+     */
+    fun observeRecentNotes(limit: Int = 20): Flow<List<JournalNote>>
+
+    /**
      * Creates a new note.
      */
-    suspend fun create(note: JournalNote)
+    suspend fun create(note: JournalNote): Uuid
 
     /**
      * Deletes a note.
@@ -24,14 +42,14 @@ interface JournalNotesRepository {
     /**
      * Deletes a note by its ID.
      */
-    suspend fun removeById(noteId: String)
+    suspend fun removeById(noteId: Uuid)
 
     /**
      * Creates a new note and add it to a journal.
      */
-    suspend fun create(note: String, journalId: String)
+    suspend fun create(note: JournalNote, journalId: Uuid)
 
-    suspend fun removeFromJournal(noteId: String, journalId: String)
+    suspend fun removeFromJournal(noteId: Uuid, journalId: Uuid)
 }
 
 enum class NoteType {
@@ -53,9 +71,11 @@ enum class NoteType {
  */
 @Serializable
 sealed class JournalNote(
+    @SerialName("noteType")
     val type: NoteType,
 ) {
-    abstract val uid: String // TODO: Migrate to Kotlin Uuid
+    @Serializable(with = UuidSerializer::class)
+    abstract val uid: Uuid
     abstract val creationTimestamp: Instant
     abstract val lastUpdated: Instant
 
@@ -66,7 +86,8 @@ sealed class JournalNote(
      */
     @Serializable
     data class Text(
-        override val uid: String,
+        @Serializable(with = UuidSerializer::class)
+        override val uid: Uuid = Uuid.random(),
         override val creationTimestamp: Instant,
         override val lastUpdated: Instant,
         val content: String,
@@ -74,7 +95,8 @@ sealed class JournalNote(
 
     @Serializable
     data class Image(
-        override val uid: String,
+        @Serializable(with = UuidSerializer::class)
+        override val uid: Uuid = Uuid.random(),
         override val creationTimestamp: Instant,
         override val lastUpdated: Instant,
         val mediaRef: String,
@@ -82,7 +104,8 @@ sealed class JournalNote(
 
     @Serializable
     data class Video(
-        override val uid: String,
+        @Serializable(with = UuidSerializer::class)
+        override val uid: Uuid = Uuid.random(),
         override val creationTimestamp: Instant,
         override val lastUpdated: Instant,
         val mediaRef: String,
@@ -91,7 +114,8 @@ sealed class JournalNote(
     @Serializable
     data class Audio(
         val mediaRef: String,
-        override val uid: String,
+        @Serializable(with = UuidSerializer::class)
+        override val uid: Uuid = Uuid.random(),
         override val creationTimestamp: Instant,
         override val lastUpdated: Instant,
     ) : JournalNote(NoteType.AUDIO)

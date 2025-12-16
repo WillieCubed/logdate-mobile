@@ -51,6 +51,15 @@ interface RewindRepository {
      * @param start The start of the time period.
      * @param end The end of the time period.
      * @return The created Rewind.
+     * @deprecated Use GenerateBasicRewindUseCase instead
      */
+    @Deprecated("Use GenerateBasicRewindUseCase instead")
     suspend fun createRewind(start: Instant, end: Instant): Rewind
+    
+    /**
+     * Saves a rewind to the repository.
+     * 
+     * @param rewind The rewind to save
+     */
+    suspend fun saveRewind(rewind: Rewind)
 }
