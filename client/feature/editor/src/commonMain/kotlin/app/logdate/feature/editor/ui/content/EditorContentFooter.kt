@@ -3,7 +3,7 @@ package app.logdate.feature.editor.ui.content
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.gestures.ScrollableState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -42,34 +42,28 @@ import kotlinx.coroutines.launch
  * A footer component for the editor content that includes an expandable toolbar
  * which appears when the user overscrolls past the bottom of the content.
  *
- * @param scrollState The scroll state of the editor content
+ * @param overscrollDetector The overscroll detector that tracks overscroll progress
  * @param onAddBlock Callback when a new block is added
  */
 @Composable
 fun EditorContentFooter(
-    scrollState: ScrollState,
     onAddBlock: (BlockType) -> Unit,
+    scrollState: ScrollableState,
+    overscrollDetector: OverscrollDetector = rememberOverscrollDetector(scrollState),
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     
-    // Create the overscroll detector
-    val overscrollDetector = rememberOverscrollDetector(
-        scrollState = scrollState,
-        onOverscrollReleased = { amount, threshold ->
-            // When overscroll is released, snap to expanded/collapsed state
-            if (amount >= threshold) {
-                // Past threshold - expand fully
-                expanded = true
-                Napier.d("Toolbar expanded")
-            } else {
-                // Below threshold - collapse
-                expanded = false
-                Napier.d("Toolbar collapsed")
-            }
+    // Monitor overscroll state
+    LaunchedEffect(overscrollDetector) {
+        // Set up a way to react to overscroll threshold changes
+        // Note: ideally we would directly observe isPastThreshold state
+        if (overscrollDetector.isPastThreshold && !expanded) {
+            expanded = true
+            Napier.d("Toolbar expanded due to threshold")
         }
-    )
+    }
     
     // Auto-collapse after a period of inactivity when expanded
     LaunchedEffect(expanded) {
@@ -85,8 +79,8 @@ fun EditorContentFooter(
     val animatedProgress by animateFloatAsState(
         targetValue = if (expanded) 1f else overscrollDetector.progressFraction,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioLowBouncy,    // Very bouncy
-            stiffness = Spring.StiffnessVeryLow            // Even slower for more playfulness
+            dampingRatio = Spring.DampingRatioMediumBouncy,    // Medium bouncy for responsiveness
+            stiffness = Spring.StiffnessLow                   // Slow enough to feel playful
         ),
         label = "Progress animation"
     )

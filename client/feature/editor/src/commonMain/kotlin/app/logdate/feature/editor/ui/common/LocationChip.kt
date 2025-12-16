@@ -1,4 +1,4 @@
-package app.logdate.feature.editor.ui
+package app.logdate.feature.editor.ui.common
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
