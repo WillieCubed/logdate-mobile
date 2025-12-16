@@ -24,18 +24,35 @@ class OfflineFirstActivityTimelineRepository : ActivityTimelineRepository {
         }
 
     override suspend fun addActivity(item: ActivityTimelineItem) {
-        TODO("Not yet implemented")
+        val currentItems = allItems.value.toMutableList()
+        currentItems.add(item)
+        allItems.value = currentItems.sortedByDescending { it.timestamp }
     }
 
     override suspend fun removeActivity(item: ActivityTimelineItem) {
-        TODO("Not yet implemented")
+        val currentItems = allItems.value.toMutableList()
+        currentItems.removeAll { it.uid == item.uid }
+        allItems.value = currentItems
     }
 
     override suspend fun updateActivity(item: ActivityTimelineItem) {
-        TODO("Not yet implemented")
+        val currentItems = allItems.value.toMutableList()
+        val index = currentItems.indexOfFirst { it.uid == item.uid }
+        if (index != -1) {
+            currentItems[index] = item
+            allItems.value = currentItems.sortedByDescending { it.timestamp }
+        } else {
+            throw NoSuchElementException("Activity with id ${item.uid} not found")
+        }
     }
 
     override fun fetchActivitiesByType(type: String): Flow<List<ActivityTimelineItem>> {
-        TODO("Not yet implemented")
+        return allItemsObserved.map { items ->
+            items.filter { item ->
+                // For now, return all items as we don't have type classification
+                // This could be enhanced later to filter by activity type
+                true
+            }
+        }
     }
 }

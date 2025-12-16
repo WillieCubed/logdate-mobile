@@ -3,7 +3,7 @@ package app.logdate.client.data.user
 import android.os.Build
 import app.logdate.client.database.dao.UserDevicesDao
 import app.logdate.client.database.entities.UserDeviceEntity
-import app.logdate.client.device.InstanceIdProvider
+import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.repository.user.RemoteUserAccountRepository
 import app.logdate.client.repository.user.devices.DeviceType
 import app.logdate.client.repository.user.devices.UserDevice
@@ -21,7 +21,7 @@ import kotlinx.datetime.Clock
  */
 class DefaultUserDeviceRepository(
     private val userDeviceDao: UserDevicesDao,
-    private val instanceIdProvider: InstanceIdProvider,
+    private val deviceIdProvider: DeviceIdProvider,
     private val remoteUserAccountRepository: RemoteUserAccountRepository,
 ) : UserDeviceRepository {
 
@@ -33,11 +33,11 @@ class DefaultUserDeviceRepository(
     // TODO: Move this functionality into domain layer
     override val currentDevice: Flow<UserDevice>
         get() = combine(
-            instanceIdProvider.currentInstanceId,
+            deviceIdProvider.getDeviceId(),
             remoteUserAccountRepository.currentUser,
         ) { instanceId, userAccount ->
             UserDevice(
-                uid = instanceId,
+                uid = instanceId.toString(),
                 userId = userAccount?.uid ?: error("No user signed in"),
                 label = Build.DEVICE,
                 operatingSystem = "Android",
@@ -80,7 +80,7 @@ class DefaultUserDeviceRepository(
         val currentUser = remoteUserAccountRepository.currentUser.first()
             ?: throw IllegalStateException("No user signed in")
         return UserDevice(
-            uid = deviceId ?: instanceIdProvider.currentInstanceId.first(),
+            uid = deviceId ?: deviceIdProvider.getDeviceId().first().toString(),
             userId = currentUser.uid,
             label = Build.DEVICE,
             operatingSystem = "Android",

@@ -46,7 +46,7 @@ class FirebaseRemoteJournalDataSource : RemoteJournalDataSource {
 
     override suspend fun editJournal(journal: Journal) = suspendCoroutine { continuation ->
         db.collection(JOURNALS_COLLECTION)
-            .document(journal.id)
+            .document(journal.id.toString())
             .set(
                 mapOf(
                     "title" to journal.id,
