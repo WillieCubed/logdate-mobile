@@ -1,9 +1,12 @@
 package app.logdate.util
 
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toJavaLocalDate
 import kotlinx.datetime.toJavaZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Locale
 
 
@@ -18,3 +21,14 @@ actual val Instant.asTime: String
             .atZone(TimeZone.currentSystemDefault().toJavaZoneId())
             .format(DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault()))
     }
+
+/**
+ * JVM implementation of localized date formatting.
+ * Uses the system locale and formatting settings.
+ */
+actual fun formatDateLocalized(date: LocalDate): String {
+    val javaLocalDate = date.toJavaLocalDate()
+    val formatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG)
+        .withLocale(Locale.getDefault())
+    return javaLocalDate.format(formatter)
+}

@@ -14,6 +14,15 @@ import kotlinx.datetime.format.char
 import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.toLocalDateTime
 
+/**
+ * Returns the current date in the system's default time zone.
+ *
+ * @param timeZone The time zone to use for the current date. Defaults to the system's default time zone.
+ */
+fun LocalDate.Companion.now(
+    timeZone: TimeZone = TimeZone.currentSystemDefault(),
+): LocalDate = Clock.System.now().toLocalDateTime(timeZone).date
+
 fun LocalDateTime.toReadableDateShort(): String = format(LocalDateTime.Format {
     monthName(MonthNames.ENGLISH_FULL)
     char(' ')
@@ -46,6 +55,16 @@ fun LocalDate.toReadableDateShort(): String = format(LocalDate.Format {
 fun Instant.toReadableDateShort(): String {
     val localDatetime = toLocalDateTime(TimeZone.currentSystemDefault())
     return localDatetime.toReadableDateShort()
+}
+
+/**
+ * Converts an [Instant] into a short readable form with time
+ *
+ * For example, "March 13, 3:30 p.m.".
+ */
+fun Instant.toReadableDateTimeShort(): String {
+    val localDatetime = toLocalDateTime(TimeZone.currentSystemDefault())
+    return "${localDatetime.toReadableDateShort()}, ${localTime}"
 }
 
 val Instant.localTime: String
@@ -108,7 +127,8 @@ val LocalDateTime.weekOfYear: Int
             // Year has 53 weeks if December 31st is on Thursday
             // OR if December 31st is on Wednesday in a leap year
             if (weekNumber == 53 && (december31WeekDay != 4 &&
-                        !(december31WeekDay == 3 && isLeapYear(year)))) {
+                        !(december31WeekDay == 3 && isLeapYear(year)))
+            ) {
                 weekNumber = 1
             }
         }
@@ -153,3 +173,12 @@ fun Instant.weeksAgo(): Int {
  * For example, "3:30 p.m."
  */
 expect val Instant.asTime: String
+
+/**
+ * Formats a LocalDate according to the current locale's full date format.
+ * For example: "June 23, 2025" in US locale or "23 juin 2025" in French locale.
+ *
+ * @param date The date to format
+ * @return A localized date string in long format
+ */
+expect fun formatDateLocalized(date: LocalDate): String
