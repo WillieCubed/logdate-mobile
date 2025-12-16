@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -34,6 +35,43 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * A rewind card component that displays summary information about a weekly rewind.
+ * 
+ * This card serves as the main content container within the floating card list, presenting
+ * key information about each rewind in a visually appealing and consistent format.
+ * 
+ * ## Content Structure:
+ * - **Label**: Short identifier for the week (e.g., "Week of November 1-7")
+ * - **Title**: Descriptive name for the rewind (e.g., "Five Cities in a Week")
+ * - **Date Range**: Start and end dates with arrow separator for clarity
+ * - **Background**: Uses secondaryContainer color for subtle card differentiation
+ * 
+ * ## Responsive Design:
+ * - **Width**: Fills available width up to container constraints
+ * - **Padding**: Generous internal spacing (Spacing.lg) for comfortable reading
+ * - **Shape**: Uses Material 3 medium rounded corners for modern appearance
+ * - **Minimum Width**: Previously 360dp, now responsive to container
+ * 
+ * ## Interaction:
+ * - **Clickable Area**: Entire card surface is interactive when ready
+ * - **Visual Feedback**: Standard Material 3 click ripple effects
+ * - **Disabled State**: Non-interactive when isReady is false
+ * 
+ * ## Future Enhancement Areas:
+ * - Photo thumbnails in LazyHorizontalGrid section
+ * - Activity indicators or mood visualization
+ * - Progress indicators for partially generated rewinds
+ * 
+ * @param id Unique identifier for the rewind
+ * @param label Short descriptive label for the time period
+ * @param title Main title describing the rewind theme or highlights
+ * @param start Start date of the rewind period
+ * @param end End date of the rewind period
+ * @param onOpenRewind Callback invoked when the card is tapped
+ * @param modifier Modifier for customizing card appearance and behavior
+ * @param isReady Whether the rewind is fully processed and viewable
+ */
 @Composable
 internal fun RewindCard(
     id: Uuid,
@@ -41,18 +79,18 @@ internal fun RewindCard(
     title: String,
     start: LocalDate,
     end: LocalDate,
-    onOpenRewind: RewindOpenCallback,
+    onOpenRewind: RewindOpenCallback, // TODO: Make generic id-less callback
     modifier: Modifier = Modifier,
     isReady: Boolean = false,
 ) {
     Column(
         modifier = modifier
+            .fillMaxWidth()
             .background(
                 MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.shapes.medium
             )
             .padding(Spacing.lg)
-            .clickable(isReady) { onOpenRewind(id) }
-            .widthIn(min = 360.dp),
+            .clickable(isReady) { onOpenRewind(id) },
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
         horizontalAlignment = Alignment.Start,
     ) {
@@ -99,6 +137,31 @@ private fun RewindCardPreview() {
     }
 }
 
+/**
+ * A loading placeholder card that appears while rewind data is being fetched or processed.
+ * 
+ * This placeholder maintains the same visual structure as a real rewind card but uses
+ * animated shimmer effects to indicate loading state. It helps maintain layout stability
+ * and provides visual feedback about ongoing background processes.
+ * 
+ * ## Animation Design:
+ * - **Shimmer Effect**: Subtle alpha animation (0.5f to 0.8f) with reverse repeat
+ * - **Duration**: 1 second cycle with keyframe at 500ms for smooth motion
+ * - **Color**: Uses secondary color with animated alpha for subtle effect
+ * - **Shape**: Matches real card structure with placeholder boxes
+ * 
+ * ## Layout Consistency:
+ * - **Dimensions**: Matches real card sizing and spacing
+ * - **Colors**: Uses same secondaryContainer background as real cards
+ * - **Structure**: Mimics title and subtitle layout with appropriately sized boxes
+ * 
+ * ## UX Benefits:
+ * - **Perceived Performance**: Makes loading feel faster than empty states
+ * - **Layout Stability**: Prevents content jumping when real data loads
+ * - **Visual Continuity**: Maintains card grid structure during transitions
+ * 
+ * @param modifier Modifier for customizing the placeholder card appearance
+ */
 @Composable
 fun RewindCardPlaceholder(
     modifier: Modifier = Modifier,
@@ -164,32 +227,99 @@ private fun RewindCardPlaceholderPreview() {
 }
 
 
+/**
+ * Types of content blocks that can appear within a rewind card.
+ * 
+ * These enum values represent different kinds of rich content that could be displayed
+ * in the future rewind card implementations.
+ */
 enum class RewindBlockType {
+    /** Image content block for photos and visual memories */
     Image,
+    /** Location content block for places visited during the rewind period */
     Place,
 }
 
+/**
+ * Sealed class hierarchy for different types of content blocks within rewind cards.
+ * 
+ * This extensible design allows for future enhancement of rewind cards with rich media
+ * content, location information, and other contextual elements.
+ * 
+ * ## Future Implementation:
+ * These blocks are intended for the LazyHorizontalGrid section of rewind cards,
+ * providing thumbnail previews of the week's content.
+ * 
+ * @param type The category of content this block represents
+ */
 sealed class RewindCardBlock(
     val type: RewindBlockType,
 ) {
+    /**
+     * A content block representing an image from the rewind period.
+     * 
+     * @param uri The URI reference to the image content
+     */
     data class ImageBlock(val uri: Uri) : RewindCardBlock(RewindBlockType.Image)
+    
+    /**
+     * A content block representing a significant location from the rewind period.
+     * 
+     * @param place The name or description of the location
+     */
     data class PlaceBlock(val place: String) : RewindCardBlock(RewindBlockType.Place)
 }
 
+/**
+ * Composable for rendering individual content blocks within rewind cards.
+ * 
+ * This is a placeholder implementation for future rich content display within
+ * the rewind card's horizontal grid section.
+ * 
+ * ## Future Implementation:
+ * - **ImageBlock**: Thumbnail with rounded corners and overlay effects
+ * - **PlaceBlock**: Location chip with icon and place name
+ * 
+ * @param block The content block data to render
+ */
 @Composable
 fun GridItem(block: RewindCardBlock) {
     when (block) {
         is RewindCardBlock.ImageBlock -> {
-
+            // TODO: Implement image thumbnail with loading states
         }
 
         is RewindCardBlock.PlaceBlock -> {
+            // TODO: Implement location chip with place name and icon
         }
     }
 }
 
 /**
- * Callback for when a rewind is opened.
+ * Callback function type for handling rewind card interactions.
+ * 
+ * This callback is invoked when a user taps on an available rewind card to open
+ * the detailed rewind view. The callback receives the unique identifier of the
+ * selected rewind for navigation and data fetching purposes.
+ * 
+ * ## Usage Pattern:
+ * ```kotlin
+ * RewindScreenContent(
+ *     state = uiState,
+ *     onOpenRewind = { rewindId ->
+ *         // Navigate to detailed rewind view
+ *         navController.navigate("rewind/$rewindId")
+ *     }
+ * )
+ * ```
+ * 
+ * ## Navigation Contract:
+ * The receiving implementation should handle:
+ * - Navigation to the detailed rewind view
+ * - Loading of specific rewind data
+ * - Error handling for invalid or missing rewind IDs
+ * 
+ * @param rewindId The unique identifier of the rewind to open
  */
 @OptIn(ExperimentalUuidApi::class)
 typealias RewindOpenCallback = (rewindId: Uuid) -> Unit

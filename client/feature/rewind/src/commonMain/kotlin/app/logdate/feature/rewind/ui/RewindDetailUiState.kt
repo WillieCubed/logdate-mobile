@@ -1,65 +1,55 @@
 package app.logdate.feature.rewind.ui
 
+/**
+ * UI state for the rewind detail screen.
+ * 
+ * This sealed interface represents the various states the rewind detail view can be in,
+ * including loading, success with panels, and error states.
+ */
 sealed interface RewindDetailUiState {
+    /**
+     * Loading state while rewind data is being fetched.
+     */
     data object Loading : RewindDetailUiState
+    
+    /**
+     * Success state with loaded rewind panels.
+     * 
+     * @property panels List of panel UI states to display in the story
+     */
     data class Success(
         val panels: List<RewindPanelUiState> = listOf(),
     ) : RewindDetailUiState
 
-    data class Error(
-        val type: String,
-        val message: String,
-    ) : RewindDetailUiState
+    /**
+     * Error states for the rewind detail screen.
+     * Using a sealed interface for type-safe, localizable error handling.
+     */
+    sealed interface Error : RewindDetailUiState {
+        /**
+         * Error when no rewind has been selected yet.
+         */
+        data object RewindNotSelected : Error
+        
+        /**
+         * Error when the rewind exists but has no content to display.
+         */
+        data object EmptyContent : Error
+        
+        /**
+         * Error when the rewind could not be loaded due to a general error.
+         */
+        data object LoadingFailed : Error
+        
+        /**
+         * Error when the rewind could not be found.
+         */
+        data object RewindNotFound : Error
+    }
 }
 
+/**
+ * Extension property to get the total number of panels in a success state.
+ */
 val RewindDetailUiState.Success.totalPanels
     get() = panels.size
-
-/**
- * UI state representing some part of a Rewind.
- */
-sealed interface RewindPanelUiState
-
-data class BasicTextRewindPanelUiState(
-    val text: String,
-    val background: RewindPanelBackgroundSpec,
-) : RewindPanelUiState
-
-/**
- * UI state representing a panel with a title and subtitle.
- *
- * @param title The title of the panel.
- * @param subtitle The subtitle of the panel.
- * @param backgroundUri The URI of the background image for the panel.
- */
-data class SubtitledRewindPanelUiState(
-    val title: String,
-    val subtitle: String,
-    val backgroundUri: String? = null,
-) : RewindPanelUiState
-
-data class BigStatisticRewindPanelUiState(
-    val title: String,
-    val statistic: Number,
-    val units: String,
-    val description: String,
-    val background: RewindPanelBackgroundSpec,
-) : RewindPanelUiState
-
-
-/**
- * Information about the background of a panel.
- *
- * @param uri The URI of the background image. If null, the panel should use a solid color.
- * @param color The color of the panel background.
- */
-data class RewindPanelBackgroundSpec(
-    val uri: String? = null,
-    val color: Int? = null,
-)
-
-/**
- * Whether the panel should use a background image.
- */
-val RewindPanelBackgroundSpec.useBackgroundImage
-    get() = uri != null

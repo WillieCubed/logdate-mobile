@@ -1,0 +1,1 @@
+package app.logdate.feature.rewind.ui.detail
