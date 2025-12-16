@@ -26,4 +26,11 @@ sealed class RewindQueryResult {
      * a Rewind was requested for a time before the user was using the app.
      */
     data object NoneAvailable : RewindQueryResult()
+    
+    /**
+     * Indicates that a [Rewind] is currently being generated for the requested time period.
+     * 
+     * The UI should display a loading indicator when this state is returned.
+     */
+    data object Generating : RewindQueryResult()
 }

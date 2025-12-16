@@ -31,11 +31,11 @@ class GetWeekRewindUseCase(
     operator fun invoke(
         weekStart: DayOfWeek = DayOfWeek.SUNDAY, // Grrr, why is this not a Monday?
     ): Flow<RewindQueryResult> {
-        val timezone = TimeZone.Companion.currentSystemDefault()
+        val timezone = TimeZone.currentSystemDefault()
         val now = Clock.System.todayIn(timezone)
         val startOfWeek = now.minus(
             (now.dayOfWeek.ordinal - weekStart.ordinal + 7) % 7,
-            DateTimeUnit.Companion.DAY,
+            DateTimeUnit.DAY,
         )
         val endOfWeek = now
 
