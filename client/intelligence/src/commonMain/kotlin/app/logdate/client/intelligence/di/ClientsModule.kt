@@ -10,8 +10,8 @@ import org.koin.dsl.module
  */
 val clientsModule: Module = module {
     single<GenerativeAIChatClient> {
-        // TODO: Load API key from configuration
-        val apiKey = "***REMOVED***"
+        val apiKey = getKoin().getProperty<String>("OPENAI_API_KEY")
+            ?: error("OPENAI_API_KEY is not configured")
         OpenAiClient(apiKey, get())
     }
 }
