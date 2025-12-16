@@ -6,15 +6,21 @@ import androidx.room.Query
 import androidx.room.Upsert
 import app.logdate.client.database.entities.JournalEntity
 import kotlinx.coroutines.flow.Flow
+import kotlin.uuid.Uuid
 
 /**
  * Data access object for journals.
+ * 
+ * All journal IDs are now represented as UUID strings.
  */
 @Dao
 interface JournalDao {
 
     @Query("SELECT * FROM journals WHERE id = :id")
-    fun observeJournalById(id: String): Flow<JournalEntity>
+    fun observeJournalById(id: Uuid): Flow<JournalEntity>
+    
+    @Query("SELECT * FROM journals WHERE id = :id")
+    suspend fun getJournalById(id: Uuid): JournalEntity?
 
     @Query("SELECT * FROM journals")
     fun observeAll(): Flow<List<JournalEntity>>
@@ -24,15 +30,13 @@ interface JournalDao {
 
     /**
      * Creates a new journal.
-     *
-     * @return The row ID of the created journal.
      */
     @Insert
-    suspend fun create(journal: JournalEntity): Long
+    suspend fun create(journal: JournalEntity)
 
     @Upsert
     suspend fun update(journal: JournalEntity)
 
     @Query("DELETE FROM journals WHERE id = :journalId")
-    suspend fun delete(journalId: String)
+    suspend fun delete(journalId: Uuid)
 }
