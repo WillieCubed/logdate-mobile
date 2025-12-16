@@ -10,37 +10,58 @@ Companion application for Wear OS devices that provides quick journaling capabil
 
 **🚀 Active Development**: Basic functionality implemented with modern Material 3 for Wear OS.
 
+## Key Components
+
+### Entry Points
+- **MainActivity.kt** - Main application activity
+- **MainComplicationService.kt** - Watch face complication provider
+- **MainTileService.kt** - Quick access tile implementation
+
+### UI Components
+- **Theme.kt** - Material 3 for Wear OS theming
+
 ## Technology Stack
 
 - **Material 3 for Wear OS**: Modern, expressive UI components designed specifically for wearables
 - **Compose for Wear OS**: Declarative UI framework optimized for watch form factors
 - **Dynamic Color**: Adapts to watch faces and system themes for cohesive visual integration
+- **Horologist**: Specialized Compose components for Wear OS
+- **Wear Tiles API**: For quick access tiles
 
-## Getting Started
+## Build and Installation
 
 To build and run the Wear OS app:
 
 ```bash
+# Build debug APK
+./gradlew :app:wear:assembleDebug
+
+# Install on connected Wear OS device/emulator
 ./gradlew :app:wear:installDebug
 ```
 
-To test on the emulator, ensure you've set up a Wear OS emulator in Android Studio.
+For testing:
+- Basic UI testing can be done on the emulator
+- **Note**: Voice input and microphone features require a physical Wear OS device for testing
+- Health Services integration also requires physical hardware
 
-## Planned Features
+## Features
 
-### Core Functionality
+### Implemented Features
+- Basic Material 3 UI for Wear OS
+- Core application structure
+
+### Planned Features
 - Quick note creation with voice-to-text
 - Recent entries viewing
 - Simple text input for brief entries
 - Sync with main phone application
-
-### Wear OS Specific Features
 - Watch complications for quick access
 - Haptic feedback for interactions
 - Gesture-based navigation
 - Always-on display support
 
-### Health Integration
+### Health Integration (Future)
 - Automatic activity logging
 - Heart rate context for entries
 - Steps and exercise correlation
@@ -51,17 +72,27 @@ To test on the emulator, ensure you've set up a Wear OS emulator in Android Stud
 ```
 Wear App
 ├── UI Layer (Compose for Wear)
+│   ├── Main Activity
+│   ├── Note Creation Screen
+│   └── Entry List Screen
 ├── ViewModel Layer
+│   ├── Entry ViewModel
+│   └── Sync ViewModel
 ├── Local Data Cache
+│   ├── Room Database
+│   └── DataStore Preferences
 └── Sync with Phone App
+    ├── Data Layer API
+    └── Message Passing
 ```
 
-## Dependencies (Planned)
+## Dependencies
 
 ### Wear OS
-- Compose for Wear
+- Compose for Wear OS
 - Wear OS Health Services
-- Wear Input Libraries
+- Horologist Compose components
+- Wear Input libraries
 
 ### Communication
 - Data Layer API for phone sync
@@ -78,20 +109,22 @@ Wear App
 - Minimal UI for battery efficiency
 - Aggressive data caching
 - Smart sync scheduling
+- Low animation overhead
 
 ### User Experience
 - Large touch targets
 - Clear visual hierarchy
 - Voice-first interactions
 - Quick gestures
+- Minimalist design
 
-## Implementation TODOs
+## Implementation Roadmap
 
 ### Phase 1: Basic Functionality
 - [x] Set up Compose for Wear UI framework
 - [x] Implement Material 3 theming
 - [ ] Implement basic note creation screen
-- [ ] Add voice-to-text integration
+- [ ] Add voice-to-text integration (requires physical device for testing)
 - [ ] Create simple entry list view
 - [ ] Implement data sync with phone app
 
@@ -103,7 +136,7 @@ Wear App
 - [ ] Implement always-on display optimization
 
 ### Phase 3: Health & Context
-- [ ] Integrate health data (heart rate, steps)
+- [ ] Integrate health data (heart rate, steps) - requires physical device
 - [ ] Add activity recognition for auto-logging
 - [ ] Implement location context for entries
 - [ ] Add mood tracking with health correlation
@@ -123,17 +156,20 @@ Wear App
 - Optimize for glanceable information
 - Minimize interaction steps
 - Support both touch and voice input
+- Use high contrast for outdoor visibility
 
 ### Performance Guidelines
 - Keep UI animations under 16ms
 - Minimize background processing
 - Use efficient data structures
 - Implement smart caching strategies
+- Limit network requests
 
 ## Testing Strategy
 
 - [ ] Unit tests for business logic
-- [ ] Wear OS emulator testing
-- [ ] Physical device testing on multiple form factors
+- [ ] Wear OS emulator testing for basic UI
+- [ ] Physical device testing for voice input and sensors
+- [ ] Testing across different watch form factors (round, square)
 - [ ] Battery life impact testing
 - [ ] Sync reliability testing

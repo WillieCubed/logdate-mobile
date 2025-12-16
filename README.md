@@ -40,7 +40,7 @@ Each module contains detailed documentation in its respective `README.md` file:
 
 ### App Modules
 - [`:app:compose-main`](app/compose-main/README.md) - Main cross-platform application
-- [`:app:wear`](app/wear/README.md) - Wear OS companion app
+- [`:app:wear`](app/wear/README.md) - Wear OS companion app with Material 3 UI
 
 ### Client Infrastructure
 - [`:client:database`](client/database/README.md) - Local data persistence with Room
@@ -75,6 +75,7 @@ Each module contains detailed documentation in its respective `README.md` file:
 - **Room Database**: Local data persistence
 - **Ktor Client**: HTTP networking
 - **Koin**: Dependency injection
+- **Napier**: Multiplatform logging solution
 
 ### Backend
 - **Ktor Server**: Web framework
@@ -92,8 +93,11 @@ Each module contains detailed documentation in its respective `README.md` file:
 - Android Studio (latest stable)
 - JDK 17 or higher
 - Xcode (for iOS development)
+- Docker and Docker Compose (for server development)
 
-### Setup
+### Quick Start with Docker
+
+The fastest way to get the LogDate server running locally:
 
 1. **Clone the repository**
    ```bash
@@ -101,12 +105,48 @@ Each module contains detailed documentation in its respective `README.md` file:
    cd logdate
    ```
 
-2. **Configure API keys**
+2. **Start the development environment**
+   ```bash
+   # Quick start (recommended)
+   ./scripts/dev-start.sh
+   
+   # Start with development tools
+   ./scripts/dev-start.sh --with-tools
+   
+   # Or manually with docker-compose
+   docker-compose up logdate-postgres logdate-redis -d
+   ```
+
+3. **Run the server**
+   ```bash
+   # Option 1: Run with Docker (full containerized setup)
+   docker-compose --profile full-stack up
+   
+   # Option 2: Run locally (connect to containerized database)  
+   export DATABASE_URL="jdbc:postgresql://localhost:15432/logdate"
+   ./gradlew :server:run
+   ```
+
+4. **Access the application**
+   - **Server API**: http://localhost:18080 (Docker) or http://localhost:8080 (local)
+   - **Database**: localhost:15432 (logdate/logdate)
+   - **Redis**: localhost:16379
+   - **PgAdmin**: http://localhost:15050 (admin@logdate.app/admin)
+   - **Redis Commander**: http://localhost:18081
+
+### Manual Setup (Alternative)
+
+If you prefer to set up dependencies manually:
+
+1. **Configure API keys**
    Create a `local.properties` file in the project root:
    ```properties
    metaAppId=<your-meta-app-id>
    apiKeys.googleMaps=<your-google-maps-api-key>
    ```
+
+2. **Database Setup**
+   Follow the [server database documentation](server/DATABASE.md) for PostgreSQL setup.
 
 3. **Firebase Setup**
    - Follow the [Firebase documentation](https://firebase.google.com/docs/android/setup)
@@ -121,7 +161,20 @@ Each module contains detailed documentation in its respective `README.md` file:
 
 From the project root, you can use these Gradle tasks:
 
-### Building
+### Server Development
+```bash
+# Start with Docker Compose (recommended)
+docker-compose up postgres redis -d
+./gradlew :server:run
+
+# Full Docker environment
+docker-compose --profile full-stack up
+
+# Server only (manual database setup required)
+./gradlew :server:run
+```
+
+### Client Applications
 ```bash
 # Build Android app
 ./gradlew :app:compose-main:assembleDebug
@@ -129,20 +182,20 @@ From the project root, you can use these Gradle tasks:
 # Build and install Android app
 ./gradlew :app:compose-main:installDebug
 
+# Build and install Wear OS app
+./gradlew :app:wear:installDebug
+
 # Run Desktop app
 ./gradlew :app:compose-main:run
 ```
 
 ### Testing
 ```bash
-# Run all tests
+# Run all project tests
 ./gradlew test
 
-# Run specific module tests
-./gradlew :client:database:test
-
-# Run tests for specific class
-./gradlew :client:domain:test --tests "GetJournalsUseCaseTest"
+# Run single test
+./gradlew :module:test --tests "package.TestClass.testMethod"
 ```
 
 ### Code Quality
@@ -152,6 +205,47 @@ From the project root, you can use these Gradle tasks:
 
 # Generate documentation
 ./gradlew dokkaHtmlMultiModule
+```
+
+### Docker Commands
+
+**Convenience Scripts (Recommended):**
+```bash
+# Start development environment
+./scripts/dev-start.sh
+
+# Start with development tools (PgAdmin, Redis Commander) 
+./scripts/dev-start.sh --with-tools
+
+# Check status of all services
+./scripts/dev-status.sh
+
+# View logs
+./scripts/dev-logs.sh [service-name]
+
+# Stop services (keeps data)
+./scripts/dev-stop.sh
+
+# Stop and remove all data
+./scripts/dev-stop.sh --clean
+
+# Reset environment (stop, clean, restart)
+./scripts/dev-reset.sh
+```
+
+**Manual Docker Compose:**
+```bash
+# Development database only
+docker-compose up logdate-postgres logdate-redis -d
+
+# With development tools
+docker-compose --profile tools up -d
+
+# Production build
+docker build --target production -t logdate-server .
+
+# Clean up (removes containers and volumes)
+docker-compose down -v
 ```
 
 ## 📖 Documentation
@@ -191,6 +285,7 @@ Each module contains detailed documentation covering:
 - **Native Feel**: Platform-appropriate UI and interactions
 - **Performance**: Optimized for each platform's constraints
 - **Integration**: Deep integration with platform services
+- **Wear OS**: Material 3 Expressive design for optimal wearable experience
 
 ## 🔄 Data Flow
 
@@ -205,9 +300,9 @@ Each module contains detailed documentation covering:
 │  Compose    │    │ Use Cases   │    │ Repository  │
 │   Views     │    │ & Entities  │    │    Impl     │
 └─────────────┘    └─────────────┘    └─────────────┘
-                                             │
-                          ┌─────────────────────┼─────────────────────┐
-                          ▼                     ▼                     ▼
+                                              │
+                          ┌───────────────────┼───────────────────┐
+                          ▼                   ▼                   ▼
                    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
                    │   Local     │    │   Remote    │    │    Cache    │
                    │  Database   │    │     API     │    │   Layer     │

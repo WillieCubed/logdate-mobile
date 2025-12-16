@@ -96,6 +96,89 @@ val people = extractor.extractPeople(
 - Background processing for non-critical features
 - Rate limiting compliance
 
+## Testing
+
+### Test Coverage
+The intelligence module has comprehensive unit tests covering all core functionality:
+
+#### EntrySummarizer Tests (`EntrySummarizerTest.kt`)
+- **10 test cases** covering:
+  - Summary generation with various text inputs
+  - Caching behavior (cache hits, misses, forced refresh)
+  - Error handling and fallback responses
+  - AI client integration and prompt validation
+  - Edge cases (empty text, null responses, long text)
+
+#### PeopleExtractor Tests (`PeopleExtractorTest.kt`)
+- **13 test cases** covering:
+  - Name extraction from various text formats
+  - Complex names (titles, compound names, international names)
+  - Caching and response processing
+  - Edge cases (empty input, whitespace handling)
+  - System prompt validation
+
+#### OpenAI Client Tests (`OpenAiClientTest.kt`)
+- **10 test cases** covering:
+  - Data structure serialization and conversion
+  - Message format transformation
+  - Request/response object validation
+  - Type-safe API integration
+
+#### Text Processing Accuracy (`TextProcessingAccuracyTest.kt`)
+- **8 integration test scenarios** with realistic journal content:
+  - Daily life entries with social interactions
+  - Work meetings and professional contexts
+  - Family gatherings and relationships
+  - Travel entries with international names
+  - Medical appointments with titles
+  - Large social events with many people
+  - Emotional entries requiring context preservation
+  - Achievement entries capturing positive sentiment
+
+### Test Infrastructure
+
+#### Fake Implementations
+- **`FakeGenerativeAICache`**: Complete cache simulation with call tracking
+- **`FakeGenerativeAIChatClient`**: Configurable AI client for deterministic testing
+- **Features**: Error simulation, response customization, call verification
+
+#### Testing Patterns
+- **Coroutine Testing**: Uses `StandardTestDispatcher` for deterministic async behavior
+- **Response Mocking**: Configurable AI responses for different test scenarios
+- **Edge Case Coverage**: Empty inputs, malformed responses, network errors
+- **Integration Testing**: End-to-end workflows with realistic data
+
+### Running Tests
+
+```bash
+# Run all intelligence module tests
+./gradlew :client:intelligence:test
+
+# Test output shows comprehensive coverage
+# 43 tests completed successfully
+```
+
+### Test Data Quality
+
+The tests use realistic journal entry scenarios including:
+- **Professional Context**: "Today's quarterly review meeting was intense..."
+- **Family Events**: "Sunday dinner at Grandma's house was wonderful..."
+- **Travel Experiences**: "First day in Tokyo was incredible!"
+- **Medical Appointments**: "Had my annual checkup with Dr. Sarah Mitchell..."
+- **Social Gatherings**: "Birthday party for Rachel was a blast!"
+
+Each scenario validates:
+- **Accuracy**: Correct extraction of people's names and relationships
+- **Context Preservation**: Maintaining important contextual information
+- **Edge Cases**: Handling of various text formats and edge conditions
+- **Performance**: Efficient processing and caching behavior
+
+### Test Quality Metrics
+- **Unit Test Coverage**: All public APIs tested
+- **Integration Coverage**: Realistic end-to-end workflows
+- **Error Coverage**: Network failures, malformed responses, edge cases
+- **Performance Testing**: Caching efficiency and response handling
+
 ## TODOs
 
 ### Core AI Features

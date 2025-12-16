@@ -1,10 +1,16 @@
 # `:server`
 
-**Backend API and services using Ktor**
+**Self-hostable backend API and services using Ktor**
 
 ## Overview
 
-Ktor-based server providing API endpoints, data synchronization services, and backend functionality for the LogDate application. Handles user authentication, data storage, and cross-device synchronization.
+Ktor-based server providing API endpoints, data synchronization services, and backend functionality for the LogDate application. Designed to be easily containerizable and self-hostable, allowing users to run their own instance of LogDate Cloud with full data ownership and privacy control.
+
+**Key Design Principles:**
+- **Self-hostable**: Complete Docker containerization for easy deployment
+- **Privacy-first**: Users maintain full control over their data
+- **Cloud-optional**: Can run entirely offline or with minimal cloud dependencies
+- **Configuration-driven**: Flexible configuration for different deployment scenarios
 
 ## Architecture
 
@@ -61,6 +67,31 @@ Server Module
 - CDN integration
 - File versioning
 - Storage quota management
+
+## Development
+
+### Running Tests
+```bash
+# Run all server tests
+./gradlew :server:test
+
+# Run specific test classes
+./gradlew :server:test --tests "app.logdate.server.passkeys.*"
+./gradlew :server:test --tests "app.logdate.server.routes.*"
+./gradlew :server:test --tests "app.logdate.server.auth.*"
+
+# Run individual test
+./gradlew :server:test --tests "app.logdate.server.passkeys.PasskeyServiceTest.generateRegistrationOptions creates valid options"
+
+# Test compilation only (useful when main code has issues)
+./gradlew :server:compileTestKotlin
+```
+
+### Available Test Suites
+- **Passkey Tests**: WebAuthn authentication, challenge validation, credential verification
+- **Route Tests**: HTTP endpoint integration tests, request/response validation
+- **Auth Tests**: Account creation workflows, session management
+- **Security Tests**: WebAuthn compliance, security constraint validation
 
 ## Dependencies
 
@@ -139,21 +170,34 @@ Response Formatting
 - Audit logging
 - Privacy policy enforcement
 
-## Deployment
+## Deployment Options
 
-### Infrastructure
-- Docker containerization
-- Kubernetes orchestration
-- Load balancing
-- Auto-scaling configuration
-- Health checks and monitoring
+### Self-Hosted Deployment (Recommended)
+- **Docker Compose**: Single-file deployment for individuals
+- **Docker Swarm**: Multi-node deployment for small teams
+- **Kubernetes**: Enterprise-grade orchestration
+- **Direct Installation**: Native deployment on Linux/macOS/Windows
+
+### Cloud Deployment (Optional)
+- Google Cloud Run (recommended for managed hosting)
+- AWS ECS/Fargate
+- Azure Container Instances
+- Any container-compatible hosting provider
+
+### Containerization
+```dockerfile
+# Multi-stage build for optimized container size
+FROM gradle:7-jdk17 AS build
+FROM eclipse-temurin:17-jre-alpine AS runtime
+# Optimized for self-hosting with minimal dependencies
+```
 
 ### Environment Management
-- Development/staging/production environments
-- Configuration management
-- Secret management
-- Database migrations
-- Blue-green deployments
+- **Configuration**: Environment variables and config files
+- **Secrets**: Local file-based or external secret managers
+- **Database**: Embedded SQLite for single-user or PostgreSQL for multi-user
+- **Storage**: Local filesystem or S3-compatible storage
+- **AI Services**: Optional integration with local or cloud AI providers
 
 ## Monitoring & Observability
 

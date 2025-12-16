@@ -65,10 +65,14 @@ Editor Feature
 - Media organization and management
 
 ### Auto-Save & Drafts
-- Real-time auto-save functionality
-- Draft management system
-- Offline editing support
-- Conflict resolution for concurrent edits
+- **Intelligent Auto-Save**: Debounced saving (2s after typing stops)
+- **Periodic Backup Saves**: Every 30 seconds to prevent data loss
+- **Robust Error Handling**: Exponential backoff retry logic for failed saves
+- **Draft Management**: Automatic draft creation, update, and cleanup
+- **Content Change Detection**: Smart detection of meaningful content changes
+- **Visual Feedback**: Save indicators to show draft status
+- **Offline Support**: Full offline editing with local draft storage
+- **Draft Recovery**: Automatic loading of recent drafts on editor restart
 
 ## Platform-Specific Features
 
@@ -116,6 +120,23 @@ Editor State
 └─────────────┴─────────────┴─────────────┘
 ```
 
+### Auto-Save Flow
+```
+User Input/Content Change
+    ↓
+Content Change Detection (with block type prefixes)
+    ↓
+Debounced Auto-Save (2s delay)
+    ↓
+Draft Create/Update (with error handling)
+    ↓
+Local Storage (via LocalEntryDraftStore)
+    ↓
+Visual Feedback (save indicator)
+    ↓
+Periodic Backup Save (every 30s)
+```
+
 ### Block System Flow
 ```
 User Input
@@ -124,7 +145,7 @@ Block Type Detection
     ↓
 Content Processing
     ↓
-Auto-Save
+State Update (triggers auto-save)
     ↓
 Draft Storage
 ```
@@ -154,6 +175,9 @@ navController.navigate(
 ## TODOs
 
 ### Core Editor Features
+- [x] **Auto-saving drafts functionality** (✅ Completed)
+- [x] **Debounced auto-save with retry logic** (✅ Completed) 
+- [x] **Draft management and cleanup** (✅ Completed)
 - [ ] Add collaborative real-time editing
 - [ ] Implement voice-to-text integration
 - [ ] Add more block types (tables, code blocks, drawings)
@@ -184,10 +208,11 @@ navController.navigate(
 - [ ] Implement writing prompts and suggestions
 
 ### Performance & Reliability
+- [x] **Implement background saving optimization** (✅ Completed)
+- [x] **Add auto-save error handling and retry logic** (✅ Completed)
 - [ ] Optimize editor performance for large entries
 - [ ] Implement efficient image compression
 - [ ] Add editor crash recovery
-- [ ] Implement background saving optimization
 - [ ] Add editor performance monitoring
 - [ ] Implement memory usage optimization
 - [ ] Add editor testing automation

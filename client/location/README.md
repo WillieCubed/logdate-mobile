@@ -111,6 +111,23 @@ val currentPlace = places.firstOrNull { it.isWithinBounds(location) }
 - **Manual Location**: User-specified locations
 - **Time Zone Detection**: Automatic time zone updates
 
+## Known Issues
+
+### Location Logging Failures
+- **Silent failures**: When location logging fails permanently (after 5 retry attempts), users are never notified
+- **Data loss**: Failed location logs result in permanent loss of location context for journal entries
+- **No user feedback**: Users have no visibility into retry status or permanent failures
+- **No manual recovery**: No option for users to manually trigger location capture for failed entries
+- **Non-persistent retries**: Pending location retries are lost if the app is killed or restarted
+
+### Recommended Improvements
+- [ ] Add UI indicators for location retry status
+- [ ] Implement user notifications for permanent location logging failures
+- [ ] Add manual location tagging as fallback option
+- [ ] **Implement persistent retry queue**: Database-backed retry queue that survives app restarts and device reboots
+- [ ] Implement graceful degradation with lower-accuracy location sources
+- [ ] Add settings to configure retry behavior and user preferences
+
 ## TODOs
 
 ### Core Location Features

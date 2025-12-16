@@ -22,8 +22,8 @@ Data Layer
 ### Repository Implementations
 - `OfflineFirstJournalRepository.kt` - Journal data management
 - `OfflineFirstJournalNotesRepository.kt` - Notes data management
-- `OfflineFirstEntryDraftRepository.kt` - Draft management
-- `LocalEntryDraftStore.kt` - Local draft storage
+- `OfflineFirstEntryDraftRepository.kt` - **Enhanced draft management with auto-save**
+- `LocalEntryDraftStore.kt` - **Platform-agnostic draft storage interface**
 
 ### Data Sources
 - `FirebaseRemoteJournalDataSource.kt` - Remote data sync
@@ -34,6 +34,13 @@ Data Layer
 - `JournalObjectMappers.kt` - Journal entity conversions
 - `NoteObjectMappers.kt` - Note entity conversions
 - Domain ↔ Entity ↔ Network model conversions
+
+### Draft Management
+- **OfflineFirstEntryDraftRepository**: In-memory StateFlow + persistent storage
+- **LocalEntryDraftStore**: Platform-agnostic storage interface
+- **Automatic draft lifecycle**: Create → Update → Delete on save
+- **Real-time reactivity**: StateFlow-based draft state management
+- **Error resilience**: Graceful handling of storage failures
 
 ### Knowledge Management
 - People and entity extraction
@@ -59,6 +66,7 @@ Data Layer
 - Lazy loading for large datasets
 - Pagination support
 - Memory-efficient data handling
+- **Optimized draft operations** with in-memory StateFlow caching
 
 ## Dependencies
 
@@ -76,15 +84,53 @@ Data Layer
 ## Data Flow
 
 ```
-UI Layer
+UI Layer (Editor)
     ↓
 Repository (this module)
     ↓
-┌─────────────┬─────────────┐
-│ Local DB    │ Remote API  │
-│ (primary)   │ (sync)      │
-└─────────────┴─────────────┘
+┌─────────────┬─────────────┬─────────────┐
+│ Local DB    │ Remote API  │ Draft Store │
+│ (primary)   │ (sync)      │ (auto-save) │
+└─────────────┴─────────────┴─────────────┘
 ```
+
+### Draft Data Flow
+```
+Editor Content Change
+    ↓
+OfflineFirstEntryDraftRepository
+    ↓
+┌─────────────┬─────────────┐
+│ StateFlow   │ Local Store │
+│ (memory)    │ (persistent)│
+└─────────────┴─────────────┘
+    ↓
+Draft State Updates (Reactive)
+```
+
+## Testing
+
+This module includes comprehensive test coverage for all repository implementations:
+
+```bash
+# Run all data module tests
+./gradlew :client:data:test
+
+# Run tests with detailed output
+./gradlew :client:data:test --continue --info
+
+# Run specific test class
+./gradlew :client:data:test --tests "OfflineFirstJournalRepositoryTest"
+
+# Run tests by platform
+./gradlew :client:data:testDebugUnitTest    # Android
+./gradlew :client:data:jvmTest             # JVM/Desktop
+```
+
+### Test Coverage
+- **OfflineFirstJournalRepositoryTest**: Journal CRUD operations, draft management
+- **OfflineFirstJournalNotesRepositoryTest**: Note creation, pagination, filtering
+- **OfflineFirstEntryDraftRepositoryTest**: Draft lifecycle, persistence, error handling
 
 ## Platform Support
 
@@ -102,6 +148,9 @@ Repository (this module)
 - [ ] Implement sync bandwidth management
 
 ### Data Management
+- [x] **Enhanced draft repository with reactive StateFlow** (✅ Completed)
+- [x] **Automatic draft cleanup after save** (✅ Completed)
+- [x] **Robust draft error handling** (✅ Completed)
 - [ ] Add data encryption for sensitive content
 - [ ] Implement data compression for large entries
 - [ ] Add data validation and integrity checks

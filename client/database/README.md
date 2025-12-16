@@ -144,6 +144,9 @@ suspend fun getJournalsPaginated(limit: Int, offset: Int): List<JournalEntity>
 - Automated migration tests verify data integrity
 - Test migrations with production-like data volumes
 - Rollback strategies for failed migrations
+- Individual migration tests for each version (5→6, 6→7, 7→8, 8→9, 9→10)
+- Complete migration chain testing (5→10) for full data integrity
+- Real database instance testing on Android platform
 
 ## Performance Considerations
 
@@ -158,6 +161,51 @@ suspend fun getJournalsPaginated(limit: Int, offset: Int): List<JournalEntity>
 - Use `@Relation` for efficient related data loading
 - Implement pagination for large result sets
 - Cache frequently accessed data
+
+## Testing
+
+### Test Structure
+The database module includes comprehensive testing across different test source sets:
+
+#### CommonTest (`src/commonTest/`)
+- **Structural Tests**: Database configuration, schema validation, entity structure
+- **Migration Definition Tests**: Verify migration definitions are properly configured
+- **Type Converter Tests**: Test data conversion logic
+- **Limitations**: Cannot test actual DAO operations (requires platform-specific SQLite instances)
+
+#### AndroidInstrumentedTest (`src/androidInstrumentedTest/`)
+- **DAO Integration Tests**: Full CRUD operations with real Room database instances
+- **Migration Integration Tests**: Data integrity verification across database versions
+- **Database Performance Tests**: Query performance and optimization validation
+- **Full Database Lifecycle Tests**: Complete database operations with real data
+
+### Running Tests
+
+#### Common Tests (Structure/Configuration)
+```bash
+./gradlew :client:database:test
+```
+
+#### Android Instrumented Tests (Full DAO Functionality)
+```bash
+./gradlew :client:database:connectedAndroidTest
+```
+
+#### All Tests
+```bash
+./gradlew :client:database:test :client:database:connectedAndroidTest
+```
+
+### Test Coverage
+- **DAO Operations**: All CRUD operations, complex queries, relationships
+- **Migration Testing**: Every migration path (5→6, 6→7, 7→8, 8→9, 9→10, 5→10)
+- **Data Integrity**: User data preservation across schema changes
+- **Error Handling**: Database operation failures, constraint violations
+- **Performance**: Query efficiency, large dataset handling
+- **Relationships**: Foreign key constraints, cascading operations
+
+### Critical Testing Focus
+Database tests prioritize **data integrity** since the module handles user data that must be preserved across app updates and database migrations. All migration paths are thoroughly tested to ensure zero data loss.
 
 ## TODOs
 
@@ -182,13 +230,13 @@ suspend fun getJournalsPaginated(limit: Int, offset: Int): List<JournalEntity>
 - [ ] Implement database security auditing
 
 ### Development & Testing
-- [ ] Add comprehensive database testing
-- [ ] Implement database migration testing automation
+- [x] Add comprehensive database testing
+- [x] Implement database migration testing automation
 - [ ] Add database performance benchmarks
 - [ ] Create database debugging tools
 - [ ] Add database documentation generation
 - [ ] Implement database mock implementations
-- [ ] Add database integration tests
+- [x] Add database integration tests
 - [ ] Create database development utilities
 
 ## Security Considerations
