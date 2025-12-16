@@ -73,8 +73,8 @@ sealed interface MediaObject {
         override val size: Int,
         override val timestamp: Instant,
         /**
-         * The duration of the video in milliseconds.
+         * The duration of the video.
          */
-        val duration: Long,
+        val duration: kotlin.time.Duration,
     ) : MediaObject
 }
