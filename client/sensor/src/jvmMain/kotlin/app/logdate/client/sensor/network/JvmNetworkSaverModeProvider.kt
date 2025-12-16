@@ -20,14 +20,18 @@ class JvmNetworkSaverModeProvider : NetworkSaverModeProvider {
     override suspend fun getCurrentDataSaverState(): NetworkSaverState {
         return _networkSaverState.value
     }
-    
+
+    /**
+     * Because there are no network saver modes on JVM platforms, this method always returns false.
+     */
     override suspend fun isDataSaverModeActive(): Boolean {
-        // JVM platforms don't have a concept of data saver mode
         return false
     }
-    
+
+    /**
+     * There are no resources to clean up for JVM, so this is a no-op.
+     */
     override fun cleanup() {
-        // No-op for JVM
     }
     
     private fun getCurrentNetworkSaverStateInternal(): NetworkSaverState {
@@ -65,7 +69,6 @@ class JvmNetworkSaverModeProvider : NetworkSaverModeProvider {
             
             return NetworkConnectionType.NONE
         } catch (e: Exception) {
-            // If we can't determine network state, assume NONE
             return NetworkConnectionType.NONE
         }
     }
