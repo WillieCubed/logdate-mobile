@@ -1,0 +1,66 @@
+import app.logdate.server.auth.StubTokenService
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+
+/**
+ * Test cases for the Kotlin-native JWT token service implementation.
+ */
+class JwtTest {
+    
+    private val tokenService = StubTokenService()
+    
+    @Test
+    fun testAccessTokenGeneration() {
+        val accountId = "test-account-123"
+        val token = tokenService.generateAccessToken(accountId)
+        
+        assertNotNull(token)
+        println("Generated access token: $token")
+        
+        val validatedAccountId = tokenService.validateAccessToken(token)
+        assertEquals(accountId, validatedAccountId)
+    }
+    
+    @Test
+    fun testRefreshTokenGeneration() {
+        val accountId = "test-account-456"
+        val token = tokenService.generateRefreshToken(accountId)
+        
+        assertNotNull(token)
+        println("Generated refresh token: $token")
+        
+        val validatedAccountId = tokenService.validateRefreshToken(token)
+        assertEquals(accountId, validatedAccountId)
+    }
+    
+    @Test
+    fun testSessionTokenGeneration() {
+        val sessionId = "session-789"
+        val token = tokenService.generateSessionToken(sessionId)
+        
+        assertNotNull(token)
+        println("Generated session token: $token")
+        
+        val validatedSessionId = tokenService.validateSessionToken(token)
+        assertEquals(sessionId, validatedSessionId)
+    }
+    
+    @Test
+    fun testInvalidToken() {
+        val invalidToken = "invalid.token.here"
+        val result = tokenService.validateAccessToken(invalidToken)
+        assertNull(result)
+    }
+    
+    @Test
+    fun testTokenTypeMismatch() {
+        val accountId = "test-account-999"
+        val refreshToken = tokenService.generateRefreshToken(accountId)
+        
+        // Try to validate refresh token as access token (should fail)
+        val result = tokenService.validateAccessToken(refreshToken)
+        assertNull(result)
+    }
+}
