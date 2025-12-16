@@ -14,6 +14,7 @@ import app.logdate.feature.core.main.navigateHome
 import app.logdate.feature.core.requiresUnlock
 import app.logdate.feature.onboarding.navigation.startOnboarding
 import app.logdate.ui.LocalSharedTransitionScope
+import app.logdate.ui.audio.AudioPlaybackProvider
 import app.logdate.ui.theme.LogDateTheme
 
 
@@ -43,7 +44,7 @@ fun LogDateAppRoot(
             ) {
                 LogDateNavHost(
                     navController = navController,
-                )
+               )
             }
         }
     }

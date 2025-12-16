@@ -1,8 +1,12 @@
 package app.logdate.client
 
+import android.content.Intent
 import android.os.Bundle
+import android.view.Menu
+import android.view.MenuItem
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -13,16 +17,20 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import app.logdate.client.ui.LogDateAppRoot
 import app.logdate.feature.core.AndroidBiometricGatekeeper
 import app.logdate.feature.core.AppViewModel
+import app.logdate.feature.core.BiometricGatekeeper
 import app.logdate.feature.core.GlobalAppUiLoadedState
 import app.logdate.feature.core.GlobalAppUiLoadingState
 import app.logdate.feature.core.GlobalAppUiState
+import app.logdate.feature.core.di.ActivityProvider
+import app.logdate.feature.core.export.AndroidExportLauncher
+import io.github.vinceglb.filekit.core.FileKit
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
+import org.koin.compose.KoinContext
 
 /**
  * The main app activity.
@@ -38,15 +46,41 @@ import org.koin.androidx.viewmodel.ext.android.viewModel
  */
 class MainActivity : FragmentActivity() {
 
-    private val androidBiometricGatekeeper: AndroidBiometricGatekeeper by inject()
+    private val biometricGatekeeper: BiometricGatekeeper by inject()
+    private val activityProvider: ActivityProvider by inject()
+    private val androidExportLauncher: AndroidExportLauncher by inject()
 
     private val viewModel by viewModel<AppViewModel>()
+    
+    // Register the document picker for export functionality
+    private val createDocumentLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val uri = if (result.resultCode == RESULT_OK) {
+            result.data?.data
+        } else {
+            null
+        }
+        androidExportLauncher.onExportDestinationSelected(uri)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
 
-        androidBiometricGatekeeper.setActivity(this)
+        // Set up FileKit for file operations
+        FileKit.init(this)
+        
+        // Set up biometric gatekeeper
+        (biometricGatekeeper as? AndroidBiometricGatekeeper)?.setActivity(this)
+        
+        // Register this activity for use by the export launcher
+        activityProvider.currentActivity = this
+        androidExportLauncher.setupActivityResultLauncher(createDocumentLauncher)
+        androidExportLauncher.setupWorkObserver(this)
+        
+        // Set up multi-window support
+        setupMultiWindowSupport()
 
         // TODO: Maybe reconsider sealed class approach to uiState loading
         var uiState: GlobalAppUiState by mutableStateOf(GlobalAppUiLoadingState)
@@ -68,11 +102,49 @@ class MainActivity : FragmentActivity() {
         setContent {
             val state = uiState
             if (state is GlobalAppUiLoadedState) {
-                LogDateAppRoot(
-                    appUiState = state,
-                    onShowUnlockPrompt = viewModel::showNativeUnlockPrompt,
-                )
+                KoinContext {
+                    MainActivityUiRoot(
+                        appUiState = state,
+                        onShowUnlockPrompt = viewModel::showNativeUnlockPrompt,
+                    )
+                }
             }
+        }
+        
+        // Handle the intent if this activity was launched with one
+        intent?.let { handleMultiWindowIntent(it) }
+    }
+    
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleMultiWindowIntent(intent)
+    }
+    
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        // Add multi-window options to the menu
+        createMultiWindowMenuOptions(menu)
+        return true
+    }
+    
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        // Handle multi-window menu selections
+        if (handleMultiWindowMenuSelection(item)) {
+            return true
+        }
+        
+        return super.onOptionsItemSelected(item)
+    }
+    
+    override fun onResume() {
+        super.onResume()
+        activityProvider.currentActivity = this
+    }
+    
+    override fun onPause() {
+        super.onPause()
+        if (activityProvider.currentActivity === this) {
+            // Only clear the reference if it's still pointing to this activity
+            activityProvider.currentActivity = null
         }
     }
 
@@ -101,8 +173,8 @@ class MainActivity : FragmentActivity() {
 @Preview
 @Composable
 fun AppAndroidPreview() {
-    LogDateAppRoot(
+    MainActivityUiRoot(
         appUiState = GlobalAppUiLoadedState(),
-        onShowUnlockPrompt = {},
+        onShowUnlockPrompt = { /* No-op for preview */ }
     )
 }
