@@ -138,12 +138,8 @@ The fastest way to get the LogDate server running locally:
 
 If you prefer to set up dependencies manually:
 
-1. **Configure API keys**
-   Create a `local.properties` file in the project root:
-   ```properties
-   metaAppId=<your-meta-app-id>
-   apiKeys.googleMaps=<your-google-maps-api-key>
-   ```
+1. **Configure API keys and environment**  
+   See `docs/environment/setup.md` for required secrets (`OPENAI_API_KEY`, DB/Redis overrides, maps/meta keys) and how to supply them via `local.properties`, environment variables, or CI.
 
 2. **Database Setup**
    Follow the [server database documentation](server/DATABASE.md) for PostgreSQL setup.
