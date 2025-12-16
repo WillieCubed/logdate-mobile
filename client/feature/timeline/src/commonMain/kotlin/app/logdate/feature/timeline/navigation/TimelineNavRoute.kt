@@ -3,6 +3,7 @@ package app.logdate.feature.timeline.navigation
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import app.logdate.feature.timeline.ui.TimelineRoute
+import kotlin.uuid.Uuid
 
 const val TIMELINE_ROUTE = "timeline"
 
@@ -11,7 +12,7 @@ const val TIMELINE_ROUTE = "timeline"
 //fun NavController.navigateToTimelineItem(itemId: String) = navigate(TIMELINE_ROUTE)
 
 // TODO: Remove this once we have a proper navigation system
-fun NavGraphBuilder.timelineRoute(onOpenTimelineItem: (id: String) -> Unit) {
+fun NavGraphBuilder.timelineRoute(onOpenTimelineItem: (id: Uuid) -> Unit) {
     composable(
         route = TIMELINE_ROUTE,
         // TODO: Support deep link

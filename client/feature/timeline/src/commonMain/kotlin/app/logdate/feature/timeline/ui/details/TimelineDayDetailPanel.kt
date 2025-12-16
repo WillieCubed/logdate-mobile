@@ -1,13 +1,11 @@
 package app.logdate.feature.timeline.ui.details
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.calculateEndPadding
-import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.History
@@ -20,19 +18,19 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.LayoutDirection
-import app.logdate.ui.timeline.ImageNoteUiState
-import app.logdate.ui.timeline.TextNoteUiState
-import app.logdate.ui.timeline.TimelineDayUiState
+import app.logdate.ui.common.plus
+import app.logdate.ui.common.scrollToTop
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.theme.Spacing
+import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.util.toReadableDateShort
-import coil3.compose.AsyncImage
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import kotlin.uuid.Uuid
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,12 +39,20 @@ fun TimelineDayDetailPanel(
     uiState: TimelineDayUiState,
     onExit: () -> Unit,
     events: List<DayEvent> = listOf(),
-    onOpenEvent: (eventId: String) -> Unit,
+    onOpenEvent: (eventId: String) -> Unit = {},
     visitedLocations: List<DayLocation> = listOf(),
     onOpenRewind: () -> Unit = {},
+    scrollState: LazyListState = rememberLazyListState(),
+    modifier: Modifier = Modifier,
 ) {
     val (summary, timestamp, people) = uiState
+    
+    LaunchedEffect(uiState) {
+        scrollState.scrollToTop()
+    }
+
     Scaffold(
+        modifier = modifier,
         topBar = {
             TopAppBar(
                 title = { Text(timestamp.toReadableDateShort()) },
@@ -71,25 +77,30 @@ fun TimelineDayDetailPanel(
     ) { contentPadding ->
         LazyColumn(
             modifier = Modifier.fillMaxWidth(),
+            state = scrollState,
             contentPadding = contentPadding + PaddingValues(vertical = Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
-            item {
+            item(
+                contentType = "tldr"
+            ) {
                 TldrSection(summary)
             }
-            item {
+            item(
+                contentType = "people"
+            ) {
                 PeopleEncounteredSection(
                     people = people,
                 )
             }
-            item {
-                Text("Notes")
-                uiState.notes.forEach { note ->
-                    when (note) {
-                        is TextNoteUiState -> TextNoteSnippet(note)
-                        is ImageNoteUiState -> ImageNoteSnippet(note)
-                    }
-                }
+            item(
+                contentType = "notes"
+            ){
+                // We already logged this info earlier, don't need redundant logging
+                
+                NotesListSection(
+                    notes = uiState.notes,
+                )
             }
 //            item {
 //                EventsSection(
@@ -97,36 +108,15 @@ fun TimelineDayDetailPanel(
 //                    onOpenEvent = onOpenEvent,
 //                )
 //            }
-            item {
+            item(
+                contentType = "locations"
+            ){
                 LocationsSection(locations = visitedLocations, DayLocation.Origin)
             }
         }
     }
 }
 
-@Composable
-private fun TextNoteSnippet(uiState: TextNoteUiState) {
-    Box(modifier = Modifier.padding(vertical = Spacing.md)) {
-        Text(uiState.text)
-    }
-}
-
-@Composable
-private fun ImageNoteSnippet(uiState: ImageNoteUiState) {
-    AsyncImage(
-        model = uiState.uri,
-        contentDescription = null,
-    )
-}
-
-operator fun PaddingValues.plus(other: PaddingValues): PaddingValues = PaddingValues(
-    start = this.calculateStartPadding(LayoutDirection.Ltr) +
-            other.calculateStartPadding(LayoutDirection.Ltr),
-    top = this.calculateTopPadding() + other.calculateTopPadding(),
-    end = this.calculateEndPadding(LayoutDirection.Ltr) +
-            other.calculateEndPadding(LayoutDirection.Ltr),
-    bottom = this.calculateBottomPadding() + other.calculateBottomPadding(),
-)
 
 @Preview
 @Composable
@@ -136,19 +126,19 @@ private fun TimelineDayDetailPanelPreview() {
         date = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date,
         people = listOf(
             PersonUiState(
-                personId = "1",
+                uid = Uuid.random(),
                 name = "Margaret Belford",
             ),
             PersonUiState(
-                personId = "2",
+                uid = Uuid.random(),
                 name = "Charles Averill",
             ),
             PersonUiState(
-                personId = "3",
+                uid = Uuid.random(),
                 name = "Lane Hughes",
             ),
             PersonUiState(
-                personId = "4",
+                uid = Uuid.random(),
                 name = "Haley Wheatley",
             ),
         ),

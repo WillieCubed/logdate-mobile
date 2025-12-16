@@ -60,6 +60,7 @@ import logdate.client.feature.timeline.generated.resources.period_years_ago
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration.Companion.hours
+import kotlin.uuid.Uuid
 
 
 /**
@@ -75,8 +76,8 @@ internal fun hasEntryFromToday(timelineItems: List<JournalNote>): Boolean {
 @Composable
 internal fun Timeline(
     timelineItems: List<JournalNote>,
-    onItemSelected: (uid: String) -> Unit,
-    onItemDeleted: (uid: String) -> Unit,
+    onItemSelected: (uid: Uuid) -> Unit,
+    onItemDeleted: (uid: Uuid) -> Unit,
     onNewEntry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -227,8 +228,8 @@ private fun TimelineContentItem(
     item: JournalNote,
     metadata: TimelineItemMetadata,
     timeDetail: TimeDetail = TimeDetail.DAY,
-    onItemSelected: (uid: String) -> Unit,
-    onDeleteItem: (uid: String) -> Unit = {},
+    onItemSelected: (uid: Uuid) -> Unit,
+    onDeleteItem: (uid: Uuid) -> Unit = {},
 ) {
     var showOptions by rememberSaveable { mutableStateOf(false) }
     Row(
@@ -306,7 +307,12 @@ private fun TimelineContentItem(
                 }
 
                 else -> {
-                    // TODO: Handle other types of journal notes
+                    // Audio and image notes only appear in detail view
+                    Text(
+                        "Tap to view ${item.type.name.lowercase()} content",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -392,8 +398,8 @@ enum class ZoomLevel {
 fun LazyListScope.constructTimeline(
     items: List<JournalNote>,
     onNewEntry: () -> Unit,
-    onItemSelected: (uid: String) -> Unit,
-    onItemDeleted: (uid: String) -> Unit,
+    onItemSelected: (uid: Uuid) -> Unit,
+    onItemDeleted: (uid: Uuid) -> Unit,
     zoomLevel: ZoomLevel = ZoomLevel.DETAILED,
 ) {
     // Sort items in reverse order, grouping them by weeks before this week, adding headers for each week.
@@ -443,6 +449,7 @@ fun LazyListScope.constructTimeline(
 }
 
 
+
 @Composable
 fun PinchableContainer(
     defaultContent: @Composable () -> Unit,
@@ -457,5 +464,4 @@ fun PinchableContainer(
             defaultContent()
         }
     }
-
 }

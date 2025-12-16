@@ -1,5 +1,8 @@
 package app.logdate.feature.timeline.ui.details
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -26,7 +29,8 @@ internal fun PeopleEncounteredSection(
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         Text("People Encountered", style = MaterialTheme.typography.titleSmall)
-        if (people.isNotEmpty()) {
+        val showPeople = people.isNotEmpty()
+        AnimatedVisibility(visible = showPeople) {
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
@@ -39,7 +43,12 @@ internal fun PeopleEncounteredSection(
                     }
                 }
             }
-        } else {
+        }
+        AnimatedVisibility(
+            visible = !showPeople,
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
             Text("No people encountered", style = MaterialTheme.typography.labelSmall)
             // TODO: Add CTA to add people
         }
