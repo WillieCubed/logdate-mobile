@@ -1,10 +1,13 @@
-package app.logdate.navigation
+package app.logdate.navigation.routes
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -17,12 +20,21 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.EntryProviderBuilder
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entry
+import app.logdate.feature.rewind.ui.ImageRewindPanelUiState
+import app.logdate.feature.rewind.ui.RewindDetailUiState
 import app.logdate.feature.rewind.ui.RewindDetailViewModel
 import app.logdate.feature.rewind.ui.RewindOverviewScreen
+import app.logdate.feature.rewind.ui.RewindPanelUiState
+import app.logdate.navigation.scenes.HomeScene
+import app.logdate.navigation.MainAppNavigator
+import app.logdate.navigation.routes.core.RewindDetailRoute
+import app.logdate.navigation.routes.core.RewindList
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 
@@ -35,21 +47,19 @@ fun MainAppNavigator.navigateToRewind(id: Uuid) {
  */
 fun EntryProviderBuilder<NavKey>.rewindRoutes(
     onBack: () -> Unit,
-    navigator: MainAppNavigator? = null
+    onNavigateToRewindDetail: (Uuid) -> Unit,
 ) {
     // Main Rewind overview screen - one of the primary tabs
     entry<RewindList>(
         metadata = HomeScene.homeScene() // Mark this as a home scene entry
     ) { _ ->
         RewindOverviewScreen(
-            onOpenRewind = { rewindId -> 
-                navigator?.navigateToRewind(rewindId) 
-            }
+            onOpenRewind = onNavigateToRewindDetail
         )
     }
     
     // Rewind detail screen
-    entry<RewindDetailRoute> { route ->
+    entry<RewindDetailRoute>() { route ->
         PublicRewindDetailScreen(
             rewindId = route.id,
             onExitRewind = onBack
@@ -58,54 +68,22 @@ fun EntryProviderBuilder<NavKey>.rewindRoutes(
 }
 
 /**
- * Public adapter for the internal RewindDetailScreen.
+ * Public adapter for the RewindDetailScreen.
  * 
- * This allows us to use the internal RewindDetailScreen from the navigation layer.
- * Implements a basic rewind detail view using a simpler, direct approach that doesn't
- * rely on the internal implementation.
+ * Uses the actual immersive RewindDetailScreen component to provide a full-screen,
+ * Instagram stories-like experience for viewing rewinds.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PublicRewindDetailScreen(
     rewindId: Uuid,
     onExitRewind: () -> Unit,
     viewModel: RewindDetailViewModel = koinViewModel()
 ) {
-    // Get the UI state from the ViewModel
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    
-    // Load the rewind data when the screen is first displayed
-    LaunchedEffect(rewindId) {
-        viewModel.loadRewind(rewindId)
-    }
-    
-    // A simple implementation of the rewind detail screen
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Rewind") },
-                navigationIcon = {
-                    IconButton(onClick = onExitRewind) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        // Show loading or content based on state
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Viewing rewind $rewindId",
-                style = MaterialTheme.typography.bodyLarge
-            )
-        }
-    }
+    // Use the actual RewindDetailScreen component
+    app.logdate.feature.rewind.ui.detail.RewindDetailScreen(
+        rewindId = rewindId,
+        onExitRewind = onExitRewind,
+        viewModel = viewModel,
+        modifier = Modifier.fillMaxSize()
+    )
 }

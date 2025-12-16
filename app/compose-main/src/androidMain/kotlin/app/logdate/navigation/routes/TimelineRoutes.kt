@@ -1,12 +1,10 @@
-package app.logdate.navigation
+package app.logdate.navigation.routes
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
-import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -20,6 +18,11 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entry
 import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.feature.timeline.ui.details.TimelineDayDetailPanel
+import app.logdate.navigation.MainAppNavigator
+import app.logdate.navigation.TimelinePaneScreen
+import app.logdate.navigation.routes.core.TimelineDetail
+import app.logdate.navigation.routes.core.TimelineListRoute
+import app.logdate.navigation.scenes.HomeScene
 import kotlinx.datetime.LocalDate
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -30,21 +33,20 @@ fun MainAppNavigator.openTimeline() {
 fun MainAppNavigator.openTimelineDetail(
     day: LocalDate,
 ) {
-    // Add the day to the navigation backstack
     backStack.add(TimelineDetail(day))
 }
 
-@OptIn(ExperimentalMaterial3AdaptiveApi::class)
 fun EntryProviderBuilder<NavKey>.timelineRoutes(
     openEntryEditor: () -> Unit,
     onOpenTimelineDetail: (day: LocalDate) -> Unit,
     onCloseTimelineDetail: () -> Unit,
-    onOpenSettings: () -> Unit, // This will open the main settings overview
+    onOpenSettings: () -> Unit,
+    onOpenSearch: () -> Unit,
     homeViewModel: HomeViewModel,
 ) {
     // The home screen
     entry<TimelineListRoute>(
-        metadata = HomeScene.homeScene() // Mark this as a home scene entry
+        metadata = HomeScene.homeScene()
     ) { _ ->
         TimelinePaneScreen(
             onNewEntry = openEntryEditor,
@@ -53,6 +55,7 @@ fun EntryProviderBuilder<NavKey>.timelineRoutes(
                 onOpenTimelineDetail(day)
             },
             onOpenSettings = onOpenSettings,
+            onOpenSearch = onOpenSearch,
             viewModel = homeViewModel
         )
     }

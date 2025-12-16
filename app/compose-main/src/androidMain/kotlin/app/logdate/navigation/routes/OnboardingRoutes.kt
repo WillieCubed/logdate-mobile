@@ -1,4 +1,4 @@
-package app.logdate.navigation
+package app.logdate.navigation.routes
 
 import androidx.navigation3.runtime.EntryProviderBuilder
 import androidx.navigation3.runtime.NavKey
@@ -7,10 +7,24 @@ import app.logdate.feature.onboarding.ui.CloudAccountSetupScreen
 import app.logdate.feature.onboarding.ui.MemoriesImportInfoScreen
 import app.logdate.feature.onboarding.ui.OnboardingCompletionScreen
 import app.logdate.feature.onboarding.ui.OnboardingStartScreen
+import app.logdate.feature.onboarding.ui.PersonalIntroScreen
 import app.logdate.feature.onboarding.ui.WelcomeBackScreen
+import app.logdate.navigation.MainAppNavigator
+import app.logdate.navigation.routes.core.OnboardingCompleteRoute
+import app.logdate.navigation.routes.core.OnboardingEntryRoute
+import app.logdate.navigation.routes.core.OnboardingImportRoute
+import app.logdate.navigation.routes.core.OnboardingSignIn
+import app.logdate.navigation.routes.core.OnboardingStart
+import app.logdate.navigation.routes.core.OnboardingWelcomeBackRoute
+import app.logdate.navigation.routes.core.PersonalIntroRoute
 
+/**
+ * Navigates to the onboarding flow.
+ * 
+ * This clears the backstack and sets the OnboardingStart route as the only entry,
+ * ensuring a clean onboarding experience.
+ */
 fun MainAppNavigator.startOnboarding() {
-    // Use safelyClearBackstack to ensure the backstack is never empty
     safelyClearBackstack(OnboardingStart)
 }
 
@@ -32,34 +46,40 @@ fun EntryProviderBuilder<NavKey>.onboarding(
     onWelcomeBack: () -> Unit,
     onComplete: () -> Unit,
 ) {
-    entry<OnboardingStart> {
+    entry<OnboardingStart>() {
         OnboardingStartScreen(
             onNext = onStartOnboarding,
             onStartFromBackup = onStartOnboarding
         )
     }
-    entry<OnboardingSignIn> { _ ->
+    entry<PersonalIntroRoute>() {
+        PersonalIntroScreen(
+            onNext = onContinueToEntry,
+            onBack = onBack
+        )
+    }
+    entry<OnboardingSignIn>() { _ ->
         CloudAccountSetupScreen(
             onBack = onBack,
             onSkip = onContinueToEntry,
             onContinue = onWelcomeBack,
         )
     }
-    entry<OnboardingEntryRoute> {
+    entry<OnboardingEntryRoute>() {
 
     }
-    entry<OnboardingImportRoute> {
+    entry<OnboardingImportRoute>() {
         MemoriesImportInfoScreen(
             onBack = onBack,
             onContinue = onImportCompleted,
         )
     }
-    entry<OnboardingCompleteRoute> {
+    entry<OnboardingCompleteRoute>() {
         OnboardingCompletionScreen(
             onFinish = onComplete,
         )
     }
-    entry<OnboardingWelcomeBackRoute> {
+    entry<OnboardingWelcomeBackRoute>() {
         WelcomeBackScreen(
             onFinish = onComplete,
         )
