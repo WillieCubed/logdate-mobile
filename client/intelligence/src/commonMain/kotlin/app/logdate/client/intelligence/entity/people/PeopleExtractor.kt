@@ -22,10 +22,16 @@ class PeopleExtractor(
 ) {
 
     companion object {
-        private const val EXTRACTION_PROMPT = """
-You are a system utility that extracts the names of people mentioned in text.
+        // TODO: Use additional logic to extract text fragments that could be resolved to people
+        private const val ADVANCED_EXTRACTION_PROMPT = """
+You are a system utility that extracts the names of likely humans mentioned in text.
 Only literally return the names from the text. Each name must be separated by a new
 line. Include references to noun-adjective parings that could be names.
+        """
+        private const val EXTRACTION_PROMPT = """
+You are a system utility that extracts the names of likely humans mentioned in text.
+Only literally return the names from the text. Each name must be separated by a new
+line.
         """
     }
 
@@ -59,8 +65,9 @@ line. Include references to noun-adjective parings that could be names.
             val response = generativeAIChatClient.submit(prompts)
             if (response != null) {
                 Napier.d(tag = "PeopleExtractor", message = "Caching response for:\n$text")
-                generativeAICache.putEntry(documentId, response)
+                Napier.d(tag = "PeopleExtractor") { "Response: ${response.trim()}" }
+                generativeAICache.putEntry(documentId, response.trim())
             }
-            response?.split("\n")?.map { Person(name = it) } ?: emptyList()
+            response?.split("\n")?.map { Person(name = it.trim()) } ?: emptyList()
         }
 }

@@ -11,7 +11,7 @@ import org.koin.dsl.module
 val clientsModule: Module = module {
     single<GenerativeAIChatClient> {
         // TODO: Load API key from configuration
-        val apiKey = ""
+        val apiKey = "***REMOVED***"
         OpenAiClient(apiKey, get())
     }
 }

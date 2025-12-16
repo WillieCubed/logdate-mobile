@@ -50,18 +50,28 @@ class EntrySummarizer(
                 tag = "EntrySummarizer",
                 message = "No cached response for $summaryId, generating new response"
             )
-            val response = genAIClient.submit(
-                listOf(
-                    GenerativeAIChatMessage("system", SYSTEM_PROMPT),
-                    GenerativeAIChatMessage("user", text),
+            try {
+                val response = genAIClient.submit(
+                    listOf(
+                        GenerativeAIChatMessage("system", SYSTEM_PROMPT),
+                        GenerativeAIChatMessage("user", text),
+                    )
                 )
-            )
-            // Cache responses
-            if (response != null) {
-                Napier.d(tag = "EntrySummarizer", message = "Caching response for:\n$text")
-                generativeAICache.putEntry(summaryId, response)
+                // Cache responses
+                if (response != null) {
+                    Napier.d(tag = "EntrySummarizer", message = "Caching response for entry $summaryId")
+                    generativeAICache.putEntry(summaryId, response)
+                }
+                response ?: "No summary available"
+            } catch (e: Exception) {
+                Napier.e(
+                    tag = "EntrySummarizer",
+                    message = "Failed to summarize entry",
+                    throwable = e
+                )
+                null
             }
-            response ?: "No summary available"
+
         }
 }
 

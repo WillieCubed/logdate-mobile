@@ -29,8 +29,10 @@ class OpenAiClient(
                 }
                 setBody(
                     OpenAiRequest(
-                        model = "gpt-4o-mini",
-                        messages = prompts.map(GenerativeAIChatMessage::toOpenAiChatMessage),
+                        // Using gpt-4.1-mini-2025-04-14 for enhanced processing capabilities
+                        // while maintaining cost efficiency for journal text analysis
+                        model = "gpt-4.1-mini-2025-04-14",
+                       messages = prompts.map(GenerativeAIChatMessage::toOpenAiChatMessage),
                     )
                 )
             }
