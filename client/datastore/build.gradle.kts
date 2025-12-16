@@ -31,12 +31,14 @@ kotlin {
         commonMain.dependencies {
             // Project dependencies
             implementation(projects.shared.model)
+            implementation(projects.shared.config)
             // External dependencies
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.androidx.datastore.preferences)
             implementation(project.dependencies.platform(libs.koin.bom))
             implementation(libs.koin.core)
+            implementation(libs.napier)
         }
         commonTest.dependencies {
             implementation(libs.junit)

@@ -33,16 +33,24 @@ kotlin {
         commonMain.dependencies {
             // Project dependencies
             implementation(projects.shared.model)
+            implementation(projects.shared.config)
             implementation(projects.client.repository)
             implementation(projects.client.database)
             implementation(projects.client.datastore)
             implementation(projects.client.device)
+            implementation(projects.client.networking)
+            implementation(projects.client.permissions)
+            implementation(projects.client.sync)
+            implementation(projects.client.util)
+            implementation(projects.client.media)
             // External dependencies
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.androidx.datastore.preferences)
             implementation(project.dependencies.platform(libs.koin.bom))
             implementation(libs.koin.core)
+            implementation(libs.napier)
         }
         androidMain.dependencies {
             implementation(libs.kotlinx.coroutines.android)
@@ -54,6 +62,11 @@ kotlin {
         }
         desktopMain.dependencies {
             implementation(libs.kotlinx.coroutines.swing)
+        }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.koin.test)
         }
     }
 }

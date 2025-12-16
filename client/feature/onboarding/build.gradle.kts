@@ -42,6 +42,9 @@ kotlin {
             implementation(projects.client.repository)
             implementation(projects.client.domain)
             implementation(projects.client.billing)
+            implementation(projects.client.media)
+            implementation(projects.client.intelligence)
+            implementation(projects.client.feature.core)
             // Compose plugin dependencies
             implementation(compose.runtime)
             implementation(compose.foundation)

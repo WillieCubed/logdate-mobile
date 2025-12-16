@@ -14,6 +14,10 @@ pluginManagement {
         }
         mavenCentral()
         gradlePluginPortal()
+        maven {
+            // Get latest version from https://androidx.dev/snapshots/builds/
+            url = uri("https://androidx.dev/snapshots/builds/13551459/artifacts/repository")
+        }
     }
 }
 
@@ -27,6 +31,10 @@ dependencyResolutionManagement {
             }
         }
         mavenCentral()
+        maven {
+            // Get latest version from https://androidx.dev/snapshots/builds/
+            url = uri("https://androidx.dev/snapshots/builds/13551459/artifacts/repository")
+        }
     }
 }
 
@@ -52,13 +60,16 @@ include(":client:permissions")
 include(":client:util")
 include(":client:billing")
 include(":client:sync")
+include(":client:health-connect")
 // Client Features
 include(":client:feature:core")
 include(":client:feature:editor")
 include(":client:feature:journal")
 include(":client:feature:rewind")
 include(":client:feature:timeline")
+include(":client:feature:location-timeline") // TODO: Probably consolidate into timeline at some point
 include(":client:feature:onboarding")
+include(":client:feature:search")
 // Shared cross-platform modules
 include(":shared:activitypub")
 include(":shared:config")

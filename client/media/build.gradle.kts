@@ -1,6 +1,3 @@
-@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
-
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -8,6 +5,8 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.dokka)
+    alias(libs.plugins.composeMultiplatform)
+    alias(libs.plugins.compose.compiler)
 }
 
 kotlin {
@@ -37,9 +36,18 @@ kotlin {
             // Koin
             implementation(project.dependencies.platform(libs.koin.bom))
             implementation(libs.koin.core)
+            // Compose
+            implementation(compose.runtime)
+            implementation(compose.foundation)
+            implementation(compose.material3)
+            // Logging
+            implementation(libs.napier)
+            // Repository
+            implementation(projects.client.repository)
         }
         androidMain.dependencies {
             implementation(libs.koin.android)
+            implementation(libs.androidx.work.runtime)
         }
     }
 }
@@ -47,10 +55,14 @@ kotlin {
 android {
     namespace = "app.logdate.client.media"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
+    
+    defaultConfig {
+        minSdk = libs.versions.android.minSdk.get().toInt()
+    }
 
     buildTypes {
         getByName("release") {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
         }
     }
     compileOptions {

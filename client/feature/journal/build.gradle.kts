@@ -41,8 +41,10 @@ kotlin {
             implementation(projects.client.ui)
             implementation(projects.client.repository)
             implementation(projects.client.datastore)
+            implementation(projects.client.domain)
             implementation(projects.client.sharing)
             implementation(projects.client.util)
+            implementation(projects.client.feature.editor)
             // Compose plugin dependencies
             implementation(compose.runtime)
             implementation(compose.foundation)
@@ -63,6 +65,8 @@ kotlin {
             implementation(libs.koin.core)
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)
+            // Logging
+            implementation(libs.napier)
         }
 
         androidMain.dependencies {

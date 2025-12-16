@@ -43,6 +43,7 @@ kotlin {
             implementation(projects.client.util)
             implementation(projects.client.media)
             implementation(projects.client.location)
+            implementation(projects.client.permissions)
             implementation(projects.shared.model)
             // Compose plugin dependencies
             implementation(compose.runtime)
@@ -64,16 +65,20 @@ kotlin {
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)
             // Others
+            implementation(libs.napier)
             implementation(libs.coil.compose)
+            implementation(libs.filekit.compose)
         }
 
         androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.koin.android)
             implementation(libs.androidx.camera.camera2)
+            implementation(libs.androidx.camera.compose)
             implementation(libs.androidx.camera.lifecycle)
             implementation(libs.androidx.camera.video)
             implementation(libs.androidx.camera.view)
+//            implementation(libs.androidx.camera.viewfinder.compose)
             implementation(libs.androidx.camera.extensions)
             implementation(libs.accompanist.permissions)
         }
@@ -99,6 +104,7 @@ kotlin {
 
 
 dependencies {
+    implementation(libs.androidx.ui.android)
     debugImplementation(compose.uiTooling)
 }
 

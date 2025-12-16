@@ -45,6 +45,7 @@ kotlin {
             implementation(projects.client.media)
             implementation(projects.client.networking)
             implementation(projects.client.util)
+            implementation(projects.client.feature.editor)
             // Compose plugin dependencies
             implementation(compose.runtime)
             implementation(compose.foundation)

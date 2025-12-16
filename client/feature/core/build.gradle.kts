@@ -39,10 +39,19 @@ kotlin {
             // Project dependencies
             implementation(projects.shared.model)
             implementation(projects.client.ui)
+            implementation(projects.client.util)
             implementation(projects.client.repository)
             implementation(projects.client.domain)
             implementation(projects.client.datastore)
             implementation(projects.client.networking)
+            implementation(projects.client.permissions)
+            implementation(projects.client.device)
+            implementation(projects.client.sync)
+            implementation(projects.client.location)
+            implementation(projects.client.feature.timeline)
+            implementation(projects.client.feature.rewind)
+            implementation(projects.client.feature.journal)
+            implementation(project(":client:feature:location-timeline"))
             // Compose plugin dependencies
             implementation(compose.runtime)
             implementation(compose.foundation)
@@ -56,6 +65,9 @@ kotlin {
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.androidx.navigation.compose)
+            implementation(libs.material3.adaptive.layout)
+            implementation(libs.material3.adaptive.navigation)
+            implementation(libs.androidx.material3.adaptive.navigation3)
             // External dependencies
             implementation(libs.coil.compose)
             // Koin
@@ -63,6 +75,8 @@ kotlin {
             implementation(libs.koin.core)
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)
+            // Logging
+            implementation(libs.napier)
         }
 
         androidMain.dependencies {
@@ -75,6 +89,8 @@ kotlin {
             implementation(libs.androidx.camera.extensions)
             implementation(libs.androidx.biometric)
             implementation(libs.accompanist.permissions)
+            // WorkManager for background export tasks
+            implementation(libs.androidx.work.runtime)
         }
     }
 }

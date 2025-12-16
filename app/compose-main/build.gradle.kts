@@ -11,6 +11,7 @@ plugins {
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.dokka)
     alias(libs.plugins.googleServices)
+    alias(libs.plugins.kotlinx.serialization)
 }
 
 kotlin {
@@ -26,7 +27,7 @@ kotlin {
         iosSimulatorArm64()
     ).forEach { iosTarget ->
         iosTarget.binaries.framework {
-            baseName = "LogDate"
+            baseName = "composeApp"
             isStatic = true
         }
     }
@@ -40,11 +41,6 @@ kotlin {
             languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
             compilerOptions.freeCompilerArgs.set(listOf("-Xexpect-actual-classes"))
         }
-        androidMain.dependencies {
-            implementation(compose.preview)
-            implementation(libs.androidx.activity.compose)
-            implementation(libs.koin.android)
-        }
         commonMain.dependencies {
             // Project dependencies
             implementation(projects.client.feature.core)
@@ -53,31 +49,53 @@ kotlin {
             implementation(projects.client.feature.timeline)
             implementation(projects.client.feature.journal)
             implementation(projects.client.feature.rewind)
+            implementation(projects.client.feature.locationTimeline)
+            implementation(projects.client.feature.search)
             implementation(projects.client.data)
             implementation(projects.client.ui)
             implementation(projects.client.theme)
             implementation(projects.client.networking) // TODO: See if this can be hoisted down
+            implementation(projects.client.device)
+            implementation(projects.client.intelligence)
+            implementation(projects.client.domain)
+            implementation(projects.client.location)
+            implementation(projects.client.sync)
+            implementation(projects.client.healthConnect)
+            implementation(projects.client.util)
             // External dependencies
             implementation(compose.runtime)
             implementation(compose.foundation)
-            implementation(compose.material)
+            implementation(compose.material3)
             implementation(compose.ui)
+            implementation(compose.animation)
+            implementation(compose.materialIconsExtended)
             implementation(compose.components.resources)
             implementation(compose.components.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.androidx.navigation.compose)
+            implementation(libs.kotlinx.serialization.core)
+            implementation(libs.kotlinx.datetime)
             // Koin
             implementation(project.dependencies.platform(libs.koin.bom))
             implementation(libs.koin.core)
             implementation(libs.koin.compose.viewmodel)
 
             implementation(libs.napier)
+            implementation(libs.filekit.compose)
         }
         androidMain.dependencies {
+            implementation(compose.preview)
+            implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.core.splashscreen)
+            implementation(libs.androidx.lifecycle.viewmodel.navigation3)
+            implementation(libs.androidx.material3.adaptive.navigation3)
+            implementation(libs.androidx.navigation3.ui)
+            implementation(libs.androidx.navigation3.runtime)
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.koin.android)
-            implementation(libs.androidx.core.splashscreen)
+            implementation(libs.koin.androidx.workmanager)
+            implementation(libs.material)
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
@@ -91,6 +109,7 @@ android {
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
+        // TODO: Change to app.logdate
         applicationId = "co.reasonabletech.logdate"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
@@ -100,6 +119,15 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            // Exclude duplicate classes from different libraries
+            pickFirsts += "**/*.properties"
+            pickFirsts += "META-INF/DEPENDENCIES"
+            pickFirsts += "META-INF/LICENSE"
+            pickFirsts += "META-INF/LICENSE.txt"
+            pickFirsts += "META-INF/LICENSE.md"
+            pickFirsts += "META-INF/NOTICE"
+            pickFirsts += "META-INF/NOTICE.txt"
+            pickFirsts += "META-INF/INDEX.LIST"
         }
     }
     buildTypes {
@@ -111,11 +139,15 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Enable core library desugaring for health-connect
+        isCoreLibraryDesugaringEnabled = true
     }
 }
 
 dependencies {
     debugImplementation(compose.uiTooling)
+    // Add core library desugaring for Java 8+ APIs support on lower Android versions
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }
 
 compose.desktop {
@@ -145,6 +177,8 @@ compose.desktop {
             linux {
                 debMaintainer = "contact@logdate.app"
                 iconFile.set(project.file("app/compose-main/src/commonMain/composeResources/drawable/ic_launcher_google_play.png"))
+
+                modules("jdk.security.auth") // Needed for FileKit
             }
         }
     }
