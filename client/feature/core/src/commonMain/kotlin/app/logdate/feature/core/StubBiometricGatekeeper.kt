@@ -9,8 +9,8 @@ import kotlinx.coroutines.flow.StateFlow
  * This can be used for tests or for platforms where biometric authentication is not supported.
  */
 class StubBiometricGatekeeper : BiometricGatekeeper {
-    override val authState: StateFlow<AppAuthState>
-        get() = MutableStateFlow(AppAuthState.NO_PROMPT_NEEDED)
+    private val _authState = MutableStateFlow(AppAuthState.NO_PROMPT_NEEDED)
+    override val authState: StateFlow<AppAuthState> = _authState
 
     override fun authenticate(
         title: String,

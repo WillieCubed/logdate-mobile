@@ -3,6 +3,7 @@ package app.logdate.feature.core.main
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
+import app.logdate.feature.journals.ui.JournalClickCallback
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
@@ -23,49 +24,18 @@ fun NavHostController.navigateHome() {
  */
 fun NavGraphBuilder.homeGraph(
     onCreateNote: () -> Unit,
+    onOpenJournal: JournalClickCallback,
+    onCreateJournal: () -> Unit,
     onOpenRewind: (uid: Uuid) -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     composable<HomeRoute> {
+        // Removed problematic CompositionLocalProvider that was causing the Compose compiler bug
         HomeScreen(
             onNewEntry = onCreateNote,
+            onOpenJournal = onOpenJournal,
+            onCreateJournal = onCreateJournal,
+            onOpenSettings = onOpenSettings,
         )
-//            mainNavGraph(
-//                appState = appState,
-//                onCreateEntry = {
-//                    navController.navigateToNoteCreation()
-//                },
-//                onOpenRewind = navController::navigateToRewind,
-//                onViewPreviousRewinds = navController::navigateToRewindsOverview,
-//                onClose = {
-//                    navController.popBackStack()
-//                },
-//                onCreateJournal = {
-//                    navController.navigate(RouteDestination.NewJournal.route)
-//                },
-//                onOpenJournal = { journalId ->
-//                    navController.navigateToJournal(journalId)
-//                },
-//                onJournalCreated = { journalId ->
-//                    navController.navigateFromNew(journalId)
-//                },
-//                onNavigateBack = {
-//                    navController.popBackStack()
-//                },
-//                onJournalDeleted = {
-//                    // Navigate to home
-//                    navController.navigate(RouteDestination.Home.route) {
-//                        popUpTo(RouteDestination.Base.route) { inclusive = true }
-//                    }
-//                },
-//                onNoteSaved = {
-//                    navController.navigate(RouteDestination.Home.route) {
-//                        popUpTo(RouteDestination.Base.route) { inclusive = true }
-//                    }
-//                },
-//                onOpenSettings = {
-//                    navController.navigate(RouteDestination.Settings.route)
-//                },
-//            )
     }
 }
