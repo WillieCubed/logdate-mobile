@@ -1,8 +1,54 @@
 package app.logdate.client.device.di
 
+import app.logdate.client.datastore.KeyValueStorage
+import app.logdate.client.device.AppInfoProvider
+import app.logdate.client.device.BuildConfigAppInfoProvider
+import app.logdate.client.device.IosAccountManager
+import app.logdate.client.device.IosAppInfoProvider
+import app.logdate.client.device.PlatformAccountManager
+import app.logdate.client.device.identity.DefaultDeviceIdProvider
+import app.logdate.client.device.identity.DeviceIdProvider
+import app.logdate.client.device.identity.di.deviceIdentityModule
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import org.koin.core.module.Module
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
+/**
+ * iOS-specific device instance module that complements the deviceIdentityModule.
+ */
 actual val deviceInstanceModule: Module = module {
-    // TODO: Implement iOS-compatible devices module
+    // Include the device identity module (which already provides DeviceIdProvider)
+    includes(deviceIdentityModule)
+    
+    // Create a SupervisorJob that will be cancelled when the app is destroyed
+    single<Job> { SupervisorJob() }
+
+    // Create a CoroutineScope that uses the application dispatcher and supervisor job
+    single {
+        CoroutineScope(get<Job>() + Dispatchers.Default)
+    }
+    
+    // New device ID provider using KeyValueStorage
+    single(named("modernDeviceIdProvider")) {
+        DefaultDeviceIdProvider(get<KeyValueStorage>(named("deviceKeyValueStorage")))
+    }
+    
+    // Provide iOS-specific app info provider
+    single<AppInfoProvider> {
+        IosAppInfoProvider()
+    }
+    
+    // Provide iOS-specific account manager
+    single<PlatformAccountManager> {
+        IosAccountManager()
+    }
+    
+    // Provide the BuildConfig-based app info provider
+    single<BuildConfigAppInfoProvider> {
+        BuildConfigAppInfoProvider()
+    }
 }
