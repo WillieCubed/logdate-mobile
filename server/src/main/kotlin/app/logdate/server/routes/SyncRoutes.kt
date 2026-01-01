@@ -1,67 +1,119 @@
 package app.logdate.server.routes
 
 import app.logdate.server.responses.error
-import app.logdate.server.responses.success
+import app.logdate.server.responses.simpleSuccess
+// Transport-only DTOs for sync; do not leak sync metadata into core domain models.
+import app.logdate.shared.model.sync.Association
+import app.logdate.shared.model.sync.AssociationChange
+import app.logdate.shared.model.sync.AssociationChangesResponse
+import app.logdate.shared.model.sync.AssociationDeleteItem
+import app.logdate.shared.model.sync.AssociationDeleteRequest
+import app.logdate.shared.model.sync.AssociationDeletion
+import app.logdate.shared.model.sync.AssociationUploadRequest
+import app.logdate.shared.model.sync.AssociationUploadResponse
+import app.logdate.shared.model.sync.ContentChange
+import app.logdate.shared.model.sync.ContentChangesResponse
+import app.logdate.shared.model.sync.ContentDeletion
+import app.logdate.shared.model.sync.ContentUpdateRequest
+import app.logdate.shared.model.sync.ContentUpdateResponse
+import app.logdate.shared.model.sync.ContentUploadRequest
+import app.logdate.shared.model.sync.ContentUploadResponse
+import app.logdate.shared.model.sync.DeviceId
+import app.logdate.shared.model.sync.JournalChange
+import app.logdate.shared.model.sync.JournalChangesResponse
+import app.logdate.shared.model.sync.JournalDeletion
+import app.logdate.shared.model.sync.JournalUpdateRequest
+import app.logdate.shared.model.sync.JournalUpdateResponse
+import app.logdate.shared.model.sync.JournalUploadRequest
+import app.logdate.shared.model.sync.JournalUploadResponse
+import app.logdate.shared.model.sync.MediaDownloadResponse
+import app.logdate.shared.model.sync.MediaUploadRequest
+import app.logdate.shared.model.sync.MediaUploadResponse
+import app.logdate.shared.model.sync.VersionConstraint
+import app.logdate.server.sync.AssociationDeletionMarker
+import app.logdate.server.sync.AssociationKey
+import app.logdate.server.sync.AssociationRecord
+import app.logdate.server.sync.ContentDeletionMarker
+import app.logdate.server.sync.ContentRecord
+import app.logdate.server.sync.InMemorySyncRepository
+import app.logdate.server.sync.JournalDeletionMarker
+import app.logdate.server.sync.JournalRecord
+import app.logdate.server.sync.MediaRecord
+import app.logdate.server.sync.SyncRepository
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicLong
-import kotlin.random.Random
-import kotlin.math.absoluteValue
 
 /**
  * Minimal in-memory sync implementation to replace previous 501 stubs.
  * This is intentionally simple but matches the shapes expected by the client Cloud API.
  * Data is stored in-memory per server instance and is not persisted.
  */
-fun Route.syncRoutes() {
+fun Route.syncRoutes(
+    repository: SyncRepository = InMemorySyncRepository()
+) {
+    @Serializable
+    data class SyncStatusSnapshot(
+        val contentCount: Int,
+        val journalCount: Int,
+        val associationCount: Int,
+        val lastTimestamp: Long
+    )
+
+    @Serializable
+    data class SyncTriggerResponse(
+        val started: Boolean,
+        val timestamp: Long
+    )
+
     route("/sync") {
         // High-level status (used by smoke tests)
         get("/status") {
-            call.respond(
-                success(
-                    mapOf(
-                        "contentCount" to SyncStore.content.size,
-                        "journalCount" to SyncStore.journals.size,
-                        "associationCount" to SyncStore.associations.size,
-                        "lastTimestamp" to SyncStore.lastTimestamp.get()
-                    )
-                )
+            val status = repository.status()
+            val snapshot = SyncStatusSnapshot(
+                contentCount = status.contentCount,
+                journalCount = status.journalCount,
+                associationCount = status.associationCount,
+                lastTimestamp = status.lastTimestamp
             )
+            call.respond(simpleSuccess(snapshot))
         }
 
         // Legacy placeholder full sync trigger
         post("/") {
-            call.respond(
-                success(
-                    mapOf(
-                        "started" to true,
-                        "timestamp" to SyncStore.now()
-                    )
-                )
+            val payload = SyncTriggerResponse(
+                started = true,
+                timestamp = System.currentTimeMillis()
             )
+            call.respond(simpleSuccess(payload))
         }
 
         // Content
         route("/content") {
             post {
                 val req = call.receive<ContentUploadRequest>()
-                val version = SyncStore.nextVersion()
-                val uploadedAt = SyncStore.now()
-                SyncStore.content[req.id] = StoredContent(
-                    id = req.id,
-                    type = req.type,
-                    content = req.content,
-                    mediaUri = req.mediaUri,
-                    createdAt = req.createdAt,
-                    lastUpdated = req.lastUpdated,
-                    serverVersion = version
+                val stored = repository.upsertContent(
+                    ContentRecord(
+                        id = req.id,
+                        type = req.type,
+                        content = req.content,
+                        mediaUri = req.mediaUri,
+                        createdAt = req.createdAt,
+                        lastUpdated = req.lastUpdated,
+                        serverVersion = 0L,
+                        deviceId = req.deviceId
+                    )
                 )
-                call.respond(ContentUploadResponse(req.id, version, uploadedAt))
+                call.respond(
+                    ContentUploadResponse(
+                        id = stored.id,
+                        serverVersion = stored.serverVersion,
+                        uploadedAt = stored.lastUpdated
+                    )
+                )
             }
 
             get("/changes") {
@@ -71,14 +123,21 @@ fun Route.syncRoutes() {
                         error("MISSING_PARAMETER", "since parameter is required")
                     )
 
-                val changes = SyncStore.content.values
-                    .filter { it.lastUpdated > since || it.serverVersion > since }
-                    .map { it.toChange() }
-                val deletions = SyncStore.contentDeletions
-                    .filterValues { it > since }
-                    .map { ContentDeletion(id = it.key, deletedAt = it.value) }
-                val lastTs = SyncStore.lastTimestamp.get()
-                call.respond(ContentChangesResponse(changes, deletions, lastTs))
+                val changeSet = repository.contentChanges(since)
+                val changes = changeSet.changes.map {
+                    ContentChange(
+                        id = it.id,
+                        type = it.type,
+                        content = it.content,
+                        mediaUri = it.mediaUri,
+                        createdAt = it.createdAt,
+                        lastUpdated = it.lastUpdated,
+                        serverVersion = it.serverVersion,
+                        isDeleted = false
+                    )
+                }
+                val deletions = changeSet.deletions.map { ContentDeletion(id = it.id, deletedAt = it.deletedAt) }
+                call.respond(ContentChangesResponse(changes, deletions, changeSet.lastTimestamp))
             }
 
             post("/{contentId}") {
@@ -87,19 +146,31 @@ fun Route.syncRoutes() {
                     error("MISSING_PARAMETER", "contentId is required")
                 )
                 val req = call.receive<ContentUpdateRequest>()
-                val existing = SyncStore.content[contentId]
-                val version = SyncStore.nextVersion()
-                val updatedAt = SyncStore.now()
-                SyncStore.content[contentId] = StoredContent(
-                    id = contentId,
-                    type = existing?.type ?: "TEXT",
-                    content = req.content ?: existing?.content,
-                    mediaUri = req.mediaUri ?: existing?.mediaUri,
-                    createdAt = existing?.createdAt ?: updatedAt,
-                    lastUpdated = req.lastUpdated,
-                    serverVersion = version
+                val existing = repository.getContent(contentId)
+                when (val constraint = req.versionConstraint) {
+                    is VersionConstraint.Known -> {
+                        if (existing != null && existing.serverVersion > constraint.serverVersion) {
+                            return@post call.respond(
+                                HttpStatusCode.Conflict,
+                                error("CONFLICT", "Server has a newer version (${constraint.serverVersion} < ${existing.serverVersion})")
+                            )
+                        }
+                    }
+                    VersionConstraint.None -> Unit
+                }
+                val updated = repository.upsertContent(
+                    ContentRecord(
+                        id = contentId,
+                        type = existing?.type ?: "TEXT",
+                        content = req.content ?: existing?.content,
+                        mediaUri = req.mediaUri ?: existing?.mediaUri,
+                        createdAt = existing?.createdAt ?: System.currentTimeMillis(),
+                        lastUpdated = req.lastUpdated,
+                        serverVersion = existing?.serverVersion ?: 0L,
+                        deviceId = req.deviceId
+                    )
                 )
-                call.respond(ContentUpdateResponse(contentId, version, updatedAt))
+                call.respond(ContentUpdateResponse(contentId, updated.serverVersion, updated.lastUpdated))
             }
 
             post("/{contentId}/delete") {
@@ -107,9 +178,8 @@ fun Route.syncRoutes() {
                     HttpStatusCode.BadRequest,
                     error("MISSING_PARAMETER", "contentId is required")
                 )
-                val deletedAt = SyncStore.now()
-                SyncStore.content.remove(contentId)
-                SyncStore.contentDeletions[contentId] = deletedAt
+                val deletedAt = System.currentTimeMillis()
+                repository.deleteContent(contentId, deletedAt)
                 call.respond(HttpStatusCode.OK)
             }
         }
@@ -118,17 +188,18 @@ fun Route.syncRoutes() {
         route("/journals") {
             post {
                 val req = call.receive<JournalUploadRequest>()
-                val version = SyncStore.nextVersion()
-                val uploadedAt = SyncStore.now()
-                SyncStore.journals[req.id] = StoredJournal(
-                    id = req.id,
-                    title = req.title,
-                    description = req.description,
-                    createdAt = req.createdAt,
-                    lastUpdated = req.lastUpdated,
-                    serverVersion = version
+                val stored = repository.upsertJournal(
+                    JournalRecord(
+                        id = req.id,
+                        title = req.title,
+                        description = req.description,
+                        createdAt = req.createdAt,
+                        lastUpdated = req.lastUpdated,
+                        serverVersion = 0L,
+                        deviceId = req.deviceId
+                    )
                 )
-                call.respond(JournalUploadResponse(req.id, version, uploadedAt))
+                call.respond(JournalUploadResponse(req.id, stored.serverVersion, stored.lastUpdated))
             }
 
             get("/changes") {
@@ -137,14 +208,20 @@ fun Route.syncRoutes() {
                         HttpStatusCode.BadRequest,
                         error("MISSING_PARAMETER", "since parameter is required")
                     )
-                val changes = SyncStore.journals.values
-                    .filter { it.lastUpdated > since || it.serverVersion > since }
-                    .map { it.toChange() }
-                val deletions = SyncStore.journalDeletions
-                    .filterValues { it > since }
-                    .map { JournalDeletion(id = it.key, deletedAt = it.value) }
-                val lastTs = SyncStore.lastTimestamp.get()
-                call.respond(JournalChangesResponse(changes, deletions, lastTs))
+                val changeSet = repository.journalChanges(since)
+                val changes = changeSet.changes.map {
+                    JournalChange(
+                        id = it.id,
+                        title = it.title,
+                        description = it.description,
+                        createdAt = it.createdAt,
+                        lastUpdated = it.lastUpdated,
+                        serverVersion = it.serverVersion,
+                        isDeleted = false
+                    )
+                }
+                val deletions = changeSet.deletions.map { JournalDeletion(id = it.id, deletedAt = it.deletedAt) }
+                call.respond(JournalChangesResponse(changes, deletions, changeSet.lastTimestamp))
             }
 
             post("/{journalId}") {
@@ -153,18 +230,31 @@ fun Route.syncRoutes() {
                     error("MISSING_PARAMETER", "journalId is required")
                 )
                 val req = call.receive<JournalUpdateRequest>()
-                val existing = SyncStore.journals[journalId]
-                val version = SyncStore.nextVersion()
-                val updatedAt = SyncStore.now()
-                SyncStore.journals[journalId] = StoredJournal(
-                    id = journalId,
-                    title = req.title ?: existing?.title.orEmpty(),
-                    description = req.description ?: existing?.description.orEmpty(),
-                    createdAt = existing?.createdAt ?: updatedAt,
-                    lastUpdated = req.lastUpdated,
-                    serverVersion = version
+                val existing = repository.getJournal(journalId)
+                when (val constraint = req.versionConstraint) {
+                    is VersionConstraint.Known -> {
+                        if (existing != null && existing.serverVersion > constraint.serverVersion) {
+                            return@post call.respond(
+                                HttpStatusCode.Conflict,
+                                error("CONFLICT", "Server has a newer version (${constraint.serverVersion} < ${existing.serverVersion})")
+                            )
+                        }
+                    }
+                    VersionConstraint.None -> Unit
+                }
+                val updatedAt = System.currentTimeMillis()
+                val stored = repository.upsertJournal(
+                    JournalRecord(
+                        id = journalId,
+                        title = req.title ?: existing?.title.orEmpty(),
+                        description = req.description ?: existing?.description.orEmpty(),
+                        createdAt = existing?.createdAt ?: updatedAt,
+                        lastUpdated = req.lastUpdated,
+                        serverVersion = existing?.serverVersion ?: 0L,
+                        deviceId = req.deviceId
+                    )
                 )
-                call.respond(JournalUpdateResponse(journalId, version, updatedAt))
+                call.respond(JournalUpdateResponse(journalId, stored.serverVersion, stored.lastUpdated))
             }
 
             post("/{journalId}/delete") {
@@ -172,9 +262,8 @@ fun Route.syncRoutes() {
                     HttpStatusCode.BadRequest,
                     error("MISSING_PARAMETER", "journalId is required")
                 )
-                val deletedAt = SyncStore.now()
-                SyncStore.journals.remove(journalId)
-                SyncStore.journalDeletions[journalId] = deletedAt
+                val deletedAt = System.currentTimeMillis()
+                repository.deleteJournal(journalId, deletedAt)
                 call.respond(HttpStatusCode.OK)
             }
         }
@@ -183,16 +272,18 @@ fun Route.syncRoutes() {
         route("/associations") {
             post {
                 val req = call.receive<AssociationUploadRequest>()
-                val uploadedAt = SyncStore.now()
-                req.associations.forEach { association ->
-                    SyncStore.associations[association.key()] = AssociationChange(
-                        journalId = association.journalId,
-                        contentId = association.contentId,
-                        createdAt = association.createdAt,
-                        serverVersion = SyncStore.nextVersion(),
-                        isDeleted = false
-                    )
-                }
+                val uploadedAt = System.currentTimeMillis()
+                repository.upsertAssociations(
+                    req.associations.map {
+                        AssociationRecord(
+                            journalId = it.journalId,
+                            contentId = it.contentId,
+                            createdAt = it.createdAt,
+                            serverVersion = 0L,
+                            deviceId = it.deviceId
+                        )
+                    }
+                )
                 call.respond(AssociationUploadResponse(req.associations.size, uploadedAt))
             }
 
@@ -202,29 +293,33 @@ fun Route.syncRoutes() {
                         HttpStatusCode.BadRequest,
                         error("MISSING_PARAMETER", "since parameter is required")
                     )
-                val changes = SyncStore.associations.values
-                    .filter { it.serverVersion > since || it.createdAt > since }
-                    .toList()
-                val deletions = SyncStore.associationDeletions
-                    .filterValues { it > since }
-                    .map { (key, deletedAt) ->
-                        AssociationDeletion(
-                            journalId = key.first,
-                            contentId = key.second,
-                            deletedAt = deletedAt
-                        )
-                    }
-                val lastTs = SyncStore.lastTimestamp.get()
-                call.respond(AssociationChangesResponse(changes, deletions, lastTs))
+                val changeSet = repository.associationChanges(since)
+                val changes = changeSet.changes.map {
+                    AssociationChange(
+                        journalId = it.journalId,
+                        contentId = it.contentId,
+                        createdAt = it.createdAt,
+                        serverVersion = it.serverVersion,
+                        isDeleted = false
+                    )
+                }
+                val deletions = changeSet.deletions.map {
+                    AssociationDeletion(
+                        journalId = it.key.journalId,
+                        contentId = it.key.contentId,
+                        deletedAt = it.deletedAt
+                    )
+                }
+                call.respond(AssociationChangesResponse(changes, deletions, changeSet.lastTimestamp))
             }
 
             post("/delete") {
                 val req = call.receive<AssociationDeleteRequest>()
-                val deletedAt = SyncStore.now()
-                req.associations.forEach { item ->
-                    SyncStore.associations.remove(item.key())
-                    SyncStore.associationDeletions[item.key()] = deletedAt
-                }
+                val deletedAt = System.currentTimeMillis()
+                repository.deleteAssociations(
+                    req.associations.map { AssociationKey(it.journalId, it.contentId) },
+                    deletedAt
+                )
                 call.respond(HttpStatusCode.OK)
             }
         }
@@ -233,26 +328,27 @@ fun Route.syncRoutes() {
         route("/media") {
             post {
                 val req = call.receive<MediaUploadRequest>()
-                val uploadedAt = SyncStore.now()
-                val mediaId = "media-${Random.nextLong().absoluteValue}"
-                val downloadUrl = "https://example.com/media/$mediaId"
-                val record = MediaDownloadResponse(
-                    contentId = req.contentId,
-                    fileName = req.fileName,
-                    mimeType = req.mimeType,
-                    sizeBytes = req.sizeBytes,
-                    data = req.data,
-                    downloadUrl = downloadUrl
-                )
-                SyncStore.media[mediaId] = record
-                call.respond(
-                    MediaUploadResponse(
+                val stored = repository.upsertMedia(
+                    MediaRecord(
+                        mediaId = "",
                         contentId = req.contentId,
-                        mediaId = mediaId,
-                        downloadUrl = downloadUrl,
-                        uploadedAt = uploadedAt
+                        fileName = req.fileName,
+                        mimeType = req.mimeType,
+                        sizeBytes = req.sizeBytes,
+                        data = req.data,
+                        createdAt = System.currentTimeMillis(),
+                        serverVersion = 0L,
+                        deviceId = req.deviceId
                     )
                 )
+                val downloadUrl = "https://example.com/media/${stored.mediaId}"
+                val response = MediaUploadResponse(
+                    contentId = req.contentId,
+                    mediaId = stored.mediaId,
+                    downloadUrl = downloadUrl,
+                    uploadedAt = stored.createdAt
+                )
+                call.respond(response)
             }
 
             get("/{mediaId}") {
@@ -260,270 +356,19 @@ fun Route.syncRoutes() {
                     HttpStatusCode.BadRequest,
                     error("MISSING_PARAMETER", "mediaId is required")
                 )
-                val record = SyncStore.media[mediaId]
+                val record = repository.getMedia(mediaId)
                     ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Media not found"))
-                call.respond(record)
+                call.respond(
+                    MediaDownloadResponse(
+                        contentId = record.contentId,
+                        fileName = record.fileName,
+                        mimeType = record.mimeType,
+                        sizeBytes = record.sizeBytes,
+                        data = record.data,
+                        downloadUrl = "https://example.com/media/${record.mediaId}"
+                    )
+                )
             }
         }
     }
 }
-
-// In-memory store used by the stubbed sync routes
-private object SyncStore {
-    val content = ConcurrentHashMap<String, StoredContent>()
-    val contentDeletions = ConcurrentHashMap<String, Long>()
-    val journals = ConcurrentHashMap<String, StoredJournal>()
-    val journalDeletions = ConcurrentHashMap<String, Long>()
-    val associations = ConcurrentHashMap<Pair<String, String>, AssociationChange>()
-    val associationDeletions = ConcurrentHashMap<Pair<String, String>, Long>()
-    val media = ConcurrentHashMap<String, MediaDownloadResponse>()
-    val lastTimestamp = AtomicLong(System.currentTimeMillis())
-
-    fun now(): Long {
-        val ts = System.currentTimeMillis()
-        lastTimestamp.set(ts)
-        return ts
-    }
-
-    fun nextVersion(): Long = lastTimestamp.incrementAndGet()
-}
-
-// Storage representations
-private data class StoredContent(
-    val id: String,
-    val type: String,
-    val content: String?,
-    val mediaUri: String?,
-    val createdAt: Long,
-    val lastUpdated: Long,
-    val serverVersion: Long
-) {
-    fun toChange(): ContentChange = ContentChange(
-        id = id,
-        type = type,
-        content = content,
-        mediaUri = mediaUri,
-        createdAt = createdAt,
-        lastUpdated = lastUpdated,
-        serverVersion = serverVersion,
-        isDeleted = false
-    )
-}
-
-private data class StoredJournal(
-    val id: String,
-    val title: String,
-    val description: String,
-    val createdAt: Long,
-    val lastUpdated: Long,
-    val serverVersion: Long
-) {
-    fun toChange(): JournalChange = JournalChange(
-        id = id,
-        title = title,
-        description = description,
-        createdAt = createdAt,
-        lastUpdated = lastUpdated,
-        serverVersion = serverVersion,
-        isDeleted = false
-    )
-}
-
-// Request/response models mirrored from client sync module
-@Serializable
-data class ContentUploadRequest(
-    val id: String,
-    val type: String,
-    val content: String?,
-    val mediaUri: String?,
-    val createdAt: Long,
-    val lastUpdated: Long,
-    val syncVersion: Long = 0
-)
-
-@Serializable
-data class ContentUploadResponse(
-    val id: String,
-    val serverVersion: Long,
-    val uploadedAt: Long
-)
-
-@Serializable
-data class ContentUpdateRequest(
-    val content: String? = null,
-    val mediaUri: String? = null,
-    val lastUpdated: Long,
-    val syncVersion: Long = 0
-)
-
-@Serializable
-data class ContentUpdateResponse(
-    val id: String,
-    val serverVersion: Long,
-    val updatedAt: Long
-)
-
-@Serializable
-data class ContentChangesResponse(
-    val changes: List<ContentChange>,
-    val deletions: List<ContentDeletion>,
-    val lastTimestamp: Long
-)
-
-@Serializable
-data class ContentChange(
-    val id: String,
-    val type: String,
-    val content: String? = null,
-    val mediaUri: String? = null,
-    val createdAt: Long,
-    val lastUpdated: Long,
-    val serverVersion: Long,
-    val isDeleted: Boolean = false
-)
-
-@Serializable
-data class ContentDeletion(
-    val id: String,
-    val deletedAt: Long
-)
-
-@Serializable
-data class JournalUploadRequest(
-    val id: String,
-    val title: String,
-    val description: String,
-    val createdAt: Long,
-    val lastUpdated: Long,
-    val syncVersion: Long = 0
-)
-
-@Serializable
-data class JournalUploadResponse(
-    val id: String,
-    val serverVersion: Long,
-    val uploadedAt: Long
-)
-
-@Serializable
-data class JournalUpdateRequest(
-    val title: String? = null,
-    val description: String? = null,
-    val lastUpdated: Long,
-    val syncVersion: Long = 0
-)
-
-@Serializable
-data class JournalUpdateResponse(
-    val id: String,
-    val serverVersion: Long,
-    val updatedAt: Long
-)
-
-@Serializable
-data class JournalChangesResponse(
-    val changes: List<JournalChange>,
-    val deletions: List<JournalDeletion>,
-    val lastTimestamp: Long
-)
-
-@Serializable
-data class JournalChange(
-    val id: String,
-    val title: String,
-    val description: String,
-    val createdAt: Long,
-    val lastUpdated: Long,
-    val serverVersion: Long,
-    val isDeleted: Boolean = false
-)
-
-@Serializable
-data class JournalDeletion(
-    val id: String,
-    val deletedAt: Long
-)
-
-@Serializable
-data class AssociationUploadRequest(
-    val associations: List<Association>
-)
-
-@Serializable
-data class Association(
-    val journalId: String,
-    val contentId: String,
-    val createdAt: Long,
-    val syncVersion: Long = 0
-) {
-    fun key(): Pair<String, String> = journalId to contentId
-}
-
-@Serializable
-data class AssociationUploadResponse(
-    val uploadedCount: Int,
-    val uploadedAt: Long
-)
-
-@Serializable
-data class AssociationChangesResponse(
-    val changes: List<AssociationChange>,
-    val deletions: List<AssociationDeletion>,
-    val lastTimestamp: Long
-)
-
-@Serializable
-data class AssociationChange(
-    val journalId: String,
-    val contentId: String,
-    val createdAt: Long,
-    val serverVersion: Long,
-    val isDeleted: Boolean = false
-)
-
-@Serializable
-data class AssociationDeletion(
-    val journalId: String,
-    val contentId: String,
-    val deletedAt: Long
-)
-
-@Serializable
-data class AssociationDeleteRequest(
-    val associations: List<AssociationDeleteItem>
-)
-
-@Serializable
-data class AssociationDeleteItem(
-    val journalId: String,
-    val contentId: String
-) {
-    fun key(): Pair<String, String> = journalId to contentId
-}
-
-@Serializable
-data class MediaUploadRequest(
-    val contentId: String,
-    val fileName: String,
-    val mimeType: String,
-    val sizeBytes: Long,
-    val data: ByteArray
-)
-
-@Serializable
-data class MediaUploadResponse(
-    val contentId: String,
-    val mediaId: String,
-    val downloadUrl: String,
-    val uploadedAt: Long
-)
-
-@Serializable
-data class MediaDownloadResponse(
-    val contentId: String,
-    val fileName: String,
-    val mimeType: String,
-    val sizeBytes: Long,
-    val data: ByteArray,
-    val downloadUrl: String
-)

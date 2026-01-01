@@ -143,23 +143,6 @@ fun Route.mediaRoutes() {
     }
 }
 
-fun Route.syncRoutes() {
-    route("/sync") {
-        get("/status") {
-            call.respond(
-                HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Sync status not implemented yet")
-            )
-        }
-        post("/") {
-            call.respond(
-                HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Sync operation not implemented yet")
-            )
-        }
-    }
-}
-
 fun Route.aiRoutes() {
     route("/ai") {
         post("/summarize") {

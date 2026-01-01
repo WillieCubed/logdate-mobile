@@ -28,6 +28,8 @@ fun main() {
 
 @OptIn(ExperimentalUuidApi::class)
 fun Application.module() {
+    val syncRepository = app.logdate.server.database.RepositoryFactory.createSyncRepository()
+
     // Configure JSON serialization
     install(ContentNegotiation) {
         json(Json {
@@ -74,7 +76,7 @@ fun Application.module() {
             notesRoutes()
             draftRoutes()
             mediaRoutes()
-            syncRoutes()
+            syncRoutes(syncRepository)
             aiRoutes()
             deviceRoutes()
             rewindRoutes()
