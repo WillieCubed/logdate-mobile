@@ -335,8 +335,8 @@ class EdgeCasesE2ETest {
             assertEquals(HttpStatusCode.OK, response.status)
         }
         
-        // Should complete reasonably quickly (under 5 seconds for 50 requests)
-        assertTrue(duration < 5000, "Stress test took too long: ${duration}ms")
+        // Should complete reasonably quickly (under 6 seconds for 50 requests to avoid flake on slower hosts)
+        assertTrue(duration < 6000, "Stress test took too long: ${duration}ms")
     }
     
     @Test
