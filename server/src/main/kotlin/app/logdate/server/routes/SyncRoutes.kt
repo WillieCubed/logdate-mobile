@@ -1,12 +1,10 @@
 package app.logdate.server.routes
 
+import app.logdate.server.auth.TokenService
 import app.logdate.server.responses.error
 import app.logdate.server.responses.simpleSuccess
-// Transport-only DTOs for sync; do not leak sync metadata into core domain models.
-import app.logdate.shared.model.sync.Association
 import app.logdate.shared.model.sync.AssociationChange
 import app.logdate.shared.model.sync.AssociationChangesResponse
-import app.logdate.shared.model.sync.AssociationDeleteItem
 import app.logdate.shared.model.sync.AssociationDeleteRequest
 import app.logdate.shared.model.sync.AssociationDeletion
 import app.logdate.shared.model.sync.AssociationUploadRequest
@@ -18,7 +16,6 @@ import app.logdate.shared.model.sync.ContentUpdateRequest
 import app.logdate.shared.model.sync.ContentUpdateResponse
 import app.logdate.shared.model.sync.ContentUploadRequest
 import app.logdate.shared.model.sync.ContentUploadResponse
-import app.logdate.shared.model.sync.DeviceId
 import app.logdate.shared.model.sync.JournalChange
 import app.logdate.shared.model.sync.JournalChangesResponse
 import app.logdate.shared.model.sync.JournalDeletion
@@ -30,49 +27,93 @@ import app.logdate.shared.model.sync.MediaDownloadResponse
 import app.logdate.shared.model.sync.MediaUploadRequest
 import app.logdate.shared.model.sync.MediaUploadResponse
 import app.logdate.shared.model.sync.VersionConstraint
-import app.logdate.server.sync.AssociationDeletionMarker
 import app.logdate.server.sync.AssociationKey
 import app.logdate.server.sync.AssociationRecord
-import app.logdate.server.sync.ContentDeletionMarker
 import app.logdate.server.sync.ContentRecord
-import app.logdate.server.sync.InMemorySyncRepository
-import app.logdate.server.sync.JournalDeletionMarker
 import app.logdate.server.sync.JournalRecord
 import app.logdate.server.sync.MediaRecord
 import app.logdate.server.sync.SyncRepository
+import io.github.aakira.napier.Napier
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
+import java.util.UUID
+
+@Serializable
+private data class SyncStatusSnapshot(
+    val contentCount: Int,
+    val journalCount: Int,
+    val associationCount: Int,
+    val lastTimestamp: Long
+)
+
+@Serializable
+private data class SyncTriggerResponse(
+    val started: Boolean,
+    val timestamp: Long
+)
 
 /**
- * Minimal in-memory sync implementation to replace previous 501 stubs.
- * This is intentionally simple but matches the shapes expected by the client Cloud API.
- * Data is stored in-memory per server instance and is not persisted.
+ * Extracts and validates the user ID from the Authorization header.
+ * Returns null and responds with 401 if authentication fails.
+ */
+private suspend fun extractUserId(
+    call: ApplicationCall,
+    tokenService: TokenService?
+): UUID? {
+    // If no token service is configured, use a test user ID for development
+    if (tokenService == null) {
+        Napier.w("TokenService not configured, using test user ID")
+        return UUID.fromString("00000000-0000-0000-0000-000000000001")
+    }
+
+    val authHeader = call.request.header(HttpHeaders.Authorization)
+    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        call.respond(
+            HttpStatusCode.Unauthorized,
+            error("UNAUTHORIZED", "Missing or invalid Authorization header")
+        )
+        return null
+    }
+
+    val token = authHeader.removePrefix("Bearer ").trim()
+    val accountId = tokenService.validateAccessToken(token)
+    if (accountId == null) {
+        call.respond(
+            HttpStatusCode.Unauthorized,
+            error("UNAUTHORIZED", "Invalid or expired token")
+        )
+        return null
+    }
+
+    return try {
+        UUID.fromString(accountId)
+    } catch (e: IllegalArgumentException) {
+        Napier.e("Invalid account ID format in token: $accountId", e)
+        call.respond(
+            HttpStatusCode.Unauthorized,
+            error("UNAUTHORIZED", "Invalid token payload")
+        )
+        null
+    }
+}
+
+/**
+ * Sync routes with JWT authentication.
+ * All endpoints require a valid Bearer token and scope data by user ID.
  */
 fun Route.syncRoutes(
-    repository: SyncRepository = InMemorySyncRepository()
+    repository: SyncRepository,
+    tokenService: TokenService? = null
 ) {
-    @Serializable
-    data class SyncStatusSnapshot(
-        val contentCount: Int,
-        val journalCount: Int,
-        val associationCount: Int,
-        val lastTimestamp: Long
-    )
-
-    @Serializable
-    data class SyncTriggerResponse(
-        val started: Boolean,
-        val timestamp: Long
-    )
-
     route("/sync") {
         // High-level status (used by smoke tests)
         get("/status") {
-            val status = repository.status()
+            val userId = extractUserId(call, tokenService) ?: return@get
+            val status = repository.status(userId)
             val snapshot = SyncStatusSnapshot(
                 contentCount = status.contentCount,
                 journalCount = status.journalCount,
@@ -84,6 +125,7 @@ fun Route.syncRoutes(
 
         // Legacy placeholder full sync trigger
         post("/") {
+            val userId = extractUserId(call, tokenService) ?: return@post
             val payload = SyncTriggerResponse(
                 started = true,
                 timestamp = System.currentTimeMillis()
@@ -94,8 +136,11 @@ fun Route.syncRoutes(
         // Content
         route("/content") {
             post {
+                val userId = extractUserId(call, tokenService) ?: return@post
                 val req = call.receive<ContentUploadRequest>()
+                Napier.d("Content upload for user $userId: ${req.id}")
                 val stored = repository.upsertContent(
+                    userId,
                     ContentRecord(
                         id = req.id,
                         type = req.type,
@@ -117,13 +162,14 @@ fun Route.syncRoutes(
             }
 
             get("/changes") {
+                val userId = extractUserId(call, tokenService) ?: return@get
                 val since = call.request.queryParameters["since"]?.toLongOrNull()
                     ?: return@get call.respond(
                         HttpStatusCode.BadRequest,
                         error("MISSING_PARAMETER", "since parameter is required")
                     )
 
-                val changeSet = repository.contentChanges(since)
+                val changeSet = repository.contentChanges(userId, since)
                 val changes = changeSet.changes.map {
                     ContentChange(
                         id = it.id,
@@ -141,12 +187,13 @@ fun Route.syncRoutes(
             }
 
             post("/{contentId}") {
+                val userId = extractUserId(call, tokenService) ?: return@post
                 val contentId = call.parameters["contentId"] ?: return@post call.respond(
                     HttpStatusCode.BadRequest,
                     error("MISSING_PARAMETER", "contentId is required")
                 )
                 val req = call.receive<ContentUpdateRequest>()
-                val existing = repository.getContent(contentId)
+                val existing = repository.getContent(userId, contentId)
                 when (val constraint = req.versionConstraint) {
                     is VersionConstraint.Known -> {
                         if (existing != null && existing.serverVersion > constraint.serverVersion) {
@@ -159,6 +206,7 @@ fun Route.syncRoutes(
                     VersionConstraint.None -> Unit
                 }
                 val updated = repository.upsertContent(
+                    userId,
                     ContentRecord(
                         id = contentId,
                         type = existing?.type ?: "TEXT",
@@ -174,12 +222,13 @@ fun Route.syncRoutes(
             }
 
             post("/{contentId}/delete") {
+                val userId = extractUserId(call, tokenService) ?: return@post
                 val contentId = call.parameters["contentId"] ?: return@post call.respond(
                     HttpStatusCode.BadRequest,
                     error("MISSING_PARAMETER", "contentId is required")
                 )
                 val deletedAt = System.currentTimeMillis()
-                repository.deleteContent(contentId, deletedAt)
+                repository.deleteContent(userId, contentId, deletedAt)
                 call.respond(HttpStatusCode.OK)
             }
         }
@@ -187,8 +236,11 @@ fun Route.syncRoutes(
         // Journals
         route("/journals") {
             post {
+                val userId = extractUserId(call, tokenService) ?: return@post
                 val req = call.receive<JournalUploadRequest>()
+                Napier.d("Journal upload for user $userId: ${req.id}")
                 val stored = repository.upsertJournal(
+                    userId,
                     JournalRecord(
                         id = req.id,
                         title = req.title,
@@ -203,12 +255,13 @@ fun Route.syncRoutes(
             }
 
             get("/changes") {
+                val userId = extractUserId(call, tokenService) ?: return@get
                 val since = call.request.queryParameters["since"]?.toLongOrNull()
                     ?: return@get call.respond(
                         HttpStatusCode.BadRequest,
                         error("MISSING_PARAMETER", "since parameter is required")
                     )
-                val changeSet = repository.journalChanges(since)
+                val changeSet = repository.journalChanges(userId, since)
                 val changes = changeSet.changes.map {
                     JournalChange(
                         id = it.id,
@@ -225,12 +278,13 @@ fun Route.syncRoutes(
             }
 
             post("/{journalId}") {
+                val userId = extractUserId(call, tokenService) ?: return@post
                 val journalId = call.parameters["journalId"] ?: return@post call.respond(
                     HttpStatusCode.BadRequest,
                     error("MISSING_PARAMETER", "journalId is required")
                 )
                 val req = call.receive<JournalUpdateRequest>()
-                val existing = repository.getJournal(journalId)
+                val existing = repository.getJournal(userId, journalId)
                 when (val constraint = req.versionConstraint) {
                     is VersionConstraint.Known -> {
                         if (existing != null && existing.serverVersion > constraint.serverVersion) {
@@ -244,6 +298,7 @@ fun Route.syncRoutes(
                 }
                 val updatedAt = System.currentTimeMillis()
                 val stored = repository.upsertJournal(
+                    userId,
                     JournalRecord(
                         id = journalId,
                         title = req.title ?: existing?.title.orEmpty(),
@@ -258,12 +313,13 @@ fun Route.syncRoutes(
             }
 
             post("/{journalId}/delete") {
+                val userId = extractUserId(call, tokenService) ?: return@post
                 val journalId = call.parameters["journalId"] ?: return@post call.respond(
                     HttpStatusCode.BadRequest,
                     error("MISSING_PARAMETER", "journalId is required")
                 )
                 val deletedAt = System.currentTimeMillis()
-                repository.deleteJournal(journalId, deletedAt)
+                repository.deleteJournal(userId, journalId, deletedAt)
                 call.respond(HttpStatusCode.OK)
             }
         }
@@ -271,9 +327,11 @@ fun Route.syncRoutes(
         // Associations
         route("/associations") {
             post {
+                val userId = extractUserId(call, tokenService) ?: return@post
                 val req = call.receive<AssociationUploadRequest>()
                 val uploadedAt = System.currentTimeMillis()
                 repository.upsertAssociations(
+                    userId,
                     req.associations.map {
                         AssociationRecord(
                             journalId = it.journalId,
@@ -288,12 +346,13 @@ fun Route.syncRoutes(
             }
 
             get("/changes") {
+                val userId = extractUserId(call, tokenService) ?: return@get
                 val since = call.request.queryParameters["since"]?.toLongOrNull()
                     ?: return@get call.respond(
                         HttpStatusCode.BadRequest,
                         error("MISSING_PARAMETER", "since parameter is required")
                     )
-                val changeSet = repository.associationChanges(since)
+                val changeSet = repository.associationChanges(userId, since)
                 val changes = changeSet.changes.map {
                     AssociationChange(
                         journalId = it.journalId,
@@ -314,9 +373,11 @@ fun Route.syncRoutes(
             }
 
             post("/delete") {
+                val userId = extractUserId(call, tokenService) ?: return@post
                 val req = call.receive<AssociationDeleteRequest>()
                 val deletedAt = System.currentTimeMillis()
                 repository.deleteAssociations(
+                    userId,
                     req.associations.map { AssociationKey(it.journalId, it.contentId) },
                     deletedAt
                 )
@@ -324,11 +385,14 @@ fun Route.syncRoutes(
             }
         }
 
-        // Media upload/download (no real storage)
+        // Media upload/download
         route("/media") {
             post {
+                val userId = extractUserId(call, tokenService) ?: return@post
                 val req = call.receive<MediaUploadRequest>()
+                Napier.d("Media upload for user $userId: ${req.fileName}")
                 val stored = repository.upsertMedia(
+                    userId,
                     MediaRecord(
                         mediaId = "",
                         contentId = req.contentId,
@@ -336,11 +400,13 @@ fun Route.syncRoutes(
                         mimeType = req.mimeType,
                         sizeBytes = req.sizeBytes,
                         data = req.data,
+                        storagePath = null,
                         createdAt = System.currentTimeMillis(),
                         serverVersion = 0L,
                         deviceId = req.deviceId
                     )
                 )
+                // TODO: Replace with GCS signed URL when GcsMediaStorage is wired
                 val downloadUrl = "https://example.com/media/${stored.mediaId}"
                 val response = MediaUploadResponse(
                     contentId = req.contentId,
@@ -352,12 +418,14 @@ fun Route.syncRoutes(
             }
 
             get("/{mediaId}") {
+                val userId = extractUserId(call, tokenService) ?: return@get
                 val mediaId = call.parameters["mediaId"] ?: return@get call.respond(
                     HttpStatusCode.BadRequest,
                     error("MISSING_PARAMETER", "mediaId is required")
                 )
-                val record = repository.getMedia(mediaId)
+                val record = repository.getMedia(userId, mediaId)
                     ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Media not found"))
+                // TODO: Replace with GCS signed URL when GcsMediaStorage is wired
                 call.respond(
                     MediaDownloadResponse(
                         contentId = record.contentId,

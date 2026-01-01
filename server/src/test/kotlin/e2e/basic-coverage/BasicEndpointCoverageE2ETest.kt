@@ -247,25 +247,25 @@ class BasicEndpointCoverageE2ETest {
         assertEquals(HttpStatusCode.NotImplemented, response.status)
     }
     
-    // Sync routes tests
+    // Sync routes tests - these now require authentication
     @Test
-    fun `sync status returns not implemented`() = testApplication {
+    fun `sync status requires authentication`() = testApplication {
         application {
             module()
         }
-        
+
         val response = client.get("/api/v1/sync/status")
-        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
     }
-    
+
     @Test
-    fun `sync operation returns not implemented`() = testApplication {
+    fun `sync operation requires authentication`() = testApplication {
         application {
             module()
         }
-        
+
         val response = client.post("/api/v1/sync/")
-        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
     }
     
     // AI routes tests

@@ -6,10 +6,7 @@ import app.logdate.client.sync.cloud.DefaultCloudJournalDataSource
 import app.logdate.client.sync.cloud.DefaultCloudAssociationDataSource
 import app.logdate.client.sync.cloud.DefaultCloudMediaDataSource
 import app.logdate.client.sync.cloud.JournalContentAssociation
-import app.logdate.client.sync.test.SimplifiedTestFactory
-import app.logdate.client.sync.test.SimpleMockJournalNotesRepository
-import app.logdate.client.sync.test.SimpleMockJournalRepository
-import app.logdate.client.sync.test.SimpleMockJournalContentRepository
+import app.logdate.client.sync.test.*
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
@@ -30,11 +27,11 @@ class AutomaticDownloadIntegrationTest {
     @Test
     fun testDownloadNewRemoteContent() = runTest {
         // Given: A sync manager with authenticated account and API client that returns remote changes
-        val mockApiClient = SimplifiedTestFactory.createSuccessfulApiClient()
-        val mockAccountRepository = SimplifiedTestFactory.createAuthenticatedAccountRepository()
-        val mockJournalNotesRepository = SimpleMockJournalNotesRepository()
-        val mockJournalRepository = SimpleMockJournalRepository()
-        val mockJournalContentRepository = SimpleMockJournalContentRepository()
+        val mockApiClient = fakeCloudApiClient()
+        val mockAccountRepository = fakeAccountRepository()
+        val mockJournalNotesRepository = FakeJournalNotesRepository()
+        val mockJournalRepository = FakeJournalRepository()
+        val mockJournalContentRepository = FakeJournalContentRepository()
         
         // Configure API client to return remote content changes
         val remoteNote = JournalNote.Text(
@@ -68,11 +65,15 @@ class AutomaticDownloadIntegrationTest {
             cloudAssociationDataSource = DefaultCloudAssociationDataSource(mockApiClient),
             cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
             cloudAccountRepository = mockAccountRepository,
+            sessionStorage = fakeSessionStorage(),
             journalRepository = mockJournalRepository,
             journalNotesRepository = mockJournalNotesRepository,
-            journalContentRepository = mockJournalContentRepository
+            journalContentRepository = mockJournalContentRepository,
+            journalConflictResolver = lastWriteWinsResolver(),
+            noteConflictResolver = lastWriteWinsResolver(),
+            syncMetadataService = fakeSyncMetadataService()
         )
-        
+
         // When: We download remote changes
         val result = syncManager.downloadRemoteChanges()
         
@@ -90,11 +91,11 @@ class AutomaticDownloadIntegrationTest {
     @Test
     fun testDownloadRemoteContentUpdates() = runTest {
         // Given: A sync manager with existing local content
-        val mockApiClient = SimplifiedTestFactory.createSuccessfulApiClient()
-        val mockAccountRepository = SimplifiedTestFactory.createAuthenticatedAccountRepository()
-        val mockJournalNotesRepository = SimpleMockJournalNotesRepository()
-        val mockJournalRepository = SimpleMockJournalRepository()
-        val mockJournalContentRepository = SimpleMockJournalContentRepository()
+        val mockApiClient = fakeCloudApiClient()
+        val mockAccountRepository = fakeAccountRepository()
+        val mockJournalNotesRepository = FakeJournalNotesRepository()
+        val mockJournalRepository = FakeJournalRepository()
+        val mockJournalContentRepository = FakeJournalContentRepository()
         
         // Add existing local note
         val existingNote = mockJournalNotesRepository.addTestNote("Original content")
@@ -125,11 +126,15 @@ class AutomaticDownloadIntegrationTest {
             cloudAssociationDataSource = DefaultCloudAssociationDataSource(mockApiClient),
             cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
             cloudAccountRepository = mockAccountRepository,
+            sessionStorage = fakeSessionStorage(),
             journalRepository = mockJournalRepository,
             journalNotesRepository = mockJournalNotesRepository,
-            journalContentRepository = mockJournalContentRepository
+            journalContentRepository = mockJournalContentRepository,
+            journalConflictResolver = lastWriteWinsResolver(),
+            noteConflictResolver = lastWriteWinsResolver(),
+            syncMetadataService = fakeSyncMetadataService()
         )
-        
+
         // When: We download remote changes
         val result = syncManager.downloadRemoteChanges()
         
@@ -141,11 +146,11 @@ class AutomaticDownloadIntegrationTest {
     @Test
     fun testDownloadRemoteContentDeletions() = runTest {
         // Given: A sync manager with API client that returns content deletions
-        val mockApiClient = SimplifiedTestFactory.createSuccessfulApiClient()
-        val mockAccountRepository = SimplifiedTestFactory.createAuthenticatedAccountRepository()
-        val mockJournalNotesRepository = SimpleMockJournalNotesRepository()
-        val mockJournalRepository = SimpleMockJournalRepository()
-        val mockJournalContentRepository = SimpleMockJournalContentRepository()
+        val mockApiClient = fakeCloudApiClient()
+        val mockAccountRepository = fakeAccountRepository()
+        val mockJournalNotesRepository = FakeJournalNotesRepository()
+        val mockJournalRepository = FakeJournalRepository()
+        val mockJournalContentRepository = FakeJournalContentRepository()
         
         val deletedNoteId = Uuid.random()
         
@@ -169,11 +174,15 @@ class AutomaticDownloadIntegrationTest {
             cloudAssociationDataSource = DefaultCloudAssociationDataSource(mockApiClient),
             cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
             cloudAccountRepository = mockAccountRepository,
+            sessionStorage = fakeSessionStorage(),
             journalRepository = mockJournalRepository,
             journalNotesRepository = mockJournalNotesRepository,
-            journalContentRepository = mockJournalContentRepository
+            journalContentRepository = mockJournalContentRepository,
+            journalConflictResolver = lastWriteWinsResolver(),
+            noteConflictResolver = lastWriteWinsResolver(),
+            syncMetadataService = fakeSyncMetadataService()
         )
-        
+
         // When: We download remote changes
         val result = syncManager.downloadRemoteChanges()
         
@@ -186,11 +195,11 @@ class AutomaticDownloadIntegrationTest {
     @Test
     fun testDownloadRemoteJournalChanges() = runTest {
         // Given: A sync manager with API client that returns journal changes
-        val mockApiClient = SimplifiedTestFactory.createSuccessfulApiClient()
-        val mockAccountRepository = SimplifiedTestFactory.createAuthenticatedAccountRepository()
-        val mockJournalNotesRepository = SimpleMockJournalNotesRepository()
-        val mockJournalRepository = SimpleMockJournalRepository()
-        val mockJournalContentRepository = SimpleMockJournalContentRepository()
+        val mockApiClient = fakeCloudApiClient()
+        val mockAccountRepository = fakeAccountRepository()
+        val mockJournalNotesRepository = FakeJournalNotesRepository()
+        val mockJournalRepository = FakeJournalRepository()
+        val mockJournalContentRepository = FakeJournalContentRepository()
         
         val remoteJournal = Journal(
             id = Uuid.random(),
@@ -224,11 +233,15 @@ class AutomaticDownloadIntegrationTest {
             cloudAssociationDataSource = DefaultCloudAssociationDataSource(mockApiClient),
             cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
             cloudAccountRepository = mockAccountRepository,
+            sessionStorage = fakeSessionStorage(),
             journalRepository = mockJournalRepository,
             journalNotesRepository = mockJournalNotesRepository,
-            journalContentRepository = mockJournalContentRepository
+            journalContentRepository = mockJournalContentRepository,
+            journalConflictResolver = lastWriteWinsResolver(),
+            noteConflictResolver = lastWriteWinsResolver(),
+            syncMetadataService = fakeSyncMetadataService()
         )
-        
+
         // When: We download remote changes
         val result = syncManager.downloadRemoteChanges()
         
@@ -241,11 +254,11 @@ class AutomaticDownloadIntegrationTest {
     @Test
     fun testDownloadRemoteAssociationChanges() = runTest {
         // Given: A sync manager with API client that returns association changes
-        val mockApiClient = SimplifiedTestFactory.createSuccessfulApiClient()
-        val mockAccountRepository = SimplifiedTestFactory.createAuthenticatedAccountRepository()
-        val mockJournalNotesRepository = SimpleMockJournalNotesRepository()
-        val mockJournalRepository = SimpleMockJournalRepository()
-        val mockJournalContentRepository = SimpleMockJournalContentRepository()
+        val mockApiClient = fakeCloudApiClient()
+        val mockAccountRepository = fakeAccountRepository()
+        val mockJournalNotesRepository = FakeJournalNotesRepository()
+        val mockJournalRepository = FakeJournalRepository()
+        val mockJournalContentRepository = FakeJournalContentRepository()
         
         val journalId = Uuid.random()
         val contentId = Uuid.random()
@@ -273,11 +286,15 @@ class AutomaticDownloadIntegrationTest {
             cloudAssociationDataSource = DefaultCloudAssociationDataSource(mockApiClient),
             cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
             cloudAccountRepository = mockAccountRepository,
+            sessionStorage = fakeSessionStorage(),
             journalRepository = mockJournalRepository,
             journalNotesRepository = mockJournalNotesRepository,
-            journalContentRepository = mockJournalContentRepository
+            journalContentRepository = mockJournalContentRepository,
+            journalConflictResolver = lastWriteWinsResolver(),
+            noteConflictResolver = lastWriteWinsResolver(),
+            syncMetadataService = fakeSyncMetadataService()
         )
-        
+
         // When: We download remote changes
         val result = syncManager.downloadRemoteChanges()
         
@@ -290,11 +307,11 @@ class AutomaticDownloadIntegrationTest {
     @Test
     fun testDownloadFailsWithUnauthenticatedUser() = runTest {
         // Given: A sync manager with unauthenticated user
-        val mockApiClient = SimplifiedTestFactory.createSuccessfulApiClient()
-        val mockAccountRepository = SimplifiedTestFactory.createUnauthenticatedAccountRepository()
-        val mockJournalNotesRepository = SimpleMockJournalNotesRepository()
-        val mockJournalRepository = SimpleMockJournalRepository()
-        val mockJournalContentRepository = SimpleMockJournalContentRepository()
+        val mockApiClient = fakeCloudApiClient()
+        val mockAccountRepository = fakeAccountRepository(authenticated = false)
+        val mockJournalNotesRepository = FakeJournalNotesRepository()
+        val mockJournalRepository = FakeJournalRepository()
+        val mockJournalContentRepository = FakeJournalContentRepository()
         
         val syncManager = DefaultSyncManager(
             cloudContentDataSource = DefaultCloudContentDataSource(mockApiClient),
@@ -302,11 +319,15 @@ class AutomaticDownloadIntegrationTest {
             cloudAssociationDataSource = DefaultCloudAssociationDataSource(mockApiClient),
             cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
             cloudAccountRepository = mockAccountRepository,
+            sessionStorage = fakeSessionStorage(authenticated = false),
             journalRepository = mockJournalRepository,
             journalNotesRepository = mockJournalNotesRepository,
-            journalContentRepository = mockJournalContentRepository
+            journalContentRepository = mockJournalContentRepository,
+            journalConflictResolver = lastWriteWinsResolver(),
+            noteConflictResolver = lastWriteWinsResolver(),
+            syncMetadataService = fakeSyncMetadataService()
         )
-        
+
         // When: We attempt to download without authentication
         val result = syncManager.downloadRemoteChanges()
         
@@ -321,11 +342,11 @@ class AutomaticDownloadIntegrationTest {
     @Test
     fun testDownloadHandlesApiErrors() = runTest {
         // Given: A sync manager with failing API client
-        val mockApiClient = SimplifiedTestFactory.createFailingApiClient()
-        val mockAccountRepository = SimplifiedTestFactory.createAuthenticatedAccountRepository()
-        val mockJournalNotesRepository = SimpleMockJournalNotesRepository()
-        val mockJournalRepository = SimpleMockJournalRepository()
-        val mockJournalContentRepository = SimpleMockJournalContentRepository()
+        val mockApiClient = failingCloudApiClient()
+        val mockAccountRepository = fakeAccountRepository()
+        val mockJournalNotesRepository = FakeJournalNotesRepository()
+        val mockJournalRepository = FakeJournalRepository()
+        val mockJournalContentRepository = FakeJournalContentRepository()
         
         val syncManager = DefaultSyncManager(
             cloudContentDataSource = DefaultCloudContentDataSource(mockApiClient),
@@ -333,11 +354,15 @@ class AutomaticDownloadIntegrationTest {
             cloudAssociationDataSource = DefaultCloudAssociationDataSource(mockApiClient),
             cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
             cloudAccountRepository = mockAccountRepository,
+            sessionStorage = fakeSessionStorage(),
             journalRepository = mockJournalRepository,
             journalNotesRepository = mockJournalNotesRepository,
-            journalContentRepository = mockJournalContentRepository
+            journalContentRepository = mockJournalContentRepository,
+            journalConflictResolver = lastWriteWinsResolver(),
+            noteConflictResolver = lastWriteWinsResolver(),
+            syncMetadataService = fakeSyncMetadataService()
         )
-        
+
         // When: We attempt to download with failing API
         val result = syncManager.downloadRemoteChanges()
         

@@ -253,16 +253,16 @@ class StubEndpointsE2ETest {
     }
     
     @Test
-    fun `sync routes with synchronization payloads`() = testApplication {
+    fun `sync routes require authentication`() = testApplication {
         application {
             module()
         }
-        
-        // Test sync status
+
+        // Test sync status - requires authentication
         val statusResponse = client.get("/api/v1/sync/status")
-        assertEquals(HttpStatusCode.OK, statusResponse.status)
-        
-        // Test sync operation with various sync types
+        assertEquals(HttpStatusCode.Unauthorized, statusResponse.status)
+
+        // Test sync operation - requires authentication
         val fullSyncResponse = client.post("/api/v1/sync/") {
             contentType(ContentType.Application.Json)
             setBody("""
@@ -273,8 +273,8 @@ class StubEndpointsE2ETest {
                 }
             """.trimIndent())
         }
-        assertEquals(HttpStatusCode.OK, fullSyncResponse.status)
-        
+        assertEquals(HttpStatusCode.Unauthorized, fullSyncResponse.status)
+
         val incrementalSyncResponse = client.post("/api/v1/sync/") {
             contentType(ContentType.Application.Json)
             setBody("""
@@ -285,7 +285,7 @@ class StubEndpointsE2ETest {
                 }
             """.trimIndent())
         }
-        assertEquals(HttpStatusCode.OK, incrementalSyncResponse.status)
+        assertEquals(HttpStatusCode.Unauthorized, incrementalSyncResponse.status)
     }
     
     @Test
@@ -444,29 +444,28 @@ class StubEndpointsE2ETest {
         application {
             module()
         }
-        
+
+        // Stub endpoints that don't require auth
         val stubEndpoints = listOf(
             "/api/v1/auth/login",
             "/api/v1/passkeys/register/begin",
             "/api/v1/journals/",
             "/api/v1/notes/",
             "/api/v1/media/",
-            "/api/v1/sync/",
             "/api/v1/ai/summarize",
             "/api/v1/devices/",
             "/api/v1/rewind/",
             "/api/v1/drafts/"
         )
-        
+
         stubEndpoints.forEach { endpoint ->
             // Test with completely malformed JSON
             val malformedResponse = client.post(endpoint) {
                 contentType(ContentType.Application.Json)
                 setBody("{invalid json structure")
             }
-            val expected = if (endpoint == "/api/v1/sync/") HttpStatusCode.OK else HttpStatusCode.NotImplemented
-            assertEquals(expected, malformedResponse.status, "Endpoint $endpoint should still return expected status for malformed JSON")
-            
+            assertEquals(HttpStatusCode.NotImplemented, malformedResponse.status, "Endpoint $endpoint should still return expected status for malformed JSON")
+
             // Test with extremely large payload
             val largePayload = "a".repeat(100000)
             val largeResponse = client.post(endpoint) {
@@ -474,13 +473,14 @@ class StubEndpointsE2ETest {
                 setBody("""{"data": "$largePayload"}""")
             }
             // Should handle gracefully - either 501 or some error, but not crash
-            val acceptable = if (endpoint == "/api/v1/sync/") {
-                // Sync stub tolerates payloads; 200 is acceptable here.
-                largeResponse.status.value in listOf(200) || largeResponse.status.value in 400..599
-            } else {
-                largeResponse.status.value in 400..599
-            }
-            assertTrue(acceptable, "Large payload should be handled gracefully for $endpoint")
+            assertTrue(largeResponse.status.value in 400..599, "Large payload should be handled gracefully for $endpoint")
         }
+
+        // Sync endpoints require auth - should return 401
+        val syncResponse = client.post("/api/v1/sync/") {
+            contentType(ContentType.Application.Json)
+            setBody("{invalid json structure")
+        }
+        assertEquals(HttpStatusCode.Unauthorized, syncResponse.status, "Sync endpoint should require authentication")
     }
 }

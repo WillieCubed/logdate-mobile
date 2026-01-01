@@ -1,9 +1,10 @@
 package app.logdate.client.sync.di
 
+import app.logdate.client.database.dao.sync.SyncMetadataDao
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.LastWriteWinsResolver
-import app.logdate.client.sync.metadata.AlwaysSyncMetadataService
+import app.logdate.client.sync.metadata.DatabaseSyncMetadataService
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.shared.model.Journal
 import org.koin.core.module.Module
@@ -32,6 +33,8 @@ val conflictResolverModule: Module = module {
         LastWriteWinsResolver()
     }
 
-    // Sync metadata service (stub for now)
-    single<SyncMetadataService> { AlwaysSyncMetadataService() }
+    // Sync metadata service backed by Room database
+    single<SyncMetadataService> {
+        DatabaseSyncMetadataService(get<SyncMetadataDao>())
+    }
 }

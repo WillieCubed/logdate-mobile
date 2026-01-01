@@ -27,6 +27,7 @@ import app.logdate.client.database.dao.journals.JournalContentDao
 import app.logdate.client.database.dao.media.IndexedMediaDao
 import app.logdate.client.database.dao.rewind.CachedRewindDao
 import app.logdate.client.database.dao.rewind.RewindGenerationRequestDao
+import app.logdate.client.database.dao.sync.SyncMetadataDao
 import app.logdate.client.database.entities.ImageNoteEntity
 import app.logdate.client.database.entities.JournalEntity
 import app.logdate.client.database.entities.JournalNoteCrossRef
@@ -46,6 +47,8 @@ import app.logdate.client.database.entities.rewind.RewindGenerationRequestEntity
 import app.logdate.client.database.entities.rewind.RewindImageContentEntity
 import app.logdate.client.database.entities.rewind.RewindTextContentEntity
 import app.logdate.client.database.entities.rewind.RewindVideoContentEntity
+import app.logdate.client.database.entities.sync.PendingUploadEntity
+import app.logdate.client.database.entities.sync.SyncCursorEntity
 import app.logdate.client.database.migrations.MIGRATION_10_11
 import app.logdate.client.database.migrations.MIGRATION_11_12
 import app.logdate.client.database.migrations.MIGRATION_12_13
@@ -57,6 +60,7 @@ import app.logdate.client.database.migrations.MIGRATION_17_18
 import app.logdate.client.database.migrations.MIGRATION_18_19
 import app.logdate.client.database.migrations.MIGRATION_19_20
 import app.logdate.client.database.migrations.MIGRATION_1_2
+import app.logdate.client.database.migrations.MIGRATION_20_21
 import app.logdate.client.database.migrations.MIGRATION_2_3
 import app.logdate.client.database.migrations.MIGRATION_3_4
 import app.logdate.client.database.migrations.MIGRATION_4_5
@@ -100,10 +104,13 @@ import kotlinx.coroutines.IO
         // Indexed media entities
         IndexedImageEntity::class,
         IndexedVideoEntity::class,
+        // Sync metadata entities
+        SyncCursorEntity::class,
+        PendingUploadEntity::class,
         // Others
         TranscriptionEntity::class,
     ],
-    version = 20, // Added FTS5 virtual table for full-text search
+    version = 21, // Added sync metadata tables
     exportSchema = true,
     autoMigrations = [
     ],
@@ -133,6 +140,7 @@ abstract class LogDateDatabase : RoomDatabase() {
     abstract fun indexedMediaDao(): IndexedMediaDao
     abstract fun transcriptionDao(): TranscriptionDao
     abstract fun searchDao(): SearchDao
+    abstract fun syncMetadataDao(): SyncMetadataDao
 }
 
 /**
@@ -186,6 +194,7 @@ fun getRoomDatabase(
         MIGRATION_17_18,
         MIGRATION_18_19,
         MIGRATION_19_20,
+        MIGRATION_20_21,
     )
     .fallbackToDestructiveMigration(destroyTablesOnUpgrade)
     .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)

@@ -59,6 +59,14 @@ dependencies {
     implementation(libs.hikariCP)
     implementation(libs.flyway.core)
     implementation(libs.flyway.database.postgresql)
+
+    // Google Cloud Storage
+    implementation("com.google.cloud:google-cloud-storage:2.30.1")
+
+    // Koin DI
+    implementation(platform(libs.koin.bom))
+    implementation(libs.koin.ktor)
+    implementation(libs.koin.logger.slf4j)
     
     // Testing
     testImplementation(libs.ktor.server.test.host)
@@ -75,10 +83,10 @@ dependencies {
 // Test configuration
 tasks.test {
     useJUnitPlatform()
-    systemProperty("junit.jupiter.execution.parallel.enabled", "true")
-    systemProperty("junit.jupiter.execution.parallel.mode.default", "concurrent")
-    maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
-    
+    // Disable parallel test execution due to Koin global context
+    systemProperty("junit.jupiter.execution.parallel.enabled", "false")
+    maxParallelForks = 1
+
     // Testcontainers configuration
     systemProperty("testcontainers.reuse.enable", "true")
 }

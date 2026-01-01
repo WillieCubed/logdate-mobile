@@ -2,6 +2,7 @@ package app.logdate.client.device
 
 import android.content.Context
 import android.content.pm.PackageManager
+import androidx.core.content.pm.PackageInfoCompat
 import io.github.aakira.napier.Napier
 
 /**
@@ -11,14 +12,14 @@ import io.github.aakira.napier.Napier
 class AndroidAppInfoProvider(
     private val context: Context
 ) : AppInfoProvider {
-    
+
     override fun getAppInfo(): AppInfo {
         try {
             val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            
+
             return AppInfo(
                 versionName = packageInfo.versionName ?: "unknown",
-                versionCode = packageInfo.versionCode,
+                versionCode = PackageInfoCompat.getLongVersionCode(packageInfo).toInt(),
                 packageName = context.packageName
             )
         } catch (e: PackageManager.NameNotFoundException) {

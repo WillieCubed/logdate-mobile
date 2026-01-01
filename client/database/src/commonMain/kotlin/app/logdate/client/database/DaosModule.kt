@@ -23,4 +23,5 @@ val daosModule: Module = module {
     single { get<LogDateDatabase>().indexedMediaDao() }
     single { get<LogDateDatabase>().transcriptionDao() }
     single { get<LogDateDatabase>().searchDao() }
+    single { get<LogDateDatabase>().syncMetadataDao() }
 }

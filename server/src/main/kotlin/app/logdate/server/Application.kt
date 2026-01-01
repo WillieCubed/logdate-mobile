@@ -1,13 +1,16 @@
 package app.logdate.server
 
 import app.logdate.SERVER_PORT
-import app.logdate.server.database.DatabaseConfig
+import app.logdate.server.auth.JwtTokenService
+import app.logdate.server.di.initializeDatabase
+import app.logdate.server.di.serverModule
 import app.logdate.server.routes.accountRoutes
 import app.logdate.server.routes.*
+import app.logdate.server.sync.SyncRepository
 import app.logdate.util.UuidSerializer
-import io.github.aakira.napier.Napier
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
+import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
@@ -17,20 +20,43 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.uuid.Uuid
 import kotlin.uuid.ExperimentalUuidApi
+import org.koin.ktor.plugin.Koin
+import org.koin.ktor.ext.inject
+import org.koin.logger.slf4jLogger
 
 fun main() {
-    // Initialize repositories (database or in-memory fallback)
-    app.logdate.server.database.RepositoryFactory.initializeDatabase()
-    
-    embeddedServer(Netty, port = SERVER_PORT, host = "0.0.0.0", module = Application::module)
-        .start(wait = true)
+    val isDatabaseAvailable = initializeDatabase()
+
+    embeddedServer(Netty, port = SERVER_PORT, host = "0.0.0.0") {
+        module(isDatabaseAvailable)
+    }.start(wait = true)
 }
 
 @OptIn(ExperimentalUuidApi::class)
-fun Application.module() {
-    val syncRepository = app.logdate.server.database.RepositoryFactory.createSyncRepository()
+fun Application.module(isDatabaseAvailable: Boolean = false) {
+    // Stop any existing Koin instance to ensure clean state for tests
+    try {
+        org.koin.core.context.stopKoin()
+    } catch (_: Exception) {
+        // Ignore if Koin wasn't started
+    }
 
-    // Configure JSON serialization
+    install(Koin) {
+        slf4jLogger()
+        modules(serverModule(isDatabaseAvailable))
+    }
+
+    environment.monitor.subscribe(ApplicationStopped) {
+        try {
+            org.koin.core.context.stopKoin()
+        } catch (_: Exception) {
+            // Ignore if already stopped
+        }
+    }
+
+    val syncRepository: SyncRepository by inject()
+    val tokenService: JwtTokenService by inject()
+
     install(ContentNegotiation) {
         json(Json {
             prettyPrint = true
@@ -41,15 +67,14 @@ fun Application.module() {
             }
         })
     }
-    
+
     routing {
         get("/") {
             call.respondText("LogDate Server API v1.0")
         }
-        
+
         get("/health") {
             try {
-                // Basic health check - can be enhanced to check database connectivity
                 val status = mapOf(
                     "status" to "healthy",
                     "timestamp" to kotlinx.datetime.Clock.System.now().toString(),
@@ -65,10 +90,8 @@ fun Application.module() {
                 call.respond(io.ktor.http.HttpStatusCode.ServiceUnavailable, status)
             }
         }
-        
-        // API routes
+
         route("/api/v1") {
-            // Import stub routes from StubRoutes.kt
             authRoutes()
             accountRoutes()
             passkeyRoutes()
@@ -76,7 +99,7 @@ fun Application.module() {
             notesRoutes()
             draftRoutes()
             mediaRoutes()
-            syncRoutes(syncRepository)
+            syncRoutes(syncRepository, tokenService)
             aiRoutes()
             deviceRoutes()
             rewindRoutes()

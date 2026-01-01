@@ -3,6 +3,7 @@ package app.logdate.client.sync.cloud.account
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.core.content.pm.PackageInfoCompat
 import app.logdate.client.device.BuildConfigAppInfoProvider
 
 /**
@@ -69,7 +70,8 @@ class AndroidPlatformInfoProvider(
     private fun getAppVersion(): String {
         return try {
             val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            "${packageInfo.versionName} (${packageInfo.versionCode})"
+            val versionCode = PackageInfoCompat.getLongVersionCode(packageInfo)
+            "${packageInfo.versionName} ($versionCode)"
         } catch (e: PackageManager.NameNotFoundException) {
             val appInfo = appInfoProvider.getAppInfo()
             "${appInfo.versionName} (${appInfo.versionCode})"

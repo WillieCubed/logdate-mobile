@@ -1,37 +1,40 @@
-@file:Suppress("DEPRECATION")
-
 package app.logdate.server.sync
 
 import app.logdate.shared.model.sync.DeviceId
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.util.UUID
 import kotlin.math.absoluteValue
 import kotlin.random.Random
 
 /**
- * Exposed-based implementation of SyncRepository.
- * Note: user scoping (user_id) is not wired yet; add it alongside auth gating.
+ * Exposed-based implementation of SyncRepository with user isolation.
+ * All queries are scoped by user_id for multi-tenancy.
  */
 class DbSyncRepository : SyncRepository {
 
     // --- Status ---
-    override fun status(): SyncStatus = transaction {
+    override fun status(userId: UUID): SyncStatus = transaction {
         SyncStatus(
-            contentCount = ContentSyncTable.selectAll().count().toInt(),
-            journalCount = JournalSyncTable.selectAll().count().toInt(),
-            associationCount = AssociationSyncTable.selectAll().count().toInt(),
+            contentCount = ContentSyncTable.selectAll().where { ContentSyncTable.userId eq userId }.count().toInt(),
+            journalCount = JournalSyncTable.selectAll().where { JournalSyncTable.userId eq userId }.count().toInt(),
+            associationCount = AssociationSyncTable.selectAll().where { AssociationSyncTable.userId eq userId }.count().toInt(),
             lastTimestamp = currentTimestamp()
         )
     }
 
     // --- Content ---
-    override fun upsertContent(record: ContentRecord): ContentRecord = transaction {
-        val existing = ContentSyncTable.select { ContentSyncTable.id eq record.id }.singleOrNull()
+    override fun upsertContent(userId: UUID, record: ContentRecord): ContentRecord = transaction {
+        val existing = ContentSyncTable.selectAll().where {
+            (ContentSyncTable.id eq record.id) and (ContentSyncTable.userId eq userId)
+        }.singleOrNull()
         val serverVersion = nextVersion(existing?.get(ContentSyncTable.serverVersion))
         if (existing == null) {
             ContentSyncTable.insert {
                 it[id] = record.id
+                it[ContentSyncTable.userId] = userId
                 it[type] = record.type
                 it[content] = record.content
                 it[mediaUri] = record.mediaUri
@@ -43,7 +46,7 @@ class DbSyncRepository : SyncRepository {
                 it[deletedAt] = null
             }
         } else {
-            ContentSyncTable.update({ ContentSyncTable.id eq record.id }) {
+            ContentSyncTable.update({ (ContentSyncTable.id eq record.id) and (ContentSyncTable.userId eq userId) }) {
                 it[type] = record.type
                 it[content] = record.content
                 it[mediaUri] = record.mediaUri
@@ -57,20 +60,20 @@ class DbSyncRepository : SyncRepository {
         record.copy(serverVersion = serverVersion, lastUpdated = currentTimestamp())
     }
 
-    override fun getContent(id: String): ContentRecord? = transaction {
-        ContentSyncTable.select { ContentSyncTable.id eq id }
-            .singleOrNull()
-            ?.toContentRecord()
+    override fun getContent(userId: UUID, id: String): ContentRecord? = transaction {
+        ContentSyncTable.selectAll().where {
+            (ContentSyncTable.id eq id) and (ContentSyncTable.userId eq userId)
+        }.singleOrNull()?.toContentRecord()
     }
 
-    override fun deleteContent(id: String, deletedAt: Long) {
+    override fun deleteContent(userId: UUID, id: String, deletedAt: Long) {
         transaction {
             val existingVersion = ContentSyncTable
-                .select { ContentSyncTable.id eq id }
+                .selectAll().where { (ContentSyncTable.id eq id) and (ContentSyncTable.userId eq userId) }
                 .singleOrNull()
                 ?.get(ContentSyncTable.serverVersion)
             val newVersion = nextVersion(existingVersion)
-            ContentSyncTable.update({ ContentSyncTable.id eq id }) {
+            ContentSyncTable.update({ (ContentSyncTable.id eq id) and (ContentSyncTable.userId eq userId) }) {
                 it[deleted] = true
                 it[ContentSyncTable.deletedAt] = deletedAt
                 it[lastUpdated] = deletedAt
@@ -79,14 +82,17 @@ class DbSyncRepository : SyncRepository {
         }
     }
 
-    override fun contentChanges(since: Long): ChangeSet<ContentRecord, ContentDeletionMarker> = transaction {
-        val changes = ContentSyncTable.select {
-            (ContentSyncTable.lastUpdated greater since) or (ContentSyncTable.serverVersion greater since)
+    override fun contentChanges(userId: UUID, since: Long): ChangeSet<ContentRecord, ContentDeletionMarker> = transaction {
+        val changes = ContentSyncTable.selectAll().where {
+            (ContentSyncTable.userId eq userId) and
+            ((ContentSyncTable.lastUpdated greater since) or (ContentSyncTable.serverVersion greater since))
         }.mapNotNull { row ->
             if (row[ContentSyncTable.deleted]) null else row.toContentRecord()
         }
-        val deletions = ContentSyncTable.select {
-            (ContentSyncTable.deleted eq true) and (ContentSyncTable.deletedAt greater since)
+        val deletions = ContentSyncTable.selectAll().where {
+            (ContentSyncTable.userId eq userId) and
+            (ContentSyncTable.deleted eq true) and
+            (ContentSyncTable.deletedAt greater since)
         }.map { row ->
             ContentDeletionMarker(row[ContentSyncTable.id], row[ContentSyncTable.deletedAt] ?: currentTimestamp())
         }
@@ -94,12 +100,15 @@ class DbSyncRepository : SyncRepository {
     }
 
     // --- Journals ---
-    override fun upsertJournal(record: JournalRecord): JournalRecord = transaction {
-        val existing = JournalSyncTable.select { JournalSyncTable.id eq record.id }.singleOrNull()
+    override fun upsertJournal(userId: UUID, record: JournalRecord): JournalRecord = transaction {
+        val existing = JournalSyncTable.selectAll().where {
+            (JournalSyncTable.id eq record.id) and (JournalSyncTable.userId eq userId)
+        }.singleOrNull()
         val serverVersion = nextVersion(existing?.get(JournalSyncTable.serverVersion))
         if (existing == null) {
             JournalSyncTable.insert {
                 it[id] = record.id
+                it[JournalSyncTable.userId] = userId
                 it[title] = record.title
                 it[description] = record.description
                 it[createdAt] = record.createdAt
@@ -110,7 +119,7 @@ class DbSyncRepository : SyncRepository {
                 it[deletedAt] = null
             }
         } else {
-            JournalSyncTable.update({ JournalSyncTable.id eq record.id }) {
+            JournalSyncTable.update({ (JournalSyncTable.id eq record.id) and (JournalSyncTable.userId eq userId) }) {
                 it[title] = record.title
                 it[description] = record.description
                 it[lastUpdated] = record.lastUpdated
@@ -123,20 +132,20 @@ class DbSyncRepository : SyncRepository {
         record.copy(serverVersion = serverVersion, lastUpdated = currentTimestamp())
     }
 
-    override fun getJournal(id: String): JournalRecord? = transaction {
-        JournalSyncTable.select { JournalSyncTable.id eq id }
-            .singleOrNull()
-            ?.toJournalRecord()
+    override fun getJournal(userId: UUID, id: String): JournalRecord? = transaction {
+        JournalSyncTable.selectAll().where {
+            (JournalSyncTable.id eq id) and (JournalSyncTable.userId eq userId)
+        }.singleOrNull()?.toJournalRecord()
     }
 
-    override fun deleteJournal(id: String, deletedAt: Long) {
+    override fun deleteJournal(userId: UUID, id: String, deletedAt: Long) {
         transaction {
             val existingVersion = JournalSyncTable
-                .select { JournalSyncTable.id eq id }
+                .selectAll().where { (JournalSyncTable.id eq id) and (JournalSyncTable.userId eq userId) }
                 .singleOrNull()
                 ?.get(JournalSyncTable.serverVersion)
             val newVersion = nextVersion(existingVersion)
-            JournalSyncTable.update({ JournalSyncTable.id eq id }) {
+            JournalSyncTable.update({ (JournalSyncTable.id eq id) and (JournalSyncTable.userId eq userId) }) {
                 it[deleted] = true
                 it[JournalSyncTable.deletedAt] = deletedAt
                 it[lastUpdated] = deletedAt
@@ -145,14 +154,17 @@ class DbSyncRepository : SyncRepository {
         }
     }
 
-    override fun journalChanges(since: Long): ChangeSet<JournalRecord, JournalDeletionMarker> = transaction {
-        val changes = JournalSyncTable.select {
-            (JournalSyncTable.lastUpdated greater since) or (JournalSyncTable.serverVersion greater since)
+    override fun journalChanges(userId: UUID, since: Long): ChangeSet<JournalRecord, JournalDeletionMarker> = transaction {
+        val changes = JournalSyncTable.selectAll().where {
+            (JournalSyncTable.userId eq userId) and
+            ((JournalSyncTable.lastUpdated greater since) or (JournalSyncTable.serverVersion greater since))
         }.mapNotNull { row ->
             if (row[JournalSyncTable.deleted]) null else row.toJournalRecord()
         }
-        val deletions = JournalSyncTable.select {
-            (JournalSyncTable.deleted eq true) and (JournalSyncTable.deletedAt greater since)
+        val deletions = JournalSyncTable.selectAll().where {
+            (JournalSyncTable.userId eq userId) and
+            (JournalSyncTable.deleted eq true) and
+            (JournalSyncTable.deletedAt greater since)
         }.map { row ->
             JournalDeletionMarker(row[JournalSyncTable.id], row[JournalSyncTable.deletedAt] ?: currentTimestamp())
         }
@@ -160,18 +172,21 @@ class DbSyncRepository : SyncRepository {
     }
 
     // --- Associations ---
-    override fun upsertAssociations(records: List<AssociationRecord>) {
+    override fun upsertAssociations(userId: UUID, records: List<AssociationRecord>) {
         transaction {
             records.forEach { record ->
                 val key = AssociationKey(record.journalId, record.contentId)
-                val existing = AssociationSyncTable.select {
-                    (AssociationSyncTable.journalId eq key.journalId) and (AssociationSyncTable.contentId eq key.contentId)
+                val existing = AssociationSyncTable.selectAll().where {
+                    (AssociationSyncTable.journalId eq key.journalId) and
+                    (AssociationSyncTable.contentId eq key.contentId) and
+                    (AssociationSyncTable.userId eq userId)
                 }.singleOrNull()
                 val serverVersion = nextVersion(existing?.get(AssociationSyncTable.serverVersion))
                 if (existing == null) {
                     AssociationSyncTable.insert {
                         it[journalId] = key.journalId
                         it[contentId] = key.contentId
+                        it[AssociationSyncTable.userId] = userId
                         it[createdAt] = record.createdAt
                         it[AssociationSyncTable.serverVersion] = serverVersion
                         it[deviceId] = record.deviceId.value
@@ -180,7 +195,9 @@ class DbSyncRepository : SyncRepository {
                     }
                 } else {
                     AssociationSyncTable.update({
-                        (AssociationSyncTable.journalId eq key.journalId) and (AssociationSyncTable.contentId eq key.contentId)
+                        (AssociationSyncTable.journalId eq key.journalId) and
+                        (AssociationSyncTable.contentId eq key.contentId) and
+                        (AssociationSyncTable.userId eq userId)
                     }) {
                         it[createdAt] = record.createdAt
                         it[AssociationSyncTable.serverVersion] = serverVersion
@@ -193,18 +210,22 @@ class DbSyncRepository : SyncRepository {
         }
     }
 
-    override fun deleteAssociations(keys: List<AssociationKey>, deletedAt: Long) {
+    override fun deleteAssociations(userId: UUID, keys: List<AssociationKey>, deletedAt: Long) {
         transaction {
             keys.forEach { key ->
                 val existingVersion = AssociationSyncTable
-                    .select {
-                        (AssociationSyncTable.journalId eq key.journalId) and (AssociationSyncTable.contentId eq key.contentId)
+                    .selectAll().where {
+                        (AssociationSyncTable.journalId eq key.journalId) and
+                        (AssociationSyncTable.contentId eq key.contentId) and
+                        (AssociationSyncTable.userId eq userId)
                     }
                     .singleOrNull()
                     ?.get(AssociationSyncTable.serverVersion)
                 val newVersion = nextVersion(existingVersion)
                 AssociationSyncTable.update({
-                    (AssociationSyncTable.journalId eq key.journalId) and (AssociationSyncTable.contentId eq key.contentId)
+                    (AssociationSyncTable.journalId eq key.journalId) and
+                    (AssociationSyncTable.contentId eq key.contentId) and
+                    (AssociationSyncTable.userId eq userId)
                 }) {
                     it[AssociationSyncTable.deleted] = true
                     it[AssociationSyncTable.deletedAt] = deletedAt
@@ -214,14 +235,17 @@ class DbSyncRepository : SyncRepository {
         }
     }
 
-    override fun associationChanges(since: Long): ChangeSet<AssociationRecord, AssociationDeletionMarker> = transaction {
-        val changes = AssociationSyncTable.select {
-            (AssociationSyncTable.serverVersion greater since) or (AssociationSyncTable.createdAt greater since)
+    override fun associationChanges(userId: UUID, since: Long): ChangeSet<AssociationRecord, AssociationDeletionMarker> = transaction {
+        val changes = AssociationSyncTable.selectAll().where {
+            (AssociationSyncTable.userId eq userId) and
+            ((AssociationSyncTable.serverVersion greater since) or (AssociationSyncTable.createdAt greater since))
         }.mapNotNull { row ->
             if (row[AssociationSyncTable.deleted]) null else row.toAssociationRecord()
         }
-        val deletions = AssociationSyncTable.select {
-            (AssociationSyncTable.deleted eq true) and (AssociationSyncTable.deletedAt greater since)
+        val deletions = AssociationSyncTable.selectAll().where {
+            (AssociationSyncTable.userId eq userId) and
+            (AssociationSyncTable.deleted eq true) and
+            (AssociationSyncTable.deletedAt greater since)
         }.map { row ->
             AssociationDeletionMarker(
                 AssociationKey(row[AssociationSyncTable.journalId], row[AssociationSyncTable.contentId]),
@@ -232,18 +256,22 @@ class DbSyncRepository : SyncRepository {
     }
 
     // --- Media ---
-    override fun upsertMedia(record: MediaRecord): MediaRecord = transaction {
+    override fun upsertMedia(userId: UUID, record: MediaRecord): MediaRecord = transaction {
         val id = if (record.mediaId.isBlank()) "media-${Random.nextLong().absoluteValue}" else record.mediaId
-        val existing = MediaSyncTable.select { MediaSyncTable.mediaId eq id }.singleOrNull()
+        val existing = MediaSyncTable.selectAll().where {
+            (MediaSyncTable.mediaId eq id) and (MediaSyncTable.userId eq userId)
+        }.singleOrNull()
         val serverVersion = nextVersion(existing?.get(MediaSyncTable.serverVersion))
         if (existing == null) {
             MediaSyncTable.insert {
                 it[mediaId] = id
+                it[MediaSyncTable.userId] = userId
                 it[contentId] = record.contentId
                 it[fileName] = record.fileName
                 it[mimeType] = record.mimeType
                 it[sizeBytes] = record.sizeBytes
                 it[data] = record.data
+                it[storagePath] = record.storagePath
                 it[createdAt] = record.createdAt
                 it[MediaSyncTable.serverVersion] = serverVersion
                 it[deviceId] = record.deviceId.value
@@ -251,11 +279,12 @@ class DbSyncRepository : SyncRepository {
                 it[deletedAt] = null
             }
         } else {
-            MediaSyncTable.update({ MediaSyncTable.mediaId eq id }) {
+            MediaSyncTable.update({ (MediaSyncTable.mediaId eq id) and (MediaSyncTable.userId eq userId) }) {
                 it[fileName] = record.fileName
                 it[mimeType] = record.mimeType
                 it[sizeBytes] = record.sizeBytes
                 it[data] = record.data
+                it[storagePath] = record.storagePath
                 it[MediaSyncTable.serverVersion] = serverVersion
                 it[deviceId] = record.deviceId.value
                 it[deleted] = false
@@ -265,10 +294,10 @@ class DbSyncRepository : SyncRepository {
         record.copy(mediaId = id, serverVersion = serverVersion, createdAt = currentTimestamp())
     }
 
-    override fun getMedia(mediaId: String): MediaRecord? = transaction {
-        MediaSyncTable.select { MediaSyncTable.mediaId eq mediaId }
-            .singleOrNull()
-            ?.toMediaRecord()
+    override fun getMedia(userId: UUID, mediaId: String): MediaRecord? = transaction {
+        MediaSyncTable.selectAll().where {
+            (MediaSyncTable.mediaId eq mediaId) and (MediaSyncTable.userId eq userId)
+        }.singleOrNull()?.toMediaRecord()
     }
 
     // --- Helpers ---
@@ -308,6 +337,7 @@ class DbSyncRepository : SyncRepository {
         mimeType = this[MediaSyncTable.mimeType],
         sizeBytes = this[MediaSyncTable.sizeBytes],
         data = this[MediaSyncTable.data],
+        storagePath = this[MediaSyncTable.storagePath],
         createdAt = this[MediaSyncTable.createdAt],
         serverVersion = this[MediaSyncTable.serverVersion],
         deviceId = DeviceId(this[MediaSyncTable.deviceId])

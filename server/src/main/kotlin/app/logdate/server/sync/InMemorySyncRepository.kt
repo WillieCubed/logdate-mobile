@@ -1,24 +1,25 @@
 package app.logdate.server.sync
 
-import app.logdate.shared.model.sync.DeviceId
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.absoluteValue
 import kotlin.random.Random
 
 /**
- * In-memory implementation of SyncRepository.
+ * In-memory implementation of SyncRepository with user isolation.
  * Non-persistent, intended for development and tests until DB-backed storage is wired.
  */
 class InMemorySyncRepository : SyncRepository {
 
-    private val content = ConcurrentHashMap<String, ContentRecord>()
-    private val contentDeletions = ConcurrentHashMap<String, Long>()
-    private val journals = ConcurrentHashMap<String, JournalRecord>()
-    private val journalDeletions = ConcurrentHashMap<String, Long>()
-    private val associations = ConcurrentHashMap<AssociationKey, AssociationRecord>()
-    private val associationDeletions = ConcurrentHashMap<AssociationKey, Long>()
-    private val media = ConcurrentHashMap<String, MediaRecord>()
+    // User-scoped storage: userId -> (entityId -> record)
+    private val content = ConcurrentHashMap<UUID, ConcurrentHashMap<String, ContentRecord>>()
+    private val contentDeletions = ConcurrentHashMap<UUID, ConcurrentHashMap<String, Long>>()
+    private val journals = ConcurrentHashMap<UUID, ConcurrentHashMap<String, JournalRecord>>()
+    private val journalDeletions = ConcurrentHashMap<UUID, ConcurrentHashMap<String, Long>>()
+    private val associations = ConcurrentHashMap<UUID, ConcurrentHashMap<AssociationKey, AssociationRecord>>()
+    private val associationDeletions = ConcurrentHashMap<UUID, ConcurrentHashMap<AssociationKey, Long>>()
+    private val media = ConcurrentHashMap<UUID, ConcurrentHashMap<String, MediaRecord>>()
     private val lastTimestamp = AtomicLong(System.currentTimeMillis())
 
     private fun now(): Long {
@@ -29,98 +30,101 @@ class InMemorySyncRepository : SyncRepository {
 
     private fun nextVersion(): Long = lastTimestamp.incrementAndGet()
 
-    override fun status(): SyncStatus = SyncStatus(
-        contentCount = content.size,
-        journalCount = journals.size,
-        associationCount = associations.size,
+    private fun <K, V> ConcurrentHashMap<UUID, ConcurrentHashMap<K, V>>.forUser(userId: UUID): ConcurrentHashMap<K, V> =
+        getOrPut(userId) { ConcurrentHashMap() }
+
+    override fun status(userId: UUID): SyncStatus = SyncStatus(
+        contentCount = content.forUser(userId).size,
+        journalCount = journals.forUser(userId).size,
+        associationCount = associations.forUser(userId).size,
         lastTimestamp = lastTimestamp.get()
     )
 
     // Content
-    override fun upsertContent(record: ContentRecord): ContentRecord {
+    override fun upsertContent(userId: UUID, record: ContentRecord): ContentRecord {
         val versioned = record.copy(serverVersion = nextVersion(), lastUpdated = record.lastUpdated)
-        content[record.id] = versioned
+        content.forUser(userId)[record.id] = versioned
         return versioned.copy(serverVersion = versioned.serverVersion, lastUpdated = now())
     }
 
-    override fun getContent(id: String): ContentRecord? = content[id]
+    override fun getContent(userId: UUID, id: String): ContentRecord? = content.forUser(userId)[id]
 
-    override fun deleteContent(id: String, deletedAt: Long) {
-        content.remove(id)
-        contentDeletions[id] = deletedAt
+    override fun deleteContent(userId: UUID, id: String, deletedAt: Long) {
+        content.forUser(userId).remove(id)
+        contentDeletions.forUser(userId)[id] = deletedAt
         lastTimestamp.set(deletedAt)
     }
 
-    override fun contentChanges(since: Long): ChangeSet<ContentRecord, ContentDeletionMarker> {
-        val changes = content.values
+    override fun contentChanges(userId: UUID, since: Long): ChangeSet<ContentRecord, ContentDeletionMarker> {
+        val changes = content.forUser(userId).values
             .filter { it.lastUpdated > since || it.serverVersion > since }
             .map { it.copy() }
-        val deletions = contentDeletions
+        val deletions = contentDeletions.forUser(userId)
             .filterValues { it > since }
             .map { ContentDeletionMarker(it.key, it.value) }
         return ChangeSet(changes, deletions, lastTimestamp.get())
     }
 
     // Journals
-    override fun upsertJournal(record: JournalRecord): JournalRecord {
+    override fun upsertJournal(userId: UUID, record: JournalRecord): JournalRecord {
         val versioned = record.copy(serverVersion = nextVersion(), lastUpdated = record.lastUpdated)
-        journals[record.id] = versioned
+        journals.forUser(userId)[record.id] = versioned
         return versioned.copy(serverVersion = versioned.serverVersion, lastUpdated = now())
     }
 
-    override fun getJournal(id: String): JournalRecord? = journals[id]
+    override fun getJournal(userId: UUID, id: String): JournalRecord? = journals.forUser(userId)[id]
 
-    override fun deleteJournal(id: String, deletedAt: Long) {
-        journals.remove(id)
-        journalDeletions[id] = deletedAt
+    override fun deleteJournal(userId: UUID, id: String, deletedAt: Long) {
+        journals.forUser(userId).remove(id)
+        journalDeletions.forUser(userId)[id] = deletedAt
         lastTimestamp.set(deletedAt)
     }
 
-    override fun journalChanges(since: Long): ChangeSet<JournalRecord, JournalDeletionMarker> {
-        val changes = journals.values
+    override fun journalChanges(userId: UUID, since: Long): ChangeSet<JournalRecord, JournalDeletionMarker> {
+        val changes = journals.forUser(userId).values
             .filter { it.lastUpdated > since || it.serverVersion > since }
             .map { it.copy() }
-        val deletions = journalDeletions
+        val deletions = journalDeletions.forUser(userId)
             .filterValues { it > since }
             .map { JournalDeletionMarker(it.key, it.value) }
         return ChangeSet(changes, deletions, lastTimestamp.get())
     }
 
     // Associations
-    override fun upsertAssociations(records: List<AssociationRecord>) {
+    override fun upsertAssociations(userId: UUID, records: List<AssociationRecord>) {
         records.forEach { association ->
-            associations[AssociationKey(association.journalId, association.contentId)] =
+            associations.forUser(userId)[AssociationKey(association.journalId, association.contentId)] =
                 association.copy(serverVersion = nextVersion())
         }
     }
 
-    override fun deleteAssociations(keys: List<AssociationKey>, deletedAt: Long) {
+    override fun deleteAssociations(userId: UUID, keys: List<AssociationKey>, deletedAt: Long) {
         keys.forEach { key ->
-            associations.remove(key)
-            associationDeletions[key] = deletedAt
+            associations.forUser(userId).remove(key)
+            associationDeletions.forUser(userId)[key] = deletedAt
         }
         lastTimestamp.set(deletedAt)
     }
 
-    override fun associationChanges(since: Long): ChangeSet<AssociationRecord, AssociationDeletionMarker> {
-        val changes = associations.values
+    override fun associationChanges(userId: UUID, since: Long): ChangeSet<AssociationRecord, AssociationDeletionMarker> {
+        val changes = associations.forUser(userId).values
             .filter { it.serverVersion > since || it.createdAt > since }
             .map { it.copy() }
-        val deletions = associationDeletions
+        val deletions = associationDeletions.forUser(userId)
             .filterValues { it > since }
             .map { (key, deletedAt) -> AssociationDeletionMarker(key, deletedAt) }
         return ChangeSet(changes, deletions, lastTimestamp.get())
     }
 
     // Media
-    override fun upsertMedia(record: MediaRecord): MediaRecord {
+    override fun upsertMedia(userId: UUID, record: MediaRecord): MediaRecord {
         val versioned = record.copy(
             mediaId = if (record.mediaId.isBlank()) "media-${Random.nextLong().absoluteValue}" else record.mediaId,
             serverVersion = nextVersion()
         )
-        media[versioned.mediaId] = versioned
+        media.forUser(userId)[versioned.mediaId] = versioned
         return versioned.copy(serverVersion = versioned.serverVersion, createdAt = now())
     }
 
-    override fun getMedia(mediaId: String): MediaRecord? = media[mediaId]
+    override fun getMedia(userId: UUID, mediaId: String): MediaRecord? = media.forUser(userId)[mediaId]
 }

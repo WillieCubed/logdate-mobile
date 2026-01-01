@@ -1,6 +1,7 @@
 package app.logdate.server.sync
 
 import app.logdate.shared.model.sync.DeviceId
+import java.util.UUID
 
 /**
  * Transport-level storage records for sync. These are not core domain entities;
@@ -42,6 +43,7 @@ data class MediaRecord(
     val mimeType: String,
     val sizeBytes: Long,
     val data: ByteArray,
+    val storagePath: String? = null,
     val createdAt: Long,
     val serverVersion: Long,
     val deviceId: DeviceId
@@ -53,29 +55,33 @@ data class ChangeSet<T, D>(
     val lastTimestamp: Long
 )
 
+/**
+ * Repository interface for sync data operations.
+ * All methods require a userId for multi-tenancy isolation.
+ */
 interface SyncRepository {
-    fun status(): SyncStatus
+    fun status(userId: UUID): SyncStatus
 
     // Content
-    fun upsertContent(record: ContentRecord): ContentRecord
-    fun getContent(id: String): ContentRecord?
-    fun deleteContent(id: String, deletedAt: Long)
-    fun contentChanges(since: Long): ChangeSet<ContentRecord, ContentDeletionMarker>
+    fun upsertContent(userId: UUID, record: ContentRecord): ContentRecord
+    fun getContent(userId: UUID, id: String): ContentRecord?
+    fun deleteContent(userId: UUID, id: String, deletedAt: Long)
+    fun contentChanges(userId: UUID, since: Long): ChangeSet<ContentRecord, ContentDeletionMarker>
 
     // Journals
-    fun upsertJournal(record: JournalRecord): JournalRecord
-    fun getJournal(id: String): JournalRecord?
-    fun deleteJournal(id: String, deletedAt: Long)
-    fun journalChanges(since: Long): ChangeSet<JournalRecord, JournalDeletionMarker>
+    fun upsertJournal(userId: UUID, record: JournalRecord): JournalRecord
+    fun getJournal(userId: UUID, id: String): JournalRecord?
+    fun deleteJournal(userId: UUID, id: String, deletedAt: Long)
+    fun journalChanges(userId: UUID, since: Long): ChangeSet<JournalRecord, JournalDeletionMarker>
 
     // Associations
-    fun upsertAssociations(records: List<AssociationRecord>)
-    fun deleteAssociations(keys: List<AssociationKey>, deletedAt: Long)
-    fun associationChanges(since: Long): ChangeSet<AssociationRecord, AssociationDeletionMarker>
+    fun upsertAssociations(userId: UUID, records: List<AssociationRecord>)
+    fun deleteAssociations(userId: UUID, keys: List<AssociationKey>, deletedAt: Long)
+    fun associationChanges(userId: UUID, since: Long): ChangeSet<AssociationRecord, AssociationDeletionMarker>
 
     // Media
-    fun upsertMedia(record: MediaRecord): MediaRecord
-    fun getMedia(mediaId: String): MediaRecord?
+    fun upsertMedia(userId: UUID, record: MediaRecord): MediaRecord
+    fun getMedia(userId: UUID, mediaId: String): MediaRecord?
 }
 
 data class SyncStatus(
