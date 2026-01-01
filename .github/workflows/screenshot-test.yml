@@ -1,0 +1,40 @@
+name: Screenshot Tests
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'app/compose-main/**'
+      - 'client/feature/**'
+      - 'client/ui/**'
+      - 'client/theme/**'
+
+jobs:
+  screenshot-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Validate Screenshots
+        run: ./gradlew :app:compose-main:validateDebugScreenshotTest
+
+      - name: Upload Screenshot Report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshot-report
+          path: app/compose-main/build/reports/screenshotTest/
+          retention-days: 14

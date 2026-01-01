@@ -12,6 +12,7 @@ plugins {
     alias(libs.plugins.dokka)
     alias(libs.plugins.googleServices)
     alias(libs.plugins.kotlinx.serialization)
+    alias(libs.plugins.screenshot)
 }
 
 kotlin {
@@ -142,12 +143,15 @@ android {
         // Enable core library desugaring for health-connect
         isCoreLibraryDesugaringEnabled = true
     }
+    experimentalProperties["android.experimental.enableScreenshotTest"] = true
 }
 
 dependencies {
     debugImplementation(compose.uiTooling)
     // Add core library desugaring for Java 8+ APIs support on lower Android versions
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    // Screenshot testing
+    screenshotTestImplementation(libs.androidx.ui.tooling)
 }
 
 compose.desktop {
