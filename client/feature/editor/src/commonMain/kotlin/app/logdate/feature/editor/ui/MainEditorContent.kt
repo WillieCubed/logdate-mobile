@@ -18,17 +18,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import app.logdate.feature.editor.ui.audio.AudioBlockEditor
+import app.logdate.feature.editor.ui.camera.CameraBlockEditor
 import app.logdate.feature.editor.ui.content.EditorContentFooter
 import app.logdate.feature.editor.ui.content.EmptyEditorStateContent
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.editor.BlockType
+import app.logdate.feature.editor.ui.editor.CameraBlockUiState
 import app.logdate.feature.editor.ui.editor.EntryBlockUiState
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
+import app.logdate.feature.editor.ui.editor.VideoBlockUiState
 import app.logdate.feature.editor.ui.layout.EntryEditorSurface
 import app.logdate.feature.editor.ui.state.BlocksUiState
 import app.logdate.feature.editor.ui.state.EditorRecorderState
 import app.logdate.feature.editor.ui.text.TextBlockContent
+import app.logdate.feature.editor.ui.video.VideoBlockEditor
 import app.logdate.ui.common.conditional
 import app.logdate.ui.utils.scrollToEnd
 import io.github.aakira.napier.Napier
@@ -53,17 +57,21 @@ fun MainEditorContent(
     if (isEmpty) {
         // Show the bento box style layout for empty state without LazyColumn
         EmptyEditorStateContent(
-            onStartTextBlock = { 
+            onStartTextBlock = {
                 Napier.i("EmptyEditorState: Starting text block")
                 uiState.onCreateBlock(BlockType.TEXT)
             },
-            onStartPhotoBlock = { 
+            onStartPhotoBlock = {
                 Napier.i("EmptyEditorState: Starting photo block")
                 uiState.onCreateBlock(BlockType.IMAGE)
             },
-            onStartAudioBlock = { 
+            onStartAudioBlock = {
                 Napier.i("EmptyEditorState: Starting audio block")
                 uiState.onCreateBlock(BlockType.AUDIO)
+            },
+            onStartCameraBlock = {
+                Napier.i("EmptyEditorState: Starting camera block")
+                uiState.onCreateBlock(BlockType.CAMERA)
             },
             modifier = modifier.fillMaxSize()
         )
@@ -164,7 +172,7 @@ fun <T : EntryBlockUiState> BlockContent(
                 // Use the AudioBlockEditor to handle both recording and playback
                 AudioBlockEditor(
                     block = block,
-                    onBlockUpdated = { updatedBlock -> 
+                    onBlockUpdated = { updatedBlock ->
                         onBlockUpdated(updatedBlock as T)
                     },
                     onDeleteRequested = {
@@ -174,7 +182,33 @@ fun <T : EntryBlockUiState> BlockContent(
                     }
                 )
             }
-            // Other block types would go here
+
+            is CameraBlockUiState -> {
+                // Use CameraBlockEditor for camera-captured media
+                CameraBlockEditor(
+                    block = block,
+                    onBlockUpdated = { updatedBlock ->
+                        onBlockUpdated(updatedBlock as T)
+                    },
+                    onDeleteRequested = {
+                        // Block deletion placeholder
+                    }
+                )
+            }
+
+            is VideoBlockUiState -> {
+                // Use VideoBlockEditor for video content
+                VideoBlockEditor(
+                    block = block,
+                    onBlockUpdated = { updatedBlock ->
+                        onBlockUpdated(updatedBlock as T)
+                    },
+                    onDeleteRequested = {
+                        // Block deletion placeholder
+                    }
+                )
+            }
+
             else -> {
                 Text("Unsupported block type: ${block::class.simpleName}")
             }

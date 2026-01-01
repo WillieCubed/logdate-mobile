@@ -70,16 +70,28 @@ kotlin {
             implementation(libs.filekit.compose)
         }
 
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
+        }
+
         androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.koin.android)
+            // CameraX
             implementation(libs.androidx.camera.camera2)
             implementation(libs.androidx.camera.compose)
             implementation(libs.androidx.camera.lifecycle)
             implementation(libs.androidx.camera.video)
             implementation(libs.androidx.camera.view)
-//            implementation(libs.androidx.camera.viewfinder.compose)
             implementation(libs.androidx.camera.extensions)
+            // Media3 / ExoPlayer for video playback
+            implementation(libs.media3.exoplayer)
+            implementation(libs.media3.ui)
+            implementation(libs.media3.common)
+            // Coil video frame extraction
+            implementation(libs.coil.video)
+            // Permissions
             implementation(libs.accompanist.permissions)
         }
     }

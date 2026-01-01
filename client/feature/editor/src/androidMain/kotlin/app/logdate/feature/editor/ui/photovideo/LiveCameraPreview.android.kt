@@ -1,7 +1,6 @@
 package app.logdate.feature.editor.ui.photovideo
 
 import android.content.Context
-import android.icu.text.SimpleDateFormat
 import androidx.camera.compose.CameraXViewfinder
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
@@ -9,24 +8,29 @@ import androidx.camera.core.SurfaceRequest
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.lifecycle.awaitInstance
 import androidx.camera.viewfinder.core.ImplementationMode
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import java.io.File
-import java.util.Date
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import io.github.aakira.napier.Napier
 
 @Composable
 fun rememberSurfaceRequestState(): MutableState<SurfaceRequest?> {
-    val surfaceRequestState = remember { mutableStateOf<SurfaceRequest?>(null) }
-    return surfaceRequestState
+    return remember { mutableStateOf<SurfaceRequest?>(null) }
 }
-
 
 @Composable
 actual fun LiveCameraPreview(
@@ -34,75 +38,87 @@ actual fun LiveCameraPreview(
     cameraType: CameraType,
     modifier: Modifier,
 ) {
-    val surfaceRequestState = rememberSurfaceRequestState()
-    val preview by remember(cameraType) {
-        derivedStateOf {
-
-//        val isPreviewStabilizationSupported =
-//            Preview.getPreviewCapabilities(cameraProvider.getCameraInfo(cameraSelector))
-//                .isStabilizationSupported
-            Preview.Builder().apply {
-//            if (isPreviewStabilizationSupported) {
-                setPreviewStabilizationEnabled(true)
-//            }
-            }.build()
-        }
-    }
-// Set up the surface provider
-    LaunchedEffect(preview) {
-        preview.setSurfaceProvider { newSurfaceRequest ->
-            surfaceRequestState.value = newSurfaceRequest
-        }
-    }
-
-    val lensFacing = when (cameraType) {
-        CameraType.FRONT -> "front"
-        CameraType.BACK -> CameraSelector.LENS_FACING_BACK
-    }
     if (!canUseCamera) {
-        Text("Camera permission not granted")
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "Camera permission not granted",
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        return
     }
 
-// Render the viewfinder when we have a surface request
-//    surfaceRequestState.value?.let { surfaceRequest ->
-//        Viewfinder(
-//            surfaceRequest = surfaceRequest,
-//            implementationMode = ImplementationMode.EXTERNAL,
-//            transformationInfo = TransformationInfo(
-//                sourceRotation = 0,
-//                cropRectLeft = 0,
-//                cropRectTop = 0,
-//                cropRectRight = 0,
-//                cropRectBottom = 0,
-//                shouldMirror = cameraType == CameraType.FRONT
-//            ),
-//            modifier = modifier
-//        )
-//    }
-// TODO: Show placeholder if no surface request exists
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val surfaceRequestState = rememberSurfaceRequestState()
+    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+
+    val cameraSelector = remember(cameraType) {
+        when (cameraType) {
+            CameraType.FRONT -> CameraSelector.DEFAULT_FRONT_CAMERA
+            CameraType.BACK -> CameraSelector.DEFAULT_BACK_CAMERA
+        }
+    }
+
+    val preview = remember {
+        Preview.Builder()
+            .build()
+            .apply {
+                setSurfaceProvider { newSurfaceRequest ->
+                    surfaceRequestState.value = newSurfaceRequest
+                }
+            }
+    }
+
+    LaunchedEffect(cameraType) {
+        try {
+            val provider = ProcessCameraProvider.awaitInstance(context)
+            cameraProvider = provider
+
+            provider.unbindAll()
+
+            provider.bindToLifecycle(
+                lifecycleOwner,
+                cameraSelector,
+                preview
+            )
+
+            Napier.d("LiveCameraPreview: Camera bound successfully with $cameraType")
+        } catch (e: Exception) {
+            Napier.e("LiveCameraPreview: Failed to bind camera", e)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            cameraProvider?.unbindAll()
+            Napier.d("LiveCameraPreview: Camera unbound on dispose")
+        }
+    }
+
     val surfaceRequest = surfaceRequestState.value
-    surfaceRequest?.let {
+    if (surfaceRequest != null) {
         CameraXViewfinder(
             surfaceRequest = surfaceRequest,
-            implementationMode = ImplementationMode.EXTERNAL, // Or EMBEDDED
+            implementationMode = ImplementationMode.EXTERNAL,
             modifier = modifier
         )
+    } else {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "Loading camera...",
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
-}
-
-// TODO: Move somewhere else
-fun Context.createImageFile(): File {
-    val timeStamp = SimpleDateFormat.getDateTimeInstance().format(Date())
-    val imageFileName = "JPEG_" + timeStamp + "_"
-    return File.createTempFile(
-        imageFileName, /* prefix */
-        ".jpg", /* suffix */
-        externalCacheDir      /* directory */
-    )
-}
-
-
-private suspend fun Context.getCameraProvider(): ProcessCameraProvider {
-    val provider = ProcessCameraProvider.awaitInstance(this)
-    return provider
 }

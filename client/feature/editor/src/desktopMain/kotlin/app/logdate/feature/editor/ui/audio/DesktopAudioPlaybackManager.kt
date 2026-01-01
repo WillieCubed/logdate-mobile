@@ -75,7 +75,7 @@ class DesktopAudioPlaybackManager : AudioPlaybackManager {
             clip = newClip
             
             // Get total frames for progress calculation
-            totalFrames = newClip.frameLength
+            totalFrames = newClip.frameLength.toLong()
             
             // Add listener for playback completion
             newClip.addLineListener { event ->

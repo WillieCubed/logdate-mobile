@@ -4,6 +4,8 @@ import app.logdate.feature.editor.ui.audio.AudioPlaybackManager
 import app.logdate.feature.editor.ui.audio.AudioRecordingManager
 import app.logdate.feature.editor.ui.audio.IosAudioPlaybackManager
 import app.logdate.feature.editor.ui.audio.IosAudioRecordingManager
+import app.logdate.feature.editor.ui.camera.CameraCaptureManager
+import app.logdate.feature.editor.ui.camera.IosCameraCaptureManager
 import app.logdate.feature.editor.ui.image.IosImagePickerService
 import app.logdate.feature.editor.ui.image.ImagePickerService
 import org.koin.core.module.Module
@@ -18,14 +20,19 @@ actual val platformEditorModule: Module = module {
     factory<AudioRecordingManager> {
         IosAudioRecordingManager()
     }
-    
+
     // Provide iOS implementation of AudioPlaybackManager
     factory<AudioPlaybackManager> {
         IosAudioPlaybackManager()
     }
-    
+
     // Provide iOS implementation of ImagePickerService
     factory<ImagePickerService> {
         IosImagePickerService()
+    }
+
+    // Provide iOS stub implementation of CameraCaptureManager
+    factory<CameraCaptureManager> {
+        IosCameraCaptureManager()
     }
 }

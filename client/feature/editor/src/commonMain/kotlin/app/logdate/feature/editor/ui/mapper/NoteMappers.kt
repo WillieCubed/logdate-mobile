@@ -1,6 +1,7 @@
 package app.logdate.feature.editor.ui.mapper
 
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.feature.editor.ui.camera.CapturedMediaType
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.editor.CameraBlockUiState
 import app.logdate.feature.editor.ui.editor.EntryBlockUiState
@@ -83,12 +84,21 @@ fun EntryBlockUiState.toJournalNote(): JournalNote? {
         
         is CameraBlockUiState -> {
             if (!hasContent()) return null
-            JournalNote.Image(
-                uid = id,
-                creationTimestamp = timestamp,
-                lastUpdated = now,
-                mediaRef = uri ?: return null
-            )
+            val mediaRef = uri ?: return null
+            when (mediaType) {
+                CapturedMediaType.PHOTO -> JournalNote.Image(
+                    uid = id,
+                    creationTimestamp = timestamp,
+                    lastUpdated = now,
+                    mediaRef = mediaRef
+                )
+                CapturedMediaType.VIDEO -> JournalNote.Video(
+                    uid = id,
+                    creationTimestamp = timestamp,
+                    lastUpdated = now,
+                    mediaRef = mediaRef
+                )
+            }
         }
         
         is VideoBlockUiState -> {

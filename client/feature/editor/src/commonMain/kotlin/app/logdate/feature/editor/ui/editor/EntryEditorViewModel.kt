@@ -16,6 +16,7 @@ import app.logdate.client.domain.notes.drafts.GetAllDraftsUseCase
 import app.logdate.client.domain.notes.drafts.UpdateEntryDraftUseCase
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.feature.editor.ui.camera.CapturedMediaType
 import app.logdate.feature.editor.ui.editor.delegate.AutoSaveDelegate
 import app.logdate.feature.editor.ui.editor.delegate.JournalSelectionDelegate
 import app.logdate.feature.editor.ui.editor.mediator.EditorMediator
@@ -369,12 +370,23 @@ class EntryEditorViewModel(
                             lastUpdated = Clock.System.now(),
                             mediaRef = block.uri ?: return@mapNotNull null
                         )
-                        is CameraBlockUiState -> JournalNote.Image(
-                            uid = block.id,
-                            creationTimestamp = block.timestamp,
-                            lastUpdated = Clock.System.now(),
-                            mediaRef = block.uri ?: return@mapNotNull null
-                        )
+                        is CameraBlockUiState -> {
+                            val mediaRef = block.uri ?: return@mapNotNull null
+                            when (block.mediaType) {
+                                CapturedMediaType.PHOTO -> JournalNote.Image(
+                                    uid = block.id,
+                                    creationTimestamp = block.timestamp,
+                                    lastUpdated = Clock.System.now(),
+                                    mediaRef = mediaRef
+                                )
+                                CapturedMediaType.VIDEO -> JournalNote.Video(
+                                    uid = block.id,
+                                    creationTimestamp = block.timestamp,
+                                    lastUpdated = Clock.System.now(),
+                                    mediaRef = mediaRef
+                                )
+                            }
+                        }
                         is VideoBlockUiState -> JournalNote.Video(
                             uid = block.id,
                             creationTimestamp = block.timestamp,

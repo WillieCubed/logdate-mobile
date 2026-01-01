@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.TextFields
@@ -44,6 +45,7 @@ fun EmptyEditorStateContent(
     onStartTextBlock: () -> Unit,
     onStartPhotoBlock: () -> Unit,
     onStartAudioBlock: () -> Unit,
+    onStartCameraBlock: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     // Use the entire size of the parent with some padding
@@ -53,37 +55,53 @@ fun EmptyEditorStateContent(
             .padding(spacing),
         verticalArrangement = Arrangement.spacedBy(spacing),
     ) {
-        // Top row with text and audio buttons - each takes equal height in the top half
+        // Top row with text and audio buttons
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f), // Take proportional space in the top half
+                .weight(1f),
             horizontalArrangement = Arrangement.spacedBy(spacing),
         ) {
-            // Text surface - fills half the width and full available height in this row
+            // Text surface
             TextEntrySurface(
                 onClick = onStartTextBlock,
                 modifier = Modifier
-                    .weight(1f) // Take equal space with audio button
-                    .fillMaxSize() // Fill all available height in this row
+                    .weight(1f)
+                    .fillMaxSize()
             )
-            
-            // Audio surface - fills half the width and full available height in this row
+
+            // Audio surface
             AudioRecordingSurface(
                 onClick = onStartAudioBlock,
                 modifier = Modifier
-                    .weight(1f) // Take equal space with text button
-                    .fillMaxSize() // Fill all available height in this row
+                    .weight(1f)
+                    .fillMaxSize()
             )
         }
-        
-        // Photo surface - takes full width and proportional height in the bottom half
-        PhotoSurface(
-            onClick = onStartPhotoBlock,
+
+        // Middle row with camera and photo options
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f) // Take proportional space in the bottom half
-        )
+                .weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(spacing),
+        ) {
+            // Camera capture surface
+            CameraCaptureSurface(
+                onClick = onStartCameraBlock,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxSize()
+            )
+
+            // Photo gallery surface
+            PhotoSurface(
+                onClick = onStartPhotoBlock,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxSize()
+            )
+        }
     }
 }
 
@@ -183,7 +201,56 @@ private fun AudioRecordingSurface(
 }
 
 /**
- * Surface for creating a new photo entry
+ * Surface for capturing a new photo or video with camera
+ */
+@Composable
+private fun CameraCaptureSurface(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = {
+            Napier.i("CameraCaptureSurface: onClick triggered")
+            onClick()
+        },
+        modifier = modifier,
+        shape = RoundedCornerShape(cornerRadius),
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.CameraAlt,
+                    contentDescription = "Capture photo or video",
+                    modifier = Modifier.size(48.dp),
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Capture",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "Photo or video",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Surface for selecting a photo from gallery
  */
 @Composable
 private fun PhotoSurface(
@@ -200,31 +267,29 @@ private fun PhotoSurface(
         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
     ) {
         Box(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
+            modifier = Modifier.fillMaxSize().padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-                modifier = Modifier.fillMaxWidth()
+                verticalArrangement = Arrangement.Center
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Image,
-                    contentDescription = "Add photo",
-                    modifier = Modifier.size(72.dp),
+                    contentDescription = "Add photo from gallery",
+                    modifier = Modifier.size(48.dp),
                     tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Add a photo",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Capture a moment or upload from your gallery",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = "Gallery",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "Choose a photo",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                     textAlign = TextAlign.Center
                 )

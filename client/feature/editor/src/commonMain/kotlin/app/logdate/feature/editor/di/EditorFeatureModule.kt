@@ -2,6 +2,7 @@ package app.logdate.feature.editor.di
 
 import app.logdate.client.domain.di.domainModule
 import app.logdate.feature.editor.ui.audio.audioModule
+import app.logdate.feature.editor.ui.camera.CameraViewModel
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.feature.editor.ui.editor.delegate.AutoSaveDelegate
 import app.logdate.feature.editor.ui.editor.delegate.JournalSelectionDelegate
@@ -39,6 +40,13 @@ val editorFeatureModule: Module = module {
     viewModel {
         ImageBlockViewModel(
             imagePickerService = get()
+        )
+    }
+
+    // Camera view model
+    viewModel {
+        CameraViewModel(
+            cameraCaptureManager = get()
         )
     }
 

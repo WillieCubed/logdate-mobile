@@ -140,6 +140,15 @@ interface CloudApiClient {
 }
 
 /**
+ * Response indicating whether a username is available.
+ */
+@kotlinx.serialization.Serializable
+data class CheckUsernameAvailabilityResponse(
+    val available: Boolean,
+    val username: String
+)
+
+/**
  * Response containing account information.
  */
 @kotlinx.serialization.Serializable
