@@ -1,0 +1,5 @@
+# Local properties template (copy to `local.properties` and keep untracked)
+OPENAI_API_KEY=replace-with-openai-key
+DATABASE_URL=jdbc:postgresql://localhost:15432/logdate
+GOOGLE_MAPS_API_KEY=replace-with-google-maps-key
+metaAppId=replace-with-meta-app-id

@@ -17,6 +17,7 @@ export OPENAI_API_KEY="your-openai-key"
 export DATABASE_URL="jdbc:postgresql://localhost:15432/logdate" # if not using defaults
 ```
 You can also pass JVM props: `./gradlew -DOPENAI_API_KEY="your-openai-key" ...`
+Template: `docs/environment/.env.example` (copy to `.env`, keep untracked).
 
 ### local.properties (never commit)
 Create `local.properties` in the repo root:
@@ -26,6 +27,7 @@ DATABASE_URL=jdbc:postgresql://localhost:15432/logdate
 GOOGLE_MAPS_API_KEY=your-google-maps-key
 metaAppId=your-meta-app-id
 ```
+Template: `docs/environment/local.properties.example` (copy and edit; keep untracked).
 
 ### Docker Compose
 The supplied `docker-compose.yml` and scripts (`./scripts/dev-start.sh`) start Postgres/Redis with defaults. Override with a `.env` file if needed:
