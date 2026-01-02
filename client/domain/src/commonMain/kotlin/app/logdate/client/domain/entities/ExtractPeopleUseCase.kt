@@ -1,5 +1,6 @@
 package app.logdate.client.domain.entities
 
+import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.entity.people.PeopleExtractor
 import app.logdate.shared.model.Person
 
@@ -17,7 +18,7 @@ class ExtractPeopleUseCase(
      * @param documentId An ID used to identify and cache the response.
      * @param text The text to extract people's names from.
      */
-    suspend operator fun invoke(documentId: String, text: String): List<Person> {
+    suspend operator fun invoke(documentId: String, text: String): AIResult<List<Person>> {
         return peopleExtractor.extractPeople(documentId, text)
     }
 }

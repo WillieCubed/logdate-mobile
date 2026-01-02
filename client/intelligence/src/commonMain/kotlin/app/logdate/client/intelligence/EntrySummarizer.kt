@@ -3,6 +3,7 @@ package app.logdate.client.intelligence
 import app.logdate.client.intelligence.cache.GenerativeAICache
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
+import app.logdate.client.networking.NetworkAvailabilityMonitor
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +20,7 @@ import kotlinx.coroutines.withContext
 class EntrySummarizer(
     private val generativeAICache: GenerativeAICache,
     private val genAIClient: GenerativeAIChatClient,
+    private val networkAvailabilityMonitor: NetworkAvailabilityMonitor,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private companion object {
@@ -34,7 +36,11 @@ class EntrySummarizer(
      * @param useCached Whether to use a cached response if available. If false, the response will
      * be generated from scratch.
      */
-    suspend fun summarize(summaryId: String, text: String, useCached: Boolean = true): String? =
+    suspend fun summarize(
+        summaryId: String,
+        text: String,
+        useCached: Boolean = true
+    ): AIResult<String> =
         withContext(ioDispatcher) {
             if (useCached) {
                 val cachedResponse = generativeAICache.getEntry(summaryId)
@@ -43,13 +49,16 @@ class EntrySummarizer(
                         tag = "EntrySummarizer",
                         message = "Using cached response for $summaryId"
                     )
-                    return@withContext cachedResponse.content
+                    return@withContext AIResult.Success(cachedResponse.content, fromCache = true)
                 }
             }
             Napier.d(
                 tag = "EntrySummarizer",
                 message = "No cached response for $summaryId, generating new response"
             )
+            if (!networkAvailabilityMonitor.isNetworkAvailable()) {
+                return@withContext AIResult.Unavailable(AIUnavailableReason.NoNetwork)
+            }
             try {
                 val response = genAIClient.submit(
                     listOf(
@@ -61,17 +70,17 @@ class EntrySummarizer(
                 if (response != null) {
                     Napier.d(tag = "EntrySummarizer", message = "Caching response for entry $summaryId")
                     generativeAICache.putEntry(summaryId, response)
+                    return@withContext AIResult.Success(response, fromCache = false)
                 }
-                response ?: "No summary available"
+                AIResult.Error(AIError.InvalidResponse)
             } catch (e: Exception) {
                 Napier.e(
                     tag = "EntrySummarizer",
                     message = "Failed to summarize entry",
                     throwable = e
                 )
-                null
+                AIResult.Error(AIError.Unknown, e)
             }
 
         }
 }
-

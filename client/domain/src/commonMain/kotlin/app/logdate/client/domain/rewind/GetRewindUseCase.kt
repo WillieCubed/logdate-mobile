@@ -2,12 +2,9 @@ package app.logdate.client.domain.rewind
 
 import app.logdate.client.repository.rewind.RewindRepository
 import app.logdate.client.repository.rewind.RewindGenerationManager
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -24,8 +21,6 @@ class GetRewindUseCase(
     private val generationManager: RewindGenerationManager,
     private val generateBasicRewindUseCase: GenerateBasicRewindUseCase,
 ) {
-    // Create a dedicated scope for background rewind generation
-    private val generationScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     /**
      * Retrieves a Rewind for a given time period with temporal logic and instant UX.
      * 
@@ -49,46 +44,43 @@ class GetRewindUseCase(
         }
         
         // Check if generation is already in progress and get rewind
-        return flow {
+        return channelFlow {
             if (generationManager.isGenerationInProgress(params.start, params.end)) {
                 Napier.d("Generation already in progress for period")
-                emit(RewindQueryResult.Generating)
-                return@flow
+                send(RewindQueryResult.Generating)
+                return@channelFlow
             }
-            
+
             Napier.d("Checking for existing rewind for period ${params.start} to ${params.end}")
-            
+
             // Collect the repository flow to check if rewind exists
             rewindRepository.getRewindBetween(params.start, params.end).collect { rewind ->
                 if (rewind != null) {
                     Napier.d("Found existing rewind for period")
-                    emit(RewindQueryResult.Success(rewind))
+                    send(RewindQueryResult.Success(rewind))
                 } else {
                     // No rewind exists for this current/past period - trigger instant generation
                     Napier.d("No rewind exists for period, triggering instant generation")
-                    
+
                     // Immediately emit Generating state for instant UX
-                    emit(RewindQueryResult.Generating)
-                    
+                    send(RewindQueryResult.Generating)
+
                     // Trigger generation in background for seamless experience
-                    generationScope.launch {
+                    launch {
                         try {
                             val result = generateBasicRewindUseCase(params.start, params.end)
                             when (result) {
                                 is GenerateBasicRewindResult.Success -> {
                                     Napier.i("Successfully generated rewind for period - UI will auto-update")
-                                    // Repository flow will automatically emit the new rewind
                                 }
                                 is GenerateBasicRewindResult.AlreadyInProgress -> {
                                     Napier.d("Generation already in progress - will continue")
                                 }
                                 is GenerateBasicRewindResult.NoContent -> {
                                     Napier.w("No content available for rewind period")
-                                    // UI will need to handle this case (empty state)
                                 }
                                 is GenerateBasicRewindResult.Error -> {
                                     Napier.e("Failed to generate rewind: ${result.error}", result.exception)
-                                    // UI will need to handle this case (error state)
                                 }
                             }
                         } catch (e: Exception) {
@@ -123,4 +115,3 @@ data class RewindParams(
      */
     val end: Instant,
 )
-

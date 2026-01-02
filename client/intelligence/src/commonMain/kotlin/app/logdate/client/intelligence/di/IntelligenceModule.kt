@@ -20,9 +20,9 @@ val intelligenceModule: Module = module {
 
     single<RewindGenerator> { DefaultRewindGenerator() }
     single<RewindMessageGenerator> { WittyRewindMessageGenerator() }
-    single { EntrySummarizer(get(), get()) }
-    single { PeopleExtractor(get(), get()) }
-    single { WeekNarrativeSynthesizer(get(), get()) }
+    single { EntrySummarizer(get(), get(), networkAvailabilityMonitor = get()) }
+    single { PeopleExtractor(get(), get(), networkAvailabilityMonitor = get()) }
+    single { WeekNarrativeSynthesizer(get(), get(), networkAvailabilityMonitor = get()) }
     single { RewindSequencer() }
 }
 

@@ -2,6 +2,7 @@ package app.logdate.client.domain.rewind
 
 import app.logdate.client.domain.media.IndexMediaForPeriodUseCase
 import app.logdate.client.domain.notes.FetchNotesForDayUseCase
+import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.entity.people.PeopleExtractor
 import app.logdate.client.intelligence.narrative.RewindSequencer
 import app.logdate.client.intelligence.narrative.WeekNarrativeSynthesizer
@@ -157,14 +158,19 @@ class GenerateBasicRewindUseCase(
 
             // Extract people mentioned in entries for narrative context
             val people = allTextEntries.flatMap { entry ->
-                try {
-                    peopleExtractor.extractPeople(
-                        documentId = entry.uid.toString(),
-                        text = entry.content
-                    )
-                } catch (e: Exception) {
-                    Napier.w("Failed to extract people from entry: ${e.message}")
-                    emptyList()
+                when (val result = peopleExtractor.extractPeople(
+                    documentId = entry.uid.toString(),
+                    text = entry.content
+                )) {
+                    is AIResult.Success -> result.value
+                    is AIResult.Unavailable -> {
+                        Napier.w("People extraction unavailable for entry ${entry.uid}")
+                        emptyList()
+                    }
+                    is AIResult.Error -> {
+                        Napier.w("Failed to extract people from entry ${entry.uid}: ${result.error}")
+                        emptyList()
+                    }
                 }
             }.distinctBy { it.name }
 
@@ -174,7 +180,7 @@ class GenerateBasicRewindUseCase(
             val weekId = "${startTime.toLocalDateTime(timezone).date}"
 
             // Synthesize narrative understanding of the week
-            val narrative = narrativeSynthesizer.synthesize(
+            val narrativeResult = narrativeSynthesizer.synthesize(
                 weekId = weekId,
                 textEntries = allTextEntries,
                 media = mediaItems,
@@ -183,21 +189,31 @@ class GenerateBasicRewindUseCase(
             )
 
             // Sequence content into narrative-driven panels
-            val narrativeContent = if (narrative != null) {
-                Napier.d("Using AI narrative with ${narrative.storyBeats.size} story beats")
-                rewindSequencer.sequence(
-                    narrative = narrative,
-                    textEntries = allTextEntries,
-                    media = mediaItems,
-                    people = people
-                )
-            } else {
-                Napier.w("Narrative synthesis failed, falling back to chronological content")
-                // Fallback: chronological content if narrative synthesis fails
-                val fallbackContent = mutableListOf<RewindContent>()
-                fallbackContent.addAll(allTextEntries.map { it.toRewindContent() })
-                fallbackContent.addAll(mediaItems.map { it.toRewindContent() })
-                fallbackContent.sortedBy { it.timestamp }
+            val narrativeContent = when (narrativeResult) {
+                is AIResult.Success -> {
+                    Napier.d("Using AI narrative with ${narrativeResult.value.storyBeats.size} story beats")
+                    rewindSequencer.sequence(
+                        narrative = narrativeResult.value,
+                        textEntries = allTextEntries,
+                        media = mediaItems,
+                        people = people
+                    )
+                }
+                is AIResult.Unavailable -> {
+                    Napier.w("Narrative synthesis unavailable, falling back to chronological content")
+                    // Fallback: chronological content if narrative synthesis fails
+                    val fallbackContent = mutableListOf<RewindContent>()
+                    fallbackContent.addAll(allTextEntries.map { it.toRewindContent() })
+                    fallbackContent.addAll(mediaItems.map { it.toRewindContent() })
+                    fallbackContent.sortedBy { it.timestamp }
+                }
+                is AIResult.Error -> {
+                    Napier.w("Narrative synthesis failed, falling back to chronological content")
+                    val fallbackContent = mutableListOf<RewindContent>()
+                    fallbackContent.addAll(allTextEntries.map { it.toRewindContent() })
+                    fallbackContent.addAll(mediaItems.map { it.toRewindContent() })
+                    fallbackContent.sortedBy { it.timestamp }
+                }
             }
 
             Napier.d("Generated ${narrativeContent.size} narrative panels")

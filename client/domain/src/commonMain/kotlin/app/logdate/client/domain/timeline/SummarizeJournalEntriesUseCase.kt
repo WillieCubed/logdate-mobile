@@ -1,7 +1,8 @@
 package app.logdate.client.domain.timeline
 
+import app.logdate.client.intelligence.AIResult
+import app.logdate.client.intelligence.AIUnavailableReason
 import app.logdate.client.intelligence.EntrySummarizer
-import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.repository.journals.JournalNote
 import io.github.aakira.napier.Napier
 import kotlinx.datetime.TimeZone
@@ -18,16 +19,11 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  */
 class SummarizeJournalEntriesUseCase(
     private val summarizer: EntrySummarizer,
-    private val networkAvailabilityMonitor: NetworkAvailabilityMonitor,
 ) {
     suspend operator fun invoke(entries: List<JournalNote>): SummarizeJournalEntriesResult {
         if (entries.isEmpty()) {
             return SummarizeJournalEntriesResult.SummaryUnavailable
         }
-        if (!networkAvailabilityMonitor.isNetworkAvailable()) {
-            return SummarizeJournalEntriesResult.NetworkUnavailable
-        }
-
         // Sort entries by creation timestamp to ensure chronological order
         val sortedEntries = entries.filterIsInstance<JournalNote.Text>()
             .sortedBy { it.creationTimestamp }
@@ -44,23 +40,21 @@ ${it.content}
         // Create a fixed-length key by hashing the entry UIDs
         val summaryKey = generateHashKey(entries.map { it.uid.toString() })
 
-        try {
-            val summary = summarizer.summarize(summaryKey, summaryPrompt)
-            if (summary == null) {
-                Napier.w(
-                    tag = "SummarizeJournalEntriesUseCase",
-                    message = "External model could not summarize entries"
-                )
-                return SummarizeJournalEntriesResult.SummaryUnavailable
+        return when (val result = summarizer.summarize(summaryKey, summaryPrompt)) {
+            is AIResult.Success ->
+                SummarizeJournalEntriesResult.Success(result.value)
+            is AIResult.Unavailable -> when (result.reason) {
+                AIUnavailableReason.NoNetwork -> SummarizeJournalEntriesResult.NetworkUnavailable
+                else -> SummarizeJournalEntriesResult.SummaryUnavailable
             }
-            return SummarizeJournalEntriesResult.Success(summary)
-        } catch (e: Exception) {
-            Napier.e(
-                tag = "SummarizeJournalEntriesUseCase",
-                throwable = e,
-                message = "Could not summarize journal entries",
-            )
-            return SummarizeJournalEntriesResult.SummaryUnavailable
+            is AIResult.Error -> {
+                Napier.e(
+                    tag = "SummarizeJournalEntriesUseCase",
+                    throwable = result.throwable,
+                    message = "Could not summarize journal entries: ${result.error}"
+                )
+                SummarizeJournalEntriesResult.SummaryUnavailable
+            }
         }
     }
 

@@ -16,6 +16,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Instant
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlin.time.Duration
 import kotlin.uuid.Uuid
 
@@ -30,6 +34,8 @@ class OfflineFirstRewindRepository(
     private val cachedRewindDao: CachedRewindDao,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : RewindRepository {
+
+    private val contentJson = Json { ignoreUnknownKeys = true }
     
     /**
      * Retrieves all rewinds that have been generated.
@@ -178,14 +184,57 @@ class OfflineFirstRewindRepository(
     }
     
     /**
-     * Converts a RewindTextContentEntity to a domain TextNote.
+     * Converts a RewindTextContentEntity to a domain RewindContent entry.
      */
-    private fun RewindTextContentEntity.toDomainModel(): RewindContent.TextNote {
-        return RewindContent.TextNote(
-            timestamp = timestamp,
-            sourceId = sourceId,
-            content = content
-        )
+    private fun RewindTextContentEntity.toDomainModel(): RewindContent {
+        return when {
+            content.startsWith(NARRATIVE_PREFIX) -> {
+                runCatching {
+                    contentJson.decodeFromString<NarrativeContextPayload>(
+                        content.removePrefix(NARRATIVE_PREFIX)
+                    )
+                }.map { payload ->
+                    RewindContent.NarrativeContext(
+                        timestamp = timestamp,
+                        sourceId = sourceId,
+                        contextText = payload.contextText,
+                        backgroundImage = payload.backgroundImage
+                    )
+                }.getOrElse {
+                    Napier.w("Failed to decode narrative context payload for rewind text content", it)
+                    RewindContent.TextNote(
+                        timestamp = timestamp,
+                        sourceId = sourceId,
+                        content = content
+                    )
+                }
+            }
+            content.startsWith(TRANSITION_PREFIX) -> {
+                runCatching {
+                    contentJson.decodeFromString<TransitionPayload>(
+                        content.removePrefix(TRANSITION_PREFIX)
+                    )
+                }.map { payload ->
+                    RewindContent.Transition(
+                        timestamp = timestamp,
+                        sourceId = sourceId,
+                        transitionText = payload.transitionText
+                    )
+                }.getOrElse {
+                    Napier.w("Failed to decode transition payload for rewind text content", it)
+                    RewindContent.TextNote(
+                        timestamp = timestamp,
+                        sourceId = sourceId,
+                        content = content
+                    )
+                }
+            }
+            else -> RewindContent.TextNote(
+                timestamp = timestamp,
+                sourceId = sourceId,
+                content = content
+            )
+        }
     }
     
     /**
@@ -230,6 +279,8 @@ class OfflineFirstRewindRepository(
                 is RewindContent.TextNote -> textEntities.add(content.toTextEntity(rewindId))
                 is RewindContent.Image -> imageEntities.add(content.toImageEntity(rewindId))
                 is RewindContent.Video -> videoEntities.add(content.toVideoEntity(rewindId))
+                is RewindContent.NarrativeContext -> textEntities.add(content.toNarrativeEntity(rewindId))
+                is RewindContent.Transition -> textEntities.add(content.toTransitionEntity(rewindId))
             }
         }
         
@@ -246,6 +297,28 @@ class OfflineFirstRewindRepository(
             sourceId = sourceId,
             timestamp = timestamp,
             content = content
+        )
+    }
+
+    private fun RewindContent.NarrativeContext.toNarrativeEntity(rewindId: Uuid): RewindTextContentEntity {
+        val payload = NarrativeContextPayload(contextText = contextText, backgroundImage = backgroundImage)
+        return RewindTextContentEntity(
+            id = sourceId,
+            rewindId = rewindId,
+            sourceId = sourceId,
+            timestamp = timestamp,
+            content = NARRATIVE_PREFIX + contentJson.encodeToString(payload)
+        )
+    }
+
+    private fun RewindContent.Transition.toTransitionEntity(rewindId: Uuid): RewindTextContentEntity {
+        val payload = TransitionPayload(transitionText = transitionText)
+        return RewindTextContentEntity(
+            id = sourceId,
+            rewindId = rewindId,
+            sourceId = sourceId,
+            timestamp = timestamp,
+            content = TRANSITION_PREFIX + contentJson.encodeToString(payload)
         )
     }
     
@@ -276,5 +349,21 @@ class OfflineFirstRewindRepository(
             caption = caption,
             duration = duration.toString()
         )
+    }
+
+    @Serializable
+    private data class NarrativeContextPayload(
+        val contextText: String,
+        val backgroundImage: String?
+    )
+
+    @Serializable
+    private data class TransitionPayload(
+        val transitionText: String
+    )
+
+    private companion object {
+        private const val NARRATIVE_PREFIX = "LD_NARRATIVE:"
+        private const val TRANSITION_PREFIX = "LD_TRANSITION:"
     }
 }

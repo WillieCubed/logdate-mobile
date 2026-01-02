@@ -110,7 +110,7 @@ val domainModule: Module = module {
     factory { GetStreamingTimelineUseCase(get(), get()) }
     factory { GetTimelineDayUseCase(get(), get(), get()) }
     factory { GetTimelineBannerUseCase(get(), get()) }
-    factory { SummarizeJournalEntriesUseCase(get(), get()) }
+    factory { SummarizeJournalEntriesUseCase(get()) }
     
     // Include health domain module
     includes(healthDomainModule)
@@ -119,7 +119,7 @@ val domainModule: Module = module {
     includes(locationDomainModule)
 
     // Onboarding
-    factory { ProcessPersonalIntroductionUseCase(get(), get()) }
+    factory { ProcessPersonalIntroductionUseCase(get(), get(), get()) }
 
     // Journals
     factory { GetCurrentUserJournalsUseCase(get()) }

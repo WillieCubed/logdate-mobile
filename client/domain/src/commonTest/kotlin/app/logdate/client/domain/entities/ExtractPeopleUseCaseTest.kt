@@ -1,5 +1,6 @@
 package app.logdate.client.domain.entities
 
+import app.logdate.client.intelligence.AIResult
 import app.logdate.shared.model.Person
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,16 +23,16 @@ class ExtractPeopleUseCaseTest {
             var capturedDocumentId: String? = null
             var capturedText: String? = null
             
-            suspend fun extractPeople(documentId: String, text: String): List<Person> {
+            suspend fun extractPeople(documentId: String, text: String): AIResult<List<Person>> {
                 capturedDocumentId = documentId
                 capturedText = text
-                return expectedPeople
+                return AIResult.Success(expectedPeople)
             }
         }
         
         // Create UseCase with mocked extractor behavior
         val useCase = object {
-            suspend operator fun invoke(documentId: String, text: String): List<Person> {
+            suspend operator fun invoke(documentId: String, text: String): AIResult<List<Person>> {
                 return mockExtractor.extractPeople(documentId, text)
             }
         }
@@ -40,7 +41,7 @@ class ExtractPeopleUseCaseTest {
         val result = useCase(documentId, text)
 
         // Then
-        assertEquals(expectedPeople, result)
+        assertEquals(AIResult.Success(expectedPeople), result)
         assertEquals(documentId, mockExtractor.capturedDocumentId)
         assertEquals(text, mockExtractor.capturedText)
     }
@@ -52,13 +53,13 @@ class ExtractPeopleUseCaseTest {
         val text = "No names in this text"
         
         val mockExtractor = object {
-            suspend fun extractPeople(documentId: String, text: String): List<Person> {
-                return emptyList()
+            suspend fun extractPeople(documentId: String, text: String): AIResult<List<Person>> {
+                return AIResult.Success(emptyList())
             }
         }
         
         val useCase = object {
-            suspend operator fun invoke(documentId: String, text: String): List<Person> {
+            suspend operator fun invoke(documentId: String, text: String): AIResult<List<Person>> {
                 return mockExtractor.extractPeople(documentId, text)
             }
         }
@@ -67,7 +68,7 @@ class ExtractPeopleUseCaseTest {
         val result = useCase(documentId, text)
 
         // Then
-        assertEquals(emptyList(), result)
+        assertEquals(AIResult.Success(emptyList<Person>()), result)
     }
 
     @Test
@@ -78,13 +79,13 @@ class ExtractPeopleUseCaseTest {
         val expectedPerson = Person(name = "Alice")
         
         val mockExtractor = object {
-            suspend fun extractPeople(documentId: String, text: String): List<Person> {
-                return listOf(expectedPerson)
+            suspend fun extractPeople(documentId: String, text: String): AIResult<List<Person>> {
+                return AIResult.Success(listOf(expectedPerson))
             }
         }
         
         val useCase = object {
-            suspend operator fun invoke(documentId: String, text: String): List<Person> {
+            suspend operator fun invoke(documentId: String, text: String): AIResult<List<Person>> {
                 return mockExtractor.extractPeople(documentId, text)
             }
         }
@@ -93,7 +94,7 @@ class ExtractPeopleUseCaseTest {
         val result = useCase(documentId, text)
 
         // Then
-        assertEquals(listOf(expectedPerson), result)
+        assertEquals(AIResult.Success(listOf(expectedPerson)), result)
     }
 
     @Test
@@ -103,13 +104,13 @@ class ExtractPeopleUseCaseTest {
         val text = ""
         
         val mockExtractor = object {
-            suspend fun extractPeople(documentId: String, text: String): List<Person> {
-                return emptyList()
+            suspend fun extractPeople(documentId: String, text: String): AIResult<List<Person>> {
+                return AIResult.Success(emptyList())
             }
         }
         
         val useCase = object {
-            suspend operator fun invoke(documentId: String, text: String): List<Person> {
+            suspend operator fun invoke(documentId: String, text: String): AIResult<List<Person>> {
                 return mockExtractor.extractPeople(documentId, text)
             }
         }
@@ -118,7 +119,7 @@ class ExtractPeopleUseCaseTest {
         val result = useCase(documentId, text)
 
         // Then
-        assertEquals(emptyList(), result)
+        assertEquals(AIResult.Success(emptyList<Person>()), result)
     }
 
     @Test
@@ -128,13 +129,13 @@ class ExtractPeopleUseCaseTest {
         val text = "   \n\t  "
         
         val mockExtractor = object {
-            suspend fun extractPeople(documentId: String, text: String): List<Person> {
-                return emptyList()
+            suspend fun extractPeople(documentId: String, text: String): AIResult<List<Person>> {
+                return AIResult.Success(emptyList())
             }
         }
         
         val useCase = object {
-            suspend operator fun invoke(documentId: String, text: String): List<Person> {
+            suspend operator fun invoke(documentId: String, text: String): AIResult<List<Person>> {
                 return mockExtractor.extractPeople(documentId, text)
             }
         }
@@ -143,6 +144,6 @@ class ExtractPeopleUseCaseTest {
         val result = useCase(documentId, text)
 
         // Then
-        assertEquals(emptyList(), result)
+        assertEquals(AIResult.Success(emptyList<Person>()), result)
     }
 }

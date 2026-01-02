@@ -1,8 +1,12 @@
 package app.logdate.client.intelligence.narrative
 
+import app.logdate.client.intelligence.AIError
+import app.logdate.client.intelligence.AIResult
+import app.logdate.client.intelligence.AIUnavailableReason
 import app.logdate.client.intelligence.cache.GenerativeAICache
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
+import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.shared.model.Person
@@ -34,6 +38,7 @@ import kotlinx.serialization.json.Json
 class WeekNarrativeSynthesizer(
     private val generativeAICache: GenerativeAICache,
     private val genAIClient: GenerativeAIChatClient,
+    private val networkAvailabilityMonitor: NetworkAvailabilityMonitor,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
     private companion object {
@@ -126,16 +131,23 @@ Respond ONLY with valid JSON in this format. No additional text."""
         media: List<IndexedMedia>,
         people: List<Person> = emptyList(),
         useCached: Boolean = true
-    ): WeekNarrative? = withContext(ioDispatcher) {
+    ): AIResult<WeekNarrative> = withContext(ioDispatcher) {
         if (useCached) {
             val cached = generativeAICache.getEntry(weekId)
             if (cached != null) {
                 Napier.d("Using cached narrative for $weekId")
-                return@withContext parseNarrativeResponse(cached.content)
+                val parsed = parseNarrativeResponse(cached.content)
+                if (parsed != null) {
+                    return@withContext AIResult.Success(parsed, fromCache = true)
+                }
+                Napier.w("Cached narrative response was invalid for $weekId")
             }
         }
 
         Napier.d("Generating narrative for $weekId with ${textEntries.size} entries, ${media.size} media items")
+        if (!networkAvailabilityMonitor.isNetworkAvailable()) {
+            return@withContext AIResult.Unavailable(AIUnavailableReason.NoNetwork)
+        }
 
         // Build content summary for AI
         val contentSummary = buildContentSummary(textEntries, media, people)
@@ -159,14 +171,18 @@ Analyze this content and provide the narrative structure in JSON format as speci
             if (response != null) {
                 Napier.d("Caching narrative for $weekId")
                 generativeAICache.putEntry(weekId, response)
-                return@withContext parseNarrativeResponse(response)
+                val parsed = parseNarrativeResponse(response)
+                if (parsed != null) {
+                    return@withContext AIResult.Success(parsed, fromCache = false)
+                }
+                return@withContext AIResult.Error(AIError.InvalidResponse)
             } else {
                 Napier.w("AI returned null response for narrative synthesis")
-                return@withContext null
+                return@withContext AIResult.Error(AIError.InvalidResponse)
             }
         } catch (e: Exception) {
             Napier.e("Failed to synthesize narrative", throwable = e)
-            return@withContext null
+            return@withContext AIResult.Error(AIError.Unknown, e)
         }
     }
 

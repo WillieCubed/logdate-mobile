@@ -2,6 +2,7 @@ package app.logdate.client.domain.onboarding
 
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
+import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.shared.model.profile.LogDateProfile
 import io.github.aakira.napier.Napier
@@ -14,7 +15,8 @@ import io.github.aakira.napier.Napier
  */
 class ProcessPersonalIntroductionUseCase(
     private val profileRepository: ProfileRepository,
-    private val generativeAiClient: GenerativeAIChatClient
+    private val generativeAiClient: GenerativeAIChatClient,
+    private val networkAvailabilityMonitor: NetworkAvailabilityMonitor
 ) {
     
     /**
@@ -73,6 +75,9 @@ class ProcessPersonalIntroductionUseCase(
      */
     private suspend fun generateFriendlyResponse(name: String, bio: String): String {
         return try {
+            if (!networkAvailabilityMonitor.isNetworkAvailable()) {
+                return createFallbackResponse(name)
+            }
             val systemMessage = GenerativeAIChatMessage(
                 role = "system",
                 content = """You are a friendly, warm AI assistant helping someone set up their personal journal app called LogDate. 

@@ -1,8 +1,12 @@
 package app.logdate.client.intelligence.entity.people
 
+import app.logdate.client.intelligence.AIError
+import app.logdate.client.intelligence.AIResult
+import app.logdate.client.intelligence.AIUnavailableReason
 import app.logdate.client.intelligence.cache.GenerativeAICache
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
+import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.shared.model.Person
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
@@ -18,6 +22,7 @@ import kotlin.uuid.ExperimentalUuidApi
 class PeopleExtractor(
     private val generativeAICache: GenerativeAICache,
     private val generativeAIChatClient: GenerativeAIChatClient,
+    private val networkAvailabilityMonitor: NetworkAvailabilityMonitor,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
@@ -49,25 +54,50 @@ line.
         documentId: String,
         text: String,
         useCached: Boolean = true,
-    ): List<Person> =
+    ): AIResult<List<Person>> =
         withContext(ioDispatcher) {
             if (useCached) {
                 val cachedResponse = generativeAICache.getEntry(documentId)
                 if (cachedResponse != null) {
-                    return@withContext cachedResponse.content.split("\n").map { Person(name = it) }
+                    return@withContext AIResult.Success(
+                        cachedResponse.content.split("\n")
+                            .map { it.trim() }
+                            .filter { it.isNotBlank() }
+                            .map { Person(name = it) },
+                        fromCache = true
+                    )
                 }
+            }
+            if (!networkAvailabilityMonitor.isNetworkAvailable()) {
+                return@withContext AIResult.Unavailable(AIUnavailableReason.NoNetwork)
             }
             val prompts = listOf(
                 GenerativeAIChatMessage("system", EXTRACTION_PROMPT),
                 GenerativeAIChatMessage("user", text),
                 // TODO: Use structured response format
             )
-            val response = generativeAIChatClient.submit(prompts)
-            if (response != null) {
-                Napier.d(tag = "PeopleExtractor", message = "Caching response for:\n$text")
-                Napier.d(tag = "PeopleExtractor") { "Response: ${response.trim()}" }
-                generativeAICache.putEntry(documentId, response.trim())
+            try {
+                val response = generativeAIChatClient.submit(prompts)
+                if (response != null) {
+                    Napier.d(tag = "PeopleExtractor", message = "Caching response for:\n$text")
+                    Napier.d(tag = "PeopleExtractor") { "Response: ${response.trim()}" }
+                    generativeAICache.putEntry(documentId, response.trim())
+                }
+                if (response == null) {
+                    return@withContext AIResult.Error(AIError.InvalidResponse)
+                }
+                val people = response.split("\n")
+                    .map { it.trim() }
+                    .filter { it.isNotBlank() }
+                    .map { Person(name = it) }
+                AIResult.Success(people, fromCache = false)
+            } catch (e: Exception) {
+                Napier.e(
+                    tag = "PeopleExtractor",
+                    message = "Failed to extract people",
+                    throwable = e
+                )
+                AIResult.Error(AIError.Unknown, e)
             }
-            response?.split("\n")?.map { Person(name = it.trim()) } ?: emptyList()
         }
 }

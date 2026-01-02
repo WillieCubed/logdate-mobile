@@ -1,7 +1,9 @@
 package app.logdate.client.intelligence.narrative
 
+import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.fakes.FakeGenerativeAICache
 import app.logdate.client.intelligence.fakes.FakeGenerativeAIChatClient
+import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.shared.model.Person
@@ -12,7 +14,6 @@ import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
@@ -23,10 +24,12 @@ class WeekNarrativeSynthesizerTest {
     private val testDispatcher = StandardTestDispatcher()
     private val fakeCache = FakeGenerativeAICache()
     private val fakeAIClient = FakeGenerativeAIChatClient()
+    private val fakeNetworkMonitor = TestNetworkAvailabilityMonitor()
 
     private val synthesizer = WeekNarrativeSynthesizer(
         generativeAICache = fakeCache,
         genAIClient = fakeAIClient,
+        networkAvailabilityMonitor = fakeNetworkMonitor,
         ioDispatcher = testDispatcher
     )
 
@@ -96,15 +99,15 @@ class WeekNarrativeSynthesizerTest {
             useCached = false
         )
 
-        assertNotNull(result)
-        assertEquals(3, result.themes.size)
-        assertTrue(result.themes.contains("vacation"))
-        assertTrue(result.themes.contains("exploration"))
-        assertTrue(result.themes.contains("culinary adventure"))
-        assertEquals("excited and refreshed", result.emotionalTone)
-        assertEquals(2, result.storyBeats.size)
-        assertEquals("Finally found the hidden beach at Point Reyes", result.storyBeats[0].moment)
-        assertEquals("triumphant", result.storyBeats[0].emotionalWeight)
+        val narrative = assertSuccess(result)
+        assertEquals(3, narrative.themes.size)
+        assertTrue(narrative.themes.contains("vacation"))
+        assertTrue(narrative.themes.contains("exploration"))
+        assertTrue(narrative.themes.contains("culinary adventure"))
+        assertEquals("excited and refreshed", narrative.emotionalTone)
+        assertEquals(2, narrative.storyBeats.size)
+        assertEquals("Finally found the hidden beach at Point Reyes", narrative.storyBeats[0].moment)
+        assertEquals("triumphant", narrative.storyBeats[0].emotionalWeight)
     }
 
     @Test
@@ -173,13 +176,13 @@ class WeekNarrativeSynthesizerTest {
             useCached = false
         )
 
-        assertNotNull(result)
-        assertEquals(3, result.themes.size)
-        assertTrue(result.themes.contains("relationship strain"))
-        assertEquals("stressful but resilient", result.emotionalTone)
-        assertEquals(3, result.storyBeats.size)
-        assertEquals("melancholy", result.storyBeats[0].emotionalWeight)
-        assertEquals("grateful", result.storyBeats[2].emotionalWeight)
+        val narrative = assertSuccess(result)
+        assertEquals(3, narrative.themes.size)
+        assertTrue(narrative.themes.contains("relationship strain"))
+        assertEquals("stressful but resilient", narrative.emotionalTone)
+        assertEquals(3, narrative.storyBeats.size)
+        assertEquals("melancholy", narrative.storyBeats[0].emotionalWeight)
+        assertEquals("grateful", narrative.storyBeats[2].emotionalWeight)
     }
 
     @Test
@@ -213,9 +216,9 @@ class WeekNarrativeSynthesizerTest {
             useCached = true
         )
 
-        assertNotNull(result)
-        assertEquals(listOf("relaxation"), result.themes)
-        assertEquals("peaceful", result.emotionalTone)
+        val narrative = assertSuccess(result)
+        assertEquals(listOf("relaxation"), narrative.themes)
+        assertEquals("peaceful", narrative.emotionalTone)
 
         // Verify AI client was not called (cached response used)
         assertEquals(0, fakeAIClient.submissions.size)
@@ -245,9 +248,9 @@ class WeekNarrativeSynthesizerTest {
             useCached = false
         )
 
-        assertNotNull(result)
-        assertEquals(listOf("quiet"), result.themes)
-        assertTrue(result.storyBeats.isEmpty())
+        val narrative = assertSuccess(result)
+        assertEquals(listOf("quiet"), narrative.themes)
+        assertTrue(narrative.storyBeats.isEmpty())
     }
 
     @Test
@@ -272,7 +275,7 @@ class WeekNarrativeSynthesizerTest {
             useCached = false
         )
 
-        assertNull(result)
+        assertTrue(result is AIResult.Error)
     }
 
     @Test
@@ -297,7 +300,7 @@ class WeekNarrativeSynthesizerTest {
             useCached = false
         )
 
-        assertNull(result)
+        assertTrue(result is AIResult.Error)
     }
 
     @Test
@@ -390,5 +393,18 @@ class WeekNarrativeSynthesizerTest {
         assertTrue(userMessage.content.contains("Video"))
         assertTrue(userMessage.content.contains("Cooking adventure"))
         assertTrue(userMessage.content.contains("MEDIA"))
+    }
+
+    private fun assertSuccess(result: AIResult<app.logdate.shared.model.WeekNarrative>): app.logdate.shared.model.WeekNarrative {
+        assertTrue(result is AIResult.Success)
+        return result.value
+    }
+
+    private class TestNetworkAvailabilityMonitor(
+        private var available: Boolean = true
+    ) : NetworkAvailabilityMonitor {
+        override fun isNetworkAvailable(): Boolean = available
+
+        override fun observeNetwork() = throw UnsupportedOperationException("Not used in tests")
     }
 }

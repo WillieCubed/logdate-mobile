@@ -3,13 +3,13 @@ package app.logdate.client.intelligence
 import app.logdate.client.intelligence.fakes.FakeGenerativeAICache
 import app.logdate.client.intelligence.fakes.FakeGenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
+import app.logdate.client.networking.NetworkAvailabilityMonitor
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -18,10 +18,12 @@ class EntrySummarizerTest {
     private val testDispatcher = StandardTestDispatcher()
     private val fakeCache = FakeGenerativeAICache()
     private val fakeAIClient = FakeGenerativeAIChatClient()
+    private val fakeNetworkMonitor = TestNetworkAvailabilityMonitor()
     
     private val entrySummarizer = EntrySummarizer(
         generativeAICache = fakeCache,
         genAIClient = fakeAIClient,
+        networkAvailabilityMonitor = fakeNetworkMonitor,
         ioDispatcher = testDispatcher
     )
     
@@ -41,7 +43,7 @@ class EntrySummarizerTest {
         
         val result = entrySummarizer.summarize(summaryId, inputText, useCached = false)
         
-        assertEquals(expectedSummary, result)
+        assertEquals(AIResult.Success(expectedSummary, fromCache = false), result)
         
         // Verify AI client was called with correct messages
         val lastSubmission = fakeAIClient.getLastSubmission()
@@ -74,7 +76,7 @@ class EntrySummarizerTest {
         
         val result = entrySummarizer.summarize(summaryId, inputText, useCached = true)
         
-        assertEquals(cachedSummary, result)
+        assertEquals(AIResult.Success(cachedSummary, fromCache = true), result)
         
         // Verify cache was checked but AI client was not called
         assertTrue(fakeCache.getEntryCalls.contains(summaryId))
@@ -95,7 +97,7 @@ class EntrySummarizerTest {
         
         val result = entrySummarizer.summarize(summaryId, inputText, useCached = false)
         
-        assertEquals(newSummary, result)
+        assertEquals(AIResult.Success(newSummary, fromCache = false), result)
         
         // Verify cache was not checked and AI client was called
         assertEquals(0, fakeCache.getEntryCalls.size)
@@ -113,7 +115,7 @@ class EntrySummarizerTest {
         
         val result = entrySummarizer.summarize(summaryId, inputText, useCached = true)
         
-        assertEquals(expectedSummary, result)
+        assertEquals(AIResult.Success(expectedSummary, fromCache = false), result)
         
         // Verify cache was checked first, then AI client was called
         assertTrue(fakeCache.getEntryCalls.contains(summaryId))
@@ -131,7 +133,7 @@ class EntrySummarizerTest {
         
         val result = entrySummarizer.summarize(summaryId, inputText, useCached = false)
         
-        assertEquals("No summary available", result)
+        assertTrue(result is AIResult.Error)
         assertEquals(1, fakeAIClient.submissions.size)
     }
 
@@ -146,7 +148,7 @@ class EntrySummarizerTest {
         
         val result = entrySummarizer.summarize(summaryId, inputText, useCached = false)
         
-        assertNull(result)
+        assertTrue(result is AIResult.Error)
         assertEquals(1, fakeAIClient.submissions.size)
         
         // Verify error doesn't get cached
@@ -164,7 +166,7 @@ class EntrySummarizerTest {
         
         val result = entrySummarizer.summarize(summaryId, inputText, useCached = false)
         
-        assertEquals(expectedSummary, result)
+        assertEquals(AIResult.Success(expectedSummary, fromCache = false), result)
         
         val userMessage = fakeAIClient.getLastUserMessage()
         assertEquals("", userMessage)
@@ -190,7 +192,7 @@ class EntrySummarizerTest {
         
         val result = entrySummarizer.summarize(summaryId, inputText, useCached = false)
         
-        assertEquals(expectedSummary, result)
+        assertEquals(AIResult.Success(expectedSummary, fromCache = false), result)
         
         val userMessage = fakeAIClient.getLastUserMessage()
         assertEquals(inputText, userMessage)
@@ -233,12 +235,20 @@ class EntrySummarizerTest {
         val result1 = entrySummarizer.summarize(entry1Id, entry1Text, useCached = false)
         val result2 = entrySummarizer.summarize(entry2Id, entry2Text, useCached = false)
         
-        assertEquals(entry1Summary, result1)
-        assertEquals(entry2Summary, result2)
+        assertEquals(AIResult.Success(entry1Summary, fromCache = false), result1)
+        assertEquals(AIResult.Success(entry2Summary, fromCache = false), result2)
         
         // Verify both entries were cached independently
         assertTrue(fakeCache.hasEntry(entry1Id))
         assertTrue(fakeCache.hasEntry(entry2Id))
         assertEquals(2, fakeAIClient.submissions.size)
+    }
+
+    private class TestNetworkAvailabilityMonitor(
+        private var available: Boolean = true
+    ) : NetworkAvailabilityMonitor {
+        override fun isNetworkAvailable(): Boolean = available
+
+        override fun observeNetwork() = throw UnsupportedOperationException("Not used in tests")
     }
 }

@@ -147,6 +147,22 @@ class RewindDetailViewModel(
                         dateFormatted = formatTimestamp(content.timestamp)
                     )
                 }
+
+                is RewindContent.NarrativeContext -> {
+                    BasicTextRewindPanelUiState(
+                        text = content.contextText,
+                        background = content.backgroundImage?.let {
+                            RewindPanelBackgroundSpec(uri = it)
+                        } ?: RewindPanelBackgroundSpec(color = 0xFF2E2E3A)
+                    )
+                }
+
+                is RewindContent.Transition -> {
+                    BasicTextRewindPanelUiState(
+                        text = content.transitionText,
+                        background = RewindPanelBackgroundSpec(color = 0xFF1A1A2E)
+                    )
+                }
             }
         }
 

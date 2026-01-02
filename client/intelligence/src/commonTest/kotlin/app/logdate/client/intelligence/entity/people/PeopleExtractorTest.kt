@@ -1,7 +1,9 @@
 package app.logdate.client.intelligence.entity.people
 
+import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.fakes.FakeGenerativeAICache
 import app.logdate.client.intelligence.fakes.FakeGenerativeAIChatClient
+import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.shared.model.Person
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -17,10 +19,12 @@ class PeopleExtractorTest {
     private val testDispatcher = StandardTestDispatcher()
     private val fakeCache = FakeGenerativeAICache()
     private val fakeAIClient = FakeGenerativeAIChatClient()
+    private val fakeNetworkMonitor = TestNetworkAvailabilityMonitor()
     
     private val peopleExtractor = PeopleExtractor(
         generativeAICache = fakeCache,
         generativeAIChatClient = fakeAIClient,
+        networkAvailabilityMonitor = fakeNetworkMonitor,
         ioDispatcher = testDispatcher
     )
     
@@ -39,9 +43,10 @@ class PeopleExtractorTest {
         fakeAIClient.setResponseFor(inputText, aiResponse)
         
         val result = peopleExtractor.extractPeople(documentId, inputText, useCached = false)
+        val people = assertSuccess(result)
         
-        assertEquals(1, result.size)
-        assertEquals("Sarah", result[0].name)
+        assertEquals(1, people.size)
+        assertEquals("Sarah", people[0].name)
         
         // Verify AI client was called with correct prompt
         val lastSubmission = fakeAIClient.getLastSubmission()
@@ -68,9 +73,10 @@ class PeopleExtractorTest {
         fakeAIClient.setResponseFor(inputText, aiResponse)
         
         val result = peopleExtractor.extractPeople(documentId, inputText, useCached = false)
+        val people = assertSuccess(result)
         
-        assertEquals(4, result.size)
-        val names = result.map { it.name }
+        assertEquals(4, people.size)
+        val names = people.map { it.name }
         assertTrue(names.contains("John"))
         assertTrue(names.contains("Sarah"))
         assertTrue(names.contains("Michael"))
@@ -88,9 +94,10 @@ class PeopleExtractorTest {
         fakeCache.setEntry(documentId, cachedResponse)
         
         val result = peopleExtractor.extractPeople(documentId, inputText, useCached = true)
+        val people = assertSuccess(result)
         
-        assertEquals(1, result.size)
-        assertEquals("Bob", result[0].name)
+        assertEquals(1, people.size)
+        assertEquals("Bob", people[0].name)
         
         // Verify cache was checked but AI client was not called
         assertTrue(fakeCache.getEntryCalls.contains(documentId))
@@ -110,9 +117,10 @@ class PeopleExtractorTest {
         fakeAIClient.setResponseFor(inputText, newResponse)
         
         val result = peopleExtractor.extractPeople(documentId, inputText, useCached = false)
+        val people = assertSuccess(result)
         
-        assertEquals(1, result.size)
-        assertEquals("Alice", result[0].name)
+        assertEquals(1, people.size)
+        assertEquals("Alice", people[0].name)
         
         // Verify cache was not checked and AI client was called
         assertEquals(0, fakeCache.getEntryCalls.size)
@@ -129,10 +137,9 @@ class PeopleExtractorTest {
         fakeAIClient.setResponseFor(inputText, "")
         
         val result = peopleExtractor.extractPeople(documentId, inputText, useCached = false)
+        val people = assertSuccess(result)
         
-        // Expected: 1 person with empty name (due to empty string split behavior)
-        assertEquals(1, result.size)
-        assertEquals("", result[0].name)
+        assertEquals(0, people.size)
     }
 
     @Test
@@ -144,8 +151,7 @@ class PeopleExtractorTest {
         fakeAIClient.defaultResponse = null
         
         val result = peopleExtractor.extractPeople(documentId, inputText, useCached = false)
-        
-        assertEquals(0, result.size)
+        assertTrue(result is AIResult.Error)
         assertEquals(1, fakeAIClient.submissions.size)
     }
 
@@ -159,15 +165,11 @@ class PeopleExtractorTest {
         fakeAIClient.setResponseFor(inputText, aiResponse)
         
         val result = peopleExtractor.extractPeople(documentId, inputText, useCached = false)
+        val people = assertSuccess(result)
         
-        // The response "  David  \n\n  Lisa  \n" split by "\n" gives:
-        // ["  David  ", "", "  Lisa  ", ""]
-        // After trimming: ["David", "", "Lisa", ""]
-        assertEquals(4, result.size)
-        assertEquals("David", result[0].name)
-        assertEquals("", result[1].name)  // Empty line becomes empty name
-        assertEquals("Lisa", result[2].name)
-        assertEquals("", result[3].name)  // Trailing newline becomes empty name
+        assertEquals(2, people.size)
+        assertEquals("David", people[0].name)
+        assertEquals("Lisa", people[1].name)
     }
 
     @Test
@@ -180,11 +182,12 @@ class PeopleExtractorTest {
         fakeAIClient.setResponseFor(inputText, aiResponse)
         
         val result = peopleExtractor.extractPeople(documentId, inputText, useCached = false)
+        val people = assertSuccess(result)
         
-        assertEquals(3, result.size)
-        assertEquals("Dr. Sarah Johnson", result[0].name)
-        assertEquals("Mr. John Smith", result[1].name)
-        assertEquals("Mary-Elizabeth", result[2].name)
+        assertEquals(3, people.size)
+        assertEquals("Dr. Sarah Johnson", people[0].name)
+        assertEquals("Mr. John Smith", people[1].name)
+        assertEquals("Mary-Elizabeth", people[2].name)
     }
 
     @Test
@@ -197,10 +200,11 @@ class PeopleExtractorTest {
         fakeAIClient.setResponseFor(inputText, aiResponse)
         
         val result = peopleExtractor.extractPeople(documentId, inputText, useCached = false)
+        val people = assertSuccess(result)
         
-        assertEquals(2, result.size)
-        assertEquals("Mom", result[0].name)
-        assertEquals("Dad", result[1].name)
+        assertEquals(2, people.size)
+        assertEquals("Mom", people[0].name)
+        assertEquals("Dad", people[1].name)
     }
 
     @Test
@@ -212,12 +216,9 @@ class PeopleExtractorTest {
         fakeAIClient.setResponseFor(inputText, "")
         
         val result = peopleExtractor.extractPeople(documentId, inputText, useCached = false)
+        val people = assertSuccess(result)
         
-        // When response is empty string, split("\n") creates a list with one empty string
-        // which gets trimmed to empty, so we get one Person with empty name
-        // This is expected behavior based on the implementation
-        assertEquals(1, result.size)
-        assertEquals("", result[0].name)
+        assertEquals(0, people.size)
         
         val userMessage = fakeAIClient.getLastUserMessage()
         assertEquals("", userMessage)
@@ -233,8 +234,9 @@ class PeopleExtractorTest {
         fakeAIClient.setResponseFor(inputText, aiResponse)
         
         val result = peopleExtractor.extractPeople(documentId, inputText, useCached = false)
+        val people = assertSuccess(result)
         
-        assertEquals(2, result.size)
+        assertEquals(2, people.size)
         
         // Verify result was cached
         assertTrue(fakeCache.putEntryCalls.any { 
@@ -252,12 +254,13 @@ class PeopleExtractorTest {
         fakeAIClient.setResponseFor(inputText, aiResponse)
         
         val result = peopleExtractor.extractPeople(documentId, inputText, useCached = false)
+        val people = assertSuccess(result)
         
-        assertEquals(4, result.size)
-        assertEquals("SARAH", result[0].name)
-        assertEquals("bob", result[1].name)
-        assertEquals("Dr. WILSON", result[2].name)
-        assertEquals("ms. jane", result[3].name)
+        assertEquals(4, people.size)
+        assertEquals("SARAH", people[0].name)
+        assertEquals("bob", people[1].name)
+        assertEquals("Dr. WILSON", people[2].name)
+        assertEquals("ms. jane", people[3].name)
     }
 
     @Test
@@ -277,9 +280,10 @@ class PeopleExtractorTest {
         fakeAIClient.setResponseFor(inputText, aiResponse)
         
         val result = peopleExtractor.extractPeople(documentId, inputText, useCached = false)
+        val people = assertSuccess(result)
         
-        assertEquals(8, result.size)
-        val names = result.map { it.name }
+        assertEquals(8, people.size)
+        val names = people.map { it.name }
         assertTrue(names.contains("Jennifer"))
         assertTrue(names.contains("Mark Thompson"))
         assertTrue(names.contains("Amanda"))
@@ -308,5 +312,18 @@ class PeopleExtractorTest {
         assertTrue(systemMessage.contains("humans mentioned"))
         assertTrue(systemMessage.contains("literally return"))
         assertTrue(systemMessage.contains("line"))
+    }
+
+    private fun assertSuccess(result: AIResult<List<Person>>): List<Person> {
+        assertTrue(result is AIResult.Success)
+        return result.value
+    }
+
+    private class TestNetworkAvailabilityMonitor(
+        private var available: Boolean = true
+    ) : NetworkAvailabilityMonitor {
+        override fun isNetworkAvailable(): Boolean = available
+
+        override fun observeNetwork() = throw UnsupportedOperationException("Not used in tests")
     }
 }
