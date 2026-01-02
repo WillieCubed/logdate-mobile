@@ -50,12 +50,6 @@ private data class SyncStatusSnapshot(
     val lastTimestamp: Long
 )
 
-@Serializable
-private data class SyncTriggerResponse(
-    val started: Boolean,
-    val timestamp: Long
-)
-
 /**
  * Extracts and validates the user ID from the Authorization header.
  * Returns null and responds with 401 if authentication fails.
@@ -64,10 +58,12 @@ private suspend fun extractUserId(
     call: ApplicationCall,
     tokenService: TokenService?
 ): UUID? {
-    // If no token service is configured, use a test user ID for development
     if (tokenService == null) {
-        Napier.w("TokenService not configured, using test user ID")
-        return UUID.fromString("00000000-0000-0000-0000-000000000001")
+        call.respond(
+            HttpStatusCode.InternalServerError,
+            error("SERVER_MISCONFIGURED", "Token service is not configured")
+        )
+        return null
     }
 
     val authHeader = call.request.header(HttpHeaders.Authorization)
@@ -121,16 +117,6 @@ fun Route.syncRoutes(
                 lastTimestamp = status.lastTimestamp
             )
             call.respond(simpleSuccess(snapshot))
-        }
-
-        // Legacy placeholder full sync trigger
-        post("/") {
-            val userId = extractUserId(call, tokenService) ?: return@post
-            val payload = SyncTriggerResponse(
-                started = true,
-                timestamp = System.currentTimeMillis()
-            )
-            call.respond(simpleSuccess(payload))
         }
 
         // Content
@@ -406,8 +392,7 @@ fun Route.syncRoutes(
                         deviceId = req.deviceId
                     )
                 )
-                // TODO: Replace with GCS signed URL when GcsMediaStorage is wired
-                val downloadUrl = "https://example.com/media/${stored.mediaId}"
+                val downloadUrl = buildMediaDownloadUrl(call, stored.mediaId)
                 val response = MediaUploadResponse(
                     contentId = req.contentId,
                     mediaId = stored.mediaId,
@@ -425,7 +410,6 @@ fun Route.syncRoutes(
                 )
                 val record = repository.getMedia(userId, mediaId)
                     ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Media not found"))
-                // TODO: Replace with GCS signed URL when GcsMediaStorage is wired
                 call.respond(
                     MediaDownloadResponse(
                         contentId = record.contentId,
@@ -433,10 +417,18 @@ fun Route.syncRoutes(
                         mimeType = record.mimeType,
                         sizeBytes = record.sizeBytes,
                         data = record.data,
-                        downloadUrl = "https://example.com/media/${record.mediaId}"
+                        downloadUrl = buildMediaDownloadUrl(call, record.mediaId)
                     )
                 )
             }
         }
     }
+}
+
+private fun buildMediaDownloadUrl(call: ApplicationCall, mediaId: String): String {
+    val origin = call.request.local
+    val defaultPort = (origin.scheme == "http" && origin.localPort == 80) ||
+        (origin.scheme == "https" && origin.localPort == 443)
+    val portPart = if (defaultPort) "" else ":${origin.localPort}"
+    return "${origin.scheme}://${origin.localHost}$portPart/api/v1/sync/media/$mediaId"
 }

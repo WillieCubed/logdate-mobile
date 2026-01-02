@@ -1,12 +1,15 @@
 package app.logdate.server
 
 import app.logdate.SERVER_PORT
+import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.JwtTokenService
+import app.logdate.server.auth.SessionManager
 import app.logdate.server.di.initializeDatabase
 import app.logdate.server.di.serverModule
 import app.logdate.server.routes.accountRoutes
 import app.logdate.server.routes.*
 import app.logdate.server.sync.SyncRepository
+import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.util.UuidSerializer
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -46,7 +49,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
         modules(serverModule(isDatabaseAvailable))
     }
 
-    environment.monitor.subscribe(ApplicationStopped) {
+    monitor.subscribe(ApplicationStopped) {
         try {
             org.koin.core.context.stopKoin()
         } catch (_: Exception) {
@@ -56,6 +59,9 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
 
     val syncRepository: SyncRepository by inject()
     val tokenService: JwtTokenService by inject()
+    val accountRepository: AccountRepository by inject()
+    val sessionManager: SessionManager by inject()
+    val webAuthnService: WebAuthnPasskeyService by inject()
 
     install(ContentNegotiation) {
         json(Json {
@@ -92,18 +98,13 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
         }
 
         route("/api/v1") {
-            authRoutes()
-            accountRoutes()
-            passkeyRoutes()
-            journalRoutes()
-            notesRoutes()
-            draftRoutes()
-            mediaRoutes()
+            accountRoutes(
+                accountRepository = accountRepository,
+                sessionManager = sessionManager,
+                webAuthnService = webAuthnService,
+                tokenService = tokenService
+            )
             syncRoutes(syncRepository, tokenService)
-            aiRoutes()
-            deviceRoutes()
-            rewindRoutes()
-            timelineRoutes()
         }
     }
 }

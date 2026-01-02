@@ -99,12 +99,12 @@ data class CompleteAuthenticationResponse(
 
 
 @OptIn(ExperimentalUuidApi::class)
-fun Route.accountRoutes() {
-    val webAuthnService = app.logdate.server.database.RepositoryFactory.createWebAuthnService()
-    val accountRepository: AccountRepository = app.logdate.server.database.RepositoryFactory.createAccountRepository()
-    val passkeyRepository = app.logdate.server.database.RepositoryFactory.createPasskeyRepository()
-    val sessionManager: SessionManager = app.logdate.server.database.RepositoryFactory.createSessionManager()
-    val tokenService: TokenService = JwtTokenService()
+fun Route.accountRoutes(
+    accountRepository: AccountRepository,
+    sessionManager: SessionManager,
+    webAuthnService: WebAuthnPasskeyService,
+    tokenService: TokenService
+) {
     
     route("/accounts") {
         
@@ -296,7 +296,9 @@ fun Route.accountRoutes() {
                 // Generate authentication options
                 val authenticationOptions = webAuthnService.generateAuthenticationOptions(
                     userId = user?.id,
-                    allowedCredentials = user?.let { webAuthnService.getUserCredentials(it.id) } ?: emptyList()
+                    allowedCredentials = user?.let { account ->
+                        webAuthnService.getUserCredentials(account.id)
+                    } ?: emptyList()
                 )
                 
                 // Create session
@@ -491,20 +493,5 @@ fun Route.accountRoutes() {
             }
         }
         
-        // Update account preferences (stub for now)
-        patch("/me") {
-            call.respond(
-                HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Account update not implemented yet")
-            )
-        }
-        
-        // Deactivate account (stub for now)
-        delete("/me") {
-            call.respond(
-                HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Account deletion not implemented yet")
-            )
-        }
     }
 }
