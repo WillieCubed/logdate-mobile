@@ -5,6 +5,7 @@ import app.logdate.client.domain.notes.FetchNotesForDayUseCase
 import app.logdate.client.domain.fakes.FakeNetworkAvailabilityMonitor
 import app.logdate.client.intelligence.cache.GenerativeAICache
 import app.logdate.client.intelligence.cache.GenerativeAICacheEntry
+import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
 import app.logdate.client.intelligence.entity.people.PeopleExtractor
 import app.logdate.client.intelligence.AIError
 import app.logdate.client.intelligence.AIResult
@@ -214,14 +215,16 @@ class GetWeekRewindUseCaseTest {
     }
 
     private class FakeGenerativeAICache : GenerativeAICache {
-        override suspend fun getEntry(key: String): GenerativeAICacheEntry? = null
-        override suspend fun putEntry(key: String, value: String) {}
+        override suspend fun getEntry(request: GenerativeAICacheRequest): GenerativeAICacheEntry? = null
+        override suspend fun putEntry(request: GenerativeAICacheRequest, content: String) {}
         override suspend fun purge() {}
     }
 
     private class FakeGenerativeAIChatClient(
         private val response: String?
     ) : GenerativeAIChatClient {
+        override val providerId: String = "fake"
+        override val defaultModel: String? = "fake-model"
         override suspend fun submit(request: GenerativeAIRequest): AIResult<GenerativeAIResponse> {
             return if (response == null) {
                 AIResult.Error(AIError.InvalidResponse)
