@@ -100,7 +100,10 @@ Guidelines:
             )
 
             val response = generativeAiClient.submit(
-                GenerativeAIRequest(messages = listOf(systemMessage, userMessage))
+                GenerativeAIRequest(
+                    messages = listOf(systemMessage, userMessage),
+                    model = generativeAiClient.defaultModel
+                )
             )
             when (response) {
                 is app.logdate.client.intelligence.AIResult.Success -> {
