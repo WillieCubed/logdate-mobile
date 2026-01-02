@@ -1,8 +1,5 @@
 package app.logdate.client.domain.timeline
 
-import io.mockk.coEvery
-import io.mockk.every
-import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
@@ -13,6 +10,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import app.logdate.client.health.model.DayBounds
 
 /**
  * Tests for the iOS implementation of HealthConnectRepository.
@@ -23,15 +21,15 @@ import kotlin.test.assertTrue
  */
 class IosHealthConnectRepositoryTest {
 
-    private val mockHealthKit = mockk<PlatformHealthService>()
-    private val repository = TestIosHealthConnectRepository(mockHealthKit)
+    private val healthService = FakePlatformHealthService()
+    private val repository = TestIosHealthConnectRepository(healthService)
     private val testDate = LocalDate(2023, 6, 15)
     private val testTimeZone = TimeZone.of("UTC")
 
     @Test
     fun `isHealthConnectAvailable returns result from health service`() = runTest {
         // Given
-        coEvery { mockHealthKit.isHealthKitAvailable() } returns true
+        healthService.isAvailable = true
         
         // When
         val result = repository.isHealthConnectAvailable()
@@ -43,7 +41,7 @@ class IosHealthConnectRepositoryTest {
     @Test
     fun `isHealthConnectAvailable returns false when health service returns false`() = runTest {
         // Given
-        coEvery { mockHealthKit.isHealthKitAvailable() } returns false
+        healthService.isAvailable = false
         
         // When
         val result = repository.isHealthConnectAvailable()
@@ -55,7 +53,7 @@ class IosHealthConnectRepositoryTest {
     @Test
     fun `hasSleepPermissions returns result from health service`() = runTest {
         // Given
-        coEvery { mockHealthKit.hasSleepPermissions() } returns true
+        healthService.hasPermissions = true
         
         // When
         val result = repository.hasSleepPermissions()
@@ -67,7 +65,7 @@ class IosHealthConnectRepositoryTest {
     @Test
     fun `requestSleepPermissions returns result from health service`() = runTest {
         // Given
-        coEvery { mockHealthKit.requestSleepPermissions() } returns true
+        healthService.requestPermissionsResult = true
         
         // When
         val result = repository.requestSleepPermissions()
@@ -82,10 +80,10 @@ class IosHealthConnectRepositoryTest {
         val wakeUpTime = 6 // 6:00 AM
         val sleepTime = 22 // 10:00 PM
         
-        coEvery { mockHealthKit.isHealthKitAvailable() } returns true
-        coEvery { mockHealthKit.hasSleepPermissions() } returns true
-        coEvery { mockHealthKit.getAverageWakeUpTime() } returns wakeUpTime
-        coEvery { mockHealthKit.getAverageSleepTime() } returns sleepTime
+        healthService.isAvailable = true
+        healthService.hasPermissions = true
+        healthService.averageWakeUpTime = wakeUpTime
+        healthService.averageSleepTime = sleepTime
         
         // When
         val result = repository.getDayBoundsForDate(testDate, testTimeZone)
@@ -109,7 +107,7 @@ class IosHealthConnectRepositoryTest {
     @Test
     fun `getDayBoundsForDate uses default bounds when health service unavailable`() = runTest {
         // Given
-        coEvery { mockHealthKit.isHealthKitAvailable() } returns false
+        healthService.isAvailable = false
         
         // When
         val result = repository.getDayBoundsForDate(testDate, testTimeZone)
@@ -127,8 +125,8 @@ class IosHealthConnectRepositoryTest {
     @Test
     fun `getDayBoundsForDate uses default bounds when permissions not granted`() = runTest {
         // Given
-        coEvery { mockHealthKit.isHealthKitAvailable() } returns true
-        coEvery { mockHealthKit.hasSleepPermissions() } returns false
+        healthService.isAvailable = true
+        healthService.hasPermissions = false
         
         // When
         val result = repository.getDayBoundsForDate(testDate, testTimeZone)
@@ -146,10 +144,10 @@ class IosHealthConnectRepositoryTest {
     @Test
     fun `getDayBoundsForDate handles invalid sleep data`() = runTest {
         // Given
-        coEvery { mockHealthKit.isHealthKitAvailable() } returns true
-        coEvery { mockHealthKit.hasSleepPermissions() } returns true
-        coEvery { mockHealthKit.getAverageWakeUpTime() } returns null
-        coEvery { mockHealthKit.getAverageSleepTime() } returns 22 // 10:00 PM
+        healthService.isAvailable = true
+        healthService.hasPermissions = true
+        healthService.averageWakeUpTime = null
+        healthService.averageSleepTime = 22 // 10:00 PM
         
         // When
         val result = repository.getDayBoundsForDate(testDate, testTimeZone)
@@ -174,6 +172,20 @@ interface PlatformHealthService {
     suspend fun requestSleepPermissions(): Boolean
     suspend fun getAverageWakeUpTime(): Int?
     suspend fun getAverageSleepTime(): Int?
+}
+
+class FakePlatformHealthService : PlatformHealthService {
+    var isAvailable: Boolean = false
+    var hasPermissions: Boolean = false
+    var requestPermissionsResult: Boolean = false
+    var averageWakeUpTime: Int? = null
+    var averageSleepTime: Int? = null
+
+    override suspend fun isHealthKitAvailable(): Boolean = isAvailable
+    override suspend fun hasSleepPermissions(): Boolean = hasPermissions
+    override suspend fun requestSleepPermissions(): Boolean = requestPermissionsResult
+    override suspend fun getAverageWakeUpTime(): Int? = averageWakeUpTime
+    override suspend fun getAverageSleepTime(): Int? = averageSleepTime
 }
 
 /**

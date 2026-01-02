@@ -73,18 +73,23 @@ class RemoveNoteUseCaseTest {
         val removedIds = mutableListOf<Uuid>()
         var shouldThrowException = false
 
-        override suspend fun removeById(id: Uuid) {
+        override suspend fun removeById(noteId: Uuid) {
             if (shouldThrowException) {
                 throw Exception("Repository error")
             }
-            removedIds.add(id)
+            removedIds.add(noteId)
         }
 
-        override suspend fun create(note: JournalNote) = Unit
-        override suspend fun getByJournalId(journalId: Uuid) = emptyList<JournalNote>()
-        override suspend fun observeNotesInRange(start: kotlinx.datetime.Instant, end: kotlinx.datetime.Instant) = kotlinx.coroutines.flow.flowOf(emptyList<JournalNote>())
-        override suspend fun observeNotesByJournal(journalId: Uuid) = kotlinx.coroutines.flow.flowOf(emptyList<JournalNote>())
-        override suspend fun getNotesForDay(date: kotlinx.datetime.LocalDate) = emptyList<JournalNote>()
-        override suspend fun getAll() = emptyList<JournalNote>()
+        override val allNotesObserved = kotlinx.coroutines.flow.flowOf(emptyList<JournalNote>())
+        override fun observeNotesInJournal(journalId: Uuid) = kotlinx.coroutines.flow.flowOf(emptyList<JournalNote>())
+        override fun observeNotesInRange(start: kotlinx.datetime.Instant, end: kotlinx.datetime.Instant) =
+            kotlinx.coroutines.flow.flowOf(emptyList<JournalNote>())
+        override fun observeNotesPage(pageSize: Int, offset: Int) = kotlinx.coroutines.flow.flowOf(emptyList<JournalNote>())
+        override fun observeNotesStream(pageSize: Int) = kotlinx.coroutines.flow.flowOf(emptyList<JournalNote>())
+        override fun observeRecentNotes(limit: Int) = kotlinx.coroutines.flow.flowOf(emptyList<JournalNote>())
+        override suspend fun create(note: JournalNote): Uuid = note.uid
+        override suspend fun remove(note: JournalNote) = Unit
+        override suspend fun create(note: JournalNote, journalId: Uuid) = Unit
+        override suspend fun removeFromJournal(noteId: Uuid, journalId: Uuid) = Unit
     }
 }

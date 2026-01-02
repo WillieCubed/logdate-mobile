@@ -3,8 +3,8 @@ package app.logdate.client.domain.account.model
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlin.uuid.Uuid
 
 /**
  * Tests for the PasskeyCredential domain model.
@@ -14,7 +14,7 @@ class PasskeyCredentialTest {
     @Test
     fun `PasskeyCredential creation with full device info`() {
         // Arrange
-        val credentialId = "credential_id_123"
+        val credentialId = Uuid.parse("6ba7b815-9dad-11d1-80b4-00c04fd430c8")
         val nickname = "My Phone"
         val deviceInfo = DeviceInfo(
             platform = "Android",
@@ -44,7 +44,7 @@ class PasskeyCredentialTest {
     @Test
     fun `PasskeyCredential creation with null device name`() {
         // Arrange
-        val credentialId = "credential_id_123"
+        val credentialId = Uuid.parse("6ba7b816-9dad-11d1-80b4-00c04fd430c8")
         val nickname = "Unknown Device"
         val deviceInfo = DeviceInfo(
             platform = "iOS",
@@ -74,7 +74,7 @@ class PasskeyCredentialTest {
     @Test
     fun `PasskeyCredential creation with null device info`() {
         // Arrange
-        val credentialId = "credential_id_123"
+        val credentialId = Uuid.parse("6ba7b817-9dad-11d1-80b4-00c04fd430c8")
         val nickname = "Unknown Device"
         val createdAt = Instant.parse("2023-01-01T00:00:00Z")
         

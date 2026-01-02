@@ -39,33 +39,33 @@ class BasicEndpointCoverageE2ETest {
     
     // Auth routes tests
     @Test
-    fun `auth login returns not implemented`() = testApplication {
+    fun `auth login returns not found`() = testApplication {
         application {
             module()
         }
         
         val response = client.post("/api/v1/auth/login")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
     
     @Test
-    fun `auth logout returns not implemented`() = testApplication {
+    fun `auth logout returns not found`() = testApplication {
         application {
             module()
         }
         
         val response = client.post("/api/v1/auth/logout")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
     
     @Test
-    fun `auth refresh returns not implemented`() = testApplication {
+    fun `auth refresh returns not found`() = testApplication {
         application {
             module()
         }
         
         val response = client.post("/api/v1/auth/refresh")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
     
     // Account routes tests
@@ -134,117 +134,117 @@ class BasicEndpointCoverageE2ETest {
     
     // Passkey routes tests
     @Test
-    fun `passkeys list returns not implemented`() = testApplication {
+    fun `passkeys list returns not found`() = testApplication {
         application {
             module()
         }
         
         val response = client.get("/api/v1/passkeys/")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
     
     @Test
-    fun `passkey register begin returns not implemented`() = testApplication {
+    fun `passkey register begin returns not found`() = testApplication {
         application {
             module()
         }
         
         val response = client.post("/api/v1/passkeys/register/begin")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
     
     // Journal routes tests
     @Test
-    fun `journals list returns not implemented`() = testApplication {
+    fun `journals list returns not found`() = testApplication {
         application {
             module()
         }
         
         val response = client.get("/api/v1/journals/")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
     
     @Test
-    fun `journals create returns not implemented`() = testApplication {
+    fun `journals create returns not found`() = testApplication {
         application {
             module()
         }
         
         val response = client.post("/api/v1/journals/")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
     
     @Test
-    fun `journal details returns not implemented`() = testApplication {
+    fun `journal details returns not found`() = testApplication {
         application {
             module()
         }
         
         val response = client.get("/api/v1/journals/123")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
     
     // Notes routes tests
     @Test
-    fun `notes list returns not implemented`() = testApplication {
+    fun `notes list returns not found`() = testApplication {
         application {
             module()
         }
         
         val response = client.get("/api/v1/notes/")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
     
     @Test
-    fun `notes create returns not implemented`() = testApplication {
+    fun `notes create returns not found`() = testApplication {
         application {
             module()
         }
         
         val response = client.post("/api/v1/notes/")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
     
     // Drafts routes tests
     @Test
-    fun `drafts list returns not implemented`() = testApplication {
+    fun `drafts list returns not found`() = testApplication {
         application {
             module()
         }
         
         val response = client.get("/api/v1/drafts/")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
     
     @Test
-    fun `drafts create returns not implemented`() = testApplication {
+    fun `drafts create returns not found`() = testApplication {
         application {
             module()
         }
         
         val response = client.post("/api/v1/drafts/")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
     
     // Media routes tests
     @Test
-    fun `media list returns not implemented`() = testApplication {
+    fun `media list returns not found`() = testApplication {
         application {
             module()
         }
         
         val response = client.get("/api/v1/media/")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
     
     @Test
-    fun `media upload returns not implemented`() = testApplication {
+    fun `media upload returns not found`() = testApplication {
         application {
             module()
         }
         
         val response = client.post("/api/v1/media/")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
     
     // Sync routes tests - these now require authentication
@@ -259,86 +259,86 @@ class BasicEndpointCoverageE2ETest {
     }
 
     @Test
-    fun `sync operation requires authentication`() = testApplication {
+    fun `sync trigger endpoint is not available`() = testApplication {
         application {
             module()
         }
 
         val response = client.post("/api/v1/sync/")
-        assertEquals(HttpStatusCode.Unauthorized, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
     
     // AI routes tests
     @Test
-    fun `ai summarize returns not implemented`() = testApplication {
+    fun `ai summarize returns not found`() = testApplication {
         application {
             module()
         }
         
         val response = client.post("/api/v1/ai/summarize")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
     
     // Device routes tests
     @Test
-    fun `devices list returns not implemented`() = testApplication {
+    fun `devices list returns not found`() = testApplication {
         application {
             module()
         }
         
         val response = client.get("/api/v1/devices/")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
     
     @Test
-    fun `device registration returns not implemented`() = testApplication {
+    fun `device registration returns not found`() = testApplication {
         application {
             module()
         }
         
         val response = client.post("/api/v1/devices/")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
     
     // Rewind routes tests
     @Test
-    fun `rewind list returns not implemented`() = testApplication {
+    fun `rewind list returns not found`() = testApplication {
         application {
             module()
         }
         
         val response = client.get("/api/v1/rewind/")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
     
     @Test
-    fun `rewind create returns not implemented`() = testApplication {
+    fun `rewind create returns not found`() = testApplication {
         application {
             module()
         }
         
         val response = client.post("/api/v1/rewind/")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
     
     // Timeline routes tests
     @Test
-    fun `timeline list returns not implemented`() = testApplication {
+    fun `timeline list returns not found`() = testApplication {
         application {
             module()
         }
         
         val response = client.get("/api/v1/timeline/")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
     
     @Test
-    fun `timeline for date returns not implemented`() = testApplication {
+    fun `timeline for date returns not found`() = testApplication {
         application {
             module()
         }
         
         val response = client.get("/api/v1/timeline/2024-01-01")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
 }

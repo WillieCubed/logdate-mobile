@@ -5,23 +5,19 @@ import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.PlatformAccountManager
 import app.logdate.client.device.PlatformAccountInfo
 import app.logdate.client.device.TokenPair
-import app.logdate.client.networking.PasskeyApiClient
+import app.logdate.client.networking.PasskeyApiClientContract
 import app.logdate.client.permissions.PasskeyManager
 import app.logdate.client.repository.account.AccountCreationRequest
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.AccountTokens
 import app.logdate.shared.model.BeginAccountCreationData
 import app.logdate.shared.model.BeginAccountCreationRequest
-import app.logdate.shared.model.BeginAccountCreationResponse
 import app.logdate.shared.model.BeginAuthenticationData
 import app.logdate.shared.model.BeginAuthenticationRequest
-import app.logdate.shared.model.BeginAuthenticationResponse
 import app.logdate.shared.model.CompleteAccountCreationData
 import app.logdate.shared.model.CompleteAccountCreationRequest
-import app.logdate.shared.model.CompleteAccountCreationResponse
 import app.logdate.shared.model.CompleteAuthenticationData
 import app.logdate.shared.model.CompleteAuthenticationRequest
-import app.logdate.shared.model.CompleteAuthenticationResponse
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyAllowCredential
 import app.logdate.shared.model.PasskeyAssertionResponse
@@ -536,7 +532,7 @@ class DefaultPasskeyAccountRepositoryTest {
     /**
      * Fake implementation of PasskeyApiClient for testing.
      */
-    class FakePasskeyApiClient {
+    inner class FakePasskeyApiClient : PasskeyApiClientContract {
         var usernameAvailabilityResponse: Result<UsernameAvailabilityData> = Result.success(
             UsernameAvailabilityData(
                 username = "test",
@@ -544,139 +540,87 @@ class DefaultPasskeyAccountRepositoryTest {
             )
         )
         
-        var beginAccountCreationResponse: Result<BeginAccountCreationResponse> = Result.success(
-            BeginAccountCreationResponse(
-                success = true,
-                data = BeginAccountCreationData(
-                    sessionToken = "session123",
-                    registrationOptions = PasskeyRegistrationOptions(
-                        challenge = "challenge123",
-                        user = PasskeyUser(
-                            id = "user123",
-                            name = "testuser",
-                            displayName = "Test User"
-                        ),
-                        timeout = 300000
-                    )
-                )
-            )
-        )
-        
-        var completeAccountCreationResponse: Result<CompleteAccountCreationResponse> = Result.success(
-            CompleteAccountCreationResponse(
-                success = true,
-                data = CompleteAccountCreationData(
-                    account = LogDateAccount(
-                        id = kotlin.uuid.Uuid.random(),
-                        username = "testuser",
-                        displayName = "Test User",
-                        bio = "Test bio",
-                        createdAt = Clock.System.now(),
-                        updatedAt = Clock.System.now()
-                    ),
-                    tokens = AccountTokens(
-                        accessToken = "access_token_123",
-                        refreshToken = "refresh_token_123"
-                    )
-                )
-            )
-        )
-        
-        var beginAuthenticationResponse: Result<BeginAuthenticationResponse> = Result.success(
-            BeginAuthenticationResponse(
-                success = true,
-                data = BeginAuthenticationData(
+        var beginAccountCreationResponse: Result<BeginAccountCreationData> = Result.success(
+            BeginAccountCreationData(
+                sessionToken = "session123",
+                registrationOptions = PasskeyRegistrationOptions(
                     challenge = "challenge123",
-                    rpId = "logdate.app",
-                    allowCredentials = listOf(
-                        PasskeyAllowCredential(id = "cred123", type = "public-key", transports = listOf("internal"))
+                    user = PasskeyUser(
+                        id = "user123",
+                        name = "testuser",
+                        displayName = "Test User"
                     ),
-                    timeout = 300000,
-                    userVerification = "preferred"
+                    timeout = 300000
                 )
             )
         )
         
-        var completeAuthenticationResponse: Result<CompleteAuthenticationResponse> = Result.success(
-            CompleteAuthenticationResponse(
-                success = true,
-                data = CompleteAuthenticationData(
-                    account = LogDateAccount(
-                        id = kotlin.uuid.Uuid.random(),
-                        username = "testuser",
-                        displayName = "Test User",
-                        bio = "Test bio",
-                        createdAt = Clock.System.now(),
-                        updatedAt = Clock.System.now()
-                    ),
-                    tokens = AccountTokens(
-                        accessToken = "access_token_123",
-                        refreshToken = "refresh_token_123"
-                    )
-                )
+        var completeAccountCreationResponse: Result<CompleteAccountCreationData> = Result.success(
+            CompleteAccountCreationData(
+                account = testAccount,
+                tokens = testTokens
+            )
+        )
+        
+        var beginAuthenticationResponse: Result<BeginAuthenticationData> = Result.success(
+            BeginAuthenticationData(
+                challenge = "challenge123",
+                rpId = "logdate.app",
+                allowCredentials = listOf(
+                    PasskeyAllowCredential(id = "cred123", type = "public-key", transports = listOf("internal"))
+                ),
+                timeout = 300000,
+                userVerification = "preferred"
+            )
+        )
+        
+        var completeAuthenticationResponse: Result<CompleteAuthenticationData> = Result.success(
+            CompleteAuthenticationData(
+                account = testAccount,
+                tokens = testTokens
             )
         )
         
         var refreshTokenResponse: Result<String> = Result.success("new_access_token")
         var deletePasskeyResponse: Result<Unit> = Result.success(Unit)
-        var getAccountInfoResponse: Result<LogDateAccount> = Result.success(
-            LogDateAccount(
-                id = kotlin.uuid.Uuid.random(),
-                username = "testuser",
-                displayName = "Test User",
-                bio = "Test bio",
-                createdAt = Clock.System.now(),
-                updatedAt = Clock.System.now()
-            )
-        )
+        var getAccountInfoResponse: Result<LogDateAccount> = Result.success(testAccount)
         var getAccountInfoResponses: List<Result<LogDateAccount>>? = null
-        var deletePasskeyResponse: Result<Unit> = Result.success(Unit)
         var deletePasskeyResponses: List<Result<Unit>>? = null
         
         private var getAccountInfoCallCount = 0
         private var deletePasskeyCallCount = 0
         
-        suspend fun checkUsernameAvailability(username: String): Result<UsernameAvailabilityData> {
+        override suspend fun checkUsernameAvailability(username: String): Result<UsernameAvailabilityData> {
             return usernameAvailabilityResponse
         }
         
-        suspend fun beginAccountCreation(request: BeginAccountCreationRequest): Result<BeginAccountCreationResponse> {
+        override suspend fun beginAccountCreation(request: BeginAccountCreationRequest): Result<BeginAccountCreationData> {
             return beginAccountCreationResponse
         }
         
-        suspend fun completeAccountCreation(request: CompleteAccountCreationRequest): Result<CompleteAccountCreationResponse> {
+        override suspend fun completeAccountCreation(request: CompleteAccountCreationRequest): Result<CompleteAccountCreationData> {
             return completeAccountCreationResponse
         }
         
-        suspend fun beginAuthentication(request: BeginAuthenticationRequest): Result<BeginAuthenticationResponse> {
+        override suspend fun beginAuthentication(request: BeginAuthenticationRequest): Result<BeginAuthenticationData> {
             return beginAuthenticationResponse
         }
         
-        suspend fun completeAuthentication(request: CompleteAuthenticationRequest): Result<CompleteAuthenticationResponse> {
+        override suspend fun completeAuthentication(request: CompleteAuthenticationRequest): Result<CompleteAuthenticationData> {
             return completeAuthenticationResponse
         }
         
-        suspend fun refreshToken(refreshToken: String): Result<String> {
-            return refreshTokenResponse
-        }
-        
-        suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount> {
+        override suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount> {
             return getAccountInfoResponses?.let { responses ->
                 responses[getAccountInfoCallCount++.coerceAtMost(responses.size - 1)]
             } ?: getAccountInfoResponse
         }
         
-        suspend fun deletePasskey(accessToken: String, credentialId: String): Result<Unit> {
-            return deletePasskeyResponses?.let { responses ->
-                responses[deletePasskeyCallCount++.coerceAtMost(responses.size - 1)]
-            } ?: deletePasskeyResponse
-        }
-
-        suspend fun updateAccountProfile(
+        override suspend fun updateAccountProfile(
             accessToken: String,
-            displayName: String? = null,
-            username: String? = null,
-            bio: String? = null
+            displayName: String?,
+            username: String?,
+            bio: String?
         ): Result<LogDateAccount> {
             return getAccountInfoResponse.map { account ->
                 account.copy(
@@ -687,36 +631,14 @@ class DefaultPasskeyAccountRepositoryTest {
             }
         }
         
-        suspend fun checkUsernameAvailability(username: String): Result<UsernameAvailabilityData> {
-            return usernameAvailabilityResponse
-        }
-        
-        suspend fun beginAccountCreation(request: BeginAccountCreationRequest): Result<BeginAccountCreationData> {
-            return beginAccountCreationResponse
-        }
-        
-        suspend fun completeAccountCreation(request: CompleteAccountCreationRequest): Result<CompleteAccountCreationData> {
-            return completeAccountCreationResponse
-        }
-        
-        suspend fun beginAuthentication(request: BeginAuthenticationRequest): Result<BeginAuthenticationData> {
-            return beginAuthenticationResponse
-        }
-        
-        suspend fun completeAuthentication(request: CompleteAuthenticationRequest): Result<CompleteAuthenticationData> {
-            return completeAuthenticationResponse
-        }
-        
-        suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount> {
-            return getAccountInfoResponse
-        }
-        
-        suspend fun refreshToken(refreshToken: String): Result<String> {
+        override suspend fun refreshToken(refreshToken: String): Result<String> {
             return refreshTokenResponse
         }
         
-        suspend fun deletePasskey(accessToken: String, credentialId: String): Result<Unit> {
-            return deletePasskeyResponse
+        override suspend fun deletePasskey(accessToken: String, credentialId: String): Result<Unit> {
+            return deletePasskeyResponses?.let { responses ->
+                responses[deletePasskeyCallCount++.coerceAtMost(responses.size - 1)]
+            } ?: deletePasskeyResponse
         }
     }
 
@@ -724,8 +646,34 @@ class DefaultPasskeyAccountRepositoryTest {
      * Fake implementation of PasskeyManager for testing.
      */
     class FakePasskeyManager : PasskeyManager {
-        var registerPasskeyResponse: Result<String> = Result.success("""{"type":"public-key","id":"credential123"}""")
-        var authenticateWithPasskeyResponse: Result<String> = Result.success("""{"type":"public-key","id":"credential123"}""")
+        var registerPasskeyResponse: Result<String> = Result.success(
+            """
+            {
+              "id": "credential123",
+              "rawId": "credential123",
+              "type": "public-key",
+              "response": {
+                "clientDataJSON": "client-data",
+                "attestationObject": "attestation-object"
+              }
+            }
+            """.trimIndent()
+        )
+        var authenticateWithPasskeyResponse: Result<String> = Result.success(
+            """
+            {
+              "id": "credential123",
+              "rawId": "credential123",
+              "type": "public-key",
+              "response": {
+                "clientDataJSON": "client-data",
+                "authenticatorData": "auth-data",
+                "signature": "signature",
+                "userHandle": "user-handle"
+              }
+            }
+            """.trimIndent()
+        )
         
         override suspend fun getCapabilities(): PasskeyCapabilities {
             return PasskeyCapabilities(
@@ -763,17 +711,24 @@ class DefaultPasskeyAccountRepositoryTest {
      */
     class FakeSessionStorage : SessionStorage {
         private var session: UserSession? = null
+        private val sessionFlow = MutableStateFlow<UserSession?>(null)
         
         override fun getSession(): UserSession? {
             return session
         }
+
+        override fun getSessionFlow(): Flow<UserSession?> = sessionFlow.asStateFlow()
+
+        override suspend fun hasValidSession(): Boolean = session != null
         
         override fun saveSession(session: UserSession) {
             this.session = session
+            sessionFlow.value = session
         }
         
         override fun clearSession() {
             session = null
+            sessionFlow.value = null
         }
     }
 

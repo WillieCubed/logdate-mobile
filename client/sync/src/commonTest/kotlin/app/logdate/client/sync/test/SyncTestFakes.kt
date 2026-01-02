@@ -15,6 +15,8 @@ import app.logdate.client.sync.cloud.*
 import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.LastWriteWinsResolver
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.PendingOperation
+import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.shared.model.*
 import kotlinx.coroutines.flow.Flow
@@ -320,23 +322,34 @@ class FakeSessionStorage : SessionStorage {
  * Fake SyncMetadataService for testing.
  */
 class FakeSyncMetadataService : SyncMetadataService {
-    private val pendingUploads = mutableMapOf<EntityType, MutableSet<Uuid>>()
+    private val pendingUploads = mutableMapOf<EntityType, MutableMap<String, PendingOperation>>()
     private val syncTimes = mutableMapOf<EntityType, Instant>()
     private val _pendingCount = MutableStateFlow(0)
 
-    override suspend fun getPendingUploads(entityType: EntityType): List<Uuid> =
-        pendingUploads[entityType]?.toList() ?: emptyList()
+    override suspend fun getPendingUploads(entityType: EntityType): List<PendingUpload> =
+        pendingUploads[entityType]
+            ?.map { (entityId, operation) -> PendingUpload(entityId, operation) }
+            ?: emptyList()
 
-    override suspend fun markAsSynced(entityId: Uuid, entityType: EntityType, syncedAt: Instant, version: Int) {
+    override suspend fun markAsSynced(entityId: String, entityType: EntityType, syncedAt: Instant, version: Long) {
         pendingUploads[entityType]?.remove(entityId)
-        syncTimes[entityType] = syncedAt
+        updateSyncTime(entityType, syncedAt)
         updatePendingCount()
     }
 
     override suspend fun getLastSyncTime(entityType: EntityType): Instant? = syncTimes[entityType]
 
-    override suspend fun resetSyncStatus(entityId: Uuid, entityType: EntityType) {
-        pendingUploads.getOrPut(entityType) { mutableSetOf() }.add(entityId)
+    override suspend fun updateLastSyncTime(entityType: EntityType, syncedAt: Instant) {
+        updateSyncTime(entityType, syncedAt)
+    }
+
+    override suspend fun enqueuePending(entityId: String, entityType: EntityType, operation: PendingOperation) {
+        pendingUploads.getOrPut(entityType) { mutableMapOf() }[entityId] = operation
+        updatePendingCount()
+    }
+
+    override suspend fun resetSyncStatus(entityId: String, entityType: EntityType) {
+        enqueuePending(entityId, entityType, PendingOperation.UPDATE)
         updatePendingCount()
     }
 
@@ -348,8 +361,8 @@ class FakeSyncMetadataService : SyncMetadataService {
         _pendingCount.value = pendingUploads.values.sumOf { it.size }
     }
 
-    fun addPending(entityId: Uuid, entityType: EntityType) {
-        pendingUploads.getOrPut(entityType) { mutableSetOf() }.add(entityId)
+    fun addPending(entityId: Uuid, entityType: EntityType, operation: PendingOperation = PendingOperation.UPDATE) {
+        pendingUploads.getOrPut(entityType) { mutableMapOf() }[entityId.toString()] = operation
         updatePendingCount()
     }
 
@@ -357,6 +370,13 @@ class FakeSyncMetadataService : SyncMetadataService {
         pendingUploads.clear()
         syncTimes.clear()
         _pendingCount.value = 0
+    }
+
+    private fun updateSyncTime(entityType: EntityType, syncedAt: Instant) {
+        val current = syncTimes[entityType]
+        if (current == null || syncedAt >= current) {
+            syncTimes[entityType] = syncedAt
+        }
     }
 }
 
@@ -417,6 +437,14 @@ class FakeJournalNotesRepository : JournalNotesRepository {
     }
 }
 
+class FailingJournalNotesRepository(
+    private val delegate: JournalNotesRepository = FakeJournalNotesRepository()
+) : JournalNotesRepository by delegate {
+    override suspend fun create(note: JournalNote): Uuid {
+        throw IllegalStateException("Simulated note create failure")
+    }
+}
+
 /**
  * Fake JournalRepository for testing.
  */
@@ -473,6 +501,40 @@ class FakeJournalContentRepository : JournalContentRepository {
     override suspend fun removeContentFromJournal(contentId: Uuid, journalId: Uuid) {}
     override suspend fun addContentToJournals(contentId: Uuid, journalIds: List<Uuid>) {}
     override suspend fun removeContentFromAllJournals(contentId: Uuid) {}
+}
+
+class TrackingJournalContentRepository : JournalContentRepository {
+    private data class AssociationKey(val contentId: Uuid, val journalId: Uuid)
+
+    private val associations = mutableSetOf<AssociationKey>()
+
+    override fun observeContentForJournal(journalId: Uuid): Flow<List<JournalNote>> =
+        MutableStateFlow(emptyList())
+
+    override fun observeJournalsForContent(contentId: Uuid): Flow<List<Journal>> =
+        MutableStateFlow(emptyList())
+
+    override suspend fun addContentToJournal(contentId: Uuid, journalId: Uuid) {
+        associations.add(AssociationKey(contentId, journalId))
+    }
+
+    override suspend fun removeContentFromJournal(contentId: Uuid, journalId: Uuid) {
+        associations.remove(AssociationKey(contentId, journalId))
+    }
+
+    override suspend fun addContentToJournals(contentId: Uuid, journalIds: List<Uuid>) {
+        journalIds.forEach { journalId ->
+            addContentToJournal(contentId, journalId)
+        }
+    }
+
+    override suspend fun removeContentFromAllJournals(contentId: Uuid) {
+        associations.removeAll { it.contentId == contentId }
+    }
+
+    fun hasAssociation(contentId: Uuid, journalId: Uuid): Boolean {
+        return associations.contains(AssociationKey(contentId, journalId))
+    }
 }
 
 /**

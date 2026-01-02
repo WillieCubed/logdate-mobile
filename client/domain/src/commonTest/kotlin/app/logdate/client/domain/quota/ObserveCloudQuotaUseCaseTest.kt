@@ -1,7 +1,9 @@
 package app.logdate.client.domain.quota
 
-import app.logdate.client.sync.quota.CloudQuotaManager
-import app.logdate.client.sync.quota.CloudStorageQuota
+import app.logdate.shared.model.CloudObjectType
+import app.logdate.shared.model.CloudQuotaManager
+import app.logdate.shared.model.CloudStorageQuota
+import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlinx.coroutines.flow.Flow
@@ -12,22 +14,41 @@ import kotlinx.coroutines.test.runTest
 class ObserveCloudQuotaUseCaseTest {
 
     private class MockCloudQuotaManager : CloudQuotaManager {
-        var observeQuotaResult: Flow<CloudStorageQuota> = flowOf(CloudStorageQuota.Unknown)
+        var observeQuotaResult: Flow<CloudStorageQuota> = flowOf(
+            CloudStorageQuota(
+                totalBytes = 0L,
+                usedBytes = 0L,
+                categories = emptyList()
+            )
+        )
+        var currentQuota: CloudStorageQuota = CloudStorageQuota(
+            totalBytes = 0L,
+            usedBytes = 0L,
+            categories = emptyList()
+        )
 
         override fun observeQuota(): Flow<CloudStorageQuota> = observeQuotaResult
 
-        override suspend fun refreshQuota(): CloudStorageQuota = CloudStorageQuota.Unknown
-        override suspend fun getCurrentQuota(): CloudStorageQuota = CloudStorageQuota.Unknown
+        override suspend fun getCurrentQuota(): CloudStorageQuota = currentQuota
+        override suspend fun recordObjectCreation(objectType: CloudObjectType, bytes: Long) {}
+        override suspend fun recordObjectDeletion(objectType: CloudObjectType, bytes: Long) {}
+        override suspend fun recordObjectUpdate(objectType: CloudObjectType, oldBytes: Long, newBytes: Long) {}
+        override suspend fun recalculateQuota(): CloudStorageQuota = currentQuota
+        override suspend fun setQuotaLimit(totalBytes: Long) {
+            currentQuota = currentQuota.copy(totalBytes = totalBytes)
+        }
+        override suspend fun syncWithServer(): CloudStorageQuota = currentQuota
+        override suspend fun getLastServerSyncTime(): Instant? = null
     }
 
     @Test
     fun `invoke should return flow of quota from quota manager`() = runTest {
         // Given
         val mockQuotaManager = MockCloudQuotaManager()
-        val expectedQuota = CloudStorageQuota.Available(
+        val expectedQuota = CloudStorageQuota(
             totalBytes = 1000000000L, // 1GB
             usedBytes = 250000000L,   // 250MB
-            availableBytes = 750000000L // 750MB
+            categories = emptyList()
         )
         mockQuotaManager.observeQuotaResult = flowOf(expectedQuota)
         val useCase = ObserveCloudQuotaUseCase(mockQuotaManager)
@@ -42,10 +63,15 @@ class ObserveCloudQuotaUseCaseTest {
     }
 
     @Test
-    fun `invoke should return unknown quota when quota manager returns unknown`() = runTest {
+    fun `invoke should return empty quota when quota manager returns zeros`() = runTest {
         // Given
         val mockQuotaManager = MockCloudQuotaManager()
-        mockQuotaManager.observeQuotaResult = flowOf(CloudStorageQuota.Unknown)
+        val emptyQuota = CloudStorageQuota(
+            totalBytes = 0L,
+            usedBytes = 0L,
+            categories = emptyList()
+        )
+        mockQuotaManager.observeQuotaResult = flowOf(emptyQuota)
         val useCase = ObserveCloudQuotaUseCase(mockQuotaManager)
 
         // When
@@ -54,17 +80,17 @@ class ObserveCloudQuotaUseCaseTest {
         // Then
         val emittedValues = result.toList()
         assertEquals(1, emittedValues.size)
-        assertEquals(CloudStorageQuota.Unknown, emittedValues.first())
+        assertEquals(emptyQuota, emittedValues.first())
     }
 
     @Test
     fun `invoke should return quota at capacity when storage is full`() = runTest {
         // Given
         val mockQuotaManager = MockCloudQuotaManager()
-        val fullQuota = CloudStorageQuota.Available(
+        val fullQuota = CloudStorageQuota(
             totalBytes = 1000000000L,  // 1GB
             usedBytes = 1000000000L,   // 1GB (full)
-            availableBytes = 0L        // 0 bytes available
+            categories = emptyList()
         )
         mockQuotaManager.observeQuotaResult = flowOf(fullQuota)
         val useCase = ObserveCloudQuotaUseCase(mockQuotaManager)
@@ -82,10 +108,10 @@ class ObserveCloudQuotaUseCaseTest {
     fun `invoke should return quota with no usage when storage is empty`() = runTest {
         // Given
         val mockQuotaManager = MockCloudQuotaManager()
-        val emptyQuota = CloudStorageQuota.Available(
+        val emptyQuota = CloudStorageQuota(
             totalBytes = 1000000000L,  // 1GB
             usedBytes = 0L,            // 0 bytes used
-            availableBytes = 1000000000L // 1GB available
+            categories = emptyList()
         )
         mockQuotaManager.observeQuotaResult = flowOf(emptyQuota)
         val useCase = ObserveCloudQuotaUseCase(mockQuotaManager)
@@ -103,15 +129,15 @@ class ObserveCloudQuotaUseCaseTest {
     fun `invoke should handle multiple quota emissions from manager`() = runTest {
         // Given
         val mockQuotaManager = MockCloudQuotaManager()
-        val firstQuota = CloudStorageQuota.Available(
+        val firstQuota = CloudStorageQuota(
             totalBytes = 1000000000L,
             usedBytes = 100000000L,   // 100MB
-            availableBytes = 900000000L
+            categories = emptyList()
         )
-        val secondQuota = CloudStorageQuota.Available(
+        val secondQuota = CloudStorageQuota(
             totalBytes = 1000000000L,
             usedBytes = 200000000L,   // 200MB (increased usage)
-            availableBytes = 800000000L
+            categories = emptyList()
         )
         mockQuotaManager.observeQuotaResult = flowOf(firstQuota, secondQuota)
         val useCase = ObserveCloudQuotaUseCase(mockQuotaManager)
@@ -130,12 +156,17 @@ class ObserveCloudQuotaUseCaseTest {
     fun `invoke should handle quota transitions from unknown to available`() = runTest {
         // Given
         val mockQuotaManager = MockCloudQuotaManager()
-        val availableQuota = CloudStorageQuota.Available(
+        val availableQuota = CloudStorageQuota(
             totalBytes = 2000000000L,  // 2GB
             usedBytes = 500000000L,    // 500MB
-            availableBytes = 1500000000L // 1.5GB
+            categories = emptyList()
         )
-        mockQuotaManager.observeQuotaResult = flowOf(CloudStorageQuota.Unknown, availableQuota)
+        val emptyQuota = CloudStorageQuota(
+            totalBytes = 0L,
+            usedBytes = 0L,
+            categories = emptyList()
+        )
+        mockQuotaManager.observeQuotaResult = flowOf(emptyQuota, availableQuota)
         val useCase = ObserveCloudQuotaUseCase(mockQuotaManager)
 
         // When
@@ -144,7 +175,7 @@ class ObserveCloudQuotaUseCaseTest {
         // Then
         val emittedValues = result.toList()
         assertEquals(2, emittedValues.size)
-        assertEquals(CloudStorageQuota.Unknown, emittedValues[0])
+        assertEquals(emptyQuota, emittedValues[0])
         assertEquals(availableQuota, emittedValues[1])
     }
 
@@ -152,10 +183,10 @@ class ObserveCloudQuotaUseCaseTest {
     fun `invoke should handle large quota values`() = runTest {
         // Given
         val mockQuotaManager = MockCloudQuotaManager()
-        val largeQuota = CloudStorageQuota.Available(
+        val largeQuota = CloudStorageQuota(
             totalBytes = 1000000000000L,  // 1TB
             usedBytes = 250000000000L,    // 250GB
-            availableBytes = 750000000000L // 750GB
+            categories = emptyList()
         )
         mockQuotaManager.observeQuotaResult = flowOf(largeQuota)
         val useCase = ObserveCloudQuotaUseCase(mockQuotaManager)

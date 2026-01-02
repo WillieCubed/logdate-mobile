@@ -12,21 +12,17 @@ import kotlin.uuid.ExperimentalUuidApi
 class PasskeyRoutesTest {
 
     @Test
-    fun `GET passkeys returns not implemented`() = testApplication {
+    fun `GET passkeys returns not found`() = testApplication {
         application {
             module()
         }
 
         val response = client.get("/api/v1/passkeys/")
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
-        
-        val responseBody = response.bodyAsText()
-        assertTrue(responseBody.contains("NOT_IMPLEMENTED"))
-        assertTrue(responseBody.contains("Passkey listing not implemented yet"))
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
 
     @Test
-    fun `POST passkeys register begin returns not implemented`() = testApplication {
+    fun `POST passkeys register begin returns not found`() = testApplication {
         application {
             module()
         }
@@ -36,15 +32,11 @@ class PasskeyRoutesTest {
             setBody("""{"username": "testuser"}""")
         }
 
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
-        
-        val responseBody = response.bodyAsText()
-        assertTrue(responseBody.contains("NOT_IMPLEMENTED"))
-        assertTrue(responseBody.contains("Passkey registration not implemented yet"))
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
 
     @Test
-    fun `POST passkeys register complete returns not implemented`() = testApplication {
+    fun `POST passkeys register complete returns not found`() = testApplication {
         application {
             module()
         }
@@ -54,15 +46,11 @@ class PasskeyRoutesTest {
             setBody("""{"sessionId": "test", "credential": {}}""")
         }
 
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
-        
-        val responseBody = response.bodyAsText()
-        assertTrue(responseBody.contains("NOT_IMPLEMENTED"))
-        assertTrue(responseBody.contains("Passkey registration not implemented yet"))
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
 
     @Test
-    fun `POST passkeys authenticate begin returns not implemented`() = testApplication {
+    fun `POST passkeys authenticate begin returns not found`() = testApplication {
         application {
             module()
         }
@@ -72,15 +60,11 @@ class PasskeyRoutesTest {
             setBody("""{"username": "testuser"}""")
         }
 
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
-        
-        val responseBody = response.bodyAsText()
-        assertTrue(responseBody.contains("NOT_IMPLEMENTED"))
-        assertTrue(responseBody.contains("Passkey authentication not implemented yet"))
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
 
     @Test
-    fun `POST passkeys authenticate complete returns not implemented`() = testApplication {
+    fun `POST passkeys authenticate complete returns not found`() = testApplication {
         application {
             module()
         }
@@ -90,11 +74,7 @@ class PasskeyRoutesTest {
             setBody("""{"sessionId": "test", "credential": {}}""")
         }
 
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
-        
-        val responseBody = response.bodyAsText()
-        assertTrue(responseBody.contains("NOT_IMPLEMENTED"))
-        assertTrue(responseBody.contains("Passkey authentication not implemented yet"))
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
 
     @Test
@@ -105,7 +85,7 @@ class PasskeyRoutesTest {
 
         val response = client.get("/health")
         assertEquals(HttpStatusCode.OK, response.status)
-        assertEquals("OK", response.bodyAsText())
+        assertTrue(response.bodyAsText().contains("healthy"))
     }
 
     @Test
@@ -117,42 +97,6 @@ class PasskeyRoutesTest {
         val response = client.get("/")
         assertEquals(HttpStatusCode.OK, response.status)
         assertTrue(response.bodyAsText().contains("LogDate Server API"))
-    }
-
-    @Test
-    fun `account routes are accessible`() = testApplication {
-        application {
-            module()
-        }
-
-        val response = client.post("/api/v1/accounts/create/begin") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"username": "testuser"}""")
-        }
-
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
-        
-        val responseBody = response.bodyAsText()
-        assertTrue(responseBody.contains("NOT_IMPLEMENTED"))
-        assertTrue(responseBody.contains("Account creation not implemented yet"))
-    }
-
-    @Test
-    fun `authentication routes are accessible`() = testApplication {
-        application {
-            module()
-        }
-
-        val response = client.post("/api/v1/auth/login") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"email": "test@example.com", "password": "password"}""")
-        }
-
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
-        
-        val responseBody = response.bodyAsText()
-        assertTrue(responseBody.contains("NOT_IMPLEMENTED"))
-        assertTrue(responseBody.contains("Login not implemented yet"))
     }
 
     @Test

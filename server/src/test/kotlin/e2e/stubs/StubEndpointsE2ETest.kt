@@ -10,13 +10,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Comprehensive E2E tests for all stub endpoints to verify they return proper
- * "Not Implemented" responses and handle various request scenarios gracefully.
+ * Comprehensive E2E tests for endpoints that are intentionally not registered.
+ * These should return 404 regardless of payload shape.
  */
 class StubEndpointsE2ETest {
     
     @Test
-    fun `auth routes return not implemented with proper error structure`() = testApplication {
+    fun `auth routes return not found for any payload`() = testApplication {
         application {
             module()
         }
@@ -35,16 +35,12 @@ class StubEndpointsE2ETest {
                 setBody("{}")
             }
             
-            assertEquals(HttpStatusCode.NotImplemented, response.status, "Endpoint $endpoint should return 501")
-            
-            val body = response.bodyAsText()
-            assertTrue(body.contains("NOT_IMPLEMENTED"), "Response should contain NOT_IMPLEMENTED error")
-            assertTrue(body.isNotBlank(), "Response body should not be empty for $endpoint")
+            assertEquals(HttpStatusCode.NotFound, response.status, "Endpoint $endpoint should return 404")
         }
     }
     
     @Test
-    fun `passkey routes return not implemented with various request payloads`() = testApplication {
+    fun `passkey routes return not found with various request payloads`() = testApplication {
         application {
             module()
         }
@@ -67,7 +63,7 @@ class StubEndpointsE2ETest {
                     setBody("{}")
                 }
             }
-            assertEquals(HttpStatusCode.NotImplemented, emptyResponse.status)
+            assertEquals(HttpStatusCode.NotFound, emptyResponse.status)
             
             // Test with complex payload for POST endpoints
             if (method == HttpMethod.Post) {
@@ -89,7 +85,7 @@ class StubEndpointsE2ETest {
                         }
                     """.trimIndent())
                 }
-                assertEquals(HttpStatusCode.NotImplemented, complexResponse.status)
+                assertEquals(HttpStatusCode.NotFound, complexResponse.status)
             }
         }
     }
@@ -121,7 +117,7 @@ class StubEndpointsE2ETest {
                     """.trimIndent())
                 }
             }
-            assertEquals(HttpStatusCode.NotImplemented, jsonResponse.status)
+            assertEquals(HttpStatusCode.NotFound, jsonResponse.status)
             
             // Test with invalid content type for POST
             if (method == HttpMethod.Post) {
@@ -130,7 +126,7 @@ class StubEndpointsE2ETest {
                     contentType(ContentType.Text.Plain)
                     setBody("title=Test Journal&description=Test")
                 }
-                assertEquals(HttpStatusCode.NotImplemented, invalidTypeResponse.status)
+                assertEquals(HttpStatusCode.NotFound, invalidTypeResponse.status)
             }
         }
     }
@@ -161,7 +157,7 @@ class StubEndpointsE2ETest {
                         }
                     """.trimIndent())
                 }
-                assertEquals(HttpStatusCode.NotImplemented, textNoteResponse.status)
+                assertEquals(HttpStatusCode.NotFound, textNoteResponse.status)
                 
                 // Test with image note
                 val imageNoteResponse = client.request(endpoint) {
@@ -180,7 +176,7 @@ class StubEndpointsE2ETest {
                         }
                     """.trimIndent())
                 }
-                assertEquals(HttpStatusCode.NotImplemented, imageNoteResponse.status)
+                assertEquals(HttpStatusCode.NotFound, imageNoteResponse.status)
                 
                 // Test with audio note
                 val audioNoteResponse = client.request(endpoint) {
@@ -195,12 +191,12 @@ class StubEndpointsE2ETest {
                         }
                     """.trimIndent())
                 }
-                assertEquals(HttpStatusCode.NotImplemented, audioNoteResponse.status)
+                assertEquals(HttpStatusCode.NotFound, audioNoteResponse.status)
             } else {
                 val getResponse = client.request(endpoint) {
                     this.method = method
                 }
-                assertEquals(HttpStatusCode.NotImplemented, getResponse.status)
+                assertEquals(HttpStatusCode.NotFound, getResponse.status)
             }
         }
     }
@@ -224,7 +220,7 @@ class StubEndpointsE2ETest {
                     contentType(ContentType.MultiPart.FormData)
                     setBody("--boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"test.jpg\"\r\nContent-Type: image/jpeg\r\n\r\nfake-image-data\r\n--boundary--")
                 }
-                assertEquals(HttpStatusCode.NotImplemented, multipartResponse.status)
+                assertEquals(HttpStatusCode.NotFound, multipartResponse.status)
                 
                 // Test with JSON metadata
                 val jsonResponse = client.request(endpoint) {
@@ -242,12 +238,12 @@ class StubEndpointsE2ETest {
                         }
                     """.trimIndent())
                 }
-                assertEquals(HttpStatusCode.NotImplemented, jsonResponse.status)
+                assertEquals(HttpStatusCode.NotFound, jsonResponse.status)
             } else {
                 val getResponse = client.request(endpoint) {
                     this.method = method
                 }
-                assertEquals(HttpStatusCode.NotImplemented, getResponse.status)
+                assertEquals(HttpStatusCode.NotFound, getResponse.status)
             }
         }
     }
@@ -262,7 +258,7 @@ class StubEndpointsE2ETest {
         val statusResponse = client.get("/api/v1/sync/status")
         assertEquals(HttpStatusCode.Unauthorized, statusResponse.status)
 
-        // Test sync operation - requires authentication
+        // Sync trigger endpoint has been removed
         val fullSyncResponse = client.post("/api/v1/sync/") {
             contentType(ContentType.Application.Json)
             setBody("""
@@ -273,7 +269,7 @@ class StubEndpointsE2ETest {
                 }
             """.trimIndent())
         }
-        assertEquals(HttpStatusCode.Unauthorized, fullSyncResponse.status)
+        assertEquals(HttpStatusCode.NotFound, fullSyncResponse.status)
 
         val incrementalSyncResponse = client.post("/api/v1/sync/") {
             contentType(ContentType.Application.Json)
@@ -285,7 +281,7 @@ class StubEndpointsE2ETest {
                 }
             """.trimIndent())
         }
-        assertEquals(HttpStatusCode.Unauthorized, incrementalSyncResponse.status)
+        assertEquals(HttpStatusCode.NotFound, incrementalSyncResponse.status)
     }
     
     @Test
@@ -305,7 +301,7 @@ class StubEndpointsE2ETest {
                 }
             """.trimIndent())
         }
-        assertEquals(HttpStatusCode.NotImplemented, textSummaryResponse.status)
+        assertEquals(HttpStatusCode.NotFound, textSummaryResponse.status)
         
         val journalSummaryResponse = client.post("/api/v1/ai/summarize") {
             contentType(ContentType.Application.Json)
@@ -320,7 +316,7 @@ class StubEndpointsE2ETest {
                 }
             """.trimIndent())
         }
-        assertEquals(HttpStatusCode.NotImplemented, journalSummaryResponse.status)
+        assertEquals(HttpStatusCode.NotFound, journalSummaryResponse.status)
     }
     
     @Test
@@ -331,7 +327,7 @@ class StubEndpointsE2ETest {
         
         // Test device listing
         val listResponse = client.get("/api/v1/devices/")
-        assertEquals(HttpStatusCode.NotImplemented, listResponse.status)
+        assertEquals(HttpStatusCode.NotFound, listResponse.status)
         
         // Test device registration with various device types
         val mobileDeviceResponse = client.post("/api/v1/devices/") {
@@ -347,7 +343,7 @@ class StubEndpointsE2ETest {
                 }
             """.trimIndent())
         }
-        assertEquals(HttpStatusCode.NotImplemented, mobileDeviceResponse.status)
+        assertEquals(HttpStatusCode.NotFound, mobileDeviceResponse.status)
         
         val desktopDeviceResponse = client.post("/api/v1/devices/") {
             contentType(ContentType.Application.Json)
@@ -361,7 +357,7 @@ class StubEndpointsE2ETest {
                 }
             """.trimIndent())
         }
-        assertEquals(HttpStatusCode.NotImplemented, desktopDeviceResponse.status)
+        assertEquals(HttpStatusCode.NotFound, desktopDeviceResponse.status)
     }
     
     @Test
@@ -372,7 +368,7 @@ class StubEndpointsE2ETest {
         
         // Test rewind operations
         val rewindListResponse = client.get("/api/v1/rewind/")
-        assertEquals(HttpStatusCode.NotImplemented, rewindListResponse.status)
+        assertEquals(HttpStatusCode.NotFound, rewindListResponse.status)
         
         val rewindCreateResponse = client.post("/api/v1/rewind/") {
             contentType(ContentType.Application.Json)
@@ -387,18 +383,18 @@ class StubEndpointsE2ETest {
                 }
             """.trimIndent())
         }
-        assertEquals(HttpStatusCode.NotImplemented, rewindCreateResponse.status)
+        assertEquals(HttpStatusCode.NotFound, rewindCreateResponse.status)
         
         // Test timeline operations
         val timelineListResponse = client.get("/api/v1/timeline/")
-        assertEquals(HttpStatusCode.NotImplemented, timelineListResponse.status)
+        assertEquals(HttpStatusCode.NotFound, timelineListResponse.status)
         
         val specificDateResponse = client.get("/api/v1/timeline/2024-01-15")
-        assertEquals(HttpStatusCode.NotImplemented, specificDateResponse.status)
+        assertEquals(HttpStatusCode.NotFound, specificDateResponse.status)
         
         // Test with various date formats
         val isoDateResponse = client.get("/api/v1/timeline/2024-01-15T00:00:00Z")
-        assertEquals(HttpStatusCode.NotImplemented, isoDateResponse.status)
+        assertEquals(HttpStatusCode.NotFound, isoDateResponse.status)
     }
     
     @Test
@@ -409,7 +405,7 @@ class StubEndpointsE2ETest {
         
         // Test draft listing
         val listResponse = client.get("/api/v1/drafts/")
-        assertEquals(HttpStatusCode.NotImplemented, listResponse.status)
+        assertEquals(HttpStatusCode.NotFound, listResponse.status)
         
         // Test draft creation with various draft types
         val textDraftResponse = client.post("/api/v1/drafts/") {
@@ -423,7 +419,7 @@ class StubEndpointsE2ETest {
                 }
             """.trimIndent())
         }
-        assertEquals(HttpStatusCode.NotImplemented, textDraftResponse.status)
+        assertEquals(HttpStatusCode.NotFound, textDraftResponse.status)
         
         val journalDraftResponse = client.post("/api/v1/drafts/") {
             contentType(ContentType.Application.Json)
@@ -436,7 +432,7 @@ class StubEndpointsE2ETest {
                 }
             """.trimIndent())
         }
-        assertEquals(HttpStatusCode.NotImplemented, journalDraftResponse.status)
+        assertEquals(HttpStatusCode.NotFound, journalDraftResponse.status)
     }
     
     @Test
@@ -464,7 +460,7 @@ class StubEndpointsE2ETest {
                 contentType(ContentType.Application.Json)
                 setBody("{invalid json structure")
             }
-            assertEquals(HttpStatusCode.NotImplemented, malformedResponse.status, "Endpoint $endpoint should still return expected status for malformed JSON")
+            assertEquals(HttpStatusCode.NotFound, malformedResponse.status, "Endpoint $endpoint should still return expected status for malformed JSON")
 
             // Test with extremely large payload
             val largePayload = "a".repeat(100000)
@@ -472,15 +468,15 @@ class StubEndpointsE2ETest {
                 contentType(ContentType.Application.Json)
                 setBody("""{"data": "$largePayload"}""")
             }
-            // Should handle gracefully - either 501 or some error, but not crash
+            // Should handle gracefully with a client/server error response.
             assertTrue(largeResponse.status.value in 400..599, "Large payload should be handled gracefully for $endpoint")
         }
 
-        // Sync endpoints require auth - should return 401
+        // Sync trigger endpoint has been removed
         val syncResponse = client.post("/api/v1/sync/") {
             contentType(ContentType.Application.Json)
             setBody("{invalid json structure")
         }
-        assertEquals(HttpStatusCode.Unauthorized, syncResponse.status, "Sync endpoint should require authentication")
+        assertEquals(HttpStatusCode.NotFound, syncResponse.status, "Sync trigger endpoint should be removed")
     }
 }

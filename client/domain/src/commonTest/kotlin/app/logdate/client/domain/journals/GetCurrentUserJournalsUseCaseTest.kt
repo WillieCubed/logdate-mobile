@@ -23,7 +23,9 @@ class GetCurrentUserJournalsUseCaseTest {
         override fun observeJournalById(id: Uuid): Flow<Journal> = flowOf(
             Journal(id = id, title = "Test")
         )
-        override suspend fun create(journal: Journal): String = journal.id.toString()
+        override suspend fun getJournalById(id: Uuid): Journal? = null
+        override suspend fun create(journal: Journal): Uuid = journal.id
+        override suspend fun update(journal: Journal) = Unit
         override suspend fun delete(journalId: Uuid) = Unit
         override suspend fun saveDraft(draft: EditorDraft) = Unit
         override suspend fun getLatestDraft(): EditorDraft? = null

@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
+import kotlin.time.Duration.Companion.hours
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -85,18 +86,16 @@ class HasNotesForTodayUseCaseTest {
         val capturedStart = mockRepository.lastStartTime!!
         val capturedEnd = mockRepository.lastEndTime!!
         val timeDifference = capturedEnd - capturedStart
-        assertEquals(24 * 60 * 60 * 1000, timeDifference.inWholeMilliseconds) // 24 hours in milliseconds
+        assertEquals(24.hours, timeDifference)
     }
 
     private fun createTestNote(
         content: String = "Test note content",
-        journalId: Uuid = Uuid.random()
-    ) = JournalNote.TextNote(
-        id = Uuid.random(),
+    ) = JournalNote.Text(
+        uid = Uuid.random(),
         content = content,
-        journalId = journalId,
-        createdAt = Clock.System.now(),
-        updatedAt = Clock.System.now()
+        creationTimestamp = Clock.System.now(),
+        lastUpdated = Clock.System.now()
     )
 
     private class MockJournalNotesRepository : JournalNotesRepository {
@@ -105,18 +104,22 @@ class HasNotesForTodayUseCaseTest {
         var lastStartTime: Instant? = null
         var lastEndTime: Instant? = null
 
-        override suspend fun observeNotesInRange(start: Instant, end: Instant): Flow<List<JournalNote>> {
+        override fun observeNotesInRange(start: Instant, end: Instant): Flow<List<JournalNote>> {
             observeCallCount++
             lastStartTime = start
             lastEndTime = end
             return flowOf(notesForRange)
         }
 
-        override suspend fun create(note: JournalNote) = Unit
-        override suspend fun removeById(id: Uuid) = Unit
-        override suspend fun getByJournalId(journalId: Uuid) = emptyList<JournalNote>()
-        override suspend fun observeNotesByJournal(journalId: Uuid) = flowOf(emptyList<JournalNote>())
-        override suspend fun getNotesForDay(date: LocalDate) = emptyList<JournalNote>()
-        override suspend fun getAll() = emptyList<JournalNote>()
+        override val allNotesObserved: Flow<List<JournalNote>> = flowOf(emptyList())
+        override fun observeNotesInJournal(journalId: Uuid) = flowOf(emptyList<JournalNote>())
+        override fun observeNotesPage(pageSize: Int, offset: Int) = flowOf(emptyList<JournalNote>())
+        override fun observeNotesStream(pageSize: Int) = flowOf(emptyList<JournalNote>())
+        override fun observeRecentNotes(limit: Int) = flowOf(emptyList<JournalNote>())
+        override suspend fun create(note: JournalNote): Uuid = note.uid
+        override suspend fun remove(note: JournalNote) = Unit
+        override suspend fun removeById(noteId: Uuid) = Unit
+        override suspend fun create(note: JournalNote, journalId: Uuid) = Unit
+        override suspend fun removeFromJournal(noteId: Uuid, journalId: Uuid) = Unit
     }
 }

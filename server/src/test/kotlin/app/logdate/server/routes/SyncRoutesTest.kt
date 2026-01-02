@@ -1,5 +1,6 @@
 package app.logdate.server.routes
 
+import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.module
 import io.ktor.client.call.body
 import io.ktor.client.request.*
@@ -9,6 +10,8 @@ import io.ktor.server.testing.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.koin.ktor.ext.getKoin
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -16,6 +19,11 @@ import kotlin.test.assertTrue
 class SyncRoutesTest {
 
     private val json = Json { ignoreUnknownKeys = true }
+
+    private fun authHeader(tokenService: JwtTokenService): String {
+        val accountId = UUID.randomUUID().toString()
+        return "Bearer ${tokenService.generateAccessToken(accountId)}"
+    }
 
     @Serializable
     private data class SyncStatusPayload(
@@ -56,9 +64,16 @@ class SyncRoutesTest {
 
     @Test
     fun `sync status returns ok and counts`() = testApplication {
-        application { module() }
+        lateinit var tokenService: JwtTokenService
+        application {
+            module()
+            tokenService = getKoin().get()
+        }
 
-        val response = client.get("/api/v1/sync/status")
+        val authHeader = authHeader(tokenService)
+        val response = client.get("/api/v1/sync/status") {
+            header(HttpHeaders.Authorization, authHeader)
+        }
         assertEquals(HttpStatusCode.OK, response.status)
 
         val payload = json.decodeFromString<SyncStatusPayload>(response.bodyAsText())
@@ -69,9 +84,15 @@ class SyncRoutesTest {
 
     @Test
     fun `content upload appears in change feed`() = testApplication {
-        application { module() }
+        lateinit var tokenService: JwtTokenService
+        application {
+            module()
+            tokenService = getKoin().get()
+        }
+        val authHeader = authHeader(tokenService)
 
         val upload = client.post("/api/v1/sync/content") {
+            header(HttpHeaders.Authorization, authHeader)
             contentType(ContentType.Application.Json)
             setBody(
                 """
@@ -89,7 +110,9 @@ class SyncRoutesTest {
         }
         assertEquals(HttpStatusCode.OK, upload.status)
 
-        val changes = client.get("/api/v1/sync/content/changes?since=0")
+        val changes = client.get("/api/v1/sync/content/changes?since=0") {
+            header(HttpHeaders.Authorization, authHeader)
+        }
         assertEquals(HttpStatusCode.OK, changes.status)
 
         val payload = json.decodeFromString<ContentChangesPayload>(changes.bodyAsText())
@@ -99,10 +122,16 @@ class SyncRoutesTest {
 
     @Test
     fun `content update detects conflict when version is stale`() = testApplication {
-        application { module() }
+        lateinit var tokenService: JwtTokenService
+        application {
+            module()
+            tokenService = getKoin().get()
+        }
+        val authHeader = authHeader(tokenService)
 
         // seed initial content
         client.post("/api/v1/sync/content") {
+            header(HttpHeaders.Authorization, authHeader)
             contentType(ContentType.Application.Json)
             setBody(
                 """
@@ -121,6 +150,7 @@ class SyncRoutesTest {
 
         // update with stale version constraint
         val conflict = client.post("/api/v1/sync/content/note-2") {
+            header(HttpHeaders.Authorization, authHeader)
             contentType(ContentType.Application.Json)
             setBody(
                 """
@@ -142,9 +172,15 @@ class SyncRoutesTest {
 
     @Test
     fun `content delete surfaces as tombstone`() = testApplication {
-        application { module() }
+        lateinit var tokenService: JwtTokenService
+        application {
+            module()
+            tokenService = getKoin().get()
+        }
+        val authHeader = authHeader(tokenService)
 
         client.post("/api/v1/sync/content") {
+            header(HttpHeaders.Authorization, authHeader)
             contentType(ContentType.Application.Json)
             setBody(
                 """
@@ -161,10 +197,14 @@ class SyncRoutesTest {
             )
         }
 
-        val delete = client.post("/api/v1/sync/content/note-3/delete")
+        val delete = client.post("/api/v1/sync/content/note-3/delete") {
+            header(HttpHeaders.Authorization, authHeader)
+        }
         assertEquals(HttpStatusCode.OK, delete.status)
 
-        val changes = client.get("/api/v1/sync/content/changes?since=0")
+        val changes = client.get("/api/v1/sync/content/changes?since=0") {
+            header(HttpHeaders.Authorization, authHeader)
+        }
         val payload = json.decodeFromString<ContentChangesPayload>(changes.bodyAsText())
         assertTrue(payload.data.deletions.any { it.id == "note-3" })
     }
@@ -199,10 +239,16 @@ class SyncRoutesTest {
 
     @Test
     fun `journal upload and changes work end-to-end`() = testApplication {
-        application { module() }
+        lateinit var tokenService: JwtTokenService
+        application {
+            module()
+            tokenService = getKoin().get()
+        }
+        val authHeader = authHeader(tokenService)
 
         // Upload journal
         val upload = client.post("/api/v1/sync/journals") {
+            header(HttpHeaders.Authorization, authHeader)
             contentType(ContentType.Application.Json)
             setBody(
                 """
@@ -220,7 +266,9 @@ class SyncRoutesTest {
         assertEquals(HttpStatusCode.OK, upload.status)
 
         // Check changes
-        val changes = client.get("/api/v1/sync/journals/changes?since=0")
+        val changes = client.get("/api/v1/sync/journals/changes?since=0") {
+            header(HttpHeaders.Authorization, authHeader)
+        }
         assertEquals(HttpStatusCode.OK, changes.status)
 
         val payload = json.decodeFromString<JournalChangesPayload>(changes.bodyAsText())
@@ -231,10 +279,16 @@ class SyncRoutesTest {
 
     @Test
     fun `journal update works with version constraint`() = testApplication {
-        application { module() }
+        lateinit var tokenService: JwtTokenService
+        application {
+            module()
+            tokenService = getKoin().get()
+        }
+        val authHeader = authHeader(tokenService)
 
         // Create journal
         client.post("/api/v1/sync/journals") {
+            header(HttpHeaders.Authorization, authHeader)
             contentType(ContentType.Application.Json)
             setBody(
                 """
@@ -252,6 +306,7 @@ class SyncRoutesTest {
 
         // Update with no version constraint (should succeed)
         val update = client.post("/api/v1/sync/journals/journal-2") {
+            header(HttpHeaders.Authorization, authHeader)
             contentType(ContentType.Application.Json)
             setBody(
                 """
@@ -270,10 +325,16 @@ class SyncRoutesTest {
 
     @Test
     fun `journal delete creates tombstone`() = testApplication {
-        application { module() }
+        lateinit var tokenService: JwtTokenService
+        application {
+            module()
+            tokenService = getKoin().get()
+        }
+        val authHeader = authHeader(tokenService)
 
         // Create journal
         client.post("/api/v1/sync/journals") {
+            header(HttpHeaders.Authorization, authHeader)
             contentType(ContentType.Application.Json)
             setBody(
                 """
@@ -290,11 +351,15 @@ class SyncRoutesTest {
         }
 
         // Delete
-        val delete = client.post("/api/v1/sync/journals/journal-3/delete")
+        val delete = client.post("/api/v1/sync/journals/journal-3/delete") {
+            header(HttpHeaders.Authorization, authHeader)
+        }
         assertEquals(HttpStatusCode.OK, delete.status)
 
         // Check deletions
-        val changes = client.get("/api/v1/sync/journals/changes?since=0")
+        val changes = client.get("/api/v1/sync/journals/changes?since=0") {
+            header(HttpHeaders.Authorization, authHeader)
+        }
         val payload = json.decodeFromString<JournalChangesPayload>(changes.bodyAsText())
         assertTrue(payload.deletions.any { it.id == "journal-3" })
     }
@@ -307,10 +372,16 @@ class SyncRoutesTest {
 
     @Test
     fun `association upload and changes work`() = testApplication {
-        application { module() }
+        lateinit var tokenService: JwtTokenService
+        application {
+            module()
+            tokenService = getKoin().get()
+        }
+        val authHeader = authHeader(tokenService)
 
         // Upload associations
         val upload = client.post("/api/v1/sync/associations") {
+            header(HttpHeaders.Authorization, authHeader)
             contentType(ContentType.Application.Json)
             setBody(
                 """
@@ -330,23 +401,39 @@ class SyncRoutesTest {
         assertEquals(HttpStatusCode.OK, upload.status)
 
         // Check changes
-        val changes = client.get("/api/v1/sync/associations/changes?since=0")
+        val changes = client.get("/api/v1/sync/associations/changes?since=0") {
+            header(HttpHeaders.Authorization, authHeader)
+        }
         assertEquals(HttpStatusCode.OK, changes.status)
     }
 
     @Test
     fun `missing since parameter returns bad request`() = testApplication {
-        application { module() }
+        lateinit var tokenService: JwtTokenService
+        application {
+            module()
+            tokenService = getKoin().get()
+        }
 
-        val response = client.get("/api/v1/sync/content/changes")
+        val authHeader = authHeader(tokenService)
+        val response = client.get("/api/v1/sync/content/changes") {
+            header(HttpHeaders.Authorization, authHeader)
+        }
         assertEquals(HttpStatusCode.BadRequest, response.status)
     }
 
     @Test
-    fun `sync trigger endpoint returns started status`() = testApplication {
-        application { module() }
+    fun `sync trigger endpoint is not available`() = testApplication {
+        lateinit var tokenService: JwtTokenService
+        application {
+            module()
+            tokenService = getKoin().get()
+        }
 
-        val response = client.post("/api/v1/sync/")
-        assertEquals(HttpStatusCode.OK, response.status)
+        val authHeader = authHeader(tokenService)
+        val response = client.post("/api/v1/sync/") {
+            header(HttpHeaders.Authorization, authHeader)
+        }
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
 }

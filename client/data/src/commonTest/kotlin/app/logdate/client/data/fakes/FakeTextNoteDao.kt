@@ -68,6 +68,12 @@ class FakeTextNoteDao : TextNoteDao {
         noteIds.forEach { notes.remove(it) }
         updateFlow()
     }
+
+    override suspend fun updateSyncMetadata(noteId: Uuid, syncVersion: Long, lastSynced: kotlinx.datetime.Instant) {
+        val existing = notes[noteId] ?: return
+        notes[noteId] = existing.copy(syncVersion = syncVersion, lastSynced = lastSynced)
+        updateFlow()
+    }
     
     override suspend fun getTextNotesByContent(content: String): List<TextNoteEntity> {
         return notes.values.filter { it.content == content }.sortedByDescending { it.created }

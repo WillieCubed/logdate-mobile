@@ -1,11 +1,15 @@
 package app.logdate.client.sync
 
-import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
 import app.logdate.client.sync.cloud.DefaultCloudJournalDataSource
 import app.logdate.client.sync.cloud.DefaultCloudAssociationDataSource
 import app.logdate.client.sync.cloud.DefaultCloudMediaDataSource
+import app.logdate.client.sync.metadata.AssociationPendingKey
+import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.test.*
+import app.logdate.shared.model.Journal
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
 import kotlin.test.Test
@@ -23,6 +27,7 @@ class AutomaticUploadIntegrationTest {
     fun testAutomaticContentUpload() = runTest {
         val apiClient = fakeCloudApiClient()
         val notesRepository = fakeJournalNotesRepository()
+        val syncMetadataService = fakeSyncMetadataService()
 
         val syncManager = DefaultSyncManager(
             cloudContentDataSource = DefaultCloudContentDataSource(apiClient),
@@ -36,10 +41,15 @@ class AutomaticUploadIntegrationTest {
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = fakeSyncMetadataService()
+            syncMetadataService = syncMetadataService
         )
 
-        notesRepository.addTestNote("Test automatic upload")
+        val note = notesRepository.addTestNote("Test automatic upload")
+        syncMetadataService.enqueuePending(
+            entityId = note.uid.toString(),
+            entityType = EntityType.NOTE,
+            operation = PendingOperation.CREATE
+        )
 
         val result = syncManager.syncContent()
 
@@ -53,6 +63,8 @@ class AutomaticUploadIntegrationTest {
     @Test
     fun testAutomaticJournalUpload() = runTest {
         val apiClient = fakeCloudApiClient()
+        val journalRepository = fakeJournalRepository()
+        val syncMetadataService = fakeSyncMetadataService()
 
         val syncManager = DefaultSyncManager(
             cloudContentDataSource = DefaultCloudContentDataSource(apiClient),
@@ -61,12 +73,26 @@ class AutomaticUploadIntegrationTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
             cloudAccountRepository = fakeAccountRepository(),
             sessionStorage = fakeSessionStorage(),
-            journalRepository = fakeJournalRepository(),
+            journalRepository = journalRepository,
             journalNotesRepository = fakeJournalNotesRepository(),
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = fakeSyncMetadataService()
+            syncMetadataService = syncMetadataService
+        )
+
+        val journal = Journal(
+            id = Uuid.random(),
+            title = "Test journal",
+            description = "Test journal description",
+            created = Clock.System.now(),
+            lastUpdated = Clock.System.now()
+        )
+        journalRepository.create(journal)
+        syncMetadataService.enqueuePending(
+            entityId = journal.id.toString(),
+            entityType = EntityType.JOURNAL,
+            operation = PendingOperation.CREATE
         )
 
         val result = syncManager.syncJournals()
@@ -79,6 +105,7 @@ class AutomaticUploadIntegrationTest {
     @Test
     fun testAutomaticAssociationUpload() = runTest {
         val apiClient = fakeCloudApiClient()
+        val syncMetadataService = fakeSyncMetadataService()
 
         val syncManager = DefaultSyncManager(
             cloudContentDataSource = DefaultCloudContentDataSource(apiClient),
@@ -92,7 +119,14 @@ class AutomaticUploadIntegrationTest {
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = fakeSyncMetadataService()
+            syncMetadataService = syncMetadataService
+        )
+
+        val associationKey = AssociationPendingKey(Uuid.random(), Uuid.random())
+        syncMetadataService.enqueuePending(
+            entityId = associationKey.toPendingId(),
+            entityType = EntityType.ASSOCIATION,
+            operation = PendingOperation.CREATE
         )
 
         val result = syncManager.syncAssociations()
@@ -105,6 +139,8 @@ class AutomaticUploadIntegrationTest {
     @Test
     fun testUploadFailuresAreHandledGracefully() = runTest {
         val apiClient = failingCloudApiClient()
+        val syncMetadataService = fakeSyncMetadataService()
+        val notesRepository = fakeJournalNotesRepository("Test note 1", "Test note 2")
 
         val syncManager = DefaultSyncManager(
             cloudContentDataSource = DefaultCloudContentDataSource(apiClient),
@@ -114,23 +150,38 @@ class AutomaticUploadIntegrationTest {
             cloudAccountRepository = fakeAccountRepository(),
             sessionStorage = fakeSessionStorage(),
             journalRepository = fakeJournalRepository(),
-            journalNotesRepository = fakeJournalNotesRepository("Test note 1", "Test note 2"),
+            journalNotesRepository = notesRepository,
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = fakeSyncMetadataService()
+            syncMetadataService = syncMetadataService
         )
+
+        val pendingNotes = notesRepository.allNotesObserved.first()
+        pendingNotes.forEach { note ->
+            syncMetadataService.enqueuePending(
+                entityId = note.uid.toString(),
+                entityType = EntityType.NOTE,
+                operation = PendingOperation.CREATE
+            )
+        }
 
         val result = syncManager.syncContent()
 
         assertTrue(!result.success, "Content sync should fail with failing API")
         assertTrue(result.errors.isNotEmpty(), "Should have error information")
         assertTrue(apiClient.wasMethodCalled("uploadContent"), "Should still attempt upload calls")
+        assertTrue(
+            syncMetadataService.getPendingUploads(EntityType.NOTE).isNotEmpty(),
+            "Pending uploads should remain after a failed sync"
+        )
     }
 
     @Test
     fun testUnauthenticatedUploadFails() = runTest {
         val apiClient = fakeCloudApiClient()
+        val syncMetadataService = fakeSyncMetadataService()
+        val notesRepository = fakeJournalNotesRepository("Test note 1", "Test note 2")
 
         val syncManager = DefaultSyncManager(
             cloudContentDataSource = DefaultCloudContentDataSource(apiClient),
@@ -140,12 +191,21 @@ class AutomaticUploadIntegrationTest {
             cloudAccountRepository = fakeAccountRepository(authenticated = false),
             sessionStorage = fakeSessionStorage(authenticated = false),
             journalRepository = fakeJournalRepository(),
-            journalNotesRepository = fakeJournalNotesRepository("Test note 1", "Test note 2"),
+            journalNotesRepository = notesRepository,
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = fakeSyncMetadataService()
+            syncMetadataService = syncMetadataService
         )
+
+        val pendingNotes = notesRepository.allNotesObserved.first()
+        pendingNotes.forEach { note ->
+            syncMetadataService.enqueuePending(
+                entityId = note.uid.toString(),
+                entityType = EntityType.NOTE,
+                operation = PendingOperation.CREATE
+            )
+        }
 
         val result = syncManager.syncContent()
 

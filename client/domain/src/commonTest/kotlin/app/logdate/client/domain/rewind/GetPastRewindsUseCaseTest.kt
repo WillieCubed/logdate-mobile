@@ -134,19 +134,21 @@ class GetPastRewindsUseCaseTest {
         val now = Clock.System.now()
         val rewind1 = Rewind(
             uid = Uuid.random(),
-            startTime = Instant.fromEpochMilliseconds(now.toEpochMilliseconds() - 7000),
-            endTime = Instant.fromEpochMilliseconds(now.toEpochMilliseconds() - 6000),
-            summary = "Short rewind",
-            highlights = emptyList(),
-            createdAt = now
+            startDate = Instant.fromEpochMilliseconds(now.toEpochMilliseconds() - 7000),
+            endDate = Instant.fromEpochMilliseconds(now.toEpochMilliseconds() - 6000),
+            generationDate = now,
+            label = "2024#01",
+            title = "Short rewind",
+            content = emptyList()
         )
         val rewind2 = Rewind(
             uid = Uuid.random(),
-            startTime = Instant.fromEpochMilliseconds(now.toEpochMilliseconds() - 10000),
-            endTime = Instant.fromEpochMilliseconds(now.toEpochMilliseconds() - 1000),
-            summary = "Long rewind",
-            highlights = emptyList(),
-            createdAt = now
+            startDate = Instant.fromEpochMilliseconds(now.toEpochMilliseconds() - 10000),
+            endDate = Instant.fromEpochMilliseconds(now.toEpochMilliseconds() - 1000),
+            generationDate = now,
+            label = "2024#02",
+            title = "Long rewind",
+            content = emptyList()
         )
         
         mockRepository.allRewinds = listOf(rewind1, rewind2)
@@ -160,13 +162,14 @@ class GetPastRewindsUseCaseTest {
         assertEquals(rewind2, result[1])
     }
 
-    private fun createTestRewind(summary: String) = Rewind(
+    private fun createTestRewind(title: String) = Rewind(
         uid = Uuid.random(),
-        startTime = Clock.System.now(),
-        endTime = Clock.System.now(),
-        summary = summary,
-        highlights = emptyList(),
-        createdAt = Clock.System.now()
+        startDate = Clock.System.now(),
+        endDate = Clock.System.now(),
+        generationDate = Clock.System.now(),
+        label = "2024#01",
+        title = title,
+        content = emptyList()
     )
 
     private class MockRewindRepository : RewindRepository {
@@ -181,15 +184,18 @@ class GetPastRewindsUseCaseTest {
         override fun getRewind(uid: Uuid): Flow<Rewind> = flowOf(createTestRewind("Single rewind"))
         override fun getRewindBetween(start: Instant, end: Instant): Flow<Rewind?> = flowOf(null)
         override suspend fun isRewindAvailable(start: Instant, end: Instant): Boolean = false
+        @Deprecated("Use GenerateBasicRewindUseCase instead")
         override suspend fun createRewind(start: Instant, end: Instant): Rewind = createTestRewind("Created rewind")
+        override suspend fun saveRewind(rewind: Rewind) {}
 
-        private fun createTestRewind(summary: String) = Rewind(
+        private fun createTestRewind(title: String) = Rewind(
             uid = Uuid.random(),
-            startTime = Clock.System.now(),
-            endTime = Clock.System.now(),
-            summary = summary,
-            highlights = emptyList(),
-            createdAt = Clock.System.now()
+            startDate = Clock.System.now(),
+            endDate = Clock.System.now(),
+            generationDate = Clock.System.now(),
+            label = "2024#01",
+            title = title,
+            content = emptyList()
         )
     }
 }

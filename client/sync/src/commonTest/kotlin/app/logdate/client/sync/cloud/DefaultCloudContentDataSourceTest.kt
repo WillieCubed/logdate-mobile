@@ -1,6 +1,7 @@
 package app.logdate.client.sync.cloud
 
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.shared.model.sync.VersionConstraint
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -45,7 +46,9 @@ class DefaultCloudContentDataSourceTest {
         assertTrue(result.isSuccess, "Upload should succeed")
         // Compare with millisecond precision since that's what the API returns
         val expectedTime = Instant.fromEpochMilliseconds(uploadTime.toEpochMilliseconds())
-        assertEquals(expectedTime, result.getOrNull(), "Should return upload timestamp")
+        val uploadResult = result.getOrNull()
+        assertEquals(expectedTime, uploadResult?.syncedAt, "Should return upload timestamp")
+        assertEquals(1, uploadResult?.serverVersion, "Should return server version")
         assertEquals(1, mockApiClient.uploadCalls.size, "Should make one API call")
         
         val (token, request) = mockApiClient.uploadCalls.first()
@@ -96,7 +99,8 @@ class DefaultCloudContentDataSourceTest {
             uid = Uuid.random(),
             content = "Updated content",
             creationTimestamp = Clock.System.now(),
-            lastUpdated = Clock.System.now()
+            lastUpdated = Clock.System.now(),
+            syncVersion = 1
         )
         
         val updateTime = Clock.System.now()
@@ -115,13 +119,18 @@ class DefaultCloudContentDataSourceTest {
         assertTrue(result.isSuccess, "Update should succeed")
         // Compare with millisecond precision since that's what the API returns
         val expectedTime = Instant.fromEpochMilliseconds(updateTime.toEpochMilliseconds())
-        assertEquals(expectedTime, result.getOrNull(), "Should return update timestamp")
+        val updateResult = result.getOrNull()
+        assertEquals(expectedTime, updateResult?.syncedAt, "Should return update timestamp")
+        assertEquals(2, updateResult?.serverVersion, "Should return server version")
         assertEquals(1, mockApiClient.updateCalls.size, "Should make one API call")
         
         val (token, noteId, request) = mockApiClient.updateCalls.first()
         assertEquals(accessToken, token, "Should use correct access token")
         assertEquals(textNote.uid.toString(), noteId, "Should use correct note ID")
         assertEquals(textNote.content, request.content, "Should preserve updated content")
+        val constraint = request.versionConstraint
+        assertTrue(constraint is VersionConstraint.Known, "Should include version constraint")
+        assertEquals(1, (constraint as VersionConstraint.Known).serverVersion, "Should pass current sync version")
     }
     
     @Test

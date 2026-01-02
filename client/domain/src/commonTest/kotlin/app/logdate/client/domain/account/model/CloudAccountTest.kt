@@ -16,13 +16,16 @@ class CloudAccountTest {
     @Test
     fun `CloudAccount creation with valid parameters`() {
         // Arrange
-        val id = "acc_12345"
+        val id = Uuid.parse("6ba7b812-9dad-11d1-80b4-00c04fd430c8")
         val username = "testuser"
         val displayName = "Test User"
-        val userId = Uuid.fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+        val userId = Uuid.parse("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
         val createdAt = Instant.parse("2023-01-01T00:00:00Z")
         val updatedAt = Instant.parse("2023-01-02T00:00:00Z")
-        val passkeyCredentialIds = listOf("credential1", "credential2")
+        val passkeyCredentialIds = listOf(
+            Uuid.parse("6ba7b813-9dad-11d1-80b4-00c04fd430c8"),
+            Uuid.parse("6ba7b814-9dad-11d1-80b4-00c04fd430c8")
+        )
         
         // Act
         val account = CloudAccount(
@@ -49,13 +52,13 @@ class CloudAccountTest {
     fun `AuthenticationResult Success contains correct account and credentials`() {
         // Arrange
         val account = CloudAccount(
-            id = "acc_12345",
+            id = Uuid.parse("6ba7b812-9dad-11d1-80b4-00c04fd430c8"),
             username = "testuser",
             displayName = "Test User",
-            userId = Uuid.fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8"),
+            userId = Uuid.parse("6ba7b810-9dad-11d1-80b4-00c04fd430c8"),
             createdAt = Instant.parse("2023-01-01T00:00:00Z"),
             updatedAt = Instant.parse("2023-01-02T00:00:00Z"),
-            passkeyCredentialIds = listOf("credential1")
+            passkeyCredentialIds = listOf(Uuid.parse("6ba7b813-9dad-11d1-80b4-00c04fd430c8"))
         )
         
         val credentials = AccountCredentials(
@@ -65,7 +68,7 @@ class CloudAccountTest {
         )
         
         // Act
-        val result = AuthenticationResult.Success(
+        val result = app.logdate.shared.model.AuthenticationResult.Success(
             account = account,
             credentials = credentials
         )
@@ -85,7 +88,7 @@ class CloudAccountTest {
         val message = "The provided credentials are invalid"
         
         // Act
-        val result = AuthenticationResult.Error(
+        val result = app.logdate.shared.model.AuthenticationResult.Error(
             errorCode = errorCode,
             message = message
         )

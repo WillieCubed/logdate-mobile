@@ -1,6 +1,7 @@
 package app.logdate.client.sync.test
 
 import app.logdate.client.sync.DefaultSyncManager
+import app.logdate.client.sync.cloud.ContentUploadRequest
 import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
 import app.logdate.client.sync.cloud.DefaultCloudJournalDataSource
 import app.logdate.client.sync.cloud.DefaultCloudAssociationDataSource
@@ -24,7 +25,7 @@ class SyncTestFakesTest {
         val apiClient = FakeCloudApiClient()
 
         // When: Making API calls
-        apiClient.uploadContent("token", app.logdate.client.sync.cloud.ContentUploadRequest(
+        apiClient.uploadContent("token", ContentUploadRequest(
             id = "test",
             type = "TEXT",
             content = "Test content",
@@ -48,7 +49,7 @@ class SyncTestFakesTest {
         apiClient.configureContentSyncFailure(testError)
 
         // When: Making a content upload call
-        val result = apiClient.uploadContent("token", app.logdate.client.sync.cloud.ContentUploadRequest(
+        val result = apiClient.uploadContent("token", ContentUploadRequest(
             id = "test",
             type = "TEXT",
             content = "Test content",

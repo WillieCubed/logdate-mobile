@@ -15,7 +15,7 @@ class UserIdentityTest {
     @Test
     fun `UserIdentity creation with default values`() {
         // Arrange
-        val userId = Uuid.fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+        val userId = Uuid.parse("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
         
         // Act
         val userIdentity = UserIdentity(userId = userId)
@@ -29,7 +29,7 @@ class UserIdentityTest {
     @Test
     fun `UserIdentity creation with cloud account linked`() {
         // Arrange
-        val userId = Uuid.fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+        val userId = Uuid.parse("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
         val cloudAccountId = "acc_12345"
         
         // Act
@@ -48,8 +48,8 @@ class UserIdentityTest {
     @Test
     fun `IdentityMigrationState creation with all values`() {
         // Arrange
-        val oldUserId = Uuid.fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
-        val newUserId = Uuid.fromString("6ba7b811-9dad-11d1-80b4-00c04fd430c8")
+        val oldUserId = Uuid.parse("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+        val newUserId = Uuid.parse("6ba7b811-9dad-11d1-80b4-00c04fd430c8")
         val itemsProcessed = 50
         val totalItems = 100
         val lastProcessedId = "last_processed_id"

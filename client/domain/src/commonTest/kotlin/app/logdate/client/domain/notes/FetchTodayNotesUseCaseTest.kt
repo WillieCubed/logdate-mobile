@@ -69,7 +69,7 @@ class FetchTodayNotesUseCaseTest {
         assertEquals(1, mockRepository.observeCallCount)
         // Verify the buffer is applied (start time should be 4 hours before start of day)
         val timeDifference = mockRepository.lastEndTime!! - mockRepository.lastStartTime!!
-        assertEquals(28 * 60 * 60 * 1000, timeDifference.inWholeMilliseconds) // 28 hours (24 + 4 buffer)
+        assertEquals(28.hours, timeDifference)
     }
 
     @Test
@@ -85,7 +85,7 @@ class FetchTodayNotesUseCaseTest {
         assertEquals(1, mockRepository.observeCallCount)
         // Verify the custom buffer is applied
         val timeDifference = mockRepository.lastEndTime!! - mockRepository.lastStartTime!!
-        assertEquals(26 * 60 * 60 * 1000, timeDifference.inWholeMilliseconds) // 26 hours (24 + 2 buffer)
+        assertEquals(26.hours, timeDifference)
     }
 
     @Test
@@ -101,7 +101,7 @@ class FetchTodayNotesUseCaseTest {
         assertEquals(1, mockRepository.observeCallCount)
         // Verify no buffer is applied
         val timeDifference = mockRepository.lastEndTime!! - mockRepository.lastStartTime!!
-        assertEquals(24 * 60 * 60 * 1000, timeDifference.inWholeMilliseconds) // Exactly 24 hours
+        assertEquals(24.hours, timeDifference)
     }
 
     @Test
@@ -137,18 +137,16 @@ class FetchTodayNotesUseCaseTest {
         assertEquals(notesIncludingPreviousDay, result)
         // Verify 6-hour buffer is applied
         val timeDifference = mockRepository.lastEndTime!! - mockRepository.lastStartTime!!
-        assertEquals(30 * 60 * 60 * 1000, timeDifference.inWholeMilliseconds) // 30 hours (24 + 6 buffer)
+        assertEquals(30.hours, timeDifference)
     }
 
     private fun createTestNote(
         content: String = "Test note content",
-        journalId: Uuid = Uuid.random()
-    ) = JournalNote.TextNote(
-        id = Uuid.random(),
+    ) = JournalNote.Text(
+        uid = Uuid.random(),
         content = content,
-        journalId = journalId,
-        createdAt = Clock.System.now(),
-        updatedAt = Clock.System.now()
+        creationTimestamp = Clock.System.now(),
+        lastUpdated = Clock.System.now()
     )
 
     private class MockJournalNotesRepository : JournalNotesRepository {
@@ -157,18 +155,22 @@ class FetchTodayNotesUseCaseTest {
         var lastStartTime: Instant? = null
         var lastEndTime: Instant? = null
 
-        override suspend fun observeNotesInRange(start: Instant, end: Instant): Flow<List<JournalNote>> {
+        override fun observeNotesInRange(start: Instant, end: Instant): Flow<List<JournalNote>> {
             observeCallCount++
             lastStartTime = start
             lastEndTime = end
             return flowOf(notesForRange)
         }
 
-        override suspend fun create(note: JournalNote) = Unit
-        override suspend fun removeById(id: Uuid) = Unit
-        override suspend fun getByJournalId(journalId: Uuid) = emptyList<JournalNote>()
-        override suspend fun observeNotesByJournal(journalId: Uuid) = flowOf(emptyList<JournalNote>())
-        override suspend fun getNotesForDay(date: LocalDate) = emptyList<JournalNote>()
-        override suspend fun getAll() = emptyList<JournalNote>()
+        override val allNotesObserved: Flow<List<JournalNote>> = flowOf(emptyList())
+        override fun observeNotesInJournal(journalId: Uuid) = flowOf(emptyList<JournalNote>())
+        override fun observeNotesPage(pageSize: Int, offset: Int) = flowOf(emptyList<JournalNote>())
+        override fun observeNotesStream(pageSize: Int) = flowOf(emptyList<JournalNote>())
+        override fun observeRecentNotes(limit: Int) = flowOf(emptyList<JournalNote>())
+        override suspend fun create(note: JournalNote): Uuid = note.uid
+        override suspend fun remove(note: JournalNote) = Unit
+        override suspend fun removeById(noteId: Uuid) = Unit
+        override suspend fun create(note: JournalNote, journalId: Uuid) = Unit
+        override suspend fun removeFromJournal(noteId: Uuid, journalId: Uuid) = Unit
     }
 }

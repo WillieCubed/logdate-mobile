@@ -2,12 +2,25 @@ package app.logdate.client.domain.notes
 
 import app.logdate.client.domain.world.LogLocationUseCase
 import app.logdate.client.domain.location.LogCurrentLocationUseCase
+import app.logdate.client.domain.location.LocationRetryWorker
+import app.logdate.client.location.ClientLocationProvider
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.location.LocationHistoryItem
+import app.logdate.client.repository.location.LocationHistoryRepository
+import app.logdate.client.repository.timeline.ActivityTimelineRepository
+import app.logdate.shared.model.ActivityTimelineItem
 import app.logdate.shared.model.Journal
+import app.logdate.shared.model.Location
+import app.logdate.shared.model.LocationAltitude
+import app.logdate.shared.model.AltitudeUnit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -39,10 +52,9 @@ class AddNoteUseCaseTest {
         useCase = AddNoteUseCase(
             repository = mockRepository,
             journalContentRepository = mockJournalContentRepository,
+            logLocationUseCase = mockLogLocationUseCase.useCase,
+            logCurrentLocationUseCase = mockLogCurrentLocationUseCase.useCase,
             mediaManager = mockMediaManager
-            // Commented out for now
-            // logLocationUseCase = mockLogLocationUseCase,
-            // logCurrentLocationUseCase = mockLogCurrentLocationUseCase,
         )
     }
 
@@ -52,7 +64,7 @@ class AddNoteUseCaseTest {
         val testNote = createTestNote()
         
         // When
-        useCase(testNote)
+        useCase(notes = listOf(testNote))
         
         // Then
         assertEquals(1, mockRepository.createdNotes.size)
@@ -67,13 +79,14 @@ class AddNoteUseCaseTest {
             createTestNote(content = "Second note"),
             createTestNote(content = "Third note")
         )
+        val expectedNotes: List<JournalNote> = testNotes
         
         // When
-        useCase(testNotes)
+        useCase(notes = testNotes)
         
         // Then
         assertEquals(3, mockRepository.createdNotes.size)
-        assertEquals(testNotes, mockRepository.createdNotes)
+        assertEquals(expectedNotes, mockRepository.createdNotes)
     }
 
     /**
@@ -114,7 +127,7 @@ class AddNoteUseCaseTest {
         val attachments = listOf("file://path1.jpg", "file://path2.png")
         
         // When
-        useCase(testNote, attachments = attachments)
+        useCase(notes = listOf(testNote), attachments = attachments)
         
         // Then
         assertEquals(1, mockRepository.createdNotes.size)
@@ -127,13 +140,14 @@ class AddNoteUseCaseTest {
         val note1 = createTestNote(content = "Note 1")
         val note2 = createTestNote(content = "Note 2")
         val note3 = createTestNote(content = "Note 3")
+        val expectedNotes: List<JournalNote> = listOf(note1, note2, note3)
         
         // When
-        useCase(note1, note2, note3)
+        useCase(notes = arrayOf(note1, note2, note3), journalIds = emptyArray())
         
         // Then
         assertEquals(3, mockRepository.createdNotes.size)
-        assertEquals(listOf(note1, note2, note3), mockRepository.createdNotes)
+        assertEquals(expectedNotes, mockRepository.createdNotes)
     }
 
     /**
@@ -211,7 +225,7 @@ class AddNoteUseCaseTest {
         val testNote = createTestNote()
         
         // When
-        useCase(testNote, attachments = emptyList())
+        useCase(notes = listOf(testNote), attachments = emptyList())
         
         // Then
         assertEquals(1, mockRepository.createdNotes.size)
@@ -268,6 +282,8 @@ class AddNoteUseCaseTest {
         val errorHandlingUseCase = AddNoteUseCase(
             repository = mockRepository,
             journalContentRepository = mockErrorContentRepo,
+            logLocationUseCase = mockLogLocationUseCase.useCase,
+            logCurrentLocationUseCase = mockLogCurrentLocationUseCase.useCase,
             mediaManager = mockMediaManager
         )
         
@@ -351,25 +367,21 @@ class AddNoteUseCaseTest {
         override suspend fun removeContentFromAllJournals(contentId: Uuid) = Unit
     }
 
-    private class MockLogLocationUseCase : LogLocationUseCase {
-        var shouldThrowException = false
-
-        override suspend fun invoke() {
-            if (shouldThrowException) {
-                throw Exception("Location logging failed")
-            }
-        }
+    private class MockLogLocationUseCase {
+        private val locationProvider = FakeLocationProvider()
+        private val activityRepository = FakeActivityTimelineRepository()
+        val useCase = LogLocationUseCase(locationProvider, activityRepository)
     }
 
-    private class MockLogCurrentLocationUseCase : LogCurrentLocationUseCase {
-        var shouldThrowException = false
-
-        override suspend fun invoke(request: LogCurrentLocationUseCase.LocationLogRequest): LogCurrentLocationUseCase.LocationLogResult {
-            if (shouldThrowException) {
-                throw Exception("Current location logging failed")
-            }
-            return LogCurrentLocationUseCase.LocationLogResult.LogSuccess
-        }
+    private class MockLogCurrentLocationUseCase {
+        private val locationProvider = FakeLocationProvider()
+        private val locationHistoryRepository = FakeLocationHistoryRepository()
+        private val retryWorker = LocationRetryWorker(
+            locationProvider = locationProvider,
+            locationHistoryRepository = locationHistoryRepository,
+            coroutineScope = CoroutineScope(Dispatchers.Unconfined)
+        )
+        val useCase = LogCurrentLocationUseCase(locationProvider, locationHistoryRepository, retryWorker)
     }
     
     private class MockMediaManager : MediaManager {
@@ -383,5 +395,62 @@ class AddNoteUseCaseTest {
         override suspend fun exists(mediaId: String): Boolean = false
         override suspend fun getRecentMedia(): Flow<List<MediaObject>> = flowOf(emptyList())
         override suspend fun queryMediaByDate(start: Instant, end: Instant): Flow<List<MediaObject>> = flowOf(emptyList())
+    }
+
+    private class FakeLocationProvider : ClientLocationProvider {
+        private val shared = MutableSharedFlow<Location>(replay = 1)
+        private val location = Location(
+            latitude = 37.0,
+            longitude = -122.0,
+            altitude = LocationAltitude(0.0, AltitudeUnit.METERS)
+        )
+
+        override val currentLocation: SharedFlow<Location> = shared
+
+        override suspend fun getCurrentLocation(): Location = location
+
+        override suspend fun refreshLocation() {}
+    }
+
+    private class FakeActivityTimelineRepository : ActivityTimelineRepository {
+        private val location = Location(
+            latitude = 37.0,
+            longitude = -122.0,
+            altitude = LocationAltitude(0.0, AltitudeUnit.METERS)
+        )
+
+        override val allItemsObserved: Flow<List<ActivityTimelineItem>> = flowOf(emptyList())
+
+        override fun observeModelById(id: Uuid): Flow<ActivityTimelineItem> =
+            flowOf(ActivityTimelineItem(timestamp = Clock.System.now(), uid = id, location = location))
+
+        override suspend fun addActivity(item: ActivityTimelineItem) {}
+        override suspend fun removeActivity(item: ActivityTimelineItem) {}
+        override suspend fun updateActivity(item: ActivityTimelineItem) {}
+        override fun fetchActivitiesByType(type: String): Flow<List<ActivityTimelineItem>> = flowOf(emptyList())
+    }
+
+    private class FakeLocationHistoryRepository : LocationHistoryRepository {
+        override suspend fun getAllLocationHistory(): List<LocationHistoryItem> = emptyList()
+        override fun observeLocationHistory(): Flow<List<LocationHistoryItem>> = flowOf(emptyList())
+        override suspend fun getRecentLocationHistory(limit: Int): List<LocationHistoryItem> = emptyList()
+        override suspend fun getLocationHistoryBetween(startTime: Instant, endTime: Instant): List<LocationHistoryItem> = emptyList()
+        override suspend fun getLastLocation(): LocationHistoryItem? = null
+        override fun observeLastLocation(): Flow<LocationHistoryItem?> = flowOf(null)
+        override suspend fun logLocation(
+            location: Location,
+            userId: String,
+            deviceId: String,
+            confidence: Float,
+            isGenuine: Boolean
+        ): Result<Unit> = Result.success(Unit)
+
+        override suspend fun deleteLocationEntry(userId: String, deviceId: String, timestamp: Instant): Result<Unit> =
+            Result.success(Unit)
+
+        override suspend fun deleteLocationsBetween(startTime: Instant, endTime: Instant): Result<Unit> =
+            Result.success(Unit)
+
+        override suspend fun getLocationCount(): Int = 0
     }
 }

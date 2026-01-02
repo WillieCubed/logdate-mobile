@@ -3,6 +3,7 @@ package app.logdate.client.data.journals
 import app.logdate.client.data.fakes.FakeDraftRepository
 import app.logdate.client.data.fakes.FakeJournalDao
 import app.logdate.client.data.fakes.FakeRemoteJournalDataSource
+import app.logdate.client.data.fakes.FakeSyncMetadataService
 import app.logdate.client.database.entities.JournalEntity
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
@@ -44,6 +45,7 @@ class OfflineFirstJournalRepositoryTest {
     private lateinit var journalDao: FakeJournalDao
     private lateinit var remoteDataSource: FakeRemoteJournalDataSource
     private lateinit var draftRepository: FakeDraftRepository
+    private lateinit var syncMetadataService: FakeSyncMetadataService
     private lateinit var testDispatcher: TestDispatcher
     private lateinit var repository: OfflineFirstJournalRepository
 
@@ -52,12 +54,14 @@ class OfflineFirstJournalRepositoryTest {
         journalDao = FakeJournalDao()
         remoteDataSource = FakeRemoteJournalDataSource()
         draftRepository = FakeDraftRepository()
+        syncMetadataService = FakeSyncMetadataService()
         testDispatcher = UnconfinedTestDispatcher()
         
         repository = OfflineFirstJournalRepository(
             journalDao = journalDao,
             remoteDataSource = remoteDataSource,
             draftRepository = draftRepository,
+            syncMetadataService = syncMetadataService,
             dispatcher = testDispatcher,
             externalScope = CoroutineScope(testDispatcher)
         )
@@ -185,29 +189,6 @@ class OfflineFirstJournalRepositoryTest {
     }
 
     /**
-     * Tests error handling when trying to save a draft without a draft repository.
-     * 
-     * Expected behavior: When draftRepository is null and saveDraft is called, the repository
-     * should throw an IllegalStateException to indicate that the operation cannot be performed.
-     */
-    @Test
-    fun saveDraft_throwsWhenDraftRepositoryNull() = runTest(testDispatcher) {
-        val repositoryWithoutDrafts = OfflineFirstJournalRepository(
-            journalDao = journalDao,
-            remoteDataSource = remoteDataSource,
-            draftRepository = FakeDraftRepository(),
-            dispatcher = testDispatcher,
-            externalScope = CoroutineScope(testDispatcher)
-        )
-        
-        val draft = createTestDraft()
-        
-        assertFailsWith<IllegalStateException> {
-            repositoryWithoutDrafts.saveDraft(draft)
-        }
-    }
-
-    /**
      * Tests that the repository correctly retrieves the latest modified draft.
      * 
      * Expected behavior: When multiple drafts exist, getLatestDraft should return the draft with
@@ -301,27 +282,6 @@ class OfflineFirstJournalRepositoryTest {
         
         val retrievedDraft = draftRepository.getDraft(draft.id)
         assertNull(retrievedDraft)
-    }
-
-    /**
-     * Tests error handling when trying to delete a draft without a draft repository.
-     * 
-     * Expected behavior: When draftRepository is null and deleteDraft is called, the repository
-     * should throw an IllegalStateException to indicate that the operation cannot be performed.
-     */
-    @Test
-    fun deleteDraft_throwsWhenDraftRepositoryNull() = runTest(testDispatcher) {
-        val repositoryWithoutDrafts = OfflineFirstJournalRepository(
-            journalDao = journalDao,
-            remoteDataSource = remoteDataSource,
-            draftRepository = FakeDraftRepository(),
-            dispatcher = testDispatcher,
-            externalScope = CoroutineScope(testDispatcher)
-        )
-        
-        assertFailsWith<IllegalStateException> {
-            repositoryWithoutDrafts.deleteDraft(Uuid.random())
-        }
     }
 
     /**

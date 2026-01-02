@@ -8,7 +8,12 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.plus
+import kotlin.time.Duration.Companion.seconds
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -75,12 +80,12 @@ class GetMediaUrisUseCaseTest {
         val queryCall = mockMediaManager.queryMediaByDateCalls.first()
         
         // Start should be beginning of the day
-        val expectedStart = testDay.atStartOfDayIn(kotlinx.datetime.TimeZone.currentSystemDefault())
+        val expectedStart = testDay.atStartOfDayIn(TimeZone.currentSystemDefault())
         assertEquals(expectedStart, queryCall.first)
         
         // End should be beginning of next day
-        val expectedEnd = testDay.plus(kotlinx.datetime.DatePeriod(days = 1))
-            .atStartOfDayIn(kotlinx.datetime.TimeZone.currentSystemDefault())
+        val expectedEnd = testDay.plus(DatePeriod(days = 1))
+            .atStartOfDayIn(TimeZone.currentSystemDefault())
         assertEquals(expectedEnd, queryCall.second)
     }
 
@@ -177,7 +182,7 @@ class GetMediaUrisUseCaseTest {
         uri = uri,
         size = 2048,
         timestamp = Clock.System.now(),
-        duration = 30000 // 30 seconds
+        duration = 30.seconds
     )
 
     private class MockMediaManager : MediaManager {

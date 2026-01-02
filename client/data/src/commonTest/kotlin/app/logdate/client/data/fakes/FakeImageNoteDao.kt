@@ -67,6 +67,12 @@ class FakeImageNoteDao : ImageNoteDao {
         noteIds.forEach { notes.remove(it) }
         updateFlow()
     }
+
+    override suspend fun updateSyncMetadata(noteId: Uuid, syncVersion: Long, lastSynced: kotlinx.datetime.Instant) {
+        val existing = notes[noteId] ?: return
+        notes[noteId] = existing.copy(syncVersion = syncVersion, lastSynced = lastSynced)
+        updateFlow()
+    }
     
     /**
      * Clears all notes in the fake database.

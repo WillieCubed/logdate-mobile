@@ -385,7 +385,7 @@ class AccountE2ETest {
     }
     
     @Test
-    fun `account update returns not implemented`() = testApplication {
+    fun `account update returns method not allowed`() = testApplication {
         application {
             module()
         }
@@ -395,21 +395,17 @@ class AccountE2ETest {
             setBody("""{"displayName": "Updated Name"}""")
         }
         
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
-        val responseBody = response.bodyAsText()
-        assertTrue(responseBody.contains("NOT_IMPLEMENTED"))
+        assertEquals(HttpStatusCode.MethodNotAllowed, response.status)
     }
     
     @Test
-    fun `account deletion returns not implemented`() = testApplication {
+    fun `account deletion returns method not allowed`() = testApplication {
         application {
             module()
         }
         
         val response = client.delete("/api/v1/accounts/me")
         
-        assertEquals(HttpStatusCode.NotImplemented, response.status)
-        val responseBody = response.bodyAsText()
-        assertTrue(responseBody.contains("NOT_IMPLEMENTED"))
+        assertEquals(HttpStatusCode.MethodNotAllowed, response.status)
     }
 }

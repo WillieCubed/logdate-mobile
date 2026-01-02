@@ -4,7 +4,6 @@ import app.logdate.client.database.dao.JournalNotesDao
 import app.logdate.client.database.entities.JournalEntity
 import app.logdate.client.database.entities.JournalNoteCrossRef
 import app.logdate.client.database.entities.JournalWithNotes
-import app.logdate.client.database.entities.NoteJournals
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -31,17 +30,9 @@ class FakeJournalNotesDao : JournalNotesDao {
         return journalsFlow.map { emptyList() }
     }
     
-    override fun getNotesForJournal(journalId: Uuid): Flow<List<NoteJournals>> {
+    override fun getNotesForJournal(journalId: Uuid): Flow<List<JournalNoteCrossRef>> {
         return journalNotesFlow.map { refs ->
             refs.filter { it.journalId == journalId }
-                .map { ref ->
-                    val journal = journals[ref.journalId] ?: return@map null
-                    NoteJournals(
-                        noteId = ref.noteId,
-                        journal = journal
-                    )
-                }
-                .filterNotNull()
         }
     }
     
