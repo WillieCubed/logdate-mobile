@@ -138,9 +138,10 @@ class WittyRewindMessageGenerator : RewindMessageGenerator {
     }
 
     /**
-     * Generates a contextual message based on rewind characteristics.
+     * Generates a contextual message based on rewind characteristics and narrative themes.
      *
      * @param rewindAvailable Whether the rewind is ready
+     * @param themes Narrative themes from AI analysis (e.g., "travel", "work stress", "celebration")
      * @param photoCount Number of photos in the rewind
      * @param videoCount Number of videos in the rewind
      * @param textCount Number of text entries in the rewind
@@ -153,6 +154,7 @@ class WittyRewindMessageGenerator : RewindMessageGenerator {
      */
     fun generateContextualMessage(
         rewindAvailable: Boolean,
+        themes: List<String> = emptyList(),
         photoCount: Int = 0,
         videoCount: Int = 0,
         textCount: Int = 0,
@@ -168,6 +170,14 @@ class WittyRewindMessageGenerator : RewindMessageGenerator {
 
         // Check for streak milestones first (highest priority)
         STREAK_MESSAGES[streakDays]?.let { return it }
+
+        // Check for theme-based messages (AI-driven narrative themes take precedence)
+        if (themes.isNotEmpty()) {
+            val themeMessages = findThemeMessages(themes)
+            if (themeMessages.isNotEmpty()) {
+                return themeMessages.random()
+            }
+        }
 
         // Check for activity-specific messages
         activity?.let { activityType ->
@@ -210,6 +220,56 @@ class WittyRewindMessageGenerator : RewindMessageGenerator {
             // Default: General message
             else -> GENERAL_MESSAGES.random()
         }
+    }
+
+    /**
+     * Maps narrative themes to appropriate message categories.
+     *
+     * Prioritizes messages based on AI-generated themes like "vacation",
+     * "work stress", "celebration", "relationships", etc.
+     */
+    private fun findThemeMessages(themes: List<String>): List<String> {
+        val messages = mutableListOf<String>()
+
+        themes.forEach { theme ->
+            when {
+                theme.contains("travel", ignoreCase = true) ||
+                    theme.contains("vacation", ignoreCase = true) ||
+                    theme.contains("trip", ignoreCase = true) ->
+                    messages.addAll(TRAVEL_MESSAGES)
+
+                theme.contains("work", ignoreCase = true) ||
+                    theme.contains("project", ignoreCase = true) ||
+                    theme.contains("deadline", ignoreCase = true) ->
+                    messages.addAll(FOCUSED_WORK_MESSAGES)
+
+                theme.contains("social", ignoreCase = true) ||
+                    theme.contains("relationship", ignoreCase = true) ||
+                    theme.contains("connection", ignoreCase = true) ||
+                    theme.contains("friend", ignoreCase = true) ||
+                    theme.contains("family", ignoreCase = true) ->
+                    messages.addAll(SOCIAL_WEEK_MESSAGES)
+
+                theme.contains("celebration", ignoreCase = true) ||
+                    theme.contains("milestone", ignoreCase = true) ||
+                    theme.contains("achievement", ignoreCase = true) ||
+                    theme.contains("success", ignoreCase = true) ->
+                    messages.addAll(MILESTONE_MESSAGES)
+
+                theme.contains("food", ignoreCase = true) ||
+                    theme.contains("culinary", ignoreCase = true) ||
+                    theme.contains("dining", ignoreCase = true) ->
+                    messages.addAll(FOODIE_MESSAGES)
+
+                theme.contains("quiet", ignoreCase = true) ||
+                    theme.contains("rest", ignoreCase = true) ||
+                    theme.contains("peaceful", ignoreCase = true) ||
+                    theme.contains("calm", ignoreCase = true) ->
+                    messages.addAll(QUIET_WEEK_MESSAGES)
+            }
+        }
+
+        return messages
     }
 
     private fun selectMessage(rewindAvailable: Boolean): String {
