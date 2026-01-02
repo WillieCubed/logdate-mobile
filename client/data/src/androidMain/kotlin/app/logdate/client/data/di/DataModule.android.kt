@@ -26,6 +26,7 @@ import app.logdate.client.data.search.OfflineFirstSearchRepository
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.PlatformAccountManager
 import app.logdate.client.networking.PasskeyApiClient
+import app.logdate.client.networking.PasskeyApiClientContract
 import app.logdate.client.networking.httpClient
 import app.logdate.client.permissions.PasskeyManager
 import app.logdate.client.repository.account.AccountRepository
@@ -79,7 +80,15 @@ actual val dataModule: Module = module {
     factory<RemoteJournalDataSource> { FirebaseRemoteJournalDataSource() }
     single<JournalUserDataRepository> { OfflineFirstJournalUserDataRepository(get()) }
     single<DraftRepository> { LocalFirstDraftRepository(get(), get()) }
-    single<JournalRepository> { OfflineFirstJournalRepository(get(), get(), get()) }
+    single<JournalRepository> {
+        OfflineFirstJournalRepository(
+            get(),
+            get(),
+            get(),
+            syncManagerProvider = { get() },
+            syncMetadataService = get()
+        )
+    }
 
     // Notes
     single<JournalNotesRepository> {
@@ -87,11 +96,21 @@ actual val dataModule: Module = module {
             get(), // textNoteDao
             get(), // imageNoteDao
             get(), // voiceNoteDao
+            get(), // videoNoteDao
             get(), // journalNotesDao
-            get()  // journalRepository
+            get(), // journalRepository
+            syncManagerProvider = { get() },
+            syncMetadataService = get()
         )
     }
-    single<JournalContentRepository> { OfflineFirstJournalContentRepository(get(), get(), get()) }
+    single<JournalContentRepository> {
+        OfflineFirstJournalContentRepository(
+            get(),
+            get(),
+            get(),
+            syncMetadataService = get()
+        )
+    }
 
     single<EntryDraftRepository> { OfflineFirstEntryDraftRepository(get(), get()) }
     factory<LocalEntryDraftStore> { AndroidLocalEntryDraftStore(get()) }
@@ -120,7 +139,7 @@ actual val dataModule: Module = module {
     single<UserStateRepository> { OfflineFirstUserStateRepository(get()) }
 
     // Networking
-    single { PasskeyApiClient(httpClient, get(), get()) }
+    single<PasskeyApiClientContract> { PasskeyApiClient(httpClient, get(), get()) }
 
     // Account
     single<AccountRepository> { DefaultAccountRepository(get()) { null } } // TODO: Implement proper token provider

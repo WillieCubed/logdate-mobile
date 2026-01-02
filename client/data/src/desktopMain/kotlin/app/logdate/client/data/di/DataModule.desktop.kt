@@ -75,20 +75,37 @@ actual val dataModule: Module = module {
     factory<RemoteJournalDataSource> { StubJournalDataSource }
     single<JournalUserDataRepository> { OfflineFirstJournalUserDataRepository(get()) }
     single<DraftRepository> { LocalFirstDraftRepository(get(), get()) }
-    single<JournalRepository> { OfflineFirstJournalRepository(get(), get(), get()) }
+    single<JournalRepository> {
+        OfflineFirstJournalRepository(
+            get(),
+            get(),
+            get(),
+            syncManagerProvider = { get() },
+            syncMetadataService = get()
+        )
+    }
 
     // Notes
-    single<JournalNotesRepository> { 
+    single<JournalNotesRepository> {
         OfflineFirstJournalNotesRepository(
             get(), // textNoteDao
             get(), // imageNoteDao
             get(), // voiceNoteDao
+            get(), // videoNoteDao
             get(), // journalNotesDao
             get(), // journalRepository
-            get()  // syncManager
-        ) 
+            syncManagerProvider = { get() },
+            syncMetadataService = get()
+        )
     }
-    single<JournalContentRepository> { OfflineFirstJournalContentRepository(get(), get(), get()) }
+    single<JournalContentRepository> {
+        OfflineFirstJournalContentRepository(
+            get(),
+            get(),
+            get(),
+            syncMetadataService = get()
+        )
+    }
 
     single<EntryDraftRepository> { OfflineFirstEntryDraftRepository(get(), get()) }
     factory<LocalEntryDraftStore> { DesktopLocalEntryDraftStore() }

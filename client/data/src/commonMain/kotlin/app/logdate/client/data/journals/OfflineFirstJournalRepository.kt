@@ -3,6 +3,11 @@ package app.logdate.client.data.journals
 import app.logdate.client.database.dao.JournalDao
 import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.journals.SyncableJournalRepository
+import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.PendingOperation
+import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.client.sync.NoOpSyncManager
 import app.logdate.client.sync.SyncManager
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
@@ -16,6 +21,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -29,10 +35,11 @@ class OfflineFirstJournalRepository(
     private val journalDao: JournalDao,
     private val remoteDataSource: RemoteJournalDataSource,
     private val draftRepository: DraftRepository,
-    private val syncManager: SyncManager? = null,
+    private val syncManagerProvider: () -> SyncManager = { NoOpSyncManager },
+    private val syncMetadataService: SyncMetadataService,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val externalScope: CoroutineScope = CoroutineScope(dispatcher),
-) : JournalRepository {
+) : JournalRepository, SyncableJournalRepository {
 
     override val allJournalsObserved: Flow<List<Journal>>
         get() = journalDao.observeAll().map { journals ->
@@ -52,15 +59,19 @@ class OfflineFirstJournalRepository(
             journalDao.create(journal.toEntity())
             journal.id // Return the UUID from the journal
         }.await()
+
+        syncMetadataService.enqueuePending(
+            entityId = journal.id.toString(),
+            entityType = EntityType.JOURNAL,
+            operation = PendingOperation.CREATE
+        )
         
         // Trigger sync after successful creation
-        syncManager?.let { syncManager ->
-            externalScope.launch {
-                try {
-                    syncManager.syncJournals()
-                } catch (e: Exception) {
-                    Napier.w("Failed to sync after journal creation", e)
-                }
+        externalScope.launch {
+            try {
+                syncManagerProvider().syncJournals()
+            } catch (e: Exception) {
+                Napier.w("Failed to sync after journal creation", e)
             }
         }
         
@@ -69,15 +80,19 @@ class OfflineFirstJournalRepository(
     
     override suspend fun update(journal: Journal): Unit = withContext(dispatcher) {
         journalDao.update(journal.toEntity())
+
+        syncMetadataService.enqueuePending(
+            entityId = journal.id.toString(),
+            entityType = EntityType.JOURNAL,
+            operation = PendingOperation.UPDATE
+        )
         
         // Trigger sync after successful update
-        syncManager?.let { syncManager ->
-            externalScope.launch {
-                try {
-                    syncManager.syncJournals()
-                } catch (e: Exception) {
-                    Napier.w("Failed to sync after journal update", e)
-                }
+        externalScope.launch {
+            try {
+                syncManagerProvider().syncJournals()
+            } catch (e: Exception) {
+                Napier.w("Failed to sync after journal update", e)
             }
         }
     }
@@ -86,15 +101,19 @@ class OfflineFirstJournalRepository(
         externalScope.async {
             journalDao.delete(journalId)
         }.await()
+
+        syncMetadataService.enqueuePending(
+            entityId = journalId.toString(),
+            entityType = EntityType.JOURNAL,
+            operation = PendingOperation.DELETE
+        )
         
         // Trigger sync after successful deletion
-        syncManager?.let { syncManager ->
-            externalScope.launch {
-                try {
-                    syncManager.syncJournals()
-                } catch (e: Exception) {
-                    Napier.w("Failed to sync after journal deletion", e)
-                }
+        externalScope.launch {
+            try {
+                syncManagerProvider().syncJournals()
+            } catch (e: Exception) {
+                Napier.w("Failed to sync after journal deletion", e)
             }
         }
     }
@@ -121,6 +140,23 @@ class OfflineFirstJournalRepository(
         draftRepository.deleteDraft(id)
     }
 
+    override suspend fun createFromSync(journal: Journal) = withContext(dispatcher) {
+        journalDao.create(journal.toEntity())
+    }
+
+    override suspend fun updateFromSync(journal: Journal) = withContext(dispatcher) {
+        journalDao.update(journal.toEntity())
+    }
+
+    override suspend fun deleteFromSync(journalId: Uuid) = withContext(dispatcher) {
+        journalDao.delete(journalId)
+    }
+
+    override suspend fun updateSyncMetadata(journalId: Uuid, syncVersion: Long, syncedAt: Instant) =
+        withContext(dispatcher) {
+            journalDao.updateSyncMetadata(journalId, syncVersion, syncedAt)
+        }
+
     private fun syncLocalWithRemote() {
         externalScope.launch(dispatcher) {
             val localJournals = journalDao.getAll()
@@ -128,4 +164,3 @@ class OfflineFirstJournalRepository(
         }
     }
 }
-

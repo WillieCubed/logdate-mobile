@@ -5,7 +5,9 @@ import app.logdate.client.data.fakes.FakeImageNoteDao
 import app.logdate.client.data.fakes.FakeJournalNotesDao
 import app.logdate.client.data.fakes.FakeJournalRepository
 import app.logdate.client.data.fakes.FakeSyncManager
+import app.logdate.client.data.fakes.FakeSyncMetadataService
 import app.logdate.client.data.fakes.FakeTextNoteDao
+import app.logdate.client.data.fakes.FakeVideoNoteDao
 import app.logdate.client.database.entities.JournalEntity
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.shared.model.Journal
@@ -17,7 +19,6 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
@@ -39,26 +40,32 @@ class OfflineFirstJournalNotesRepositoryTest {
     
     private lateinit var textNoteDao: FakeTextNoteDao
     private lateinit var imageNoteDao: FakeImageNoteDao
+    private lateinit var videoNoteDao: FakeVideoNoteDao
     private lateinit var journalNotesDao: FakeJournalNotesDao
     private lateinit var journalRepository: FakeJournalRepository
     private lateinit var syncManager: FakeSyncManager
+    private lateinit var syncMetadataService: FakeSyncMetadataService
     private lateinit var repository: OfflineFirstJournalNotesRepository
 
     @BeforeTest
     fun setup() {
         textNoteDao = FakeTextNoteDao()
         imageNoteDao = FakeImageNoteDao()
+        videoNoteDao = FakeVideoNoteDao()
         journalNotesDao = FakeJournalNotesDao()
         journalRepository = FakeJournalRepository()
         syncManager = FakeSyncManager()
+        syncMetadataService = FakeSyncMetadataService()
         
         repository = OfflineFirstJournalNotesRepository(
             textNoteDao = textNoteDao,
             imageNoteDao = imageNoteDao,
             audioNoteDao = FakeAudioNoteDao(),
+            videoNoteDao = videoNoteDao,
             journalNotesDao = journalNotesDao,
             journalRepository = journalRepository,
-            syncManager = syncManager
+            syncManagerProvider = { syncManager },
+            syncMetadataService = syncMetadataService
         )
     }
 
@@ -66,6 +73,7 @@ class OfflineFirstJournalNotesRepositoryTest {
     fun tearDown() {
         textNoteDao.clear()
         imageNoteDao.clear()
+        videoNoteDao.clear()
         journalNotesDao.clear()
         journalRepository.clear()
         syncManager.reset()
@@ -182,6 +190,22 @@ class OfflineFirstJournalNotesRepositoryTest {
         assertEquals(2, notes.size)
     }
 
+    @Test
+    fun create_videoNote_addsToDatabase() = runTest {
+        val videoNote = JournalNote.Video(
+            uid = Uuid.random(),
+            creationTimestamp = Clock.System.now(),
+            lastUpdated = Clock.System.now(),
+            mediaRef = "file:///video.mp4"
+        )
+
+        val noteId = repository.create(videoNote)
+
+        assertEquals(videoNote.uid, noteId)
+        val allNotes = repository.allNotesObserved.first()
+        assertTrue(allNotes.any { it.uid == videoNote.uid })
+    }
+
     /**
      * Tests creating a text note through the repository.
      * 
@@ -215,7 +239,7 @@ class OfflineFirstJournalNotesRepositoryTest {
     }
 
     @Test
-    fun create_audioNote_throwsNotImplemented() = runTest {
+    fun create_audioNote_addsToDatabase() = runTest {
         val audioNote = JournalNote.Audio(
             uid = Uuid.random(),
             creationTimestamp = Clock.System.now(),
@@ -223,9 +247,11 @@ class OfflineFirstJournalNotesRepositoryTest {
             mediaRef = "audio.mp3"
         )
         
-        assertFailsWith<NotImplementedError> {
-            repository.create(audioNote)
-        }
+        val noteId = repository.create(audioNote)
+
+        assertEquals(audioNote.uid, noteId)
+        val allNotes = repository.allNotesObserved.first()
+        assertTrue(allNotes.any { it.uid == audioNote.uid })
     }
 
     @Test
