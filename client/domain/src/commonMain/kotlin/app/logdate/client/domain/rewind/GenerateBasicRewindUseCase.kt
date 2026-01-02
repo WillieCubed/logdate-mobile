@@ -2,6 +2,9 @@ package app.logdate.client.domain.rewind
 
 import app.logdate.client.domain.media.IndexMediaForPeriodUseCase
 import app.logdate.client.domain.notes.FetchNotesForDayUseCase
+import app.logdate.client.intelligence.entity.people.PeopleExtractor
+import app.logdate.client.intelligence.narrative.RewindSequencer
+import app.logdate.client.intelligence.narrative.WeekNarrativeSynthesizer
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.client.repository.media.IndexedMediaRepository
@@ -25,16 +28,17 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 
 /**
- * Use case for generating a basic rewind for a given time period.
- * 
+ * Use case for generating a narrative-driven rewind for a given time period.
+ *
  * This use case coordinates the generation of a rewind by:
- * 1. First ensuring all media in the time period is properly indexed
+ * 1. Ensuring all media in the time period is properly indexed
  * 2. Fetching notes and indexed media for the period
- * 3. Organizing them into a cohesive rewind structure
- * 4. Saving the rewind to the repository
- * 
- * This serves as a proof-of-concept implementation that demonstrates
- * the core rewind generation workflow.
+ * 3. Using AI to understand the STORY of the week (themes, emotional tone, key moments)
+ * 4. Sequencing content into a narrative-driven structure
+ * 5. Saving the rewind to the repository
+ *
+ * Unlike mechanical content aggregation, this creates a story that contextualizes
+ * what the week was ABOUT, not just what content exists.
  */
 class GenerateBasicRewindUseCase(
     private val rewindRepository: RewindRepository,
@@ -43,6 +47,9 @@ class GenerateBasicRewindUseCase(
     private val indexedMediaRepository: IndexedMediaRepository,
     private val indexMediaForPeriod: IndexMediaForPeriodUseCase,
     private val generateRewindTitle: GenerateRewindTitleUseCase,
+    private val narrativeSynthesizer: WeekNarrativeSynthesizer,
+    private val rewindSequencer: RewindSequencer,
+    private val peopleExtractor: PeopleExtractor,
 ) {
     private companion object {
         /**
@@ -117,40 +124,27 @@ class GenerateBasicRewindUseCase(
             // First ensure all media in the time period is indexed
             val newlyIndexedCount = indexMediaForPeriod(startTime, endTime)
             Napier.d("Indexed $newlyIndexedCount new media items")
-            
-            // Collect all content for the rewind
-            val allContent = mutableListOf<RewindContent>()
-            
+
+            // Collect all raw content for narrative synthesis
+            val allTextEntries = mutableListOf<JournalNote.Text>()
+
             // Convert the date range to local dates for day-by-day processing
             val timezone = TimeZone.currentSystemDefault()
             var currentDate = startTime.toLocalDateTime(timezone).date
             val endDate = endTime.toLocalDateTime(timezone).date
-            
+
             // Collect notes for each day in the period
             while (currentDate <= endDate) {
                 val notesForDay = fetchNotesForDay(currentDate).firstOrNull() ?: emptyList()
-                
-                // TODO: Direct mapping from JournalNote to RewindContent is likely a code smell.
-                // We should consider introducing a proper domain model mapper or transformation layer
-                // that handles the conversion between repository and domain models more explicitly.
-                allContent.addAll(notesForDay.mapNotNull { 
-                    try {
-                        it.toRewindContent() 
-                    } catch (e: Exception) {
-                        Napier.w("Failed to convert note to rewind content: ${e.message}")
-                        null
-                    }
-                })
-                
+                allTextEntries.addAll(notesForDay.filterIsInstance<JournalNote.Text>())
                 currentDate = currentDate.plus(1, DateTimeUnit.DAY)
             }
-            
+
             // Collect indexed media for the period
             val mediaItems = indexedMediaRepository.getForPeriod(startTime, endTime).first()
-            allContent.addAll(mediaItems.map { it.toRewindContent() })
-            
+
             // Check if we have any content
-            if (allContent.isEmpty()) {
+            if (allTextEntries.isEmpty() && mediaItems.isEmpty()) {
                 updateGenerationStatus(
                     request.id,
                     RewindGenerationRequest.Status.FAILED,
@@ -158,11 +152,60 @@ class GenerateBasicRewindUseCase(
                 )
                 return GenerateBasicRewindResult.NoContent
             }
-            
+
+            Napier.d("Collected ${allTextEntries.size} text entries and ${mediaItems.size} media items")
+
+            // Extract people mentioned in entries for narrative context
+            val people = allTextEntries.flatMap { entry ->
+                try {
+                    peopleExtractor.extractPeople(
+                        documentId = entry.uid.toString(),
+                        text = entry.content
+                    )
+                } catch (e: Exception) {
+                    Napier.w("Failed to extract people from entry: ${e.message}")
+                    emptyList()
+                }
+            }.distinctBy { it.name }
+
+            Napier.d("Extracted ${people.size} unique people from entries")
+
+            // Generate week identifier for narrative caching
+            val weekId = "${startTime.toLocalDateTime(timezone).date}"
+
+            // Synthesize narrative understanding of the week
+            val narrative = narrativeSynthesizer.synthesize(
+                weekId = weekId,
+                textEntries = allTextEntries,
+                media = mediaItems,
+                people = people,
+                useCached = true
+            )
+
+            // Sequence content into narrative-driven panels
+            val narrativeContent = if (narrative != null) {
+                Napier.d("Using AI narrative with ${narrative.storyBeats.size} story beats")
+                rewindSequencer.sequence(
+                    narrative = narrative,
+                    textEntries = allTextEntries,
+                    media = mediaItems,
+                    people = people
+                )
+            } else {
+                Napier.w("Narrative synthesis failed, falling back to chronological content")
+                // Fallback: chronological content if narrative synthesis fails
+                val fallbackContent = mutableListOf<RewindContent>()
+                fallbackContent.addAll(allTextEntries.map { it.toRewindContent() })
+                fallbackContent.addAll(mediaItems.map { it.toRewindContent() })
+                fallbackContent.sortedBy { it.timestamp }
+            }
+
+            Napier.d("Generated ${narrativeContent.size} narrative panels")
+
             // Generate a title and label based on the period
             val titleInfo = generateRewindTitle(startTime, endTime)
-            
-            // Create the rewind
+
+            // Create the rewind with narrative-driven content
             val rewind = Rewind(
                 uid = Uuid.random(),
                 startDate = startTime,
@@ -170,7 +213,7 @@ class GenerateBasicRewindUseCase(
                 generationDate = Clock.System.now(),
                 label = titleInfo.label,
                 title = titleInfo.title,
-                content = allContent
+                content = narrativeContent
             )
             
             // Save the rewind to the repository
@@ -182,7 +225,7 @@ class GenerateBasicRewindUseCase(
                 RewindGenerationRequest.Status.COMPLETED
             )
             
-            Napier.d("Successfully generated rewind with ${allContent.size} content items")
+            Napier.d("Successfully generated rewind with ${narrativeContent.size} content items")
             return GenerateBasicRewindResult.Success(rewind)
         } catch (e: Exception) {
             Napier.e("Failed to generate rewind", e)

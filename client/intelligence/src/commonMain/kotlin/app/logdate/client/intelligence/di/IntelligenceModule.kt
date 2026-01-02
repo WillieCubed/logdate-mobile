@@ -2,6 +2,8 @@ package app.logdate.client.intelligence.di
 
 import app.logdate.client.intelligence.EntrySummarizer
 import app.logdate.client.intelligence.entity.people.PeopleExtractor
+import app.logdate.client.intelligence.narrative.RewindSequencer
+import app.logdate.client.intelligence.narrative.WeekNarrativeSynthesizer
 import app.logdate.client.intelligence.rewind.DefaultRewindGenerator
 import app.logdate.client.intelligence.rewind.RewindGenerator
 import app.logdate.client.intelligence.rewind.RewindMessageGenerator
@@ -20,6 +22,8 @@ val intelligenceModule: Module = module {
     single<RewindMessageGenerator> { WittyRewindMessageGenerator() }
     single { EntrySummarizer(get(), get()) }
     single { PeopleExtractor(get(), get()) }
+    single { WeekNarrativeSynthesizer(get(), get()) }
+    single { RewindSequencer() }
 }
 
 expect val cacheModule: Module

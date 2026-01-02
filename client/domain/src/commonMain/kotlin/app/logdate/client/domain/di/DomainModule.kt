@@ -102,7 +102,7 @@ val domainModule: Module = module {
     single<RewindGenerationManager> { StubRewindGenerationManager() }
     
     // Create the GenerateBasicRewindUseCase with all its dependencies
-    factory { GenerateBasicRewindUseCase(get(), get(), get(), get(), get(), get()) }
+    factory { GenerateBasicRewindUseCase(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
 
     // Timeline
     factory { GetMediaUrisUseCase(get()) }
