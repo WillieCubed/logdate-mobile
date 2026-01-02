@@ -246,6 +246,14 @@ docker-compose down -v
 
 ## 📖 Documentation
 
+### Testing
+Comprehensive testing guides for all test types:
+- [Testing Overview](docs/testing/introduction.md) - Test pyramid and approach
+- [Unit Tests](docs/testing/unit-tests.md) - Testing individual components
+- [Integration Tests](docs/testing/integration-tests.md) - Database and API testing
+- [UI Tests](docs/testing/ui-tests.md) - Compose component testing
+- [Screenshot Tests](docs/testing/screenshot-tests.md) - Visual regression testing
+
 ### API Documentation
 Generate comprehensive API documentation:
 ```bash
