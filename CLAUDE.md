@@ -41,6 +41,20 @@
 - Avoid redundant comments when making code changes. Don't add comments that simply restate what the code does.
 - Keep modifications minimal and focused on addressing the issue at hand.
 
+## Git Commit Workflow
+- **CRITICAL**: Always combine `git restore --staged .`, `git add`, and `git commit` in a single command using `&&` to avoid race conditions with other agents
+- **Correct pattern**:
+  ```bash
+  git restore --staged . && git add file1.kt file2.kt && git commit -m "commit message"
+  ```
+- **Why**: Files may be modified by other processes between separate commands, causing commits to fail or include unintended changes
+- **Required steps in order**:
+  1. `git restore --staged .` - Unstage all files to ensure clean slate
+  2. `git add <files>` - Stage only the intended files
+  3. `git commit -m "message"` - Commit the staged files
+- **Never** run these commands separately in different tool calls
+- All three commands must be chained with `&&` in a single bash execution
+
 ## KMP Guidelines
 - For UUIDs, use kotlin.uuid.Uuid with Uuid.random() for generating new UUIDs (NOT Java's UUID class)
 - For cross-platform serialization, use kotlinx.serialization
