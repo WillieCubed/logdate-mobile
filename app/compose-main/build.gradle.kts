@@ -3,6 +3,7 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -162,8 +163,11 @@ dependencies {
     screenshotTestImplementation(compose.foundation)
 }
 
-// Configure screenshot test Kotlin compilation task
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+// Workaround for Google Compose Screenshot Testing + KMP compatibility issue.
+// The screenshot plugin doesn't properly set moduleName for KMP projects, causing
+// "Required value was null" errors during compilation. Explicitly setting the module
+// name resolves this. See: https://issuetracker.google.com/issues/402137754
+tasks.withType<KotlinCompile>().configureEach {
     if (name.contains("ScreenshotTest", ignoreCase = true)) {
         compilerOptions {
             moduleName.set("compose-main-screenshottest")
