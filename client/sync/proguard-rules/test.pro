@@ -1,8 +1,8 @@
-# Keep test classes
--keep class app.logdate.client.sync.cloud.** { *; }
--keepclasseswithmembers class app.logdate.client.sync.cloud.** { *; }
--keepnames class app.logdate.client.sync.cloud.**
--keepclassmembernames class app.logdate.client.sync.cloud.** { *; }
+# Keep sync API and cloud classes referenced by tests or Koin wiring
+-keep class app.logdate.client.sync.** { *; }
+-keepclasseswithmembers class app.logdate.client.sync.** { *; }
+-keepnames class app.logdate.client.sync.**
+-keepclassmembernames class app.logdate.client.sync.** { *; }
 
 # Keep Kotlin serialization
 -keepattributes *Annotation*, InnerClasses

@@ -1,0 +1,2 @@
+-keep class app.logdate.client.domain.** { *; }
+-keep class app.logdate.shared.model.** { *; }

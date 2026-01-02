@@ -34,8 +34,10 @@ kotlin {
             // Project dependencies
             implementation(projects.shared.model)
             implementation(projects.client.networking)
+            implementation(projects.client.repository)
             // External dependencies
             implementation(libs.kotlinx.serialization.core)
+            implementation(libs.kotlinx.serialization.json)
             implementation(libs.kotlinx.coroutines.core)
             // Koin
             implementation(project.dependencies.platform(libs.koin.bom))
