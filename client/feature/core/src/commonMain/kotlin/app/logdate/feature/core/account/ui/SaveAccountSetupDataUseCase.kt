@@ -17,7 +17,7 @@ class SaveAccountSetupDataUseCase(
      * @param displayName The display name to save
      * @param email Optional email to save
      */
-    operator fun invoke(username: String, displayName: String, email: String? = null) {
+    suspend operator fun invoke(username: String, displayName: String, email: String? = null) {
         try {
             val accountSetupData = AccountSetupData(
                 username = username,

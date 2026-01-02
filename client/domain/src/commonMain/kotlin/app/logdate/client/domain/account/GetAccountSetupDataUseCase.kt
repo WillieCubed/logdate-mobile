@@ -31,7 +31,7 @@ class GetAccountSetupDataUseCase(
      * @param data Optional data to save (only used with Save action)
      * @return AccountSetupData containing the information entered during account setup when using Get action
      */
-    operator fun invoke(
+    suspend operator fun invoke(
         action: Action = Action.Get,
         data: AccountSetupData? = null
     ): AccountSetupData {
@@ -59,42 +59,46 @@ class GetAccountSetupDataUseCase(
         object Clear : Action()
     }
     
-    private fun getAccountData(): AccountSetupData {
-        try {
-            val username = keyValueStorage.getStringSync(KEY_USERNAME) ?: ""
-            val displayName = keyValueStorage.getStringSync(KEY_DISPLAY_NAME) ?: ""
-            val email = keyValueStorage.getStringSync(KEY_EMAIL)
-            
-            return AccountSetupData(
+    private suspend fun getAccountData(): AccountSetupData {
+        return try {
+            val username = keyValueStorage.getString(KEY_USERNAME) ?: ""
+            val displayName = keyValueStorage.getString(KEY_DISPLAY_NAME) ?: ""
+            val email = keyValueStorage.getString(KEY_EMAIL)
+
+            AccountSetupData(
                 username = username,
                 displayName = displayName,
                 email = email
             )
         } catch (e: Exception) {
             Napier.e("Failed to retrieve account setup data", e)
-            return AccountSetupData()
+            AccountSetupData()
         }
     }
 
-    private fun saveAccountData(data: AccountSetupData) {
+    private suspend fun saveAccountData(data: AccountSetupData) {
         try {
-            // Using synchronous methods since we can't use suspend functions here
-            keyValueStorage.getStringSync(KEY_USERNAME) // Just use getStringSync to avoid suspending functions
-            // The actual saving will need to be done by the caller in a coroutine
-            Napier.i("Account setup data ready to be saved")
+            keyValueStorage.putString(KEY_USERNAME, data.username)
+            keyValueStorage.putString(KEY_DISPLAY_NAME, data.displayName)
+            if (data.email != null) {
+                keyValueStorage.putString(KEY_EMAIL, data.email)
+            } else {
+                keyValueStorage.remove(KEY_EMAIL)
+            }
+            Napier.i("Account setup data saved")
         } catch (e: Exception) {
-            Napier.e("Failed to prepare account setup data", e)
+            Napier.e("Failed to save account setup data", e)
         }
     }
 
-    private fun clearAccountData() {
+    private suspend fun clearAccountData() {
         try {
-            // Using synchronous methods since we can't use suspend functions here
-            keyValueStorage.getStringSync(KEY_USERNAME) // Just use getStringSync to avoid suspending functions
-            // The actual clearing will need to be done by the caller in a coroutine
-            Napier.i("Account setup data ready to be cleared")
+            keyValueStorage.remove(KEY_USERNAME)
+            keyValueStorage.remove(KEY_DISPLAY_NAME)
+            keyValueStorage.remove(KEY_EMAIL)
+            Napier.i("Account setup data cleared")
         } catch (e: Exception) {
-            Napier.e("Failed to prepare account data clearing", e)
+            Napier.e("Failed to clear account setup data", e)
         }
     }
 }

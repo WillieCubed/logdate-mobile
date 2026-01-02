@@ -3,7 +3,10 @@ package app.logdate.client.domain.location
 import app.logdate.client.location.ClientLocationProvider
 import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.shared.model.Location
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,7 +24,7 @@ import kotlin.time.Duration.Companion.seconds
 class LocationRetryWorker(
     private val locationProvider: ClientLocationProvider,
     private val locationHistoryRepository: LocationHistoryRepository,
-    private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val coroutineScope: CoroutineScope
 ) {
     
     private val _pendingRetries = MutableStateFlow<List<PendingLocationLog>>(emptyList())

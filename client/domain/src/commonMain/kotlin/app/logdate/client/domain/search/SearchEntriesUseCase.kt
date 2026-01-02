@@ -2,6 +2,7 @@ package app.logdate.client.domain.search
 
 import app.logdate.client.repository.search.SearchRepository
 import app.logdate.client.repository.search.SearchResult
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.debounce
@@ -14,7 +15,7 @@ import kotlinx.coroutines.flow.flowOf
  *
  * Provides debounced search to avoid excessive queries while the user types.
  */
-@OptIn(FlowPreview::class)
+@OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 class SearchEntriesUseCase(
     private val searchRepository: SearchRepository,
 ) {

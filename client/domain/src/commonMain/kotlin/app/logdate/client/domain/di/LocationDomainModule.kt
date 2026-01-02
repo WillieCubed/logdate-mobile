@@ -28,7 +28,7 @@ val locationDomainModule: Module = module {
     factory { LogLocationUseCase(get(), get()) }
     
     // Location retry system
-    single { LocationRetryWorker(get(), get()) }
+    single { LocationRetryWorker(get(), get(), get()) }
     factory { LogCurrentLocationUseCase(get(), get(), get()) }
     factory { ObserveLocationRetryStatusUseCase(get()) }
 }

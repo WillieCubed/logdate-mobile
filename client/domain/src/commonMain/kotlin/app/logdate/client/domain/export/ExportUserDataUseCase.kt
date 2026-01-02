@@ -6,9 +6,14 @@ import app.logdate.client.domain.notes.GetAllAudioNotesUseCase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
-import app.logdate.client.repository.journals.NoteType
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.shared.model.Journal
+import app.logdate.shared.model.EditorDraft
+import app.logdate.shared.model.SerializableAudioBlock
+import app.logdate.shared.model.SerializableCameraBlock
+import app.logdate.shared.model.SerializableImageBlock
+import app.logdate.shared.model.SerializableTextBlock
+import app.logdate.shared.model.SerializableVideoBlock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -53,17 +58,17 @@ class ExportUserDataUseCase(
             // Specifically gather all audio notes for media export
             val audioNotes = getAllAudioNotesUseCase().first()
             
-            // Gather all drafts - stub implementation
+            // Gather all drafts
             emit(ExportProgress.InProgress(0.5f, "Collecting drafts..."))
-            val drafts = emptyList<app.logdate.client.repository.journals.EntryDraft>()
+            val drafts = journalRepository.getAllDrafts()
             
             // Get app info and user ID
             val appInfo = appInfoProvider.getAppInfo()
             // Device ID will be our user ID if not signed in
-            val userId = deviceIdProvider.getDeviceId().toString()
+            val userId = deviceIdProvider.getDeviceId().value.toString()
             
             // Get device ID
-            val deviceId = deviceIdProvider.getDeviceId().toString()
+            val deviceId = deviceIdProvider.getDeviceId().value.toString()
             
             // Create export data structure
             emit(ExportProgress.InProgress(0.7f, "Preparing export data..."))
@@ -102,13 +107,11 @@ class ExportUserDataUseCase(
                 }
             }
             
-            // Stub implementation
-            val exportDrafts = emptyList<ExportDraft>()
+            val exportDrafts = drafts.map { it.toExportDraft() }
             
             // Calculate actual stats
-            val mediaCount = exportNotes.count { it.mediaPath != null } + 
-                            exportDrafts.sumOf { it.mediaReferences.size } + 
-                            audioNotes.size
+            val mediaFiles = getMediaFilesToExport(exportNotes, exportDrafts, audioNotes)
+            val mediaCount = mediaFiles.size
                             
             val stats = ExportStats(
                 journalCount = journals.size,
@@ -137,7 +140,7 @@ class ExportUserDataUseCase(
                 journals = journalsJson,
                 notes = notesJson,
                 drafts = draftsJson,
-                mediaFiles = getMediaFilesToExport(exportNotes, exportDrafts, audioNotes)
+                mediaFiles = mediaFiles
             )
             
             emit(ExportProgress.Completed(exportData))
@@ -233,13 +236,13 @@ class ExportUserDataUseCase(
         drafts: List<ExportDraft>,
         audioNotes: List<JournalNote.Audio> = emptyList()
     ): List<ExportMediaFile> {
-        val mediaFiles = mutableListOf<ExportMediaFile>()
+        val mediaFilesByPath = linkedMapOf<String, String>()
         
         // Process regular notes with media
         notes.forEach { note ->
             if (note.mediaPath != null) {
                 val exportPath = createMediaPath(note.mediaPath, note.createdAt)
-                mediaFiles.add(ExportMediaFile(exportPath, note.mediaPath))
+                mediaFilesByPath[exportPath] = note.mediaPath
             }
         }
         
@@ -247,17 +250,61 @@ class ExportUserDataUseCase(
         drafts.forEach { draft ->
             draft.mediaReferences.forEach { mediaRef ->
                 val exportPath = createMediaPath(mediaRef, draft.createdAt)
-                mediaFiles.add(ExportMediaFile(exportPath, mediaRef))
+                mediaFilesByPath[exportPath] = mediaRef
             }
         }
         
         // Process audio notes
         audioNotes.forEach { audioNote ->
             val exportPath = createMediaPath(audioNote.mediaRef, audioNote.creationTimestamp)
-            mediaFiles.add(ExportMediaFile(exportPath, audioNote.mediaRef))
+            mediaFilesByPath[exportPath] = audioNote.mediaRef
         }
         
-        return mediaFiles
+        return mediaFilesByPath.map { (exportPath, sourceUri) ->
+            ExportMediaFile(exportPath, sourceUri)
+        }
+    }
+
+    private fun EditorDraft.toExportDraft(): ExportDraft {
+        val location = blocks.firstNotNullOfOrNull { block ->
+            val latitude = block.locationLat
+            val longitude = block.locationLng
+            if (latitude != null && longitude != null) {
+                ExportLocation(
+                    latitude = latitude,
+                    longitude = longitude
+                )
+            } else null
+        }
+
+        val content = blocks.filterIsInstance<SerializableTextBlock>()
+            .joinToString("\n") { it.content }
+
+        val mediaReferences = buildList {
+            blocks.filterIsInstance<SerializableImageBlock>()
+                .mapNotNullTo(this) { it.uri }
+            blocks.filterIsInstance<SerializableVideoBlock>().forEach { block ->
+                listOfNotNull(block.uri, block.thumbnailUri).forEach { uri ->
+                    add(uri)
+                }
+            }
+            blocks.filterIsInstance<SerializableAudioBlock>()
+                .mapNotNullTo(this) { it.uri }
+            blocks.filterIsInstance<SerializableCameraBlock>()
+                .mapNotNullTo(this) { it.uri }
+        }.distinct()
+
+        val journalId = selectedJournalIds.firstOrNull()?.toString()
+
+        return ExportDraft(
+            id = id.toString(),
+            journalId = journalId,
+            content = content,
+            createdAt = createdAt,
+            updatedAt = lastModifiedAt,
+            location = location,
+            mediaReferences = mediaReferences
+        )
     }
 }
 

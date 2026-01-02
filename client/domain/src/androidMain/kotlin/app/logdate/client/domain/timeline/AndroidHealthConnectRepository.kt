@@ -22,12 +22,18 @@ import java.time.temporal.ChronoUnit
  * Android implementation of HealthConnectRepository using Health Connect API.
  */
 class AndroidHealthConnectRepository(
-    private val context: Context
+    private val context: Context,
+    private val healthConnectClientProvider: (Context) -> HealthConnectClient? = {
+        HealthConnectClient.getOrCreate(it)
+    },
+    private val sdkStatusProvider: (Context) -> Int = {
+        HealthConnectClient.getSdkStatus(it)
+    }
 ) : HealthConnectRepository {
 
     private val healthConnectClient by lazy {
         try {
-            HealthConnectClient.getOrCreate(context)
+            healthConnectClientProvider(context)
         } catch (e: Exception) {
             Napier.e("Failed to create HealthConnectClient", e)
             null
@@ -132,7 +138,7 @@ class AndroidHealthConnectRepository(
     
     override suspend fun isHealthConnectAvailable(): Boolean {
         return try {
-            val availability = HealthConnectClient.getSdkStatus(context)
+            val availability = sdkStatusProvider(context)
             availability == HealthConnectClient.SDK_AVAILABLE
         } catch (e: Exception) {
             Napier.e("Error checking Health Connect availability", e)
