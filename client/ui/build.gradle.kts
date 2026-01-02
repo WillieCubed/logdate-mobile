@@ -73,6 +73,7 @@ kotlin {
             // TODO: Move this to proper shared module
             implementation(libs.google.maps.compose)
             implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.window)
             implementation(libs.multiplatform.markdown.renderer)
         }
         desktopMain.dependencies {

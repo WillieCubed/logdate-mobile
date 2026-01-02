@@ -6,25 +6,28 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.layout.AnimatedPane
+import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffold
+import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
+import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.ui.Scene
 import androidx.navigation3.ui.SceneStrategy
-import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
 import app.logdate.navigation.routes.core.AccountSettingsRoute
 import app.logdate.navigation.routes.core.BirthdaySettingsRoute
 import app.logdate.navigation.routes.core.DangerZoneSettingsRoute
@@ -32,8 +35,6 @@ import app.logdate.navigation.routes.core.DataSettingsRoute
 import app.logdate.navigation.routes.core.LocationSettingsRoute
 import app.logdate.navigation.routes.core.PrivacySettingsRoute
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
-import app.logdate.ui.scaffold.ResponsiveScaffold
-import app.logdate.ui.scaffold.ResponsiveScaffoldDefaults
 import io.github.aakira.napier.Napier
 
 /**
@@ -105,49 +106,44 @@ private object SettingsRouteConfig {
 }
 
 /**
- * Factory for creating SettingsScene instances with consistent configuration.
+ * Creates a SettingsScene for the settings list only.
  */
-private object SettingsSceneFactory {
-    /**
-     * Creates a SettingsScene for the settings list only.
-     */
-    fun <T : Any> createListOnlyScene(
-        entry: NavEntry<T>,
-        previousEntries: List<NavEntry<T>>,
-    ): SettingsScene<T> = SettingsScene(
-        key = Pair("SettingsScene", entry.key),
-        previousEntries = previousEntries,
-        listEntry = entry,
-        detailEntry = null
-    )
-    
-    /**
-     * Creates a SettingsScene for list-detail layout.
-     */
-    fun <T : Any> createListDetailScene(
-        listEntry: NavEntry<T>,
-        detailEntry: NavEntry<T>,
-        previousEntries: List<NavEntry<T>>,
-    ): SettingsScene<T> = SettingsScene(
-        key = Triple("SettingsScene", listEntry.key, detailEntry.key),
-        previousEntries = previousEntries,
-        listEntry = listEntry,
-        detailEntry = detailEntry
-    )
-    
-    /**
-     * Creates a SettingsScene for full-screen detail view.
-     */
-    fun <T : Any> createDetailOnlyScene(
-        entry: NavEntry<T>,
-        previousEntries: List<NavEntry<T>>,
-    ): SettingsScene<T> = SettingsScene(
-        key = Pair("SettingsScene", entry.key),
-        previousEntries = previousEntries,
-        listEntry = entry,
-        detailEntry = null
-    )
-}
+private fun <T : Any> createListOnlySettingsScene(
+    entry: NavEntry<T>,
+    previousEntries: List<NavEntry<T>>,
+): SettingsScene<T> = SettingsScene(
+    key = Pair("SettingsScene", entry.key),
+    previousEntries = previousEntries,
+    listEntry = entry,
+    detailEntry = null
+)
+
+/**
+ * Creates a SettingsScene for list-detail layout.
+ */
+private fun <T : Any> createListDetailSettingsScene(
+    listEntry: NavEntry<T>,
+    detailEntry: NavEntry<T>,
+    previousEntries: List<NavEntry<T>>,
+): SettingsScene<T> = SettingsScene(
+    key = Triple("SettingsScene", listEntry.key, detailEntry.key),
+    previousEntries = previousEntries,
+    listEntry = listEntry,
+    detailEntry = detailEntry
+)
+
+/**
+ * Creates a SettingsScene for full-screen detail view.
+ */
+private fun <T : Any> createDetailOnlySettingsScene(
+    entry: NavEntry<T>,
+    previousEntries: List<NavEntry<T>>,
+): SettingsScene<T> = SettingsScene(
+    key = Pair("SettingsScene", entry.key),
+    previousEntries = previousEntries,
+    listEntry = entry,
+    detailEntry = null
+)
 
 /**
  * A custom [Scene] that implements a list-detail adaptive navigation pattern for settings.
@@ -193,65 +189,34 @@ class SettingsScene<T : Any>(
         }
     }
     
+    @OptIn(ExperimentalMaterial3AdaptiveApi::class)
     @Composable
     private fun SettingsSceneContent() {
-        val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
-        val useTwoPane = windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND) && 
-                         detailEntry != null
+        val navigator = rememberListDetailPaneScaffoldNavigator<Nothing>()
+        val coroutineScope = rememberCoroutineScope()
 
-        // Create a SnackbarHostState to be used by the ResponsiveScaffold
-        val snackbarHostState = ResponsiveScaffoldDefaults.rememberSnackbarHostState()
-
-        ResponsiveScaffold(
-            showNavigationRail = false, // Settings don't need navigation rail
-            showBottomNavigation = false, // Settings don't need bottom navigation
-            snackbarHost = {
-                SnackbarHost(hostState = snackbarHostState)
-            },
-            containerColor = MaterialTheme.colorScheme.surface,
-        ) { paddingValues ->
-            Box(
-                modifier = Modifier
-                    .padding(paddingValues)
-                    .fillMaxSize()
-            ) {
-                if (useTwoPane) {
-                    // Two-pane layout for large screens
-                    Row(modifier = Modifier.fillMaxSize()) {
-                        // List pane (left side)
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .widthIn(max = 360.dp)
-                                .fillMaxHeight()
-                        ) {
-                            listEntry.content.invoke(listEntry.key)
-                        }
-
-                        // Detail pane (right side)
-                        Box(
-                            modifier = Modifier
-                                .weight(1.5f)
-                                .fillMaxHeight()
-                        ) {
-                            detailEntry?.content?.invoke(detailEntry.key) 
-                                ?: SettingsEmptyDetailPane()
-                        }
-                    }
-                } else {
-                    // Single-pane layout for smaller screens
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        if (detailEntry != null) {
-                            // Show detail full-screen on small screens
-                            detailEntry.content.invoke(detailEntry.key)
-                        } else {
-                            // Show list full-screen
-                            listEntry.content.invoke(listEntry.key)
-                        }
-                    }
-                }
+        // Navigate to detail pane when we have a detail entry
+        LaunchedEffect(detailEntry) {
+            if (detailEntry != null) {
+                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail)
             }
         }
+
+        ListDetailPaneScaffold(
+            directive = navigator.scaffoldDirective,
+            value = navigator.scaffoldValue,
+            listPane = {
+                AnimatedPane {
+                    listEntry.content.invoke(listEntry.key)
+                }
+            },
+            detailPane = {
+                AnimatedPane {
+                    detailEntry?.content?.invoke(detailEntry.key)
+                        ?: SettingsEmptyDetailPane()
+                }
+            },
+        )
     }
 
     companion object {
@@ -323,7 +288,7 @@ class SettingsSceneStrategy<T : Any> : SceneStrategy<T> {
         return when (classification) {
             SettingsRouteClassification.SettingsList -> {
                 Napier.v("SettingsSceneStrategy: Creating list-only scene")
-                SettingsSceneFactory.createListOnlyScene(
+                createListOnlySettingsScene(
                     entry = lastEntry,
                     previousEntries = entries.dropLast(1)
                 )
@@ -338,7 +303,7 @@ class SettingsSceneStrategy<T : Any> : SceneStrategy<T> {
                 if (listEntry != null && !SettingsRouteConfig.isAlwaysFullscreen(lastEntry.key as NavKey)) {
                     Napier.v("SettingsSceneStrategy: Creating list-detail scene")
                     // Create list-detail scene for supported layouts
-                    SettingsSceneFactory.createListDetailScene(
+                    createListDetailSettingsScene(
                         listEntry = listEntry,
                         detailEntry = lastEntry,
                         previousEntries = entries.dropLast(2)
@@ -346,7 +311,7 @@ class SettingsSceneStrategy<T : Any> : SceneStrategy<T> {
                 } else {
                     Napier.v("SettingsSceneStrategy: Creating detail-only scene (fullscreen or no list context)")
                     // Fall back to detail-only for fullscreen routes or when no list context
-                    SettingsSceneFactory.createDetailOnlyScene(
+                    createDetailOnlySettingsScene(
                         entry = lastEntry,
                         previousEntries = entries.dropLast(1)
                     )

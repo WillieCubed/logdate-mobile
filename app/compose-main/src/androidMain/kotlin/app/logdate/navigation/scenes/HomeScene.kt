@@ -106,7 +106,13 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -147,10 +153,7 @@ import app.logdate.navigation.routes.core.RewindList
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
 import app.logdate.navigation.routes.core.TimelineDetail
 import app.logdate.navigation.routes.core.TimelineListRoute
-import app.logdate.ui.scaffold.ResponsiveScaffold
-import app.logdate.ui.scaffold.ResponsiveScaffoldDefaults
-import app.logdate.ui.scaffold.ResponsiveScaffoldDefaults.rememberSnackbarHostState
-import app.logdate.ui.scaffold.SnackbarHost
+import androidx.compose.runtime.remember
 import io.github.aakira.napier.Napier
 
 /**
@@ -407,102 +410,74 @@ private object RouteConfig {
 }
 
 /**
- * Factory for creating HomeScene instances with consistent configuration.
- * 
- * This factory encapsulates the creation logic for different scene types, ensuring
- * consistent key generation, entry management, and parameter passing. It serves as
- * the single source of truth for scene creation patterns.
- * 
- * ## Scene Creation Patterns
- * 
- * ### Scene Keys
- * All scenes use composite keys to ensure uniqueness and enable proper scene lifecycle:
- * - **Main Tab Scenes**: `Pair("HomeScene", entryKey)`
- * - **Two-Pane Scenes**: `Triple("HomeScene", mainEntryKey, detailEntryKey)`
- * - **Fullscreen Scenes**: `Pair("FullscreenScene", entryKey)`
- * 
- * ### Entry Management
- * The factory carefully manages which entries are included in each scene:
- * - **Single Entry Scenes**: Only the primary entry is included
- * - **Two-Pane Scenes**: Both main and detail entries are included
- * - **Fullscreen Scenes**: Only the content entry is included
- * 
- * ### Lifecycle Considerations
- * - Scenes are created fresh each time the back stack changes
- * - Scene keys enable Navigation 3 to detect when scenes can be reused
- * - Entry references are maintained to support proper navigation transitions
+ * Creates a HomeScene for a main tab.
  */
-private object HomeSceneFactory {
-    /**
-     * Creates a HomeScene for a main tab.
-     */
-    fun <T : Any> createMainTabScene(
-        entry: NavEntry<T>,
-        previousEntries: List<NavEntry<T>>,
-        tab: HomeTab,
-        onTabSelected: (HomeTab) -> Unit,
-        onNewEntry: () -> Unit,
-    ): HomeScene<T> = HomeScene(
-        key = Pair("HomeScene", entry.key),
-        previousEntries = previousEntries,
-        mainEntry = entry,
-        detailEntry = null,
-        onTabSelected = onTabSelected,
-        onNewEntry = onNewEntry,
-        selectedTab = tab
-    )
-    
-    /**
-     * Creates a HomeScene for a two-pane detail view.
-     */
-    fun <T : Any> createTwoPaneScene(
-        mainEntry: NavEntry<T>,
-        detailEntry: NavEntry<T>,
-        previousEntries: List<NavEntry<T>>,
-        tab: HomeTab,
-        onTabSelected: (HomeTab) -> Unit,
-        onNewEntry: () -> Unit,
-    ): HomeScene<T> = HomeScene(
-        key = Triple("HomeScene", mainEntry.key, detailEntry.key),
-        previousEntries = previousEntries,
-        mainEntry = mainEntry,
-        detailEntry = detailEntry,
-        onTabSelected = onTabSelected,
-        onNewEntry = onNewEntry,
-        selectedTab = tab
-    )
-    
-    /**
-     * Creates a HomeScene for a full-screen detail view.
-     */
-    fun <T : Any> createFullscreenScene(
-        entry: NavEntry<T>,
-        previousEntries: List<NavEntry<T>>,
-        tab: HomeTab,
-        onTabSelected: (HomeTab) -> Unit,
-        onNewEntry: () -> Unit,
-    ): HomeScene<T> = HomeScene(
-        key = Pair("HomeScene", entry.key),
-        previousEntries = previousEntries,
-        mainEntry = entry,
-        detailEntry = null,
-        onTabSelected = onTabSelected,
-        onNewEntry = onNewEntry,
-        selectedTab = tab
-    )
-    
-    /**
-     * Creates a FullscreenScene for truly immersive content without any navigation chrome.
-     */
-    fun <T : Any> createFullscreenDetailScene(
-        entry: NavEntry<T>,
-        previousEntries: List<NavEntry<T>>,
-    ): FullscreenScene<T> = FullscreenScene(
-        key = Pair("FullscreenScene", entry.key),
-        previousEntries = previousEntries,
-        entry = entry
-    )
-}
+private fun <T : Any> createMainTabHomeScene(
+    entry: NavEntry<T>,
+    previousEntries: List<NavEntry<T>>,
+    tab: HomeTab,
+    onTabSelected: (HomeTab) -> Unit,
+    onNewEntry: () -> Unit,
+): HomeScene<T> = HomeScene(
+    key = Pair("HomeScene", entry.key),
+    previousEntries = previousEntries,
+    mainEntry = entry,
+    detailEntry = null,
+    onTabSelected = onTabSelected,
+    onNewEntry = onNewEntry,
+    selectedTab = tab
+)
+
+/**
+ * Creates a HomeScene for a two-pane detail view.
+ */
+private fun <T : Any> createTwoPaneHomeScene(
+    mainEntry: NavEntry<T>,
+    detailEntry: NavEntry<T>,
+    previousEntries: List<NavEntry<T>>,
+    tab: HomeTab,
+    onTabSelected: (HomeTab) -> Unit,
+    onNewEntry: () -> Unit,
+): HomeScene<T> = HomeScene(
+    key = Triple("HomeScene", mainEntry.key, detailEntry.key),
+    previousEntries = previousEntries,
+    mainEntry = mainEntry,
+    detailEntry = detailEntry,
+    onTabSelected = onTabSelected,
+    onNewEntry = onNewEntry,
+    selectedTab = tab
+)
+
+/**
+ * Creates a HomeScene for a full-screen detail view.
+ */
+private fun <T : Any> createFullscreenHomeScene(
+    entry: NavEntry<T>,
+    previousEntries: List<NavEntry<T>>,
+    tab: HomeTab,
+    onTabSelected: (HomeTab) -> Unit,
+    onNewEntry: () -> Unit,
+): HomeScene<T> = HomeScene(
+    key = Pair("HomeScene", entry.key),
+    previousEntries = previousEntries,
+    mainEntry = entry,
+    detailEntry = null,
+    onTabSelected = onTabSelected,
+    onNewEntry = onNewEntry,
+    selectedTab = tab
+)
+
+/**
+ * Creates a FullscreenScene for truly immersive content without any navigation chrome.
+ */
+private fun <T : Any> createFullscreenDetailScene(
+    entry: NavEntry<T>,
+    previousEntries: List<NavEntry<T>>,
+): FullscreenScene<T> = FullscreenScene(
+    key = Pair("FullscreenScene", entry.key),
+    previousEntries = previousEntries,
+    entry = entry
+)
 
 /**
  * Represents the different tabs in the HomeScene
@@ -614,98 +589,97 @@ class HomeScene<T : Any>(
     
     @Composable
     private fun HomeSceneContent() {
-        val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
-        val useNavigationRail =
-            windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_MEDIUM_LOWER_BOUND)
+        val adaptiveInfo = currentWindowAdaptiveInfo()
+        val windowSizeClass = adaptiveInfo.windowSizeClass
         val useTwoPane =
             windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND) && detailEntry != null
 
         // Check if we're on a detail-only view (no main entry showing)
         val isDetailOnlyView = !useTwoPane && detailEntry != null
 
-        // Create a SnackbarHostState to be used by the ResponsiveScaffold
-        val snackbarHostState = rememberSnackbarHostState()
+        // Create a SnackbarHostState
+        val snackbarHostState = remember { SnackbarHostState() }
 
-        ResponsiveScaffold(
-            showNavigationRail = useNavigationRail && !isDetailOnlyView,
-            showBottomNavigation = !useNavigationRail && !isDetailOnlyView,
-            navigationRail = {
-                LogDateNavigationRail(
-                    selectedTab = selectedTab,
-                    onTabSelected = onTabSelected,
-                    headerContent = {
-                        SharedElementFAB(
-                            onClick = onNewEntry,
-                            contentDescription = "New Entry"
-                        )
-                    }
-                )
-            },
-            bottomNavigation = {
-                LogDateBottomNavigationBar(
-                    selectedTab = selectedTab,
-                    onTabSelected = onTabSelected
-                )
-            },
-            snackbarHost = {
-                ResponsiveScaffoldDefaults.SnackbarHost(hostState = snackbarHostState)
-            },
+        // Wrap content in Scaffold to add snackbar support
+        Scaffold(
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
         ) { paddingValues ->
-            Box(
-                modifier = Modifier
-                    .padding(paddingValues)
-                    .fillMaxSize()
-            ) {
-                if (useTwoPane) {
-                    // Two-pane layout (large screens with both main and detail content)
-                    Row(modifier = Modifier.fillMaxSize()) {
-                        // Left content
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .widthIn(max = 360.dp)
-                                .fillMaxHeight()
-                        ) {
-                            mainEntry.content.invoke(mainEntry.key)
-                        }
-
-                        // Detail pane
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                        ) {
-                            detailEntry?.content?.invoke(detailEntry.key)
-                        }
-                    }
+            // Use NavigationSuiteScaffold for automatic adaptive navigation
+            NavigationSuiteScaffold(
+                layoutType = if (isDetailOnlyView) {
+                    // Hide navigation when showing detail-only views
+                    NavigationSuiteType.None
                 } else {
-                    // Single-pane layout (smaller screens or journal details)
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        if (detailEntry != null) {
-                            // If there's a detail entry but we're in single pane mode,
-                            // show only the detail entry (fullscreen)
-                            detailEntry.content.invoke(detailEntry.key)
-                        } else {
-                            // Otherwise show the main entry
-                            mainEntry.content.invoke(mainEntry.key)
-                        }
-
-                        // TODO: Create a more robust FAB display system for all screen sizes
-                        // Currently FAB is only visible in nav rail mode but not in bottom nav mode
-                        // Need to implement consistent FAB visibility across all layouts
-
-                        // Show FAB for bottom navigation (smaller screens)
-                        // Only show when navigation is visible (not in detail-only view)
-                        // and not using navigation rail
-                        if (!useNavigationRail && !isDetailOnlyView) {
-                            SharedElementFAB(
-                                onClick = onNewEntry,
-                                contentDescription = "New Entry",
+                    // Let NavigationSuiteScaffold automatically choose based on screen size
+                    // (Bottom bar for small screens, Rail for medium/large)
+                    NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(adaptiveInfo)
+                },
+                navigationSuiteItems = {
+                    HomeTab.entries.forEach { tab ->
+                        item(
+                            selected = selectedTab == tab,
+                            onClick = { onTabSelected(tab) },
+                            icon = {
+                                Icon(
+                                    imageVector = if (selectedTab == tab) tab.selectedIcon else tab.unselectedIcon,
+                                    contentDescription = tab.title
+                                )
+                            },
+                            label = { androidx.compose.material3.Text(tab.title) }
+                        )
+                    }
+                }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(paddingValues)
+                        .fillMaxSize()
+                ) {
+                    if (useTwoPane) {
+                        // Two-pane layout (large screens with both main and detail content)
+                        Row(modifier = Modifier.fillMaxSize()) {
+                            // Left content
+                            Box(
                                 modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(16.dp)
-                            )
+                                    .weight(1f)
+                                    .widthIn(max = 360.dp)
+                                    .fillMaxHeight()
+                            ) {
+                                mainEntry.content.invoke(mainEntry.key)
+                            }
+
+                            // Detail pane
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                            ) {
+                                detailEntry?.content?.invoke(detailEntry.key)
+                            }
+                        }
+                    } else {
+                        // Single-pane layout (smaller screens or journal details)
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            if (detailEntry != null) {
+                                // If there's a detail entry but we're in single pane mode,
+                                // show only the detail entry (fullscreen)
+                                detailEntry.content.invoke(detailEntry.key)
+                            } else {
+                                // Otherwise show the main entry
+                                mainEntry.content.invoke(mainEntry.key)
+                            }
+
+                            // Show FAB only when not in detail-only view
+                            if (!isDetailOnlyView) {
+                                SharedElementFAB(
+                                    onClick = onNewEntry,
+                                    contentDescription = "New Entry",
+                                    modifier = Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .padding(16.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -929,7 +903,7 @@ class HomeSceneStrategy<T : Any>(
         return when (classification) {
             is RouteClassification.MainTab -> {
                 Napier.v("HomeSceneStrategy: Creating MainTab scene for ${classification.tab.title}")
-                HomeSceneFactory.createMainTabScene(
+                createMainTabHomeScene(
                     entry = lastEntry,
                     previousEntries = entries.dropLast(1),
                     tab = classification.tab,
@@ -942,7 +916,7 @@ class HomeSceneStrategy<T : Any>(
                 if (previousEntry != null && !RouteConfig.isAlwaysFullscreen(lastEntry.key as NavKey)) {
                     Napier.v("HomeSceneStrategy: Creating TwoPane scene for ${classification.parentTab.title}")
                     // Create two-pane layout for supported detail views
-                    HomeSceneFactory.createTwoPaneScene(
+                    createTwoPaneHomeScene(
                         mainEntry = previousEntry,
                         detailEntry = lastEntry,
                         previousEntries = entries.dropLast(2),
@@ -953,7 +927,7 @@ class HomeSceneStrategy<T : Any>(
                 } else {
                     Napier.v("HomeSceneStrategy: Creating Fullscreen scene for ${classification.parentTab.title} (TwoPane fallback)")
                     // Fall back to fullscreen if conditions aren't met
-                    HomeSceneFactory.createFullscreenScene(
+                    createFullscreenHomeScene(
                         entry = lastEntry,
                         previousEntries = entries.dropLast(1),
                         tab = classification.parentTab,
@@ -965,7 +939,7 @@ class HomeSceneStrategy<T : Any>(
             
             is RouteClassification.FullscreenDetail -> {
                 Napier.v("HomeSceneStrategy: Creating FullscreenDetailScene (no navigation chrome)")
-                HomeSceneFactory.createFullscreenDetailScene(
+                createFullscreenDetailScene(
                     entry = lastEntry,
                     previousEntries = entries.dropLast(1)
                 )

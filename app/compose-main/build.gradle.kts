@@ -20,6 +20,9 @@ kotlin {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
+        // Configure screenshot tests to use the test source set tree
+        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+        instrumentedTestVariant.sourceSetTree.set(org.jetbrains.kotlin.gradle.plugin.KotlinSourceSetTree.test)
     }
 
     listOf(
@@ -67,6 +70,7 @@ kotlin {
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)
+            implementation(compose.material3AdaptiveNavigationSuite)
             implementation(compose.ui)
             implementation(compose.animation)
             implementation(compose.materialIconsExtended)
@@ -152,6 +156,19 @@ dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
     // Screenshot testing
     screenshotTestImplementation(libs.androidx.ui.tooling)
+    screenshotTestImplementation(libs.screenshot.validation.api)
+    screenshotTestImplementation(compose.material3)
+    screenshotTestImplementation(compose.runtime)
+    screenshotTestImplementation(compose.foundation)
+}
+
+// Configure screenshot test Kotlin compilation task
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    if (name.contains("ScreenshotTest", ignoreCase = true)) {
+        compilerOptions {
+            moduleName.set("compose-main-screenshottest")
+        }
+    }
 }
 
 compose.desktop {
