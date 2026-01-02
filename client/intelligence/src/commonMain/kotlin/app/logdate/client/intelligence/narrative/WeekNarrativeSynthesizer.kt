@@ -2,7 +2,10 @@ package app.logdate.client.intelligence.narrative
 
 import app.logdate.client.intelligence.AIError
 import app.logdate.client.intelligence.AIResult
+import app.logdate.client.intelligence.cache.AICachePolicy
 import app.logdate.client.intelligence.cache.GenerativeAICache
+import app.logdate.client.intelligence.cache.GenerativeAICacheContentType
+import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
 import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
@@ -113,13 +116,18 @@ Example for tough week:
 
 Respond ONLY with valid JSON in this format. No additional text."""
 
+        private const val PROMPT_VERSION = "narrative-v1"
+        private const val SCHEMA_VERSION = "week-narrative-v1"
+        private const val TEMPLATE_ID = "week-narrative"
+        private const val CACHE_TTL_SECONDS = 60L * 60L * 24L * 30L
+
         private val json = Json { ignoreUnknownKeys = true; isLenient = true }
     }
 
     /**
      * Synthesizes a narrative from a week's worth of content.
      *
-     * @param weekId Unique identifier for caching (e.g., "2024-W42")
+     * @param weekId Unique identifier for log correlation (e.g., "2024-W42")
      * @param textEntries Journal text entries from the week
      * @param media Photos and videos from the week
      * @param people People mentioned across entries (from PeopleExtractor)
@@ -133,8 +141,18 @@ Respond ONLY with valid JSON in this format. No additional text."""
         people: List<Person> = emptyList(),
         useCached: Boolean = true
     ): AIResult<WeekNarrative> = withContext(ioDispatcher) {
+        val cacheRequest = GenerativeAICacheRequest(
+            contentType = GenerativeAICacheContentType.Narrative,
+            inputText = buildContentSummary(textEntries, media, people),
+            providerId = genAIClient.providerId,
+            model = genAIClient.defaultModel,
+            promptVersion = PROMPT_VERSION,
+            schemaVersion = SCHEMA_VERSION,
+            templateId = TEMPLATE_ID,
+            policy = AICachePolicy(ttlSeconds = CACHE_TTL_SECONDS)
+        )
         if (useCached) {
-            val cached = generativeAICache.getEntry(weekId)
+            val cached = generativeAICache.getEntry(cacheRequest)
             if (cached != null) {
                 Napier.d("Using cached narrative for $weekId")
                 val parsed = parseNarrativeResponse(cached.content)
@@ -152,7 +170,7 @@ Respond ONLY with valid JSON in this format. No additional text."""
         }
 
         // Build content summary for AI
-        val contentSummary = buildContentSummary(textEntries, media, people)
+        val contentSummary = cacheRequest.inputText
 
         val prompt = """
 Week's content for analysis:
@@ -167,7 +185,8 @@ Analyze this content and provide the narrative structure in JSON format as speci
                 messages = listOf(
                     GenerativeAIChatMessage("system", SYSTEM_PROMPT),
                     GenerativeAIChatMessage("user", prompt)
-                )
+                ),
+                model = cacheRequest.model
             )
         )
 
@@ -175,7 +194,7 @@ Analyze this content and provide the narrative structure in JSON format as speci
             is AIResult.Success -> {
                 val content = response.value.content
                 Napier.d("Caching narrative for $weekId")
-                generativeAICache.putEntry(weekId, content)
+                generativeAICache.putEntry(cacheRequest, content)
                 val parsed = parseNarrativeResponse(content)
                 if (parsed != null) {
                     AIResult.Success(parsed, fromCache = false)

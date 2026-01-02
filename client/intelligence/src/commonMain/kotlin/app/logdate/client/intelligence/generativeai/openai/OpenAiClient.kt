@@ -24,9 +24,14 @@ class OpenAiClient(
     private val httpClient: HttpClient,
 ) : GenerativeAIChatClient {
     private companion object {
+        const val PROVIDER_ID = "openai"
         private const val DEFAULT_MODEL = "gpt-4.1-mini-2025-04-14"
         private const val DEFAULT_TEMPERATURE = 0.7
     }
+
+    override val providerId: String = PROVIDER_ID
+
+    override val defaultModel: String = DEFAULT_MODEL
 
     override suspend fun submit(request: GenerativeAIRequest): AIResult<GenerativeAIResponse> {
         return try {

@@ -6,6 +6,9 @@ import app.logdate.client.intelligence.AIResult
  * A generic interface for a chat client that uses a generative AI model to generate responses.
  */
 interface GenerativeAIChatClient {
+    val providerId: String
+    val defaultModel: String?
+
     /**
      * Sends a request to the generative AI model and returns the generated response.
      */
@@ -13,14 +16,14 @@ interface GenerativeAIChatClient {
 
     @Deprecated("Use submit(GenerativeAIRequest) for structured error handling.")
     suspend fun submit(prompts: List<GenerativeAIChatMessage>): String? =
-        when (val result = submit(GenerativeAIRequest(messages = prompts))) {
+        when (val result = submit(GenerativeAIRequest(messages = prompts, model = defaultModel))) {
             is AIResult.Success -> result.value.content
             else -> null
         }
 
     @Deprecated("Use submit(GenerativeAIRequest) for structured error handling.")
     suspend fun submit(vararg prompts: GenerativeAIChatMessage): String? =
-        when (val result = submit(GenerativeAIRequest(messages = prompts.toList()))) {
+        when (val result = submit(GenerativeAIRequest(messages = prompts.toList(), model = defaultModel))) {
             is AIResult.Success -> result.value.content
             else -> null
         }

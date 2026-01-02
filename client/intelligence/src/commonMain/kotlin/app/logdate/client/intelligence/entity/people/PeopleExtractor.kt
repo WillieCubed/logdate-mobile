@@ -1,7 +1,10 @@
 package app.logdate.client.intelligence.entity.people
 
 import app.logdate.client.intelligence.AIResult
+import app.logdate.client.intelligence.cache.AICachePolicy
 import app.logdate.client.intelligence.cache.GenerativeAICache
+import app.logdate.client.intelligence.cache.GenerativeAICacheContentType
+import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
 import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
@@ -38,12 +41,16 @@ You are a system utility that extracts the names of likely humans mentioned in t
 Only literally return the names from the text. Each name must be separated by a new
 line.
         """
+        private const val PROMPT_VERSION = "people-v1"
+        private const val SCHEMA_VERSION = "people-text-v1"
+        private const val TEMPLATE_ID = "people-extractor"
+        private const val CACHE_TTL_SECONDS = 60L * 60L * 24L * 30L
     }
 
     /**
      * Extracts people's names from the given text.
      *
-     * @param documentId An ID used to identify and cache the response.
+     * @param documentId An ID used for log correlation.
      * @param text The text to extract people's names from.
      * @param useCached Whether to use a cached response if available. If false, the response will
      * be generated from scratch.
@@ -56,8 +63,18 @@ line.
         useCached: Boolean = true,
     ): AIResult<List<Person>> =
         withContext(ioDispatcher) {
+            val cacheRequest = GenerativeAICacheRequest(
+                contentType = GenerativeAICacheContentType.People,
+                inputText = text,
+                providerId = generativeAIChatClient.providerId,
+                model = generativeAIChatClient.defaultModel,
+                promptVersion = PROMPT_VERSION,
+                schemaVersion = SCHEMA_VERSION,
+                templateId = TEMPLATE_ID,
+                policy = AICachePolicy(ttlSeconds = CACHE_TTL_SECONDS)
+            )
             if (useCached) {
-                val cachedResponse = generativeAICache.getEntry(documentId)
+                val cachedResponse = generativeAICache.getEntry(cacheRequest)
                 if (cachedResponse != null) {
                     return@withContext AIResult.Success(
                         cachedResponse.content.split("\n")
@@ -78,14 +95,17 @@ line.
                 // TODO: Use structured response format
             )
             val response = generativeAIChatClient.submit(
-                GenerativeAIRequest(messages = prompts)
+                GenerativeAIRequest(
+                    messages = prompts,
+                    model = cacheRequest.model
+                )
             )
             when (response) {
                 is AIResult.Success -> {
                     val content = response.value.content
                     Napier.d(tag = "PeopleExtractor", message = "Caching response for:\n$text")
                     Napier.d(tag = "PeopleExtractor") { "Response: ${content.trim()}" }
-                    generativeAICache.putEntry(documentId, content.trim())
+                    generativeAICache.putEntry(cacheRequest, content.trim())
                     val people = content.split("\n")
                         .map { it.trim() }
                         .filter { it.isNotBlank() }

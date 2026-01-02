@@ -14,6 +14,8 @@ import kotlinx.coroutines.delay
  * This allows testing of AI-dependent functionality without actual API calls.
  */
 class FakeGenerativeAIChatClient : GenerativeAIChatClient {
+    override val providerId: String = "fake"
+    override val defaultModel: String? = "fake-model"
     
     // Track all submissions for testing
     var submissions = mutableListOf<List<GenerativeAIChatMessage>>()

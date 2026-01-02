@@ -1,5 +1,8 @@
 package app.logdate.client.intelligence
 
+import app.logdate.client.intelligence.cache.AICachePolicy
+import app.logdate.client.intelligence.cache.GenerativeAICacheContentType
+import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
 import app.logdate.client.intelligence.fakes.FakeGenerativeAICache
 import app.logdate.client.intelligence.fakes.FakeGenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
@@ -32,6 +35,19 @@ class EntrySummarizerTest {
         fakeAIClient.clear()
     }
 
+    private fun cacheRequestFor(text: String): GenerativeAICacheRequest {
+        return GenerativeAICacheRequest(
+            contentType = GenerativeAICacheContentType.Summary,
+            inputText = text,
+            providerId = fakeAIClient.providerId,
+            model = fakeAIClient.defaultModel,
+            promptVersion = "summary-v1",
+            schemaVersion = "summary-text-v1",
+            templateId = "entry-summary",
+            policy = AICachePolicy(ttlSeconds = 60L * 60L * 24L * 30L)
+        )
+    }
+
     @Test
     fun summarize_withValidText_generatesNewSummary() = runTest(testDispatcher) {
         setup()
@@ -61,7 +77,8 @@ class EntrySummarizerTest {
         assertEquals(inputText, userMessage.content)
         
         // Verify caching behavior
-        assertTrue(fakeCache.putEntryCalls.any { it.first == summaryId && it.second == expectedSummary })
+        val cacheRequest = cacheRequestFor(inputText)
+        assertTrue(fakeCache.putEntryCalls.any { it.first == cacheRequest && it.second == expectedSummary })
     }
 
     @Test
@@ -72,14 +89,15 @@ class EntrySummarizerTest {
         val cachedSummary = "You had a cached experience."
         
         // Pre-populate cache
-        fakeCache.setEntry(summaryId, cachedSummary)
+        val cacheRequest = cacheRequestFor(inputText)
+        fakeCache.setEntry(cacheRequest, cachedSummary)
         
         val result = entrySummarizer.summarize(summaryId, inputText, useCached = true)
         
         assertEquals(AIResult.Success(cachedSummary, fromCache = true), result)
         
         // Verify cache was checked but AI client was not called
-        assertTrue(fakeCache.getEntryCalls.contains(summaryId))
+        assertTrue(fakeCache.getEntryCalls.contains(cacheRequest))
         assertEquals(0, fakeAIClient.submissions.size)
     }
 
@@ -92,7 +110,8 @@ class EntrySummarizerTest {
         val newSummary = "Fresh summary"
         
         // Pre-populate cache
-        fakeCache.setEntry(summaryId, cachedSummary)
+        val cacheRequest = cacheRequestFor(inputText)
+        fakeCache.setEntry(cacheRequest, cachedSummary)
         fakeAIClient.setResponseFor(inputText, newSummary)
         
         val result = entrySummarizer.summarize(summaryId, inputText, useCached = false)
@@ -118,9 +137,10 @@ class EntrySummarizerTest {
         assertEquals(AIResult.Success(expectedSummary, fromCache = false), result)
         
         // Verify cache was checked first, then AI client was called
-        assertTrue(fakeCache.getEntryCalls.contains(summaryId))
+        val cacheRequest = cacheRequestFor(inputText)
+        assertTrue(fakeCache.getEntryCalls.contains(cacheRequest))
         assertEquals(1, fakeAIClient.submissions.size)
-        assertTrue(fakeCache.putEntryCalls.any { it.first == summaryId && it.second == expectedSummary })
+        assertTrue(fakeCache.putEntryCalls.any { it.first == cacheRequest && it.second == expectedSummary })
     }
 
     @Test
@@ -252,8 +272,8 @@ class EntrySummarizerTest {
         assertEquals(AIResult.Success(entry2Summary, fromCache = false), result2)
         
         // Verify both entries were cached independently
-        assertTrue(fakeCache.hasEntry(entry1Id))
-        assertTrue(fakeCache.hasEntry(entry2Id))
+        assertTrue(fakeCache.hasEntry(cacheRequestFor(entry1Text)))
+        assertTrue(fakeCache.hasEntry(cacheRequestFor(entry2Text)))
         assertEquals(2, fakeAIClient.submissions.size)
     }
 

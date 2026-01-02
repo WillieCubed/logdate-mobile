@@ -1,6 +1,9 @@
 package app.logdate.client.intelligence.narrative
 
 import app.logdate.client.intelligence.AIResult
+import app.logdate.client.intelligence.cache.AICachePolicy
+import app.logdate.client.intelligence.cache.GenerativeAICacheContentType
+import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
 import app.logdate.client.intelligence.fakes.FakeGenerativeAICache
 import app.logdate.client.intelligence.fakes.FakeGenerativeAIChatClient
 import app.logdate.client.networking.NetworkAvailabilityMonitor
@@ -36,6 +39,56 @@ class WeekNarrativeSynthesizerTest {
     private fun setup() {
         fakeCache.clear()
         fakeAIClient.clear()
+    }
+
+    private fun cacheRequestFor(
+        textEntries: List<JournalNote.Text>,
+        media: List<IndexedMedia>,
+        people: List<Person>
+    ): GenerativeAICacheRequest {
+        val summary = buildString {
+            appendLine("=== TEXT ENTRIES ===")
+            textEntries.forEach { entry ->
+                appendLine("\n[${entry.creationTimestamp}] (ID: ${entry.uid})")
+                appendLine(entry.content.take(500))
+                if (entry.content.length > 500) appendLine("... [truncated]")
+            }
+
+            appendLine("\n=== MEDIA ===")
+            media.forEach { item ->
+                when (item) {
+                    is IndexedMedia.Image -> {
+                        appendLine("\n[${item.timestamp}] Photo (ID: ${item.uid})")
+                        item.caption?.let { appendLine("Caption: $it") }
+                    }
+                    is IndexedMedia.Video -> {
+                        appendLine("\n[${item.timestamp}] Video (ID: ${item.uid}) - Duration: ${item.duration}")
+                        item.caption?.let { appendLine("Caption: $it") }
+                    }
+                }
+            }
+
+            if (people.isNotEmpty()) {
+                appendLine("\n=== PEOPLE MENTIONED ===")
+                appendLine(people.joinToString(", ") { it.name })
+            }
+
+            appendLine("\n=== SUMMARY STATS ===")
+            appendLine("Total entries: ${textEntries.size}")
+            appendLine("Total media: ${media.size}")
+            appendLine("People mentioned: ${people.size}")
+        }
+
+        return GenerativeAICacheRequest(
+            contentType = GenerativeAICacheContentType.Narrative,
+            inputText = summary,
+            providerId = fakeAIClient.providerId,
+            model = fakeAIClient.defaultModel,
+            promptVersion = "narrative-v1",
+            schemaVersion = "week-narrative-v1",
+            templateId = "week-narrative",
+            policy = AICachePolicy(ttlSeconds = 60L * 60L * 24L * 30L)
+        )
     }
 
     @Test
@@ -206,7 +259,8 @@ class WeekNarrativeSynthesizerTest {
         }
         """.trimIndent()
 
-        fakeCache.setEntry(weekId, cachedResponse)
+        val cacheRequest = cacheRequestFor(emptyList(), emptyList(), emptyList())
+        fakeCache.setEntry(cacheRequest, cachedResponse)
 
         val result = synthesizer.synthesize(
             weekId = weekId,

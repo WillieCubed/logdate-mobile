@@ -1,6 +1,9 @@
 package app.logdate.client.intelligence.entity.people
 
 import app.logdate.client.intelligence.AIResult
+import app.logdate.client.intelligence.cache.AICachePolicy
+import app.logdate.client.intelligence.cache.GenerativeAICacheContentType
+import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
 import app.logdate.client.intelligence.fakes.FakeGenerativeAICache
 import app.logdate.client.intelligence.fakes.FakeGenerativeAIChatClient
 import app.logdate.client.networking.NetworkAvailabilityMonitor
@@ -31,6 +34,19 @@ class PeopleExtractorTest {
     private fun setup() {
         fakeCache.clear()
         fakeAIClient.clear()
+    }
+
+    private fun cacheRequestFor(text: String): GenerativeAICacheRequest {
+        return GenerativeAICacheRequest(
+            contentType = GenerativeAICacheContentType.People,
+            inputText = text,
+            providerId = fakeAIClient.providerId,
+            model = fakeAIClient.defaultModel,
+            promptVersion = "people-v1",
+            schemaVersion = "people-text-v1",
+            templateId = "people-extractor",
+            policy = AICachePolicy(ttlSeconds = 60L * 60L * 24L * 30L)
+        )
     }
 
     @Test
@@ -91,7 +107,8 @@ class PeopleExtractorTest {
         val cachedResponse = "Bob"
         
         // Pre-populate cache
-        fakeCache.setEntry(documentId, cachedResponse)
+        val cacheRequest = cacheRequestFor(inputText)
+        fakeCache.setEntry(cacheRequest, cachedResponse)
         
         val result = peopleExtractor.extractPeople(documentId, inputText, useCached = true)
         val people = assertSuccess(result)
@@ -100,7 +117,7 @@ class PeopleExtractorTest {
         assertEquals("Bob", people[0].name)
         
         // Verify cache was checked but AI client was not called
-        assertTrue(fakeCache.getEntryCalls.contains(documentId))
+        assertTrue(fakeCache.getEntryCalls.contains(cacheRequest))
         assertEquals(0, fakeAIClient.submissions.size)
     }
 
@@ -113,7 +130,8 @@ class PeopleExtractorTest {
         val newResponse = "Alice"
         
         // Pre-populate cache with different data
-        fakeCache.setEntry(documentId, cachedResponse)
+        val cacheRequest = cacheRequestFor(inputText)
+        fakeCache.setEntry(cacheRequest, cachedResponse)
         fakeAIClient.setResponseFor(inputText, newResponse)
         
         val result = peopleExtractor.extractPeople(documentId, inputText, useCached = false)
@@ -252,8 +270,9 @@ class PeopleExtractorTest {
         assertEquals(2, people.size)
         
         // Verify result was cached
+        val cacheRequest = cacheRequestFor(inputText)
         assertTrue(fakeCache.putEntryCalls.any { 
-            it.first == documentId && it.second == aiResponse.trim() 
+            it.first == cacheRequest && it.second == aiResponse.trim() 
         })
     }
 
