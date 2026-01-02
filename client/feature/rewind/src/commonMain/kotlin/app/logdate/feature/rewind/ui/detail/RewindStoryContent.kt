@@ -23,10 +23,11 @@ import androidx.compose.ui.unit.dp
 import app.logdate.feature.rewind.ui.BasicTextRewindPanelUiState
 import app.logdate.feature.rewind.ui.BigStatisticRewindPanelUiState
 import app.logdate.feature.rewind.ui.ImageRewindPanelUiState
+import app.logdate.feature.rewind.ui.NarrativeContextRewindPanelUiState
 import app.logdate.feature.rewind.ui.RewindPanelUiState
 import app.logdate.feature.rewind.ui.SubtitledRewindPanelUiState
 import app.logdate.feature.rewind.ui.TextNoteRewindPanelUiState
-import app.logdate.feature.rewind.ui.detail.ImageNotePanel
+import app.logdate.feature.rewind.ui.TransitionRewindPanelUiState
 import coil3.compose.AsyncImage
 
 /**
@@ -104,7 +105,22 @@ fun RewindStoryContent(
                 modifier = modifier
             )
         }
-        
+
+        is NarrativeContextRewindPanelUiState -> {
+            NarrativeContextPanel(
+                contextText = panel.contextText,
+                backgroundImageUri = panel.backgroundImageUri,
+                modifier = modifier
+            )
+        }
+
+        is TransitionRewindPanelUiState -> {
+            TransitionPanel(
+                transitionText = panel.transitionText,
+                modifier = modifier
+            )
+        }
+
         // Add this catch-all branch for any future panel types
         else -> {
             // This should never happen with the current implementation

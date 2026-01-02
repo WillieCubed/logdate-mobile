@@ -104,8 +104,46 @@ data class ImageRewindPanelUiState(
 ) : RewindPanelUiState
 
 /**
+ * UI state for a narrative context panel.
+ *
+ * Sets the scene and provides context for the rewind story. Used to establish
+ * the overall narrative or introduce thematic segments.
+ *
+ * Example: "You finally made it to the California coast"
+ *
+ * @property sourceId Unique identifier of the original content
+ * @property timestamp When this narrative context was created
+ * @property contextText The narrative text that sets the scene
+ * @property backgroundImageUri Optional background image URI
+ */
+data class NarrativeContextRewindPanelUiState(
+    val sourceId: Uuid,
+    val timestamp: Instant,
+    val contextText: String,
+    val backgroundImageUri: String? = null
+) : RewindPanelUiState
+
+/**
+ * UI state for a transition panel.
+ *
+ * Connects story beats and explains thematic shifts in the narrative.
+ * These panels create flow by bridging different moments.
+ *
+ * Example: "But evenings shifted to culinary adventures"
+ *
+ * @property sourceId Unique identifier of the original content
+ * @property timestamp When this transition was created
+ * @property transitionText The transition text connecting story beats
+ */
+data class TransitionRewindPanelUiState(
+    val sourceId: Uuid,
+    val timestamp: Instant,
+    val transitionText: String
+) : RewindPanelUiState
+
+/**
  * Background styling information for rewind panels.
- * 
+ *
  * Defines the visual appearance of a panel's background, supporting either
  * solid colors or image backgrounds.
  *
