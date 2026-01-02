@@ -78,6 +78,7 @@ sealed class JournalNote(
     abstract val uid: Uuid
     abstract val creationTimestamp: Instant
     abstract val lastUpdated: Instant
+    abstract val syncVersion: Long
 
     /**
      * A text note, like a unit of content on a microblog (e.g. post, tweet).
@@ -91,6 +92,7 @@ sealed class JournalNote(
         override val creationTimestamp: Instant,
         override val lastUpdated: Instant,
         val content: String,
+        override val syncVersion: Long = 0,
     ) : JournalNote(NoteType.TEXT)
 
     @Serializable
@@ -100,6 +102,7 @@ sealed class JournalNote(
         override val creationTimestamp: Instant,
         override val lastUpdated: Instant,
         val mediaRef: String,
+        override val syncVersion: Long = 0,
     ) : JournalNote(NoteType.IMAGE)
 
     @Serializable
@@ -109,6 +112,7 @@ sealed class JournalNote(
         override val creationTimestamp: Instant,
         override val lastUpdated: Instant,
         val mediaRef: String,
+        override val syncVersion: Long = 0,
     ) : JournalNote(NoteType.VIDEO)
 
     @Serializable
@@ -118,5 +122,6 @@ sealed class JournalNote(
         override val uid: Uuid = Uuid.random(),
         override val creationTimestamp: Instant,
         override val lastUpdated: Instant,
+        override val syncVersion: Long = 0,
     ) : JournalNote(NoteType.AUDIO)
 }

@@ -3,7 +3,7 @@ package app.logdate.client.data.account
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.PlatformAccountManager
-import app.logdate.client.networking.PasskeyApiClient
+import app.logdate.client.networking.PasskeyApiClientContract
 import app.logdate.client.permissions.PasskeyManager
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.client.repository.account.AccountCreationRequest
@@ -31,7 +31,7 @@ import kotlinx.serialization.json.Json
  * Default implementation of PasskeyAccountRepository
  */
 class DefaultPasskeyAccountRepository(
-    private val apiClient: PasskeyApiClient,
+    private val apiClient: PasskeyApiClientContract,
     private val passkeyManager: PasskeyManager,
     private val sessionStorage: SessionStorage,
     private val platformAccountManager: PlatformAccountManager,
@@ -359,4 +359,3 @@ class DefaultPasskeyAccountRepository(
         return json.decodeFromString(PasskeyAssertionResponse.serializer(), assertionJson)
     }
 }
-

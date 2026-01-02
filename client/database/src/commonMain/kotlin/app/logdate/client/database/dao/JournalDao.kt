@@ -37,6 +37,9 @@ interface JournalDao {
     @Upsert
     suspend fun update(journal: JournalEntity)
 
+    @Query("UPDATE journals SET syncVersion = :syncVersion, lastSynced = :lastSynced WHERE id = :journalId")
+    suspend fun updateSyncMetadata(journalId: Uuid, syncVersion: Long, lastSynced: kotlinx.datetime.Instant)
+
     @Query("DELETE FROM journals WHERE id = :journalId")
     suspend fun delete(journalId: Uuid)
 }

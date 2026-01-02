@@ -16,4 +16,5 @@ data class Journal(
     val isFavorited: Boolean = false, // TODO: Move to separate user journal data repository
     val created: Instant = Clock.System.now(),
     val lastUpdated: Instant = Clock.System.now(),
+    val syncVersion: Long = 0,
 )

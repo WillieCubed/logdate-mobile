@@ -1,19 +1,23 @@
 package app.logdate.client.data.journals
 
-import app.logdate.client.database.dao.JournalDao
-import app.logdate.client.database.dao.JournalNotesDao
 import app.logdate.client.database.dao.journals.JournalContentDao
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.journals.SyncableJournalContentRepository
+import app.logdate.client.sync.metadata.AssociationPendingKey
+import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.PendingOperation
+import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlin.uuid.Uuid
 
@@ -25,8 +29,9 @@ class OfflineFirstJournalContentRepository(
     private val journalContentDao: JournalContentDao,
     private val journalRepository: JournalRepository,
     private val journalNotesRepository: JournalNotesRepository,
+    private val syncMetadataService: SyncMetadataService,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
-) : JournalContentRepository {
+) : JournalContentRepository, SyncableJournalContentRepository {
 
     override fun observeContentForJournal(journalId: Uuid): Flow<List<JournalNote>> {
         // Use the JournalContentDao to get content IDs associated with this journal
@@ -54,11 +59,27 @@ class OfflineFirstJournalContentRepository(
         // Create a link in the journal content table using string IDs
         val link = JournalContentEntityLink(journalId, contentId)
         journalContentDao.addContentToJournal(link)
+
+        syncMetadataService.enqueuePending(
+            entityId = AssociationPendingKey(journalId, contentId).toPendingId(),
+            entityType = EntityType.ASSOCIATION,
+            operation = PendingOperation.CREATE
+        )
+
+        Unit
     }
 
     override suspend fun removeContentFromJournal(contentId: Uuid, journalId: Uuid) = withContext(dispatcher) {
         // Remove from the journal content links table using string IDs
         journalContentDao.removeContentFromJournal(journalId, contentId)
+
+        syncMetadataService.enqueuePending(
+            entityId = AssociationPendingKey(journalId, contentId).toPendingId(),
+            entityType = EntityType.ASSOCIATION,
+            operation = PendingOperation.DELETE
+        )
+
+        Unit
     }
 
     override suspend fun addContentToJournals(contentId: Uuid, journalIds: List<Uuid>) = withContext(dispatcher) {
@@ -68,7 +89,26 @@ class OfflineFirstJournalContentRepository(
     }
 
     override suspend fun removeContentFromAllJournals(contentId: Uuid) = withContext(dispatcher) {
+        val journalIds = journalContentDao.getJournalsForContent(contentId).first()
+
+        journalIds.forEach { journalId ->
+            syncMetadataService.enqueuePending(
+                entityId = AssociationPendingKey(journalId, contentId).toPendingId(),
+                entityType = EntityType.ASSOCIATION,
+                operation = PendingOperation.DELETE
+            )
+        }
+
         // Remove from the journal content links table using Uuid
         journalContentDao.removeContentFromAllJournals(contentId)
+    }
+
+    override suspend fun addContentToJournalFromSync(contentId: Uuid, journalId: Uuid) = withContext(dispatcher) {
+        val link = JournalContentEntityLink(journalId, contentId)
+        journalContentDao.addContentToJournal(link)
+    }
+
+    override suspend fun removeContentFromJournalFromSync(contentId: Uuid, journalId: Uuid) = withContext(dispatcher) {
+        journalContentDao.removeContentFromJournal(journalId, contentId)
     }
 }

@@ -1,6 +1,6 @@
 package app.logdate.client.data.account
 
-import app.logdate.client.networking.PasskeyApiClient
+import app.logdate.client.networking.PasskeyApiClientContract
 import app.logdate.client.repository.account.AccountRepository
 import app.logdate.shared.model.LogDateAccount
 import kotlinx.coroutines.flow.Flow
@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * Default implementation of AccountRepository using PasskeyApiClient.
  */
 class DefaultAccountRepository(
-    private val passkeyApiClient: PasskeyApiClient,
+    private val passkeyApiClient: PasskeyApiClientContract,
     private val tokenProvider: () -> String? // TODO: Replace with proper token management
 ) : AccountRepository {
     

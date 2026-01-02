@@ -1,6 +1,7 @@
 package app.logdate.client.sync.cloud
 
 import app.logdate.shared.model.Journal
+import app.logdate.shared.model.sync.VersionConstraint
 import kotlinx.datetime.Instant
 import kotlin.uuid.Uuid
 
@@ -15,12 +16,12 @@ interface CloudJournalDataSource {
     /**
      * Uploads new journal metadata to the cloud.
      */
-    suspend fun uploadJournal(accessToken: String, journal: Journal): Result<Instant>
+    suspend fun uploadJournal(accessToken: String, journal: Journal): Result<SyncUploadResult>
     
     /**
      * Updates existing journal metadata in the cloud.
      */
-    suspend fun updateJournal(accessToken: String, journal: Journal): Result<Instant>
+    suspend fun updateJournal(accessToken: String, journal: Journal): Result<SyncUploadResult>
     
     /**
      * Deletes journal metadata from the cloud.
@@ -49,17 +50,23 @@ class DefaultCloudJournalDataSource(
     private val cloudApiClient: CloudApiClient
 ) : CloudJournalDataSource {
     
-    override suspend fun uploadJournal(accessToken: String, journal: Journal): Result<Instant> {
+    override suspend fun uploadJournal(accessToken: String, journal: Journal): Result<SyncUploadResult> {
         val request = journal.toUploadRequest()
         return cloudApiClient.uploadJournal(accessToken, request).map {
-            Instant.fromEpochMilliseconds(it.uploadedAt)
+            SyncUploadResult(
+                serverVersion = it.serverVersion,
+                syncedAt = Instant.fromEpochMilliseconds(it.uploadedAt)
+            )
         }
     }
     
-    override suspend fun updateJournal(accessToken: String, journal: Journal): Result<Instant> {
+    override suspend fun updateJournal(accessToken: String, journal: Journal): Result<SyncUploadResult> {
         val request = journal.toUpdateRequest()
         return cloudApiClient.updateJournal(accessToken, journal.id.toString(), request).map {
-            Instant.fromEpochMilliseconds(it.updatedAt)
+            SyncUploadResult(
+                serverVersion = it.serverVersion,
+                syncedAt = Instant.fromEpochMilliseconds(it.updatedAt)
+            )
         }
     }
     
@@ -84,7 +91,7 @@ class DefaultCloudJournalDataSource(
             description = description,
             createdAt = created.toEpochMilliseconds(),
             lastUpdated = lastUpdated.toEpochMilliseconds(),
-            syncVersion = 0 // TODO: Add syncVersion to Journal model
+            syncVersion = syncVersion
         )
     }
     
@@ -93,7 +100,12 @@ class DefaultCloudJournalDataSource(
             title = title,
             description = description,
             lastUpdated = lastUpdated.toEpochMilliseconds(),
-            syncVersion = 0 // TODO: Add syncVersion to Journal model
+            syncVersion = syncVersion,
+            versionConstraint = if (syncVersion > 0) {
+                VersionConstraint.Known(syncVersion)
+            } else {
+                VersionConstraint.None
+            }
         )
     }
     
@@ -103,7 +115,8 @@ class DefaultCloudJournalDataSource(
             title = title,
             description = description,
             created = Instant.fromEpochMilliseconds(createdAt),
-            lastUpdated = Instant.fromEpochMilliseconds(lastUpdated)
+            lastUpdated = Instant.fromEpochMilliseconds(lastUpdated),
+            syncVersion = serverVersion
         )
     }
 }

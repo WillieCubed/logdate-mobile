@@ -65,4 +65,7 @@ interface VideoNoteDao {
      */
     @Query("DELETE FROM video_notes WHERE uid IN (:noteIds)")
     suspend fun removeNote(noteIds: List<Uuid>)
+
+    @Query("UPDATE video_notes SET syncVersion = :syncVersion, lastSynced = :lastSynced WHERE uid = :noteId")
+    suspend fun updateSyncMetadata(noteId: Uuid, syncVersion: Long, lastSynced: kotlinx.datetime.Instant)
 }

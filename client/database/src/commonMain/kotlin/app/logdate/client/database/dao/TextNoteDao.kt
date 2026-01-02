@@ -70,6 +70,9 @@ interface TextNoteDao {
      */
     @Query("DELETE FROM text_notes WHERE uid IN (:noteIds)")
     suspend fun removeNote(noteIds: List<Uuid>)
+
+    @Query("UPDATE text_notes SET syncVersion = :syncVersion, lastSynced = :lastSynced WHERE uid = :noteId")
+    suspend fun updateSyncMetadata(noteId: Uuid, syncVersion: Long, lastSynced: kotlinx.datetime.Instant)
     
     /**
      * Fetches notes by their content, useful for finding newly created notes.

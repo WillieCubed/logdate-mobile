@@ -14,6 +14,7 @@ fun JournalEntity.toModel() = Journal(
     description = description,
     created = created,
     lastUpdated = lastUpdated,
+    syncVersion = syncVersion,
     isFavorited = false, // TODO: Move this to separate user data source
 )
 
@@ -28,4 +29,5 @@ fun Journal.toEntity() = JournalEntity(
     description = description,
     created = created,
     lastUpdated = lastUpdated,
+    syncVersion = syncVersion,
 )

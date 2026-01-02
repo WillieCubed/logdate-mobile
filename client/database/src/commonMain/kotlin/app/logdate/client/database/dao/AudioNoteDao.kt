@@ -65,4 +65,7 @@ interface AudioNoteDao {
      */
     @Query("DELETE FROM voice_notes WHERE uid IN (:noteIds)")
     suspend fun removeNote(noteIds: List<Uuid>)
+
+    @Query("UPDATE voice_notes SET syncVersion = :syncVersion, lastSynced = :lastSynced WHERE uid = :noteId")
+    suspend fun updateSyncMetadata(noteId: Uuid, syncVersion: Long, lastSynced: kotlinx.datetime.Instant)
 }

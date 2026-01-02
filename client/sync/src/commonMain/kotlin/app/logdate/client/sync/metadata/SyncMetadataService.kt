@@ -11,14 +11,14 @@ import kotlin.uuid.Uuid
 interface SyncMetadataService {
     /**
      * Gets entities that need to be uploaded.
-     * Returns only entities that have been modified since last sync.
+     * Returns pending entries with operation metadata for each entity type.
      */
-    suspend fun getPendingUploads(entityType: EntityType): List<Uuid>
+    suspend fun getPendingUploads(entityType: EntityType): List<PendingUpload>
 
     /**
      * Marks an entity as successfully synced.
      */
-    suspend fun markAsSynced(entityId: Uuid, entityType: EntityType, syncedAt: Instant, version: Int)
+    suspend fun markAsSynced(entityId: String, entityType: EntityType, syncedAt: Instant, version: Long)
 
     /**
      * Gets the last sync time for a specific entity type.
@@ -26,9 +26,19 @@ interface SyncMetadataService {
     suspend fun getLastSyncTime(entityType: EntityType): Instant?
 
     /**
+     * Updates the last sync time for a specific entity type.
+     */
+    suspend fun updateLastSyncTime(entityType: EntityType, syncedAt: Instant)
+
+    /**
+     * Enqueues an entity change for sync (create, update, delete).
+     */
+    suspend fun enqueuePending(entityId: String, entityType: EntityType, operation: PendingOperation)
+
+    /**
      * Resets sync metadata for an entity (forces re-sync).
      */
-    suspend fun resetSyncStatus(entityId: Uuid, entityType: EntityType)
+    suspend fun resetSyncStatus(entityId: String, entityType: EntityType)
 
     /**
      * Gets count of pending uploads for UI display.
@@ -57,38 +67,4 @@ enum class EntityType {
     NOTE,
     ASSOCIATION,
     MEDIA
-}
-
-/**
- * Stub implementation that syncs everything (current behavior).
- * Replace with real implementation backed by database.
- */
-class AlwaysSyncMetadataService : SyncMetadataService {
-    override suspend fun getPendingUploads(entityType: EntityType): List<Uuid> {
-        // TODO: Implement proper tracking - for now returns empty list
-        // This forces DefaultSyncManager to fall back to syncing everything
-        return emptyList()
-    }
-
-    override suspend fun markAsSynced(entityId: Uuid, entityType: EntityType, syncedAt: Instant, version: Int) {
-        // Stub: Do nothing
-    }
-
-    override suspend fun getLastSyncTime(entityType: EntityType): Instant? {
-        // Stub: No tracking yet
-        return null
-    }
-
-    override suspend fun resetSyncStatus(entityId: Uuid, entityType: EntityType) {
-        // Stub: Do nothing
-    }
-
-    override suspend fun getPendingCount(): Int {
-        // Stub: No pending items tracked
-        return 0
-    }
-
-    override fun observePendingCount(): Flow<Int> {
-        return kotlinx.coroutines.flow.flowOf(0)
-    }
 }

@@ -29,6 +29,9 @@ interface SyncMetadataDao {
     @Query("SELECT * FROM pending_uploads WHERE entityType = :entityType ORDER BY createdAt ASC")
     suspend fun getPendingByType(entityType: String): List<PendingUploadEntity>
 
+    @Query("SELECT * FROM pending_uploads WHERE entityType = :entityType AND entityId = :entityId")
+    suspend fun getPending(entityType: String, entityId: String): PendingUploadEntity?
+
     @Query("SELECT * FROM pending_uploads ORDER BY createdAt ASC")
     suspend fun getAllPending(): List<PendingUploadEntity>
 

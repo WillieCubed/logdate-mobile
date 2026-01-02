@@ -1,7 +1,7 @@
 package app.logdate.client.sync.cloud
 
 import app.logdate.client.repository.journals.JournalNote
-import kotlinx.datetime.Clock
+import app.logdate.shared.model.sync.VersionConstraint
 import kotlinx.datetime.Instant
 import kotlin.uuid.Uuid
 
@@ -15,12 +15,12 @@ interface CloudContentDataSource {
     /**
      * Uploads a new note to the cloud.
      */
-    suspend fun uploadNote(accessToken: String, note: JournalNote): Result<Instant>
+    suspend fun uploadNote(accessToken: String, note: JournalNote): Result<SyncUploadResult>
     
     /**
      * Updates an existing note in the cloud.
      */
-    suspend fun updateNote(accessToken: String, note: JournalNote): Result<Instant>
+    suspend fun updateNote(accessToken: String, note: JournalNote): Result<SyncUploadResult>
     
     /**
      * Deletes a note from the cloud.
@@ -49,17 +49,23 @@ class DefaultCloudContentDataSource(
     private val cloudApiClient: CloudApiClient
 ) : CloudContentDataSource {
     
-    override suspend fun uploadNote(accessToken: String, note: JournalNote): Result<Instant> {
+    override suspend fun uploadNote(accessToken: String, note: JournalNote): Result<SyncUploadResult> {
         val request = note.toUploadRequest()
         return cloudApiClient.uploadContent(accessToken, request).map {
-            Instant.fromEpochMilliseconds(it.uploadedAt)
+            SyncUploadResult(
+                serverVersion = it.serverVersion,
+                syncedAt = Instant.fromEpochMilliseconds(it.uploadedAt)
+            )
         }
     }
     
-    override suspend fun updateNote(accessToken: String, note: JournalNote): Result<Instant> {
+    override suspend fun updateNote(accessToken: String, note: JournalNote): Result<SyncUploadResult> {
         val request = note.toUpdateRequest()
         return cloudApiClient.updateContent(accessToken, note.uid.toString(), request).map {
-            Instant.fromEpochMilliseconds(it.updatedAt)
+            SyncUploadResult(
+                serverVersion = it.serverVersion,
+                syncedAt = Instant.fromEpochMilliseconds(it.updatedAt)
+            )
         }
     }
     
@@ -98,7 +104,7 @@ class DefaultCloudContentDataSource(
             },
             createdAt = creationTimestamp.toEpochMilliseconds(),
             lastUpdated = lastUpdated.toEpochMilliseconds(),
-            syncVersion = 0 // TODO: Track sync version in note entities
+            syncVersion = syncVersion
         )
     }
     
@@ -115,7 +121,12 @@ class DefaultCloudContentDataSource(
                 else -> null
             },
             lastUpdated = lastUpdated.toEpochMilliseconds(),
-            syncVersion = 0 // TODO: Track sync version in note entities
+            syncVersion = syncVersion,
+            versionConstraint = if (syncVersion > 0) {
+                VersionConstraint.Known(syncVersion)
+            } else {
+                VersionConstraint.None
+            }
         )
     }
     
@@ -129,25 +140,29 @@ class DefaultCloudContentDataSource(
                 uid = uid,
                 creationTimestamp = creationTimestamp,
                 lastUpdated = lastUpdated,
-                content = content ?: ""
+                content = content ?: "",
+                syncVersion = serverVersion
             )
             "IMAGE" -> JournalNote.Image(
                 uid = uid,
                 creationTimestamp = creationTimestamp,
                 lastUpdated = lastUpdated,
-                mediaRef = mediaUri ?: ""
+                mediaRef = mediaUri ?: "",
+                syncVersion = serverVersion
             )
             "VIDEO" -> JournalNote.Video(
                 uid = uid,
                 creationTimestamp = creationTimestamp,
                 lastUpdated = lastUpdated,
-                mediaRef = mediaUri ?: ""
+                mediaRef = mediaUri ?: "",
+                syncVersion = serverVersion
             )
             "AUDIO" -> JournalNote.Audio(
                 uid = uid,
                 creationTimestamp = creationTimestamp,
                 lastUpdated = lastUpdated,
-                mediaRef = mediaUri ?: ""
+                mediaRef = mediaUri ?: "",
+                syncVersion = serverVersion
             )
             else -> throw IllegalArgumentException("Unknown content type: $type")
         }

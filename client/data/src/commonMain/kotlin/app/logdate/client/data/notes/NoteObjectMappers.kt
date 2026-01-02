@@ -2,6 +2,7 @@ package app.logdate.client.data.notes
 
 import app.logdate.client.database.entities.ImageNoteEntity
 import app.logdate.client.database.entities.TextNoteEntity
+import app.logdate.client.database.entities.VideoNoteEntity
 import app.logdate.client.database.entities.VoiceNoteEntity
 import app.logdate.client.repository.journals.JournalNote
 
@@ -10,6 +11,7 @@ fun TextNoteEntity.toModel() = JournalNote.Text(
     content = content,
     creationTimestamp = created,
     lastUpdated = lastUpdated,
+    syncVersion = syncVersion,
 )
 
 fun JournalNote.Text.toEntity() = TextNoteEntity(
@@ -17,6 +19,7 @@ fun JournalNote.Text.toEntity() = TextNoteEntity(
     content = content,
     created = creationTimestamp,
     lastUpdated = lastUpdated,
+    syncVersion = syncVersion,
 )
 
 fun ImageNoteEntity.toModel() = JournalNote.Image(
@@ -24,6 +27,7 @@ fun ImageNoteEntity.toModel() = JournalNote.Image(
     mediaRef = contentUri,
     creationTimestamp = created,
     lastUpdated = lastUpdated,
+    syncVersion = syncVersion,
 )
 
 fun JournalNote.Image.toEntity() = ImageNoteEntity(
@@ -31,6 +35,23 @@ fun JournalNote.Image.toEntity() = ImageNoteEntity(
     contentUri = mediaRef,
     created = creationTimestamp,
     lastUpdated = lastUpdated,
+    syncVersion = syncVersion,
+)
+
+fun VideoNoteEntity.toModel() = JournalNote.Video(
+    uid = uid,
+    mediaRef = contentUri,
+    creationTimestamp = created,
+    lastUpdated = lastUpdated,
+    syncVersion = syncVersion,
+)
+
+fun JournalNote.Video.toEntity() = VideoNoteEntity(
+    uid = uid,
+    contentUri = mediaRef,
+    created = creationTimestamp,
+    lastUpdated = lastUpdated,
+    syncVersion = syncVersion,
 )
 
 // TODO: Rename VoiceNoteEntity to AudioNoteEntity to better represent general audio content
@@ -41,6 +62,7 @@ fun VoiceNoteEntity.toModel(): JournalNote.Audio {
         mediaRef = contentUri,
         creationTimestamp = created,
         lastUpdated = lastUpdated,
+        syncVersion = syncVersion,
     )
     
     // Add debug logging for audio note conversion
@@ -57,6 +79,7 @@ fun JournalNote.Audio.toEntity() = VoiceNoteEntity(
     contentUri = mediaRef,
     created = creationTimestamp,
     lastUpdated = lastUpdated,
+    syncVersion = syncVersion,
     // Duration might be null since it's not included in JournalNote.Audio
     durationMs = null
 )

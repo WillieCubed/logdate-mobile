@@ -34,7 +34,8 @@ interface CloudAssociationDataSource {
 data class JournalContentAssociation(
     val journalId: Uuid,
     val contentId: Uuid,
-    val createdAt: Instant = Clock.System.now()
+    val createdAt: Instant = Clock.System.now(),
+    val syncVersion: Long = 0
 )
 
 /**
@@ -101,7 +102,7 @@ class DefaultCloudAssociationDataSource(
             journalId = journalId.toString(),
             contentId = contentId.toString(),
             createdAt = createdAt.toEpochMilliseconds(),
-            syncVersion = 0 // TODO: Add sync version tracking for associations
+            syncVersion = syncVersion
         )
     }
     
@@ -109,7 +110,8 @@ class DefaultCloudAssociationDataSource(
         return JournalContentAssociation(
             journalId = Uuid.parse(journalId),
             contentId = Uuid.parse(contentId),
-            createdAt = Instant.fromEpochMilliseconds(createdAt)
+            createdAt = Instant.fromEpochMilliseconds(createdAt),
+            syncVersion = serverVersion
         )
     }
 }
