@@ -1,18 +1,17 @@
 package app.logdate.client.intelligence.cache
 
-import kotlinx.datetime.Clock
-
 object InMemoryAICacheLocalDataSource : AICacheLocalDataSource {
-    private val cache = mutableMapOf<String, String>()
+    private val cache = mutableMapOf<String, GenerativeAICacheEntry>()
 
-    override fun get(key: String): GenerativeAICacheEntry {
-        return GenerativeAICacheEntry(key, cache[key] ?: "", Clock.System.now())
+    override fun get(key: String): GenerativeAICacheEntry? {
+        return cache[key]
     }
+
     override fun set(key: String, summary: GenerativeAICacheEntry) {
-        TODO("Not yet implemented")
+        cache[key] = summary
     }
 
     override fun clear() {
-        TODO("Not yet implemented")
+        cache.clear()
     }
 }

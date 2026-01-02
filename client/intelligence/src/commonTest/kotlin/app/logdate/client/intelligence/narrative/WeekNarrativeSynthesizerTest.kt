@@ -254,6 +254,24 @@ class WeekNarrativeSynthesizerTest {
     }
 
     @Test
+    fun synthesize_whenOffline_returnsUnavailable() = runTest(testDispatcher) {
+        setup()
+        fakeNetworkMonitor.setAvailable(false)
+        val weekId = "2024-W33-offline"
+
+        val result = synthesizer.synthesize(
+            weekId = weekId,
+            textEntries = emptyList(),
+            media = emptyList(),
+            people = emptyList(),
+            useCached = false
+        )
+
+        assertTrue(result is AIResult.Unavailable)
+        assertEquals(0, fakeAIClient.submissions.size)
+    }
+
+    @Test
     fun synthesize_withNullAIResponse_returnsNull() = runTest(testDispatcher) {
         setup()
         val weekId = "2024-W34"
@@ -406,5 +424,9 @@ class WeekNarrativeSynthesizerTest {
         override fun isNetworkAvailable(): Boolean = available
 
         override fun observeNetwork() = throw UnsupportedOperationException("Not used in tests")
+
+        fun setAvailable(isAvailable: Boolean) {
+            available = isAvailable
+        }
     }
 }

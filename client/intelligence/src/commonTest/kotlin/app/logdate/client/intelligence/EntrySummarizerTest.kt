@@ -199,6 +199,19 @@ class EntrySummarizerTest {
     }
 
     @Test
+    fun summarize_whenOffline_returnsUnavailable() = runTest(testDispatcher) {
+        setup()
+        fakeNetworkMonitor.setAvailable(false)
+        val summaryId = "offline-entry"
+        val inputText = "Offline summary text"
+
+        val result = entrySummarizer.summarize(summaryId, inputText, useCached = false)
+
+        assertTrue(result is AIResult.Unavailable)
+        assertEquals(0, fakeAIClient.submissions.size)
+    }
+
+    @Test
     fun summarize_systemPromptIsCorrect() = runTest(testDispatcher) {
         setup()
         val summaryId = "prompt-test"
@@ -250,5 +263,9 @@ class EntrySummarizerTest {
         override fun isNetworkAvailable(): Boolean = available
 
         override fun observeNetwork() = throw UnsupportedOperationException("Not used in tests")
+
+        fun setAvailable(isAvailable: Boolean) {
+            available = isAvailable
+        }
     }
 }

@@ -3,6 +3,7 @@ package app.logdate.client.intelligence
 import app.logdate.client.intelligence.cache.GenerativeAICache
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
+import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
@@ -56,30 +57,33 @@ class EntrySummarizer(
                 tag = "EntrySummarizer",
                 message = "No cached response for $summaryId, generating new response"
             )
-            if (!networkAvailabilityMonitor.isNetworkAvailable()) {
-                return@withContext AIResult.Unavailable(AIUnavailableReason.NoNetwork)
+            val unavailableReason = networkAvailabilityMonitor.unavailableReason()
+            if (unavailableReason != null) {
+                return@withContext AIResult.Unavailable(unavailableReason)
             }
-            try {
-                val response = genAIClient.submit(
-                    listOf(
+            val response = genAIClient.submit(
+                GenerativeAIRequest(
+                    messages = listOf(
                         GenerativeAIChatMessage("system", SYSTEM_PROMPT),
                         GenerativeAIChatMessage("user", text),
                     )
                 )
-                // Cache responses
-                if (response != null) {
+            )
+            when (response) {
+                is AIResult.Success -> {
                     Napier.d(tag = "EntrySummarizer", message = "Caching response for entry $summaryId")
-                    generativeAICache.putEntry(summaryId, response)
-                    return@withContext AIResult.Success(response, fromCache = false)
+                    generativeAICache.putEntry(summaryId, response.value.content)
+                    AIResult.Success(response.value.content, fromCache = false)
                 }
-                AIResult.Error(AIError.InvalidResponse)
-            } catch (e: Exception) {
-                Napier.e(
-                    tag = "EntrySummarizer",
-                    message = "Failed to summarize entry",
-                    throwable = e
-                )
-                AIResult.Error(AIError.Unknown, e)
+                is AIResult.Unavailable -> response
+                is AIResult.Error -> {
+                    Napier.e(
+                        tag = "EntrySummarizer",
+                        message = "Failed to summarize entry",
+                        throwable = response.throwable
+                    )
+                    response
+                }
             }
 
         }

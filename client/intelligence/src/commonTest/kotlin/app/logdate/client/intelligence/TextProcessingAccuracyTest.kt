@@ -3,6 +3,8 @@ package app.logdate.client.intelligence
 import app.logdate.client.intelligence.entity.people.PeopleExtractor
 import app.logdate.client.intelligence.fakes.FakeGenerativeAICache
 import app.logdate.client.intelligence.fakes.FakeGenerativeAIChatClient
+import app.logdate.client.networking.NetworkAvailabilityMonitor
+import app.logdate.shared.model.Person
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -21,16 +23,19 @@ class TextProcessingAccuracyTest {
     private val testDispatcher = StandardTestDispatcher()
     private val fakeCache = FakeGenerativeAICache()
     private val fakeAIClient = FakeGenerativeAIChatClient()
+    private val fakeNetworkMonitor = TestNetworkAvailabilityMonitor()
     
     private val entrySummarizer = EntrySummarizer(
         generativeAICache = fakeCache,
         genAIClient = fakeAIClient,
+        networkAvailabilityMonitor = fakeNetworkMonitor,
         ioDispatcher = testDispatcher
     )
     
     private val peopleExtractor = PeopleExtractor(
         generativeAICache = fakeCache,
         generativeAIChatClient = fakeAIClient,
+        networkAvailabilityMonitor = fakeNetworkMonitor,
         ioDispatcher = testDispatcher
     )
     
@@ -58,7 +63,9 @@ class TextProcessingAccuracyTest {
         fakeAIClient.responses["summary-$journalText"] = expectedSummary // For summarization
         
         // Test people extraction
-        val extractedPeople = peopleExtractor.extractPeople("daily-entry", journalText, useCached = false)
+        val extractedPeople = assertPeopleSuccess(
+            peopleExtractor.extractPeople("daily-entry", journalText, useCached = false)
+        )
         assertEquals(5, extractedPeople.size)
         val names = extractedPeople.map { it.name }
         assertTrue(names.contains("Mom"))
@@ -72,7 +79,9 @@ class TextProcessingAccuracyTest {
         fakeAIClient.setResponseFor(journalText, expectedSummary)
         
         // Test summarization
-        val summary = entrySummarizer.summarize("daily-entry-summary", journalText, useCached = false)
+        val summary = assertSummarySuccess(
+            entrySummarizer.summarize("daily-entry-summary", journalText, useCached = false)
+        )
         assertEquals(expectedSummary, summary)
     }
 
@@ -92,7 +101,9 @@ class TextProcessingAccuracyTest {
         
         fakeAIClient.setResponseFor(journalText, expectedPeople)
         
-        val extractedPeople = peopleExtractor.extractPeople("work-meeting", journalText, useCached = false)
+        val extractedPeople = assertPeopleSuccess(
+            peopleExtractor.extractPeople("work-meeting", journalText, useCached = false)
+        )
         assertEquals(5, extractedPeople.size)
         
         // Verify professional titles are preserved
@@ -118,7 +129,9 @@ class TextProcessingAccuracyTest {
         
         fakeAIClient.setResponseFor(journalText, expectedPeople)
         
-        val extractedPeople = peopleExtractor.extractPeople("family-gathering", journalText, useCached = false)
+        val extractedPeople = assertPeopleSuccess(
+            peopleExtractor.extractPeople("family-gathering", journalText, useCached = false)
+        )
         assertEquals(9, extractedPeople.size)
         
         // Verify family relationship terms are preserved
@@ -146,7 +159,9 @@ class TextProcessingAccuracyTest {
         
         fakeAIClient.setResponseFor(journalText, expectedPeople)
         
-        val extractedPeople = peopleExtractor.extractPeople("travel-entry", journalText, useCached = false)
+        val extractedPeople = assertPeopleSuccess(
+            peopleExtractor.extractPeople("travel-entry", journalText, useCached = false)
+        )
         assertEquals(4, extractedPeople.size)
         
         val names = extractedPeople.map { it.name }
@@ -172,7 +187,9 @@ class TextProcessingAccuracyTest {
         
         fakeAIClient.setResponseFor(journalText, expectedPeople)
         
-        val extractedPeople = peopleExtractor.extractPeople("medical-appointment", journalText, useCached = false)
+        val extractedPeople = assertPeopleSuccess(
+            peopleExtractor.extractPeople("medical-appointment", journalText, useCached = false)
+        )
         assertEquals(4, extractedPeople.size)
         
         // Verify medical titles are preserved
@@ -197,7 +214,9 @@ class TextProcessingAccuracyTest {
         
         fakeAIClient.setResponseFor(journalText, expectedPeople)
         
-        val extractedPeople = peopleExtractor.extractPeople("social-event", journalText, useCached = false)
+        val extractedPeople = assertPeopleSuccess(
+            peopleExtractor.extractPeople("social-event", journalText, useCached = false)
+        )
         assertEquals(11, extractedPeople.size)
         
         val names = extractedPeople.map { it.name }
@@ -222,11 +241,13 @@ class TextProcessingAccuracyTest {
         
         fakeAIClient.setResponseFor(journalText, expectedSummary)
         
-        val summary = entrySummarizer.summarize("emotional-entry", journalText, useCached = false)
+        val summary = assertSummarySuccess(
+            entrySummarizer.summarize("emotional-entry", journalText, useCached = false)
+        )
         assertEquals(expectedSummary, summary)
         
         // Verify the summary captures both the difficulty and the support
-        assertTrue(summary!!.contains("challenging") || summary.contains("difficult"))
+        assertTrue(summary.contains("challenging") || summary.contains("difficult"))
         assertTrue(summary.contains("support") || summary.contains("comfort") || summary.contains("perspective"))
     }
 
@@ -246,11 +267,31 @@ class TextProcessingAccuracyTest {
         
         fakeAIClient.setResponseFor(journalText, expectedSummary)
         
-        val summary = entrySummarizer.summarize("achievement-entry", journalText, useCached = false)
+        val summary = assertSummarySuccess(
+            entrySummarizer.summarize("achievement-entry", journalText, useCached = false)
+        )
         assertEquals(expectedSummary, summary)
         
         // Verify the summary captures the achievement and celebration
-        assertTrue(summary!!.contains("achievement") || summary.contains("promotion") || summary.contains("milestone"))
+        assertTrue(summary.contains("achievement") || summary.contains("promotion") || summary.contains("milestone"))
         assertTrue(summary.contains("celebrat") || summary.contains("accomplishment"))
+    }
+
+    private fun assertPeopleSuccess(result: AIResult<List<Person>>): List<Person> {
+        assertTrue(result is AIResult.Success)
+        return result.value
+    }
+
+    private fun assertSummarySuccess(result: AIResult<String>): String {
+        assertTrue(result is AIResult.Success)
+        return result.value
+    }
+
+    private class TestNetworkAvailabilityMonitor(
+        private var available: Boolean = true
+    ) : NetworkAvailabilityMonitor {
+        override fun isNetworkAvailable(): Boolean = available
+
+        override fun observeNetwork() = throw UnsupportedOperationException("Not used in tests")
     }
 }

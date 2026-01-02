@@ -6,8 +6,12 @@ import app.logdate.client.domain.fakes.FakeNetworkAvailabilityMonitor
 import app.logdate.client.intelligence.cache.GenerativeAICache
 import app.logdate.client.intelligence.cache.GenerativeAICacheEntry
 import app.logdate.client.intelligence.entity.people.PeopleExtractor
+import app.logdate.client.intelligence.AIError
+import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
+import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
+import app.logdate.client.intelligence.generativeai.GenerativeAIResponse
 import app.logdate.client.intelligence.narrative.RewindSequencer
 import app.logdate.client.intelligence.narrative.WeekNarrativeSynthesizer
 import app.logdate.client.media.MediaManager
@@ -245,7 +249,13 @@ class GetRewindUseCaseTest {
     private class FakeGenerativeAIChatClient(
         private val response: String?
     ) : GenerativeAIChatClient {
-        override suspend fun submit(prompts: List<GenerativeAIChatMessage>): String? = response
+        override suspend fun submit(request: GenerativeAIRequest): AIResult<GenerativeAIResponse> {
+            return if (response == null) {
+                AIResult.Error(AIError.InvalidResponse)
+            } else {
+                AIResult.Success(GenerativeAIResponse(response))
+            }
+        }
     }
 
     private class FakeRewindRepository : RewindRepository {

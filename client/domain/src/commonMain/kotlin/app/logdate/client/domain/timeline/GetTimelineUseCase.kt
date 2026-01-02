@@ -1,6 +1,7 @@
 package app.logdate.client.domain.timeline
 
 import app.logdate.client.domain.entities.ExtractPeopleUseCase
+import app.logdate.client.intelligence.AIResult
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.shared.model.Person
@@ -127,11 +128,15 @@ class GetTimelineDayUseCase(
         }
 
         val mediaUris = getMediaUrisUseCase(date)
-        val people = extractPeopleUseCase(
+        val people = when (val peopleResult = extractPeopleUseCase(
             documentId = "people_summary_" + date.toEpochDays().toString(),
             text = entries.filterIsInstance<JournalNote.Text>()
                 .joinToString("\n") { note -> note.content }
-        )
+        )) {
+            is AIResult.Success -> peopleResult.value
+            is AIResult.Unavailable -> emptyList()
+            is AIResult.Error -> emptyList()
+        }
 
         return TimelineDay(
             tldr = summary,

@@ -8,6 +8,6 @@ import org.koin.core.module.Module
 import org.koin.dsl.module
 
 actual val cacheModule: Module = module {
-    factory<AICacheLocalDataSource> { IOSAICacheLocalDataSource(get()) }
+    factory<AICacheLocalDataSource> { IOSAICacheLocalDataSource() }
     single<GenerativeAICache> { OfflineGenerativeAICache(get()) }
 }

@@ -1,7 +1,11 @@
 package app.logdate.client.intelligence.fakes
 
+import app.logdate.client.intelligence.AIError
+import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
+import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
+import app.logdate.client.intelligence.generativeai.GenerativeAIResponse
 import kotlinx.coroutines.delay
 
 /**
@@ -13,6 +17,7 @@ class FakeGenerativeAIChatClient : GenerativeAIChatClient {
     
     // Track all submissions for testing
     var submissions = mutableListOf<List<GenerativeAIChatMessage>>()
+    var requests = mutableListOf<GenerativeAIRequest>()
     
     // Configurable responses for different test scenarios
     var responses = mutableMapOf<String, String>()
@@ -25,28 +30,34 @@ class FakeGenerativeAIChatClient : GenerativeAIChatClient {
     // Delay simulation
     var delayMs: Long = 0
     
-    override suspend fun submit(prompts: List<GenerativeAIChatMessage>): String? {
-        submissions.add(prompts.toList())
+    override suspend fun submit(request: GenerativeAIRequest): AIResult<GenerativeAIResponse> {
+        requests.add(request)
+        submissions.add(request.messages.toList())
         
         if (delayMs > 0) {
             delay(delayMs)
         }
         
         if (shouldThrowError) {
-            throw errorToThrow
+            return AIResult.Error(AIError.Unknown, errorToThrow)
         }
         
         // Look for specific responses based on user content
-        val userMessage = prompts.find { it.role == "user" }?.content
+        val userMessage = request.messages.find { it.role == "user" }?.content
         if (userMessage != null && responses.containsKey(userMessage)) {
-            return responses[userMessage]
+            return AIResult.Success(GenerativeAIResponse(responses[userMessage] ?: ""))
         }
         
-        return defaultResponse
+        return if (defaultResponse == null) {
+            AIResult.Error(AIError.InvalidResponse)
+        } else {
+            AIResult.Success(GenerativeAIResponse(defaultResponse ?: ""))
+        }
     }
     
     fun clear() {
         submissions.clear()
+        requests.clear()
         responses.clear()
         defaultResponse = "Default AI response"
         shouldThrowError = false

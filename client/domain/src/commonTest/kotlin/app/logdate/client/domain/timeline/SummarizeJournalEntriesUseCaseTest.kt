@@ -1,10 +1,22 @@
 package app.logdate.client.domain.timeline
 
 import app.logdate.client.intelligence.EntrySummarizer
+import app.logdate.client.intelligence.cache.GenerativeAICache
+import app.logdate.client.intelligence.cache.GenerativeAICacheEntry
+import app.logdate.client.intelligence.AIError
+import app.logdate.client.intelligence.AIResult
+import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
+import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
+import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
+import app.logdate.client.intelligence.generativeai.GenerativeAIResponse
 import app.logdate.client.networking.NetworkAvailabilityMonitor
+import app.logdate.client.networking.NetworkState
 import app.logdate.client.repository.journals.JournalNote
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -13,17 +25,22 @@ import kotlin.uuid.Uuid
 
 class SummarizeJournalEntriesUseCaseTest {
 
-    private lateinit var mockSummarizer: MockEntrySummarizer
+    private lateinit var fakeCache: FakeGenerativeAICache
+    private lateinit var fakeChatClient: FakeGenerativeAIChatClient
     private lateinit var mockNetworkMonitor: MockNetworkAvailabilityMonitor
     private lateinit var useCase: SummarizeJournalEntriesUseCase
 
     @BeforeTest
     fun setUp() {
-        mockSummarizer = MockEntrySummarizer()
+        fakeCache = FakeGenerativeAICache()
+        fakeChatClient = FakeGenerativeAIChatClient()
         mockNetworkMonitor = MockNetworkAvailabilityMonitor()
         useCase = SummarizeJournalEntriesUseCase(
-            summarizer = mockSummarizer,
-            networkAvailabilityMonitor = mockNetworkMonitor
+            summarizer = EntrySummarizer(
+                generativeAICache = fakeCache,
+                genAIClient = fakeChatClient,
+                networkAvailabilityMonitor = mockNetworkMonitor
+            )
         )
     }
 
@@ -37,7 +54,7 @@ class SummarizeJournalEntriesUseCaseTest {
         
         // Then
         assertEquals(SummarizeJournalEntriesResult.SummaryUnavailable, result)
-        assertEquals(0, mockSummarizer.summarizeCalls.size)
+        assertEquals(0, fakeChatClient.prompts.size)
     }
 
     @Test
@@ -51,7 +68,7 @@ class SummarizeJournalEntriesUseCaseTest {
         
         // Then
         assertEquals(SummarizeJournalEntriesResult.NetworkUnavailable, result)
-        assertEquals(0, mockSummarizer.summarizeCalls.size)
+        assertEquals(0, fakeChatClient.prompts.size)
     }
 
     @Test
@@ -63,7 +80,7 @@ class SummarizeJournalEntriesUseCaseTest {
         )
         val expectedSummary = "This is a test summary"
         mockNetworkMonitor.isAvailable = true
-        mockSummarizer.summaryResult = expectedSummary
+        fakeChatClient.response = expectedSummary
         
         // When
         val result = useCase(testEntries)
@@ -71,7 +88,7 @@ class SummarizeJournalEntriesUseCaseTest {
         // Then
         assertTrue(result is SummarizeJournalEntriesResult.Success)
         assertEquals(expectedSummary, (result as SummarizeJournalEntriesResult.Success).summary)
-        assertEquals(1, mockSummarizer.summarizeCalls.size)
+        assertEquals(1, fakeChatClient.prompts.size)
     }
 
     @Test
@@ -79,14 +96,14 @@ class SummarizeJournalEntriesUseCaseTest {
         // Given
         val testEntries = listOf(createTestNote("Test content"))
         mockNetworkMonitor.isAvailable = true
-        mockSummarizer.summaryResult = null
+        fakeChatClient.response = null
         
         // When
         val result = useCase(testEntries)
         
         // Then
         assertEquals(SummarizeJournalEntriesResult.SummaryUnavailable, result)
-        assertEquals(1, mockSummarizer.summarizeCalls.size)
+        assertEquals(1, fakeChatClient.prompts.size)
     }
 
     @Test
@@ -94,14 +111,14 @@ class SummarizeJournalEntriesUseCaseTest {
         // Given
         val testEntries = listOf(createTestNote("Test content"))
         mockNetworkMonitor.isAvailable = true
-        mockSummarizer.shouldThrowException = true
+        fakeChatClient.shouldThrowException = true
         
         // When
         val result = useCase(testEntries)
         
         // Then
         assertEquals(SummarizeJournalEntriesResult.SummaryUnavailable, result)
-        assertEquals(1, mockSummarizer.summarizeCalls.size)
+        assertEquals(1, fakeChatClient.prompts.size)
     }
 
     @Test
@@ -118,21 +135,21 @@ class SummarizeJournalEntriesUseCaseTest {
         
         val testEntries = listOf(newerNote, imageNote, olderNote) // Mixed order and types
         mockNetworkMonitor.isAvailable = true
-        mockSummarizer.summaryResult = "Test summary"
+        fakeChatClient.response = "Test summary"
         
         // When
         val result = useCase(testEntries)
         
         // Then
         assertTrue(result is SummarizeJournalEntriesResult.Success)
-        assertEquals(1, mockSummarizer.summarizeCalls.size)
+        assertEquals(1, fakeChatClient.prompts.size)
         
         // Verify that the prompt contains text notes in chronological order
-        val summarizeCall = mockSummarizer.summarizeCalls.first()
-        assertTrue(summarizeCall.second.contains("Older note"))
-        assertTrue(summarizeCall.second.contains("Newer note"))
+        val prompt = fakeChatClient.prompts.first().last().content
+        assertTrue(prompt.contains("Older note"))
+        assertTrue(prompt.contains("Newer note"))
         // Image note should not be included in text summary
-        assertFalse(summarizeCall.second.contains("test_image.jpg"))
+        assertFalse(prompt.contains("test_image.jpg"))
     }
 
     @Test
@@ -143,18 +160,18 @@ class SummarizeJournalEntriesUseCaseTest {
             createTestNote("Content 2")
         )
         mockNetworkMonitor.isAvailable = true
-        mockSummarizer.summaryResult = "Test summary"
+        fakeChatClient.response = "Test summary"
         
         // When
         useCase(testEntries)
         useCase(testEntries) // Call twice with same entries
         
         // Then
-        assertEquals(2, mockSummarizer.summarizeCalls.size)
+        assertEquals(2, fakeCache.getCalls.size)
         // Both calls should have the same summary key
         assertEquals(
-            mockSummarizer.summarizeCalls[0].first,
-            mockSummarizer.summarizeCalls[1].first
+            fakeCache.getCalls[0],
+            fakeCache.getCalls[1]
         )
     }
 
@@ -163,7 +180,7 @@ class SummarizeJournalEntriesUseCaseTest {
         // Given
         val singleNote = createTestNote("Single note content")
         mockNetworkMonitor.isAvailable = true
-        mockSummarizer.summaryResult = "Single note summary"
+        fakeChatClient.response = "Single note summary"
         
         // When
         val result = useCase(listOf(singleNote))
@@ -184,23 +201,54 @@ class SummarizeJournalEntriesUseCaseTest {
         kotlin.test.assertFalse(condition)
     }
 
-    private class MockEntrySummarizer : EntrySummarizer {
-        val summarizeCalls = mutableListOf<Pair<String, String>>()
-        var summaryResult: String? = "Default summary"
+    private class FakeGenerativeAICache : GenerativeAICache {
+        val getCalls = mutableListOf<String>()
+        val putCalls = mutableListOf<Pair<String, String>>()
+        private val store = mutableMapOf<String, GenerativeAICacheEntry>()
+
+        override suspend fun getEntry(key: String): GenerativeAICacheEntry? {
+            getCalls.add(key)
+            return store[key]
+        }
+
+        override suspend fun putEntry(key: String, value: String) {
+            putCalls.add(key to value)
+            store[key] = GenerativeAICacheEntry(
+                key = key,
+                content = value,
+                lastUpdated = Clock.System.now()
+            )
+        }
+
+        override suspend fun purge() {
+            store.clear()
+        }
+    }
+
+    private class FakeGenerativeAIChatClient : GenerativeAIChatClient {
+        val prompts = mutableListOf<List<GenerativeAIChatMessage>>()
+        var response: String? = "Default summary"
         var shouldThrowException = false
 
-        override suspend fun summarize(summaryKey: String, prompt: String): String? {
-            summarizeCalls.add(Pair(summaryKey, prompt))
+        override suspend fun submit(request: GenerativeAIRequest): AIResult<GenerativeAIResponse> {
+            prompts.add(request.messages)
             if (shouldThrowException) {
-                throw Exception("Summarizer error")
+                return AIResult.Error(AIError.Unknown, RuntimeException("Summarizer error"))
             }
-            return summaryResult
+            return if (response == null) {
+                AIResult.Error(AIError.InvalidResponse)
+            } else {
+                AIResult.Success(GenerativeAIResponse(response ?: ""))
+            }
         }
     }
 
     private class MockNetworkAvailabilityMonitor : NetworkAvailabilityMonitor {
         var isAvailable = true
+        private val networkFlow = MutableSharedFlow<NetworkState>(replay = 1)
 
         override fun isNetworkAvailable(): Boolean = isAvailable
+
+        override fun observeNetwork(): SharedFlow<NetworkState> = networkFlow
     }
 }

@@ -173,6 +173,19 @@ class PeopleExtractorTest {
     }
 
     @Test
+    fun extractPeople_whenOffline_returnsUnavailable() = runTest(testDispatcher) {
+        setup()
+        fakeNetworkMonitor.setAvailable(false)
+        val documentId = "doc-offline"
+        val inputText = "I met Alice"
+
+        val result = peopleExtractor.extractPeople(documentId, inputText, useCached = false)
+
+        assertTrue(result is AIResult.Unavailable)
+        assertEquals(0, fakeAIClient.submissions.size)
+    }
+
+    @Test
     fun extractPeople_withComplexNames_extractsCorrectly() = runTest(testDispatcher) {
         setup()
         val documentId = "doc-complex-names"
@@ -325,5 +338,9 @@ class PeopleExtractorTest {
         override fun isNetworkAvailable(): Boolean = available
 
         override fun observeNetwork() = throw UnsupportedOperationException("Not used in tests")
+
+        fun setAvailable(isAvailable: Boolean) {
+            available = isAvailable
+        }
     }
 }

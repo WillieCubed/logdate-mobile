@@ -1,9 +1,7 @@
 package app.logdate.client.intelligence.cache
 
 /**
- * A cache that stores generative AI summaries in files.
- *
- * Each file is named after the key of the entry, and the content is stored in the file.
+ * A local cache that stores generative AI summaries.
  */
 interface AICacheLocalDataSource {
 

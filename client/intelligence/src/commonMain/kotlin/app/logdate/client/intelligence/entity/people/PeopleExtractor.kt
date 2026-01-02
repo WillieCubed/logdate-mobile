@@ -1,11 +1,11 @@
 package app.logdate.client.intelligence.entity.people
 
-import app.logdate.client.intelligence.AIError
 import app.logdate.client.intelligence.AIResult
-import app.logdate.client.intelligence.AIUnavailableReason
 import app.logdate.client.intelligence.cache.GenerativeAICache
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
+import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
+import app.logdate.client.intelligence.unavailableReason
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.shared.model.Person
 import io.github.aakira.napier.Napier
@@ -68,36 +68,39 @@ line.
                     )
                 }
             }
-            if (!networkAvailabilityMonitor.isNetworkAvailable()) {
-                return@withContext AIResult.Unavailable(AIUnavailableReason.NoNetwork)
+            val unavailableReason = networkAvailabilityMonitor.unavailableReason()
+            if (unavailableReason != null) {
+                return@withContext AIResult.Unavailable(unavailableReason)
             }
             val prompts = listOf(
                 GenerativeAIChatMessage("system", EXTRACTION_PROMPT),
                 GenerativeAIChatMessage("user", text),
                 // TODO: Use structured response format
             )
-            try {
-                val response = generativeAIChatClient.submit(prompts)
-                if (response != null) {
+            val response = generativeAIChatClient.submit(
+                GenerativeAIRequest(messages = prompts)
+            )
+            when (response) {
+                is AIResult.Success -> {
+                    val content = response.value.content
                     Napier.d(tag = "PeopleExtractor", message = "Caching response for:\n$text")
-                    Napier.d(tag = "PeopleExtractor") { "Response: ${response.trim()}" }
-                    generativeAICache.putEntry(documentId, response.trim())
+                    Napier.d(tag = "PeopleExtractor") { "Response: ${content.trim()}" }
+                    generativeAICache.putEntry(documentId, content.trim())
+                    val people = content.split("\n")
+                        .map { it.trim() }
+                        .filter { it.isNotBlank() }
+                        .map { Person(name = it) }
+                    AIResult.Success(people, fromCache = false)
                 }
-                if (response == null) {
-                    return@withContext AIResult.Error(AIError.InvalidResponse)
+                is AIResult.Unavailable -> response
+                is AIResult.Error -> {
+                    Napier.e(
+                        tag = "PeopleExtractor",
+                        message = "Failed to extract people",
+                        throwable = response.throwable
+                    )
+                    response
                 }
-                val people = response.split("\n")
-                    .map { it.trim() }
-                    .filter { it.isNotBlank() }
-                    .map { Person(name = it) }
-                AIResult.Success(people, fromCache = false)
-            } catch (e: Exception) {
-                Napier.e(
-                    tag = "PeopleExtractor",
-                    message = "Failed to extract people",
-                    throwable = e
-                )
-                AIResult.Error(AIError.Unknown, e)
             }
         }
 }

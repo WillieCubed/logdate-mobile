@@ -66,20 +66,29 @@ Intelligence Module
 
 ### Entry Summarization
 ```kotlin
-val summarizer = EntrySummarizer(openAiClient)
-val summary = summarizer.summarizeEntry(
-    content = "Long journal entry text...",
-    maxLength = 100
+val summarizer = EntrySummarizer(cache, openAiClient, networkMonitor)
+val result = summarizer.summarize(
+    summaryId = "entry-123",
+    text = "Long journal entry text...",
+    useCached = true
 )
+val summary = when (result) {
+    is AIResult.Success -> result.value
+    else -> null
+}
 ```
 
 ### People Extraction
 ```kotlin
-val extractor = PeopleExtractor(openAiClient)
-val people = extractor.extractPeople(
-    content = "Had lunch with Alice and Bob today."
+val extractor = PeopleExtractor(cache, openAiClient, networkMonitor)
+val result = extractor.extractPeople(
+    documentId = "entry-123",
+    text = "Had lunch with Alice and Bob today."
 )
-// Returns: ["Alice", "Bob"]
+val people = when (result) {
+    is AIResult.Success -> result.value
+    else -> emptyList()
+}
 ```
 
 ## Platform Considerations

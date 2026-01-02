@@ -2,6 +2,7 @@ package app.logdate.client.domain.onboarding
 
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
+import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.shared.model.profile.LogDateProfile
@@ -98,11 +99,16 @@ Guidelines:
                 content = "My name is $name and here's a bit about me: $bio"
             )
 
-            val messages = listOf(systemMessage, userMessage)
-            val response = generativeAiClient.submit(messages)
-            
-            response?.takeIf { it.isNotBlank() }
-                ?: createFallbackResponse(name)
+            val response = generativeAiClient.submit(
+                GenerativeAIRequest(messages = listOf(systemMessage, userMessage))
+            )
+            when (response) {
+                is app.logdate.client.intelligence.AIResult.Success -> {
+                    response.value.content.takeIf { it.isNotBlank() }
+                        ?: createFallbackResponse(name)
+                }
+                else -> createFallbackResponse(name)
+            }
                 
         } catch (e: Exception) {
             Napier.w("LLM processing failed, using fallback response", e)
