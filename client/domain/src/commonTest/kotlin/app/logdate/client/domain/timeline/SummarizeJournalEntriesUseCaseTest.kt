@@ -1,8 +1,12 @@
 package app.logdate.client.domain.timeline
 
 import app.logdate.client.intelligence.EntrySummarizer
+import app.logdate.client.intelligence.cache.AICacheKeyInput
+import app.logdate.client.intelligence.cache.DefaultAICacheKeyStrategy
 import app.logdate.client.intelligence.cache.GenerativeAICache
 import app.logdate.client.intelligence.cache.GenerativeAICacheEntry
+import app.logdate.client.intelligence.cache.GenerativeAICacheEntryMetadata
+import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
 import app.logdate.client.intelligence.AIError
 import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
@@ -17,6 +21,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlin.time.Duration.Companion.seconds
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -153,7 +158,7 @@ class SummarizeJournalEntriesUseCaseTest {
     }
 
     @Test
-    fun `invoke should generate consistent hash key for same entries`() = runTest {
+    fun `invoke should generate consistent cache request for same entries`() = runTest {
         // Given
         val testEntries = listOf(
             createTestNote("Content 1"),
@@ -168,7 +173,7 @@ class SummarizeJournalEntriesUseCaseTest {
         
         // Then
         assertEquals(2, fakeCache.getCalls.size)
-        // Both calls should have the same summary key
+        // Both calls should use the same cache request
         assertEquals(
             fakeCache.getCalls[0],
             fakeCache.getCalls[1]
@@ -202,30 +207,61 @@ class SummarizeJournalEntriesUseCaseTest {
     }
 
     private class FakeGenerativeAICache : GenerativeAICache {
-        val getCalls = mutableListOf<String>()
-        val putCalls = mutableListOf<Pair<String, String>>()
         private val store = mutableMapOf<String, GenerativeAICacheEntry>()
+        private val keyStrategy = DefaultAICacheKeyStrategy()
+        val getCalls = mutableListOf<GenerativeAICacheRequest>()
+        val putCalls = mutableListOf<Pair<GenerativeAICacheRequest, String>>()
 
-        override suspend fun getEntry(key: String): GenerativeAICacheEntry? {
-            getCalls.add(key)
-            return store[key]
+        override suspend fun getEntry(request: GenerativeAICacheRequest): GenerativeAICacheEntry? {
+            getCalls.add(request)
+            val key = keyStrategy.createKey(request.toKeyInput())
+            return store[key.value]
         }
 
-        override suspend fun putEntry(key: String, value: String) {
-            putCalls.add(key to value)
-            store[key] = GenerativeAICacheEntry(
-                key = key,
-                content = value,
-                lastUpdated = Clock.System.now()
+        override suspend fun putEntry(request: GenerativeAICacheRequest, content: String) {
+            putCalls.add(request to content)
+            val key = keyStrategy.createKey(request.toKeyInput())
+            val now = Clock.System.now()
+            val expiresAt = now + request.policy.ttlSeconds.seconds
+            store[key.value] = GenerativeAICacheEntry(
+                key = key.value,
+                content = content,
+                lastUpdated = now,
+                metadata = GenerativeAICacheEntryMetadata(
+                    contentTypeId = request.contentType.id,
+                    providerId = request.providerId,
+                    model = request.model,
+                    promptVersion = request.promptVersion,
+                    schemaVersion = request.schemaVersion,
+                    templateId = request.templateId,
+                    ttlSeconds = request.policy.ttlSeconds,
+                    expiresAt = expiresAt,
+                    sourceHash = key.sourceHash,
+                    debugPrefix = key.debugPrefix,
+                    contentBytes = content.encodeToByteArray().size.toLong()
+                )
             )
         }
 
         override suspend fun purge() {
             store.clear()
         }
+
+        private fun GenerativeAICacheRequest.toKeyInput() = AICacheKeyInput(
+            contentType = contentType,
+            inputText = inputText,
+            providerId = providerId,
+            model = model,
+            promptVersion = promptVersion,
+            schemaVersion = schemaVersion,
+            templateId = templateId,
+            policy = policy
+        )
     }
 
     private class FakeGenerativeAIChatClient : GenerativeAIChatClient {
+        override val providerId: String = "fake"
+        override val defaultModel: String? = "fake-model"
         val prompts = mutableListOf<List<GenerativeAIChatMessage>>()
         var response: String? = "Default summary"
         var shouldThrowException = false
