@@ -4,8 +4,15 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 
 /**
  * Data class representing a user session
@@ -21,8 +28,7 @@ data class UserSession(
  */
 interface SessionStorage {
     /**
-     * Gets the current session synchronously.
-     * May block on first call.
+     * Gets the current session synchronously from the latest cached value.
      */
     fun getSession(): UserSession?
 
@@ -52,7 +58,8 @@ interface SessionStorage {
  * DataStore-based implementation of SessionStorage for secure token persistence
  */
 class DataStoreSessionStorage(
-    private val dataStore: DataStore<Preferences>
+    private val dataStore: DataStore<Preferences>,
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 ) : SessionStorage {
     
     companion object {
@@ -60,33 +67,39 @@ class DataStoreSessionStorage(
         private val REFRESH_TOKEN_KEY = stringPreferencesKey("refresh_token")
         private val ACCOUNT_ID_KEY = stringPreferencesKey("account_id")
     }
-    
-    override fun getSession(): UserSession? {
-        return try {
-            val preferences = kotlinx.coroutines.runBlocking {
-                dataStore.data.first()
-            }
-            
-            val accessToken = preferences[ACCESS_TOKEN_KEY]
-            val refreshToken = preferences[REFRESH_TOKEN_KEY]
-            val accountId = preferences[ACCOUNT_ID_KEY]
-            
-            if (accessToken != null && refreshToken != null && accountId != null) {
-                UserSession(
-                    accessToken = accessToken,
-                    refreshToken = refreshToken,
-                    accountId = accountId
-                )
-            } else {
-                null
-            }
-        } catch (e: Exception) {
-            null
+
+    private val sessionState = MutableStateFlow<UserSession?>(null)
+
+    init {
+        scope.launch {
+            dataStore.data
+                .map { preferences ->
+                    val accessToken = preferences[ACCESS_TOKEN_KEY]
+                    val refreshToken = preferences[REFRESH_TOKEN_KEY]
+                    val accountId = preferences[ACCOUNT_ID_KEY]
+
+                    if (accessToken != null && refreshToken != null && accountId != null) {
+                        UserSession(
+                            accessToken = accessToken,
+                            refreshToken = refreshToken,
+                            accountId = accountId
+                        )
+                    } else {
+                        null
+                    }
+                }
+                .distinctUntilChanged()
+                .collect { sessionState.value = it }
         }
+    }
+
+    override fun getSession(): UserSession? {
+        return sessionState.value
     }
     
     override fun saveSession(session: UserSession) {
-        kotlinx.coroutines.runBlocking {
+        sessionState.value = session
+        scope.launch {
             dataStore.edit { preferences ->
                 preferences[ACCESS_TOKEN_KEY] = session.accessToken
                 preferences[REFRESH_TOKEN_KEY] = session.refreshToken
@@ -96,7 +109,8 @@ class DataStoreSessionStorage(
     }
     
     override fun clearSession() {
-        kotlinx.coroutines.runBlocking {
+        sessionState.value = null
+        scope.launch {
             dataStore.edit { preferences ->
                 preferences.remove(ACCESS_TOKEN_KEY)
                 preferences.remove(REFRESH_TOKEN_KEY)
@@ -108,31 +122,21 @@ class DataStoreSessionStorage(
     /**
      * Flow-based version of getSession for reactive use cases
      */
-    override fun getSessionFlow() = dataStore.data.map { preferences ->
-        val accessToken = preferences[ACCESS_TOKEN_KEY]
-        val refreshToken = preferences[REFRESH_TOKEN_KEY]
-        val accountId = preferences[ACCOUNT_ID_KEY]
-        
-        if (accessToken != null && refreshToken != null && accountId != null) {
-            UserSession(
-                accessToken = accessToken,
-                refreshToken = refreshToken,
-                accountId = accountId
-            )
-        } else {
-            null
-        }
-    }
+    override fun getSessionFlow() = sessionState.asStateFlow()
     
     /**
      * Check if a valid session exists
      */
     override suspend fun hasValidSession(): Boolean {
+        val cached = sessionState.value
+        if (cached != null) {
+            return true
+        }
         return try {
             val preferences = dataStore.data.first()
-            preferences[ACCESS_TOKEN_KEY] != null && 
-            preferences[REFRESH_TOKEN_KEY] != null && 
-            preferences[ACCOUNT_ID_KEY] != null
+            preferences[ACCESS_TOKEN_KEY] != null &&
+                preferences[REFRESH_TOKEN_KEY] != null &&
+                preferences[ACCOUNT_ID_KEY] != null
         } catch (e: Exception) {
             false
         }
