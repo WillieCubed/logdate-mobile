@@ -1,19 +1,29 @@
 package app.logdate.client.intelligence.cache
 
 /**
- * A local cache that stores generative AI summaries.
+ * A local cache that stores generative AI responses.
  */
 interface AICacheLocalDataSource {
 
     /**
-     * Retrieves a generative AI summary from the cache.
+     * Retrieves a generative AI response from the cache.
      */
-    operator fun get(key: String): GenerativeAICacheEntry?
+    fun get(key: String): GenerativeAICacheEntry?
 
     /**
-     * Stores a generative AI summary in the cache.
+     * Stores a generative AI response in the cache.
      */
-    operator fun set(key: String, summary: GenerativeAICacheEntry)
+    fun set(key: String, entry: GenerativeAICacheEntry)
+
+    /**
+     * Removes a cached entry by key.
+     */
+    fun remove(key: String)
+
+    /**
+     * Lists all cached entries stored locally.
+     */
+    fun entries(): List<GenerativeAICacheEntry>
 
     /**
      * Clears the cache of all generative AI entries.
