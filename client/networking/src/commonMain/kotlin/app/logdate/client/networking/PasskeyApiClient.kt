@@ -13,7 +13,27 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 
 /**
- * API client for passkey-based account creation and authentication
+ * Interface for passkey API operations.
+ */
+interface PasskeyApiClientContract {
+    suspend fun checkUsernameAvailability(username: String): Result<UsernameAvailabilityData>
+    suspend fun beginAccountCreation(request: BeginAccountCreationRequest): Result<BeginAccountCreationData>
+    suspend fun completeAccountCreation(request: CompleteAccountCreationRequest): Result<CompleteAccountCreationData>
+    suspend fun beginAuthentication(request: BeginAuthenticationRequest): Result<BeginAuthenticationData>
+    suspend fun completeAuthentication(request: CompleteAuthenticationRequest): Result<CompleteAuthenticationData>
+    suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount>
+    suspend fun updateAccountProfile(
+        accessToken: String,
+        displayName: String? = null,
+        username: String? = null,
+        bio: String? = null
+    ): Result<LogDateAccount>
+    suspend fun refreshToken(refreshToken: String): Result<String>
+    suspend fun deletePasskey(accessToken: String, credentialId: String): Result<Unit>
+}
+
+/**
+ * API client for passkey-based account creation and authentication.
  */
 class PasskeyApiClient(
     private val httpClient: HttpClient,
@@ -22,7 +42,7 @@ class PasskeyApiClient(
         ignoreUnknownKeys = true
         encodeDefaults = false
     }
-) {
+) : PasskeyApiClientContract {
     companion object {
         private const val ACCOUNTS_PATH = "/accounts"
     }
@@ -32,7 +52,7 @@ class PasskeyApiClient(
     /**
      * Check if a username is available for registration
      */
-    suspend fun checkUsernameAvailability(username: String): Result<UsernameAvailabilityData> {
+    override suspend fun checkUsernameAvailability(username: String): Result<UsernameAvailabilityData> {
         return try {
             val baseUrl = getBaseUrl()
             val response = httpClient.get("$baseUrl$ACCOUNTS_PATH/username/$username/available")
@@ -53,7 +73,7 @@ class PasskeyApiClient(
     /**
      * Begin the account creation process
      */
-    suspend fun beginAccountCreation(request: BeginAccountCreationRequest): Result<BeginAccountCreationData> {
+    override suspend fun beginAccountCreation(request: BeginAccountCreationRequest): Result<BeginAccountCreationData> {
         return try {
             val baseUrl = getBaseUrl()
             val response = httpClient.post("$baseUrl$ACCOUNTS_PATH/create/begin") {
@@ -77,7 +97,7 @@ class PasskeyApiClient(
     /**
      * Complete the account creation process with passkey credential
      */
-    suspend fun completeAccountCreation(request: CompleteAccountCreationRequest): Result<CompleteAccountCreationData> {
+    override suspend fun completeAccountCreation(request: CompleteAccountCreationRequest): Result<CompleteAccountCreationData> {
         return try {
             val baseUrl = getBaseUrl()
             val response = httpClient.post("$baseUrl$ACCOUNTS_PATH/create/complete") {
@@ -101,7 +121,7 @@ class PasskeyApiClient(
     /**
      * Begin the authentication process
      */
-    suspend fun beginAuthentication(request: BeginAuthenticationRequest): Result<BeginAuthenticationData> {
+    override suspend fun beginAuthentication(request: BeginAuthenticationRequest): Result<BeginAuthenticationData> {
         return try {
             val baseUrl = getBaseUrl()
             val response = httpClient.post("$baseUrl$ACCOUNTS_PATH/authenticate/begin") {
@@ -125,7 +145,7 @@ class PasskeyApiClient(
     /**
      * Complete the authentication process with passkey assertion
      */
-    suspend fun completeAuthentication(request: CompleteAuthenticationRequest): Result<CompleteAuthenticationData> {
+    override suspend fun completeAuthentication(request: CompleteAuthenticationRequest): Result<CompleteAuthenticationData> {
         return try {
             val baseUrl = getBaseUrl()
             val response = httpClient.post("$baseUrl$ACCOUNTS_PATH/authenticate/complete") {
@@ -149,7 +169,7 @@ class PasskeyApiClient(
     /**
      * Get current account information (requires authentication)
      */
-    suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount> {
+    override suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount> {
         return try {
             val baseUrl = getBaseUrl()
             val response = httpClient.get("$baseUrl$ACCOUNTS_PATH/me") {
@@ -172,11 +192,11 @@ class PasskeyApiClient(
     /**
      * Update account profile information (requires authentication)
      */
-    suspend fun updateAccountProfile(
+    override suspend fun updateAccountProfile(
         accessToken: String,
-        displayName: String? = null,
-        username: String? = null,
-        bio: String? = null
+        displayName: String?,
+        username: String?,
+        bio: String?
     ): Result<LogDateAccount> {
         return try {
             val baseUrl = getBaseUrl()
@@ -207,7 +227,7 @@ class PasskeyApiClient(
     /**
      * Refresh access token using refresh token
      */
-    suspend fun refreshToken(refreshToken: String): Result<String> {
+    override suspend fun refreshToken(refreshToken: String): Result<String> {
         return try {
             val baseUrl = getBaseUrl()
             val response = httpClient.post("$baseUrl$ACCOUNTS_PATH/refresh") {
@@ -231,7 +251,7 @@ class PasskeyApiClient(
     /**
      * Delete a specific passkey credential (requires authentication)
      */
-    suspend fun deletePasskey(accessToken: String, credentialId: String): Result<Unit> {
+    override suspend fun deletePasskey(accessToken: String, credentialId: String): Result<Unit> {
         return try {
             val baseUrl = getBaseUrl()
             val response = httpClient.delete("$baseUrl/passkeys/$credentialId") {
