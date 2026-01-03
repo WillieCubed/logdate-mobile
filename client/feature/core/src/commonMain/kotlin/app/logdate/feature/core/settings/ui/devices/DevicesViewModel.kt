@@ -6,7 +6,6 @@ import app.logdate.client.device.identity.DefaultDeviceManager
 import app.logdate.client.device.models.DeviceInfo
 import app.logdate.client.device.models.DevicePlatform
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,7 +31,7 @@ class DevicesViewModel(
     fun loadDevices() {
         _uiState.update { it.copy(isLoading = true) }
         
-        viewModelScope.launch(Dispatchers.Default) {
+        viewModelScope.launch {
             try {
                 // Get current device info
                 val currentDevice = deviceManager.getCurrentDeviceInfo()
@@ -84,7 +83,12 @@ class DevicesViewModel(
     fun removeDevice(deviceId: Uuid) {
         viewModelScope.launch {
             try {
-                deviceManager.removeDevice(deviceId)
+                val result = deviceManager.removeDevice(deviceId)
+                if (result.isFailure) {
+                    val message = result.exceptionOrNull()?.message ?: "Unknown error"
+                    _uiState.update { it.copy(error = "Failed to remove device: $message") }
+                    return@launch
+                }
                 loadDevices() // Reload devices to update UI
             } catch (e: Exception) {
                 Napier.e("Failed to remove device", e)
