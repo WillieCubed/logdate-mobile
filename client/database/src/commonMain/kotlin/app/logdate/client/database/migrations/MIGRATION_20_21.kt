@@ -31,17 +31,9 @@ val MIGRATION_20_21 = object : Migration(20, 21) {
                 entityId TEXT NOT NULL,
                 operation TEXT NOT NULL,
                 createdAt INTEGER NOT NULL,
-                retryCount INTEGER NOT NULL DEFAULT 0,
+                retryCount INTEGER NOT NULL,
                 PRIMARY KEY (entityType, entityId)
             )
-            """.trimIndent()
-        )
-
-        // Index for efficient lookup by entity type
-        connection.execSQL(
-            """
-            CREATE INDEX IF NOT EXISTS idx_pending_uploads_entity_type
-            ON pending_uploads(entityType)
             """.trimIndent()
         )
     }
