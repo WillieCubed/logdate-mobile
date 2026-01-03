@@ -53,14 +53,27 @@ class PasskeyCreationViewModel(
                     username = username,
                     displayName = displayName
                 )
-                
-                // Store the account ID for later use
-                val accountId = result.toString()
-                
-                _uiState.update { it.copy(passkeyCreated = true) }
-                
-                // Then create the cloud account
-                createCloudAccount(username, displayName, accountId)
+
+                when (result) {
+                    is CreatePasskeyAccountUseCase.Result.Success -> {
+                        _uiState.update { 
+                            it.copy(
+                                isCreatingPasskey = false,
+                                passkeyCreated = true
+                            ) 
+                        }
+                        // Then create the cloud account
+                        createCloudAccount(username, displayName)
+                    }
+                    is CreatePasskeyAccountUseCase.Result.Error -> {
+                        _uiState.update { 
+                            it.copy(
+                                isCreatingPasskey = false,
+                                errorMessage = "Failed to create passkey. Please try again."
+                            ) 
+                        }
+                    }
+                }
             } catch (e: Exception) {
                 Napier.e("Failed to create passkey", e)
                 _uiState.update { 
@@ -105,7 +118,7 @@ class PasskeyCreationViewModel(
         }
     }
     
-    private suspend fun createCloudAccount(username: String, displayName: String, accountId: String) {
+    private suspend fun createCloudAccount(username: String, displayName: String) {
         _uiState.update { it.copy(isCreatingAccount = true) }
         
         try {
@@ -116,16 +129,28 @@ class PasskeyCreationViewModel(
             )
             
             // Clear the account setup data since we're done with it
-            getAccountSetupDataUseCase(
-                action = GetAccountSetupDataUseCase.Action.Clear
-            )
-            
-            _uiState.update { 
-                it.copy(
-                    isCreatingAccount = false,
-                    accountCreated = true,
-                    navigateToNextScreen = true
-                ) 
+            when (result) {
+                is CreateRemoteAccountUseCase.Result.Success -> {
+                    getAccountSetupDataUseCase(
+                        action = GetAccountSetupDataUseCase.Action.Clear
+                    )
+
+                    _uiState.update { 
+                        it.copy(
+                            isCreatingAccount = false,
+                            accountCreated = true,
+                            navigateToNextScreen = true
+                        ) 
+                    }
+                }
+                is CreateRemoteAccountUseCase.Result.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isCreatingAccount = false,
+                            errorMessage = "Failed to create account. Please try again."
+                        )
+                    }
+                }
             }
         } catch (e: Exception) {
             Napier.e("Failed to create cloud account", e)
