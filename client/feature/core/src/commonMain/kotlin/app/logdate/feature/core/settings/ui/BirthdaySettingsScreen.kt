@@ -37,6 +37,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -49,6 +51,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.core.settings.ui.BirthdayUpdateState
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
 import io.github.aakira.napier.Napier
@@ -70,6 +73,25 @@ fun BirthdaySettingsScreen(
     onBack: () -> Unit,
     viewModel: SettingsViewModel = koinViewModel(),
 ) {
+    // Observe birthday update state to know when save completes
+    val birthdayUpdateState by viewModel.birthdayUpdateState.collectAsState()
+
+    // Navigate back after successful save
+    LaunchedEffect(birthdayUpdateState) {
+        when (birthdayUpdateState) {
+            is BirthdayUpdateState.Success -> {
+                Napier.d("Birthday saved successfully, navigating back")
+                viewModel.resetBirthdayUpdateState()
+                onBack()
+            }
+            is BirthdayUpdateState.Error -> {
+                val errorMsg = (birthdayUpdateState as BirthdayUpdateState.Error).message
+                Napier.e("Failed to save birthday: $errorMsg")
+            }
+            else -> { /* Idle or Updating - do nothing */ }
+        }
+    }
+
     // Get initial birthday from userData just once
     val initialBirthday = remember {
         val currentBirthday = viewModel.uiState.value.userData.birthday
@@ -123,13 +145,13 @@ fun BirthdaySettingsScreen(
         datePickerState.selectedDateMillis?.let { millis ->
             val birthdayInstant = Instant.fromEpochMilliseconds(millis)
             Napier.d("BirthdayScreen: Save clicked with date $birthdayInstant")
-            // Update the birthday and immediately navigate back
+            // Update the birthday - LaunchedEffect will handle navigation when save completes
             viewModel.updateBirthday(birthdayInstant)
         } ?: run {
             Napier.w("BirthdayScreen: Save clicked but no date selected")
+            // If no date selected, just go back
+            onBack()
         }
-        // Navigate back after saving
-        onBack()
     }
     
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()

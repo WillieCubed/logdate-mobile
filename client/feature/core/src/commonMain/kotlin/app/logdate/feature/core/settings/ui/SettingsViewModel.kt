@@ -135,7 +135,7 @@ class SettingsViewModel(
     
     /**
      * Updates the user's birthday.
-     * 
+     *
      * @param birthday The new birthday date
      */
     fun updateBirthday(birthday: Instant) {
@@ -154,6 +154,14 @@ class SettingsViewModel(
                 )
             }
         }
+    }
+
+    /**
+     * Resets the birthday update state to Idle.
+     * Should be called after successfully navigating back from the birthday settings screen.
+     */
+    fun resetBirthdayUpdateState() {
+        _birthdayUpdateState.value = BirthdayUpdateState.Idle
     }
 
     init {
