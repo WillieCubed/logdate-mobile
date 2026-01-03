@@ -94,6 +94,9 @@ fun MainEditorContent(
                         onBlockUpdated = { updatedBlock ->
                             uiState.onUpdateBlock(updatedBlock)
                         },
+                        onBlockDeleted = { blockId ->
+                            uiState.onDeleteBlock(blockId)
+                        },
                         audioState = uiState.audioState,
                         modifier = Modifier.conditional(true) {
                             fillMaxSize()
@@ -130,6 +133,7 @@ fun <T : EntryBlockUiState> BlockContent(
     block: T,
     onBlockFocused: (Uuid) -> Unit,
     onBlockUpdated: (T) -> Unit,
+    onBlockDeleted: (Uuid) -> Unit,
     audioState: EditorRecorderState? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -191,7 +195,7 @@ fun <T : EntryBlockUiState> BlockContent(
                         onBlockUpdated(updatedBlock as T)
                     },
                     onDeleteRequested = {
-                        // Block deletion placeholder
+                        onBlockDeleted(block.id)
                     }
                 )
             }
@@ -204,7 +208,7 @@ fun <T : EntryBlockUiState> BlockContent(
                         onBlockUpdated(updatedBlock as T)
                     },
                     onDeleteRequested = {
-                        // Block deletion placeholder
+                        onBlockDeleted(block.id)
                     }
                 )
             }

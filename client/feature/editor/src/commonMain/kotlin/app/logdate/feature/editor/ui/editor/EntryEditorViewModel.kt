@@ -338,6 +338,18 @@ class EntryEditorViewModel(
     }
 
     /**
+     * Removes a block from the entry.
+     */
+    fun removeBlock(blockId: Uuid) {
+        Napier.d("Removing block: $blockId")
+        _mutableState.update { currentState ->
+            currentState.apply {
+                removeBlock(blockId)
+            }.copy(isModified = true)
+        }
+    }
+
+    /**
      * Autosaves the current entry state using the AutoSaveDelegate.
      */
     fun autoSaveEntry(state: EditorState) {

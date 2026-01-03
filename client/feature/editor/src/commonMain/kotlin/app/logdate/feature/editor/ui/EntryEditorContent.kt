@@ -100,6 +100,7 @@ fun EntryEditorContent(
         onUpdateBlock = viewModel::updateBlock,
         onFocusBlock = viewModel::setExpandedBlockId,
         onCreateBlock = viewModel::createNewBlock,
+        onDeleteBlock = viewModel::removeBlock,
         onUpdateJournalSelection = viewModel::setSelectedJournals,
     )
     

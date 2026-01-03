@@ -49,6 +49,11 @@ class CameraViewModel(
     }
 
     /**
+     * Returns the camera capture manager for platform-specific operations.
+     */
+    fun getCaptureManager(): CameraCaptureManager = cameraCaptureManager
+
+    /**
      * Stops the camera preview.
      */
     fun stopPreview() {

@@ -67,6 +67,7 @@ fun CameraBlockEditor(
                     )
                 )
             },
+            onClose = onDeleteRequested,
             modifier = modifier
         )
     }
@@ -173,13 +174,15 @@ private fun formatDuration(durationMs: Long): String {
 
 /**
  * Platform-specific camera capture content.
- * Shows an inline preview that expands to fullscreen on tap.
+ * Shows an inline preview with camera controls.
  *
  * @param onMediaCaptured Callback when media is captured, providing URI, type, and duration
+ * @param onClose Callback when the user closes the camera without capturing
  * @param modifier Modifier for layout customization
  */
 @Composable
 expect fun CameraCaptureContent(
     onMediaCaptured: (uri: String, mediaType: CapturedMediaType, durationMs: Long) -> Unit,
+    onClose: () -> Unit,
     modifier: Modifier = Modifier
 )

@@ -1,7 +1,6 @@
 package app.logdate.feature.editor.ui.camera
 
 import android.Manifest
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -12,13 +11,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FiberManualRecord
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -42,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,8 +52,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import app.logdate.feature.editor.ui.photovideo.CameraType
 import app.logdate.feature.editor.ui.photovideo.LiveCameraPreview
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -63,15 +61,15 @@ import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * Android implementation of the camera capture content.
- * Shows an inline preview that expands to a fullscreen capture dialog on tap.
+ * Shows an inline camera with controls for capturing photos/videos.
  */
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 actual fun CameraCaptureContent(
     onMediaCaptured: (uri: String, mediaType: CapturedMediaType, durationMs: Long) -> Unit,
+    onClose: () -> Unit,
     modifier: Modifier
 ) {
-    var isFullscreen by remember { mutableStateOf(false) }
     val viewModel: CameraViewModel = koinViewModel()
     val uiState by viewModel.uiState.collectAsState()
 
@@ -82,6 +80,16 @@ actual fun CameraCaptureContent(
         )
     )
 
+    val hasPermissions by remember {
+        derivedStateOf { cameraPermissions.allPermissionsGranted }
+    }
+
+    LaunchedEffect(cameraPermissions.permissions) {
+        Napier.d("Camera permissions state: ${cameraPermissions.permissions.map {
+            "${it.permission}: ${it.status}"
+        }}")
+    }
+
     LaunchedEffect(uiState.capturedMediaUri) {
         uiState.capturedMediaUri?.let { uri ->
             val mediaType = uiState.capturedMediaType ?: CapturedMediaType.PHOTO
@@ -89,31 +97,21 @@ actual fun CameraCaptureContent(
             Napier.d("CameraCaptureContent - Captured media: $uri, type: $mediaType, duration: $duration")
             onMediaCaptured(uri, mediaType, duration)
             viewModel.clearCapturedMedia()
-            isFullscreen = false
         }
     }
 
-    if (!cameraPermissions.allPermissionsGranted) {
+    if (!hasPermissions) {
         CameraPermissionRequest(
             onRequestPermission = { cameraPermissions.launchMultiplePermissionRequest() },
             modifier = modifier
         )
     } else {
-        InlineCameraPreview(
-            onClick = { isFullscreen = true },
+        InlineCameraCapture(
+            viewModel = viewModel,
+            uiState = uiState,
+            onClose = onClose,
             modifier = modifier
         )
-
-        if (isFullscreen) {
-            FullscreenCameraCapture(
-                viewModel = viewModel,
-                uiState = uiState,
-                onDismiss = {
-                    viewModel.stopPreview()
-                    isFullscreen = false
-                }
-            )
-        }
     }
 }
 
@@ -129,7 +127,7 @@ private fun CameraPermissionRequest(
         onClick = onRequestPermission,
         modifier = modifier
             .fillMaxWidth()
-            .height(200.dp),
+            .defaultMinSize(minHeight = 200.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
@@ -157,71 +155,23 @@ private fun CameraPermissionRequest(
 }
 
 /**
- * Inline camera preview card that shows a hint to tap for capture.
+ * First-class inline camera capture interface with live preview and controls.
+ * Works like Instagram stories - capture directly without opening fullscreen.
  */
 @Composable
-private fun InlineCameraPreview(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .height(200.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(64.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.CameraAlt,
-                            contentDescription = "Open camera",
-                            modifier = Modifier.size(32.dp),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = "Tap to capture",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "Photo or video",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-            }
-        }
-    }
-}
-
-/**
- * Fullscreen camera capture dialog with live preview and controls.
- */
-@Composable
-private fun FullscreenCameraCapture(
+private fun InlineCameraCapture(
     viewModel: CameraViewModel,
     uiState: CameraUiState,
-    onDismiss: () -> Unit
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    BackHandler { onDismiss() }
-
-    LaunchedEffect(Unit) {
+    LaunchedEffect(lifecycleOwner) {
+        val manager = viewModel.getCaptureManager()
+        if (manager is AndroidCameraCaptureManager) {
+            manager.setLifecycleOwner(lifecycleOwner)
+        }
         viewModel.startPreview()
     }
 
@@ -231,19 +181,15 @@ private fun FullscreenCameraCapture(
         }
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            dismissOnBackPress = true,
-            dismissOnClickOutside = false
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .fillMaxSize(),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.Black
         )
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black)
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             val cameraType = when (uiState.cameraFacing) {
                 CameraFacing.FRONT -> CameraType.FRONT
                 CameraFacing.BACK -> CameraType.BACK
@@ -258,13 +204,13 @@ private fun FullscreenCameraCapture(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .statusBarsPadding()
+                    .align(Alignment.TopStart)
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
-                    onClick = onDismiss,
+                    onClick = onClose,
                     modifier = Modifier
                         .background(Color.Black.copy(alpha = 0.5f), CircleShape)
                 ) {
@@ -275,6 +221,10 @@ private fun FullscreenCameraCapture(
                     )
                 }
 
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                 if (uiState.isRecording) {
                     Surface(
                         shape = RoundedCornerShape(16.dp),
@@ -298,8 +248,7 @@ private fun FullscreenCameraCapture(
                             )
                         }
                     }
-                } else {
-                    Spacer(modifier = Modifier.width(48.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                 }
 
                 IconButton(
@@ -314,13 +263,13 @@ private fun FullscreenCameraCapture(
                         tint = if (uiState.isRecording) Color.Gray else Color.White
                     )
                 }
+                }
             }
 
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(bottom = 32.dp),
+                    .padding(bottom = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 AnimatedVisibility(
@@ -334,7 +283,7 @@ private fun FullscreenCameraCapture(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 ShutterButton(
                     isRecording = uiState.isRecording,
@@ -348,8 +297,7 @@ private fun FullscreenCameraCapture(
                 Surface(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .statusBarsPadding()
-                        .padding(top = 80.dp),
+                        .padding(top = 16.dp),
                     shape = RoundedCornerShape(8.dp),
                     color = MaterialTheme.colorScheme.errorContainer
                 ) {

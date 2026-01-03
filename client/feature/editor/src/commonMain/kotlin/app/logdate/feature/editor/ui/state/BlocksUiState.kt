@@ -29,6 +29,7 @@ class BlocksUiState(
     val navigationState: EditorNavigationState,
     val onUpdateBlock: (EntryBlockUiState) -> Unit,
     val onCreateBlock: (BlockType) -> EntryBlockUiState,
+    val onDeleteBlock: (Uuid) -> Unit,
 ) {
     val hasContent get() = blocks.isNotEmpty() && blocks.any { it.hasContent() }
     val pagerState get() = navigationState.pagerState
@@ -84,6 +85,7 @@ fun rememberBlocksUiState(
     onUpdateBlock: (EntryBlockUiState) -> Unit,
     onFocusBlock: (Uuid) -> Unit,
     onCreateBlock: (BlockType) -> EntryBlockUiState,
+    onDeleteBlock: (Uuid) -> Unit,
     onUpdateJournalSelection: (List<Uuid>) -> Unit
 ): BlocksUiState {
     val coroutineScope = rememberCoroutineScope()
@@ -151,6 +153,10 @@ fun rememberBlocksUiState(
                 // Log the block update for debugging
                 Napier.d("Updating block: ${it.id}")
                 onUpdateBlock(it)
+            },
+            onDeleteBlock = { blockId ->
+                Napier.d("Deleting block: $blockId")
+                onDeleteBlock(blockId)
             }
         )
     }
