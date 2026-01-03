@@ -1276,8 +1276,16 @@ class AsyncLoadingState<T>(
 
     // Properties
     val isLoading: Boolean get() = status is LoadingStatus.Loading
-    val data: T? get() = (status as? LoadingStatus.Success)?.data
-    val error: Throwable? get() = (status as? LoadingStatus.Error)?.error
+    val data: T?
+        get() = when (val current = status) {
+            is LoadingStatus.Success -> current.data
+            else -> null
+        }
+    val error: Throwable?
+        get() = when (val current = status) {
+            is LoadingStatus.Error -> current.error
+            else -> null
+        }
     
     // Action
     fun load() {
