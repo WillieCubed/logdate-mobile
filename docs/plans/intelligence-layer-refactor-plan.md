@@ -187,9 +187,9 @@ Phase 6: Validation, QA, rollout, and documentation updates.
 ### 3.1 Structured output strategy
 - [ ] Define JSON schemas for each intelligence task.
 - [ ] Use schema-first prompting with validation before parsing.
-- [ ] Prefer provider-native structured output features when available.
+- [x] Prefer provider-native structured output features when available.
 - [ ] Include schema version in responses and cache keys.
-- [ ] Fallback: best-effort parsing with strict validation and safe error paths.
+- [x] Fallback: best-effort parsing with strict validation and safe error paths.
 
 ### 3.2 Summarization output schema
 - [ ] Define SummaryResponse schema: summaryText, lengthHint, tone, keyPoints.
@@ -201,21 +201,21 @@ Phase 6: Validation, QA, rollout, and documentation updates.
 ### 3.3 People extraction schema
 - [ ] Define PeopleExtractionResponse schema: people[], confidence, ambiguousTokens.
 - [ ] Require each person to include name and optional title/context.
-- [ ] Update PeopleExtractor prompts to request JSON output.
-- [ ] Add strict validation to filter empty or invalid names.
+- [x] Update PeopleExtractor prompts to request JSON output.
+- [x] Add strict validation to filter empty or invalid names.
 - [ ] Add fallback heuristics if JSON is invalid (line split).
 
 ### 3.4 Week narrative schema
-- [ ] Define NarrativeResponse schema with themes, emotionalTone, storyBeats, overallNarrative.
+- [x] Define NarrativeResponse schema with themes, emotionalTone, storyBeats, overallNarrative.
 - [ ] Require evidenceIds to match input IDs or be empty.
-- [ ] Add schema-based parsing with error reporting.
-- [ ] Update parseNarrativeResponse to use the schema validator first.
+- [x] Add schema-based parsing with error reporting.
+- [x] Update parseNarrativeResponse to use the schema validator first.
 - [ ] Add tests for malformed and extra fields.
 
 ### 3.5 Onboarding response schema
 - [ ] Define OnboardingResponse schema: greeting, reflection, encouragement.
-- [ ] Update ProcessPersonalIntroductionUseCase to request schema output.
-- [ ] Add fallback message generator when schema invalid or missing.
+- [x] Update ProcessPersonalIntroductionUseCase to request schema output.
+- [x] Add fallback message generator when schema invalid or missing.
 
 ### 3.6 Schema utilities
 - [ ] Define a SchemaRegistry with id and version fields.
@@ -224,7 +224,7 @@ Phase 6: Validation, QA, rollout, and documentation updates.
 - [ ] Add centralized error mapping for JSON parsing failures.
 
 ### 3.7 Provider-specific structured output handling
-- [ ] OpenAI: use response_format json_schema or tools where appropriate.
+- [x] OpenAI: use response_format json_schema or tools where appropriate.
 - [ ] Anthropic: use tool use or JSON mode and parse from content.
 - [ ] Add provider capability flags to select best structured output mode.
 - [ ] Add fallback to unstructured text when provider lacks structured output.
@@ -326,7 +326,7 @@ Phase 6: Validation, QA, rollout, and documentation updates.
 - [ ] Add unit tests for AIResult and AIError mapping.
 - [ ] Add integration tests for each intelligence use case.
 - [ ] Add offline tests to ensure no network calls are attempted.
-- [ ] Add parsing tests for structured output responses.
+- [x] Add parsing tests for structured output responses.
 - [ ] Add provider mock tests for OpenAI and Anthropic clients.
 
 ### 6.2 Performance validation
@@ -336,7 +336,7 @@ Phase 6: Validation, QA, rollout, and documentation updates.
 - [ ] Validate model cost impact with gpt-5.2 defaults.
 
 ### 6.3 Documentation updates
-- [ ] Update client/intelligence/README.md with new APIs, providers, and structured outputs.
+- [x] Update client/intelligence/README.md with new APIs, providers, and structured outputs.
 - [ ] Update docs/environment/setup.md with provider configuration.
 - [ ] Document cache behaviors and invalidation rules.
 - [ ] Add a troubleshooting guide for provider failures and offline mode.
