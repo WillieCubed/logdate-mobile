@@ -56,7 +56,7 @@ class TextProcessingAccuracyTest {
         """.trimIndent()
         
         // Set up expected AI responses
-        val expectedPeople = "Mom\nSarah\nMike\nJessica\nTom"
+        val expectedPeople = jsonResponse("Mom", "Sarah", "Mike", "Jessica", "Tom")
         val expectedSummary = "You had a social day connecting with family, colleagues, and friends from breakfast through dinner."
         
         fakeAIClient.setResponseFor(journalText, expectedPeople) // For people extraction
@@ -96,7 +96,13 @@ class TextProcessingAccuracyTest {
             the meeting, I had coffee with my manager Lisa Rodriguez to discuss my performance review.
         """.trimIndent()
         
-        val expectedPeople = "Richard Williams\nJennifer Liu\nDr. Patel\nAlex Chen\nLisa Rodriguez"
+        val expectedPeople = jsonResponse(
+            "Richard Williams",
+            "Jennifer Liu",
+            "Dr. Patel",
+            "Alex Chen",
+            "Lisa Rodriguez"
+        )
         val expectedSummary = "You attended an important quarterly meeting with leadership and had a productive follow-up with your manager."
         
         fakeAIClient.setResponseFor(journalText, expectedPeople)
@@ -124,7 +130,17 @@ class TextProcessingAccuracyTest {
             It's these family moments that I treasure most.
         """.trimIndent()
         
-        val expectedPeople = "Grandma\nUncle Bob\nAunt Mary\nJake\nEmma\nDad\nGrandpa\nMom\nAunt Susan"
+        val expectedPeople = jsonResponse(
+            "Grandma",
+            "Uncle Bob",
+            "Aunt Mary",
+            "Jake",
+            "Emma",
+            "Dad",
+            "Grandpa",
+            "Mom",
+            "Aunt Susan"
+        )
         val expectedSummary = "You enjoyed a heartwarming family gathering filled with good food, stories, and quality time with multiple generations."
         
         fakeAIClient.setResponseFor(journalText, expectedPeople)
@@ -154,7 +170,7 @@ class TextProcessingAccuracyTest {
             more with them tomorrow.
         """.trimIndent()
         
-        val expectedPeople = "Hiroshi\nYuki\nMaria\nKlaus"
+        val expectedPeople = jsonResponse("Hiroshi", "Yuki", "Maria", "Klaus")
         val expectedSummary = "You had an amazing first day in Tokyo, meeting locals and fellow travelers while exploring the city."
         
         fakeAIClient.setResponseFor(journalText, expectedPeople)
@@ -182,7 +198,7 @@ class TextProcessingAccuracyTest {
             with scheduling and insurance questions.
         """.trimIndent()
         
-        val expectedPeople = "Dr. Sarah Mitchell\nAmy Johnson\nDr. Chen\nMaria"
+        val expectedPeople = jsonResponse("Dr. Sarah Mitchell", "Amy Johnson", "Dr. Chen", "Maria")
         val expectedSummary = "You completed your annual medical checkup with positive results and scheduled appropriate follow-up care."
         
         fakeAIClient.setResponseFor(journalText, expectedPeople)
@@ -210,7 +226,19 @@ class TextProcessingAccuracyTest {
             catching up with high school friend Miguel who I hadn't seen in years.
         """.trimIndent()
         
-        val expectedPeople = "Rachel\nDavid\nJennifer\nMarcus\nAmy\nSteven\nKatie\nTom\nMr. Peterson\nMrs. Peterson\nMiguel"
+        val expectedPeople = jsonResponse(
+            "Rachel",
+            "David",
+            "Jennifer",
+            "Marcus",
+            "Amy",
+            "Steven",
+            "Katie",
+            "Tom",
+            "Mr. Peterson",
+            "Mrs. Peterson",
+            "Miguel"
+        )
         
         fakeAIClient.setResponseFor(journalText, expectedPeople)
         
@@ -285,6 +313,14 @@ class TextProcessingAccuracyTest {
     private fun assertSummarySuccess(result: AIResult<String>): String {
         assertTrue(result is AIResult.Success)
         return result.value
+    }
+
+    private fun jsonResponse(vararg names: String): String {
+        if (names.isEmpty()) {
+            return """{"names":[]}"""
+        }
+        val quoted = names.joinToString(",") { "\"$it\"" }
+        return """{"names":[${quoted}]}"""
     }
 
     private class TestNetworkAvailabilityMonitor(

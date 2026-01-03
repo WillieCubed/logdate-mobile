@@ -1,6 +1,7 @@
 package app.logdate.client.intelligence.entity.people
 
 import app.logdate.client.intelligence.AIResult
+import app.logdate.client.intelligence.AIError
 import app.logdate.client.intelligence.cache.AICachePolicy
 import app.logdate.client.intelligence.cache.GenerativeAICache
 import app.logdate.client.intelligence.cache.GenerativeAICacheContentType
@@ -8,6 +9,9 @@ import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
 import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
+import app.logdate.client.intelligence.generativeai.GenerativeAIResponseFormat
+import app.logdate.client.intelligence.structured.JsonStructuredOutputParser
+import app.logdate.client.intelligence.structured.StructuredOutputResult
 import app.logdate.client.intelligence.unavailableReason
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.shared.model.Person
@@ -16,6 +20,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlin.uuid.ExperimentalUuidApi
 
 /**
@@ -33,18 +39,33 @@ class PeopleExtractor(
         // TODO: Use additional logic to extract text fragments that could be resolved to people
         private const val ADVANCED_EXTRACTION_PROMPT = """
 You are a system utility that extracts the names of likely humans mentioned in text.
-Only literally return the names from the text. Each name must be separated by a new
-line. Include references to noun-adjective parings that could be names.
+Return a JSON object with a "names" array containing the literal names from the text.
+Include references to noun-adjective pairings that could be names.
         """
         private const val EXTRACTION_PROMPT = """
 You are a system utility that extracts the names of likely humans mentioned in text.
-Only literally return the names from the text. Each name must be separated by a new
-line.
+Return a JSON object with a "names" array containing the literal names from the text.
+If no names are present, return an empty array.
         """
         private const val PROMPT_VERSION = "people-v1"
-        private const val SCHEMA_VERSION = "people-text-v1"
+        private const val SCHEMA_VERSION = "people-json-v1"
         private const val TEMPLATE_ID = "people-extractor"
         private const val CACHE_TTL_SECONDS = 60L * 60L * 24L * 30L
+        private const val RESPONSE_SCHEMA = """
+{
+  "type": "object",
+  "properties": {
+    "names": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "required": ["names"],
+  "additionalProperties": false
+}
+"""
+
+        private val json = Json { ignoreUnknownKeys = true }
     }
 
     /**
@@ -76,13 +97,11 @@ line.
             if (useCached) {
                 val cachedResponse = generativeAICache.getEntry(cacheRequest)
                 if (cachedResponse != null) {
-                    return@withContext AIResult.Success(
-                        cachedResponse.content.split("\n")
-                            .map { it.trim() }
-                            .filter { it.isNotBlank() }
-                            .map { Person(name = it) },
-                        fromCache = true
-                    )
+                    val parsed = parsePeopleResponse(cachedResponse.content)
+                    if (parsed != null) {
+                        return@withContext AIResult.Success(parsed, fromCache = true)
+                    }
+                    Napier.w(tag = "PeopleExtractor", message = "Cached people response was invalid for $documentId")
                 }
             }
             val unavailableReason = networkAvailabilityMonitor.unavailableReason()
@@ -92,24 +111,25 @@ line.
             val prompts = listOf(
                 GenerativeAIChatMessage("system", EXTRACTION_PROMPT),
                 GenerativeAIChatMessage("user", text),
-                // TODO: Use structured response format
             )
             val response = generativeAIChatClient.submit(
                 GenerativeAIRequest(
                     messages = prompts,
-                    model = cacheRequest.model
+                    model = cacheRequest.model,
+                    responseFormat = GenerativeAIResponseFormat.JsonSchema(
+                        name = "people_extraction",
+                        schema = RESPONSE_SCHEMA
+                    )
                 )
             )
             when (response) {
                 is AIResult.Success -> {
                     val content = response.value.content
+                    val people = parsePeopleResponse(content)
+                        ?: return@withContext AIResult.Error(AIError.InvalidResponse)
                     Napier.d(tag = "PeopleExtractor", message = "Caching response for:\n$text")
                     Napier.d(tag = "PeopleExtractor") { "Response: ${content.trim()}" }
                     generativeAICache.putEntry(cacheRequest, content.trim())
-                    val people = content.split("\n")
-                        .map { it.trim() }
-                        .filter { it.isNotBlank() }
-                        .map { Person(name = it) }
                     AIResult.Success(people, fromCache = false)
                 }
                 is AIResult.Unavailable -> response
@@ -123,4 +143,26 @@ line.
                 }
             }
         }
+
+    private fun parsePeopleResponse(raw: String): List<Person>? {
+        val parser = JsonStructuredOutputParser(
+            json = json,
+            serializer = PeopleResponse.serializer(),
+            allowEmbeddedJson = true
+        )
+        return when (val result = parser.parse(raw)) {
+            is StructuredOutputResult.Success ->
+                result.value.names
+                    .map { it.trim() }
+                    .filter { it.isNotBlank() }
+                    .map { Person(name = it) }
+            StructuredOutputResult.Empty -> emptyList()
+            StructuredOutputResult.Invalid -> null
+        }
+    }
+
+    @Serializable
+    private data class PeopleResponse(
+        val names: List<String>
+    )
 }

@@ -6,6 +6,7 @@ import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
 import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
 import app.logdate.client.intelligence.generativeai.GenerativeAIResponse
+import app.logdate.client.intelligence.generativeai.GenerativeAIResponseFormat
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.headers
@@ -14,7 +15,10 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 
 /**
  * A generative AI client that uses the OpenAI API to generate responses.
@@ -35,6 +39,10 @@ class OpenAiClient(
 
     override suspend fun submit(request: GenerativeAIRequest): AIResult<GenerativeAIResponse> {
         return try {
+            val responseFormat = mapResponseFormat(request.responseFormat)
+            if (request.responseFormat is GenerativeAIResponseFormat.JsonSchema && responseFormat == null) {
+                return AIResult.Error(AIError.InvalidResponse)
+            }
             val response: HttpResponse =
                 httpClient.post("https://api.openai.com/v1/chat/completions") {
                     headers {
@@ -47,7 +55,8 @@ class OpenAiClient(
                             // while maintaining cost efficiency for journal text analysis
                             model = request.model ?: DEFAULT_MODEL,
                             messages = request.messages.map(GenerativeAIChatMessage::toOpenAiChatMessage),
-                            temperature = request.temperature ?: DEFAULT_TEMPERATURE
+                            temperature = request.temperature ?: DEFAULT_TEMPERATURE,
+                            responseFormat = responseFormat
                         )
                     )
                 }
@@ -70,6 +79,24 @@ class OpenAiClient(
         }
     }
 
+    private fun mapResponseFormat(format: GenerativeAIResponseFormat?): OpenAiResponseFormat? {
+        return when (format) {
+            null, GenerativeAIResponseFormat.Text -> null
+            is GenerativeAIResponseFormat.JsonSchema -> {
+                val schema = runCatching { Json.parseToJsonElement(format.schema) }.getOrNull()
+                    ?: return null
+                OpenAiResponseFormat(
+                    type = "json_schema",
+                    jsonSchema = OpenAiJsonSchema(
+                        name = format.name,
+                        schema = schema,
+                        strict = format.strict
+                    )
+                )
+            }
+        }
+    }
+
     private fun mapError(response: HttpResponse): AIError {
         return when (response.status.value) {
             401, 403 -> AIError.Unauthorized
@@ -85,6 +112,8 @@ data class OpenAiRequest(
     val model: String,
     val messages: List<OpenAiChatMessage>,
     val temperature: Double = 0.7,
+    @SerialName("response_format")
+    val responseFormat: OpenAiResponseFormat? = null,
 )
 
 @Serializable
@@ -107,6 +136,20 @@ data class Choice(
     val message: OpenAiChatMessage,
     val index: Int,
     val finish_reason: String,
+)
+
+@Serializable
+data class OpenAiResponseFormat(
+    val type: String,
+    @SerialName("json_schema")
+    val jsonSchema: OpenAiJsonSchema? = null,
+)
+
+@Serializable
+data class OpenAiJsonSchema(
+    val name: String,
+    val schema: JsonElement,
+    val strict: Boolean = true,
 )
 
 internal fun GenerativeAIChatMessage.toOpenAiChatMessage() =

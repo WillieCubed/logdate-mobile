@@ -43,7 +43,7 @@ class PeopleExtractorTest {
             providerId = fakeAIClient.providerId,
             model = fakeAIClient.defaultModel,
             promptVersion = "people-v1",
-            schemaVersion = "people-text-v1",
+            schemaVersion = "people-json-v1",
             templateId = "people-extractor",
             policy = AICachePolicy(ttlSeconds = 60L * 60L * 24L * 30L)
         )
@@ -54,7 +54,7 @@ class PeopleExtractorTest {
         setup()
         val documentId = "doc-single-person"
         val inputText = "I had lunch with Sarah today. She was telling me about her new job."
-        val aiResponse = "Sarah"
+        val aiResponse = jsonResponse("Sarah")
         
         fakeAIClient.setResponseFor(inputText, aiResponse)
         
@@ -73,7 +73,7 @@ class PeopleExtractorTest {
         assertNotNull(systemMessage)
         assertTrue(systemMessage.content.contains("extracts the names"))
         assertTrue(systemMessage.content.contains("humans mentioned"))
-        assertTrue(systemMessage.content.contains("line"))
+        assertTrue(systemMessage.content.contains("JSON"))
         
         val userMessage = lastSubmission.find { it.role == "user" }
         assertEquals(inputText, userMessage?.content)
@@ -84,7 +84,7 @@ class PeopleExtractorTest {
         setup()
         val documentId = "doc-multiple-people"
         val inputText = "Today I met with John, Sarah, and Michael to discuss the project. Emily couldn't make it."
-        val aiResponse = "John\nSarah\nMichael\nEmily"
+        val aiResponse = jsonResponse("John", "Sarah", "Michael", "Emily")
         
         fakeAIClient.setResponseFor(inputText, aiResponse)
         
@@ -104,7 +104,7 @@ class PeopleExtractorTest {
         setup()
         val documentId = "doc-cached"
         val inputText = "I talked to Bob yesterday."
-        val cachedResponse = "Bob"
+        val cachedResponse = jsonResponse("Bob")
         
         // Pre-populate cache
         val cacheRequest = cacheRequestFor(inputText)
@@ -126,8 +126,8 @@ class PeopleExtractorTest {
         setup()
         val documentId = "doc-skip-cache"
         val inputText = "Alice and I went shopping."
-        val cachedResponse = "Bob"
-        val newResponse = "Alice"
+        val cachedResponse = jsonResponse("Bob")
+        val newResponse = jsonResponse("Alice")
         
         // Pre-populate cache with different data
         val cacheRequest = cacheRequestFor(inputText)
@@ -151,8 +151,7 @@ class PeopleExtractorTest {
         val documentId = "doc-no-names"
         val inputText = "I went to the store and bought some groceries. The weather was nice."
         
-        // When AI returns empty string, we get one empty Person name due to split behavior
-        fakeAIClient.setResponseFor(inputText, "")
+        fakeAIClient.setResponseFor(inputText, jsonResponse())
         
         val result = peopleExtractor.extractPeople(documentId, inputText, useCached = false)
         val people = assertSuccess(result)
@@ -178,7 +177,7 @@ class PeopleExtractorTest {
         setup()
         val documentId = "doc-whitespace"
         val inputText = "I saw David and Lisa at the park."
-        val aiResponse = "  David  \n\n  Lisa  \n"
+        val aiResponse = jsonResponse("  David  ", "  Lisa  ")
         
         fakeAIClient.setResponseFor(inputText, aiResponse)
         
@@ -208,7 +207,7 @@ class PeopleExtractorTest {
         setup()
         val documentId = "doc-complex-names"
         val inputText = "I met Dr. Sarah Johnson and Mr. John Smith at the conference. Mary-Elizabeth was also there."
-        val aiResponse = "Dr. Sarah Johnson\nMr. John Smith\nMary-Elizabeth"
+        val aiResponse = jsonResponse("Dr. Sarah Johnson", "Mr. John Smith", "Mary-Elizabeth")
         
         fakeAIClient.setResponseFor(inputText, aiResponse)
         
@@ -226,7 +225,7 @@ class PeopleExtractorTest {
         setup()
         val documentId = "doc-first-person"
         val inputText = "I talked to myself and then called Mom. Dad was busy so he couldn't chat."
-        val aiResponse = "Mom\nDad"
+        val aiResponse = jsonResponse("Mom", "Dad")
         
         fakeAIClient.setResponseFor(inputText, aiResponse)
         
@@ -244,7 +243,7 @@ class PeopleExtractorTest {
         val documentId = "doc-empty"
         val inputText = ""
         
-        fakeAIClient.setResponseFor(inputText, "")
+        fakeAIClient.setResponseFor(inputText, jsonResponse())
         
         val result = peopleExtractor.extractPeople(documentId, inputText, useCached = false)
         val people = assertSuccess(result)
@@ -260,7 +259,7 @@ class PeopleExtractorTest {
         setup()
         val documentId = "doc-caching"
         val inputText = "I visited Tom and Jerry today."
-        val aiResponse = "Tom\nJerry"
+        val aiResponse = jsonResponse("Tom", "Jerry")
         
         fakeAIClient.setResponseFor(inputText, aiResponse)
         
@@ -281,7 +280,7 @@ class PeopleExtractorTest {
         setup()
         val documentId = "doc-mixed"
         val inputText = "SARAH, bob, and Dr. WILSON were discussing the meeting with ms. jane."
-        val aiResponse = "SARAH\nbob\nDr. WILSON\nms. jane"
+        val aiResponse = jsonResponse("SARAH", "bob", "Dr. WILSON", "ms. jane")
         
         fakeAIClient.setResponseFor(inputText, aiResponse)
         
@@ -307,7 +306,16 @@ class PeopleExtractorTest {
             Rebecca and Tom on the marketing strategy. The day ended with drinks, where I 
             caught up with old colleague David Kim who now works in a different department.
         """.trimIndent()
-        val aiResponse = "Jennifer\nMark Thompson\nAmanda\nCarlos\nPriya\nRebecca\nTom\nDavid Kim"
+        val aiResponse = jsonResponse(
+            "Jennifer",
+            "Mark Thompson",
+            "Amanda",
+            "Carlos",
+            "Priya",
+            "Rebecca",
+            "Tom",
+            "David Kim"
+        )
         
         fakeAIClient.setResponseFor(inputText, aiResponse)
         
@@ -332,7 +340,7 @@ class PeopleExtractorTest {
         val documentId = "doc-prompt-test"
         val inputText = "Test text with Alex"
         
-        fakeAIClient.defaultResponse = "Alex"
+        fakeAIClient.defaultResponse = jsonResponse("Alex")
         
         peopleExtractor.extractPeople(documentId, inputText, useCached = false)
         
@@ -342,13 +350,20 @@ class PeopleExtractorTest {
         // Verify key requirements in system prompt
         assertTrue(systemMessage.contains("extracts the names"))
         assertTrue(systemMessage.contains("humans mentioned"))
-        assertTrue(systemMessage.contains("literally return"))
-        assertTrue(systemMessage.contains("line"))
+        assertTrue(systemMessage.contains("JSON"))
     }
 
     private fun assertSuccess(result: AIResult<List<Person>>): List<Person> {
         assertTrue(result is AIResult.Success)
         return result.value
+    }
+
+    private fun jsonResponse(vararg names: String): String {
+        if (names.isEmpty()) {
+            return """{"names":[]}"""
+        }
+        val quoted = names.joinToString(",") { "\"$it\"" }
+        return """{"names":[${quoted}]}"""
     }
 
     private class TestNetworkAvailabilityMonitor(

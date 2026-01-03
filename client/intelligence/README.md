@@ -74,7 +74,8 @@ val result = summarizer.summarize(
 )
 val summary = when (result) {
     is AIResult.Success -> result.value
-    else -> null
+    is AIResult.Unavailable -> null
+    is AIResult.Error -> null
 }
 ```
 
@@ -87,9 +88,15 @@ val result = extractor.extractPeople(
 )
 val people = when (result) {
     is AIResult.Success -> result.value
-    else -> emptyList()
+    is AIResult.Unavailable -> emptyList()
+    is AIResult.Error -> emptyList()
 }
 ```
+
+### Structured Output Support
+- OpenAI requests can include JSON schema response formats for stronger parsing guarantees.
+- People extraction and narrative synthesis use structured output schemas to improve reliability.
+- Map `AIResult.Error` to user-friendly copy in UI layers; error types are the source of truth.
 
 ## Platform Considerations
 

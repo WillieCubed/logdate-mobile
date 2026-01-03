@@ -85,7 +85,7 @@ class WeekNarrativeSynthesizerTest {
             providerId = fakeAIClient.providerId,
             model = fakeAIClient.defaultModel,
             promptVersion = "narrative-v1",
-            schemaVersion = "week-narrative-v1",
+            schemaVersion = "week-narrative-json-v1",
             templateId = "week-narrative",
             policy = AICachePolicy(ttlSeconds = 60L * 60L * 24L * 30L)
         )

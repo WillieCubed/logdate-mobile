@@ -9,6 +9,9 @@ import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
 import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
+import app.logdate.client.intelligence.generativeai.GenerativeAIResponseFormat
+import app.logdate.client.intelligence.structured.JsonStructuredOutputParser
+import app.logdate.client.intelligence.structured.StructuredOutputResult
 import app.logdate.client.intelligence.unavailableReason
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.repository.journals.JournalNote
@@ -21,9 +24,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 /**
@@ -117,11 +118,44 @@ Example for tough week:
 Respond ONLY with valid JSON in this format. No additional text."""
 
         private const val PROMPT_VERSION = "narrative-v1"
-        private const val SCHEMA_VERSION = "week-narrative-v1"
+        private const val SCHEMA_VERSION = "week-narrative-json-v1"
         private const val TEMPLATE_ID = "week-narrative"
         private const val CACHE_TTL_SECONDS = 60L * 60L * 24L * 30L
 
-        private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+        private const val RESPONSE_SCHEMA = """
+{
+  "type": "object",
+  "properties": {
+    "themes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "emotionalTone": { "type": "string" },
+    "storyBeats": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "moment": { "type": "string" },
+          "context": { "type": "string" },
+          "emotionalWeight": { "type": "string" },
+          "evidenceIds": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["moment", "context", "emotionalWeight", "evidenceIds"],
+        "additionalProperties": false
+      }
+    },
+    "overallNarrative": { "type": "string" }
+  },
+  "required": ["themes", "emotionalTone", "storyBeats", "overallNarrative"],
+  "additionalProperties": false
+}
+"""
+
+        private val json = Json { ignoreUnknownKeys = true }
     }
 
     /**
@@ -186,7 +220,11 @@ Analyze this content and provide the narrative structure in JSON format as speci
                     GenerativeAIChatMessage("system", SYSTEM_PROMPT),
                     GenerativeAIChatMessage("user", prompt)
                 ),
-                model = cacheRequest.model
+                model = cacheRequest.model,
+                responseFormat = GenerativeAIResponseFormat.JsonSchema(
+                    name = "week_narrative",
+                    schema = RESPONSE_SCHEMA
+                )
             )
         )
 
@@ -258,14 +296,14 @@ Analyze this content and provide the narrative structure in JSON format as speci
      * Parses AI response into WeekNarrative structure.
      */
     private fun parseNarrativeResponse(response: String): WeekNarrative? {
-        return try {
-            // Extract JSON from response (AI might include extra text)
-            val jsonStart = response.indexOf('{')
-            val jsonEnd = response.lastIndexOf('}') + 1
-            if (jsonStart >= 0 && jsonEnd > jsonStart) {
-                val jsonString = response.substring(jsonStart, jsonEnd)
-                val parsed = json.decodeFromString<NarrativeResponse>(jsonString)
-
+        val parser = JsonStructuredOutputParser(
+            json = json,
+            serializer = NarrativeResponse.serializer(),
+            allowEmbeddedJson = true
+        )
+        return when (val result = parser.parse(response)) {
+            is StructuredOutputResult.Success -> {
+                val parsed = result.value
                 WeekNarrative(
                     themes = parsed.themes,
                     emotionalTone = parsed.emotionalTone,
@@ -279,13 +317,15 @@ Analyze this content and provide the narrative structure in JSON format as speci
                     },
                     overallNarrative = parsed.overallNarrative
                 )
-            } else {
-                Napier.w("Could not find JSON in AI response")
+            }
+            StructuredOutputResult.Empty -> {
+                Napier.w("Narrative response was empty")
                 null
             }
-        } catch (e: Exception) {
-            Napier.e("Failed to parse narrative response", throwable = e)
-            null
+            StructuredOutputResult.Invalid -> {
+                Napier.w("Narrative response did not match schema")
+                null
+            }
         }
     }
 
