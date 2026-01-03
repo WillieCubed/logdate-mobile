@@ -79,7 +79,7 @@ actual val dataModule: Module = module {
             get(), // imageNoteDao
             get(), // voiceNoteDao
             get(), // videoNoteDao
-            get(), // journalNotesDao
+            get(), // journalContentDao
             get(), // journalRepository
             syncManagerProvider = { get() },
             syncMetadataService = get()

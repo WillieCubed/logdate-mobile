@@ -26,7 +26,6 @@ class FakeSyncMetadataService : SyncMetadataService {
         version: Long
     ) {
         pendingUploads[entityType]?.remove(entityId)
-        updateSyncTime(entityType, syncedAt)
         updatePendingCount()
     }
 

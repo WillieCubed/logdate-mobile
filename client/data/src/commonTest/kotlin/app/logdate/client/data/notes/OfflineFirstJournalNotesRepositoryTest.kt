@@ -2,13 +2,14 @@ package app.logdate.client.data.notes
 
 import app.logdate.client.data.fakes.FakeAudioNoteDao
 import app.logdate.client.data.fakes.FakeImageNoteDao
-import app.logdate.client.data.fakes.FakeJournalNotesDao
+import app.logdate.client.data.fakes.FakeJournalContentDao
 import app.logdate.client.data.fakes.FakeJournalRepository
 import app.logdate.client.data.fakes.FakeSyncManager
 import app.logdate.client.data.fakes.FakeSyncMetadataService
 import app.logdate.client.data.fakes.FakeTextNoteDao
 import app.logdate.client.data.fakes.FakeVideoNoteDao
 import app.logdate.client.database.entities.JournalEntity
+import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.flow.first
@@ -41,7 +42,7 @@ class OfflineFirstJournalNotesRepositoryTest {
     private lateinit var textNoteDao: FakeTextNoteDao
     private lateinit var imageNoteDao: FakeImageNoteDao
     private lateinit var videoNoteDao: FakeVideoNoteDao
-    private lateinit var journalNotesDao: FakeJournalNotesDao
+    private lateinit var journalContentDao: FakeJournalContentDao
     private lateinit var journalRepository: FakeJournalRepository
     private lateinit var syncManager: FakeSyncManager
     private lateinit var syncMetadataService: FakeSyncMetadataService
@@ -52,7 +53,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         textNoteDao = FakeTextNoteDao()
         imageNoteDao = FakeImageNoteDao()
         videoNoteDao = FakeVideoNoteDao()
-        journalNotesDao = FakeJournalNotesDao()
+        journalContentDao = FakeJournalContentDao()
         journalRepository = FakeJournalRepository()
         syncManager = FakeSyncManager()
         syncMetadataService = FakeSyncMetadataService()
@@ -62,7 +63,7 @@ class OfflineFirstJournalNotesRepositoryTest {
             imageNoteDao = imageNoteDao,
             audioNoteDao = FakeAudioNoteDao(),
             videoNoteDao = videoNoteDao,
-            journalNotesDao = journalNotesDao,
+            journalContentDao = journalContentDao,
             journalRepository = journalRepository,
             syncManagerProvider = { syncManager },
             syncMetadataService = syncMetadataService
@@ -74,7 +75,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         textNoteDao.clear()
         imageNoteDao.clear()
         videoNoteDao.clear()
-        journalNotesDao.clear()
+        journalContentDao.clear()
         journalRepository.clear()
         syncManager.reset()
     }
@@ -293,7 +294,6 @@ class OfflineFirstJournalNotesRepositoryTest {
         val textNote = createTestTextNote()
         
         journalRepository.addJournal(journal)
-        journalNotesDao.addJournal(journal.toEntity())
         
         repository.create(textNote, journal.id)
         
@@ -301,9 +301,9 @@ class OfflineFirstJournalNotesRepositoryTest {
         assertEquals(1, allNotes.size)
         
         // Verify the note is linked to the journal
-        val noteJournals = journalNotesDao.getNotesForJournal(journal.id).first()
-        assertEquals(1, noteJournals.size)
-        assertEquals(textNote.uid, noteJournals.first().noteId)
+        val journalNotes = journalContentDao.getContentForJournal(journal.id).first()
+        assertEquals(1, journalNotes.size)
+        assertEquals(textNote.uid, journalNotes.first())
     }
 
     @Test
@@ -312,13 +312,15 @@ class OfflineFirstJournalNotesRepositoryTest {
         val textNote = createTestTextNote()
         
         journalRepository.addJournal(journal)
-        journalNotesDao.addJournal(journal.toEntity())
-        journalNotesDao.addNoteToJournal(journal.id, textNote.uid)
+        textNoteDao.addNote(textNote.toEntity())
+        journalContentDao.addContentToJournal(
+            JournalContentEntityLink(journal.id, textNote.uid)
+        )
         
         repository.removeFromJournal(textNote.uid, journal.id)
         
-        val noteJournals = journalNotesDao.getNotesForJournal(journal.id).first()
-        assertTrue(noteJournals.isEmpty())
+        val journalNotes = journalContentDao.getContentForJournal(journal.id).first()
+        assertTrue(journalNotes.isEmpty())
     }
 
     /**
