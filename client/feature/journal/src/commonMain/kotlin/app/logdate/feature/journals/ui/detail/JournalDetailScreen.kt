@@ -108,8 +108,8 @@ fun JournalDetailScreen(
                         if (sharedTransitionScope != null && animatedVisibilityScope != null) {
                             with(sharedTransitionScope) {
                                 baseModifier.sharedElement(
-                                    sharedContentState = rememberSharedContentState("journal-container-${(state as JournalDetailUiState.Success).journalId}"),
-                                    animatedVisibilityScope = animatedVisibilityScope,
+                                    rememberSharedContentState("journal-container-${(state as JournalDetailUiState.Success).journalId}"),
+                                    animatedVisibilityScope,
                                 )
                             }
                         } else {

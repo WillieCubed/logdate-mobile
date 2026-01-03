@@ -1,6 +1,7 @@
 package app.logdate.client.media.audio.transcription
 
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -19,9 +20,29 @@ class TranscriptionManagerTest {
         // Ideally, we would have platform-specific tests for each implementation.
         
         val mockTranscriptionService = object : TranscriptionService {
+            private val updates = MutableSharedFlow<TranscriptionResult>()
+
+            override fun getTranscriptionFlow() = updates
+
+            override suspend fun startLiveTranscription(): Boolean = false
+
+            override suspend fun stopLiveTranscription() = Unit
+
             override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult {
                 return TranscriptionResult.Success("This is a mock transcription result")
             }
+
+            override fun cancelTranscription() = Unit
+
+            override fun getSupportedLanguages(): List<String> = emptyList()
+
+            override fun setLanguage(languageCode: String) = Unit
+
+            override val supportsLiveTranscription: Boolean = false
+
+            override val supportsFileTranscription: Boolean = true
+
+            override fun release() = Unit
         }
         
         val manager = MockTranscriptionManager(mockTranscriptionService)

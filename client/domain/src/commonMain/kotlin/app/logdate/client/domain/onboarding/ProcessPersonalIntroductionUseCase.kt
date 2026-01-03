@@ -3,10 +3,15 @@ package app.logdate.client.domain.onboarding
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
 import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
+import app.logdate.client.intelligence.generativeai.GenerativeAIResponseFormat
+import app.logdate.client.intelligence.structured.JsonStructuredOutputParser
+import app.logdate.client.intelligence.structured.StructuredOutputResult
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.shared.model.profile.LogDateProfile
 import io.github.aakira.napier.Napier
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 /**
  * Use case for processing personal introduction during onboarding.
@@ -19,6 +24,20 @@ class ProcessPersonalIntroductionUseCase(
     private val generativeAiClient: GenerativeAIChatClient,
     private val networkAvailabilityMonitor: NetworkAvailabilityMonitor
 ) {
+
+    private companion object {
+        private const val RESPONSE_SCHEMA = """
+{
+  "type": "object",
+  "properties": {
+    "message": { "type": "string" }
+  },
+  "required": ["message"],
+  "additionalProperties": false
+}
+"""
+        private val json = Json { ignoreUnknownKeys = true }
+    }
     
     /**
      * Process the personal introduction with name, bio, and LLM response.
@@ -39,7 +58,7 @@ class ProcessPersonalIntroductionUseCase(
             if (nameResult.isFailure) {
                 val exception = nameResult.exceptionOrNull()
                 Napier.e("Failed to save display name", exception)
-                return Result.Error("Failed to save your name: ${exception?.message}")
+                return Result.Error(ErrorReason.SaveDisplayNameFailed)
             }
             
             // Save bio to profile (both LLM-processed and original)
@@ -50,11 +69,11 @@ class ProcessPersonalIntroductionUseCase(
             if (bioResult.isFailure) {
                 val exception = bioResult.exceptionOrNull()
                 Napier.e("Failed to save bio", exception)
-                return Result.Error("Failed to save your information: ${exception?.message}")
+                return Result.Error(ErrorReason.SaveBioFailed)
             }
             
             val updatedProfile = bioResult.getOrNull()
-                ?: return Result.Error("Failed to retrieve updated profile")
+                ?: return Result.Error(ErrorReason.ProfileUpdateFailed)
             
             Napier.d("Personal introduction processed successfully")
             Result.Success(
@@ -67,7 +86,7 @@ class ProcessPersonalIntroductionUseCase(
             
         } catch (e: Exception) {
             Napier.e("Unexpected error processing personal introduction", e)
-            Result.Error("An unexpected error occurred: ${e.message}")
+            Result.Error(ErrorReason.UnexpectedFailure)
         }
     }
     
@@ -91,7 +110,9 @@ Guidelines:
 - Reflect back what they shared in a warm, genuine way
 - Express enthusiasm about their journaling journey
 - Don't ask questions - just acknowledge and encourage
-- Use their name naturally in your response"""
+- Use their name naturally in your response
+
+Return a JSON object with a "message" field that contains the response."""
             )
             
             val userMessage = GenerativeAIChatMessage(
@@ -102,20 +123,35 @@ Guidelines:
             val response = generativeAiClient.submit(
                 GenerativeAIRequest(
                     messages = listOf(systemMessage, userMessage),
-                    model = generativeAiClient.defaultModel
+                    model = generativeAiClient.defaultModel,
+                    responseFormat = GenerativeAIResponseFormat.JsonSchema(
+                        name = "personal_introduction",
+                        schema = RESPONSE_SCHEMA
+                    )
                 )
             )
             when (response) {
-                is app.logdate.client.intelligence.AIResult.Success -> {
-                    response.value.content.takeIf { it.isNotBlank() }
-                        ?: createFallbackResponse(name)
-                }
+                is app.logdate.client.intelligence.AIResult.Success -> parseResponse(response.value.content)
+                    ?: createFallbackResponse(name)
                 else -> createFallbackResponse(name)
             }
                 
         } catch (e: Exception) {
             Napier.w("LLM processing failed, using fallback response", e)
             createFallbackResponse(name)
+        }
+    }
+
+    private fun parseResponse(raw: String): String? {
+        val parser = JsonStructuredOutputParser(
+            json = json,
+            serializer = FriendlyResponse.serializer(),
+            allowEmbeddedJson = true
+        )
+        return when (val result = parser.parse(raw)) {
+            is StructuredOutputResult.Success -> result.value.message.trim().takeIf { it.isNotBlank() }
+            StructuredOutputResult.Empty -> null
+            StructuredOutputResult.Invalid -> null
         }
     }
     
@@ -129,9 +165,16 @@ Guidelines:
     /**
      * Result sealed class for the use case operation.
      */
-    sealed class Result {
-        data class Success(val data: ProcessedIntroduction) : Result()
-        data class Error(val message: String) : Result()
+    sealed interface Result {
+        data class Success(val data: ProcessedIntroduction) : Result
+        data class Error(val reason: ErrorReason) : Result
+    }
+
+    sealed interface ErrorReason {
+        data object SaveDisplayNameFailed : ErrorReason
+        data object SaveBioFailed : ErrorReason
+        data object ProfileUpdateFailed : ErrorReason
+        data object UnexpectedFailure : ErrorReason
     }
     
     /**
@@ -141,5 +184,10 @@ Guidelines:
         val profile: LogDateProfile,
         val llmResponse: String,
         val originalBio: String
+    )
+
+    @Serializable
+    private data class FriendlyResponse(
+        val message: String
     )
 }

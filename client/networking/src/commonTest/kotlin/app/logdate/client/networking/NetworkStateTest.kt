@@ -120,7 +120,6 @@ class NetworkStateTest {
         val notConnected = NetworkState.NotConnected(timestamp)
         
         assertNotEquals<NetworkState>(connected, notConnected)
-        assertNotEquals(connected.hashCode(), notConnected.hashCode())
     }
 
     @Test

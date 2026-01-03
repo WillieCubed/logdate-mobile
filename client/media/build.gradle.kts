@@ -45,6 +45,10 @@ kotlin {
             // Repository
             implementation(projects.client.repository)
         }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
+        }
         androidMain.dependencies {
             implementation(libs.koin.android)
             implementation(libs.androidx.work.runtime)

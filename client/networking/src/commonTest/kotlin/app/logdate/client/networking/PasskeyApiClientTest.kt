@@ -46,7 +46,7 @@ class PasskeyApiClientTest {
     @Test
     fun `checkUsernameAvailability returns success when username is available`() = runTest {
         val mockEngine = MockEngine { request ->
-            assertEquals("/accounts/username/testuser/available", request.url.encodedPath)
+            assertEquals("/api/v1/accounts/username/testuser/available", request.url.encodedPath)
             respond(
                 content = """{"success": true, "data": {"username": "testuser", "available": true}}""",
                 status = HttpStatusCode.OK,
@@ -66,7 +66,7 @@ class PasskeyApiClientTest {
     @Test
     fun `checkUsernameAvailability returns success when username is taken`() = runTest {
         val mockEngine = MockEngine { request ->
-            assertEquals("/accounts/username/existinguser/available", request.url.encodedPath)
+            assertEquals("/api/v1/accounts/username/existinguser/available", request.url.encodedPath)
             respond(
                 content = """{"success": true, "data": {"username": "existinguser", "available": false}}""",
                 status = HttpStatusCode.OK,
@@ -111,7 +111,7 @@ class PasskeyApiClientTest {
         )
         
         val mockEngine = MockEngine { request ->
-            assertEquals("/accounts/create/begin", request.url.encodedPath)
+            assertEquals("/api/v1/accounts/create/begin", request.url.encodedPath)
             assertEquals("POST", request.method.value)
             respond(
                 content = """
@@ -163,7 +163,7 @@ class PasskeyApiClientTest {
         )
         
         val mockEngine = MockEngine { request ->
-            assertEquals("/accounts/create/complete", request.url.encodedPath)
+            assertEquals("/api/v1/accounts/create/complete", request.url.encodedPath)
             assertEquals("POST", request.method.value)
             respond(
                 content = """
@@ -215,7 +215,7 @@ class PasskeyApiClientTest {
     @Test
     fun `beginAuthentication returns success with authentication options`() = runTest {
         val mockEngine = MockEngine { request ->
-            assertEquals("/accounts/authenticate/begin", request.url.encodedPath)
+            assertEquals("/api/v1/accounts/authenticate/begin", request.url.encodedPath)
             assertEquals("POST", request.method.value)
             respond(
                 content = """
@@ -265,7 +265,7 @@ class PasskeyApiClientTest {
         )
         
         val mockEngine = MockEngine { request ->
-            assertEquals("/accounts/authenticate/complete", request.url.encodedPath)
+            assertEquals("/api/v1/accounts/authenticate/complete", request.url.encodedPath)
             assertEquals("POST", request.method.value)
             respond(
                 content = """
@@ -318,7 +318,7 @@ class PasskeyApiClientTest {
     @Test
     fun `refreshToken succeeds with valid refresh token`() = runTest {
         val mockEngine = MockEngine { request ->
-            assertEquals("/accounts/refresh", request.url.encodedPath)
+            assertEquals("/api/v1/accounts/refresh", request.url.encodedPath)
             assertEquals("POST", request.method.value)
             respond(
                 content = """{
@@ -367,7 +367,7 @@ class PasskeyApiClientTest {
         )
         
         val mockEngine = MockEngine { request ->
-            assertEquals("/accounts/me", request.url.encodedPath)
+            assertEquals("/api/v1/accounts/me", request.url.encodedPath)
             assertEquals("GET", request.method.value)
             assertEquals("Bearer access_token_123", request.headers["Authorization"])
             respond(
@@ -414,7 +414,7 @@ class PasskeyApiClientTest {
     @Test
     fun `deletePasskey succeeds with valid token and credential ID`() = runTest {
         val mockEngine = MockEngine { request ->
-            assertEquals("/passkeys/cred123", request.url.encodedPath)
+            assertEquals("/api/v1/passkeys/cred123", request.url.encodedPath)
             assertEquals("DELETE", request.method.value)
             assertEquals("Bearer access123", request.headers["Authorization"])
             respond(

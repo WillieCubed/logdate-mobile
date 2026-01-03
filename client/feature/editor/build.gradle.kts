@@ -117,6 +117,8 @@ kotlin {
 
 dependencies {
     implementation(libs.androidx.ui.android)
+    androidTestImplementation(libs.androidx.ui.test.junit4)
+    debugImplementation(libs.androidx.ui.test.manifest)
     debugImplementation(compose.uiTooling)
 }
 
@@ -130,6 +132,7 @@ android {
     buildTypes {
         getByName("release") {
             isMinifyEnabled = true
+            proguardFiles("proguard-rules.pro")
         }
     }
     compileOptions {

@@ -146,11 +146,9 @@ class NetworkErrorHandlingTest {
             responseBody = """{"error": "Bad Request", "message": "Invalid parameters"}""",
             statusCode = HttpStatusCode.BadRequest
         )
-        
-        val exception = assertFailsWith<Exception> {
-            client.get("https://api.example.com/bad-request")
-        }
-        assertTrue(exception.message?.contains("400") == true || exception.toString().contains("400"))
+
+        val response = client.get("https://api.example.com/bad-request")
+        assertTrue(response.status == HttpStatusCode.BadRequest)
         client.close()
     }
 
@@ -160,11 +158,9 @@ class NetworkErrorHandlingTest {
             responseBody = """{"error": "Unauthorized", "message": "Invalid API key"}""",
             statusCode = HttpStatusCode.Unauthorized
         )
-        
-        val exception = assertFailsWith<Exception> {
-            client.get("https://api.example.com/unauthorized")
-        }
-        assertTrue(exception.message?.contains("401") == true || exception.toString().contains("401"))
+
+        val response = client.get("https://api.example.com/unauthorized")
+        assertTrue(response.status == HttpStatusCode.Unauthorized)
         client.close()
     }
 
@@ -174,11 +170,9 @@ class NetworkErrorHandlingTest {
             responseBody = """{"error": "Forbidden", "message": "Access denied"}""",
             statusCode = HttpStatusCode.Forbidden
         )
-        
-        val exception = assertFailsWith<Exception> {
-            client.get("https://api.example.com/forbidden")
-        }
-        assertTrue(exception.message?.contains("403") == true || exception.toString().contains("403"))
+
+        val response = client.get("https://api.example.com/forbidden")
+        assertTrue(response.status == HttpStatusCode.Forbidden)
         client.close()
     }
 
@@ -188,11 +182,9 @@ class NetworkErrorHandlingTest {
             responseBody = """{"error": "Not Found", "message": "Resource not found"}""",
             statusCode = HttpStatusCode.NotFound
         )
-        
-        val exception = assertFailsWith<Exception> {
-            client.get("https://api.example.com/not-found")
-        }
-        assertTrue(exception.message?.contains("404") == true || exception.toString().contains("404"))
+
+        val response = client.get("https://api.example.com/not-found")
+        assertTrue(response.status == HttpStatusCode.NotFound)
         client.close()
     }
 
@@ -202,11 +194,9 @@ class NetworkErrorHandlingTest {
             responseBody = """{"error": "Internal Server Error", "message": "Server is down"}""",
             statusCode = HttpStatusCode.InternalServerError
         )
-        
-        val exception = assertFailsWith<Exception> {
-            client.get("https://api.example.com/server-error")
-        }
-        assertTrue(exception.message?.contains("500") == true || exception.toString().contains("500"))
+
+        val response = client.get("https://api.example.com/server-error")
+        assertTrue(response.status == HttpStatusCode.InternalServerError)
         client.close()
     }
 
@@ -216,11 +206,9 @@ class NetworkErrorHandlingTest {
             responseBody = """{"error": "Bad Gateway", "message": "Upstream server error"}""",
             statusCode = HttpStatusCode.BadGateway
         )
-        
-        val exception = assertFailsWith<Exception> {
-            client.get("https://api.example.com/bad-gateway")
-        }
-        assertTrue(exception.message?.contains("502") == true || exception.toString().contains("502"))
+
+        val response = client.get("https://api.example.com/bad-gateway")
+        assertTrue(response.status == HttpStatusCode.BadGateway)
         client.close()
     }
 
@@ -230,11 +218,9 @@ class NetworkErrorHandlingTest {
             responseBody = """{"error": "Service Unavailable", "message": "Server temporarily unavailable"}""",
             statusCode = HttpStatusCode.ServiceUnavailable
         )
-        
-        val exception = assertFailsWith<Exception> {
-            client.get("https://api.example.com/service-unavailable")
-        }
-        assertTrue(exception.message?.contains("503") == true || exception.toString().contains("503"))
+
+        val response = client.get("https://api.example.com/service-unavailable")
+        assertTrue(response.status == HttpStatusCode.ServiceUnavailable)
         client.close()
     }
 
@@ -242,6 +228,9 @@ class NetworkErrorHandlingTest {
     fun httpClient_withCustomTimeout_respectsTimeout() = runTest {
         val client = HttpClient(MockEngine) {
             configureClientDefaults()
+            install(HttpTimeout) {
+                requestTimeoutMillis = 500
+            }
             engine {
                 addHandler {
                     delay(2.seconds) // 2 second delay
@@ -249,8 +238,8 @@ class NetworkErrorHandlingTest {
                 }
             }
         }
-        
-        assertFailsWith<Exception> {
+
+        assertFailsWith<HttpRequestTimeoutException> {
             client.get("https://api.example.com/custom-timeout") {
                 timeout {
                     requestTimeoutMillis = 500 // 500ms timeout
@@ -266,13 +255,11 @@ class NetworkErrorHandlingTest {
             responseBody = """{"error": "Validation failed", "fields": ["email", "password"]}""",
             statusCode = HttpStatusCode.UnprocessableEntity
         )
-        
-        val exception = assertFailsWith<Exception> {
-            client.post("https://api.example.com/create") {
-                setBody("""{"email": "invalid", "password": ""}""")
-            }
+
+        val response = client.post("https://api.example.com/create") {
+            setBody("""{"email": "invalid", "password": ""}""")
         }
-        assertTrue(exception.message?.contains("422") == true || exception.toString().contains("422"))
+        assertTrue(response.status == HttpStatusCode.UnprocessableEntity)
         client.close()
     }
 
@@ -333,11 +320,9 @@ class NetworkErrorHandlingTest {
             responseBody = "",
             statusCode = HttpStatusCode.InternalServerError
         )
-        
-        val exception = assertFailsWith<Exception> {
-            client.get("https://api.example.com/empty-error")
-        }
-        assertTrue(exception.message?.contains("500") == true || exception.toString().contains("500"))
+
+        val response = client.get("https://api.example.com/empty-error")
+        assertTrue(response.status == HttpStatusCode.InternalServerError)
         client.close()
     }
 
@@ -347,11 +332,9 @@ class NetworkErrorHandlingTest {
             responseBody = """{"error": "Rate limit exceeded", "retry_after": 60}""",
             statusCode = HttpStatusCode.TooManyRequests
         )
-        
-        val exception = assertFailsWith<Exception> {
-            client.get("https://api.example.com/rate-limited")
-        }
-        assertTrue(exception.message?.contains("429") == true || exception.toString().contains("429"))
+
+        val response = client.get("https://api.example.com/rate-limited")
+        assertTrue(response.status == HttpStatusCode.TooManyRequests)
         client.close()
     }
 }

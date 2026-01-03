@@ -78,6 +78,10 @@ kotlin {
             // Logging
             implementation(libs.napier)
         }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
+        }
 
         androidMain.dependencies {
             implementation(compose.preview)
@@ -109,6 +113,7 @@ android {
     buildTypes {
         getByName("release") {
             isMinifyEnabled = true
+            proguardFiles("proguard-rules.pro")
         }
     }
     compileOptions {

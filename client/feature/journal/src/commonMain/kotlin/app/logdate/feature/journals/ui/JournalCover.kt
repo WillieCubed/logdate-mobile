@@ -83,8 +83,8 @@ fun JournalCover(
             Box(
                 modifier = baseModifier
                     .sharedElement(
-                        sharedContentState = sharedTransitionScope.rememberSharedContentState("journal-container-${journal.id}"),
-                        animatedVisibilityScope = animatedVisibilityScope,
+                        sharedTransitionScope.rememberSharedContentState("journal-container-${journal.id}"),
+                        animatedVisibilityScope,
                     )
             ) {
                 JournalCoverContent(journal)
