@@ -23,7 +23,8 @@ fun MainActivityUiRoot(
     onShowUnlockPrompt: () -> Unit,
     mainAppNavigator: MainAppNavigator = rememberMainAppNavigator(initialRoute = NavigationStart),
 ) {
-    LaunchedEffect(appUiState) {
+    // By changing the key to Unit, we ensure this effect runs only once.
+    LaunchedEffect(Unit) {
         if (!appUiState.isOnboarded) {
 //        // Ensure that onboarding is completed before proceeding
             mainAppNavigator.startOnboarding()
