@@ -2,9 +2,10 @@ package app.logdate.client.data.notes
 
 import app.logdate.client.database.dao.AudioNoteDao
 import app.logdate.client.database.dao.ImageNoteDao
-import app.logdate.client.database.dao.JournalNotesDao
 import app.logdate.client.database.dao.TextNoteDao
 import app.logdate.client.database.dao.VideoNoteDao
+import app.logdate.client.database.dao.journals.JournalContentDao
+import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.repository.journals.ExportableJournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -40,7 +41,7 @@ class OfflineFirstJournalNotesRepository(
     // TODO: Rename VoiceNoteDao to AudioNoteDao to better represent general audio content
     private val audioNoteDao: AudioNoteDao,
     private val videoNoteDao: VideoNoteDao,
-    private val journalNotesDao: JournalNotesDao,
+    private val journalContentDao: JournalContentDao,
     private val journalRepository: JournalRepository,
     private val syncManagerProvider: () -> SyncManager = { NoOpSyncManager },
     private val syncMetadataService: SyncMetadataService,
@@ -62,13 +63,9 @@ class OfflineFirstJournalNotesRepository(
 
     override fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> {
         // Get all notes-to-journal mappings for this journal
-        return journalNotesDao.getNotesForJournal(journalId)
-            .combine(allNotesObserved) { crossRefs, allNotes ->
-                // Extract note IDs from the cross-references
-                val noteIds = crossRefs.map { it.noteId }
-                
-                // Filter notes that belong to this journal using the note IDs from the cross-references
-                allNotes.filter { note -> noteIds.contains(note.uid) }
+        return journalContentDao.getContentForJournal(journalId)
+            .combine(allNotesObserved) { contentIds, allNotes ->
+                allNotes.filter { note -> contentIds.contains(note.uid) }
             }
     }
 
@@ -170,6 +167,8 @@ class OfflineFirstJournalNotesRepository(
     }
 
     override suspend fun remove(note: JournalNote) {
+        val journalIds = journalContentDao.getJournalsForContent(note.uid).first()
+
         when (note) {
             is JournalNote.Text -> {
                 textNoteDao.removeNote(note.uid)
@@ -188,6 +187,16 @@ class OfflineFirstJournalNotesRepository(
             }
         }
 
+        journalIds.forEach { journalId ->
+            syncMetadataService.enqueuePending(
+                entityId = AssociationPendingKey(journalId, note.uid).toPendingId(),
+                entityType = EntityType.ASSOCIATION,
+                operation = PendingOperation.DELETE
+            )
+        }
+
+        journalContentDao.removeContentFromAllJournals(note.uid)
+
         syncMetadataService.enqueuePending(
             entityId = note.uid.toString(),
             entityType = EntityType.NOTE,
@@ -195,14 +204,29 @@ class OfflineFirstJournalNotesRepository(
         )
 
         triggerContentSync()
+        if (journalIds.isNotEmpty()) {
+            triggerAssociationSync()
+        }
         
     }
 
     override suspend fun removeById(noteId: Uuid) {
+        val journalIds = journalContentDao.getJournalsForContent(noteId).first()
+
         textNoteDao.removeNote(noteId)
         imageNoteDao.removeNote(noteId)
         audioNoteDao.removeNote(noteId)
         videoNoteDao.removeNote(noteId)
+
+        journalIds.forEach { journalId ->
+            syncMetadataService.enqueuePending(
+                entityId = AssociationPendingKey(journalId, noteId).toPendingId(),
+                entityType = EntityType.ASSOCIATION,
+                operation = PendingOperation.DELETE
+            )
+        }
+
+        journalContentDao.removeContentFromAllJournals(noteId)
 
         syncMetadataService.enqueuePending(
             entityId = noteId.toString(),
@@ -211,6 +235,9 @@ class OfflineFirstJournalNotesRepository(
         )
 
         triggerContentSync()
+        if (journalIds.isNotEmpty()) {
+            triggerAssociationSync()
+        }
         
     }
 
@@ -219,7 +246,7 @@ class OfflineFirstJournalNotesRepository(
         create(note)
         
         // Link it to the journal
-        journalNotesDao.addNoteToJournal(journalId, note.uid)
+        journalContentDao.addContentToJournal(JournalContentEntityLink(journalId, note.uid))
 
         syncMetadataService.enqueuePending(
             entityId = AssociationPendingKey(journalId, note.uid).toPendingId(),
@@ -232,7 +259,7 @@ class OfflineFirstJournalNotesRepository(
     }
 
     override suspend fun removeFromJournal(noteId: Uuid, journalId: Uuid) {
-        journalNotesDao.removeNoteFromJournal(journalId, noteId)
+        journalContentDao.removeContentFromJournal(journalId, noteId)
 
         syncMetadataService.enqueuePending(
             entityId = AssociationPendingKey(journalId, noteId).toPendingId(),
