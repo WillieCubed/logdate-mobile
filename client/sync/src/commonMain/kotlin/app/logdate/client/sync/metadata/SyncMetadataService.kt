@@ -16,7 +16,7 @@ interface SyncMetadataService {
     suspend fun getPendingUploads(entityType: EntityType): List<PendingUpload>
 
     /**
-     * Marks an entity as successfully synced.
+     * Marks an entity as successfully synced by removing it from the pending queue.
      */
     suspend fun markAsSynced(entityId: String, entityType: EntityType, syncedAt: Instant, version: Long)
 

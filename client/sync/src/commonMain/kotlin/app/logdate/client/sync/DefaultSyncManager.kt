@@ -433,6 +433,17 @@ class DefaultSyncManager(
 
         return times.maxOrNull()
     }
+
+    private fun JournalNote.mediaRefOrNull(): String? = when (this) {
+        is JournalNote.Image -> mediaRef
+        is JournalNote.Video -> mediaRef
+        is JournalNote.Audio -> mediaRef
+        else -> null
+    }
+
+    private fun isRemoteMediaRef(mediaRef: String): Boolean {
+        return mediaRef.startsWith("http://") || mediaRef.startsWith("https://")
+    }
     
     private suspend fun uploadJournals(accessToken: String): SyncResult {
         return try {
@@ -614,6 +625,19 @@ class DefaultSyncManager(
                                 Clock.System.now(),
                                 0L
                             )
+                            continue
+                        }
+
+                        val mediaRef = note.mediaRefOrNull()
+                        if (mediaRef != null && !isRemoteMediaRef(mediaRef)) {
+                            errors.add(
+                                SyncError(
+                                    SyncErrorType.STORAGE_ERROR,
+                                    "Media for note ${note.uid} has a local URI; upload media before syncing.",
+                                    retryable = true
+                                )
+                            )
+                            Napier.w("Skipping note ${note.uid} sync; media URI is local: $mediaRef")
                             continue
                         }
 

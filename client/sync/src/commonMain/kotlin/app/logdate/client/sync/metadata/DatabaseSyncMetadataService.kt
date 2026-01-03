@@ -32,7 +32,6 @@ class DatabaseSyncMetadataService(
         version: Long
     ) {
         dao.deletePending(entityType.name, entityId)
-        updateCursorIfNewer(entityType, syncedAt)
     }
 
     override suspend fun getLastSyncTime(entityType: EntityType): Instant? {

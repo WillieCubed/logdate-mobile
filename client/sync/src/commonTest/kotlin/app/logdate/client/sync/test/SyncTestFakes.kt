@@ -333,7 +333,6 @@ class FakeSyncMetadataService : SyncMetadataService {
 
     override suspend fun markAsSynced(entityId: String, entityType: EntityType, syncedAt: Instant, version: Long) {
         pendingUploads[entityType]?.remove(entityId)
-        updateSyncTime(entityType, syncedAt)
         updatePendingCount()
     }
 

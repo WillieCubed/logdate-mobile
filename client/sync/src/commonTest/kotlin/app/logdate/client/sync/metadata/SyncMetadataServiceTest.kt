@@ -35,7 +35,6 @@ class SyncMetadataServiceTest {
 
         override suspend fun markAsSynced(entityId: String, entityType: EntityType, syncedAt: Instant, version: Long) {
             pendingUploads[entityType]?.remove(entityId)
-            updateSyncTime(entityType, syncedAt)
             updatePendingCount()
         }
 
@@ -144,7 +143,7 @@ class SyncMetadataServiceTest {
     }
 
     @Test
-    fun `markAsSynced removes entity from pending and updates sync time`() = runTest {
+    fun `markAsSynced removes entity from pending uploads`() = runTest {
         val service = InMemorySyncMetadataService()
         val entityId = Uuid.random().toString()
         val syncTime = Clock.System.now()
@@ -158,7 +157,7 @@ class SyncMetadataServiceTest {
 
         assertEquals(0, service.getPendingCount())
         assertTrue(service.getPendingUploads(EntityType.NOTE).isEmpty())
-        assertEquals(syncTime, service.getLastSyncTime(EntityType.NOTE))
+        assertNull(service.getLastSyncTime(EntityType.NOTE))
     }
 
     @Test
@@ -178,13 +177,11 @@ class SyncMetadataServiceTest {
     @Test
     fun `sync times are tracked per entity type`() = runTest {
         val service = InMemorySyncMetadataService()
-        val noteId = Uuid.random().toString()
-        val journalId = Uuid.random().toString()
         val noteTime = Instant.fromEpochMilliseconds(1000)
         val journalTime = Instant.fromEpochMilliseconds(2000)
 
-        service.markAsSynced(noteId, EntityType.NOTE, noteTime, 1L)
-        service.markAsSynced(journalId, EntityType.JOURNAL, journalTime, 1L)
+        service.updateLastSyncTime(EntityType.NOTE, noteTime)
+        service.updateLastSyncTime(EntityType.JOURNAL, journalTime)
 
         assertEquals(noteTime, service.getLastSyncTime(EntityType.NOTE))
         assertEquals(journalTime, service.getLastSyncTime(EntityType.JOURNAL))
