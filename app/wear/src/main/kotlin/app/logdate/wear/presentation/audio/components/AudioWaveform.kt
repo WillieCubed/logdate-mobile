@@ -31,6 +31,14 @@ fun AudioWaveform(
     } else {
         audioLevels
     }
+
+    val animatedLevels = levels.mapIndexed { index, level ->
+        animateFloatAsState(
+            targetValue = level,
+            animationSpec = tween(durationMillis = 100),
+            label = "audio level $index"
+        )
+    }
     
     Canvas(
         modifier = modifier
@@ -43,13 +51,7 @@ fun AudioWaveform(
         
         // For a single audio level (most common case), create a symmetrical waveform
         if (levels.size == 1) {
-            val level = levels[0]
-            // Animate the level for smooth transitions
-            val animatedLevel by animateFloatAsState(
-                targetValue = level,
-                animationSpec = tween(durationMillis = 100),
-                label = "audio level"
-            )
+            val animatedLevel = animatedLevels[0].value
             
             // Number of bars in the waveform - adapt based on screen width
             val barCount = (width / (barWidth * 2)).toInt().coerceAtMost(15)
@@ -76,12 +78,8 @@ fun AudioWaveform(
             // If we have multiple levels, draw them directly (more complex visualization)
             val barSpacing = width / levels.size.coerceAtLeast(1)
             
-            levels.forEachIndexed { index, level ->
-                val animatedLevel by animateFloatAsState(
-                    targetValue = level,
-                    animationSpec = tween(durationMillis = 100),
-                    label = "audio level $index"
-                )
+            levels.forEachIndexed { index, _ ->
+                val animatedLevel = animatedLevels[index].value
                 
                 val x = barSpacing * (index + 0.5f)
                 

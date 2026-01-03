@@ -218,7 +218,7 @@ class WearAudioRecordingService : Service() {
      */
     private fun createRecordingNotification(): Notification {
         return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_monochrome) // Use app icon as recording indicator
+            .setSmallIcon(R.mipmap.ic_launcher) // Use app icon as recording indicator
             .setContentTitle("Recording Audio")
             .setStyle(NotificationCompat.BigTextStyle().bigText("Recording in progress on your watch"))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

@@ -2,6 +2,7 @@ package app.logdate.wear.presentation.audio.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -15,11 +16,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Stop
 import androidx.wear.compose.material3.MaterialTheme
-import androidx.wear.compose.material.icons.Icons
-import androidx.wear.compose.material.icons.filled.Stop
 import androidx.wear.compose.material3.Icon
-import androidx.wear.compose.material3.Surface
 
 /**
  * Custom recording button optimized for Wear OS.
@@ -34,12 +34,12 @@ fun RecordButton(
 ) {
     val contentDesc = if (isRecording) "Stop Recording" else "Start Recording"
     
-    Surface(
-        onClick = onClick,
-        enabled = enabled,
-        shape = CircleShape,
+    Box(
         modifier = modifier
-            .semantics { contentDescription = contentDesc }
+            .clip(CircleShape)
+            .clickable(enabled = enabled, onClick = onClick)
+            .semantics { contentDescription = contentDesc },
+        contentAlignment = Alignment.Center
     ) {
         if (isRecording) {
             // Stop recording state
@@ -61,7 +61,7 @@ fun RecordButton(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surface)
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
                     .padding(4.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -70,7 +70,7 @@ fun RecordButton(
                         .size(48.dp)
                         .clip(CircleShape)
                         .background(Color.Red.copy(alpha = if (enabled) 1f else 0.6f))
-                        .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
+                        .border(2.dp, MaterialTheme.colorScheme.surfaceContainer, CircleShape)
                 )
             }
         }

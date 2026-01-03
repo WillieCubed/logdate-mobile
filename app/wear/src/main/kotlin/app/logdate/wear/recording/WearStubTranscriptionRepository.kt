@@ -1,11 +1,10 @@
 package app.logdate.wear.recording
 
 import app.logdate.client.repository.transcription.TranscriptionRepository
-import app.logdate.client.repository.transcription.TranscriptionResult
+import app.logdate.client.repository.transcription.TranscriptionData
 import app.logdate.client.repository.transcription.TranscriptionStatus
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlin.uuid.Uuid
 
@@ -22,16 +21,27 @@ class WearStubTranscriptionRepository : TranscriptionRepository {
         return false
     }
     
-    override fun observeTranscription(noteId: Uuid): Flow<TranscriptionResult?> {
+    override fun observeTranscription(noteId: Uuid): Flow<TranscriptionData?> {
         // Return empty flow - no transcription support on Wear OS
         return emptyFlow()
     }
     
-    override suspend fun getTranscription(noteId: Uuid): TranscriptionResult? {
+    override suspend fun getTranscription(noteId: Uuid): TranscriptionData? {
         return null
     }
     
-    override suspend fun cancelTranscription(noteId: Uuid): Boolean {
-        return true
+    override suspend fun getPendingTranscriptions(): List<TranscriptionData> = emptyList()
+
+    override suspend fun updateTranscription(
+        noteId: Uuid,
+        text: String?,
+        status: TranscriptionStatus,
+        errorMessage: String?
+    ): Boolean {
+        return false
+    }
+
+    override suspend fun deleteTranscription(noteId: Uuid): Boolean {
+        return false
     }
 }

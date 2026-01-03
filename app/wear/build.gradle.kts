@@ -32,6 +32,7 @@ android {
     }
     kotlinOptions {
         jvmTarget = "11"
+        freeCompilerArgs += "-opt-in=kotlin.uuid.ExperimentalUuidApi"
     }
     buildFeatures {
         compose = true
@@ -57,16 +58,16 @@ dependencies {
     // Kotlinx coroutines
     implementation(libs.kotlinx.coroutines.android)
     
-    // Minimal client dependencies for Wear - avoid full feature modules that include Material3
-    // implementation(projects.client.repository)
-    // implementation(projects.client.feature.editor)
+    // Minimal client dependencies for Wear - reuse shared repository models.
+    implementation(projects.client.repository)
+    implementation(projects.client.feature.editor)
     
     // Add navigation for Wear
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.compose.material.iconsExtended)
     
     // Additional Compose support
-    implementation(libs.kotlinx.uuid.core)
+    implementation(libs.kotlinx.datetime)
     implementation(libs.koin.compose.viewmodel)
 
     implementation(libs.play.services.wearable)
@@ -76,9 +77,11 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     
     // Material 3 for Wear OS
+    implementation(libs.androidx.compose.material)
     implementation(libs.androidx.wear.material3)
     implementation(libs.androidx.wear.foundation)
     implementation(libs.androidx.wear.navigation)
+    implementation(libs.material)
     
     implementation(libs.androidx.wear.tooling.preview)
     implementation(libs.androidx.activity.compose)

@@ -6,19 +6,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.wear.compose.foundation.SwipeToDismissBox
-import androidx.wear.compose.foundation.rememberSwipeToDismissBoxState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.wear.compose.material.SwipeToDismissBox
+import androidx.wear.compose.material.SwipeToDismissValue
+import androidx.wear.compose.material.rememberSwipeToDismissBoxState
 import androidx.wear.compose.material3.*
-import androidx.wear.compose.material.icons.Icons
-import androidx.wear.compose.material.icons.filled.Close
-import androidx.wear.compose.material.icons.filled.Pause
-import androidx.wear.compose.material.icons.filled.PlayArrow
-import app.logdate.feature.editor.ui.audio.AudioViewModel
 import app.logdate.wear.presentation.audio.components.AudioWaveform
 import app.logdate.wear.presentation.audio.components.RecordButton
 import app.logdate.wear.presentation.audio.components.RecordingTimer
-import org.koin.androidx.compose.koinViewModel
-import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.delay
+import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * Main screen for audio recording on Wear OS.
@@ -26,7 +26,7 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 @Composable
 fun AudioRecordingScreen(
-    viewModel: AudioViewModel = koinViewModel(),
+    viewModel: AudioRecordingViewModel = koinViewModel(),
     onNavigateBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -34,7 +34,7 @@ fun AudioRecordingScreen(
     
     // Handle swipe to dismiss
     LaunchedEffect(swipeToDismissBoxState.currentValue) {
-        if (swipeToDismissBoxState.currentValue == androidx.wear.compose.foundation.SwipeToDismissValue.Dismissed) {
+        if (swipeToDismissBoxState.currentValue == SwipeToDismissValue.Dismissed) {
             if (uiState.isRecording) {
                 viewModel.stopRecording()
             }
@@ -43,11 +43,9 @@ fun AudioRecordingScreen(
     }
     
     // Detect successful recording completion
-    val recordedAudioUri = uiState.recordedAudioUri
-    LaunchedEffect(recordedAudioUri) {
-        if (recordedAudioUri != null && !uiState.isRecording) {
-            // Short delay to allow user to see completion state
-            kotlinx.coroutines.delay(500)
+    LaunchedEffect(uiState.navigateBack) {
+        if (uiState.navigateBack) {
+            delay(300)
             onNavigateBack()
         }
     }
@@ -58,10 +56,7 @@ fun AudioRecordingScreen(
         modifier = Modifier.fillMaxSize()
     ) {
         ScreenScaffold(
-            timeText = { 
-                // Show compact TimeText to save space
-                TimeText(timeTextStyle = TimeTextDefaults.timeTextStyle(fontSize = MaterialTheme.typography.labelMedium.fontSize)) 
-            }
+            timeText = { TimeText() }
         ) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -75,9 +70,9 @@ fun AudioRecordingScreen(
                     verticalArrangement = Arrangement.Center
                 ) {
                     // Error message
-                    if (uiState.error != null) {
+                    if (uiState.errorMessage != null) {
                         Text(
-                            text = uiState.error!!,
+                            text = uiState.errorMessage!!,
                             style = MaterialTheme.typography.labelSmall, // Smaller text for Wear OS
                             color = MaterialTheme.colorScheme.error,
                             textAlign = TextAlign.Center,
@@ -99,7 +94,7 @@ fun AudioRecordingScreen(
                     // Recording timer
                     if (uiState.isRecording) {
                         RecordingTimer(
-                            durationMs = uiState.duration.inWholeMilliseconds,
+                            durationMs = uiState.durationMs,
                             isRecording = uiState.isRecording,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
@@ -128,11 +123,17 @@ fun AudioRecordingScreen(
                         ) {
                             // Pause/Resume button
                             Button(
-                                onClick = { viewModel.toggleRecordingPause() },
+                                onClick = {
+                                    if (uiState.isPaused) {
+                                        viewModel.resumeRecording()
+                                    } else {
+                                        viewModel.pauseRecording()
+                                    }
+                                },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.primaryContainer
                                 ),
-                                modifier = Modifier.size(ButtonDefaults.DefaultButtonSize)
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(
                                     imageVector = if (uiState.isPaused) 
@@ -152,7 +153,7 @@ fun AudioRecordingScreen(
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.errorContainer
                                 ),
-                                modifier = Modifier.size(ButtonDefaults.DefaultButtonSize)
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.Close,
@@ -164,11 +165,13 @@ fun AudioRecordingScreen(
                 }
                 
                 // Loading indicator (for storage check or initialization)
-                if (!uiState.isRecording && uiState.recordedAudioUri == null && uiState.error == null) {
+                if (!uiState.isRecording && uiState.errorMessage == null && !uiState.navigateBack) {
                     CircularProgressIndicator(
                         modifier = Modifier.align(Alignment.Center),
-                        indicatorColor = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                        colors = ProgressIndicatorDefaults.colors(
+                            indicatorColor = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceContainer
+                        )
                     )
                 }
             }

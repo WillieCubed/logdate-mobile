@@ -12,7 +12,7 @@ import io.github.aakira.napier.Napier
  */
 class StubAudioPlaybackManager : AudioPlaybackManager {
     
-    override suspend fun startPlayback(
+    override fun startPlayback(
         uri: String,
         onProgressUpdated: (Float) -> Unit,
         onPlaybackCompleted: () -> Unit
@@ -21,15 +21,15 @@ class StubAudioPlaybackManager : AudioPlaybackManager {
         onPlaybackCompleted()
     }
     
-    override suspend fun pausePlayback() {
+    override fun pausePlayback() {
         Napier.d("Playback not implemented on Wear OS yet")
     }
     
-    override suspend fun resumePlayback() {
+    override fun stopPlayback() {
         Napier.d("Playback not implemented on Wear OS yet")
     }
     
-    override suspend fun seekTo(position: Float) {
+    override fun seekTo(position: Float) {
         Napier.d("Playback not implemented on Wear OS yet")
     }
     
