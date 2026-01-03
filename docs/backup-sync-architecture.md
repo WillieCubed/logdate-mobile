@@ -99,7 +99,7 @@ sequenceDiagram
 
 ## Backup/export flow
 
-Export is a pure read path that uses repositories as sources of truth. It is deterministic and produces a portable JSON set plus a media manifest.
+Export is a pure read path that uses repositories as sources of truth. It is deterministic and produces a portable JSON set plus a media manifest. Journal-note associations are exported separately to preserve many-to-many relationships.
 
 ```mermaid
 sequenceDiagram
@@ -112,6 +112,7 @@ sequenceDiagram
     Export->>Notes: allNotesObserved.first()
     Export->>Drafts: getAllDrafts()
     Export-->>Export: map to export models
+    Export-->>Export: build journal-note relations
     Export-->>Export: build media manifest
     Export-->>Export: emit ExportProgress.Completed
 ```
@@ -122,6 +123,7 @@ sequenceDiagram
 - Remote deletions are skipped if local edits are pending or if local `lastUpdated` is newer than the last sync cursor.
 - Export includes:
   - journals, notes, drafts
+  - journal-note associations (`journal_notes.json`)
   - unique media references with deterministic export paths
 - Draft export includes media references from all block types (text, image, video, audio, camera).
 
@@ -139,6 +141,7 @@ sequenceDiagram
 
 ## Open follow-ups
 
+- Implement media blob sync (upload/download) so notes with local media URIs can sync across devices.
 - Add end-to-end sync tests against a real cloud backend.
 - Implement richer conflict resolution strategies beyond LWW.
 - Extend export/import into a full round-trip restore flow.
