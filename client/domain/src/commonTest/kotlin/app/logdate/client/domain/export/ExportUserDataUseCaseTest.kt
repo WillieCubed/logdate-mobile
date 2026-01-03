@@ -18,6 +18,7 @@ import app.logdate.shared.model.user.UserData
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
@@ -110,12 +111,13 @@ class ExportUserDataUseCaseTest {
 
         mockJournalRepository.testJournals = listOf(testJournal)
         mockNotesRepository.testNotes = listOf(textNote, audioNote)
+        mockNotesRepository.notesByJournal = mapOf(testJournal.id to listOf(textNote))
 
         val progressUpdates = useCase.exportUserData().toList()
         val result = (progressUpdates.last() as ExportProgress.Completed).result
 
         val json = Json { ignoreUnknownKeys = true }
-        val metadata = json.decodeFromString<ExportUserDataUseCase.ExportMetadata>(result.metadata)
+        val metadata = json.decodeFromString<ExportMetadata>(result.metadata)
 
         assertEquals(deviceIdProvider.getDeviceId().value.toString(), metadata.userId)
         assertEquals(deviceIdProvider.getDeviceId().value.toString(), metadata.deviceId)
@@ -124,13 +126,19 @@ class ExportUserDataUseCaseTest {
         assertEquals(2, metadata.stats.noteCount)
         assertEquals(1, metadata.stats.mediaCount)
 
-        val notesPayload = json.decodeFromString<Map<String, List<ExportUserDataUseCase.ExportNote>>>(result.notes)
+        val notesPayload = json.decodeFromString<Map<String, List<ExportNote>>>(result.notes)
         val exportedIds = notesPayload.getValue("notes").map { it.id }.toSet()
         assertTrue(exportedIds.contains(textNote.uid.toString()), "Text note should be exported")
         assertTrue(exportedIds.contains(audioNote.uid.toString()), "Audio note should be exported")
 
         val uniquePaths = result.mediaFiles.map { it.exportPath }.toSet()
         assertEquals(uniquePaths.size, result.mediaFiles.size, "Media export paths should be unique")
+
+        val relationsPayload = json.decodeFromString<Map<String, List<ExportJournalNoteRelation>>>(result.journalNotes)
+        val relations = relationsPayload.getValue("journal_notes")
+        assertEquals(1, relations.size, "Journal-note relations should be exported")
+        assertEquals(testJournal.id.toString(), relations.first().journalId)
+        assertEquals(textNote.uid.toString(), relations.first().noteId)
     }
 
     @Test
@@ -142,14 +150,17 @@ class ExportUserDataUseCaseTest {
         val result = (progressUpdates.last() as ExportProgress.Completed).result
 
         val json = Json { ignoreUnknownKeys = true }
-        val metadata = json.decodeFromString<ExportUserDataUseCase.ExportMetadata>(result.metadata)
+        val metadata = json.decodeFromString<ExportMetadata>(result.metadata)
 
         assertEquals(0, metadata.stats.journalCount)
         assertEquals(0, metadata.stats.noteCount)
         assertEquals(0, metadata.stats.mediaCount)
 
-        val notesPayload = json.decodeFromString<Map<String, List<ExportUserDataUseCase.ExportNote>>>(result.notes)
+        val notesPayload = json.decodeFromString<Map<String, List<ExportNote>>>(result.notes)
         assertTrue(notesPayload.getValue("notes").isEmpty(), "Notes payload should be empty")
+
+        val relationsPayload = json.decodeFromString<Map<String, List<ExportJournalNoteRelation>>>(result.journalNotes)
+        assertTrue(relationsPayload.getValue("journal_notes").isEmpty(), "Journal-note relations should be empty")
     }
 
     @Test
@@ -200,7 +211,7 @@ class ExportUserDataUseCaseTest {
         val result = (progressUpdates.last() as ExportProgress.Completed).result
 
         val json = Json { ignoreUnknownKeys = true }
-        val draftsPayload = json.decodeFromString<Map<String, List<ExportUserDataUseCase.ExportDraft>>>(result.drafts)
+        val draftsPayload = json.decodeFromString<Map<String, List<ExportDraft>>>(result.drafts)
         val exportDraft = draftsPayload.getValue("drafts").first()
 
         assertEquals(draft.id.toString(), exportDraft.id)
@@ -269,10 +280,12 @@ class ExportUserDataUseCaseTest {
                 field = value
                 notesFlow.value = value
             }
+        var notesByJournal: Map<Uuid, List<JournalNote>> = emptyMap()
 
         override val allNotesObserved: Flow<List<JournalNote>> = notesFlow
 
-        override fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> = flowOf(emptyList())
+        override fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> =
+            flowOf(notesByJournal[journalId] ?: emptyList())
         override fun observeNotesInRange(start: Instant, end: Instant): Flow<List<JournalNote>> = flowOf(emptyList())
         override fun observeNotesPage(pageSize: Int, offset: Int): Flow<List<JournalNote>> = flowOf(emptyList())
         override fun observeNotesStream(pageSize: Int): Flow<List<JournalNote>> = flowOf(emptyList())

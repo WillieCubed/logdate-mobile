@@ -152,6 +152,9 @@ class DesktopExportLauncher : ExportLauncher, KoinComponent {
             
             // Add notes.json
             addZipEntry(zipOutputStream, "notes.json", exportResult.notes)
+
+            // Add journal_notes.json
+            addZipEntry(zipOutputStream, "journal_notes.json", exportResult.journalNotes)
             
             // Add drafts.json
             addZipEntry(zipOutputStream, "drafts.json", exportResult.drafts)

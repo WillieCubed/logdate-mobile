@@ -108,6 +108,15 @@ class ExportUserDataUseCase(
             }
             
             val exportDrafts = drafts.map { it.toExportDraft() }
+            val exportRelations = journals.flatMap { journal ->
+                journalNotesRepository.observeNotesInJournal(journal.id).first().map { note ->
+                    ExportJournalNoteRelation(
+                        journalId = journal.id.toString(),
+                        noteId = note.uid.toString(),
+                        addedAt = note.creationTimestamp
+                    )
+                }
+            }
             
             // Calculate actual stats
             val mediaFiles = getMediaFilesToExport(exportNotes, exportDrafts, audioNotes)
@@ -133,12 +142,14 @@ class ExportUserDataUseCase(
             val journalsJson = json.encodeToString(mapOf("journals" to journals))
             val notesJson = json.encodeToString(mapOf("notes" to exportNotes))
             val draftsJson = json.encodeToString(mapOf("drafts" to exportDrafts))
+            val journalNotesJson = json.encodeToString(mapOf("journal_notes" to exportRelations))
             
             // Create the final export data
             val exportData = ExportResult(
                 metadata = metadataJson,
                 journals = journalsJson,
                 notes = notesJson,
+                journalNotes = journalNotesJson,
                 drafts = draftsJson,
                 mediaFiles = mediaFiles
             )
@@ -165,71 +176,6 @@ class ExportUserDataUseCase(
             "$year/${formattedTimestamp}_$id"
         }
     }
-    
-    /**
-     * Gets the list of media files to include in the export.
-     */
-    @Serializable
-    data class ExportLocation(
-        val latitude: Double,
-        val longitude: Double,
-        val placeName: String? = null
-    )
-    
-    /**
-     * Metadata for the export
-     */
-    @Serializable
-    data class ExportMetadata(
-        val exportDate: kotlinx.datetime.Instant,
-        val userId: String,
-        val deviceId: String,
-        val appVersion: String,
-        val stats: ExportStats
-    )
-    
-    /**
-     * Statistics about the export
-     */
-    @Serializable
-    data class ExportStats(
-        val journalCount: Int,
-        val noteCount: Int,
-        val draftCount: Int,
-        val mediaCount: Int
-    )
-    
-    /**
-     * Draft data for export
-     */
-    @Serializable
-    data class ExportDraft(
-        val id: String,
-        val journalId: String? = null,
-        val content: String = "",
-        val createdAt: kotlinx.datetime.Instant,
-        val updatedAt: kotlinx.datetime.Instant,
-        val location: ExportLocation? = null,
-        val mediaReferences: List<String> = emptyList()
-    )
-    
-    /**
-     * Note data for export
-     */
-    @Serializable
-    data class ExportNote(
-        val id: String,
-        val journalId: String? = null,
-        val type: String,
-        val content: String = "",
-        val caption: String = "",
-        val mediaPath: String? = null,
-        val createdAt: kotlinx.datetime.Instant,
-        val updatedAt: kotlinx.datetime.Instant,
-        val location: ExportLocation? = null,
-        val tags: List<String> = emptyList(),
-        val people: List<String> = emptyList()
-    )
     
     private fun getMediaFilesToExport(
         notes: List<ExportNote>, 
@@ -347,6 +293,7 @@ data class ExportResult(
     val metadata: String,
     val journals: String,
     val notes: String,
+    val journalNotes: String,
     val drafts: String,
     val mediaFiles: List<ExportMediaFile>
 )

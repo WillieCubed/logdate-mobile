@@ -160,6 +160,11 @@ class ExportWorker(
                 zipOut.putNextEntry(ZipEntry("notes.json"))
                 zipOut.write(exportData.notes.toByteArray())
                 zipOut.closeEntry()
+
+                // Add journal_notes.json file
+                zipOut.putNextEntry(ZipEntry("journal_notes.json"))
+                zipOut.write(exportData.journalNotes.toByteArray())
+                zipOut.closeEntry()
                 
                 // Add drafts.json file
                 zipOut.putNextEntry(ZipEntry("drafts.json"))
@@ -237,6 +242,11 @@ class ExportWorker(
                 // Add notes.json file
                 zipOut.putNextEntry(ZipEntry("notes.json"))
                 zipOut.write(exportData.notes.toByteArray())
+                zipOut.closeEntry()
+
+                // Add journal_notes.json file
+                zipOut.putNextEntry(ZipEntry("journal_notes.json"))
+                zipOut.write(exportData.journalNotes.toByteArray())
                 zipOut.closeEntry()
                 
                 // Add drafts.json file
