@@ -4,7 +4,7 @@ filekitCompose = "0.8.8"
 kotlin = "2.1.21"
 dokkaGradlePlugin = "1.9.20"
 compose-multiplatform = "1.7.0"
-agp = "8.9.3"
+agp = "8.13.2"
 googleServicesPlugin = "4.4.2"
 buildConfigPlugin = "5.3.5"
 kover = "0.8.3"
@@ -108,7 +108,6 @@ horologistComposeTools = "0.6.17"
 horologistTiles = "0.6.17"
 watchfaceComplicationsDataSourceKtx = "1.2.1"
 uiAndroid = "1.8.2"
-composeIcons = "1.8.2"
 kotlinxUuid = "0.0.15"
 
 
@@ -299,7 +298,7 @@ androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-toolin
 androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-material = { group = "androidx.wear.compose", name = "compose-material", version.ref = "composeMaterial" }
-androidx-compose-material-iconsExtended = { group = "androidx.compose.material", name = "material-icons-extended", version.ref = "composeIcons" }
+androidx-compose-material-iconsExtended = { group = "androidx.compose.material", name = "material-icons-extended" }
 androidx-wear-material3 = { group = "androidx.wear.compose", name = "compose-material3", version.ref = "wearComposeMaterial3" }
 androidx-wear-foundation = { group = "androidx.wear.compose", name = "compose-foundation", version.ref = "wearComposeFoundation" }
 androidx-wear-navigation = { group = "androidx.wear.compose", name = "compose-navigation", version.ref = "wearComposeNavigation" }
