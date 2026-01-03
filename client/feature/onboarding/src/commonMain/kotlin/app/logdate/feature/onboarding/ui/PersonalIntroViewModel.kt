@@ -108,7 +108,7 @@ class PersonalIntroViewModel(
                     is ProcessPersonalIntroductionUseCase.Result.Error -> {
                         _uiState.value = _uiState.value.copy(
                             isProcessingLlm = false,
-                            errorMessage = result.message
+                            errorMessage = errorMessageFor(result.reason)
                         )
                     }
                 }
@@ -117,7 +117,7 @@ class PersonalIntroViewModel(
                 Napier.e("Failed to process personal introduction", e)
                 _uiState.value = _uiState.value.copy(
                     isProcessingLlm = false,
-                    errorMessage = "An unexpected error occurred: ${e.message}"
+                    errorMessage = errorMessageFor(ProcessPersonalIntroductionUseCase.ErrorReason.UnexpectedFailure)
                 )
             }
         }
@@ -138,5 +138,18 @@ class PersonalIntroViewModel(
      */
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+
+    private fun errorMessageFor(reason: ProcessPersonalIntroductionUseCase.ErrorReason): String {
+        return when (reason) {
+            ProcessPersonalIntroductionUseCase.ErrorReason.SaveDisplayNameFailed ->
+                "We couldn't save your name right now."
+            ProcessPersonalIntroductionUseCase.ErrorReason.SaveBioFailed ->
+                "We couldn't save your bio right now."
+            ProcessPersonalIntroductionUseCase.ErrorReason.ProfileUpdateFailed ->
+                "We couldn't finish setting up your profile."
+            ProcessPersonalIntroductionUseCase.ErrorReason.UnexpectedFailure ->
+                "Something went wrong. Please try again."
+        }
     }
 }
