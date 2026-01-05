@@ -66,6 +66,8 @@ kotlin {
             implementation(libs.koin.android)
             implementation(libs.koin.androidx.workmanager)
             implementation(libs.androidx.work.runtime)
+            // Room for transaction support
+            implementation(libs.room.runtime)
             // Firebase
             implementation(libs.kotlinx.coroutines.play.services)
             implementation(project.dependencies.platform(libs.firebase.bom))

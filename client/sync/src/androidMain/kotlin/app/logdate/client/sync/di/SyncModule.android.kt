@@ -1,9 +1,12 @@
 package app.logdate.client.sync.di
 
+import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.sync.AndroidSyncManager
 import app.logdate.client.sync.DefaultSyncManager
+import app.logdate.client.sync.RoomSyncTransactionManager
 import app.logdate.client.sync.SyncManager
+import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.cloud.di.cloudAccountModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
@@ -14,6 +17,10 @@ import org.koin.dsl.module
  * A module for all sync-related dependencies.
  */
 actual val syncModule: Module = module {
+    single<SyncTransactionManager> {
+        val database = get<LogDateDatabase>()
+        RoomSyncTransactionManager(database)
+    }
     single<DefaultSyncManager> {
         DefaultSyncManager(
             cloudContentDataSource = get(),
@@ -27,7 +34,8 @@ actual val syncModule: Module = module {
             journalContentRepository = get(),
             journalConflictResolver = get(named(SyncQualifiers.JOURNAL_CONFLICT_RESOLVER)),
             noteConflictResolver = get(named(SyncQualifiers.NOTE_CONFLICT_RESOLVER)),
-            syncMetadataService = get()
+            syncMetadataService = get(),
+            transactionManager = get()
         )
     }
     single<SyncManager> { AndroidSyncManager(androidContext(), get<DefaultSyncManager>(), get()) }

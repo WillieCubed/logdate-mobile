@@ -6,11 +6,14 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.JournalContentRepository
+import app.logdate.client.repository.journals.SyncableJournalNotesRepository
+import app.logdate.client.sync.DefaultSyncManager
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncResult
 import app.logdate.client.sync.SyncStatus
 import app.logdate.client.sync.SyncError
 import app.logdate.client.sync.SyncErrorType
+import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.cloud.*
 import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.LastWriteWinsResolver
@@ -60,6 +63,38 @@ fun fakeJournalContentRepository(): FakeJournalContentRepository = FakeJournalCo
 fun trackingSyncManager(): TrackingSyncManager = TrackingSyncManager()
 
 fun <T> lastWriteWinsResolver(): ConflictResolver<T> = LastWriteWinsResolver()
+
+fun testSyncTransactionManager(): TestSyncTransactionManager = TestSyncTransactionManager()
+
+fun testDefaultSyncManager(
+    cloudContentDataSource: CloudContentDataSource = DefaultCloudContentDataSource(fakeCloudApiClient()),
+    cloudJournalDataSource: CloudJournalDataSource = DefaultCloudJournalDataSource(fakeCloudApiClient()),
+    cloudAssociationDataSource: CloudAssociationDataSource = DefaultCloudAssociationDataSource(fakeCloudApiClient()),
+    cloudMediaDataSource: CloudMediaDataSource = DefaultCloudMediaDataSource(fakeCloudApiClient()),
+    cloudAccountRepository: CloudAccountRepository = fakeAccountRepository(),
+    sessionStorage: SessionStorage = fakeSessionStorage(),
+    journalRepository: JournalRepository = FakeJournalRepository(),
+    journalNotesRepository: JournalNotesRepository = FakeJournalNotesRepository(),
+    journalContentRepository: JournalContentRepository = FakeJournalContentRepository(),
+    journalConflictResolver: ConflictResolver<Journal> = lastWriteWinsResolver(),
+    noteConflictResolver: ConflictResolver<JournalNote> = lastWriteWinsResolver(),
+    syncMetadataService: SyncMetadataService = fakeSyncMetadataService(),
+    transactionManager: SyncTransactionManager = testSyncTransactionManager()
+): DefaultSyncManager = DefaultSyncManager(
+    cloudContentDataSource = cloudContentDataSource,
+    cloudJournalDataSource = cloudJournalDataSource,
+    cloudAssociationDataSource = cloudAssociationDataSource,
+    cloudMediaDataSource = cloudMediaDataSource,
+    cloudAccountRepository = cloudAccountRepository,
+    sessionStorage = sessionStorage,
+    journalRepository = journalRepository,
+    journalNotesRepository = journalNotesRepository,
+    journalContentRepository = journalContentRepository,
+    journalConflictResolver = journalConflictResolver,
+    noteConflictResolver = noteConflictResolver,
+    syncMetadataService = syncMetadataService,
+    transactionManager = transactionManager
+)
 
 // =============================================================================
 // Fake implementations
@@ -382,7 +417,7 @@ class FakeSyncMetadataService : SyncMetadataService {
 /**
  * Fake JournalNotesRepository for testing.
  */
-class FakeJournalNotesRepository : JournalNotesRepository {
+class FakeJournalNotesRepository : SyncableJournalNotesRepository {
     private val notes = mutableListOf<JournalNote>()
     private val _notesFlow = MutableStateFlow<List<JournalNote>>(emptyList())
 
@@ -416,6 +451,26 @@ class FakeJournalNotesRepository : JournalNotesRepository {
 
     override suspend fun removeFromJournal(noteId: Uuid, journalId: Uuid) {
         // No-op for testing
+    }
+
+    override suspend fun getNoteById(noteId: Uuid): JournalNote? =
+        notes.find { it.uid == noteId }
+
+    override suspend fun createFromSync(note: JournalNote) {
+        create(note)
+    }
+
+    override suspend fun deleteFromSync(noteId: Uuid) {
+        removeById(noteId)
+    }
+
+    override suspend fun updateSyncMetadata(note: JournalNote, syncVersion: Long, syncedAt: Instant) {
+        // For testing, just update the note
+        val index = notes.indexOfFirst { it.uid == note.uid }
+        if (index >= 0) {
+            notes[index] = note
+            _notesFlow.value = notes.toList()
+        }
     }
 
     fun addTestNote(content: String): JournalNote.Text {
@@ -592,5 +647,15 @@ class TrackingSyncManager : SyncManager {
             downloadedItems = downloadedItems,
             lastSyncTime = Clock.System.now()
         )
+    }
+}
+
+/**
+ * Test implementation of SyncTransactionManager that executes blocks directly
+ * without actual transaction semantics (suitable for in-memory testing).
+ */
+class TestSyncTransactionManager : SyncTransactionManager {
+    override suspend fun <T> withTransaction(block: suspend () -> T): T {
+        return block()
     }
 }

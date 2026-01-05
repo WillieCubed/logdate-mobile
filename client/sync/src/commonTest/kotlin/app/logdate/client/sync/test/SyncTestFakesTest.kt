@@ -172,7 +172,8 @@ class SyncTestFakesTest {
             journalContentRepository = journalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = fakeSyncMetadataService()
+            syncMetadataService = fakeSyncMetadataService(),
+            transactionManager = testSyncTransactionManager()
         )
 
         // When: Performing a content sync
@@ -205,7 +206,8 @@ class SyncTestFakesTest {
             journalContentRepository = journalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = fakeSyncMetadataService()
+            syncMetadataService = fakeSyncMetadataService(),
+            transactionManager = testSyncTransactionManager()
         )
 
         // When: Attempting to sync without authentication
@@ -237,7 +239,8 @@ class SyncTestFakesTest {
             journalContentRepository = journalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = fakeSyncMetadataService()
+            syncMetadataService = fakeSyncMetadataService(),
+            transactionManager = testSyncTransactionManager()
         )
 
         // When: Attempting to sync with network failures

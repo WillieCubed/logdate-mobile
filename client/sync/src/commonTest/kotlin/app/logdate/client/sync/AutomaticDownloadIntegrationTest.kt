@@ -85,7 +85,8 @@ class AutomaticDownloadIntegrationTest {
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = fakeSyncMetadataService()
+            syncMetadataService = fakeSyncMetadataService(),
+            transactionManager = testSyncTransactionManager()
         )
 
         // When: We download remote changes
@@ -146,7 +147,8 @@ class AutomaticDownloadIntegrationTest {
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = fakeSyncMetadataService()
+            syncMetadataService = fakeSyncMetadataService(),
+            transactionManager = testSyncTransactionManager()
         )
 
         // When: We download remote changes
@@ -194,7 +196,8 @@ class AutomaticDownloadIntegrationTest {
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = fakeSyncMetadataService()
+            syncMetadataService = fakeSyncMetadataService(),
+            transactionManager = testSyncTransactionManager()
         )
 
         // When: We download remote changes
@@ -242,7 +245,8 @@ class AutomaticDownloadIntegrationTest {
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = syncMetadataService
+            syncMetadataService = syncMetadataService,
+            transactionManager = testSyncTransactionManager()
         )
 
         val result = syncManager.downloadRemoteChanges()
@@ -271,7 +275,8 @@ class AutomaticDownloadIntegrationTest {
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = fakeSyncMetadataService()
+            syncMetadataService = fakeSyncMetadataService(),
+            transactionManager = testSyncTransactionManager()
         )
 
         mockApiClient.getContentChangesResponse = Result.success(
@@ -362,7 +367,8 @@ class AutomaticDownloadIntegrationTest {
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = syncMetadataService
+            syncMetadataService = syncMetadataService,
+            transactionManager = testSyncTransactionManager()
         )
 
         val result = syncManager.downloadRemoteChanges()
@@ -419,7 +425,8 @@ class AutomaticDownloadIntegrationTest {
             journalContentRepository = trackingContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = syncMetadataService
+            syncMetadataService = syncMetadataService,
+            transactionManager = testSyncTransactionManager()
         )
 
         val result = syncManager.downloadRemoteChanges()
@@ -478,7 +485,8 @@ class AutomaticDownloadIntegrationTest {
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = fakeSyncMetadataService()
+            syncMetadataService = fakeSyncMetadataService(),
+            transactionManager = testSyncTransactionManager()
         )
 
         // When: We download remote changes
@@ -534,7 +542,8 @@ class AutomaticDownloadIntegrationTest {
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = syncMetadataService
+            syncMetadataService = syncMetadataService,
+            transactionManager = testSyncTransactionManager()
         )
 
         val result = syncManager.downloadRemoteChanges()
@@ -563,7 +572,8 @@ class AutomaticDownloadIntegrationTest {
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = fakeSyncMetadataService()
+            syncMetadataService = fakeSyncMetadataService(),
+            transactionManager = testSyncTransactionManager()
         )
 
         mockApiClient.getJournalChangesResponse = Result.success(
@@ -649,7 +659,8 @@ class AutomaticDownloadIntegrationTest {
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = fakeSyncMetadataService()
+            syncMetadataService = fakeSyncMetadataService(),
+            transactionManager = testSyncTransactionManager()
         )
 
         // When: We download remote changes
@@ -682,7 +693,8 @@ class AutomaticDownloadIntegrationTest {
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = fakeSyncMetadataService()
+            syncMetadataService = fakeSyncMetadataService(),
+            transactionManager = testSyncTransactionManager()
         )
 
         // When: We attempt to download without authentication
@@ -717,7 +729,8 @@ class AutomaticDownloadIntegrationTest {
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = fakeSyncMetadataService()
+            syncMetadataService = fakeSyncMetadataService(),
+            transactionManager = testSyncTransactionManager()
         )
 
         // When: We attempt to download with failing API

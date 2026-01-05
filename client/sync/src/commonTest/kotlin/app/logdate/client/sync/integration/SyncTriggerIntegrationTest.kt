@@ -241,6 +241,9 @@ private class TestJournalNotesRepositoryWithSyncTriggers(
         syncManager.syncAssociations()
     }
     
+    override suspend fun getNoteById(noteId: Uuid): JournalNote? =
+        notes.find { it.uid == noteId }
+
     override suspend fun removeFromJournal(noteId: Uuid, journalId: Uuid) {
         // Trigger association sync like the real repository does
         syncManager.syncAssociations()

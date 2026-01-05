@@ -41,7 +41,8 @@ class AutomaticUploadIntegrationTest {
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = syncMetadataService
+            syncMetadataService = syncMetadataService,
+            transactionManager = testSyncTransactionManager()
         )
 
         val note = notesRepository.addTestNote("Test automatic upload")
@@ -78,7 +79,8 @@ class AutomaticUploadIntegrationTest {
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = syncMetadataService
+            syncMetadataService = syncMetadataService,
+            transactionManager = testSyncTransactionManager()
         )
 
         val journal = Journal(
@@ -119,7 +121,8 @@ class AutomaticUploadIntegrationTest {
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = syncMetadataService
+            syncMetadataService = syncMetadataService,
+            transactionManager = testSyncTransactionManager()
         )
 
         val associationKey = AssociationPendingKey(Uuid.random(), Uuid.random())
@@ -154,7 +157,8 @@ class AutomaticUploadIntegrationTest {
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = syncMetadataService
+            syncMetadataService = syncMetadataService,
+            transactionManager = testSyncTransactionManager()
         )
 
         val pendingNotes = notesRepository.allNotesObserved.first()
@@ -195,7 +199,8 @@ class AutomaticUploadIntegrationTest {
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
-            syncMetadataService = syncMetadataService
+            syncMetadataService = syncMetadataService,
+            transactionManager = testSyncTransactionManager()
         )
 
         val pendingNotes = notesRepository.allNotesObserved.first()
