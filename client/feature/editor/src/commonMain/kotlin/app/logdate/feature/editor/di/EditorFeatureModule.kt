@@ -18,6 +18,15 @@ import org.koin.dsl.module
 
 /**
  * A module that provides the dependencies for the editor feature.
+ *
+ * Dependencies are organized as follows:
+ * - domainModule: Provides use cases and domain logic (including FetchEntryUseCase)
+ * - platformEditorModule: Platform-specific services (camera, audio, image picker)
+ * - audioModule: Audio-specific functionality
+ *
+ * Architecture note: The editor feature only depends on the domain layer (use cases)
+ * and platform-specific modules, never directly on the data layer. This maintains
+ * clean architecture separation of concerns.
  */
 val editorFeatureModule: Module = module {
     includes(domainModule)
@@ -50,13 +59,14 @@ val editorFeatureModule: Module = module {
         )
     }
 
-    viewModel { 
+    viewModel {
         // Provide all required dependencies for fully functional entry editor
         EntryEditorViewModel(
             fetchTodayNotes = get(),
             getCurrentUserJournals = get(),
             getDefaultSelectedJournals = get(),
             addNoteUseCase = get(),
+            fetchEntryUseCase = get(),
             journalContentRepository = get(),
 //            observeLocation = get(),
             updateEntryDraft = get(),

@@ -37,30 +37,39 @@ class EditorActivity : FragmentActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         // Initialize FileKit for file operations
         FileKit.init(this)
-        
-        // Extract initial content if provided
+
+        // Extract entry ID if editing an existing entry.
+        // When users click "Open in New Window" on a timeline entry, this activity is launched
+        // with the entry ID to load and edit that specific entry.
+        val entryId = intent.getStringExtra(EXTRA_ENTRY_ID)?.let { Uuid.parse(it) }
+        val journalId = intent.getStringExtra(EXTRA_JOURNAL_ID)?.let { Uuid.parse(it) }
+
+        // Extract initial content if provided (for new entries).
+        // This is used when creating a brand new entry (e.g., from Share intent or new entry button).
         val initialText = intent.getStringExtra(EXTRA_INITIAL_TEXT)
         val attachmentUris = intent.getStringArrayListExtra(EXTRA_ATTACHMENTS)?.toList() ?: emptyList()
-        
+
         // Configure window features
         enableEdgeToEdge()
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
-        
+
         // Set up lifecycle-aware operations
         setupLifecycleHandling()
-        
+
         setContent {
             KoinContext {
                 LogDateTheme {
                     NoteEditorScreen(
                         onNavigateBack = { finish() },
-                        onEntrySaved = { 
+                        onEntrySaved = {
                             setResult(RESULT_OK)
-                            finish() 
+                            finish()
                         },
+                        entryId = entryId,
+                        journalId = journalId,
                         initialTextContent = initialText,
                         attachments = attachmentUris,
                         viewModel = viewModel
@@ -117,30 +126,42 @@ class EditorActivity : FragmentActivity() {
     
     companion object {
         private const val EXTRA_INSTANCE_ID = "editor_instance_id"
+        private const val EXTRA_ENTRY_ID = "entry_id"
+        private const val EXTRA_JOURNAL_ID = "journal_id"
         private const val EXTRA_INITIAL_TEXT = "initial_text"
         private const val EXTRA_ATTACHMENTS = "attachments"
-        
+
         /**
          * Creates an intent to launch a new editor window.
          *
          * @param context The application context
-         * @param initialText Optional initial text content
+         * @param entryId Optional ID for editing an existing entry
+         * @param journalId Optional journal ID for context when editing
+         * @param initialText Optional initial text content for new entries
          * @param attachments Optional list of attachment URIs
          * @return Intent configured to launch the editor activity
          */
         fun createIntent(
             context: Context,
+            entryId: Uuid? = null,
+            journalId: Uuid? = null,
             initialText: String? = null,
             attachments: List<String>? = null
         ): Intent {
             return Intent(context, EditorActivity::class.java).apply {
+                entryId?.let {
+                    putExtra(EXTRA_ENTRY_ID, it.toString())
+                }
+                journalId?.let {
+                    putExtra(EXTRA_JOURNAL_ID, it.toString())
+                }
                 initialText?.let {
                     putExtra(EXTRA_INITIAL_TEXT, it)
                 }
                 attachments?.let {
                     putStringArrayListExtra(EXTRA_ATTACHMENTS, ArrayList(it))
                 }
-                
+
                 // Flags to launch as a new document/task
                 addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT)
                 addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
