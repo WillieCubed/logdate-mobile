@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.outlined.PeopleAlt
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -72,13 +73,19 @@ internal fun hasEntryFromToday(timelineItems: List<JournalNote>): Boolean {
     return timelineItems.any { it.creationTimestamp > eightHoursAgo }
 }
 
-// TODO: Move to :client:ui
+/**
+ * Displays a scrollable list of journal entries with options to edit, delete, or open in new windows.
+ *
+ * onOpenInNewWindow is invoked when the user selects "Open in New Window" from an entry's context menu,
+ * enabling multi-window editing on supported devices.
+ */
 @Composable
 internal fun Timeline(
     timelineItems: List<JournalNote>,
     onItemSelected: (uid: Uuid) -> Unit,
     onItemDeleted: (uid: Uuid) -> Unit,
     onNewEntry: () -> Unit,
+    onOpenInNewWindow: (uid: Uuid) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -89,6 +96,7 @@ internal fun Timeline(
             onItemSelected = onItemSelected,
             onItemDeleted = onItemDeleted,
             onNewEntry = onNewEntry,
+            onOpenInNewWindow = onOpenInNewWindow,
         )
         item {
             // TODO: Fetch origin date from user data
@@ -133,12 +141,25 @@ private fun EntryDropdownMenu(
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onOpenInNewWindow: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     DropdownMenu(
         expanded = isExpanded, onDismissRequest = onDismiss,
         modifier = modifier,
     ) {
+        DropdownMenuItem(
+            text = {
+                Text("Open in New Window")
+            },
+            onClick = {
+                onDismiss()
+                onOpenInNewWindow()
+            },
+            leadingIcon = {
+                Icon(imageVector = Icons.Default.OpenInNew, contentDescription = null)
+            },
+        )
         // TODO: Re-enable edit functionality when editing is implemented
 //        DropdownMenuItem(
 //            text = {
@@ -230,6 +251,7 @@ private fun TimelineContentItem(
     timeDetail: TimeDetail = TimeDetail.DAY,
     onItemSelected: (uid: Uuid) -> Unit,
     onDeleteItem: (uid: Uuid) -> Unit = {},
+    onOpenInNewWindow: (uid: Uuid) -> Unit = {},
 ) {
     var showOptions by rememberSaveable { mutableStateOf(false) }
     Row(
@@ -280,6 +302,10 @@ private fun TimelineContentItem(
                         onDelete = {
                             showOptions = false
                             onDeleteItem(item.uid)
+                        },
+                        onOpenInNewWindow = {
+                            showOptions = false
+                            onOpenInNewWindow(item.uid)
                         },
                     )
                     IconButton(onClick = { showOptions = true }) {
@@ -400,6 +426,7 @@ fun LazyListScope.constructTimeline(
     onNewEntry: () -> Unit,
     onItemSelected: (uid: Uuid) -> Unit,
     onItemDeleted: (uid: Uuid) -> Unit,
+    onOpenInNewWindow: (uid: Uuid) -> Unit = {},
     zoomLevel: ZoomLevel = ZoomLevel.DETAILED,
 ) {
     // Sort items in reverse order, grouping them by weeks before this week, adding headers for each week.
@@ -436,6 +463,7 @@ fun LazyListScope.constructTimeline(
                             ),
                             onItemSelected = onItemSelected,
                             onDeleteItem = onItemDeleted,
+                            onOpenInNewWindow = onOpenInNewWindow,
                         )
                     }
                 }

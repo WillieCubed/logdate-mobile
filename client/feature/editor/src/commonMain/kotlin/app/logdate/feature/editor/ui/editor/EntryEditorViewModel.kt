@@ -5,6 +5,7 @@ package app.logdate.feature.editor.ui.editor
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.journals.GetCurrentUserJournalsUseCase
+import app.logdate.client.domain.notes.FetchEntryUseCase
 import app.logdate.client.domain.journals.GetDefaultSelectedJournalsUseCase
 import app.logdate.client.domain.notes.AddNoteUseCase
 import app.logdate.client.domain.notes.FetchTodayNotesUseCase
@@ -45,6 +46,7 @@ class EntryEditorViewModel(
     getCurrentUserJournals: GetCurrentUserJournalsUseCase,
     private val getDefaultSelectedJournals: GetDefaultSelectedJournalsUseCase,
     private val addNoteUseCase: AddNoteUseCase,
+    private val fetchEntryUseCase: FetchEntryUseCase,
     private val journalContentRepository: JournalContentRepository,
     // observeLocation: ObserveLocationUseCase, (commented out)
     private val updateEntryDraft: UpdateEntryDraftUseCase,
@@ -54,7 +56,7 @@ class EntryEditorViewModel(
     fetchMostRecentDraft: FetchMostRecentDraftUseCase,
     getAllDrafts: GetAllDraftsUseCase,
     // private val transcriptionService: TranscriptionService,
-    
+
     // New dependencies for mediator pattern and delegation
     private val mediator: EditorMediator,
     private val autoSaveDelegate: AutoSaveDelegate,
@@ -339,12 +341,19 @@ class EntryEditorViewModel(
 
     /**
      * Removes a block from the entry.
+     * Also clears the expanded block ID if the deleted block was currently expanded.
      */
     fun removeBlock(blockId: Uuid) {
         Napier.d("Removing block: $blockId")
         _mutableState.update { currentState ->
+            // Clear expanded state if deleting the expanded block
+            val shouldClearExpanded = currentState.expandedBlockId == blockId
+
             currentState.apply {
                 removeBlock(blockId)
+                if (shouldClearExpanded) {
+                    expandedBlockId = null
+                }
             }.copy(isModified = true)
         }
     }
@@ -457,6 +466,24 @@ class EntryEditorViewModel(
      */
     fun setExpandedBlockId(blockId: Uuid?) {
         _mutableState.update { it.copy(expandedBlockId = blockId) }
+    }
+
+    /**
+     * Dismisses the currently expanded block by collapsing it.
+     * This is typically called when the user presses back while a block is focused.
+     *
+     * @return true if a block was dismissed, false if no block was expanded
+     */
+    fun dismissExpandedBlock(): Boolean {
+        val currentExpandedId = _mutableState.value.expandedBlockId
+        return if (currentExpandedId != null) {
+            Napier.d("Dismissing expanded block: $currentExpandedId")
+            setExpandedBlockId(null)
+            true
+        } else {
+            Napier.w("dismissExpandedBlock called but no block is expanded")
+            false
+        }
     }
 
     /**
@@ -579,7 +606,7 @@ class EntryEditorViewModel(
      */
     fun setInitialAttachments(attachmentUris: List<String>) {
         if (attachmentUris.isEmpty()) return
-        
+
         viewModelScope.launch {
             try {
                 // Process each attachment and create appropriate blocks
@@ -591,18 +618,18 @@ class EntryEditorViewModel(
                         uri.contains(".jpeg", ignoreCase = true) ||
                         uri.contains(".png", ignoreCase = true) ||
                         uri.contains("image/", ignoreCase = true) -> BlockType.IMAGE
-                        
+
                         uri.contains(".mp4", ignoreCase = true) ||
                         uri.contains(".mov", ignoreCase = true) ||
                         uri.contains("video/", ignoreCase = true) -> BlockType.VIDEO
-                        
+
                         uri.contains(".mp3", ignoreCase = true) ||
                         uri.contains(".wav", ignoreCase = true) ||
                         uri.contains("audio/", ignoreCase = true) -> BlockType.AUDIO
-                        
+
                         else -> BlockType.IMAGE // Default to image for unknown types
                     }
-                    
+
                     // Create appropriate block and update it with the URI
                     when (blockType) {
                         BlockType.IMAGE -> {
@@ -623,10 +650,67 @@ class EntryEditorViewModel(
                         }
                     }
                 }
-                
+
                 Napier.d("Added ${attachmentUris.size} initial attachments")
             } catch (e: Exception) {
                 Napier.e("Failed to add initial attachments: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
+     * Loads an existing entry for editing.
+     *
+     * Fetches the entry by ID and populates the editor state with its content. If provided,
+     * journalId is used to set the selected journal context.
+     */
+    fun loadExistingEntry(entryId: Uuid, journalId: Uuid? = null) {
+        viewModelScope.launch {
+            try {
+                Napier.d("EntryEditorViewModel: Loading existing entry: $entryId")
+                _mutableState.update { it.copy(isLoading = true) }
+
+                // Fetch the entry
+                val entry = fetchEntryUseCase(entryId)
+
+                if (entry == null) {
+                    Napier.w("EntryEditorViewModel: Entry not found: $entryId")
+                    _mutableState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = "Entry not found"
+                        )
+                    }
+                    return@launch
+                }
+
+                // Convert the entry to a UI block
+                val block = entry.toDomainBlock()
+
+                // Update state with the loaded entry
+                _mutableState.update { currentState ->
+                    currentState.copy(
+                        blocks = listOf(block),
+                        isLoading = false,
+                        isModified = false,
+                        errorMessage = null
+                    )
+                }
+
+                // Set selected journal if provided
+                if (journalId != null) {
+                    setSelectedJournals(listOf(journalId))
+                }
+
+                Napier.i("EntryEditorViewModel: Loaded existing entry: $entryId")
+            } catch (e: Exception) {
+                Napier.e("EntryEditorViewModel: Failed to load existing entry: $entryId", e)
+                _mutableState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = "Failed to load entry: ${e.message}"
+                    )
+                }
             }
         }
     }

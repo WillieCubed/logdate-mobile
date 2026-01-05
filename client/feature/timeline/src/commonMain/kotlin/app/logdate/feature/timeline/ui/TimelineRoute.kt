@@ -36,21 +36,28 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 
+/**
+ * Timeline screen showing journal entries for the current and past dates.
+ *
+ * onOpenEntryInNewWindow is called when the user selects "Open in New Window" from an entry's menu,
+ * enabling multi-window editing.
+ */
 @Composable
 fun TimelineRoute(
     onOpenTimelineItem: (uid: Uuid) -> Unit,
     onNewEntry: () -> Unit,
+    onOpenEntryInNewWindow: (entryId: Uuid) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: TimelineViewModel = koinViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
-    
+
     // Get the audio playback state from the ViewModel
     val audioPlaybackState by viewModel.audioPlaybackState.collectAsState()
-    
+
     // Get transcription state from the ViewModel
     val transcriptionState by viewModel.transcriptionState.collectAsState()
-    
+
     // Provide both audio playback and transcription state to all descendants
     CompositionLocalProvider(
         LocalAudioPlaybackState provides audioPlaybackState,
@@ -61,6 +68,7 @@ fun TimelineRoute(
             onOpenTimelineItem = onOpenTimelineItem,
             onDeleteTimelineItem = { viewModel.deleteItem(it) },
             onNewEntry = onNewEntry,
+            onOpenEntryInNewWindow = onOpenEntryInNewWindow,
             onAddToMemory = { memoryId -> viewModel.showAddToMemoriesSnackbar(memoryId) },
             onDismissSnackbar = { viewModel.dismissSnackbar() },
             onSetSelectedDay = { date -> viewModel.setSelectedDay(date) },
@@ -110,6 +118,7 @@ internal fun TimelineScreen(
     onOpenTimelineItem: (uid: Uuid) -> Unit,
     onDeleteTimelineItem: (uid: Uuid) -> Unit,
     onNewEntry: () -> Unit,
+    onOpenEntryInNewWindow: (entryId: Uuid) -> Unit = {},
     onAddToMemory: (memoryId: String) -> Unit,
     onDismissSnackbar: () -> Unit,
     onSetSelectedDay: (LocalDate) -> Unit,
@@ -119,9 +128,9 @@ internal fun TimelineScreen(
     var showDeletionDialog by rememberSaveable { mutableStateOf(false) }
     var pendingDeletionUid by remember { mutableStateOf<Uuid?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
-    
+
     // Birthday is now passed as a parameter
-    
+
     // Handle showing snackbar
     LaunchedEffect(state.snackbarMessage) {
         state.snackbarMessage?.let {
@@ -177,8 +186,8 @@ internal fun TimelineScreen(
                     ),
                     onNewEntry = onNewEntry,
                     onShareMemory = { /* Handle share memory */ },
-                    onOpenDay = { date -> 
-                        onSetSelectedDay(date) 
+                    onOpenDay = { date ->
+                        onSetSelectedDay(date)
                     },
                     onAddToMemory = onAddToMemory,
                     birthday = birthday,
