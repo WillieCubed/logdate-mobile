@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import app.logdate.feature.editor.ui.audio.AudioBlockEditor
 import app.logdate.feature.editor.ui.camera.CameraBlockEditor
 import app.logdate.feature.editor.ui.content.EditorContentFooter
@@ -49,6 +50,7 @@ fun MainEditorContent(
     uiState: BlocksUiState,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
+    expandedBlockId: Uuid? = null,
 ) {
     val blockCount = uiState.blocks.size
     val isEmpty by remember(blockCount) { derivedStateOf { blockCount == 0 } }
@@ -84,10 +86,14 @@ fun MainEditorContent(
             LazyColumn(
                 state = listState,
             ) {
-                items(uiState.blocks) {
+                items(
+                    items = uiState.blocks,
+                    key = { block -> block.id }  // Add stable key for animations
+                ) { block ->
                     // Render each block using the BlockContent composable
                     BlockContent(
-                        block = it,
+                        block = block,
+                        isFocused = block.id == expandedBlockId,  // Visual feedback for focused block
                         onBlockFocused = { blockId ->
                             uiState.textState.onBlockFocused(blockId)
                         },
@@ -98,9 +104,11 @@ fun MainEditorContent(
                             uiState.onDeleteBlock(blockId)
                         },
                         audioState = uiState.audioState,
-                        modifier = Modifier.conditional(true) {
-                            fillMaxSize()
-                        }
+                        modifier = Modifier
+                            .animateItemPlacement()  // Add smooth add/remove animations
+                            .conditional(true) {
+                                fillMaxSize()
+                            }
                     )
                 }
                 item {
@@ -131,6 +139,7 @@ fun MainEditorContent(
 @Composable
 fun <T : EntryBlockUiState> BlockContent(
     block: T,
+    isFocused: Boolean = false,
     onBlockFocused: (Uuid) -> Unit,
     onBlockUpdated: (T) -> Unit,
     onBlockDeleted: (Uuid) -> Unit,
@@ -140,6 +149,12 @@ fun <T : EntryBlockUiState> BlockContent(
     EntryEditorSurface(
         modifier = modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                // Subtle scale/alpha when focused to preview dismissal
+                scaleX = if (isFocused) 0.98f else 1f
+                scaleY = if (isFocused) 0.98f else 1f
+                alpha = if (isFocused) 0.95f else 1f
+            }
     ) {
         when (block) {
             is TextBlockUiState -> {

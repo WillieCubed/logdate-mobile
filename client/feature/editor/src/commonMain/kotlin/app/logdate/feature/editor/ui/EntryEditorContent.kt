@@ -108,12 +108,24 @@ fun EntryEditorContent(
     var showExitConfirmation by remember { mutableStateOf(false) }
     var showDraftsDialog by remember { mutableStateOf(false) }
     
-    // Handle back button press
+    // Handle back button with explicit priority
     PlatformBackHandler {
-        if (!editorState.canExitWithoutSaving) {
-            showExitConfirmation = true
-        } else {
-            onNavigateBack()
+        when {
+            // Priority 1: Dismiss expanded block if one exists
+            editorState.expandedBlockId != null -> {
+                Napier.d("Back pressed: Dismissing expanded block ${editorState.expandedBlockId}")
+                viewModel.dismissExpandedBlock()
+            }
+            // Priority 2: Show exit confirmation if needed
+            !editorState.canExitWithoutSaving -> {
+                Napier.d("Back pressed: Showing exit confirmation")
+                showExitConfirmation = true
+            }
+            // Priority 3: Exit directly
+            else -> {
+                Napier.d("Back pressed: Exiting editor")
+                onNavigateBack()
+            }
         }
     }
     
@@ -209,7 +221,10 @@ fun EntryEditorContent(
             // Pass the unified UI state to the content
 //            EditorContent(uiState = uiState)
             Napier.d("EntryEditorScreen: Rendering MainEditorContent with blocks: ${uiState.blocks.size}")
-            MainEditorContent(uiState = uiState)
+            MainEditorContent(
+                uiState = uiState,
+                expandedBlockId = editorState.expandedBlockId
+            )
         },
         bottomContent = {
             EditorBottomContent(journalState = uiState.journalState)
