@@ -30,6 +30,14 @@ interface JournalNotesRepository {
     fun observeRecentNotes(limit: Int = 20): Flow<List<JournalNote>>
 
     /**
+     * Fetches a specific note by its ID. Used for loading entries for editing in new windows.
+     *
+     * @param noteId The unique identifier of the note to fetch
+     * @return The note if found, null otherwise
+     */
+    suspend fun getNoteById(noteId: Uuid): JournalNote?
+
+    /**
      * Creates a new note.
      */
     suspend fun create(note: JournalNote): Uuid

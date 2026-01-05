@@ -131,6 +131,15 @@ class OfflineFirstJournalNotesRepository(
             }
     }
 
+    override suspend fun getNoteById(noteId: Uuid): JournalNote? {
+        // Try each note type DAO until we find the note
+        textNoteDao.getNoteOneOff(noteId)?.toModel()?.let { return it }
+        imageNoteDao.getNoteOneOff(noteId)?.toModel()?.let { return it }
+        audioNoteDao.getNoteOneOff(noteId)?.toModel()?.let { return it }
+        videoNoteDao.getNoteOneOff(noteId)?.toModel()?.let { return it }
+        return null
+    }
+
     override suspend fun create(note: JournalNote): Uuid {
         val noteId = when (note) {
             is JournalNote.Text -> {

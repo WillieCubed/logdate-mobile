@@ -76,8 +76,16 @@ internal fun hasEntryFromToday(timelineItems: List<JournalNote>): Boolean {
 /**
  * Displays a scrollable list of journal entries with options to edit, delete, or open in new windows.
  *
- * onOpenInNewWindow is invoked when the user selects "Open in New Window" from an entry's context menu,
- * enabling multi-window editing on supported devices.
+ * Each entry in the timeline can be clicked to edit, long-pressed for a context menu with additional options,
+ * or deleted. The "Open in New Window" option in the context menu enables multi-window editing on supported devices.
+ *
+ * @param timelineItems The list of journal notes to display in the timeline
+ * @param onItemSelected Callback invoked when a timeline item is clicked to edit
+ * @param onItemDeleted Callback invoked when a user confirms deletion of an entry
+ * @param onNewEntry Callback invoked when the user taps the action to create a new entry
+ * @param onOpenInNewWindow Callback invoked when the user selects "Open in New Window" from an entry's context menu.
+ *        The callback receives the entry's UUID to identify which entry to open.
+ * @param modifier Optional Compose modifier for customizing the Timeline's layout and appearance
  */
 @Composable
 internal fun Timeline(

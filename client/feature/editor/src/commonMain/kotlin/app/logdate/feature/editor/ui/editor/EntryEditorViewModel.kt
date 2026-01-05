@@ -663,6 +663,9 @@ class EntryEditorViewModel(
      *
      * Fetches the entry by ID and populates the editor state with its content. If provided,
      * journalId is used to set the selected journal context.
+     *
+     * @param entryId The unique identifier of the entry to load and display for editing
+     * @param journalId Optional journal ID to set as the selected journal context when loading the entry
      */
     fun loadExistingEntry(entryId: Uuid, journalId: Uuid? = null) {
         viewModelScope.launch {

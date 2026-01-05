@@ -39,8 +39,17 @@ import kotlin.uuid.Uuid
 /**
  * Timeline screen showing journal entries for the current and past dates.
  *
- * onOpenEntryInNewWindow is called when the user selects "Open in New Window" from an entry's menu,
- * enabling multi-window editing.
+ * This screen displays a list of journal entries organized by date, with options to view details,
+ * edit entries, delete entries, or open entries in new windows for multi-window editing on supported devices.
+ * The screen also handles audio playback and transcription state.
+ *
+ * @param onOpenTimelineItem Callback invoked when a timeline entry is selected to view/edit details.
+ *        Receives the entry's unique identifier.
+ * @param onNewEntry Callback invoked when the user initiates creation of a new entry
+ * @param onOpenEntryInNewWindow Callback invoked when the user selects "Open in New Window" from an entry's context menu.
+ *        Receives the entry ID to open in a separate editor window. Enables multi-window editing on supported devices.
+ * @param modifier Optional Compose modifier for customizing the screen's layout and appearance
+ * @param viewModel The ViewModel providing timeline state and event handling. Typically injected via Koin.
  */
 @Composable
 fun TimelineRoute(

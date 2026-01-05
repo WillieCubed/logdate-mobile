@@ -17,16 +17,30 @@ import org.koin.dsl.bind
 import org.koin.dsl.module
 
 /**
- * A module that provides the dependencies for the editor feature.
+ * Koin dependency injection module for the editor feature.
  *
- * Dependencies are organized as follows:
- * - domainModule: Provides use cases and domain logic (including FetchEntryUseCase)
- * - platformEditorModule: Platform-specific services (camera, audio, image picker)
- * - audioModule: Audio-specific functionality
+ * This module provides all dependencies needed by the editor screens, including ViewModels,
+ * use cases, and platform-specific services. Dependencies are organized by layer:
  *
- * Architecture note: The editor feature only depends on the domain layer (use cases)
- * and platform-specific modules, never directly on the data layer. This maintains
- * clean architecture separation of concerns.
+ * - domainModule: Provides use cases and domain logic, including FetchEntryUseCase which enables
+ *   the multi-window editing feature by loading entries by ID
+ * - platformEditorModule: Provides platform-specific services (camera, audio, image picker)
+ * - audioModule: Provides audio recording and playback functionality
+ *
+ * ViewModels provided:
+ * - EntryEditorViewModel: Main editor state and operations (note creation, editing, saving)
+ * - ImageBlockViewModel: Manages image selection and insertion
+ * - CameraViewModel: Handles camera capture functionality
+ *
+ * Other dependencies:
+ * - EditorMediator: Acts as a mediator for editor component communication (singleton)
+ * - AutoSaveDelegate: Handles automatic saving of drafts (factory-scoped)
+ * - JournalSelectionDelegate: Manages journal selection and default journal logic (factory-scoped)
+ *
+ * Architecture note: The editor feature depends only on the domain layer (use cases) and
+ * platform-specific modules, never directly on the data layer. This maintains clean architecture
+ * separation of concerns. FetchEntryUseCase in particular demonstrates this pattern by accessing
+ * entries through domain layer abstractions rather than data layer DAOs.
  */
 val editorFeatureModule: Module = module {
     includes(domainModule)

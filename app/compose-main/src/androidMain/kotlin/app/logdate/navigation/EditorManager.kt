@@ -19,14 +19,26 @@ import kotlin.uuid.Uuid
 class EditorManager(private val context: Context) {
     
     /**
-     * Checks if multiple editor windows are supported on this device (Android N+).
+     * Checks if multiple editor windows are supported on this device.
+     *
+     * Multi-window support requires Android N (API 24) or higher. This method should be called
+     * before attempting to open multiple editor windows to ensure the device supports this feature.
+     *
+     * @return true if the device supports multiple windows (Android N+), false otherwise
      */
     fun supportsMultiWindow(): Boolean {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
     }
     
     /**
-     * Opens a new editor window with optional initial content for a new entry.
+     * Opens a new editor window for creating a new entry.
+     *
+     * This launches a new instance of EditorActivity as a separate window task. The new window
+     * is independent and can be managed separately on devices that support multi-window mode.
+     * Initial content can be optionally provided (e.g., from a Share intent or template).
+     *
+     * @param initialText Optional initial text content to populate the new entry with
+     * @param attachments Optional list of attachment URIs (image, audio, or video) to add to the new entry
      */
     fun openNewEditorWindow(
         initialText: String? = null,
@@ -50,6 +62,13 @@ class EditorManager(private val context: Context) {
 
     /**
      * Opens an existing entry in a new editor window.
+     *
+     * This is used for multi-window editing on large screens or devices that support split-screen mode.
+     * When the user selects "Open in New Window" from a timeline entry's context menu, this method
+     * is called to launch a separate EditorActivity instance with that specific entry loaded for editing.
+     *
+     * @param entryId The unique identifier of the entry to load and edit in the new window
+     * @param journalId Optional journal ID providing context for the entry (used if entry has no journal association)
      */
     fun openEntryInNewWindow(
         entryId: Uuid,
@@ -71,8 +90,15 @@ class EditorManager(private val context: Context) {
     }
 
     /**
-     * Gets window layout information for a given activity, useful for adapting the UI
-     * based on window state or screen layout changes (e.g., foldable devices).
+     * Gets window layout information for a given activity.
+     *
+     * Returns a Flow of WindowLayoutInfo that emits whenever the window layout changes.
+     * This is useful for adapting the editor UI based on window state (e.g., when the device
+     * is folded/unfolded, rotated, or enters/exits split-screen mode). The Flow will continue
+     * to emit updates for the lifetime of the activity.
+     *
+     * @param activity The activity to monitor for window layout changes
+     * @return A Flow that emits WindowLayoutInfo whenever the layout changes
      */
     fun getWindowLayoutInfo(activity: Activity): Flow<WindowLayoutInfo> {
         return WindowInfoTracker.getOrCreate(activity)

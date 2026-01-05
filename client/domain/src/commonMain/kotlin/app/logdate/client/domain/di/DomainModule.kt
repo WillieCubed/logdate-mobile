@@ -9,6 +9,7 @@ import app.logdate.client.domain.journals.GetDefaultSelectedJournalsUseCase
 import app.logdate.client.domain.journals.GetJournalByIdUseCase
 import app.logdate.client.domain.journals.UpdateJournalUseCase
 import app.logdate.client.domain.notes.AddNoteUseCase
+import app.logdate.client.domain.notes.FetchEntryUseCase
 import app.logdate.client.domain.notes.FetchNotesForDayUseCase
 import app.logdate.client.domain.notes.FetchTodayNotesUseCase
 import app.logdate.client.domain.notes.GetAllAudioNotesUseCase
@@ -70,6 +71,7 @@ val domainModule: Module = module {
         logCurrentLocationUseCase = get(),
         mediaManager = get()
     ) }
+    factory { FetchEntryUseCase(get()) }
     factory { FetchTodayNotesUseCase(get()) }
     factory { FetchNotesForDayUseCase(get()) }
     factory { HasNotesForTodayUseCase(get()) }

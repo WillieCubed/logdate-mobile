@@ -24,10 +24,17 @@ import kotlin.uuid.Uuid
 
 /**
  * Activity dedicated to handling editor windows.
- * 
- * This activity is designed to be launched multiple times, with each instance
- * having its own window and editor state. It handles window lifecycle events
- * and auto-saves content when appropriate.
+ *
+ * This activity is designed to be launched multiple times, with each instance having its own window
+ * and editor state. Each instance is independent and can be managed separately on devices that support
+ * multi-window mode (Android N+).
+ *
+ * The activity supports two modes:
+ * 1. Creating new entries: Launch with initialTextContent and/or attachments to create a new entry
+ * 2. Editing existing entries: Launch with entryId to load and edit an existing entry
+ *
+ * Auto-save is triggered when the activity is paused (moved to background). Window metrics are updated
+ * when the activity is resumed to handle device rotations and foldable/split-screen layout changes.
  */
 class EditorActivity : FragmentActivity() {
     
