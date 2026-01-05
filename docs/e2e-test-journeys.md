@@ -126,6 +126,52 @@ LogDate uses a hierarchical navigation structure with the following key componen
 - [ ] Settings affect app behavior
 - [ ] Navigation back maintains changes
 
+### 5.5. Multi-Window Editor Journey
+
+**Scenario**: User edits multiple journal entries simultaneously in separate windows
+
+**Critical Path** (Android N+ devices/emulators):
+1. Start from Home screen on a device supporting multi-window mode
+2. Create or select a journal entry from timeline
+3. Tap "Open in New Window" from entry context menu
+4. Verify editor opens in a new window with the entry loaded
+5. Tap "New Editor Window" to create additional editor windows
+6. Edit content in the first window and save
+7. Switch to second window and verify it shows different content
+8. Edit and save in the second window
+9. Verify both windows maintain independent state
+10. Close one editor window
+11. Verify other editor windows remain open and functional
+12. Enter split-screen mode with two editors side-by-side
+13. Edit in both windows simultaneously
+14. Verify both saves complete independently
+
+**Test Verification Points**:
+- [ ] Entry can be opened in new editor window from timeline
+- [ ] New blank editor windows can be created
+- [ ] Each editor window has independent state
+- [ ] Edits in one window don't affect other windows
+- [ ] Auto-save works independently in each window
+- [ ] Saving one entry doesn't affect other entries
+- [ ] Split-screen mode displays both editors
+- [ ] Back navigation works correctly in each window
+- [ ] Multiple editor windows appear as separate recents
+- [ ] Windows can be closed independently without affecting others
+- [ ] Window metrics adapt to rotation/foldable device changes
+
+**Platform Requirements**:
+- Android N (API 24) or higher for multi-window support
+- Minimum 600dp width for optimal split-screen (tablet/large phone)
+- Manifest properly configured with `resizeableActivity="true"`
+
+**Variations**:
+- Opening different entry types (text, image, audio, video) in new windows
+- Creating new entries in multiple windows simultaneously
+- Switching between windows using recent apps list
+- Using split-screen with one editor and another app
+- Unfolding/folding foldable device while editors are open
+- Background/foreground transitions while multiple editors are open
+
 ## Secondary User Journeys
 
 ### 6. Cross-Feature Integration Journey
