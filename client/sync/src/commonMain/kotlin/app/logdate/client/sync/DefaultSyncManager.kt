@@ -423,11 +423,64 @@ class DefaultSyncManager(
 
     /**
      * Helper to handle CloudApiException consistently.
+     * Distinguishes 401 Unauthorized errors from other server errors.
      */
     private fun handleCloudApiError(e: CloudApiException): SyncResult {
+        val errorType = if (e.statusCode == 401) {
+            SyncErrorType.AUTHENTICATION_ERROR
+        } else {
+            SyncErrorType.SERVER_ERROR
+        }
         return SyncResult(success = false, errors = listOf(
-            SyncError(SyncErrorType.SERVER_ERROR, e.message, e)
+            SyncError(errorType, e.message, e)
         ))
+    }
+
+    /**
+     * Retry a sync operation if it fails with a 401 Unauthorized error.
+     * Attempts to refresh the access token and retry the operation once.
+     */
+    private suspend fun <T> retryWithFreshToken(
+        operation: suspend (accessToken: String) -> Result<T>,
+        operationName: String
+    ): Result<T> {
+        val currentSession = sessionStorage.getSession()
+        if (currentSession == null) {
+            Napier.w("No active session for $operationName")
+            return Result.failure(
+                CloudApiException("NO_SESSION", "No active session available", statusCode = 401)
+            )
+        }
+
+        // Try initial operation
+        val initialResult = operation(currentSession.accessToken)
+        if (initialResult.isSuccess) {
+            return initialResult
+        }
+
+        // Check if error is 401
+        val exception = initialResult.exceptionOrNull() as? CloudApiException
+        if (exception?.statusCode != 401) {
+            return initialResult // Not a token error, return as-is
+        }
+
+        // Token expired, attempt refresh
+        Napier.i("Token expired (401) during $operationName, attempting refresh")
+        val refreshResult = cloudAccountRepository.refreshAccessToken(currentSession.refreshToken)
+        if (refreshResult.isFailure) {
+            Napier.e("Token refresh failed: ${refreshResult.exceptionOrNull()}")
+            return initialResult // Return original error if refresh fails
+        }
+
+        // Refresh succeeded, retry operation with new token
+        val newToken = refreshResult.getOrNull()
+        if (newToken == null) {
+            Napier.w("Token refresh succeeded but returned null")
+            return initialResult
+        }
+
+        Napier.d("Token refreshed successfully, retrying $operationName")
+        return operation(newToken)
     }
 
     private suspend fun cursorFor(entityType: EntityType): Instant {
@@ -491,7 +544,10 @@ class DefaultSyncManager(
 
                 when (pending.operation) {
                     PendingOperation.DELETE -> {
-                        val result = cloudJournalDataSource.deleteJournal(accessToken, journalId)
+                        val result = retryWithFreshToken(
+                            { token -> cloudJournalDataSource.deleteJournal(token, journalId) },
+                            "deleteJournal(${journalId})"
+                        )
                         if (result.isSuccess) {
                             uploadedCount++
                             syncMetadataService.markAsSynced(
@@ -527,9 +583,15 @@ class DefaultSyncManager(
                         }
 
                         val result = if (pending.operation == PendingOperation.CREATE) {
-                            cloudJournalDataSource.uploadJournal(accessToken, journal)
+                            retryWithFreshToken(
+                                { token -> cloudJournalDataSource.uploadJournal(token, journal) },
+                                "uploadJournal(${journal.id})"
+                            )
                         } else {
-                            cloudJournalDataSource.updateJournal(accessToken, journal)
+                            retryWithFreshToken(
+                                { token -> cloudJournalDataSource.updateJournal(token, journal) },
+                                "updateJournal(${journal.id})"
+                            )
                         }
 
                         if (result.isSuccess) {
@@ -605,7 +667,10 @@ class DefaultSyncManager(
 
                 when (pending.operation) {
                     PendingOperation.DELETE -> {
-                        val result = cloudContentDataSource.deleteNote(accessToken, noteId)
+                        val result = retryWithFreshToken(
+                            { token -> cloudContentDataSource.deleteNote(token, noteId) },
+                            "deleteNote(${noteId})"
+                        )
                         if (result.isSuccess) {
                             uploadedCount++
                             syncMetadataService.markAsSynced(
@@ -654,9 +719,15 @@ class DefaultSyncManager(
                         }
 
                         val result = if (pending.operation == PendingOperation.CREATE) {
-                            cloudContentDataSource.uploadNote(accessToken, note)
+                            retryWithFreshToken(
+                                { token -> cloudContentDataSource.uploadNote(token, note) },
+                                "uploadNote(${note.uid})"
+                            )
                         } else {
-                            cloudContentDataSource.updateNote(accessToken, note)
+                            retryWithFreshToken(
+                                { token -> cloudContentDataSource.updateNote(token, note) },
+                                "updateNote(${note.uid})"
+                            )
                         }
 
                         if (result.isSuccess) {
@@ -751,7 +822,10 @@ class DefaultSyncManager(
             }
 
             if (createAssociations.isNotEmpty()) {
-                val result = cloudAssociationDataSource.uploadAssociations(accessToken, createAssociations)
+                val result = retryWithFreshToken(
+                    { token -> cloudAssociationDataSource.uploadAssociations(token, createAssociations) },
+                    "uploadAssociations(${createAssociations.size} items)"
+                )
                 if (result.isSuccess) {
                     val uploadedAt = result.getOrThrow()
                     createIds.forEach { id ->
@@ -773,7 +847,10 @@ class DefaultSyncManager(
             }
 
             if (deleteAssociations.isNotEmpty()) {
-                val result = cloudAssociationDataSource.deleteAssociations(accessToken, deleteAssociations)
+                val result = retryWithFreshToken(
+                    { token -> cloudAssociationDataSource.deleteAssociations(token, deleteAssociations) },
+                    "deleteAssociations(${deleteAssociations.size} items)"
+                )
                 if (result.isSuccess) {
                     val deletedAt = Clock.System.now()
                     deleteIds.forEach { id ->
