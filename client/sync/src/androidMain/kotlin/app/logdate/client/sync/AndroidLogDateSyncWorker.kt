@@ -13,13 +13,17 @@ import androidx.work.BackoffPolicy
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.Data
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.networking.NetworkAvailabilityMonitor
+import app.logdate.client.networking.NetworkState
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.util.concurrent.TimeUnit
@@ -107,16 +111,19 @@ class AndroidLogDateSyncWorker(
  * - Network-aware scheduling (WiFi preferred, but cellular allowed)
  * - Battery optimization aware
  * - Exponential backoff on failures
+ * - Automatic sync retry on network restoration
  *
  * Background sync is automatically managed:
  * - When user signs in (SessionStorage.saveSession), background sync is enabled
  * - When user signs out (SessionStorage.clearSession), background sync is disabled
  * - No UI code needs to manually enable/disable sync
+ * - Network transitions (offline→online) automatically trigger sync retry if needed
  */
 class AndroidSyncManager(
     private val applicationContext: Context,
     private val defaultSyncManager: DefaultSyncManager,
-    private val sessionStorage: SessionStorage
+    private val sessionStorage: SessionStorage,
+    private val networkMonitor: NetworkAvailabilityMonitor
 ) : SyncManager {
 
     private val workManager = WorkManager.getInstance(applicationContext)
@@ -139,6 +146,22 @@ class AndroidSyncManager(
                     }
                 }
         }
+
+        // Observe network state and trigger sync retry on network restoration
+        scope.launch {
+            var lastNetworkState: NetworkState? = null
+            networkMonitor.observeNetwork()
+                .debounce(2000) // Wait 2 seconds for network to stabilize
+                .distinctUntilChanged()
+                .collect { currentState ->
+                    // Check if transitioned from offline to online
+                    if (lastNetworkState is NetworkState.NotConnected &&
+                        currentState is NetworkState.Connected) {
+                        handleNetworkRestored()
+                    }
+                    lastNetworkState = currentState
+                }
+        }
     }
 
     /**
@@ -148,6 +171,25 @@ class AndroidSyncManager(
     fun cancel() {
         supervisorJob.cancel()
         Napier.d("AndroidSyncManager scope cancelled")
+    }
+
+    /**
+     * Handles network restoration by triggering a sync retry if the last sync
+     * failed due to a transient error (not authentication).
+     */
+    private suspend fun handleNetworkRestored() {
+        Napier.i("Network stable after offline period, checking if sync retry needed")
+        val lastError = defaultSyncManager.getLastSyncError()
+
+        // Only retry if last error was transient (not auth)
+        if (lastError != null && lastError.type != SyncErrorType.AUTHENTICATION_ERROR) {
+            Napier.d("Previous sync failed transiently (${lastError.type}), triggering immediate retry after network restoration")
+            scheduleImmediateSync(AndroidLogDateSyncWorker.SYNC_TYPE_FULL)
+        } else if (lastError == null) {
+            Napier.d("No previous sync error or last sync succeeded, skipping retry")
+        } else {
+            Napier.d("Last sync failed with auth error, not retrying on network restoration")
+        }
     }
 
     override fun sync(startNow: Boolean) {

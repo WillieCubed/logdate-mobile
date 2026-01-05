@@ -2,6 +2,7 @@ package app.logdate.client.sync.di
 
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.device.di.deviceInstanceModule
+import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.sync.AndroidSyncManager
 import app.logdate.client.sync.DefaultSyncManager
 import app.logdate.client.sync.RoomSyncTransactionManager
@@ -38,6 +39,6 @@ actual val syncModule: Module = module {
             transactionManager = get()
         )
     }
-    single<SyncManager> { AndroidSyncManager(androidContext(), get<DefaultSyncManager>(), get()) }
+    single<SyncManager> { AndroidSyncManager(androidContext(), get<DefaultSyncManager>(), get(), get<NetworkAvailabilityMonitor>()) }
     includes(quotaModule, cloudAccountModule, cloudModule, deviceInstanceModule, conflictResolverModule)
 }

@@ -379,7 +379,13 @@ class DefaultSyncManager(
             lastError = _lastError.value
         )
     }
-    
+
+    /**
+     * Gets the last sync error, used for network recovery decisions.
+     * Returns null if the last sync succeeded.
+     */
+    fun getLastSyncError(): SyncError? = _lastError.value
+
     private suspend fun getAccessToken(): String? {
         return try {
             val session = sessionStorage.getSession()
