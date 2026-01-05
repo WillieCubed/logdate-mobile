@@ -221,10 +221,7 @@ fun EntryEditorContent(
             // Pass the unified UI state to the content
 //            EditorContent(uiState = uiState)
             Napier.d("EntryEditorScreen: Rendering MainEditorContent with blocks: ${uiState.blocks.size}")
-            MainEditorContent(
-                uiState = uiState,
-                expandedBlockId = editorState.expandedBlockId
-            )
+            MainEditorContent(uiState = uiState)
         },
         bottomContent = {
             EditorBottomContent(journalState = uiState.journalState)
