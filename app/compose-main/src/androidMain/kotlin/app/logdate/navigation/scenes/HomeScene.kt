@@ -138,6 +138,7 @@ import app.logdate.navigation.routes.core.AccountSettingsRoute
 import app.logdate.navigation.routes.core.BirthdaySettingsRoute
 import app.logdate.navigation.routes.core.DangerZoneSettingsRoute
 import app.logdate.navigation.routes.core.DataSettingsRoute
+import app.logdate.navigation.routes.core.DevicesSettingsRoute
 import app.logdate.navigation.routes.core.EntryEditor
 import app.logdate.navigation.routes.core.JournalList
 import app.logdate.navigation.routes.core.LocationSettingsRoute
@@ -154,7 +155,6 @@ import app.logdate.navigation.routes.core.SettingsOverviewRoute
 import app.logdate.navigation.routes.core.TimelineDetail
 import app.logdate.navigation.routes.core.TimelineListRoute
 import androidx.compose.runtime.remember
-import io.github.aakira.napier.Napier
 
 /**
  * CompositionLocal for providing AnimatedVisibilityScope throughout the home scene.
@@ -307,12 +307,8 @@ private object RouteConfig {
      * @return The appropriate RouteClassification for this route
      */
     fun classifyRoute(routeKey: NavKey, previousRouteKey: NavKey? = null): RouteClassification {
-        // Debug logging for route classification
-        Napier.v("RouteConfig: Classifying route $routeKey (previous: $previousRouteKey)")
-        
         // Check if it's a main tab first
         HomeTab.entries.find { it.route == routeKey }?.let { tab ->
-            Napier.v("RouteConfig: Route $routeKey classified as MainTab(${tab.title})")
             return RouteClassification.MainTab(tab)
         }
         
@@ -320,50 +316,36 @@ private object RouteConfig {
         // Use type-safe matching instead of string comparison
         when (routeKey) {
             // Core navigation and startup
-            is NavigationStart -> {
-                Napier.v("RouteConfig: Route $routeKey classified as Excluded (NavigationStart)")
-                return RouteClassification.Excluded
-            }
-            
+            is NavigationStart -> return RouteClassification.Excluded
+
             // Onboarding flows - all should be excluded (handled by NavDisplay directly)
             is OnboardingStart,
-            is OnboardingSignIn, 
+            is OnboardingSignIn,
             is OnboardingEntryRoute,
             is OnboardingImportRoute,
             is OnboardingCompleteRoute,
-            is OnboardingWelcomeBackRoute -> {
-                Napier.v("RouteConfig: Route $routeKey classified as Excluded (Onboarding flow)")
-                return RouteClassification.Excluded
-            }
-            
+            is OnboardingWelcomeBackRoute -> return RouteClassification.Excluded
+
             // Settings flows - all should be excluded (handled by SettingsSceneStrategy)
             is SettingsOverviewRoute,
             is AccountSettingsRoute,
             is PrivacySettingsRoute,
             is DataSettingsRoute,
+            is DevicesSettingsRoute,
             is DangerZoneSettingsRoute,
             is BirthdaySettingsRoute,
-            is LocationSettingsRoute -> {
-                Napier.v("RouteConfig: Route $routeKey classified as Excluded (Settings flow)")
-                return RouteClassification.Excluded
-            }
-            
+            is LocationSettingsRoute -> return RouteClassification.Excluded
+
             // Cloud account setup flows - all should be excluded
             is CloudAccountIntroRoute,
             is UsernameSelectionRoute,
             is DisplayNameSelectionRoute,
             is PasskeyCreationRoute,
-            is AccountCreationCompletionRoute -> {
-                Napier.v("RouteConfig: Route $routeKey classified as Excluded (Cloud account flow)")
-                return RouteClassification.Excluded
-            }
-            
+            is AccountCreationCompletionRoute -> return RouteClassification.Excluded
+
             // Editor flows - always excluded (handled by NavDisplay directly)
-            is EntryEditor -> {
-                Napier.v("RouteConfig: Route $routeKey classified as Excluded (Editor flow)")
-                return RouteClassification.Excluded
-            }
-            
+            is EntryEditor -> return RouteClassification.Excluded
+
             // Default case for any other route not explicitly handled
             else -> { /* Continue to detail route classification */ }
         }
@@ -373,30 +355,13 @@ private object RouteConfig {
             is TimelineDetail -> {
                 if (previousRouteKey == TimelineListRoute) {
                     val timelineTab = HomeTab.entries.first { it.route == TimelineListRoute }
-                    Napier.v("RouteConfig: Route $routeKey classified as TwoPaneDetail for ${timelineTab.title}")
                     return RouteClassification.TwoPaneDetail(timelineTab)
                 }
             }
         }
-        
-        // Check for routes that should have fullscreen detail experience
-        // These are routes that need to be immersive but still part of the app's main flow
-        val routeString = routeKey.toString()
-        when {
-            routeString.contains("RewindDetailRoute") -> {
-                Napier.v("RouteConfig: Route $routeKey classified as FullscreenDetail (Rewind detail)")
-                return RouteClassification.FullscreenDetail
-            }
-            routeString.startsWith("JournalDetail") -> {
-                Napier.v("RouteConfig: Route $routeKey classified as FullscreenDetail (Journal detail)")
-                return RouteClassification.FullscreenDetail
-            }
-            else -> {
-                // All other detail routes are full-screen
-                Napier.v("RouteConfig: Route $routeKey classified as FullscreenDetail (default)")
-                return RouteClassification.FullscreenDetail
-            }
-        }
+
+        // All other detail routes are full-screen
+        return RouteClassification.FullscreenDetail
     }
     
     /**
@@ -887,22 +852,16 @@ class HomeSceneStrategy<T : Any>(
         entries: List<NavEntry<T>>,
         onBack: (Int) -> Unit,
     ): Scene<T>? {
-        if (entries.isEmpty()) {
-            Napier.v("HomeSceneStrategy: No entries, returning null")
-            return null
-        }
+        if (entries.isEmpty()) return null
 
         val lastEntry = entries.last()
         val previousEntry = entries.getOrNull(entries.size - 2)
-        
-        Napier.v("HomeSceneStrategy: Processing ${entries.size} entries, last: ${lastEntry.key}, previous: ${previousEntry?.key}")
-        
+
         // Classify the current route
         val classification = RouteConfig.classifyRoute(lastEntry.key as NavKey, previousEntry?.key as NavKey?)
-        
+
         return when (classification) {
             is RouteClassification.MainTab -> {
-                Napier.v("HomeSceneStrategy: Creating MainTab scene for ${classification.tab.title}")
                 createMainTabHomeScene(
                     entry = lastEntry,
                     previousEntries = entries.dropLast(1),
@@ -911,11 +870,9 @@ class HomeSceneStrategy<T : Any>(
                     onNewEntry = onNewEntry
                 )
             }
-            
+
             is RouteClassification.TwoPaneDetail -> {
                 if (previousEntry != null && !RouteConfig.isAlwaysFullscreen(lastEntry.key as NavKey)) {
-                    Napier.v("HomeSceneStrategy: Creating TwoPane scene for ${classification.parentTab.title}")
-                    // Create two-pane layout for supported detail views
                     createTwoPaneHomeScene(
                         mainEntry = previousEntry,
                         detailEntry = lastEntry,
@@ -925,8 +882,6 @@ class HomeSceneStrategy<T : Any>(
                         onNewEntry = onNewEntry
                     )
                 } else {
-                    Napier.v("HomeSceneStrategy: Creating Fullscreen scene for ${classification.parentTab.title} (TwoPane fallback)")
-                    // Fall back to fullscreen if conditions aren't met
                     createFullscreenHomeScene(
                         entry = lastEntry,
                         previousEntries = entries.dropLast(1),
@@ -936,20 +891,15 @@ class HomeSceneStrategy<T : Any>(
                     )
                 }
             }
-            
+
             is RouteClassification.FullscreenDetail -> {
-                Napier.v("HomeSceneStrategy: Creating FullscreenDetailScene (no navigation chrome)")
                 createFullscreenDetailScene(
                     entry = lastEntry,
                     previousEntries = entries.dropLast(1)
                 )
             }
-            
-            RouteClassification.Excluded -> {
-                Napier.v("HomeSceneStrategy: Route excluded, returning null (no home navigation UI)")
-                // Return null to let NavDisplay handle these routes without home navigation UI
-                null
-            }
+
+            RouteClassification.Excluded -> null
         }
     }
 }
