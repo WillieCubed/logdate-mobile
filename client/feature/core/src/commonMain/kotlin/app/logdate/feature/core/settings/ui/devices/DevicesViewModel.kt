@@ -12,8 +12,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlin.uuid.Uuid
 
 /**
@@ -124,7 +122,7 @@ class DevicesViewModel(
             id = id,
             name = name,
             platformName = getPlatformName(platform),
-            lastActiveFormatted = formatLastActive(lastActive),
+            lastActiveFormatted = formatDeviceLastActive(lastActive),
             appVersion = appVersion,
             isCurrentDevice = isCurrentDevice
         )
@@ -145,13 +143,6 @@ class DevicesViewModel(
         }
     }
     
-    /**
-     * Formats a timestamp as a human-readable date.
-     */
-    private fun formatLastActive(timestamp: Instant): String {
-        val localDateTime = timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
-        return "${localDateTime.date} at ${localDateTime.hour}:${localDateTime.minute.toString().padStart(2, '0')}"
-    }
 }
 
 /**
