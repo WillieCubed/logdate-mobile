@@ -38,6 +38,7 @@ kotlin {
             // Project dependencies
             implementation(project(":shared:model"))
             implementation(project(":shared:config"))
+            implementation(projects.client.util)
             // External dependencies
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.json)

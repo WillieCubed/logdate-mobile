@@ -2,15 +2,17 @@ package app.logdate.client.networking
 
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.*
+import app.logdate.util.UuidSerializer
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
 import io.ktor.client.HttpClient
 import io.ktor.client.request.*
-import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import kotlin.uuid.Uuid
 
 /**
  * Interface for passkey API operations.
@@ -41,6 +43,9 @@ class PasskeyApiClient(
     private val json: Json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = false
+        serializersModule = SerializersModule {
+            contextual(Uuid::class, UuidSerializer)
+        }
     }
 ) : PasskeyApiClientContract {
     companion object {
@@ -177,8 +182,8 @@ class PasskeyApiClient(
             }
             
             if (response.status.value in 200..299) {
-                val accountResponse = json.decodeFromString<LogDateAccount>(response.bodyAsText())
-                Result.success(accountResponse)
+                val accountResponse = json.decodeFromString<AccountInfoResponse>(response.bodyAsText())
+                Result.success(accountResponse.data)
             } else {
                 val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
@@ -212,8 +217,8 @@ class PasskeyApiClient(
             }
             
             if (response.status.value in 200..299) {
-                val accountResponse = json.decodeFromString<LogDateAccount>(response.bodyAsText())
-                Result.success(accountResponse)
+                val accountResponse = json.decodeFromString<AccountInfoResponse>(response.bodyAsText())
+                Result.success(accountResponse.data)
             } else {
                 val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
@@ -232,7 +237,7 @@ class PasskeyApiClient(
             val baseUrl = getBaseUrl()
             val response = httpClient.post("$baseUrl$ACCOUNTS_PATH/refresh") {
                 contentType(ContentType.Application.Json)
-                setBody("""{"refreshToken": "$refreshToken"}""")
+                setBody(json.encodeToString(RefreshTokenRequest.serializer(), RefreshTokenRequest(refreshToken)))
             }
             
             if (response.status.value in 200..299) {
@@ -254,7 +259,7 @@ class PasskeyApiClient(
     override suspend fun deletePasskey(accessToken: String, credentialId: String): Result<Unit> {
         return try {
             val baseUrl = getBaseUrl()
-            val response = httpClient.delete("$baseUrl/passkeys/$credentialId") {
+            val response = httpClient.delete("$baseUrl$ACCOUNTS_PATH/me/passkeys/$credentialId") {
                 header("Authorization", "Bearer $accessToken")
             }
             

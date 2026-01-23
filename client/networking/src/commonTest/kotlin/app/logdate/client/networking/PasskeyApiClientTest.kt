@@ -373,12 +373,15 @@ class PasskeyApiClientTest {
             respond(
                 content = """
                 {
-                    "id": "${testAccount.id}",
-                    "username": "testuser",
-                    "displayName": "Test User",
-                    "bio": "Test bio",
-                    "createdAt": "${testAccount.createdAt}",
-                    "updatedAt": "${testAccount.updatedAt}"
+                    "success": true,
+                    "data": {
+                        "id": "${testAccount.id}",
+                        "username": "testuser",
+                        "displayName": "Test User",
+                        "bio": "Test bio",
+                        "createdAt": "${testAccount.createdAt}",
+                        "updatedAt": "${testAccount.updatedAt}"
+                    }
                 }
                 """.trimIndent(),
                 status = HttpStatusCode.OK,
@@ -414,12 +417,12 @@ class PasskeyApiClientTest {
     @Test
     fun `deletePasskey succeeds with valid token and credential ID`() = runTest {
         val mockEngine = MockEngine { request ->
-            assertEquals("/api/v1/passkeys/cred123", request.url.encodedPath)
+            assertEquals("/api/v1/accounts/me/passkeys/cred123", request.url.encodedPath)
             assertEquals("DELETE", request.method.value)
             assertEquals("Bearer access123", request.headers["Authorization"])
             respond(
-                content = """{"success": true}""",
-                status = HttpStatusCode.OK,
+                content = "",
+                status = HttpStatusCode.NoContent,
                 headers = headersOf(HttpHeaders.ContentType, "application/json")
             )
         }
