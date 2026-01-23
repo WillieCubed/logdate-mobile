@@ -9,6 +9,8 @@ import app.logdate.server.di.serverModule
 import app.logdate.server.routes.accountRoutes
 import app.logdate.server.routes.*
 import app.logdate.server.sync.SyncRepository
+import app.logdate.server.sync.GcsMediaStorage
+import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.util.UuidSerializer
 import io.ktor.serialization.kotlinx.json.*
@@ -58,6 +60,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     }
 
     val syncRepository: SyncRepository by inject()
+    val syncMetrics: SyncMetricsRegistry by inject()
     val tokenService: JwtTokenService by inject()
     val accountRepository: AccountRepository by inject()
     val sessionManager: SessionManager by inject()
@@ -98,13 +101,14 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
         }
 
         route("/api/v1") {
+            val mediaStorage = GcsMediaStorage.fromEnvironment()
             accountRoutes(
                 accountRepository = accountRepository,
                 sessionManager = sessionManager,
                 webAuthnService = webAuthnService,
                 tokenService = tokenService
             )
-            syncRoutes(syncRepository, tokenService)
+            syncRoutes(syncRepository, tokenService, mediaStorage, syncMetrics)
         }
     }
 }

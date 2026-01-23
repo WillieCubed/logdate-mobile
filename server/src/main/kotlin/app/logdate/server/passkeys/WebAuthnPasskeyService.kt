@@ -17,7 +17,7 @@ import kotlin.uuid.Uuid
  */
 @OptIn(ExperimentalUuidApi::class)
 class WebAuthnPasskeyService(
-    private val relyingPartyId: String = "logdate.app",
+    val relyingPartyId: String = "logdate.app",
     private val relyingPartyName: String = "LogDate",
     private val origin: String = "https://app.logdate.com"
 ) {

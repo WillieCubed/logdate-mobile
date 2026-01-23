@@ -176,6 +176,8 @@ class PasskeyAccountCreationTest {
             temporaryUserId = userId,
             challenge = "test-challenge",
             username = "testuser",
+            displayName = "Test User",
+            bio = null,
             deviceInfo = DeviceInfo(
                 platform = "android",
                 deviceName = "Test Device",
@@ -207,6 +209,8 @@ class PasskeyAccountCreationTest {
             temporaryUserId = userId,
             challenge = "test-challenge",
             username = "testuser",
+            displayName = "Test User",
+            bio = null,
             deviceInfo = null,
             sessionType = SessionType.ACCOUNT_CREATION,
             createdAt = Clock.System.now().minus(kotlin.time.Duration.parse("PT1H")),

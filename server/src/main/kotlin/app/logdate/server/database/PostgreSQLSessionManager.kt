@@ -29,6 +29,8 @@ class PostgreSQLSessionManager : SessionManager {
                 it[challenge] = session.challenge
                 it[sessionType] = session.sessionType.name
                 it[username] = session.username
+                it[displayName] = session.displayName
+                it[bio] = session.bio
                 it[deviceInfo] = session.deviceInfo?.toString()
                 it[createdAt] = session.createdAt
                 it[expiresAt] = session.expiresAt
@@ -88,6 +90,7 @@ class PostgreSQLSessionManager : SessionManager {
     }
     
     override suspend fun createAccountCreationSession(
+        temporaryUserId: Uuid?,
         username: String,
         displayName: String,
         challenge: String,
@@ -95,14 +98,16 @@ class PostgreSQLSessionManager : SessionManager {
         bio: String?
     ): TemporarySession {
         val sessionId = generateSessionId()
-        val temporaryUserId = Uuid.random()
+        val resolvedUserId = temporaryUserId ?: Uuid.random()
         val now = Clock.System.now()
         
         val session = TemporarySession(
             id = sessionId,
-            temporaryUserId = temporaryUserId,
+            temporaryUserId = resolvedUserId,
             challenge = challenge,
             username = username,
+            displayName = displayName,
+            bio = bio,
             deviceInfo = deviceInfo,
             sessionType = SessionType.ACCOUNT_CREATION,
             createdAt = now,
@@ -128,6 +133,8 @@ class PostgreSQLSessionManager : SessionManager {
             temporaryUserId = temporaryUserId,
             challenge = challenge,
             username = accountHint ?: "",
+            displayName = "",
+            bio = null,
             deviceInfo = deviceInfo,
             sessionType = SessionType.AUTHENTICATION,
             createdAt = now,
@@ -167,6 +174,8 @@ class PostgreSQLSessionManager : SessionManager {
             temporaryUserId = this[SessionsTable.temporaryUserId].toKotlinUuid(),
             challenge = this[SessionsTable.challenge],
             username = this[SessionsTable.username] ?: "",
+            displayName = this[SessionsTable.displayName] ?: "",
+            bio = this[SessionsTable.bio],
             deviceInfo = this[SessionsTable.deviceInfo]?.let { 
                 // Parse device info JSON if needed
                 null // For now, keeping it simple

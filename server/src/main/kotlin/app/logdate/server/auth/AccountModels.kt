@@ -54,6 +54,8 @@ data class TemporarySession(
     val temporaryUserId: @Contextual Uuid,
     val challenge: String, // Base64URL encoded
     val username: String,
+    val displayName: String,
+    val bio: String? = null,
     val deviceInfo: DeviceInfo?,
     val sessionType: SessionType,
     val createdAt: Instant,

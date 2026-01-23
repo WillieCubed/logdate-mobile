@@ -155,6 +155,12 @@ data class ApiErrorResponse(
 )
 
 @Serializable
+data class AccountInfoResponse(
+    val success: Boolean,
+    val data: LogDateAccount
+)
+
+@Serializable
 data class UpdateAccountProfileRequest(
     val displayName: String? = null,
     val username: String? = null,
@@ -165,6 +171,11 @@ data class UpdateAccountProfileRequest(
 data class ApiError(
     val code: String,
     val message: String
+)
+
+@Serializable
+data class RefreshTokenRequest(
+    val refreshToken: String
 )
 
 @Serializable

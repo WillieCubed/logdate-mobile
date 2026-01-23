@@ -29,6 +29,14 @@ class InMemoryAccountRepository : AccountRepository {
     private val emailIndex = mutableMapOf<String, Uuid>() // email -> account ID
     
     override suspend fun save(account: Account): Account {
+        val existingAccount = accounts[account.id]
+        if (existingAccount != null && existingAccount.username != account.username) {
+            usernameIndex.remove(existingAccount.username)
+        }
+        if (existingAccount != null && existingAccount.email != account.email) {
+            existingAccount.email?.let { emailIndex.remove(it) }
+        }
+
         accounts[account.id] = account
         usernameIndex[account.username] = account.id
         account.email?.let { emailIndex[it] = account.id }

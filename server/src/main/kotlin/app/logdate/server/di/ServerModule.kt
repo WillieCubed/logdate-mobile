@@ -19,6 +19,7 @@ import app.logdate.server.sync.AssociationSyncTable
 import app.logdate.server.sync.MediaSyncTable
 import app.logdate.server.sync.DbSyncRepository
 import app.logdate.server.sync.InMemorySyncRepository
+import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.sync.SyncRepository
 import io.github.aakira.napier.Napier
 import org.jetbrains.exposed.sql.Database
@@ -71,6 +72,8 @@ fun serverModule(isDatabaseAvailable: Boolean) = module {
     single<SyncRepository> {
         if (isDatabaseAvailable) DbSyncRepository() else InMemorySyncRepository()
     }
+
+    single { SyncMetricsRegistry() }
 
     single {
         JwtTokenService(

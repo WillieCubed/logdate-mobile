@@ -7,7 +7,6 @@ import io.ktor.http.*
 import io.ktor.server.testing.*
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * Basic endpoint coverage E2E tests that verify all server endpoints are reachable
@@ -70,33 +69,33 @@ class BasicEndpointCoverageE2ETest {
     
     // Account routes tests
     @Test
-    fun `accounts username check returns server error for missing body`() = testApplication {
+    fun `accounts username availability returns bad request for empty username`() = testApplication {
         application {
             module()
         }
         
-        val response = client.post("/api/v1/accounts/username/check")
-        assertEquals(HttpStatusCode.InternalServerError, response.status)
+        val response = client.get("/api/v1/accounts/username/%20/available")
+        assertEquals(HttpStatusCode.BadRequest, response.status)
     }
     
     @Test
-    fun `accounts create begin returns server error for missing body`() = testApplication {
+    fun `accounts create begin returns bad request for missing body`() = testApplication {
         application {
             module()
         }
         
         val response = client.post("/api/v1/accounts/create/begin")
-        assertEquals(HttpStatusCode.InternalServerError, response.status)
+        assertEquals(HttpStatusCode.BadRequest, response.status)
     }
     
     @Test
-    fun `accounts create complete returns server error for missing body`() = testApplication {
+    fun `accounts create complete returns bad request for missing body`() = testApplication {
         application {
             module()
         }
         
         val response = client.post("/api/v1/accounts/create/complete")
-        assertEquals(HttpStatusCode.InternalServerError, response.status)
+        assertEquals(HttpStatusCode.BadRequest, response.status)
     }
     
     @Test
@@ -105,7 +104,7 @@ class BasicEndpointCoverageE2ETest {
             module()
         }
         
-        val response = client.post("/api/v1/accounts/auth/begin") {
+        val response = client.post("/api/v1/accounts/authenticate/begin") {
             contentType(ContentType.Application.Json)
             setBody("{}")
         }
@@ -123,12 +122,15 @@ class BasicEndpointCoverageE2ETest {
     }
     
     @Test
-    fun `accounts token refresh requires authorization header`() = testApplication {
+    fun `accounts token refresh requires refresh token`() = testApplication {
         application {
             module()
         }
         
-        val response = client.post("/api/v1/accounts/token/refresh")
+        val response = client.post("/api/v1/accounts/refresh") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"refreshToken": ""}""")
+        }
         assertEquals(HttpStatusCode.Unauthorized, response.status)
     }
     

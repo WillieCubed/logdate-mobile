@@ -19,6 +19,7 @@ interface SessionManager {
      * Create a new temporary session for account creation.
      */
     suspend fun createAccountCreationSession(
+        temporaryUserId: Uuid? = null,
         username: String,
         displayName: String,
         challenge: String,
@@ -91,6 +92,7 @@ class InMemorySessionManager : SessionManager {
     }
     
     override suspend fun createAccountCreationSession(
+        temporaryUserId: Uuid?,
         username: String,
         displayName: String,
         challenge: String,
@@ -98,14 +100,16 @@ class InMemorySessionManager : SessionManager {
         bio: String?
     ): TemporarySession {
         val sessionId = generateSessionId()
-        val temporaryUserId = Uuid.random()
+        val resolvedUserId = temporaryUserId ?: Uuid.random()
         val now = Clock.System.now()
         
         val session = TemporarySession(
             id = sessionId,
-            temporaryUserId = temporaryUserId,
+            temporaryUserId = resolvedUserId,
             challenge = challenge,
             username = username,
+            displayName = displayName,
+            bio = bio,
             deviceInfo = deviceInfo,
             sessionType = SessionType.ACCOUNT_CREATION,
             createdAt = now,
@@ -131,6 +135,8 @@ class InMemorySessionManager : SessionManager {
             temporaryUserId = temporaryUserId,
             challenge = challenge,
             username = accountHint ?: "",
+            displayName = "",
+            bio = null,
             deviceInfo = deviceInfo,
             sessionType = SessionType.AUTHENTICATION,
             createdAt = now,

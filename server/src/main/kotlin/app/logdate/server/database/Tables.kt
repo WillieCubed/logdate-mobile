@@ -49,6 +49,8 @@ object SessionsTable : Table("sessions") {
     val challenge = text("challenge")
     val sessionType = varchar("session_type", 20)
     val username = varchar("username", 50).nullable()
+    val displayName = varchar("display_name", 100).nullable()
+    val bio = text("bio").nullable()
     val deviceInfo = text("device_info").nullable()
     val createdAt = timestamp("created_at")
     val expiresAt = timestamp("expires_at")
@@ -84,4 +86,3 @@ data class WebAuthnData(
     val userVerification: String? = null,
     val extensions: Map<String, Any> = emptyMap()
 )
-

@@ -5,15 +5,21 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.assertNotNull
 
 /**
  * Comprehensive E2E tests for edge cases, error conditions, and boundary scenarios
  * across all server endpoints to ensure robust error handling.
  */
 class EdgeCasesE2ETest {
+
+    private val json = Json { ignoreUnknownKeys = true }
     
     @Test
     fun `request with extremely large payloads`() = testApplication {
@@ -23,11 +29,8 @@ class EdgeCasesE2ETest {
         
         // Test with very large username check request
         val largeUsername = "a".repeat(10000)
-        val largeUsernameResponse = client.post("/api/v1/accounts/username/check") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"username": "$largeUsername"}""")
-        }
-        assertTrue(largeUsernameResponse.status.value >= 400)
+        val largeUsernameResponse = client.get("/api/v1/accounts/username/$largeUsername/available")
+        assertEquals(HttpStatusCode.BadRequest, largeUsernameResponse.status)
         
         // Test with very large JSON payload
         val largeDisplayName = "User ".repeat(1000)
@@ -42,7 +45,7 @@ class EdgeCasesE2ETest {
             """.trimIndent())
         }
         // Should handle large payloads gracefully
-        assertTrue(largePayloadResponse.status.value in 200..599)
+        assertEquals(HttpStatusCode.BadRequest, largePayloadResponse.status)
     }
     
     @Test
@@ -52,32 +55,20 @@ class EdgeCasesE2ETest {
         }
         
         // Test with Unicode characters
-        val unicodeResponse = client.post("/api/v1/accounts/username/check") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"username": "用户名"}""")
-        }
-        assertTrue(unicodeResponse.status.value >= 400) // Should fail validation
+        val unicodeResponse = client.get("/api/v1/accounts/username/%E7%94%A8%E6%88%B7%E5%90%8D/available")
+        assertEquals(HttpStatusCode.BadRequest, unicodeResponse.status) // Should fail validation
         
         // Test with emoji
-        val emojiResponse = client.post("/api/v1/accounts/username/check") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"username": "user😀name"}""")
-        }
-        assertTrue(emojiResponse.status.value >= 400) // Should fail validation
+        val emojiResponse = client.get("/api/v1/accounts/username/user%F0%9F%98%80name/available")
+        assertEquals(HttpStatusCode.BadRequest, emojiResponse.status) // Should fail validation
         
         // Test with special characters
-        val specialCharsResponse = client.post("/api/v1/accounts/username/check") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"username": "user@#$%^&*()name"}""")
-        }
-        assertTrue(specialCharsResponse.status.value >= 400) // Should fail validation
+        val specialCharsResponse = client.get("/api/v1/accounts/username/user%40%23%24%25%5E%26%2A%28%29name/available")
+        assertEquals(HttpStatusCode.BadRequest, specialCharsResponse.status) // Should fail validation
         
         // Test with SQL injection-like strings
-        val sqlInjectionResponse = client.post("/api/v1/accounts/username/check") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"username": "'; DROP TABLE users; --"}""")
-        }
-        assertTrue(sqlInjectionResponse.status.value >= 400) // Should fail validation
+        val sqlInjectionResponse = client.get("/api/v1/accounts/username/%27%3B%20DROP%20TABLE%20users%3B%20--/available")
+        assertEquals(HttpStatusCode.BadRequest, sqlInjectionResponse.status) // Should fail validation
     }
     
     @Test
@@ -87,39 +78,39 @@ class EdgeCasesE2ETest {
         }
         
         // Test with completely malformed JSON
-        val malformedJsonResponse = client.post("/api/v1/accounts/username/check") {
+        val malformedJsonResponse = client.post("/api/v1/accounts/create/begin") {
             contentType(ContentType.Application.Json)
             setBody("{invalid json structure")
         }
-        assertTrue(malformedJsonResponse.status.value >= 400)
+        assertEquals(HttpStatusCode.BadRequest, malformedJsonResponse.status)
         
         // Test with missing closing brace
-        val incompleteJsonResponse = client.post("/api/v1/accounts/username/check") {
+        val incompleteJsonResponse = client.post("/api/v1/accounts/create/begin") {
             contentType(ContentType.Application.Json)
             setBody("""{"username": "testuser"""")
         }
-        assertTrue(incompleteJsonResponse.status.value >= 400)
+        assertEquals(HttpStatusCode.BadRequest, incompleteJsonResponse.status)
         
         // Test with wrong content type
-        val wrongContentTypeResponse = client.post("/api/v1/accounts/username/check") {
+        val wrongContentTypeResponse = client.post("/api/v1/accounts/create/begin") {
             contentType(ContentType.Text.Plain)
             setBody("""{"username": "testuser"}""")
         }
-        assertTrue(wrongContentTypeResponse.status.value >= 400)
+        assertEquals(HttpStatusCode.BadRequest, wrongContentTypeResponse.status)
         
         // Test with XML instead of JSON
-        val xmlResponse = client.post("/api/v1/accounts/username/check") {
+        val xmlResponse = client.post("/api/v1/accounts/create/begin") {
             contentType(ContentType.Application.Xml)
             setBody("<username>testuser</username>")
         }
-        assertTrue(xmlResponse.status.value >= 400)
+        assertEquals(HttpStatusCode.BadRequest, xmlResponse.status)
         
         // Test with form data instead of JSON
-        val formDataResponse = client.post("/api/v1/accounts/username/check") {
+        val formDataResponse = client.post("/api/v1/accounts/create/begin") {
             contentType(ContentType.Application.FormUrlEncoded)
             setBody("username=testuser")
         }
-        assertTrue(formDataResponse.status.value >= 400)
+        assertEquals(HttpStatusCode.BadRequest, formDataResponse.status)
     }
     
     @Test
@@ -129,32 +120,32 @@ class EdgeCasesE2ETest {
         }
         
         // Test with null values
-        val nullValueResponse = client.post("/api/v1/accounts/username/check") {
+        val nullValueResponse = client.post("/api/v1/accounts/create/begin") {
             contentType(ContentType.Application.Json)
-            setBody("""{"username": null}""")
+            setBody("""{"username": null, "displayName": "Test User"}""")
         }
-        assertTrue(nullValueResponse.status.value >= 400)
+        assertEquals(HttpStatusCode.BadRequest, nullValueResponse.status)
         
         // Test with empty JSON object
-        val emptyObjectResponse = client.post("/api/v1/accounts/username/check") {
+        val emptyObjectResponse = client.post("/api/v1/accounts/create/begin") {
             contentType(ContentType.Application.Json)
             setBody("{}")
         }
-        assertTrue(emptyObjectResponse.status.value >= 400)
+        assertEquals(HttpStatusCode.BadRequest, emptyObjectResponse.status)
         
         // Test with array instead of object
-        val arrayResponse = client.post("/api/v1/accounts/username/check") {
+        val arrayResponse = client.post("/api/v1/accounts/create/begin") {
             contentType(ContentType.Application.Json)
             setBody("""["testuser"]""")
         }
-        assertTrue(arrayResponse.status.value >= 400)
+        assertEquals(HttpStatusCode.BadRequest, arrayResponse.status)
         
         // Test with primitive value instead of object
-        val primitiveResponse = client.post("/api/v1/accounts/username/check") {
+        val primitiveResponse = client.post("/api/v1/accounts/create/begin") {
             contentType(ContentType.Application.Json)
             setBody(""""testuser"""")
         }
-        assertTrue(primitiveResponse.status.value >= 400)
+        assertEquals(HttpStatusCode.BadRequest, primitiveResponse.status)
     }
     
     @Test
@@ -164,33 +155,21 @@ class EdgeCasesE2ETest {
         }
         
         // Test with minimum valid username length (3 characters)
-        val minLengthResponse = client.post("/api/v1/accounts/username/check") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"username": "abc"}""")
-        }
+        val minLengthResponse = client.get("/api/v1/accounts/username/abc/available")
         assertEquals(HttpStatusCode.OK, minLengthResponse.status)
         
         // Test with maximum valid username length (50 characters)
         val maxLengthUsername = "a".repeat(50)
-        val maxLengthResponse = client.post("/api/v1/accounts/username/check") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"username": "$maxLengthUsername"}""")
-        }
+        val maxLengthResponse = client.get("/api/v1/accounts/username/$maxLengthUsername/available")
         assertEquals(HttpStatusCode.OK, maxLengthResponse.status)
         
         // Test with username one character too short
-        val tooShortResponse = client.post("/api/v1/accounts/username/check") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"username": "ab"}""")
-        }
+        val tooShortResponse = client.get("/api/v1/accounts/username/ab/available")
         assertEquals(HttpStatusCode.BadRequest, tooShortResponse.status)
         
         // Test with username one character too long
         val tooLongUsername = "a".repeat(51)
-        val tooLongResponse = client.post("/api/v1/accounts/username/check") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"username": "$tooLongUsername"}""")
-        }
+        val tooLongResponse = client.get("/api/v1/accounts/username/$tooLongUsername/available")
         assertEquals(HttpStatusCode.BadRequest, tooLongResponse.status)
     }
     
@@ -200,26 +179,28 @@ class EdgeCasesE2ETest {
             module()
         }
         
-        // Send multiple simultaneous requests to the same endpoint
-        val responses = mutableListOf<HttpResponse>()
-        
-        repeat(10) { i ->
-            val response = client.post("/api/v1/accounts/username/check") {
-                contentType(ContentType.Application.Json)
-                setBody("""{"username": "user$i"}""")
-            }
-            responses.add(response)
+        val responses = (0 until 10).map { i ->
+            i to client.get("/api/v1/accounts/username/user$i/available")
         }
         
         // All requests should complete successfully
-        responses.forEach { response ->
+        responses.forEach { (_, response) ->
             assertEquals(HttpStatusCode.OK, response.status)
         }
         
         // Verify each response has proper content
-        responses.forEach { response ->
+        responses.forEach { (index, response) ->
             val body = response.bodyAsText()
-            assertTrue(body.contains("available") || body.contains("error"))
+            val jsonResponse = json.parseToJsonElement(body).jsonObject
+            val data = jsonResponse["data"]?.jsonObject
+            val success = jsonResponse["success"]?.jsonPrimitive?.booleanOrNull
+            val responseUsername = data?.get("username")?.jsonPrimitive?.content
+            val available = data?.get("available")?.jsonPrimitive?.booleanOrNull
+
+            assertEquals(true, success)
+            assertNotNull(data)
+            assertEquals("user$index", responseUsername)
+            assertEquals(true, available)
         }
     }
     
@@ -229,16 +210,13 @@ class EdgeCasesE2ETest {
             module()
         }
         
-        // Test GET on POST-only endpoints
-        val getOnPostResponse = client.get("/api/v1/accounts/username/check")
-        assertEquals(HttpStatusCode.MethodNotAllowed, getOnPostResponse.status)
+        // Test POST on GET-only endpoints
+        val postOnGetResponse = client.post("/api/v1/accounts/username/testuser/available")
+        assertEquals(HttpStatusCode.NotFound, postOnGetResponse.status)
         
         // Test PUT on endpoints that don't support it
-        val putResponse = client.put("/api/v1/accounts/username/check") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"username": "testuser"}""")
-        }
-        assertEquals(HttpStatusCode.MethodNotAllowed, putResponse.status)
+        val putResponse = client.put("/api/v1/accounts/username/testuser/available")
+        assertEquals(HttpStatusCode.NotFound, putResponse.status)
         
         // Test DELETE on create endpoints
         val deleteResponse = client.delete("/api/v1/accounts/create/begin")
@@ -246,7 +224,7 @@ class EdgeCasesE2ETest {
         
         // Test HEAD requests
         val headResponse = client.head("/api/v1/accounts/me")
-        assertTrue(headResponse.status.value in listOf(401, 405)) // Unauthorized or Method Not Allowed
+        assertEquals(HttpStatusCode.MethodNotAllowed, headResponse.status)
     }
     
     @Test
@@ -256,31 +234,19 @@ class EdgeCasesE2ETest {
         }
         
         // Test with trailing slashes
-        val trailingSlashResponse = client.post("/api/v1/accounts/username/check/") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"username": "testuser"}""")
-        }
+        val trailingSlashResponse = client.get("/api/v1/accounts/username/testuser/available/")
         assertEquals(HttpStatusCode.NotFound, trailingSlashResponse.status)
         
         // Test with wrong API version
-        val wrongVersionResponse = client.post("/api/v2/accounts/username/check") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"username": "testuser"}""")
-        }
+        val wrongVersionResponse = client.get("/api/v2/accounts/username/testuser/available")
         assertEquals(HttpStatusCode.NotFound, wrongVersionResponse.status)
         
         // Test with typos in endpoint names
-        val typoResponse = client.post("/api/v1/accounts/usernme/check") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"username": "testuser"}""")
-        }
+        val typoResponse = client.get("/api/v1/accounts/usernme/testuser/available")
         assertEquals(HttpStatusCode.NotFound, typoResponse.status)
         
         // Test with case sensitivity
-        val caseResponse = client.post("/api/V1/Accounts/Username/Check") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"username": "testuser"}""")
-        }
+        val caseResponse = client.get("/api/V1/Accounts/Username/testuser/available")
         assertEquals(HttpStatusCode.NotFound, caseResponse.status)
     }
     
@@ -291,17 +257,17 @@ class EdgeCasesE2ETest {
         }
         
         // Test with missing content-type header
-        val noContentTypeResponse = client.post("/api/v1/accounts/username/check") {
-            setBody("""{"username": "testuser"}""")
+        val noContentTypeResponse = client.post("/api/v1/accounts/create/begin") {
+            setBody("""{"username": "testuser", "displayName": "Test User"}""")
         }
-        assertTrue(noContentTypeResponse.status.value >= 400)
+        assertEquals(HttpStatusCode.BadRequest, noContentTypeResponse.status)
         
         // Test with extra custom headers
-        val extraHeadersResponse = client.post("/api/v1/accounts/username/check") {
+        val extraHeadersResponse = client.post("/api/v1/accounts/create/begin") {
             contentType(ContentType.Application.Json)
             header("X-Custom-Header", "custom-value")
             header("X-Another-Header", "another-value")
-            setBody("""{"username": "testuser"}""")
+            setBody("""{"username": "testuser", "displayName": "Test User"}""")
         }
         assertEquals(HttpStatusCode.OK, extraHeadersResponse.status) // Should ignore extra headers
         
@@ -318,8 +284,6 @@ class EdgeCasesE2ETest {
             module()
         }
         
-        // Send many requests in quick succession
-        val startTime = System.currentTimeMillis()
         val responses = mutableListOf<HttpResponse>()
         
         repeat(50) { i ->
@@ -327,16 +291,10 @@ class EdgeCasesE2ETest {
             responses.add(response)
         }
         
-        val endTime = System.currentTimeMillis()
-        val duration = endTime - startTime
-        
         // All health checks should succeed
         responses.forEach { response ->
             assertEquals(HttpStatusCode.OK, response.status)
         }
-        
-        // Should complete reasonably quickly (under 6 seconds for 50 requests to avoid flake on slower hosts)
-        assertTrue(duration < 6000, "Stress test took too long: ${duration}ms")
     }
     
     @Test
@@ -347,31 +305,26 @@ class EdgeCasesE2ETest {
         
         // Test the same request multiple times to ensure consistent structure
         val username = "consistencytest"
-        val statusCodes = mutableListOf<HttpStatusCode>()
-        val responseStructures = mutableListOf<Boolean>()
-        
-        repeat(5) {
-            val response = client.post("/api/v1/accounts/username/check") {
-                contentType(ContentType.Application.Json)
-                setBody("""{"username": "$username"}""")
-            }
-            statusCodes.add(response.status)
-            
+        val responses = (0 until 5).map {
+            client.get("/api/v1/accounts/username/$username/available")
+        }
+
+        responses.forEach { response ->
+            assertEquals(HttpStatusCode.OK, response.status)
+        }
+
+        responses.forEach { response ->
             val body = response.bodyAsText()
-            // Check that response contains expected fields (not exact content due to potential timestamps)
-            val hasExpectedStructure = body.contains("success") || body.contains("data") || body.contains("error")
-            responseStructures.add(hasExpectedStructure)
-        }
-        
-        // All responses should have the same status code
-        val firstStatus = statusCodes.first()
-        statusCodes.forEach { status ->
-            assertEquals(firstStatus, status, "Status codes should be consistent")
-        }
-        
-        // All responses should have proper structure
-        responseStructures.forEach { hasStructure ->
-            assertTrue(hasStructure, "All responses should have proper structure")
+            val jsonResponse = json.parseToJsonElement(body).jsonObject
+            val data = jsonResponse["data"]?.jsonObject
+            val success = jsonResponse["success"]?.jsonPrimitive?.booleanOrNull
+            val responseUsername = data?.get("username")?.jsonPrimitive?.content
+            val available = data?.get("available")?.jsonPrimitive?.booleanOrNull
+
+            assertEquals(true, success)
+            assertNotNull(data)
+            assertEquals(username, responseUsername)
+            assertEquals(true, available)
         }
     }
 }

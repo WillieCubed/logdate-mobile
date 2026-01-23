@@ -1,102 +1,36 @@
 package app.logdate.server.routes
 
-import app.logdate.server.auth.*
-import app.logdate.server.passkeys.*
-import app.logdate.server.responses.*
+import app.logdate.server.auth.Account
+import app.logdate.server.auth.AccountRepository
+import app.logdate.server.auth.SessionManager
+import app.logdate.server.auth.SessionType
+import app.logdate.server.auth.TokenService
+import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.shared.model.*
-import app.logdate.server.auth.DeviceInfo as ServerDeviceInfo
 import io.github.aakira.napier.Napier
-import io.ktor.http.*
-import io.ktor.server.application.*
-import io.ktor.server.request.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
+import io.ktor.http.HttpStatusCode
+import io.ktor.serialization.ContentConvertException
+import io.ktor.server.application.ApplicationCall
+import io.ktor.server.application.call
+import io.ktor.server.plugins.BadRequestException
+import io.ktor.server.plugins.ContentTransformationException
+import io.ktor.server.request.receive
+import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.delete
+import io.ktor.server.routing.get
+import io.ktor.server.routing.post
+import io.ktor.server.routing.put
+import io.ktor.server.routing.route
 import kotlinx.datetime.Clock
-import kotlinx.serialization.Contextual
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-// Username availability request/response
-@Serializable
-data class UsernameAvailabilityRequest(
-    val username: String
-)
-
-@Serializable
-data class UsernameAvailabilityResponse(
-    val username: String,
-    val available: Boolean,
-    val error: String? = null
-)
-
-// Account creation request/response models
-@OptIn(ExperimentalUuidApi::class)
-@Serializable
-data class BeginAccountCreationRequest(
-    val username: String,
-    val displayName: String,
-    val bio: String? = null,
-    val deviceInfo: ServerDeviceInfo? = null
-)
-
-@OptIn(ExperimentalUuidApi::class)
-@Serializable
-data class BeginAccountCreationResponse(
-    val sessionId: String,
-    val challenge: String,
-    val registrationOptions: PasskeyRegistrationOptions
-)
-
-@OptIn(ExperimentalUuidApi::class)
-@Serializable
-data class CompleteAccountCreationRequest(
-    val sessionId: String,
-    val credential: PasskeyRegistrationResponse,
-    val accountPreferences: AccountPreferences? = null
-)
-
-@OptIn(ExperimentalUuidApi::class)
-@Serializable
-data class CompleteAccountCreationResponse(
-    val success: Boolean,
-    val account: AccountInfo,
-    val accessToken: String,
-    val refreshToken: String,
-    val passkey: PasskeyInfo
-)
-
-// Authentication request/response models
-@OptIn(ExperimentalUuidApi::class)
-@Serializable  
-data class BeginAuthenticationRequest(
-    val username: String? = null
-)
-
-@OptIn(ExperimentalUuidApi::class)
-@Serializable
-data class BeginAuthenticationResponse(
-    val sessionId: String,
-    val challenge: String,
-    val authenticationOptions: PasskeyAuthenticationOptions
-)
-
-@OptIn(ExperimentalUuidApi::class)
-@Serializable
-data class CompleteAuthenticationRequest(
-    val sessionId: String,
-    val credential: PasskeyAuthenticationResponse
-)
-
-@OptIn(ExperimentalUuidApi::class)
-@Serializable
-data class CompleteAuthenticationResponse(
-    val success: Boolean,
-    val account: AccountInfo,
-    val accessToken: String,
-    val refreshToken: String
-)
-
+private const val USERNAME_MIN_LENGTH = 3
+private const val USERNAME_MAX_LENGTH = 50
+private const val DISPLAY_NAME_MAX_LENGTH = 100
+private val USERNAME_REGEX = Regex("^[a-zA-Z0-9_]+$")
 
 @OptIn(ExperimentalUuidApi::class)
 fun Route.accountRoutes(
@@ -105,393 +39,586 @@ fun Route.accountRoutes(
     webAuthnService: WebAuthnPasskeyService,
     tokenService: TokenService
 ) {
-    
     route("/accounts") {
-        
         // Check username availability
-        post("/username/check") {
+        get("/username/{username}/available") {
             try {
-                val request = call.receive<UsernameAvailabilityRequest>()
-                
-                // Validate username format
-                if (request.username.isBlank() || request.username.length < 3 || request.username.length > 50) {
-                    call.respond(
-                        HttpStatusCode.BadRequest,
-                        error("INVALID_USERNAME", "Username must be 3-50 characters long")
-                    )
-                    return@post
+                val username = call.parameters["username"]?.trim().orEmpty()
+                val validationError = validateUsername(username)
+
+                if (validationError != null) {
+                    call.respondApiError(HttpStatusCode.BadRequest, "VALIDATION_ERROR", validationError)
+                    return@get
                 }
-                
-                if (!request.username.matches(Regex("^[a-zA-Z0-9_]+$"))) {
-                    call.respond(
-                        HttpStatusCode.BadRequest,
-                        error("INVALID_USERNAME", "Username can only contain letters, numbers, and underscores")
-                    )
-                    return@post
-                }
-                
-                // Check availability
-                val isAvailable = !accountRepository.usernameExists(request.username)
-                
+
+                val isAvailable = !accountRepository.usernameExists(username)
                 call.respond(
                     HttpStatusCode.OK,
-                    success(UsernameAvailabilityResponse(
-                        username = request.username,
-                        available = isAvailable
-                    ))
+                    UsernameAvailabilityResponse(
+                        success = true,
+                        data = UsernameAvailabilityData(
+                            username = username,
+                            available = isAvailable
+                        )
+                    )
                 )
             } catch (e: Exception) {
                 Napier.e("Failed to check username availability", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    error("SERVER_ERROR", "Failed to check username availability")
-                )
+                call.respondForRequestException(e, "Failed to check username availability")
             }
         }
-        
+
         // Begin account creation with passkey
         post("/create/begin") {
             try {
                 val request = call.receive<BeginAccountCreationRequest>()
-                
-                // Validate input
-                if (request.username.isBlank() || request.displayName.isBlank()) {
-                    call.respond(
-                        HttpStatusCode.BadRequest,
-                        error("INVALID_INPUT", "Username and display name are required")
-                    )
+
+                val usernameError = validateUsername(request.username)
+                if (usernameError != null) {
+                    call.respondApiError(HttpStatusCode.BadRequest, "VALIDATION_ERROR", usernameError)
                     return@post
                 }
-                
-                // Check username availability
+
+                val displayNameError = validateDisplayName(request.displayName)
+                if (displayNameError != null) {
+                    call.respondApiError(HttpStatusCode.BadRequest, "VALIDATION_ERROR", displayNameError)
+                    return@post
+                }
+
                 if (accountRepository.usernameExists(request.username)) {
-                    call.respond(
+                    call.respondApiError(
                         HttpStatusCode.Conflict,
-                        error("USERNAME_TAKEN", "Username is already taken")
+                        "USERNAME_TAKEN",
+                        "Username is already taken"
                     )
                     return@post
                 }
-                
-                // Generate temporary user ID and registration options
+
                 val temporaryUserId = Uuid.random()
                 val registrationOptions = webAuthnService.generateRegistrationOptions(
                     userId = temporaryUserId,
                     username = request.username,
                     displayName = request.displayName
                 )
-                
-                // Create session
+
                 val session = sessionManager.createAccountCreationSession(
+                    temporaryUserId = temporaryUserId,
                     username = request.username,
                     displayName = request.displayName,
                     challenge = registrationOptions.challenge,
-                    deviceInfo = request.deviceInfo,
+                    deviceInfo = null,
                     bio = request.bio
                 )
-                
-                val response = BeginAccountCreationResponse(
-                    sessionId = session.id,
-                    challenge = registrationOptions.challenge,
-                    registrationOptions = registrationOptions
+
+                call.respond(
+                    HttpStatusCode.OK,
+                    BeginAccountCreationResponse(
+                        success = true,
+                        data = BeginAccountCreationData(
+                            sessionToken = session.id,
+                            registrationOptions = registrationOptions
+                        )
+                    )
                 )
-                
-                call.respond(HttpStatusCode.OK, success(response))
-                
             } catch (e: Exception) {
                 Napier.e("Failed to begin account creation", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    error("SERVER_ERROR", "Failed to begin account creation")
-                )
+                call.respondForRequestException(e, "Failed to begin account creation")
             }
         }
-        
+
         // Complete account creation with passkey
         post("/create/complete") {
             try {
                 val request = call.receive<CompleteAccountCreationRequest>()
-                
-                // Validate session
-                val session = sessionManager.validateSession(request.sessionId, SessionType.ACCOUNT_CREATION)
+
+                val session = sessionManager.validateSession(request.sessionToken, SessionType.ACCOUNT_CREATION)
                 if (session == null) {
-                    call.respond(
-                        HttpStatusCode.BadRequest,
-                        error("INVALID_SESSION", "Invalid or expired session")
+                    call.respondApiError(
+                        HttpStatusCode.Unauthorized,
+                        "INVALID_SESSION_TOKEN",
+                        "Session token is invalid or expired"
                     )
                     return@post
                 }
-                
-                // Verify WebAuthn registration
+
+                val registrationResponse = request.credential.toPasskeyRegistrationResponse()
                 val verificationResult = webAuthnService.verifyRegistration(
                     userId = session.temporaryUserId,
                     challenge = session.challenge,
-                    registrationResponse = request.credential
+                    registrationResponse = registrationResponse
                 )
-                
+
                 if (!verificationResult.success) {
-                    call.respond(
+                    call.respondApiError(
                         HttpStatusCode.BadRequest,
-                        error("REGISTRATION_FAILED", verificationResult.error ?: "Failed to verify passkey")
+                        "PASSKEY_VERIFICATION_FAILED",
+                        verificationResult.error ?: "Failed to verify passkey"
                     )
                     return@post
                 }
-                
-                // Create permanent account
-                val accountId = Uuid.random()
+
                 val now = Clock.System.now()
+                val accountId = Uuid.random()
                 val account = Account(
                     id = accountId,
                     username = session.username,
-                    displayName = session.username, // We'll use username as display name for now
+                    displayName = session.displayName,
+                    bio = session.bio,
                     createdAt = now,
                     lastSignInAt = now,
                     isActive = true
                 )
-                
-                // Save account
+
                 val savedAccount = accountRepository.save(account)
-                
-                // Mark session as used
-                sessionManager.markSessionUsed(request.sessionId)
-                
-                // Generate tokens
+                sessionManager.markSessionUsed(request.sessionToken)
+
                 val accessToken = tokenService.generateAccessToken(accountId.toString())
                 val refreshToken = tokenService.generateRefreshToken(accountId.toString())
-                
-                val response = CompleteAccountCreationResponse(
-                    success = true,
-                    account = AccountInfo(
-                        userId = savedAccount.id,
-                        username = savedAccount.username,
-                        displayName = savedAccount.displayName,
-                        createdAt = savedAccount.createdAt,
-                        lastSignInAt = savedAccount.lastSignInAt
-                    ),
-                    accessToken = accessToken,
-                    refreshToken = refreshToken,
-                    passkey = verificationResult.passkey!!
+                val passkeyIds = webAuthnService.getPasskeysForUser(savedAccount.id).map { it.credentialId }
+
+                call.respond(
+                    HttpStatusCode.Created,
+                    CompleteAccountCreationResponse(
+                        success = true,
+                        data = CompleteAccountCreationData(
+                            account = savedAccount.toLogDateAccount(passkeyIds),
+                            tokens = AccountTokens(
+                                accessToken = accessToken,
+                                refreshToken = refreshToken
+                            )
+                        )
+                    )
                 )
-                
-                call.respond(HttpStatusCode.Created, success(response))
-                
             } catch (e: Exception) {
                 Napier.e("Failed to complete account creation", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    error("SERVER_ERROR", "Failed to complete account creation")
-                )
+                call.respondForRequestException(e, "Failed to complete account creation")
             }
         }
-        
+
         // Begin authentication with passkey
-        post("/auth/begin") {
+        post("/authenticate/begin") {
             try {
                 val request = call.receive<BeginAuthenticationRequest>()
-                
-                // Find user if username provided
-                val user = if (request.username != null) {
-                    accountRepository.findByUsername(request.username)
-                } else null
-                
-                // Generate authentication options
-                val authenticationOptions = webAuthnService.generateAuthenticationOptions(
-                    userId = user?.id,
-                    allowedCredentials = user?.let { account ->
-                        webAuthnService.getUserCredentials(account.id)
-                    } ?: emptyList()
+
+                val account = request.username?.let { accountRepository.findByUsername(it) }
+                val allowCredentials = account?.let { webAuthnService.getUserCredentials(it.id) } ?: emptyList()
+
+                val authOptions = webAuthnService.generateAuthenticationOptions(
+                    userId = account?.id,
+                    allowedCredentials = allowCredentials
                 )
-                
-                // Create session
-                val session = sessionManager.createAuthenticationSession(
-                    challenge = authenticationOptions.challenge,
-                    accountHint = request.username
-                )
-                
+
                 val response = BeginAuthenticationResponse(
-                    sessionId = session.id,
-                    challenge = authenticationOptions.challenge,
-                    authenticationOptions = authenticationOptions
+                    success = true,
+                    data = BeginAuthenticationData(
+                        challenge = authOptions.challenge,
+                        rpId = webAuthnService.relyingPartyId,
+                        allowCredentials = authOptions.allowCredentials.map {
+                            PasskeyAllowCredential(id = it, transports = emptyList())
+                        },
+                        timeout = authOptions.timeout,
+                        userVerification = "required"
+                    )
                 )
-                
-                call.respond(HttpStatusCode.OK, success(response))
-                
+
+                call.respond(HttpStatusCode.OK, response)
             } catch (e: Exception) {
                 Napier.e("Failed to begin authentication", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    error("SERVER_ERROR", "Failed to begin authentication")
-                )
+                call.respondForRequestException(e, "Failed to begin authentication")
             }
         }
-        
+
         // Complete authentication with passkey
-        post("/auth/complete") {
+        post("/authenticate/complete") {
             try {
                 val request = call.receive<CompleteAuthenticationRequest>()
-                
-                // Validate session
-                val session = sessionManager.validateSession(request.sessionId, SessionType.AUTHENTICATION)
-                if (session == null) {
-                    call.respond(
-                        HttpStatusCode.BadRequest,
-                        error("INVALID_SESSION", "Invalid or expired session")
-                    )
-                    return@post
-                }
-                
-                // Verify WebAuthn authentication
+
                 val verificationResult = webAuthnService.verifyAuthentication(
-                    challenge = session.challenge,
-                    authenticationResponse = request.credential
+                    challenge = request.challenge,
+                    authenticationResponse = request.credential.toPasskeyAuthenticationResponse()
                 )
-                
+
                 if (!verificationResult.success || verificationResult.userId == null) {
-                    call.respond(
+                    call.respondApiError(
                         HttpStatusCode.Unauthorized,
-                        error("AUTHENTICATION_FAILED", verificationResult.error ?: "Failed to verify passkey")
+                        "AUTHENTICATION_FAILED",
+                        verificationResult.error ?: "Failed to verify passkey"
                     )
                     return@post
                 }
-                
-                // Get account
-                val account = accountRepository.findById(verificationResult.userId!!)
+
+                val account = accountRepository.findById(verificationResult.userId)
                 if (account == null) {
-                    call.respond(
+                    call.respondApiError(
                         HttpStatusCode.NotFound,
-                        error("ACCOUNT_NOT_FOUND", "Account not found")
+                        "ACCOUNT_NOT_FOUND",
+                        "Account not found"
                     )
                     return@post
                 }
-                
-                // Update last sign-in time
+
                 accountRepository.updateLastSignIn(account.id)
-                
-                // Mark session as used
-                sessionManager.markSessionUsed(request.sessionId)
-                
-                // Generate tokens
+
                 val accessToken = tokenService.generateAccessToken(account.id.toString())
                 val refreshToken = tokenService.generateRefreshToken(account.id.toString())
-                
-                val response = CompleteAuthenticationResponse(
-                    success = true,
-                    account = AccountInfo(
-                        userId = account.id,
-                        username = account.username,
-                        displayName = account.displayName,
-                        createdAt = account.createdAt,
-                        lastSignInAt = account.lastSignInAt
-                    ),
-                    accessToken = accessToken,
-                    refreshToken = refreshToken
-                )
-                
-                call.respond(HttpStatusCode.OK, success(response))
-                
-            } catch (e: Exception) {
-                Napier.e("Failed to complete authentication", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    error("SERVER_ERROR", "Failed to complete authentication")
-                )
-            }
-        }
-        
-        // Refresh access token
-        post("/token/refresh") {
-            try {
-                val authHeader = call.request.headers["Authorization"]
-                if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                    call.respond(
-                        HttpStatusCode.Unauthorized,
-                        error("MISSING_TOKEN", "Refresh token required")
-                    )
-                    return@post
-                }
-                
-                val refreshToken = authHeader.substring(7)
-                val accountId = tokenService.validateRefreshToken(refreshToken)
-                
-                if (accountId == null) {
-                    call.respond(
-                        HttpStatusCode.Unauthorized,
-                        error("INVALID_TOKEN", "Invalid or expired refresh token")
-                    )
-                    return@post
-                }
-                
-                // Generate new access token
-                val newAccessToken = tokenService.generateAccessToken(accountId)
-                
+                val passkeyIds = webAuthnService.getUserCredentials(account.id)
+
                 call.respond(
                     HttpStatusCode.OK,
-                    success(mapOf("accessToken" to newAccessToken))
+                    CompleteAuthenticationResponse(
+                        success = true,
+                        data = CompleteAuthenticationData(
+                            account = account.toLogDateAccount(passkeyIds),
+                            tokens = AccountTokens(
+                                accessToken = accessToken,
+                                refreshToken = refreshToken
+                            )
+                        )
+                    )
                 )
-                
             } catch (e: Exception) {
-                Napier.e("Failed to refresh token", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    error("SERVER_ERROR", "Failed to refresh token")
-                )
+                Napier.e("Failed to complete authentication", e)
+                call.respondForRequestException(e, "Failed to complete authentication")
             }
         }
-        
+
+        // Refresh access token
+        post("/refresh") {
+            try {
+                val request = call.receive<RefreshTokenRequest>()
+                if (request.refreshToken.isBlank()) {
+                    call.respondApiError(
+                        HttpStatusCode.Unauthorized,
+                        "INVALID_REFRESH_TOKEN",
+                        "Refresh token is required"
+                    )
+                    return@post
+                }
+
+                val accountId = tokenService.validateRefreshToken(request.refreshToken)
+                if (accountId == null) {
+                    call.respondApiError(
+                        HttpStatusCode.Unauthorized,
+                        "INVALID_REFRESH_TOKEN",
+                        "Invalid or expired refresh token"
+                    )
+                    return@post
+                }
+
+                val newAccessToken = tokenService.generateAccessToken(accountId)
+                call.respond(
+                    HttpStatusCode.OK,
+                    RefreshTokenResponse(
+                        success = true,
+                        data = RefreshTokenData(accessToken = newAccessToken)
+                    )
+                )
+            } catch (e: Exception) {
+                Napier.e("Failed to refresh token", e)
+                call.respondForRequestException(e, "Failed to refresh token")
+            }
+        }
+
         // Get current account info
         get("/me") {
             try {
-                val authHeader = call.request.headers["Authorization"]
-                if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                    call.respond(
+                val accessToken = call.extractBearerToken()
+                if (accessToken == null) {
+                    call.respondApiError(
                         HttpStatusCode.Unauthorized,
-                        error("MISSING_TOKEN", "Access token required")
+                        "INVALID_TOKEN",
+                        "Access token is required"
                     )
                     return@get
                 }
-                
-                val accessToken = authHeader.substring(7)
+
                 val accountId = tokenService.validateAccessToken(accessToken)
-                
                 if (accountId == null) {
-                    call.respond(
+                    call.respondApiError(
                         HttpStatusCode.Unauthorized,
-                        error("INVALID_TOKEN", "Invalid or expired access token")
+                        "INVALID_TOKEN",
+                        "Invalid or expired access token"
                     )
                     return@get
                 }
-                
+
                 val account = accountRepository.findById(Uuid.parse(accountId))
                 if (account == null) {
-                    call.respond(
+                    call.respondApiError(
                         HttpStatusCode.NotFound,
-                        error("ACCOUNT_NOT_FOUND", "Account not found")
+                        "ACCOUNT_NOT_FOUND",
+                        "Account not found"
                     )
                     return@get
                 }
-                
-                val passkeys = webAuthnService.getPasskeysForUser(account.id)
-                
-                val response = mapOf(
-                    "account" to AccountInfo(
-                        userId = account.id,
-                        username = account.username,
-                        displayName = account.displayName,
-                        createdAt = account.createdAt,
-                        lastSignInAt = account.lastSignInAt
-                    ),
-                    "passkeys" to passkeys
+
+                val passkeyIds = webAuthnService.getPasskeysForUser(account.id).map { it.credentialId }
+                call.respond(
+                    HttpStatusCode.OK,
+                    AccountInfoResponse(
+                        success = true,
+                        data = account.toLogDateAccount(passkeyIds)
+                    )
                 )
-                
-                call.respond(HttpStatusCode.OK, success(response))
-                
             } catch (e: Exception) {
                 Napier.e("Failed to get account info", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    error("SERVER_ERROR", "Failed to get account info")
-                )
+                call.respondForRequestException(e, "Failed to get account info")
             }
         }
-        
+
+        // Update account profile
+        put("/me") {
+            try {
+                val accessToken = call.extractBearerToken()
+                if (accessToken == null) {
+                    call.respondApiError(
+                        HttpStatusCode.Unauthorized,
+                        "INVALID_TOKEN",
+                        "Access token is required"
+                    )
+                    return@put
+                }
+
+                val accountId = tokenService.validateAccessToken(accessToken)
+                if (accountId == null) {
+                    call.respondApiError(
+                        HttpStatusCode.Unauthorized,
+                        "INVALID_TOKEN",
+                        "Invalid or expired access token"
+                    )
+                    return@put
+                }
+
+                val account = accountRepository.findById(Uuid.parse(accountId))
+                if (account == null) {
+                    call.respondApiError(
+                        HttpStatusCode.NotFound,
+                        "ACCOUNT_NOT_FOUND",
+                        "Account not found"
+                    )
+                    return@put
+                }
+
+                val request = call.receive<UpdateAccountProfileRequest>()
+                if (request.displayName == null && request.username == null && request.bio == null) {
+                    call.respondApiError(
+                        HttpStatusCode.BadRequest,
+                        "VALIDATION_ERROR",
+                        "At least one field must be provided"
+                    )
+                    return@put
+                }
+
+                request.username?.let {
+                    val usernameError = validateUsername(it)
+                    if (usernameError != null) {
+                        call.respondApiError(HttpStatusCode.BadRequest, "VALIDATION_ERROR", usernameError)
+                        return@put
+                    }
+
+                    if (!it.equals(account.username, ignoreCase = false) && accountRepository.usernameExists(it)) {
+                        call.respondApiError(
+                            HttpStatusCode.Conflict,
+                            "USERNAME_TAKEN",
+                            "Username is already taken"
+                        )
+                        return@put
+                    }
+                }
+
+                request.displayName?.let {
+                    val displayNameError = validateDisplayName(it)
+                    if (displayNameError != null) {
+                        call.respondApiError(HttpStatusCode.BadRequest, "VALIDATION_ERROR", displayNameError)
+                        return@put
+                    }
+                }
+
+                val updatedAccount = account.copy(
+                    username = request.username ?: account.username,
+                    displayName = request.displayName ?: account.displayName,
+                    bio = request.bio ?: account.bio
+                )
+
+                val savedAccount = accountRepository.save(updatedAccount)
+                val passkeyIds = webAuthnService.getPasskeysForUser(savedAccount.id).map { it.credentialId }
+
+                call.respond(
+                    HttpStatusCode.OK,
+                    AccountInfoResponse(
+                        success = true,
+                        data = savedAccount.toLogDateAccount(passkeyIds)
+                    )
+                )
+            } catch (e: Exception) {
+                Napier.e("Failed to update account profile", e)
+                call.respondForRequestException(e, "Failed to update account profile")
+            }
+        }
+
+        // Delete a passkey credential
+        delete("/me/passkeys/{credentialId}") {
+            try {
+                val accessToken = call.extractBearerToken()
+                if (accessToken == null) {
+                    call.respondApiError(
+                        HttpStatusCode.Unauthorized,
+                        "INVALID_TOKEN",
+                        "Access token is required"
+                    )
+                    return@delete
+                }
+
+                val accountId = tokenService.validateAccessToken(accessToken)
+                if (accountId == null) {
+                    call.respondApiError(
+                        HttpStatusCode.Unauthorized,
+                        "INVALID_TOKEN",
+                        "Invalid or expired access token"
+                    )
+                    return@delete
+                }
+
+                val credentialId = call.parameters["credentialId"]?.trim().orEmpty()
+                if (credentialId.isBlank()) {
+                    call.respondApiError(
+                        HttpStatusCode.BadRequest,
+                        "VALIDATION_ERROR",
+                        "Credential ID is required"
+                    )
+                    return@delete
+                }
+
+                val account = accountRepository.findById(Uuid.parse(accountId))
+                if (account == null) {
+                    call.respondApiError(
+                        HttpStatusCode.NotFound,
+                        "ACCOUNT_NOT_FOUND",
+                        "Account not found"
+                    )
+                    return@delete
+                }
+
+                val deleted = webAuthnService.deletePasskey(credentialId, account.id)
+                if (!deleted) {
+                    call.respondApiError(
+                        HttpStatusCode.NotFound,
+                        "PASSKEY_NOT_FOUND",
+                        "Passkey not found"
+                    )
+                    return@delete
+                }
+
+                call.respond(HttpStatusCode.NoContent)
+            } catch (e: Exception) {
+                Napier.e("Failed to delete passkey", e)
+                call.respondForRequestException(e, "Failed to delete passkey")
+            }
+        }
     }
+}
+
+private fun validateUsername(username: String): String? {
+    if (username.isBlank()) {
+        return "Username is required"
+    }
+
+    if (username.length < USERNAME_MIN_LENGTH || username.length > USERNAME_MAX_LENGTH) {
+        return "Username must be 3-50 characters long"
+    }
+
+    if (!USERNAME_REGEX.matches(username)) {
+        return "Username can only contain letters, numbers, and underscores"
+    }
+
+    return null
+}
+
+private fun validateDisplayName(displayName: String): String? {
+    if (displayName.isBlank()) {
+        return "Display name is required"
+    }
+
+    if (displayName.length > DISPLAY_NAME_MAX_LENGTH) {
+        return "Display name must be 1-100 characters long"
+    }
+
+    return null
+}
+
+@OptIn(ExperimentalUuidApi::class)
+private fun Account.toLogDateAccount(passkeyCredentialIds: List<String>): LogDateAccount {
+    return LogDateAccount(
+        id = id,
+        username = username,
+        displayName = displayName,
+        bio = bio,
+        passkeyCredentialIds = passkeyCredentialIds,
+        createdAt = createdAt,
+        updatedAt = lastSignInAt ?: createdAt
+    )
+}
+
+private fun ApplicationCall.extractBearerToken(): String? {
+    val authHeader = request.headers["Authorization"] ?: return null
+    if (!authHeader.startsWith("Bearer ")) {
+        return null
+    }
+
+    return authHeader.removePrefix("Bearer ").trim().ifBlank { null }
+}
+
+private suspend fun ApplicationCall.respondApiError(
+    status: HttpStatusCode,
+    code: String,
+    message: String
+) {
+    respond(status, ApiErrorResponse(ApiError(code, message)))
+}
+
+private suspend fun ApplicationCall.respondForRequestException(
+    error: Exception,
+    fallbackMessage: String
+) {
+    when (error) {
+        is ContentTransformationException,
+        is ContentConvertException,
+        is SerializationException,
+        is BadRequestException -> respondApiError(
+            HttpStatusCode.BadRequest,
+            "INVALID_REQUEST",
+            "Request body is invalid"
+        )
+        else -> respondApiError(
+            HttpStatusCode.InternalServerError,
+            "SERVER_ERROR",
+            fallbackMessage
+        )
+    }
+}
+
+private fun PasskeyCredentialResponse.toPasskeyRegistrationResponse(): PasskeyRegistrationResponse {
+    return PasskeyRegistrationResponse(
+        id = id,
+        rawId = rawId,
+        response = AuthenticatorAttestationResponse(
+            clientDataJSON = response.clientDataJSON,
+            attestationObject = response.attestationObject
+        ),
+        type = type
+    )
+}
+
+private fun PasskeyAssertionResponse.toPasskeyAuthenticationResponse(): PasskeyAuthenticationResponse {
+    return PasskeyAuthenticationResponse(
+        id = id,
+        rawId = rawId,
+        response = AuthenticatorAssertionResponse(
+            clientDataJSON = response.clientDataJSON,
+            authenticatorData = response.authenticatorData,
+            signature = response.signature,
+            userHandle = response.userHandle
+        ),
+        type = type
+    )
 }
