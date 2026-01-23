@@ -30,6 +30,7 @@ class LogdatePreferencesDataSource(
         val SECURITY_LEVEL = stringPreferencesKey("security_level")
         val DAY_START_HOUR = intPreferencesKey("day_start_hour")
         val DAY_END_HOUR = intPreferencesKey("day_end_hour")
+        val BACKGROUND_SYNC_ENABLED = booleanPreferencesKey("background_sync_enabled")
         
         // Profile keys
         val DISPLAY_NAME = stringPreferencesKey("display_name")
@@ -45,9 +46,9 @@ class LogdatePreferencesDataSource(
         Napier.d("Read birthday from preferences: $birthdayMillis")
         
         UserData(
-            birthday = Instant.fromEpochMilliseconds(birthdayMillis),
+            birthday = millisToInstantOrDistantPast(birthdayMillis),
             isOnboarded = prefs[IS_ONBOARDED] == true,
-            onboardedDate = Instant.fromEpochMilliseconds(prefs[ONBOARDED_TIMESTAMP] ?: 0),
+            onboardedDate = millisToInstantOrDistantPast(prefs[ONBOARDED_TIMESTAMP]),
             securityLevel = AppSecurityLevel.valueOf(
                 prefs[SECURITY_LEVEL] ?: AppSecurityLevel.NONE.name
             ),
@@ -58,9 +59,13 @@ class LogdatePreferencesDataSource(
             profilePhotoUri = prefs[PROFILE_PHOTO_URI],
             bio = prefs[BIO],
             originalBio = prefs[ORIGINAL_BIO],
-            profileCreatedAt = Instant.fromEpochMilliseconds(prefs[PROFILE_CREATED_AT] ?: Clock.System.now().toEpochMilliseconds()),
-            profileLastUpdatedAt = Instant.fromEpochMilliseconds(prefs[PROFILE_LAST_UPDATED_AT] ?: Clock.System.now().toEpochMilliseconds())
+            profileCreatedAt = millisToInstantOrDistantPast(prefs[PROFILE_CREATED_AT]),
+            profileLastUpdatedAt = millisToInstantOrDistantPast(prefs[PROFILE_LAST_UPDATED_AT])
         )
+    }
+
+    val backgroundSyncEnabled: Flow<Boolean> = userPreferences.data.map { prefs ->
+        prefs[BACKGROUND_SYNC_ENABLED] ?: true
     }
 
     suspend fun setShouldHideOnboarding(value: Boolean) {
@@ -87,7 +92,11 @@ class LogdatePreferencesDataSource(
     suspend fun setBirthdate(birthday: Instant) {
         Napier.d("Setting birthday to: $birthday")
         userPreferences.updateData { preferences ->
-            val millisValue = birthday.toEpochMilliseconds()
+            val millisValue = if (birthday == Instant.DISTANT_PAST) {
+                0L
+            } else {
+                birthday.toEpochMilliseconds()
+            }
             Napier.d("Birthday in milliseconds: $millisValue")
             
             preferences.toMutablePreferences().apply {
@@ -98,6 +107,14 @@ class LogdatePreferencesDataSource(
             }
         }
         Napier.d("Birthday update complete")
+    }
+
+    suspend fun setBackgroundSyncEnabled(enabled: Boolean) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                this[BACKGROUND_SYNC_ENABLED] = enabled
+            }
+        }
     }
     
     /**
@@ -249,6 +266,15 @@ class LogdatePreferencesDataSource(
         } catch (e: Exception) {
             Napier.e("Failed to clear user data", e)
             Result.failure(e)
+        }
+    }
+
+    private fun millisToInstantOrDistantPast(millis: Long?): Instant {
+        val value = millis ?: 0L
+        return if (value == 0L) {
+            Instant.DISTANT_PAST
+        } else {
+            Instant.fromEpochMilliseconds(value)
         }
     }
 }

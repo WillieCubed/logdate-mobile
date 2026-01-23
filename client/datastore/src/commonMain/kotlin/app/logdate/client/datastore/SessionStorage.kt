@@ -59,7 +59,7 @@ interface SessionStorage {
  */
 class DataStoreSessionStorage(
     private val dataStore: DataStore<Preferences>,
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 ) : SessionStorage {
     
     companion object {
