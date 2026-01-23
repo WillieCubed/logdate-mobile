@@ -5,16 +5,22 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
-import app.logdate.feature.editor.ui.audio.AudioRecordingManager
+import app.logdate.client.media.audio.AudioRecordingManager
+import app.logdate.client.media.audio.AudioRecordingTarget
+import app.logdate.client.media.audio.AudioStorage
+import app.logdate.client.media.audio.transcription.TranscriptionService
 import app.logdate.wear.data.storage.StorageSpaceChecker
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Wear OS implementation of the AudioRecordingManager interface.
@@ -26,7 +32,8 @@ import kotlinx.coroutines.withContext
  */
 class WearAudioRecordingManager(
     private val context: Context,
-    private val storageChecker: StorageSpaceChecker
+    private val storageChecker: StorageSpaceChecker,
+    private val audioStorage: AudioStorage,
 ) : AudioRecordingManager {
 
     companion object {
@@ -39,18 +46,18 @@ class WearAudioRecordingManager(
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private val audioLevels = MutableStateFlow<List<Float>>(emptyList())
-    private val recordingDuration = MutableStateFlow(0L)
+    private val audioLevelFlow = MutableStateFlow(0f)
+    private val durationFlow = MutableStateFlow(Duration.ZERO)
+    private val transcriptionFlow = MutableStateFlow<String?>(null)
+    private var transcriptionService: TranscriptionService? = null
     
     // Recording state
     private var recordingActive = false
     private var serviceBound = false
     private var recordingService: WearAudioRecordingService? = null
     private var recordedAudioPath: String? = null
+    private var recordingTarget: AudioRecordingTarget? = null
     
-    // Callbacks
-    private var audioLevelCallback: ((List<Float>) -> Unit)? = null
-    private var durationCallback: ((Long) -> Unit)? = null
     
     // Service connection
     private val serviceConnection = object : ServiceConnection {
@@ -65,15 +72,11 @@ class WearAudioRecordingManager(
                     // Process updates only while recording is active
                     if (recordingActive) {
                         // Update audio level
-                        val level = serviceState.audioLevel
-                        val levels = listOf(level)
-                        audioLevels.value = levels
-                        audioLevelCallback?.invoke(levels)
-                        
+                        audioLevelFlow.value = serviceState.audioLevel
+
                         // Update duration
                         val durationMs = serviceState.durationSeconds * 1000L
-                        recordingDuration.value = durationMs
-                        durationCallback?.invoke(durationMs)
+                        durationFlow.value = durationMs.milliseconds
                         
                         // Check if recording stopped on service side
                         if (!serviceState.isRecording) {
@@ -97,6 +100,19 @@ class WearAudioRecordingManager(
     
     init {
         Napier.d("WearAudioRecordingManager initialized")
+    }
+
+    override val isRecording: Boolean
+        get() = recordingActive
+
+    override fun getAudioLevelFlow(): Flow<Float> = audioLevelFlow
+
+    override fun getRecordingDurationFlow(): Flow<Duration> = durationFlow
+
+    override fun getTranscriptionFlow(): Flow<String?> = transcriptionFlow
+
+    override fun setTranscriptionService(service: TranscriptionService) {
+        transcriptionService = service
     }
     
     private fun bindToService() {
@@ -135,46 +151,43 @@ class WearAudioRecordingManager(
         return availableSpace >= requiredSpace
     }
     
-    override fun startRecording(
-        onAudioLevelChanged: (List<Float>) -> Unit,
-        onDurationChanged: (Long) -> Unit
-    ) {
-        // Store callbacks
-        audioLevelCallback = onAudioLevelChanged
-        durationCallback = onDurationChanged
-        
-        scope.launch {
-            try {
-                // Check storage space first
-                val hasEnoughSpace = checkStorageSpace()
-                if (!hasEnoughSpace) {
-                    Napier.w("Not enough storage space for recording")
-                    throw IllegalStateException("Not enough storage space for a 1-minute recording")
-                }
-                
-                Napier.d("Starting Wear OS recording with foreground service")
-                
-                // Reset state
-                recordingActive = true
-                recordedAudioPath = null
-                recordingDuration.value = 0L
-                
-                // Start foreground service
-                context.startWearAudioRecordingService()
-                
-                // Bind to service
-                bindToService()
-                
-                Napier.d("Wear OS recording started successfully")
-            } catch (e: Exception) {
-                Napier.e("Error starting Wear OS recording", e)
-                recordingActive = false
-                throw e
+    override suspend fun startRecording(): Boolean {
+        if (recordingActive) {
+            return false
+        }
+
+        return try {
+            val hasEnoughSpace = checkStorageSpace()
+            if (!hasEnoughSpace) {
+                Napier.w("Not enough storage space for recording")
+                return false
             }
+
+            Napier.d("Starting Wear OS recording with foreground service")
+
+            // Reset state
+            recordingActive = true
+            recordedAudioPath = null
+            durationFlow.value = Duration.ZERO
+            audioLevelFlow.value = 0f
+            recordingTarget = audioStorage.createRecordingTarget(null)
+
+            // Start foreground service
+            context.startWearAudioRecordingService(recordingTarget?.path)
+
+            // Bind to service
+            bindToService()
+
+            Napier.d("Wear OS recording started successfully")
+            true
+        } catch (e: Exception) {
+            Napier.e("Error starting Wear OS recording", e)
+            recordingActive = false
+            false
         }
     }
     
-    override fun stopRecording(): String? {
+    override suspend fun stopRecording(): String? {
         return try {
             Napier.d("Stopping Wear OS recording")
             
@@ -184,7 +197,7 @@ class WearAudioRecordingManager(
             }
             
             // Get file path before stopping
-            val filePath = recordingService?.getRecordedFilePath()
+            val filePath = recordingService?.getRecordedFilePath() ?: recordingTarget?.path
             
             // Stop service
             context.stopWearAudioRecordingService()
@@ -199,11 +212,13 @@ class WearAudioRecordingManager(
             
             // Return audio path
             recordingActive = false
+            recordingTarget = null
             filePath ?: recordedAudioPath
         } catch (e: Exception) {
             Napier.e("Error stopping Wear OS recording", e)
             recordingActive = false
             unbindFromService()
+            recordingTarget = null
             null
         }
     }
@@ -250,7 +265,7 @@ class WearAudioRecordingManager(
         }
     }
     
-    override fun clear() {
+    override fun release() {
         try {
             Napier.d("Clearing Wear OS recording resources")
             
@@ -260,10 +275,7 @@ class WearAudioRecordingManager(
             }
             
             unbindFromService()
-            
-            // Clear callbacks
-            audioLevelCallback = null
-            durationCallback = null
+            recordingTarget = null
             
             Napier.d("Wear OS recording resources cleared")
         } catch (e: Exception) {

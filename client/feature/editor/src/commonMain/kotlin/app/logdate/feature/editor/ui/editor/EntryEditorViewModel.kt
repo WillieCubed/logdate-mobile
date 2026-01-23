@@ -346,15 +346,14 @@ class EntryEditorViewModel(
     fun removeBlock(blockId: Uuid) {
         Napier.d("Removing block: $blockId")
         _mutableState.update { currentState ->
-            // Clear expanded state if deleting the expanded block
             val shouldClearExpanded = currentState.expandedBlockId == blockId
+            val filteredBlocks = currentState.blocks.filterNot { it.id == blockId }
 
-            currentState.apply {
-                removeBlock(blockId)
-                if (shouldClearExpanded) {
-                    expandedBlockId = null
-                }
-            }.copy(isModified = true)
+            currentState.copy(
+                blocks = filteredBlocks,
+                expandedBlockId = if (shouldClearExpanded) null else currentState.expandedBlockId,
+                isModified = true
+            )
         }
     }
 
@@ -418,7 +417,8 @@ class EntryEditorViewModel(
                             uid = block.id,
                             creationTimestamp = block.timestamp,
                             lastUpdated = Clock.System.now(),
-                            mediaRef = block.uri ?: return@mapNotNull null
+                            mediaRef = block.uri ?: return@mapNotNull null,
+                            durationMs = block.duration.takeIf { it > 0 }
                         )
                         else -> null
                     }
@@ -749,7 +749,8 @@ fun JournalNote.toDomainBlock(): EntryBlockUiState {
             id = uid,
             timestamp = creationTimestamp,
             location = null,
-            uri = mediaRef
+            uri = mediaRef,
+            duration = durationMs ?: 0
         )
 
         else -> TextBlockUiState(
@@ -760,4 +761,3 @@ fun JournalNote.toDomainBlock(): EntryBlockUiState {
         )
     }
 }
-

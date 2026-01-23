@@ -5,6 +5,8 @@ import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
 import android.util.Log
+import android.webkit.MimeTypeMap
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -15,10 +17,12 @@ import kotlinx.coroutines.withContext
 import kotlinx.datetime.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.uuid.Uuid
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.OutputStream
+import java.net.URLConnection
 
 class AndroidMediaManager(
     private val contentResolver: ContentResolver,
@@ -392,6 +396,36 @@ class AndroidMediaManager(
 
     private fun getDestinationPath(mediaId: String): String = "$filesDir/user_media/$mediaId"
 
+    override suspend fun readMedia(uri: String): MediaPayload = withContext(ioDispatcher) {
+        val parsedUri = Uri.parse(uri)
+        val fileName = resolveFileName(parsedUri)
+        val mimeType = resolveMimeType(parsedUri, fileName)
+        val data = readBytes(parsedUri)
+        MediaPayload(
+            fileName = fileName,
+            mimeType = mimeType,
+            sizeBytes = data.size.toLong(),
+            data = data
+        )
+    }
+
+    override suspend fun saveMedia(payload: MediaPayload): String = withContext(ioDispatcher) {
+        val directory = File(filesDir, "user_media")
+        if (!directory.exists()) {
+            directory.mkdirs()
+        }
+        val sanitizedName = payload.fileName.replace("..", "_").replace("/", "_").replace("\\", "_")
+        val fileName = "${Uuid.random()}-$sanitizedName"
+        val file = File(directory, fileName)
+        try {
+            file.writeBytes(payload.data)
+        } catch (e: Exception) {
+            Napier.e("Failed to save media payload to local storage", e)
+            throw e
+        }
+        "file://${file.absolutePath}"
+    }
+
     private suspend fun copyMediaToAppStorage(uri: Uri, destinationPath: String) =
         withContext(ioDispatcher) {
             val inputStream: InputStream? = contentResolver.openInputStream(uri)
@@ -414,4 +448,42 @@ class AndroidMediaManager(
                 outputStream.close()
             }
         }
+
+    private fun resolveFileName(uri: Uri): String {
+        val contentName = contentResolver.query(
+            uri,
+            arrayOf(MediaStore.MediaColumns.DISPLAY_NAME),
+            null,
+            null,
+            null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME))
+            } else {
+                null
+            }
+        }
+        return contentName ?: (uri.lastPathSegment ?: "media")
+    }
+
+    private fun resolveMimeType(uri: Uri, fileName: String): String {
+        val contentType = contentResolver.getType(uri)
+        if (!contentType.isNullOrBlank()) {
+            return contentType
+        }
+        val extension = MimeTypeMap.getFileExtensionFromUrl(fileName)
+        val guessedFromExtension = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+        if (!guessedFromExtension.isNullOrBlank()) {
+            return guessedFromExtension
+        }
+        return URLConnection.guessContentTypeFromName(fileName) ?: "application/octet-stream"
+    }
+
+    private fun readBytes(uri: Uri): ByteArray {
+        val inputStream = contentResolver.openInputStream(uri)
+            ?: throw IllegalArgumentException("Invalid URI: $uri")
+        return inputStream.use { stream ->
+            stream.readBytes()
+        }
+    }
 }

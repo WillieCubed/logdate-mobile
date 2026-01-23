@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.editor.RecordingState
 import kotlin.time.Duration
@@ -128,7 +129,9 @@ fun AudioRecordingControls(
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.error
                 ),
-                modifier = Modifier.fillMaxWidth(0.8f)
+                modifier = Modifier
+                    .fillMaxWidth(0.8f)
+                    .testTag("audio_record_stop_button")
             ) {
                 Icon(
                     imageVector = Icons.Filled.Stop,
@@ -148,7 +151,9 @@ fun AudioRecordingControls(
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary
                 ),
-                modifier = Modifier.fillMaxWidth(0.8f)
+                modifier = Modifier
+                    .fillMaxWidth(0.8f)
+                    .testTag("audio_record_start_button")
             ) {
                 Icon(
                     imageVector = Icons.Filled.Mic,

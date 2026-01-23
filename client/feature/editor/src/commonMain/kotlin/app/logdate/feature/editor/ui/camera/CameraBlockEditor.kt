@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.editor.CameraBlockUiState
+import app.logdate.feature.editor.ui.formatMediaDuration
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
@@ -167,9 +168,7 @@ private fun CapturedMediaContent(
  * Formats a duration in milliseconds to a MM:SS string.
  */
 private fun formatDuration(durationMs: Long): String {
-    val seconds = (durationMs / 1000) % 60
-    val minutes = (durationMs / 1000) / 60
-    return "%02d:%02d".format(minutes, seconds)
+    return formatMediaDuration(durationMs, true)
 }
 
 /**

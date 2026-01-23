@@ -42,7 +42,8 @@ fun JournalNote.toDomainBlock(): EntryBlockUiState {
             id = uid,
             timestamp = creationTimestamp,
             location = null,
-            uri = mediaRef
+            uri = mediaRef,
+            duration = durationMs ?: 0
         )
 
         else -> TextBlockUiState(
@@ -117,7 +118,8 @@ fun EntryBlockUiState.toJournalNote(): JournalNote? {
                 uid = id,
                 creationTimestamp = timestamp,
                 lastUpdated = now,
-                mediaRef = uri ?: return null
+                mediaRef = uri ?: return null,
+                durationMs = duration.takeIf { it > 0 }
             )
         }
         

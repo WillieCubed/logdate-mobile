@@ -40,4 +40,17 @@ class StubMediaManager : MediaManager {
     override suspend fun addToDefaultCollection(uri: String) {
         // No-op
     }
+
+    override suspend fun readMedia(uri: String): MediaPayload {
+        return MediaPayload(
+            fileName = "stub.bin",
+            mimeType = "application/octet-stream",
+            sizeBytes = 0,
+            data = ByteArray(0)
+        )
+    }
+
+    override suspend fun saveMedia(payload: MediaPayload): String {
+        return "file:///tmp/${payload.fileName}"
+    }
 }

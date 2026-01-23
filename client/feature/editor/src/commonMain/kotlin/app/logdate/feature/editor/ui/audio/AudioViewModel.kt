@@ -2,16 +2,19 @@ package app.logdate.feature.editor.ui.audio
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.media.audio.AudioRecordingManager as MediaAudioRecordingManager
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.transcription.TranscriptionStatus
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration
 import kotlin.uuid.Uuid
 
 /**
@@ -20,13 +23,15 @@ import kotlin.uuid.Uuid
  * Now supports pause/resume functionality for recording.
  */
 class AudioViewModel(
-    private val audioRecordingManager: AudioRecordingManager,
+    private val audioRecordingManager: MediaAudioRecordingManager,
     private val audioPlaybackManager: AudioPlaybackManager,
     private val transcriptionRepository: TranscriptionRepository
 ) : ViewModel() {
     // StateFlow to expose immutable UI state
     private val _uiState = MutableStateFlow(AudioUiState())
     val uiState: StateFlow<AudioUiState> = _uiState.asStateFlow()
+    private var audioLevelJob: Job? = null
+    private var durationJob: Job? = null
 
     /**
      * Starts audio recording and updates the UI state.
@@ -40,21 +45,23 @@ class AudioViewModel(
                     audioPlaybackManager.stopPlayback()
                 }
                 
-                audioRecordingManager.startRecording(
-                    onAudioLevelChanged = { level ->
-                        _uiState.update { it.copy(audioLevels = level) }
-                    },
-                    onDurationChanged = { duration ->
-                        _uiState.update { it.copy(duration = duration.milliseconds) }
-                    }
-                )
-                
-                _uiState.update { it.copy(
-                    isRecording = true,
-                    isPaused = false,
-                    isPlaying = false,
-                    playbackProgress = 0f
-                )}
+                val started = audioRecordingManager.startRecording()
+                if (!started) {
+                    _uiState.update { it.copy(isRecording = false, error = "Failed to start recording") }
+                    return@launch
+                }
+
+                startRecordingCollectors()
+                _uiState.update {
+                    it.copy(
+                        isRecording = true,
+                        isPaused = false,
+                        isPlaying = false,
+                        audioLevels = emptyList(),
+                        duration = Duration.ZERO,
+                        error = null
+                    )
+                }
                 Napier.d("AudioViewModel: Recording started")
             } catch (e: Exception) {
                 Napier.e("Failed to start recording: ${e.message}", e)
@@ -71,7 +78,8 @@ class AudioViewModel(
             Napier.d("AudioViewModel: Stopping recording")
             try {
                 val uri = audioRecordingManager.stopRecording()
-                
+                stopRecordingCollectors()
+
                 _uiState.update { 
                     it.copy(
                         isRecording = false,
@@ -103,7 +111,7 @@ class AudioViewModel(
                 val success = audioRecordingManager.pauseRecording()
                 
                 if (success) {
-                    _uiState.update { it.copy(isPaused = true) }
+                    _uiState.update { it.copy(isPaused = true, isRecording = true) }
                     Napier.d("Recording paused successfully")
                 } else {
                     Napier.w("Failed to pause recording - functionality may not be supported on this platform")
@@ -125,7 +133,7 @@ class AudioViewModel(
                 val success = audioRecordingManager.resumeRecording()
                 
                 if (success) {
-                    _uiState.update { it.copy(isPaused = false) }
+                    _uiState.update { it.copy(isPaused = false, isRecording = true) }
                     Napier.d("Recording resumed successfully")
                 } else {
                     Napier.w("Failed to resume recording - functionality may not be supported on this platform")
@@ -275,7 +283,7 @@ class AudioViewModel(
      */
     fun requestTranscription() {
         val noteId = _uiState.value.currentNoteId
-        val audioUri = _uiState.value.currentUri ?: _uiState.value.recordedAudioUri
+        val audioUri = _uiState.value.recordedAudioUri ?: _uiState.value.currentUri
         
         if (noteId == null) {
             Napier.e("Cannot request transcription: No note ID set")
@@ -318,10 +326,40 @@ class AudioViewModel(
         super.onCleared()
         Napier.d("AudioViewModel: Being cleared")
         try {
-            audioRecordingManager.clear()
+            stopRecordingCollectors()
+            audioRecordingManager.release()
             audioPlaybackManager.release()
         } catch (e: Exception) {
             Napier.e("Error cleaning up audio resources: ${e.message}", e)
         }
+    }
+
+    fun clearRecordedAudio() {
+        _uiState.update { it.copy(recordedAudioUri = null) }
+    }
+
+    private fun startRecordingCollectors() {
+        audioLevelJob?.cancel()
+        durationJob?.cancel()
+        audioLevelJob = viewModelScope.launch {
+            audioRecordingManager.getAudioLevelFlow().collect { level ->
+                _uiState.update { state ->
+                    val levels = (state.audioLevels + level).takeLast(50)
+                    state.copy(audioLevels = levels)
+                }
+            }
+        }
+        durationJob = viewModelScope.launch {
+            audioRecordingManager.getRecordingDurationFlow().collect { duration ->
+                _uiState.update { it.copy(duration = duration) }
+            }
+        }
+    }
+
+    private fun stopRecordingCollectors() {
+        audioLevelJob?.cancel()
+        durationJob?.cancel()
+        audioLevelJob = null
+        durationJob = null
     }
 }

@@ -1,9 +1,7 @@
 package app.logdate.feature.editor.di
 
 import app.logdate.feature.editor.ui.audio.AudioPlaybackManager
-import app.logdate.feature.editor.ui.audio.AudioRecordingManager
 import app.logdate.feature.editor.ui.audio.IosAudioPlaybackManager
-import app.logdate.feature.editor.ui.audio.IosAudioRecordingManager
 import app.logdate.feature.editor.ui.camera.CameraCaptureManager
 import app.logdate.feature.editor.ui.camera.IosCameraCaptureManager
 import app.logdate.feature.editor.ui.image.IosImagePickerService
@@ -16,11 +14,6 @@ import org.koin.dsl.module
  * Provides platform-specific implementations.
  */
 actual val platformEditorModule: Module = module {
-    // Provide iOS implementation of AudioRecordingManager
-    factory<AudioRecordingManager> {
-        IosAudioRecordingManager()
-    }
-
     // Provide iOS implementation of AudioPlaybackManager
     factory<AudioPlaybackManager> {
         IosAudioPlaybackManager()

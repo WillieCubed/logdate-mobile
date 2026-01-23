@@ -2,14 +2,16 @@ package app.logdate.feature.editor.ui.audio
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.media.audio.AudioRecordingManager as MediaAudioRecordingManager
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * View model for audio recording functionality.
@@ -17,11 +19,13 @@ import kotlin.time.Duration.Companion.milliseconds
  * Extends ViewModel for proper lifecycle management.
  */
 class AudioRecordingViewModel(
-    private val audioRecordingManager: AudioRecordingManager
+    private val audioRecordingManager: MediaAudioRecordingManager
 ) : ViewModel() {
     // StateFlow to expose immutable UI state
     private val _uiState = MutableStateFlow(AudioRecordingUiState())
     val uiState: StateFlow<AudioRecordingUiState> = _uiState.asStateFlow()
+    private var audioLevelJob: Job? = null
+    private var durationJob: Job? = null
 
     /**
      * Starts audio recording and updates the UI state.
@@ -30,16 +34,22 @@ class AudioRecordingViewModel(
         viewModelScope.launch {
             Napier.d("AudioRecordingViewModel: Starting recording")
             try {
-                audioRecordingManager.startRecording(
-                    onAudioLevelChanged = { level ->
-                        _uiState.update { it.copy(audioLevels = level) }
-                    },
-                    onDurationChanged = { duration ->
-                        _uiState.update { it.copy(duration = duration.milliseconds) }
-                    }
-                )
-                
-                _uiState.update { it.copy(isRecording = true) }
+                val started = audioRecordingManager.startRecording()
+                if (!started) {
+                    _uiState.update { it.copy(isRecording = false, error = "Failed to start recording") }
+                    return@launch
+                }
+
+                startRecordingCollectors()
+                _uiState.update {
+                    it.copy(
+                        isRecording = true,
+                        isPaused = false,
+                        audioLevels = emptyList(),
+                        duration = Duration.ZERO,
+                        error = null
+                    )
+                }
                 Napier.d("AudioRecordingViewModel: Recording started")
             } catch (e: Exception) {
                 Napier.e("Failed to start recording: ${e.message}", e)
@@ -56,10 +66,12 @@ class AudioRecordingViewModel(
             Napier.d("AudioRecordingViewModel: Stopping recording")
             try {
                 val uri = audioRecordingManager.stopRecording()
+                stopRecordingCollectors()
                 
                 _uiState.update { 
                     it.copy(
                         isRecording = false,
+                        isPaused = false,
                         recordedAudioUri = uri,
                     )
                 }
@@ -105,7 +117,10 @@ class AudioRecordingViewModel(
             viewModelScope.launch {
                 Napier.d("AudioRecordingViewModel: Pausing recording")
                 try {
-                    _uiState.update { it.copy(isPaused = true, isRecording = false) }
+                    val paused = audioRecordingManager.pauseRecording()
+                    if (paused) {
+                        _uiState.update { it.copy(isPaused = true, isRecording = true) }
+                    }
                 } catch (e: Exception) {
                     Napier.e("Failed to pause recording: ${e.message}", e)
                 }
@@ -148,7 +163,8 @@ class AudioRecordingViewModel(
                 _uiState.update {
                     AudioRecordingUiState()
                 }
-                audioRecordingManager.clear()
+                stopRecordingCollectors()
+                audioRecordingManager.release()
             } catch (e: Exception) {
                 Napier.e("Failed to clear recording: ${e.message}", e)
             }
@@ -162,10 +178,36 @@ class AudioRecordingViewModel(
         super.onCleared()
         Napier.d("AudioRecordingViewModel: Being cleared")
         try {
-            audioRecordingManager.clear()
+            stopRecordingCollectors()
+            audioRecordingManager.release()
         } catch (e: Exception) {
             Napier.e("Error cleaning up audio resources: ${e.message}", e)
         }
+    }
+
+    private fun startRecordingCollectors() {
+        audioLevelJob?.cancel()
+        durationJob?.cancel()
+        audioLevelJob = viewModelScope.launch {
+            audioRecordingManager.getAudioLevelFlow().collect { level ->
+                _uiState.update { state ->
+                    val levels = (state.audioLevels + level).takeLast(50)
+                    state.copy(audioLevels = levels)
+                }
+            }
+        }
+        durationJob = viewModelScope.launch {
+            audioRecordingManager.getRecordingDurationFlow().collect { duration ->
+                _uiState.update { it.copy(duration = duration) }
+            }
+        }
+    }
+
+    private fun stopRecordingCollectors() {
+        audioLevelJob?.cancel()
+        durationJob?.cancel()
+        audioLevelJob = null
+        durationJob = null
     }
 }
 

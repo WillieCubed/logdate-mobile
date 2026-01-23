@@ -32,9 +32,12 @@ import java.io.IOException
 /**
  * Extension function to start the recording service for Wear OS
  */
-fun Context.startWearAudioRecordingService() {
+fun Context.startWearAudioRecordingService(outputFilePath: String? = null) {
     val intent = Intent(this, WearAudioRecordingService::class.java).apply {
         action = WearAudioRecordingService.ACTION_START
+        if (outputFilePath != null) {
+            putExtra(WearAudioRecordingService.EXTRA_OUTPUT_PATH, outputFilePath)
+        }
     }
     startForegroundService(intent)
 }
@@ -68,6 +71,7 @@ class WearAudioRecordingService : Service() {
         const val ACTION_STOP = "app.logdate.wear.action.STOP_RECORDING"
         const val ACTION_PAUSE = "app.logdate.wear.action.PAUSE_RECORDING"
         const val ACTION_RESUME = "app.logdate.wear.action.RESUME_RECORDING"
+        const val EXTRA_OUTPUT_PATH = "app.logdate.wear.extra.OUTPUT_PATH"
     }
     
     // Binder for clients
@@ -118,7 +122,8 @@ class WearAudioRecordingService : Service() {
         when (intent?.action) {
             ACTION_START -> {
                 Napier.d("Starting Wear OS audio recording service")
-                startForegroundRecording()
+                val outputPath = intent.getStringExtra(EXTRA_OUTPUT_PATH)
+                startForegroundRecording(outputPath)
                 vibrateStart()
             }
             ACTION_STOP -> {
@@ -176,7 +181,7 @@ class WearAudioRecordingService : Service() {
     /**
      * Starts foreground recording with notification
      */
-    private fun startForegroundRecording() {
+    private fun startForegroundRecording(outputPath: String?) {
         try {
             // Create a simple notification for the small screen
             val notification = createRecordingNotification()
@@ -185,13 +190,17 @@ class WearAudioRecordingService : Service() {
             acquireWakeLock()
             
             // Start foreground service with microphone type
-            startForeground(
-                NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
             
-            startRecording()
+            startRecording(outputPath)
             
             // Update recording state in background
             serviceScope.launch {
@@ -231,11 +240,20 @@ class WearAudioRecordingService : Service() {
     /**
      * Starts the actual recording process
      */
-    private fun startRecording() {
+    private fun startRecording(outputPath: String?) {
         try {
             // Create output file in cache directory
-            val outputDir = applicationContext.cacheDir
-            outputFile = File.createTempFile("wear_audio_", ".m4a", outputDir)
+            outputFile = if (outputPath != null) {
+                val file = File(outputPath)
+                file.parentFile?.mkdirs()
+                if (file.exists()) {
+                    file.delete()
+                }
+                file
+            } else {
+                val outputDir = applicationContext.cacheDir
+                File.createTempFile("wear_audio_", ".m4a", outputDir)
+            }
             
             // Initialize MediaRecorder
             mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -323,8 +341,13 @@ class WearAudioRecordingService : Service() {
         }
         
         try {
-            mediaRecorder?.pause()
-            isPaused = true
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                mediaRecorder?.pause()
+                isPaused = true
+            } else {
+                Napier.w("Pause recording not supported below Android N")
+                return
+            }
             
             Napier.d("Wear OS recording paused")
         } catch (e: Exception) {
@@ -341,8 +364,13 @@ class WearAudioRecordingService : Service() {
         }
         
         try {
-            mediaRecorder?.resume()
-            isPaused = false
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                mediaRecorder?.resume()
+                isPaused = false
+            } else {
+                Napier.w("Resume recording not supported below Android N")
+                return
+            }
             
             Napier.d("Wear OS recording resumed")
         } catch (e: Exception) {

@@ -2,6 +2,7 @@ package app.logdate.feature.editor.ui.camera
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.feature.editor.ui.formatMediaDuration
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -182,9 +183,7 @@ data class CameraUiState(
      */
     val formattedDuration: String
         get() {
-            val seconds = (recordingDurationMs / 1000) % 60
-            val minutes = (recordingDurationMs / 1000) / 60
-            return "%02d:%02d".format(minutes, seconds)
+            return formatMediaDuration(recordingDurationMs, true)
         }
 }
 

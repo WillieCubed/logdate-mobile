@@ -1,150 +1,148 @@
 package app.logdate.feature.editor.ui.audio
 
 import android.content.Context
-import android.media.MediaPlayer
-import android.net.Uri
+import androidx.annotation.OptIn
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * Android implementation of AudioPlaybackManager using MediaPlayer.
- * Handles audio playback, seeking, and progress tracking.
+ * Android implementation of AudioPlaybackManager using Media3 ExoPlayer.
+ *
+ * ExoPlayer provides better audio handling than MediaPlayer:
+ * - Better format support (including Opus, FLAC, etc.)
+ * - More reliable seeking
+ * - Better error handling
+ * - Audio focus management
  */
+@OptIn(UnstableApi::class)
 class AndroidAudioPlaybackManager(
     private val context: Context
 ) : AudioPlaybackManager {
-    private var mediaPlayer: MediaPlayer? = null
-    private var progressUpdateJob: Job? = null
-    private val scope = CoroutineScope(Dispatchers.Main)
-    
-    // Track if we're actively playing
-    private var isPlaying = false
-    
+
+    private var exoPlayer: ExoPlayer? = null
+    private var progressJob: Job? = null
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
     override fun startPlayback(
         uri: String,
         onProgressUpdated: (Float) -> Unit,
         onPlaybackCompleted: () -> Unit
     ) {
-        Napier.d("AndroidAudioPlaybackManager: Starting playback of $uri")
-        
+        Napier.d { "ExoPlayerAudioPlaybackManager: Starting playback of $uri" }
+
+        // Release any existing player
+        release()
+
         try {
-            // Stop any existing playback
-            stopPlayback()
-            
-            // Create and prepare the media player
-            val player = MediaPlayer()
-            mediaPlayer = player
-            
-            // Set up the data source
-            player.setDataSource(context, Uri.parse(uri))
-            
-            // Set up completion listener
-            player.setOnCompletionListener {
-                Napier.d("AndroidAudioPlaybackManager: Playback completed")
-                isPlaying = false
-                onProgressUpdated(1.0f)
-                onPlaybackCompleted()
-                stopProgressUpdates()
-            }
-            
-            // Set up error listener
-            player.setOnErrorListener { _, what, extra ->
-                Napier.e("AndroidAudioPlaybackManager: Error during playback: code=$what, extra=$extra")
-                isPlaying = false
-                onPlaybackCompleted()
-                stopProgressUpdates()
-                true
-            }
-            
-            // Prepare synchronously for simplicity
-            player.prepare()
-            
-            // Start playback
-            player.start()
-            isPlaying = true
-            
-            // Start tracking progress
-            startProgressUpdates(onProgressUpdated)
-            
-            Napier.d("AndroidAudioPlaybackManager: Playback started successfully")
+            exoPlayer = ExoPlayer.Builder(context)
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(C.USAGE_MEDIA)
+                        .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
+                        .build(),
+                    true // Handle audio focus
+                )
+                .build()
+                .apply {
+                    setMediaItem(MediaItem.fromUri(uri))
+
+                    addListener(object : Player.Listener {
+                        override fun onPlaybackStateChanged(playbackState: Int) {
+                            when (playbackState) {
+                                Player.STATE_ENDED -> {
+                                    Napier.d { "ExoPlayerAudioPlaybackManager: Playback completed" }
+                                    onProgressUpdated(1.0f)
+                                    onPlaybackCompleted()
+                                    stopProgressTracking()
+                                }
+                                Player.STATE_READY -> {
+                                    if (isPlaying) {
+                                        startProgressTracking(onProgressUpdated)
+                                    }
+                                }
+                            }
+                        }
+
+                        override fun onIsPlayingChanged(isPlaying: Boolean) {
+                            if (isPlaying) {
+                                startProgressTracking(onProgressUpdated)
+                            } else {
+                                stopProgressTracking()
+                            }
+                        }
+                    })
+
+                    prepare()
+                    play()
+                }
+
+            Napier.d { "ExoPlayerAudioPlaybackManager: Playback started successfully" }
         } catch (e: Exception) {
-            Napier.e("AndroidAudioPlaybackManager: Error starting playback", e)
-            releaseMediaPlayer()
+            Napier.e(e) { "ExoPlayerAudioPlaybackManager: Error starting playback" }
             onPlaybackCompleted()
         }
     }
-    
+
     override fun pausePlayback() {
-        Napier.d("AndroidAudioPlaybackManager: Pausing playback")
-        mediaPlayer?.let {
-            if (it.isPlaying) {
-                it.pause()
-                isPlaying = false
-                stopProgressUpdates()
+        Napier.d { "ExoPlayerAudioPlaybackManager: Pausing playback" }
+        exoPlayer?.pause()
+        stopProgressTracking()
+    }
+
+    override fun stopPlayback() {
+        Napier.d { "ExoPlayerAudioPlaybackManager: Stopping playback" }
+        stopProgressTracking()
+        exoPlayer?.stop()
+    }
+
+    override fun seekTo(position: Float) {
+        Napier.d { "ExoPlayerAudioPlaybackManager: Seeking to $position" }
+        exoPlayer?.let { player ->
+            val duration = player.duration
+            if (duration > 0) {
+                val seekPosition = (position * duration).toLong()
+                player.seekTo(seekPosition)
             }
         }
     }
-    
-    override fun stopPlayback() {
-        Napier.d("AndroidAudioPlaybackManager: Stopping playback")
-        releaseMediaPlayer()
-        stopProgressUpdates()
-        isPlaying = false
-    }
-    
-    override fun seekTo(position: Float) {
-        Napier.d("AndroidAudioPlaybackManager: Seeking to $position")
-        mediaPlayer?.let {
-            val durationMs = it.duration
-            val seekPositionMs = (position * durationMs).toInt()
-            it.seekTo(seekPositionMs)
-        }
-    }
-    
+
     override fun release() {
-        Napier.d("AndroidAudioPlaybackManager: Releasing resources")
-        releaseMediaPlayer()
-        stopProgressUpdates()
+        Napier.d { "ExoPlayerAudioPlaybackManager: Releasing resources" }
+        stopProgressTracking()
+        exoPlayer?.release()
+        exoPlayer = null
     }
-    
-    private fun startProgressUpdates(onProgressUpdated: (Float) -> Unit) {
-        stopProgressUpdates()
-        
-        progressUpdateJob = scope.launch {
-            while (isActive && isPlaying) {
-                mediaPlayer?.let {
-                    if (it.duration > 0) {
-                        val progress = it.currentPosition.toFloat() / it.duration.toFloat()
-                        onProgressUpdated(progress)
+
+    private fun startProgressTracking(onProgressUpdated: (Float) -> Unit) {
+        stopProgressTracking()
+        progressJob = scope.launch {
+            while (isActive) {
+                exoPlayer?.let { player ->
+                    val duration = player.duration
+                    if (duration > 0) {
+                        val progress = player.currentPosition.toFloat() / duration.toFloat()
+                        onProgressUpdated(progress.coerceIn(0f, 1f))
                     }
                 }
                 delay(100) // Update every 100ms
             }
         }
     }
-    
-    private fun stopProgressUpdates() {
-        progressUpdateJob?.cancel()
-        progressUpdateJob = null
-    }
-    
-    private fun releaseMediaPlayer() {
-        mediaPlayer?.let {
-            try {
-                if (it.isPlaying) {
-                    it.stop()
-                }
-                it.reset()
-                it.release()
-            } catch (e: Exception) {
-                Napier.e("AndroidAudioPlaybackManager: Error releasing media player", e)
-            }
-        }
-        mediaPlayer = null
+
+    private fun stopProgressTracking() {
+        progressJob?.cancel()
+        progressJob = null
     }
 }

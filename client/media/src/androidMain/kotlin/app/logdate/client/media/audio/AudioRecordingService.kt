@@ -23,9 +23,12 @@ import java.io.IOException
 /**
  * Extension function to start the recording service
  */
-fun Context.startAudioRecordingService() {
+fun Context.startAudioRecordingService(outputFilePath: String? = null) {
     val intent = Intent(this, AudioRecordingService::class.java).apply {
         action = AudioRecordingService.SERVICE_ACTION_START
+        if (outputFilePath != null) {
+            putExtra(AudioRecordingService.EXTRA_OUTPUT_PATH, outputFilePath)
+        }
     }
     startForegroundService(intent)
 }
@@ -54,6 +57,7 @@ class AudioRecordingService : Service() {
         const val SERVICE_ACTION_STOP = "app.logdate.action.STOP_RECORDING"
         const val SERVICE_ACTION_PAUSE = AndroidAudioNotificationHandler.ACTION_PAUSE
         const val SERVICE_ACTION_RESUME = AndroidAudioNotificationHandler.ACTION_RESUME
+        const val EXTRA_OUTPUT_PATH = "app.logdate.extra.OUTPUT_PATH"
     }
 
     // Service binder for clients
@@ -89,7 +93,8 @@ class AudioRecordingService : Service() {
         when (intent?.action) {
             SERVICE_ACTION_START -> {
                 Napier.d("Starting audio recording service")
-                startForegroundRecording()
+                val outputPath = intent.getStringExtra(EXTRA_OUTPUT_PATH)
+                startForegroundRecording(outputPath)
             }
             SERVICE_ACTION_STOP -> {
                 Napier.d("Stopping audio recording service")
@@ -125,18 +130,22 @@ class AudioRecordingService : Service() {
     /**
      * Starts foreground recording with notification
      */
-    private fun startForegroundRecording() {
+    private fun startForegroundRecording(outputPath: String?) {
         try {
             val notification = notificationHandler.createRecordingNotification(true, System.currentTimeMillis())
             
             // Start as a foreground service with the microphone type
-            startForeground(
-                NOTIFICATION_ID, 
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
             
-            startRecording()
+            startRecording(outputPath)
 
             // Update recording state
             serviceScope.launch {
@@ -167,8 +176,13 @@ class AudioRecordingService : Service() {
         }
         
         try {
-            mediaRecorder?.pause()
-            isPaused = true
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                mediaRecorder?.pause()
+                isPaused = true
+            } else {
+                Napier.w("Pause recording not supported below Android N")
+                return
+            }
             
             // Update notification to show paused state
             notificationHandler.updateRecordingNotification(
@@ -191,8 +205,13 @@ class AudioRecordingService : Service() {
         }
         
         try {
-            mediaRecorder?.resume()
-            isPaused = false
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                mediaRecorder?.resume()
+                isPaused = false
+            } else {
+                Napier.w("Resume recording not supported below Android N")
+                return
+            }
             
             // Update notification to show recording state
             notificationHandler.updateRecordingNotification(
@@ -209,11 +228,20 @@ class AudioRecordingService : Service() {
     /**
      * Starts the actual recording process
      */
-    private fun startRecording() {
+    private fun startRecording(outputPath: String?) {
         try {
             // Create output file
-            val outputDir = applicationContext.cacheDir
-            outputFile = File.createTempFile("audio_recording_", ".m4a", outputDir)
+            outputFile = if (outputPath != null) {
+                val file = File(outputPath)
+                file.parentFile?.mkdirs()
+                if (file.exists()) {
+                    file.delete()
+                }
+                file
+            } else {
+                val outputDir = applicationContext.cacheDir
+                File.createTempFile("audio_recording_", ".m4a", outputDir)
+            }
 
             // Initialize MediaRecorder
             mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

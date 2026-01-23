@@ -1,8 +1,10 @@
 package app.logdate.client.media.di
 
 import app.logdate.client.media.audio.AndroidAudioRecordingManager
+import app.logdate.client.media.audio.AndroidAudioStorage
 import app.logdate.client.media.audio.AndroidEditorAudioRecorder
 import app.logdate.client.media.audio.AudioRecordingManager
+import app.logdate.client.media.audio.AudioStorage
 import app.logdate.client.media.audio.EditorAudioRecorder
 import app.logdate.client.media.audio.EditorAudioRecorderConfig
 import app.logdate.client.media.audio.transcription.AndroidTranscriptionService
@@ -19,8 +21,9 @@ import org.koin.dsl.module
  * Android implementation of audio module
  */
 actual val audioModule: Module = module {
+    single<AudioStorage> { AndroidAudioStorage(androidContext()) }
     // Provide the Android implementation of AudioRecordingManager as a singleton
-    single<AudioRecordingManager> { AndroidAudioRecordingManager(androidContext()) }
+    single<AudioRecordingManager> { AndroidAudioRecordingManager(androidContext(), get()) }
     
     // Provide the Android implementation of TranscriptionService
     factory<TranscriptionService> { AndroidTranscriptionService(androidContext()) }

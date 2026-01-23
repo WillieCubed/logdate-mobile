@@ -457,8 +457,8 @@ private fun SharedTransitionScope.MemoryThumbnail(
             .then(
                 if (!isExpanded) {
                     Modifier.sharedElement(
-                        sharedContentState = rememberSharedContentState("memory-${memory.uri}"),
-                        animatedVisibilityScope = animatedVisibilityScope
+                        rememberSharedContentState("memory-${memory.uri}"),
+                        animatedVisibilityScope
                     )
                 } else {
                     Modifier
@@ -577,8 +577,8 @@ private fun SharedTransitionScope.ExpandedMemoryOverlay(
                 .fillMaxWidth(0.9f)
                 .aspectRatio(1f)
                 .sharedElement(
-                    sharedContentState = rememberSharedContentState("memory-${memory.uri}"),
-                    animatedVisibilityScope = animatedVisibilityScope
+                    rememberSharedContentState("memory-${memory.uri}"),
+                    animatedVisibilityScope
                 )
                 .clickable { }, // Prevent dismissing when clicking on the card itself
             colors = CardDefaults.cardColors(

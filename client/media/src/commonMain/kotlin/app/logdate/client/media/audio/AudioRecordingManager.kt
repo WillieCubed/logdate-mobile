@@ -4,6 +4,7 @@ import app.logdate.client.media.audio.transcription.TranscriptionService
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Duration
+import kotlin.uuid.Uuid
 
 /**
  * Interface for audio recording functionality across platforms
@@ -45,6 +46,26 @@ interface AudioRecordingManager {
      * Releases resources when recording is no longer needed
      */
     fun release()
+
+    /**
+     * Pauses the current recording if supported by the platform.
+     * Default implementation does nothing and returns false.
+     *
+     * @return True if recording was successfully paused.
+     */
+    suspend fun pauseRecording(): Boolean {
+        return false
+    }
+
+    /**
+     * Resumes a paused recording if supported by the platform.
+     * Default implementation does nothing and returns false.
+     *
+     * @return True if recording was successfully resumed.
+     */
+    suspend fun resumeRecording(): Boolean {
+        return false
+    }
     
     /**
      * Whether recording is currently in progress

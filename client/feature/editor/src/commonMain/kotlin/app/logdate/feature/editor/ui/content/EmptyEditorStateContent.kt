@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import io.github.aakira.napier.Napier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
@@ -162,7 +163,7 @@ private fun AudioRecordingSurface(
             Napier.i("AudioRecordingSurface: onClick triggered")
             onClick()
         },
-        modifier = modifier,
+        modifier = modifier.testTag("editor_start_audio_block"),
         shape = RoundedCornerShape(cornerRadius),
         color = MaterialTheme.colorScheme.secondaryContainer,
     ) {

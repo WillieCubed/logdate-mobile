@@ -5,6 +5,7 @@ import app.logdate.client.domain.journals.GetDefaultSelectedJournalsUseCase
 import app.logdate.client.domain.location.LogCurrentLocationUseCase
 import app.logdate.client.domain.location.LocationRetryWorker
 import app.logdate.client.domain.notes.AddNoteUseCase
+import app.logdate.client.domain.notes.FetchEntryUseCase
 import app.logdate.client.domain.notes.FetchTodayNotesUseCase
 import app.logdate.client.domain.notes.drafts.CreateEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.DeleteEntryDraftUseCase
@@ -90,6 +91,7 @@ class TextEditingTest {
             logCurrentLocationUseCase = logCurrentLocationUseCase,
             mediaManager = mediaManager
         )
+        val fetchEntryUseCase = FetchEntryUseCase(journalNotesRepository)
         val updateEntryDraft = UpdateEntryDraftUseCase(entryDraftRepository)
         val createEntryDraft = CreateEntryDraftUseCase(entryDraftRepository)
         val deleteEntryDraft = DeleteEntryDraftUseCase(entryDraftRepository)
@@ -112,6 +114,7 @@ class TextEditingTest {
             getCurrentUserJournals = getCurrentUserJournals,
             getDefaultSelectedJournals = getDefaultSelectedJournals,
             addNoteUseCase = addNoteUseCase,
+            fetchEntryUseCase = fetchEntryUseCase,
             journalContentRepository = journalContentRepository,
             updateEntryDraft = updateEntryDraft,
             createEntryDraft = createEntryDraft,

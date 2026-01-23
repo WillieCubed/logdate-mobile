@@ -16,17 +16,16 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Implementation of AudioRecordingManager for Android
  */
 class AndroidAudioRecordingManager(
-    private val context: Context
+    private val context: Context,
+    private val audioStorage: AudioStorage,
 ) : AudioRecordingManager {
     
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -34,6 +33,7 @@ class AndroidAudioRecordingManager(
     private val durationFlow = MutableStateFlow(0L)
     private val transcriptionFlow = MutableStateFlow<String?>(null)
     private var transcriptionService: TranscriptionService? = null
+    private var recordingTarget: AudioRecordingTarget? = null
     
     // Service connection
     private var recordingService: AudioRecordingService? = null
@@ -100,8 +100,9 @@ class AndroidAudioRecordingManager(
         }
         
         try {
+            recordingTarget = audioStorage.createRecordingTarget(null)
             // Start foreground service for recording
-            context.startAudioRecordingService()
+            context.startAudioRecordingService(recordingTarget?.path)
             
             // Bind to the service to get updates
             bindToService()
@@ -157,12 +158,13 @@ class AndroidAudioRecordingManager(
             context.stopAudioRecordingService()
             
             // Get file path from service before unbinding
-            val filePath = recordingService?.getRecordedFilePath()
+            val filePath = recordingService?.getRecordedFilePath() ?: recordingTarget?.path
             
             // Unbind from service
             unbindServiceSafely()
             
             recordingActive = false
+            recordingTarget = null
             
             // Stop live transcription
             transcriptionService?.let { service ->
@@ -193,7 +195,7 @@ class AndroidAudioRecordingManager(
      * Pause the current recording
      * @return True if successfully paused
      */
-    suspend fun pauseRecording(): Boolean {
+    override suspend fun pauseRecording(): Boolean {
         if (!recordingActive || recordingService == null) {
             return false
         }
@@ -218,7 +220,7 @@ class AndroidAudioRecordingManager(
      * Resume a paused recording
      * @return True if successfully resumed
      */
-    suspend fun resumeRecording(): Boolean {
+    override suspend fun resumeRecording(): Boolean {
         if (!recordingActive || recordingService == null) {
             return false
         }
@@ -269,5 +271,6 @@ class AndroidAudioRecordingManager(
         
         // Release transcription service
         transcriptionService?.release()
+        recordingTarget = null
     }
 }

@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 actual fun CameraCaptureContent(
     onMediaCaptured: (uri: String, mediaType: CapturedMediaType, durationMs: Long) -> Unit,
+    onClose: () -> Unit,
     modifier: Modifier
 ) {
     Card(

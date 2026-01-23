@@ -39,7 +39,30 @@ interface MediaManager {
      * @param uri The URI of the on-device media object to add to the default collection
      */
     suspend fun addToDefaultCollection(uri: String)
+
+    /**
+     * Reads a media asset into memory for upload or processing.
+     *
+     * @param uri The URI of the media asset to read
+     * @return The media payload including bytes and metadata
+     */
+    suspend fun readMedia(uri: String): MediaPayload
+
+    /**
+     * Saves a media payload to local storage.
+     *
+     * @param payload The media payload to persist
+     * @return A URI pointing to the saved media asset
+     */
+    suspend fun saveMedia(payload: MediaPayload): String
 }
+
+data class MediaPayload(
+    val fileName: String,
+    val mimeType: String,
+    val sizeBytes: Long,
+    val data: ByteArray
+)
 
 sealed interface MediaObject {
     // TODO: Support multiplatform URI

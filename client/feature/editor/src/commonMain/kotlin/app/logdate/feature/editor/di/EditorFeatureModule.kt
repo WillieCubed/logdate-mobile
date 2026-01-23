@@ -24,8 +24,8 @@ import org.koin.dsl.module
  *
  * - domainModule: Provides use cases and domain logic, including FetchEntryUseCase which enables
  *   the multi-window editing feature by loading entries by ID
- * - platformEditorModule: Provides platform-specific services (camera, audio, image picker)
- * - audioModule: Provides audio recording and playback functionality
+ * - platformEditorModule: Provides platform-specific services (camera, playback, image picker)
+ * - audioModule: Provides audio ViewModels and UI state wiring
  *
  * ViewModels provided:
  * - EntryEditorViewModel: Main editor state and operations (note creation, editing, saving)
@@ -47,7 +47,8 @@ val editorFeatureModule: Module = module {
     includes(platformEditorModule)
     includes(audioModule)
     
-    // AudioRecordingManager, AudioPlaybackManager, and ImagePickerService are provided by platformEditorModule
+    // AudioRecordingManager is provided by client.media audioModule at the app level.
+    // AudioPlaybackManager and ImagePickerService are provided by platformEditorModule.
     
     // Provide mediator as a singleton to ensure consistent state across components
     singleOf(::EditorMediatorImpl) bind EditorMediator::class

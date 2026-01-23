@@ -3,10 +3,13 @@ package app.logdate.wear.presentation.audio
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.repository.journals.JournalNote
 import app.logdate.wear.data.storage.StorageSpaceChecker
 import app.logdate.wear.recording.WearAudioRecordingManager
 import app.logdate.wear.repository.WearJournalNotesRepository
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -39,12 +42,14 @@ class AudioRecordingViewModel(
     val uiState: StateFlow<AudioRecordingUiState> = _uiState
     
     // Recording metadata
-    private var recordingStartTime: Long = 0
     private var audioPath: String? = null
+    private var audioLevelJob: Job? = null
+    private var durationJob: Job? = null
     
     // Clean up resources when ViewModel is cleared
     override fun onCleared() {
-        recordingManager.clear()
+        stopRecordingCollectors()
+        recordingManager.release()
         super.onCleared()
     }
     
@@ -69,21 +74,26 @@ class AudioRecordingViewModel(
                 }
                 
                 // Start recording
-                recordingStartTime = System.currentTimeMillis()
-                recordingManager.startRecording(
-                    onAudioLevelChanged = { levels ->
-                        _uiState.update { it.copy(audioLevels = levels) }
-                    },
-                    onDurationChanged = { duration ->
-                        _uiState.update { it.copy(durationMs = duration) }
+                val started = recordingManager.startRecording()
+                if (!started) {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = "Failed to start recording"
+                        )
                     }
-                )
+                    return@launch
+                }
+
+                startRecordingCollectors()
                 
-                _uiState.update { 
+                _uiState.update {
                     it.copy(
                         isRecording = true,
                         isLoading = false,
-                        isPaused = false
+                        isPaused = false,
+                        audioLevels = emptyList(),
+                        durationMs = 0
                     ) 
                 }
                 
@@ -110,16 +120,18 @@ class AudioRecordingViewModel(
                 
                 // Stop recording and get file path
                 audioPath = recordingManager.stopRecording()
+                stopRecordingCollectors()
                 
                 // Check if recording was successful
                 if (audioPath != null) {
                     // Create and save the audio note
                     val now = Clock.System.now()
-                    val audioNote = app.logdate.client.repository.journals.JournalNote.Audio(
+                    val audioNote = JournalNote.Audio(
                         mediaRef = audioPath!!,
                         uid = Uuid.random(),
                         creationTimestamp = now,
-                        lastUpdated = now
+                        lastUpdated = now,
+                        durationMs = _uiState.value.durationMs.takeIf { it > 0 }
                     )
                     
                     // Save to repository
@@ -197,7 +209,8 @@ class AudioRecordingViewModel(
     fun cancelRecording() {
         viewModelScope.launch {
             try {
-                recordingManager.clear()
+                stopRecordingCollectors()
+                recordingManager.release()
                 _uiState.update { 
                     it.copy(
                         isRecording = false,
@@ -230,6 +243,33 @@ class AudioRecordingViewModel(
         Napier.d("Available storage: ${availableSpace / 1024}KB, Required: ${requiredSpace / 1024}KB")
         
         return availableSpace >= requiredSpace
+    }
+
+    private fun startRecordingCollectors() {
+        audioLevelJob?.cancel()
+        durationJob?.cancel()
+
+        audioLevelJob = viewModelScope.launch {
+            recordingManager.getAudioLevelFlow().collect { level ->
+                _uiState.update { state ->
+                    val levels = (state.audioLevels + level).takeLast(50)
+                    state.copy(audioLevels = levels)
+                }
+            }
+        }
+
+        durationJob = viewModelScope.launch {
+            recordingManager.getRecordingDurationFlow().collect { duration ->
+                _uiState.update { it.copy(durationMs = duration.inWholeMilliseconds) }
+            }
+        }
+    }
+
+    private fun stopRecordingCollectors() {
+        audioLevelJob?.cancel()
+        durationJob?.cancel()
+        audioLevelJob = null
+        durationJob = null
     }
 }
 

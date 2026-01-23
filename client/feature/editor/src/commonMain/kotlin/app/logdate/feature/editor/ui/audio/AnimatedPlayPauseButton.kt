@@ -1,14 +1,9 @@
 package app.logdate.feature.editor.ui.audio
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -18,9 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Mic
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonColors
@@ -29,7 +21,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.editor.PlaybackState
@@ -37,7 +30,12 @@ import app.logdate.feature.editor.ui.editor.RecordingState
 
 /**
  * A button that animates between play/pause/record icons and state-appropriate shapes.
- * 
+ *
+ * Features graceful path-morphing animations where:
+ * - Play triangle morphs smoothly into pause bars
+ * - Play triangle morphs into stop square (for recording)
+ * - Mic icon uses standard AnimatedContent for recording start
+ *
  * @param playbackState Current playback state (PLAYING, PAUSED, STOPPED)
  * @param recordingState Current recording state (RECORDING, INACTIVE, etc)
  * @param onClick Callback to be invoked when the button is clicked
@@ -72,9 +70,9 @@ fun AnimatedPlayPauseButton(
     }
 ) {
     // Determine if the button is in an active state (playing or recording)
-    val isActive = playbackState == PlaybackState.PLAYING || 
+    val isActive = playbackState == PlaybackState.PLAYING ||
                   recordingState == RecordingState.RECORDING
-    
+
     // Animate corner radius based on active state
     // Circle when inactive, rounded square when active
     val cornerRadius by animateFloatAsState(
@@ -85,85 +83,84 @@ fun AnimatedPlayPauseButton(
         ),
         label = "ButtonCornerRadiusAnimation"
     )
-    
+
     // Create the shape with animated corner radius
     val shape = RoundedCornerShape(cornerRadius.dp)
-    
-    // Add a pulsing animation when recording
-    val infiniteTransition = rememberInfiniteTransition(label = "RecordingPulseAnimation")
-    val scale = if (recordingState == RecordingState.RECORDING) {
-        val pulseAnimation by infiniteTransition.animateFloat(
-            initialValue = 1f,
-            targetValue = 1.1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(800),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "PulseAnimation"
-        )
-        pulseAnimation
-    } else 1f
-    
+
+    // Determine content description for accessibility
+    val description = when {
+        recordingState == RecordingState.RECORDING -> "Stop Recording"
+        recordingState == RecordingState.PAUSED -> "Resume Recording"
+        recordingState == RecordingState.INACTIVE && playbackState == PlaybackState.STOPPED -> "Start Recording"
+        playbackState == PlaybackState.PLAYING -> "Pause"
+        else -> "Play"
+    }
+
     FilledIconButton(
         onClick = onClick,
-        modifier = modifier.scale(scale),
+        modifier = modifier.semantics { contentDescription = description },
         shape = shape,
         colors = colors
     ) {
-        // Determine which icon to show based on recording and playback state
-        val iconAndDescription = when {
-            recordingState == RecordingState.RECORDING -> Icons.Rounded.Stop to "Stop Recording"
-            recordingState == RecordingState.PAUSED -> Icons.Rounded.Mic to "Resume Recording"
-            recordingState == RecordingState.INACTIVE && playbackState == PlaybackState.STOPPED -> 
-                Icons.Rounded.Mic to "Start Recording"
-            playbackState == PlaybackState.PLAYING -> Icons.Rounded.Pause to "Pause"
-            else -> Icons.Rounded.PlayArrow to "Play"
+        // Get content color for morphing icons
+        val contentColor = when {
+            recordingState == RecordingState.RECORDING -> MaterialTheme.colorScheme.onError
+            recordingState == RecordingState.PROCESSING -> MaterialTheme.colorScheme.onError
+            else -> MaterialTheme.colorScheme.onPrimary
         }
-        
-        AnimatedContent(
-            targetState = iconAndDescription,
-            transitionSpec = {
-                // Use a spring-based animation for smooth transitions
-                fadeIn(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow
-                    )
-                ) + scaleIn(
-                    initialScale = 0.8f, 
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow
-                    )
-                ) togetherWith fadeOut(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow
-                    )
-                ) + scaleOut(
-                    targetScale = 0.8f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow
-                    )
+
+        // Use morphing icons for play/pause/stop transitions
+        // Use AnimatedContent only for mic icon (recording start state)
+        when {
+            // Recording active: show morphing stop icon
+            recordingState == RecordingState.RECORDING -> {
+                MorphingPlayStopIcon(
+                    isActive = true,
+                    size = iconSize,
+                    tint = contentColor
                 )
-            },
-            label = "AudioButtonStateAnimation"
-        ) { (icon, description) ->
-            Icon(
-                imageVector = icon,
-                contentDescription = description,
-                modifier = Modifier.size(iconSize)
-            )
+            }
+            // Mic states: use AnimatedContent for mic icon
+            recordingState == RecordingState.PAUSED ||
+            (recordingState == RecordingState.INACTIVE && playbackState == PlaybackState.STOPPED) -> {
+                AnimatedContent(
+                    targetState = recordingState,
+                    transitionSpec = {
+                        fadeIn(spring(stiffness = Spring.StiffnessLow)) +
+                        scaleIn(initialScale = 0.8f, animationSpec = spring(stiffness = Spring.StiffnessLow)) togetherWith
+                        fadeOut(spring(stiffness = Spring.StiffnessLow)) +
+                        scaleOut(targetScale = 0.8f, animationSpec = spring(stiffness = Spring.StiffnessLow))
+                    },
+                    label = "MicIconAnimation"
+                ) { _ ->
+                    Icon(
+                        imageVector = Icons.Rounded.Mic,
+                        contentDescription = null, // Handled by button semantics
+                        modifier = Modifier.size(iconSize)
+                    )
+                }
+            }
+            // Playback states: use morphing play/pause icon
+            else -> {
+                MorphingPlayPauseIcon(
+                    isPlaying = playbackState == PlaybackState.PLAYING,
+                    size = iconSize,
+                    tint = contentColor
+                )
+            }
         }
     }
 }
 
 /**
  * A button that animates between play and pause icons.
- * Features a shape animation that transitions between a circle (when paused)
+ *
+ * Features graceful path-morphing animation where the play triangle
+ * smoothly transforms into two pause bars.
+ *
+ * Also includes a shape animation that transitions between a circle (when paused)
  * and a rounded square (when playing).
- * 
+ *
  * This simpler version is maintained for backward compatibility.
  *
  * @param isPlaying Current playback state, true for playing (pause icon), false for paused (play icon)
@@ -192,49 +189,20 @@ fun AnimatedPlayPauseButton(
         ),
         label = "ButtonCornerRadiusAnimation"
     )
-    
+
     val shape = RoundedCornerShape(cornerRadius.dp)
-    
+    val description = if (isPlaying) "Pause" else "Play"
+
     FilledIconButton(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.semantics { contentDescription = description },
         shape = shape,
         colors = colors
     ) {
-        AnimatedContent(
-            targetState = isPlaying,
-            transitionSpec = {
-                fadeIn(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow
-                    )
-                ) + scaleIn(
-                    initialScale = 0.8f, 
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow
-                    )
-                ) togetherWith fadeOut(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow
-                    )
-                ) + scaleOut(
-                    targetScale = 0.8f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow
-                    )
-                )
-            },
-            label = "PlayPauseAnimation"
-        ) { playing ->
-            Icon(
-                imageVector = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                contentDescription = if (playing) "Pause" else "Play",
-                modifier = Modifier.size(iconSize)
-            )
-        }
+        MorphingPlayPauseIcon(
+            isPlaying = isPlaying,
+            size = iconSize,
+            tint = MaterialTheme.colorScheme.onPrimary
+        )
     }
 }

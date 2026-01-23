@@ -1,7 +1,14 @@
 package app.logdate.feature.editor.ui.audio.iosbackground
 
 import io.github.aakira.napier.Napier
-import platform.Foundation.NSProcessInfo
+import platform.Foundation.NSDateComponentsFormatter
+import platform.Foundation.NSDateComponentsFormatterUnitsStylePositional
+import platform.Foundation.NSDateComponentsFormatterZeroFormattingBehaviorPad
+import platform.Foundation.NSNumber
+import platform.Foundation.NSCalendarUnitMinute
+import platform.Foundation.NSCalendarUnitSecond
+import platform.UIKit.UIApplication
+import platform.UIKit.UIApplicationState
 import platform.UserNotifications.UNMutableNotificationContent
 import platform.UserNotifications.UNNotificationRequest
 import platform.UserNotifications.UNNotificationSound
@@ -16,7 +23,6 @@ import platform.UserNotifications.UNUserNotificationCenter
  */
 class LiveActivityController {
     private val notificationCenter = UNUserNotificationCenter.currentNotificationCenter()
-    private val processInfo = NSProcessInfo.processInfo
     
     // IDs for notifications
     private val RECORDING_NOTIFICATION_ID = "app.logdate.recording.notification"
@@ -39,7 +45,7 @@ class LiveActivityController {
                 setCategoryIdentifier("recording")
                 
                 // Add a badge
-                setBadge(1)
+                setBadge(NSNumber(1))
             }
             
             // Create a repeating trigger (fires every minute to keep notification updated)
@@ -66,10 +72,7 @@ class LiveActivityController {
      */
     fun updateRecordingNotification(elapsedTimeSeconds: Long, isPaused: Boolean) {
         try {
-            // Format time as MM:SS
-            val minutes = elapsedTimeSeconds / 60
-            val seconds = elapsedTimeSeconds % 60
-            val timeString = String.format("%02d:%02d", minutes, seconds)
+            val timeString = formatElapsedTime(elapsedTimeSeconds)
             
             // Create notification content
             val content = UNMutableNotificationContent().apply {
@@ -118,6 +121,16 @@ class LiveActivityController {
      * Checks if the app is running in the foreground
      */
     fun isAppInForeground(): Boolean {
-        return processInfo.isActive
+        return UIApplication.sharedApplication.applicationState == UIApplicationState.UIApplicationStateActive
+    }
+
+    private fun formatElapsedTime(elapsedTimeSeconds: Long): String {
+        val formatter = NSDateComponentsFormatter().apply {
+            allowedUnits = NSCalendarUnitMinute or NSCalendarUnitSecond
+            unitsStyle = NSDateComponentsFormatterUnitsStylePositional
+            zeroFormattingBehavior = NSDateComponentsFormatterZeroFormattingBehaviorPad
+        }
+
+        return formatter.stringFromTimeInterval(elapsedTimeSeconds.toDouble()) ?: "0:00"
     }
 }

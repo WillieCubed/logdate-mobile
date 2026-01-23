@@ -21,13 +21,16 @@ import java.io.ByteArrayOutputStream
 /**
  * Desktop implementation of AudioRecordingManager using JavaSound API
  */
-class DesktopAudioRecordingManager : AudioRecordingManager {
+class DesktopAudioRecordingManager(
+    private val audioStorage: AudioStorage,
+) : AudioRecordingManager {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     
     // Recording state
     private var recordingActive = false
     private var recordingThread: Thread? = null
     private var recordingStartTime: Long = 0
+    private var recordingTarget: AudioRecordingTarget? = null
     
     // Audio capture
     private var line: TargetDataLine? = null
@@ -75,6 +78,7 @@ class DesktopAudioRecordingManager : AudioRecordingManager {
         if (recordingActive) return false
         
         try {
+            recordingTarget = audioStorage.createRecordingTarget(null, extension = "wav")
             // Set up audio format and data line
             val info = DataLine.Info(TargetDataLine::class.java, audioFormat)
             
@@ -155,8 +159,8 @@ class DesktopAudioRecordingManager : AudioRecordingManager {
                 }
             }
             
-            // Create output file
-            val outputFile = File.createTempFile("desktop_audio_", ".wav")
+            val outputFile = recordingTarget?.path?.let { File(it) }
+                ?: File.createTempFile("desktop_audio_", ".wav")
             
             // Save audio data to file
             saveAudioToFile(outputFile)
@@ -184,6 +188,7 @@ class DesktopAudioRecordingManager : AudioRecordingManager {
             // Reset state
             line = null
             audioData = null
+            recordingTarget = null
             
             Napier.d("Desktop: Stopped recording: $fileUri")
             return fileUri
@@ -221,6 +226,7 @@ class DesktopAudioRecordingManager : AudioRecordingManager {
             
             // Clear audio data
             audioData = null
+            recordingTarget = null
             
             // Release transcription service
             transcriptionService?.release()

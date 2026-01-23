@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.editor.VideoBlockUiState
+import app.logdate.feature.editor.ui.formatMediaDuration
 import io.github.aakira.napier.Napier
 
 /**
@@ -143,9 +144,7 @@ private fun VideoDisplayContent(
  * Formats a duration in milliseconds to a MM:SS string.
  */
 private fun formatDuration(durationMs: Long): String {
-    val seconds = (durationMs / 1000) % 60
-    val minutes = (durationMs / 1000) / 60
-    return "%d:%02d".format(minutes, seconds)
+    return formatMediaDuration(durationMs, false)
 }
 
 /**

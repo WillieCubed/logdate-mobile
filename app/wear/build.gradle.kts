@@ -61,9 +61,11 @@ dependencies {
     // Minimal client dependencies for Wear - reuse shared repository models.
     implementation(projects.client.repository)
     implementation(projects.client.feature.editor)
+    implementation(projects.client.media)
     
     // Add navigation for Wear
-    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.navigation3.ui)
     implementation(libs.androidx.compose.material.iconsExtended)
     
     // Additional Compose support

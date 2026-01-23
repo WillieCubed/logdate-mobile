@@ -2,6 +2,7 @@ package app.logdate.feature.editor.ui.editor
 
 import app.logdate.feature.editor.ui.camera.CapturedMediaType
 import app.logdate.shared.model.Location
+import app.logdate.feature.editor.ui.formatMediaDuration
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlin.uuid.Uuid
@@ -86,9 +87,7 @@ data class CameraBlockUiState(
      */
     val formattedDuration: String
         get() {
-            val seconds = (durationMs / 1000) % 60
-            val minutes = (durationMs / 1000) / 60
-            return "%02d:%02d".format(minutes, seconds)
+            return formatMediaDuration(durationMs, true)
         }
 }
 
@@ -117,9 +116,7 @@ data class VideoBlockUiState(
      */
     val formattedDuration: String
         get() {
-            val seconds = (durationMs / 1000) % 60
-            val minutes = (durationMs / 1000) / 60
-            return "%02d:%02d".format(minutes, seconds)
+            return formatMediaDuration(durationMs, true)
         }
 }
 

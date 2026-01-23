@@ -3,6 +3,7 @@ package app.logdate.feature.editor.ui.editor.fakes
 import app.logdate.client.location.ClientLocationProvider
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
+import app.logdate.client.media.MediaPayload
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalContentRepository
@@ -50,6 +51,10 @@ class FakeJournalNotesRepository : JournalNotesRepository {
     override fun observeNotesStream(pageSize: Int): Flow<List<JournalNote>> = flowOf(emptyList())
 
     override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> = notesFlow
+
+    override suspend fun getNoteById(noteId: Uuid): JournalNote? {
+        return notesFlow.value.firstOrNull { it.uid == noteId }
+    }
 
     override suspend fun create(note: JournalNote): Uuid {
         notesFlow.value = notesFlow.value + note
@@ -268,6 +273,19 @@ class FakeMediaManager : MediaManager {
 
     override suspend fun addToDefaultCollection(uri: String) {
         // No-op for tests
+    }
+
+    override suspend fun readMedia(uri: String): MediaPayload {
+        return MediaPayload(
+            fileName = "media.bin",
+            mimeType = "application/octet-stream",
+            sizeBytes = 0,
+            data = ByteArray(0)
+        )
+    }
+
+    override suspend fun saveMedia(payload: MediaPayload): String {
+        return "file:///tmp/${payload.fileName}"
     }
 }
 

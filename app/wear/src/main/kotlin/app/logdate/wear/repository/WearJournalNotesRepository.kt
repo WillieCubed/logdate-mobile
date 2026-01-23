@@ -69,12 +69,25 @@ class WearJournalNotesRepository(
             
             // Create a permanent file with the note's UUID
             val destFile = File(audioDir, "${note.uid}.m4a")
+
+            if (sourceFile.absolutePath == destFile.absolutePath) {
+                Napier.d("Audio file already in destination: ${destFile.absolutePath}")
+                return note
+            }
+
+            if (destFile.exists()) {
+                destFile.delete()
+            }
             
-            // Copy the file
-            sourceFile.inputStream().use { input ->
-                destFile.outputStream().use { output ->
-                    input.copyTo(output)
+            val moved = sourceFile.renameTo(destFile)
+            if (!moved) {
+                // Copy the file
+                sourceFile.inputStream().use { input ->
+                    destFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
                 }
+                sourceFile.delete()
             }
             
             // If copy was successful, create new note with updated path

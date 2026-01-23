@@ -102,7 +102,7 @@ fun MainEditorContent(
                         },
                         audioState = uiState.audioState,
                         modifier = Modifier
-                            .animateItemPlacement()  // Add smooth add/remove animations
+                            .animateItem()  // Add smooth add/remove animations
                             .conditional(true) {
                                 fillMaxSize()
                             }

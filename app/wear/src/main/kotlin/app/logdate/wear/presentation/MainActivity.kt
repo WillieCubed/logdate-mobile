@@ -19,10 +19,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -30,10 +28,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.navigation.NavController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
+import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.entry
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.ui.NavDisplay
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
@@ -41,6 +39,8 @@ import androidx.wear.compose.material3.TimeText
 import androidx.wear.compose.material3.ScreenScaffold
 import app.logdate.wear.R
 import app.logdate.wear.presentation.audio.AudioRecordingScreen
+import app.logdate.wear.presentation.navigation.WearAudioRecordingRoute
+import app.logdate.wear.presentation.navigation.WearHomeRoute
 import app.logdate.wear.presentation.theme.LogDateTheme
 import io.github.aakira.napier.Napier
 
@@ -89,26 +89,36 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun WearApp() {
     LogDateTheme {
-        val navController = rememberNavController()
+        val backStack = remember { mutableStateListOf<NavKey>(WearHomeRoute) }
         
-        NavHost(
-            navController = navController,
-            startDestination = "home"
-        ) {
-            composable("home") {
-                HomeScreen(navController)
+        NavDisplay(
+            backStack = backStack,
+            onBack = { count ->
+                val entriesToRemove = count.coerceAtMost(backStack.size - 1)
+                repeat(entriesToRemove) { backStack.removeAt(backStack.lastIndex) }
+            },
+            entryProvider = entryProvider {
+                entry<WearHomeRoute> {
+                    HomeScreen(
+                        onNavigateToAudio = { backStack.add(WearAudioRecordingRoute) }
+                    )
+                }
+                entry<WearAudioRecordingRoute> {
+                    AudioRecordingScreen(
+                        onNavigateBack = {
+                            if (backStack.size > 1) {
+                                backStack.removeAt(backStack.lastIndex)
+                            }
+                        }
+                    )
+                }
             }
-            composable("audio_recording") {
-                AudioRecordingScreen(
-                    onNavigateBack = { navController.popBackStack() }
-                )
-            }
-        }
+        )
     }
 }
 
 @Composable
-fun HomeScreen(navController: NavController) {
+fun HomeScreen(onNavigateToAudio: () -> Unit) {
     ScreenScaffold(
         timeText = { TimeText() }
     ) {
@@ -133,7 +143,7 @@ fun HomeScreen(navController: NavController) {
                 )
                 
                 Button(
-                    onClick = { navController.navigate("audio_recording") },
+                    onClick = onNavigateToAudio,
                     modifier = Modifier.padding(top = 16.dp)
                 ) {
                     Text("Record Audio")

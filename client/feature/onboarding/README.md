@@ -141,9 +141,6 @@ val onboardingFeatureModule = module {
     viewModel { OnboardingViewModel(get(), get(), get()) }
     viewModel { WelcomeBackViewModel(get()) }
     viewModel { MemorySelectionViewModel(get()) }
-    
-    // Additional dependencies
-    factory { AudioEntryRecorder() }
 }
 ```
 

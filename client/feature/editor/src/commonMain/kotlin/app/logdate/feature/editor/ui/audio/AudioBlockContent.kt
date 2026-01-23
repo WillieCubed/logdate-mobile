@@ -51,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -410,7 +411,9 @@ private fun ExpandedAudioContent(
                         text = formatDuration(block.duration.milliseconds),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.width(48.dp),
+                        modifier = Modifier
+                            .width(48.dp)
+                            .testTag("audio_block_duration"),
                         textAlign = TextAlign.End
                     )
                 } else {
@@ -502,4 +505,3 @@ private fun formatDuration(duration: kotlin.time.Duration): String {
 
     return "$minutesStr:$secondsStr"
 }
-

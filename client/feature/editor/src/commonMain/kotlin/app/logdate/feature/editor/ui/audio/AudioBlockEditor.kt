@@ -2,6 +2,7 @@ package app.logdate.feature.editor.ui.audio
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -58,12 +59,20 @@ fun AudioBlockEditor(
     // Function to handle saving a recorded audio file
     val handleSaveRecording = { uri: String ->
         Napier.d("Audio recording saved: $uri")
-        onBlockUpdated(block.copy(uri = uri))
+        onBlockUpdated(
+            block.copy(
+                uri = uri,
+                duration = audioUiState.duration.inWholeMilliseconds
+            )
+        )
     }
     
-    // If we get a recording URI from the viewModel, update the block
-    if (audioUiState.recordedAudioUri != null && block.uri == null) {
-        handleSaveRecording(audioUiState.recordedAudioUri!!)
+    LaunchedEffect(audioUiState.recordedAudioUri, block.uri) {
+        val recordedUri = audioUiState.recordedAudioUri
+        if (recordedUri != null && block.uri == null) {
+            handleSaveRecording(recordedUri)
+            audioViewModel.clearRecordedAudio()
+        }
     }
     
     // Show appropriate audio UI based on the current state
