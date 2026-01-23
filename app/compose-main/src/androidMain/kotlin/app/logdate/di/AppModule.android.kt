@@ -12,6 +12,7 @@ import app.logdate.client.health.di.healthModule
 import app.logdate.client.health.di.androidHealthModule
 import app.logdate.client.intelligence.di.intelligenceModule
 import app.logdate.client.location.di.locationModule
+import app.logdate.client.media.di.audioModule
 import app.logdate.client.networking.di.networkingModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
@@ -38,6 +39,7 @@ actual val appModule: Module = module {
     includes(defaultModules)
     includes(intelligenceModule)
     includes(locationModule)
+    includes(audioModule)
     includes(windowingModule)
 }
 

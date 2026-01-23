@@ -15,10 +15,8 @@ This is the primary application entry point that orchestrates all feature module
 ## Key Components
 
 ### Navigation Structure
-- **MainNavigationRoot.kt** - Root navigation component
-- **MainAppNavigator.kt** - Navigation controller
-- **Route files** - Feature-specific navigation routes
-- **Scene files** - Adaptive layout scene definitions for different screen sizes
+- **Android (Navigation3)**: `MainNavigationRoot.kt`, `MainAppNavigator.kt`, scene/route files
+- **Shared (Navigation Compose)**: `LogDateAppRoot.kt`, `LogDateNavHost.kt`, feature route files
 
 ### Platform Entry Points
 - **Android**: `MainActivity.kt` and `LogDateApplication.kt`
@@ -51,7 +49,8 @@ This is the primary application entry point that orchestrates all feature module
 ## External Dependencies
 
 - **Compose Multiplatform** - UI framework
-- **AndroidX Navigation Compose** - Navigation
+- **AndroidX Navigation3** - Android navigation stack
+- **AndroidX Navigation Compose** - Shared navigation
 - **Koin** - Dependency Injection
 - **Napier** - Logging
 - **FileKit Compose** - File operations
@@ -68,15 +67,17 @@ The app module follows a feature-based modular architecture where:
 ## Navigation Flow
 
 ```
-MainNavigationRoot
+Android (Navigation3)
 ├── Onboarding Flow (first launch)
-├── Home Scene (main content)
-│   ├── Timeline Tab
-│   ├── Journals Tab
-│   ├── Rewind Tab
-│   └── Settings Tab
-├── Editor Screen (modal)
-└── Detail Screens (journal details, etc.)
+├── Home Scene (tabs + adaptive panes)
+├── Editor (modal)
+└── Detail Screens
+
+Shared (Navigation Compose)
+├── Onboarding Flow
+├── Home
+├── Editor
+└── Detail Screens
 ```
 
 ## Adaptive Layout

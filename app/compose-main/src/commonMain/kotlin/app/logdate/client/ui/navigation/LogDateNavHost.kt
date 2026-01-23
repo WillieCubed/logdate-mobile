@@ -5,15 +5,20 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import app.logdate.feature.core.account.navigation.cloudAccountSetupRoute
+import app.logdate.feature.core.account.navigation.navigateToCloudAccountSetup
 import app.logdate.feature.core.main.homeGraph
 import app.logdate.feature.core.main.navigateHome
 import app.logdate.feature.core.navigation.BaseRoute
 import app.logdate.feature.core.navigation.landingDestination
+import app.logdate.feature.core.profile.navigation.navigateToProfile
+import app.logdate.feature.core.profile.navigation.profileRoute
 import app.logdate.feature.core.settings.navigation.navigateToSettings
 import app.logdate.feature.core.settings.navigation.settingsDestination
 import app.logdate.feature.editor.ui.EntryEditorContent
 import app.logdate.feature.journals.navigation.journalDetailsRoute
 import app.logdate.feature.journals.navigation.journalSettingsRoute
+import app.logdate.feature.journals.navigation.journalsOverviewRoute
 import app.logdate.feature.journals.navigation.navigateToJournal
 import app.logdate.feature.journals.navigation.navigateToJournalCreation
 import app.logdate.feature.journals.navigation.navigateToJournalsOverview
@@ -22,6 +27,7 @@ import app.logdate.feature.journals.navigation.newJournalRoute
 import app.logdate.feature.journals.navigation.noteDetailRoute
 import app.logdate.feature.onboarding.navigation.onboardingGraph
 import app.logdate.feature.onboarding.navigation.startOnboarding
+import app.logdate.feature.rewind.navigation.rewindRoutes
 import app.logdate.feature.rewind.navigation.navigateToRewind
 
 /**
@@ -52,8 +58,7 @@ internal fun LogDateNavHost(
         )
         homeGraph(
             onCreateNote = {
-                // Instead of using navigateToNoteCreation, we'll navigate to the editorDestination directly
-                // using the EntryEditor route from MainNavigationRoot
+                // Use the editor destination directly to avoid extra route plumbing.
                 navController.navigate("editor")
             },
             onOpenJournal = navController::navigateToJournal,
@@ -62,6 +67,11 @@ internal fun LogDateNavHost(
                 navController.navigateToRewind(it)
             },
             onOpenSettings = navController::navigateToSettings,
+            onBrowseJournals = navController::navigateToJournalsOverview,
+        )
+        journalsOverviewRoute(
+            onOpenJournal = navController::navigateToJournal,
+            onCreateJournal = navController::navigateToJournalCreation,
         )
         journalDetailsRoute(
             onGoBack = {
@@ -109,14 +119,26 @@ internal fun LogDateNavHost(
             },
             onAppReset = navController::startOnboarding,
             onNavigateToCloudAccountCreation = {
-                // TODO: Implement cloud account creation navigation
-                navController.popBackStack()
+                navController.navigateToCloudAccountSetup()
             },
             onNavigateToProfile = {
-                // TODO: Implement profile navigation
-                navController.popBackStack()
+                navController.navigateToProfile()
             },
             navController = navController,
+        )
+
+        profileRoute(
+            onGoBack = { navController.popBackStack() },
+        )
+
+        cloudAccountSetupRoute(
+            onComplete = { navController.popBackStack() },
+            onSkip = { navController.popBackStack() },
+        )
+
+        rewindRoutes(
+            onOpenRewind = { navController.navigateToRewind(it) },
+            onGoBack = { navController.popBackStack() },
         )
     }
 }

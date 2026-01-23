@@ -142,6 +142,7 @@ class MainActivity : FragmentActivity() {
     
     override fun onPause() {
         super.onPause()
+        viewModel.onAppBackgrounded()
         if (activityProvider.currentActivity === this) {
             // Only clear the reference if it's still pointing to this activity
             activityProvider.currentActivity = null

@@ -31,7 +31,7 @@ actual val coreFeatureModule: Module = module {
     single<ExportLauncher> { DesktopExportLauncher() }
 
     viewModel { AppViewModel(get(), get(), get()) }
-    viewModel { SettingsViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { SettingsViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { HomeViewModel(get(), get(), get()) }
     viewModel { CloudAccountOnboardingViewModel(get(), get(), get()) }
     viewModel { ProfileViewModel(get(), get(), get(), get()) }

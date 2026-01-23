@@ -11,12 +11,14 @@ import app.logdate.feature.core.settings.ui.DataSettingsScreen
 import app.logdate.feature.core.settings.ui.LocationSettingsScreen
 import app.logdate.feature.core.settings.ui.PrivacySettingsScreen
 import app.logdate.feature.core.settings.ui.SettingsOverviewScreen
+import app.logdate.feature.core.settings.ui.devices.DevicesScreen
 import app.logdate.navigation.MainAppNavigator
 import app.logdate.navigation.routes.ProfileRoute
 import app.logdate.navigation.routes.core.AccountSettingsRoute
 import app.logdate.navigation.routes.core.BirthdaySettingsRoute
 import app.logdate.navigation.routes.core.DangerZoneSettingsRoute
 import app.logdate.navigation.routes.core.DataSettingsRoute
+import app.logdate.navigation.routes.core.DevicesSettingsRoute
 import app.logdate.navigation.routes.core.LocationSettingsRoute
 import app.logdate.navigation.routes.core.OnboardingStart
 import app.logdate.navigation.routes.core.PrivacySettingsRoute
@@ -81,6 +83,13 @@ fun MainAppNavigator.openLocationSettings() {
 }
 
 /**
+ * Opens the connected devices settings screen.
+ */
+fun MainAppNavigator.openDevicesSettings() {
+    backStack.add(DevicesSettingsRoute)
+}
+
+/**
  * Opens the data and storage settings screen.
  */
 fun MainAppNavigator.openDataSettings() {
@@ -105,6 +114,7 @@ fun MainAppNavigator.openDangerZoneSettings() {
  * @param onNavigateToAccount Callback to navigate to account settings
  * @param onNavigateToPrivacy Callback to navigate to privacy settings
  * @param onNavigateToData Callback to navigate to data settings
+ * @param onNavigateToDevices Callback to navigate to devices settings
  * @param onNavigateToDangerZone Callback to navigate to danger zone settings
  * @param onNavigateToLocation Callback to navigate to location settings
  * @param onNavigateToBirthdaySettings Callback to navigate to the birthday settings screen
@@ -117,6 +127,7 @@ fun EntryProviderBuilder<NavKey>.appSettingsRoutes(
     onNavigateToAccount: () -> Unit,
     onNavigateToPrivacy: () -> Unit,
     onNavigateToData: () -> Unit,
+    onNavigateToDevices: () -> Unit,
     onNavigateToDangerZone: () -> Unit,
     onNavigateToLocation: () -> Unit,
     onNavigateToBirthdaySettings: () -> Unit,
@@ -130,11 +141,8 @@ fun EntryProviderBuilder<NavKey>.appSettingsRoutes(
             onNavigateToPrivacy = onNavigateToPrivacy,
             onNavigateToData = onNavigateToData,
             onNavigateToDangerZone = onNavigateToDangerZone,
-            onNavigateToDevices = onNavigateToData, // TODO: Remove unnecessary separate devices screen
-            onNavigateToLocation = onNavigateToLocation,
-            // TODO: Determine selected detail and two-pane mode based on current navigation context
-            selectedDetail = null,
-            isInTwoPaneMode = false
+            onNavigateToDevices = onNavigateToDevices,
+            onNavigateToLocation = onNavigateToLocation
         )
     }
     
@@ -142,6 +150,13 @@ fun EntryProviderBuilder<NavKey>.appSettingsRoutes(
     entry<ProfileRoute>() { _ ->
         ProfileScreen(
             onBack = onBack
+        )
+    }
+
+    // Connected devices screen
+    entry<DevicesSettingsRoute>() { _ ->
+        DevicesScreen(
+            onBackClick = onBack
         )
     }
     

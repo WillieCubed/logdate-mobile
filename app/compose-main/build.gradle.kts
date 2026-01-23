@@ -64,6 +64,7 @@ kotlin {
             implementation(projects.client.intelligence)
             implementation(projects.client.domain)
             implementation(projects.client.location)
+            implementation(projects.client.media)
             implementation(projects.client.sync)
             implementation(projects.client.healthConnect)
             implementation(projects.client.util)
@@ -107,6 +108,25 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
         }
+
+        val androidUnitTest by getting {
+            dependencies {
+                implementation(libs.kotlin.test)
+                implementation(libs.kotlin.test.junit)
+            }
+        }
+
+        val androidInstrumentedTest by getting {
+            dependencies {
+                implementation(projects.client.permissions)
+                implementation(projects.client.repository)
+                implementation(libs.kotlin.test.junit)
+                implementation(libs.androidx.test.core)
+                implementation(libs.androidx.test.runner)
+                implementation(libs.androidx.test.ext.junit)
+                implementation(libs.androidx.ui.test.junit4)
+            }
+        }
     }
 }
 
@@ -121,6 +141,7 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     packaging {
         resources {
@@ -148,6 +169,12 @@ android {
         // Enable core library desugaring for health-connect
         isCoreLibraryDesugaringEnabled = true
     }
+    // Use the new recommended source set layout
+    sourceSets {
+        getByName("androidTest") {
+            java.srcDirs("src/androidInstrumentedTest/kotlin")
+        }
+    }
     experimentalProperties["android.experimental.enableScreenshotTest"] = true
 }
 
@@ -161,6 +188,8 @@ dependencies {
     screenshotTestImplementation(compose.material3)
     screenshotTestImplementation(compose.runtime)
     screenshotTestImplementation(compose.foundation)
+    androidTestImplementation(libs.androidx.ui.test.junit4)
+    debugImplementation(libs.androidx.ui.test.manifest)
 }
 
 // Workaround for Google Compose Screenshot Testing + KMP compatibility issue.

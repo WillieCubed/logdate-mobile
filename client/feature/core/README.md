@@ -146,7 +146,7 @@ actual val coreFeatureModule: Module = module {
     
     viewModel { AppViewModel(get(), get(), get()) }
     viewModel { SettingsViewModel(get(), get(), get(), get(), get(), get()) }
-    viewModel { HomeViewModel(get()) }
+    viewModel { HomeViewModel(get(), get(), get()) }  // GetStreamingTimelineUseCase + dependencies
     viewModel { CloudAccountOnboardingViewModel(get(), get(), get()) }
 }
 ```

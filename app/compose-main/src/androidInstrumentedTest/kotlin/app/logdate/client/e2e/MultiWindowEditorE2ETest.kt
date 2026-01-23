@@ -2,7 +2,7 @@ package app.logdate.client.e2e
 
 import android.content.Context
 import android.content.Intent
-import androidx.compose.ui.test.junit4.createEmptyComposeTestRule
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -11,7 +11,6 @@ import io.github.aakira.napier.Napier
 import kotlin.test.assertEquals
 import kotlin.uuid.Uuid
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -40,10 +39,6 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class MultiWindowEditorE2ETest {
-
-    @get:Rule
-    val composeTestRule = createEmptyComposeTestRule()
-
     private lateinit var context: Context
 
     @Before
@@ -122,7 +117,7 @@ class MultiWindowEditorE2ETest {
         assertEquals(initialText, intent.getStringExtra("initial_text"))
         assertEquals(
             listOf(attachmentUri),
-            intent.getStringArrayListExtra("attachments")
+            intent.getStringArrayListExtra("attachments") ?: emptyList()
         )
 
         // Verify this is configured as a new document
@@ -236,7 +231,7 @@ class MultiWindowEditorE2ETest {
 
         scenario.use {
             // Move to resumed state where metrics are updated
-            it.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+            it.moveToState(Lifecycle.State.RESUMED)
 
             it.onActivity { activity ->
                 // Activity is resumed and should have updated window metrics

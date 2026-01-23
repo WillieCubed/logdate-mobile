@@ -7,6 +7,10 @@ import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.navigation.compose.rememberNavController
 import app.logdate.client.ui.navigation.LogDateNavHost
 import app.logdate.feature.core.GlobalAppUiLoadedState
@@ -24,16 +28,21 @@ fun LogDateAppRoot(
     onShowUnlockPrompt: () -> Unit,
 ) {
     val navController = rememberNavController()
-    LaunchedEffect(appUiState) {
+    var hasRequestedUnlock by remember { mutableStateOf(false) }
+    LaunchedEffect(appUiState.isOnboarded, appUiState.requiresUnlock) {
         if (!appUiState.isOnboarded) {
 //        // Ensure that onboarding is completed before proceeding
             navController.startOnboarding()
             return@LaunchedEffect
         }
         if (appUiState.requiresUnlock) {
-            onShowUnlockPrompt()
+            if (!hasRequestedUnlock) {
+                hasRequestedUnlock = true
+                onShowUnlockPrompt()
+            }
             return@LaunchedEffect
         }
+        hasRequestedUnlock = false
         navController.navigateHome()
     }
 

@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import app.logdate.client.domain.timeline.GetTimelineUseCase
+import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.feature.journals.ui.JournalClickCallback
 import app.logdate.feature.journals.ui.JournalsOverviewScreen
@@ -55,12 +55,15 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import org.koin.compose.viewmodel.koinViewModel
+import kotlin.uuid.Uuid
 
 @Composable
 fun HomeScreen(
     onNewEntry: () -> Unit,
     onOpenJournal: JournalClickCallback,
     onCreateJournal: () -> Unit,
+    onBrowseJournals: () -> Unit,
+    onOpenRewind: (Uuid) -> Unit,
     onOpenSettings: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = koinViewModel(),
@@ -94,7 +97,7 @@ fun HomeScreen(
 
             HomeRouteDestination.Rewind -> {
                 RewindOverviewScreen(
-                    onOpenRewind = { /* TODO: Handle rewind navigation */ },
+                    onOpenRewind = onOpenRewind,
                     modifier = Modifier.applyScreenStyles()
                 )
             }
@@ -102,7 +105,7 @@ fun HomeScreen(
             HomeRouteDestination.Journals -> {
                 JournalsOverviewScreen(
                     onOpenJournal = onOpenJournal,
-                    onBrowseJournals = { /* TODO: Handle browse navigation */ },
+                    onBrowseJournals = onBrowseJournals,
                     onCreateJournal = onCreateJournal,
                     modifier = Modifier.applyScreenStyles()
                 )
@@ -175,7 +178,7 @@ internal fun HomeScaffoldWrapper(
 
 
 class HomeViewModel(
-    getTimelineUseCase: GetTimelineUseCase,
+    private val getStreamingTimelineUseCase: GetStreamingTimelineUseCase,
     private val fetchNotesForDayUseCase: app.logdate.client.domain.notes.FetchNotesForDayUseCase,
     private val notesRepository: app.logdate.client.repository.journals.JournalNotesRepository,
 ) : ViewModel() {
@@ -186,7 +189,7 @@ class HomeViewModel(
     private val selectedDayFlow = MutableStateFlow<LocalDate?>(null)
     
     val uiState: StateFlow<HomeTimelineUiState> = combine(
-        getTimelineUseCase(),
+        getStreamingTimelineUseCase(),
         selectedNotes,
         _selectedItemUiState,
         selectedDayFlow
@@ -215,6 +218,7 @@ class HomeViewModel(
                                 noteId = it.uid,
                                 uri = it.mediaRef,
                                 timestamp = it.creationTimestamp,
+                                duration = it.durationMs ?: 0,
                             )
                             is JournalNote.Video -> VideoNoteUiState(
                                 noteId = it.uid,
@@ -241,14 +245,21 @@ class HomeViewModel(
         }
         
         println("Updating HomeViewModel state: selectedDay=$selectedDay, selection=$selection")
-        
+
+        // Detect loading state based on placeholder summaries (e.g., "3 entries")
+        val hasPlaceholderSummaries = items.any { it.summary.contains("entries") }
+
         HomeTimelineUiState(
             items = items,
             selectedItem = selection,
             selectedDay = selectedDay,
             showEmptyState = items.isEmpty(),
-            isLoading = false,
-            loadingState = TimelineLoadingState.Loaded
+            isLoading = items.isEmpty(),
+            loadingState = when {
+                items.isEmpty() -> TimelineLoadingState.InitialLoading
+                hasPlaceholderSummaries -> TimelineLoadingState.LoadingContent
+                else -> TimelineLoadingState.Loaded
+            }
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeTimelineUiState())
         

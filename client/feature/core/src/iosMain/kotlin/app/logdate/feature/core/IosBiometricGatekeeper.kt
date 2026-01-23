@@ -1,20 +1,28 @@
 package app.logdate.feature.core
 
-import app.logdate.feature.core.BiometricGatekeeper.AuthResult
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * iOS implementation of the BiometricGatekeeper.
- * Currently uses a stub implementation, to be replaced with actual
- * iOS biometric authentication in the future.
+ * Currently uses a stub implementation, to be replaced with native biometrics.
  */
 class IosBiometricGatekeeper : BiometricGatekeeper {
-    override suspend fun authenticate(title: String?, subtitle: String?): AuthResult {
-        // Stub implementation always succeeds
-        return AuthResult.Success
+    private val _authState = MutableStateFlow(AppAuthState.NO_PROMPT_NEEDED)
+    override val authState: StateFlow<AppAuthState> = _authState
+
+    override fun authenticate(
+        title: String,
+        subtitle: String,
+        cancelLabel: String,
+        requireConfirmation: Boolean,
+        requestEnrollmentIfNecessary: Boolean,
+        description: String?,
+    ) {
+        // no-op until native biometrics are implemented for iOS
     }
 
-    override suspend fun isAvailable(): Boolean {
-        // For now, just return true to indicate biometrics is available
-        return true
+    override fun requestEnrollment() {
+        // no-op until native biometrics are implemented for iOS
     }
 }

@@ -28,6 +28,7 @@ fun NavGraphBuilder.homeGraph(
     onCreateJournal: () -> Unit,
     onOpenRewind: (uid: Uuid) -> Unit,
     onOpenSettings: () -> Unit,
+    onBrowseJournals: () -> Unit,
 ) {
     composable<HomeRoute> {
         // Removed problematic CompositionLocalProvider that was causing the Compose compiler bug
@@ -35,6 +36,8 @@ fun NavGraphBuilder.homeGraph(
             onNewEntry = onCreateNote,
             onOpenJournal = onOpenJournal,
             onCreateJournal = onCreateJournal,
+            onBrowseJournals = onBrowseJournals,
+            onOpenRewind = onOpenRewind,
             onOpenSettings = onOpenSettings,
         )
     }

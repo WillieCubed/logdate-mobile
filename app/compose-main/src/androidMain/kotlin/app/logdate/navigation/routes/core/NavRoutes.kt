@@ -150,6 +150,12 @@ data object PrivacySettingsRoute : NavKey
 data object DataSettingsRoute : NavKey
 
 /**
+ * Navigation route for connected devices settings.
+ */
+@Serializable
+data object DevicesSettingsRoute : NavKey
+
+/**
  * Navigation route for destructive actions like resetting the app or deleting data.
  */
 @Serializable

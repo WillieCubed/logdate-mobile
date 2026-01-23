@@ -7,6 +7,7 @@ import app.logdate.client.domain.di.domainModule
 import app.logdate.client.domain.di.iosHealthConnectModule
 import app.logdate.client.domain.di.locationDomainModule
 import app.logdate.client.domain.di.quotaDomainModule
+import app.logdate.client.media.di.audioModule
 import app.logdate.client.networking.di.networkingModule
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -31,4 +32,5 @@ actual val appModule: Module = module {
     includes(app.logdate.client.health.di.healthModule) // Common Health Connect implementation
     includes(app.logdate.client.health.di.iosHealthModule) // iOS-specific Health Connect implementation
     includes(domainModule)         // Main domain module with no circular deps
+    includes(audioModule)
 }

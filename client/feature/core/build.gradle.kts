@@ -43,6 +43,7 @@ kotlin {
             implementation(projects.client.repository)
             implementation(projects.client.domain)
             implementation(projects.client.datastore)
+            implementation(projects.client.database)
             implementation(projects.client.networking)
             implementation(projects.client.permissions)
             implementation(projects.client.device)
@@ -67,7 +68,6 @@ kotlin {
             implementation(libs.androidx.navigation.compose)
             implementation(libs.material3.adaptive.layout)
             implementation(libs.material3.adaptive.navigation)
-            implementation(libs.androidx.material3.adaptive.navigation3)
             // External dependencies
             implementation(libs.coil.compose)
             // Koin

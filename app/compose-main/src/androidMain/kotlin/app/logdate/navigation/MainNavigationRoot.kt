@@ -75,6 +75,10 @@ import androidx.navigation3.ui.rememberSceneSetupNavEntryDecorator
 import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.navigation.routes.appSettingsRoutes
 import app.logdate.navigation.routes.cloudAccountSetup
+import app.logdate.navigation.routes.CloudAccountIntroRoute
+import app.logdate.navigation.routes.DisplayNameSelectionRoute
+import app.logdate.navigation.routes.PasskeyCreationRoute
+import app.logdate.navigation.routes.UsernameSelectionRoute
 import app.logdate.navigation.routes.core.JournalList
 import app.logdate.navigation.routes.core.NavigationStart
 import app.logdate.navigation.routes.core.NewJournalRoute
@@ -97,6 +101,7 @@ import app.logdate.navigation.routes.openAccountSettings
 import app.logdate.navigation.routes.openBirthdaySettings
 import app.logdate.navigation.routes.openDangerZoneSettings
 import app.logdate.navigation.routes.openDataSettings
+import app.logdate.navigation.routes.openDevicesSettings
 import app.logdate.navigation.routes.openJournalDetail
 import app.logdate.navigation.routes.openJournalSettings
 import app.logdate.navigation.routes.openLocationSettings
@@ -465,28 +470,27 @@ fun MainNavigationRoot(
                 // Remove all but one to allow app to continue with a main tab
                 val entriesToRemove = (mainAppNavigator.backStack.size - 1).coerceAtLeast(0)
                 Napier.w("Navigation: Requested to remove $keysToRemove entries but only removing $entriesToRemove to prevent empty backstack")
-                repeat(entriesToRemove) { 
+                repeat(entriesToRemove) {
                     val removedEntry = mainAppNavigator.backStack.removeLastOrNull()
                     Napier.d("Navigation: Removed entry: ${removedEntry?.let { it::class.simpleName }}")
-                }
-                
-                // If we only have one entry left and it's not a main tab, navigate to Timeline
-                val remainingEntry = mainAppNavigator.backStack.lastOrNull()
-                val mainTabRoutes = HomeTab.entries.map { it.route }
-                if (remainingEntry != null && remainingEntry !in mainTabRoutes) {
-                    Napier.w("Navigation: Last remaining entry is not a main tab, replacing with Timeline")
-                    mainAppNavigator.backStack.removeLastOrNull()
-                    mainAppNavigator.backStack.add(HomeTab.TIMELINE.route)
                 }
             } else {
                 // Normal case: remove the requested number of entries
                 Napier.d("Navigation: Removing $keysToRemove entries (normal back navigation)")
-                repeat(keysToRemove) { 
+                repeat(keysToRemove) {
                     val removedEntry = mainAppNavigator.backStack.removeLastOrNull()
                     Napier.d("Navigation: Removed entry: ${removedEntry?.let { it::class.simpleName }}")
                 }
             }
-            
+
+            // Safety check: ensure we always have at least one main tab in the backstack
+            val mainTabRoutes = HomeTab.entries.map { it.route }
+            if (mainAppNavigator.backStack.isEmpty() || mainAppNavigator.backStack.none { it in mainTabRoutes }) {
+                Napier.w("Navigation: No main tab in backstack, resetting to Timeline")
+                mainAppNavigator.backStack.clear()
+                mainAppNavigator.backStack.add(HomeTab.TIMELINE.route)
+            }
+
             Napier.d("Navigation: After back navigation, backstack size: ${mainAppNavigator.backStack.size}")
             Napier.d("Navigation: New backstack entries: ${mainAppNavigator.backStack.map { it::class.simpleName }}")
             Napier.d("Navigation: HomeSceneStrategy will recalculate scene based on new backstack state")
@@ -545,12 +549,13 @@ fun MainNavigationRoot(
                 onBack = mainAppNavigator::goBack,
                 onAppReset = mainAppNavigator::resetApp,
                 onNavigateToCloudAccountCreation = {
-                    mainAppNavigator.backStack.add(app.logdate.navigation.routes.CloudAccountIntroRoute())
+                    mainAppNavigator.backStack.add(CloudAccountIntroRoute())
                 },
                 onNavigateToProfile = mainAppNavigator::openProfile,
                 onNavigateToAccount = mainAppNavigator::openAccountSettings,
                 onNavigateToPrivacy = mainAppNavigator::openPrivacySettings,
                 onNavigateToData = mainAppNavigator::openDataSettings,
+                onNavigateToDevices = mainAppNavigator::openDevicesSettings,
                 onNavigateToDangerZone = mainAppNavigator::openDangerZoneSettings,
                 onNavigateToLocation = mainAppNavigator::openLocationSettings,
                 onNavigateToBirthdaySettings = mainAppNavigator::openBirthdaySettings
@@ -558,13 +563,13 @@ fun MainNavigationRoot(
             cloudAccountSetup(
                 onBack = mainAppNavigator::goBack,
                 onUsernameSelected = { 
-                    mainAppNavigator.backStack.add(app.logdate.navigation.routes.UsernameSelectionRoute)
+                    mainAppNavigator.backStack.add(UsernameSelectionRoute)
                 },
                 onDisplayNameSelected = {
-                    mainAppNavigator.backStack.add(app.logdate.navigation.routes.DisplayNameSelectionRoute)
+                    mainAppNavigator.backStack.add(DisplayNameSelectionRoute)
                 },
                 onPasskeyCreated = {
-                    mainAppNavigator.backStack.add(app.logdate.navigation.routes.PasskeyCreationRoute)
+                    mainAppNavigator.backStack.add(PasskeyCreationRoute)
                 },
                 onSetupCompleted = {
                     // After setup is completed, go back to settings
