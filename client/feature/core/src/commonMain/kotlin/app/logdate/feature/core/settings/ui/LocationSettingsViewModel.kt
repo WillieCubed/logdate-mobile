@@ -25,13 +25,11 @@ class LocationSettingsViewModel(
     data class UiState(
         val settings: LocationTrackingSettings = LocationTrackingSettings(),
         val isLoading: Boolean = false,
-        val errorMessage: String? = null,
-        val showLocationTimelineEnabled: Boolean = true
+        val errorMessage: String? = null
     )
     
     private val _isLoading = MutableStateFlow(false)
     private val _errorMessage = MutableStateFlow<String?>(null)
-    private val _showLocationTimelineEnabled = MutableStateFlow(true)
     
     /**
      * Current UI state.
@@ -39,32 +37,18 @@ class LocationSettingsViewModel(
     val uiState: StateFlow<UiState> = combine(
         settingsRepository.observeSettings(),
         _isLoading,
-        _errorMessage,
-        _showLocationTimelineEnabled
-    ) { settings, isLoading, errorMessage, showLocationTimelineEnabled ->
+        _errorMessage
+    ) { settings, isLoading, errorMessage ->
         UiState(
             settings = settings,
             isLoading = isLoading,
-            errorMessage = errorMessage,
-            showLocationTimelineEnabled = showLocationTimelineEnabled
+            errorMessage = errorMessage
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = UiState(isLoading = true)
     )
-    
-    init {
-        // Initialize the showLocationTimelineEnabled value from preferences
-        viewModelScope.launch {
-            try {
-                val currentSettings = settingsRepository.getSettings()
-                _showLocationTimelineEnabled.value = currentSettings.showLocationTimeline ?: true
-            } catch (e: Exception) {
-                Napier.e("Failed to load location timeline setting", e)
-            }
-        }
-    }
     
     /**
      * Toggle background location tracking.
@@ -115,27 +99,6 @@ class LocationSettingsViewModel(
                 Napier.i("Timeline tracking set to: $enabled")
             } catch (e: Exception) {
                 Napier.e("Failed to toggle timeline tracking", e)
-                _errorMessage.value = "Failed to update setting: ${e.message}"
-            }
-        }
-    }
-    
-    /**
-     * Toggle showing the location timeline.
-     */
-    fun toggleShowLocationTimeline(enabled: Boolean) {
-        viewModelScope.launch {
-            try {
-                val currentSettings = settingsRepository.getSettings()
-                // Update local state immediately
-                _showLocationTimelineEnabled.value = enabled
-                // Persist the setting
-                settingsRepository.updateSettings(
-                    currentSettings.copy(showLocationTimeline = enabled)
-                )
-                Napier.i("Show location timeline set to: $enabled")
-            } catch (e: Exception) {
-                Napier.e("Failed to toggle location timeline visibility", e)
                 _errorMessage.value = "Failed to update setting: ${e.message}"
             }
         }

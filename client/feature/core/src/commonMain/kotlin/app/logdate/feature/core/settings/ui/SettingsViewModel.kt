@@ -2,18 +2,24 @@ package app.logdate.feature.core.settings.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.domain.account.CreatePasskeyUseCase
 import app.logdate.client.domain.account.DeletePasskeyUseCase
 import app.logdate.client.domain.account.GetCurrentAccountUseCase
+import app.logdate.client.domain.profile.UpdateProfileUseCase
 import app.logdate.client.domain.quota.ObserveCloudQuotaUseCase
+import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.sync.SyncManager
+import app.logdate.client.database.LogDateDatabase
+import app.logdate.client.database.clearAllLogDateTables
 import app.logdate.shared.model.CloudStorageQuota
 import app.logdate.feature.core.export.ExportLauncher
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.user.UserData
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,6 +30,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.Instant
 
 /**
@@ -36,31 +43,35 @@ class SettingsViewModel(
     private val getCurrentAccountUseCase: GetCurrentAccountUseCase,
     private val deletePasskeyUseCase: DeletePasskeyUseCase,
     private val createPasskeyUseCase: CreatePasskeyUseCase,
+    private val updateProfileUseCase: UpdateProfileUseCase,
+    private val passkeyAccountRepository: PasskeyAccountRepository,
     private val syncManager: SyncManager,
     private val sessionStorage: SessionStorage,
+    private val preferencesDataSource: LogdatePreferencesDataSource,
+    private val database: LogDateDatabase,
 ) : ViewModel() {
     
-    // State for tracking passkey revocation operations
     private val _passkeyRevocationState = MutableStateFlow<PasskeyRevocationState>(PasskeyRevocationState.Idle)
     val passkeyRevocationState: StateFlow<PasskeyRevocationState> = _passkeyRevocationState.asStateFlow()
     
-    // State for tracking passkey creation operations
     private val _passkeyCreationState = MutableStateFlow<PasskeyCreationState>(PasskeyCreationState.Idle)
     val passkeyCreationState: StateFlow<PasskeyCreationState> = _passkeyCreationState.asStateFlow()
     
-    // State for tracking export operations and destination
     private val _exportState = MutableStateFlow<ExportState>(ExportState.Idle)
     val exportState: StateFlow<ExportState> = _exportState.asStateFlow()
     
-    // State for tracking birthday update operations
     private val _birthdayUpdateState = MutableStateFlow<BirthdayUpdateState>(BirthdayUpdateState.Idle)
     val birthdayUpdateState: StateFlow<BirthdayUpdateState> = _birthdayUpdateState.asStateFlow()
 
-    // State for tracking sync operations
+    private val _profileUpdateState = MutableStateFlow<ProfileUpdateState>(ProfileUpdateState.Idle)
+    val profileUpdateState: StateFlow<ProfileUpdateState> = _profileUpdateState.asStateFlow()
+
     private val _syncStatusState = MutableStateFlow<SyncStatusState>(SyncStatusState.Idle)
     val syncStatusState: StateFlow<SyncStatusState> = _syncStatusState.asStateFlow()
 
     private val cloudQuotaFlow = observeCloudQuotaUseCase()
+    private val sessionFlow = sessionStorage.getSessionFlow()
+    private val backgroundSyncEnabledFlow = preferencesDataSource.backgroundSyncEnabled
 
     // Poll sync status periodically
     private val syncStatusFlow = flow {
@@ -82,24 +93,54 @@ class SettingsViewModel(
     }
 
     /**
-     * Consolidated UI state combining all settings-related data.
+     * Consolidated settings state assembled from core data sources.
+     *
+     * @property userData Local user profile and settings data.
+     * @property quotaState Cloud storage usage details.
+     * @property currentAccount Authenticated account metadata.
+     * @property exportState Export workflow state.
+     * @property syncStatus Latest sync status from the sync manager.
      */
-    val uiState: StateFlow<SettingsUiState> = combine(
+    private data class SettingsCoreState(
+        val userData: UserData?,
+        val quotaState: CloudStorageQuota?,
+        val currentAccount: LogDateAccount?,
+        val exportState: ExportState,
+        val syncStatus: app.logdate.client.sync.SyncStatus?
+    )
+
+    private val coreStateFlow = combine(
         userStateRepository.userData,
         cloudQuotaFlow,
         currentAccountFlow,
         _exportState,
         syncStatusFlow
     ) { userData, quotaState, currentAccount, exportState, syncStatus ->
-        val isAuthenticated = sessionStorage.getSession() != null
-        SettingsUiState(
-            userData = userData.orDefault(),
-            quotaState = quotaState.orDefault(),
-            currentAccount = currentAccount.orDefault(),
-            passkeyCreationState = PasskeyCreationState.Idle,
+        SettingsCoreState(
+            userData = userData,
+            quotaState = quotaState,
+            currentAccount = currentAccount,
             exportState = exportState,
-            syncStatus = syncStatus,
-            isAuthenticated = isAuthenticated
+            syncStatus = syncStatus
+        )
+    }
+
+    val uiState: StateFlow<SettingsUiState> = combine(
+        coreStateFlow,
+        sessionFlow,
+        _passkeyCreationState,
+        backgroundSyncEnabledFlow
+    ) { coreState, session, passkeyCreationState, isBackgroundSyncEnabled ->
+        val isAuthenticated = session != null
+        SettingsUiState(
+            userData = coreState.userData.orDefault(),
+            quotaState = coreState.quotaState.orDefault(),
+            currentAccount = coreState.currentAccount.orDefault(),
+            passkeyCreationState = passkeyCreationState,
+            exportState = coreState.exportState,
+            syncStatus = coreState.syncStatus,
+            isAuthenticated = isAuthenticated,
+            isBackgroundSyncEnabled = isBackgroundSyncEnabled
         )
     }.stateIn(
         viewModelScope,
@@ -111,7 +152,8 @@ class SettingsViewModel(
             passkeyCreationState = PasskeyCreationState.Idle,
             exportState = ExportState.Idle,
             syncStatus = null,
-            isAuthenticated = false
+            isAuthenticated = false,
+            isBackgroundSyncEnabled = true
         )
     )
 
@@ -130,6 +172,45 @@ class SettingsViewModel(
     fun setBiometricEnabled(enabled: Boolean) {
         viewModelScope.launch {
             userStateRepository.setBiometricEnabled(enabled)
+        }
+    }
+
+    /**
+     * Updates profile details for the current account.
+     */
+    fun updateProfile(displayName: String, username: String) {
+        val trimmedDisplayName = displayName.trim()
+        val trimmedUsername = username.trim()
+        val displayNameUpdate = trimmedDisplayName.takeIf { it.isNotEmpty() }
+        val usernameUpdate = trimmedUsername.takeIf { it.isNotEmpty() }
+
+        if (displayNameUpdate == null && usernameUpdate == null) {
+            _profileUpdateState.value = ProfileUpdateState.Error("No profile changes to save")
+            return
+        }
+
+        viewModelScope.launch {
+            _profileUpdateState.value = ProfileUpdateState.Updating
+
+            when (val result = updateProfileUseCase(displayName = displayNameUpdate, username = usernameUpdate)) {
+                is UpdateProfileUseCase.Result.Success -> {
+                    if (displayNameUpdate != null) {
+                        preferencesDataSource.updateDisplayName(displayNameUpdate)
+                    }
+                    getCurrentAccountUseCase(GetCurrentAccountUseCase.AccountRequest.RefreshAccountInfo)
+                    _profileUpdateState.value = ProfileUpdateState.Success
+                }
+                is UpdateProfileUseCase.Result.Error -> {
+                    val error = result.error
+                    val message = when (error) {
+                        is UpdateProfileUseCase.ProfileUpdateError.InvalidDisplayName -> "Invalid display name"
+                        is UpdateProfileUseCase.ProfileUpdateError.InvalidUsername -> "Invalid username"
+                        is UpdateProfileUseCase.ProfileUpdateError.NetworkError -> "Network error updating profile"
+                        is UpdateProfileUseCase.ProfileUpdateError.Unknown -> error.message
+                    }
+                    _profileUpdateState.value = ProfileUpdateState.Error(message)
+                }
+            }
         }
     }
     
@@ -203,6 +284,15 @@ class SettingsViewModel(
             } else {
                 it
             }
+        }
+    }
+
+    /**
+     * Enable or disable background sync.
+     */
+    fun setBackgroundSyncEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesDataSource.setBackgroundSyncEnabled(enabled)
         }
     }
     
@@ -287,6 +377,44 @@ class SettingsViewModel(
     }
 
     /**
+     * Clears all local content and metadata stored in the database.
+     */
+    fun clearLocalData(onComplete: (() -> Unit)? = null) {
+        viewModelScope.launch {
+            val result = runCatching {
+                withContext(Dispatchers.Default) {
+                    database.clearAllLogDateTables()
+                }
+            }
+
+            if (result.isFailure) {
+                Napier.e("Failed to clear local data", result.exceptionOrNull())
+            }
+
+            onComplete?.invoke()
+        }
+    }
+
+    /**
+     * Clears local data, preferences, and session state for a full reset.
+     */
+    fun resetApp(onComplete: (() -> Unit)? = null) {
+        viewModelScope.launch {
+            clearLocalData()
+
+            val prefsResult = preferencesDataSource.clearUserData()
+            if (prefsResult.isFailure) {
+                Napier.e("Failed to clear user preferences", prefsResult.exceptionOrNull())
+            }
+
+            passkeyAccountRepository.signOut()
+            userStateRepository.setIsOnboardingComplete(false)
+
+            onComplete?.invoke()
+        }
+    }
+
+    /**
      * Signs out the current user.
      * Clears the session and disables background sync.
      */
@@ -294,7 +422,8 @@ class SettingsViewModel(
         viewModelScope.launch {
             try {
                 Napier.i("Signing out user")
-                sessionStorage.clearSession()
+                passkeyAccountRepository.signOut()
+                preferencesDataSource.setBackgroundSyncEnabled(false)
                 Napier.i("Session cleared successfully")
             } catch (e: Exception) {
                 Napier.e("Failed to sign out", e)
@@ -405,4 +534,29 @@ sealed class SyncStatusState {
      * A sync operation failed.
      */
     data class Error(val message: String) : SyncStatusState()
+}
+
+/**
+ * Represents the state of a profile update operation.
+ */
+sealed class ProfileUpdateState {
+    /**
+     * No profile update is in progress.
+     */
+    data object Idle : ProfileUpdateState()
+
+    /**
+     * A profile update operation is in progress.
+     */
+    data object Updating : ProfileUpdateState()
+
+    /**
+     * A profile update operation completed successfully.
+     */
+    data object Success : ProfileUpdateState()
+
+    /**
+     * A profile update operation failed.
+     */
+    data class Error(val message: String) : ProfileUpdateState()
 }

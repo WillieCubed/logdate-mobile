@@ -35,8 +35,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
-import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
 import app.logdate.shared.model.user.AppSecurityLevel
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
@@ -65,12 +63,12 @@ fun PrivacySettingsScreen(
     onBack: () -> Unit,
     onNavigateToLocationSettings: () -> Unit = {},
     viewModel: SettingsViewModel = koinViewModel(),
+    isPotentialDetailPane: Boolean? = null,
 ) {
-    // Detect if we're in a large screen layout where this might be a detail pane
-    val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
-    val isPotentialDetailPane = windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND)
     val uiState by viewModel.uiState.collectAsState()
     val revocationState by viewModel.passkeyRevocationState.collectAsState()
+    val layoutInfo = LocalSettingsLayoutInfo.current
+    val resolvedIsDetailPane = isPotentialDetailPane ?: layoutInfo.isDetailPane
     
     // Convert passkey credentials to PasskeyInfo objects using extension function
     val passkeyInfoList = uiState.currentAccount.toPasskeyInfoList()
@@ -81,13 +79,14 @@ fun PrivacySettingsScreen(
         onBack = onBack,
         onSetBiometricsEnabled = viewModel::setBiometricEnabled,
         isBiometricsEnabled = uiState.userData.securityLevel == AppSecurityLevel.BIOMETRIC,
+        isAuthenticated = uiState.isAuthenticated,
         passkeys = passkeyInfoList,
         onCreatePasskey = { viewModel.createPasskey() },
         onRevokePasskey = { passkey -> viewModel.revokePasskey(passkey.id) },
         onNavigateToLocationSettings = onNavigateToLocationSettings,
         revocationState = revocationState,
         creationState = creationState,
-        isPotentialDetailPane = isPotentialDetailPane
+        isPotentialDetailPane = resolvedIsDetailPane
     )
 }
 
@@ -164,6 +163,7 @@ private fun PrivacySettingsContent(
     onBack: () -> Unit,
     onSetBiometricsEnabled: (enabled: Boolean) -> Unit,
     isBiometricsEnabled: Boolean,
+    isAuthenticated: Boolean,
     passkeys: List<PasskeyInfo> = emptyList(),
     onCreatePasskey: () -> Unit = {},
     onRevokePasskey: (PasskeyInfo) -> Unit = {},
@@ -285,19 +285,6 @@ private fun PrivacySettingsContent(
                                 }
                             )
                         }
-                        
-                        SurfaceItem {
-                            ListItem(
-                                headlineContent = { Text("App Lock") },
-                                supportingContent = { Text("Lock the app when not in use") },
-                                trailingContent = {
-                                    Switch(
-                                        checked = false,
-                                        onCheckedChange = { /* TODO: Implement */ }
-                                    )
-                                }
-                            )
-                        }
                     }
                 }
             }
@@ -339,13 +326,16 @@ private fun PrivacySettingsContent(
             }
             
             // Passkeys management section
-            item {
-                PasskeysInfoSection(
-                    passkeys = passkeys,
-                    onCreatePasskey = onCreatePasskey,
-                    onRevokePasskey = { passkey -> passkeyToDelete = passkey },
-                    modifier = Modifier.padding(horizontal = Spacing.lg)
-                )
+            if (isAuthenticated) {
+                item {
+                    PasskeysInfoSection(
+                        passkeys = passkeys,
+                        onCreatePasskey = onCreatePasskey,
+                        onRevokePasskey = { passkey -> passkeyToDelete = passkey },
+                        showCreatePasskeyAction = false,
+                        modifier = Modifier.padding(horizontal = Spacing.lg)
+                    )
+                }
             }
             }
         }
@@ -359,6 +349,7 @@ private fun PrivacySettingsScreenPreview() {
         onBack = {},
         onSetBiometricsEnabled = {},
         isBiometricsEnabled = true,
+        isAuthenticated = true,
         passkeys = listOf(
             PasskeyInfo(
                 id = "1",
@@ -379,6 +370,7 @@ private fun PrivacySettingsScreenEmptyPasskeysPreview() {
         onBack = {},
         onSetBiometricsEnabled = {},
         isBiometricsEnabled = false,
+        isAuthenticated = false,
         passkeys = emptyList()
     )
 }
@@ -390,6 +382,7 @@ private fun PrivacySettingsScreenLoadingRevocationPreview() {
         onBack = {},
         onSetBiometricsEnabled = {},
         isBiometricsEnabled = true,
+        isAuthenticated = true,
         passkeys = listOf(
             PasskeyInfo(
                 id = "1",
@@ -409,6 +402,7 @@ private fun PrivacySettingsScreenLoadingCreationPreview() {
         onBack = {},
         onSetBiometricsEnabled = {},
         isBiometricsEnabled = true,
+        isAuthenticated = true,
         passkeys = listOf(
             PasskeyInfo(
                 id = "1",

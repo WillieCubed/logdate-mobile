@@ -34,6 +34,7 @@ import app.logdate.ui.theme.Spacing
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.common.DefaultSettingsContentContainer
+import app.logdate.feature.core.settings.ui.LocalSettingsLayoutInfo
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.screen_title_settings
 import org.jetbrains.compose.resources.stringResource
@@ -81,10 +82,13 @@ fun SettingsOverviewScreen(
     onNavigateToLocation: () -> Unit,
     modifier: Modifier = Modifier,
     selectedDetail: String? = null,
-    isInTwoPaneMode: Boolean = false,
+    isInTwoPaneMode: Boolean? = null,
     viewModel: SettingsViewModel = koinViewModel(),
 ) {
+    val layoutInfo = LocalSettingsLayoutInfo.current
     val uiState by viewModel.uiState.collectAsState()
+    val resolvedSelectedDetail = selectedDetail ?: layoutInfo.selectedDetail
+    val resolvedIsInTwoPaneMode = isInTwoPaneMode ?: layoutInfo.isInTwoPaneMode
     
     SettingsOverviewContent(
         onBack = onBack,
@@ -96,8 +100,8 @@ fun SettingsOverviewScreen(
         onNavigateToDangerZone = onNavigateToDangerZone,
         onNavigateToLocation = onNavigateToLocation,
         userProfile = uiState.currentAccount.toUserProfile(),
-        selectedDetail = selectedDetail,
-        isInTwoPaneMode = isInTwoPaneMode,
+        selectedDetail = resolvedSelectedDetail,
+        isInTwoPaneMode = resolvedIsInTwoPaneMode,
         modifier = modifier
     )
 }

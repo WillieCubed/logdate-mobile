@@ -32,6 +32,15 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
+/**
+ * UI-facing metadata for a passkey credential.
+ *
+ * @property id Credential identifier used for revocation.
+ * @property name Display name shown in the list.
+ * @property device Human-readable device label.
+ * @property createdAt Display string for creation time.
+ * @property lastUsed Timestamp of last usage.
+ */
 data class PasskeyInfo(
     val id: String,
     val name: String = "Passkey",
@@ -40,11 +49,17 @@ data class PasskeyInfo(
     val lastUsed: Instant = Clock.System.now(),
 )
 
+/**
+ * Displays passkey details and an optional create action.
+ *
+ * @param showCreatePasskeyAction Whether to show the create passkey button.
+ */
 @Composable
 fun PasskeysInfoSection(
     passkeys: List<PasskeyInfo>,
     onCreatePasskey: () -> Unit,
     onRevokePasskey: (PasskeyInfo) -> Unit = {},
+    showCreatePasskeyAction: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -114,22 +129,24 @@ fun PasskeysInfoSection(
             }
 
             // Create passkey button (always shown)
-            SurfaceItem(
-                color = MaterialTheme.colorScheme.primaryContainer
-            ) {
-                Button(
-                    onClick = onCreatePasskey,
-                    modifier = Modifier.fillMaxWidth()
+            if (showCreatePasskeyAction) {
+                SurfaceItem(
+                    color = MaterialTheme.colorScheme.primaryContainer
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Key,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        text = "Create Passkey",
-                        modifier = Modifier.padding(start = Spacing.sm)
-                    )
+                    Button(
+                        onClick = onCreatePasskey,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Key,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = "Create Passkey",
+                            modifier = Modifier.padding(start = Spacing.sm)
+                        )
+                    }
                 }
             }
         }
@@ -165,7 +182,7 @@ private fun MaterialContainerScope.PasskeyItem(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Stored on ${passkey.device} • Last used ${formatLastUsed(passkey.lastUsed)}",
+                        text = "Stored on ${passkey.device} • Last used ${formatPasskeyLastUsed(passkey.lastUsed)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -197,7 +214,7 @@ private fun MaterialContainerScope.PasskeyItem(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Last used ${formatLastUsed(passkey.lastUsed)}",
+                        text = "Last used ${formatPasskeyLastUsed(passkey.lastUsed)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -216,22 +233,6 @@ private fun MaterialContainerScope.PasskeyItem(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun formatLastUsed(lastUsed: Instant): String {
-    val now = Clock.System.now()
-    val diffInSeconds = now.epochSeconds - lastUsed.epochSeconds
-
-    return when {
-        diffInSeconds < 60 -> "just now"
-        diffInSeconds < 3600 -> "${diffInSeconds / 60} minutes ago"
-        diffInSeconds < 86400 -> "${diffInSeconds / 3600} hours ago"
-        diffInSeconds < 604800 -> "${diffInSeconds / 86400} days ago"
-        diffInSeconds < 2592000 -> "${diffInSeconds / 604800} weeks ago"
-        diffInSeconds < 31536000 -> "${diffInSeconds / 2592000} months ago"
-        else -> "${diffInSeconds / 31536000} years ago"
     }
 }
 

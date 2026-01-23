@@ -30,9 +30,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
-import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
 // CloudStorageQuota import is not needed, removed
+import app.logdate.feature.core.settings.ui.LocalSettingsLayoutInfo
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.common.DefaultSettingsContentContainer
@@ -60,11 +59,11 @@ import org.koin.compose.viewmodel.koinViewModel
 fun DataSettingsScreen(
     onBack: () -> Unit,
     viewModel: SettingsViewModel = koinViewModel(),
+    isPotentialDetailPane: Boolean? = null,
 ) {
-    // Detect if we're in a large screen layout where this might be a detail pane
-    val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
-    val isPotentialDetailPane = windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND)
     val uiState by viewModel.uiState.collectAsState()
+    val layoutInfo = LocalSettingsLayoutInfo.current
+    val resolvedIsDetailPane = isPotentialDetailPane ?: layoutInfo.isDetailPane
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     
@@ -88,10 +87,12 @@ fun DataSettingsScreen(
         onExportContent = viewModel::exportContent,
         exportState = uiState.exportState,
         snackbarHostState = snackbarHostState,
-        isPotentialDetailPane = isPotentialDetailPane,
+        isPotentialDetailPane = resolvedIsDetailPane,
         syncStatus = uiState.syncStatus,
         isAuthenticated = uiState.isAuthenticated,
-        onSyncNow = viewModel::syncNow
+        onSyncNow = viewModel::syncNow,
+        isBackgroundSyncEnabled = uiState.isBackgroundSyncEnabled,
+        onBackgroundSyncEnabledChange = viewModel::setBackgroundSyncEnabled
     )
 }
 
@@ -106,7 +107,9 @@ private fun DataSettingsContent(
     isPotentialDetailPane: Boolean = false,
     syncStatus: app.logdate.client.sync.SyncStatus? = null,
     isAuthenticated: Boolean = false,
-    onSyncNow: () -> Unit = {}
+    onSyncNow: () -> Unit = {},
+    isBackgroundSyncEnabled: Boolean = true,
+    onBackgroundSyncEnabledChange: (Boolean) -> Unit = {}
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     
@@ -193,15 +196,6 @@ private fun DataSettingsContent(
                             }
                         )
 
-                        ListItem(
-                            headlineContent = { Text("Import Data") },
-                            supportingContent = { Text("Import data from a backup file") },
-                            trailingContent = {
-                                Button(onClick = { /* TODO: Implement */ }) {
-                                    Text("Import")
-                                }
-                            }
-                        )
                     }
                 }
             }
@@ -212,6 +206,8 @@ private fun DataSettingsContent(
                     syncStatus = syncStatus,
                     isAuthenticated = isAuthenticated,
                     onSyncNow = onSyncNow,
+                    isBackgroundSyncEnabled = isBackgroundSyncEnabled,
+                    onBackgroundSyncEnabledChange = onBackgroundSyncEnabledChange,
                     modifier = Modifier.padding(horizontal = Spacing.lg)
                 )
             }
@@ -225,6 +221,8 @@ private fun SyncSettingsSection(
     syncStatus: app.logdate.client.sync.SyncStatus?,
     isAuthenticated: Boolean,
     onSyncNow: () -> Unit,
+    isBackgroundSyncEnabled: Boolean,
+    onBackgroundSyncEnabledChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -292,8 +290,8 @@ private fun SyncSettingsSection(
                     supportingContent = { Text("Automatically sync your data in the background") },
                     trailingContent = {
                         Switch(
-                            checked = true,
-                            onCheckedChange = { /* TODO: Implement */ }
+                            checked = isBackgroundSyncEnabled,
+                            onCheckedChange = onBackgroundSyncEnabledChange
                         )
                     }
                 )
@@ -317,6 +315,7 @@ private fun DataSettingsScreenPreview() {
         ),
         onExportContent = {},
         exportState = ExportState.Idle,
-        snackbarHostState = remember { SnackbarHostState() }
+        snackbarHostState = remember { SnackbarHostState() },
+        isBackgroundSyncEnabled = true
     )
 }

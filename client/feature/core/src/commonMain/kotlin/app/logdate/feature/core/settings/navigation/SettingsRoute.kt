@@ -3,6 +3,12 @@ package app.logdate.feature.core.settings.navigation
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
+import app.logdate.feature.core.settings.ui.AccountSettingsScreen
+import app.logdate.feature.core.settings.ui.BirthdaySettingsScreen
+import app.logdate.feature.core.settings.ui.DangerZoneSettingsScreen
+import app.logdate.feature.core.settings.ui.DataSettingsScreen
+import app.logdate.feature.core.settings.ui.LocationSettingsScreen
+import app.logdate.feature.core.settings.ui.PrivacySettingsScreen
 import app.logdate.feature.core.settings.ui.SettingsOverviewScreen
 import app.logdate.feature.core.settings.ui.devices.DevicesScreen
 import kotlinx.serialization.Serializable
@@ -15,6 +21,24 @@ data class SettingsRoute(
 
 @Serializable
 data class DevicesRoute(val id: String = "devices")
+
+@Serializable
+data object AccountSettingsRoute
+
+@Serializable
+data object PrivacySettingsRoute
+
+@Serializable
+data object DataSettingsRoute
+
+@Serializable
+data object LocationSettingsRoute
+
+@Serializable
+data object DangerZoneSettingsRoute
+
+@Serializable
+data object BirthdaySettingsRoute
 
 /**
  * Navigates to the settings screen.
@@ -33,6 +57,30 @@ fun NavController.navigateToSettings(settingId: String? = null, selectedDetail: 
  */
 fun NavController.navigateToSettingsDetail(detailType: String) {
     navigate(SettingsRoute(selectedDetail = detailType))
+}
+
+fun NavController.navigateToAccountSettings() {
+    navigate(AccountSettingsRoute)
+}
+
+fun NavController.navigateToPrivacySettings() {
+    navigate(PrivacySettingsRoute)
+}
+
+fun NavController.navigateToDataSettings() {
+    navigate(DataSettingsRoute)
+}
+
+fun NavController.navigateToLocationSettings() {
+    navigate(LocationSettingsRoute)
+}
+
+fun NavController.navigateToDangerZoneSettings() {
+    navigate(DangerZoneSettingsRoute)
+}
+
+fun NavController.navigateToBirthdaySettings() {
+    navigate(BirthdaySettingsRoute)
 }
 
 /**
@@ -55,30 +103,29 @@ fun NavGraphBuilder.settingsDestination(
     onNavigateToCloudAccountCreation: () -> Unit,
     onNavigateToProfile: () -> Unit,
     navController: NavController,
-    onNavigateToLocation: () -> Unit = {}
 ) {
     composable<SettingsRoute> {
         SettingsOverviewScreen(
             onBack = onGoBack,
             onNavigateToProfile = onNavigateToProfile,
             onNavigateToAccount = {
-                // TODO: Navigate to account settings
-                // This will use onNavigateToCloudAccountCreation when needed
+                navController.navigateToAccountSettings()
             },
             onNavigateToData = {
-                // TODO: Implement navigation to data settings
+                navController.navigateToDataSettings()
             },
             onNavigateToPrivacy = {
-                // TODO: Implement navigation to privacy settings
+                navController.navigateToPrivacySettings()
             },
             onNavigateToDevices = {
                 navController.navigateToDevices()
             },
             onNavigateToDangerZone = {
-                // This includes app reset functionality
-                onAppReset()
+                navController.navigateToDangerZoneSettings()
             },
-            onNavigateToLocation = onNavigateToLocation
+            onNavigateToLocation = {
+                navController.navigateToLocationSettings()
+            }
         )
     }
     
@@ -87,6 +134,46 @@ fun NavGraphBuilder.settingsDestination(
             onBackClick = {
                 navController.popBackStack()
             }
+        )
+    }
+
+    composable<AccountSettingsRoute> {
+        AccountSettingsScreen(
+            onBack = { navController.popBackStack() },
+            onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
+            onNavigateToBirthdaySettings = { navController.navigateToBirthdaySettings() },
+        )
+    }
+
+    composable<PrivacySettingsRoute> {
+        PrivacySettingsScreen(
+            onBack = { navController.popBackStack() },
+            onNavigateToLocationSettings = { navController.navigateToLocationSettings() },
+        )
+    }
+
+    composable<DataSettingsRoute> {
+        DataSettingsScreen(
+            onBack = { navController.popBackStack() },
+        )
+    }
+
+    composable<LocationSettingsRoute> {
+        LocationSettingsScreen(
+            onBack = { navController.popBackStack() },
+        )
+    }
+
+    composable<DangerZoneSettingsRoute> {
+        DangerZoneSettingsScreen(
+            onBack = { navController.popBackStack() },
+            onAppReset = onAppReset,
+        )
+    }
+
+    composable<BirthdaySettingsRoute> {
+        BirthdaySettingsScreen(
+            onBack = { navController.popBackStack() },
         )
     }
 }

@@ -3,8 +3,7 @@ package app.logdate.feature.core.settings.ui.components
 import kotlinx.datetime.LocalDate
 import platform.Foundation.NSDateFormatter
 import platform.Foundation.NSDateFormatterLongStyle
-import platform.Foundation.NSDateFormatterMediumStyle
-import platform.Foundation.NSDateFormatterStyle
+import platform.Foundation.NSDateFormatterNoStyle
 import platform.Foundation.NSLocale
 import platform.Foundation.NSTimeZone
 import platform.Foundation.currentLocale
@@ -18,7 +17,7 @@ import platform.Foundation.localTimeZone
 actual fun formatDateLocalized(date: LocalDate): String {
     val formatter = NSDateFormatter().apply {
         dateStyle = NSDateFormatterLongStyle
-        timeStyle = NSDateFormatterStyle.NSDateFormatterNoStyle
+        timeStyle = NSDateFormatterNoStyle
         locale = NSLocale.currentLocale
         timeZone = NSTimeZone.localTimeZone
     }

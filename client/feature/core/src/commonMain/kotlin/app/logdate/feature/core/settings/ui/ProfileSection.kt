@@ -77,8 +77,9 @@ fun ProfileSection(
         }
 
         // Profile Info Display
-        val itemModifier = if (isPreview && onNavigateToAccount != null) {
-            Modifier.clickable { onNavigateToAccount() }
+        val navigateAction = onNavigateToProfile ?: onNavigateToAccount
+        val itemModifier = if (isPreview && navigateAction != null) {
+            Modifier.clickable { navigateAction() }
         } else {
             Modifier
         }
@@ -127,7 +128,7 @@ fun ProfileSection(
                     }
                 }
                 
-                if (isPreview && onNavigateToAccount != null) {
+                if (isPreview && navigateAction != null) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                         contentDescription = "Go to account settings",

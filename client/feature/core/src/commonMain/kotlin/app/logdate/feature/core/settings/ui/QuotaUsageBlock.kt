@@ -72,7 +72,7 @@ fun QuotaUsageBlock(
                 )
                 
                 Text(
-                    text = "${quotaUsage.usedGB}/${quotaUsage.totalGB} GB",
+                    text = "${quotaUsage.formattedUsed} / ${quotaUsage.formattedTotal}",
                     style = MaterialTheme.typography.headlineLarge,
                     color = MaterialTheme.colorScheme.onTertiaryContainer,
                     fontWeight = FontWeight.Bold
@@ -140,7 +140,7 @@ fun QuotaUsageBlock(
                             }
                             
                             Text(
-                                text = "${quotaUsage.usedGB}/${quotaUsage.totalGB} GB",
+                                text = "${quotaUsage.formattedUsed} / ${quotaUsage.formattedTotal}",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Medium
@@ -177,11 +177,7 @@ fun QuotaUsageBlock(
                                     )
                                 }
                                 Text(
-                                    text = if (category.sizeInMB >= 1000) {
-                                        "${String.format("%.1f", category.sizeInMB / 1000f)} GB"
-                                    } else {
-                                        "${category.sizeInMB} MB"
-                                    },
+                                    text = category.formattedUsed,
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onTertiaryContainer,
                                     fontWeight = FontWeight.Medium

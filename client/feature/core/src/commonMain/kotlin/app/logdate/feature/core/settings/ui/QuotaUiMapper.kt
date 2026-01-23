@@ -2,7 +2,6 @@ package app.logdate.feature.core.settings.ui
 
 import androidx.compose.ui.graphics.Color
 import app.logdate.shared.model.CloudStorageQuota
-import app.logdate.shared.model.CloudStorageCategoryUsage
 
 /**
  * UI state representation of quota usage for display in settings.
@@ -92,19 +91,3 @@ fun CloudStorageQuota.toQuotaUsageUi(): StorageQuotaUi {
 /**
  * Formats byte size to human-readable string (e.g., "1.5 GB").
  */
-fun formatByteSize(bytes: Long): String {
-    val units = arrayOf("B", "KB", "MB", "GB", "TB")
-    var size = bytes.toDouble()
-    var unitIndex = 0
-    
-    while (size >= 1024 && unitIndex < units.size - 1) {
-        size /= 1024
-        unitIndex++
-    }
-    
-    return when {
-        unitIndex == 0 -> "$bytes ${units[unitIndex]}"
-        size < 10 -> "%.1f ${units[unitIndex]}".format(size)
-        else -> "%.0f ${units[unitIndex]}".format(size)
-    }
-}

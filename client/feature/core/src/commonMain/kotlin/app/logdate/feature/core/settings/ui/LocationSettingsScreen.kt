@@ -34,8 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
-import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.feature.location.timeline.ui.LocationTimelineBottomSheet
 import app.logdate.ui.common.MaterialContainer
@@ -59,12 +57,12 @@ fun LocationSettingsScreen(
     onBack: () -> Unit,
     viewModel: LocationSettingsViewModel = koinViewModel(),
     modifier: Modifier = Modifier,
+    isPotentialDetailPane: Boolean? = null,
 ) {
-    // Detect if we're in a large screen layout where this might be a detail pane
-    val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
-    val isPotentialDetailPane = windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND)
     val uiState by viewModel.uiState.collectAsState()
     var showLocationTimeline by remember { mutableStateOf(false) }
+    val layoutInfo = LocalSettingsLayoutInfo.current
+    val resolvedIsDetailPane = isPotentialDetailPane ?: layoutInfo.isDetailPane
 
     LocationSettingsContent(
         settings = uiState.settings,
@@ -74,7 +72,7 @@ fun LocationSettingsScreen(
         onToggleTimelineTracking = viewModel::toggleTimelineTracking,
         onUpdateTrackingInterval = viewModel::updateTrackingInterval,
         onShowLocationTimeline = { showLocationTimeline = true },
-        isPotentialDetailPane = isPotentialDetailPane,
+        isPotentialDetailPane = resolvedIsDetailPane,
         modifier = modifier.applyScreenStyles()
     )
 
@@ -259,7 +257,6 @@ private fun LocationSettingsContent(
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(vertical = Spacing.sm)
                     )
-
                     OutlinedCard(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = onShowLocationTimeline

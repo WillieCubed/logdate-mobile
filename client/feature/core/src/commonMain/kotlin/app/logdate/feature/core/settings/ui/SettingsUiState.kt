@@ -5,11 +5,22 @@ import app.logdate.shared.model.CloudStorageQuota
 import app.logdate.shared.model.CloudStorageCategoryUsage
 import app.logdate.shared.model.CloudObjectType
 import app.logdate.shared.model.LogDateAccount
-import app.logdate.shared.model.user.AppSecurityLevel
 import app.logdate.shared.model.user.UserData
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 
+/**
+ * Aggregated state for the settings UI.
+ *
+ * @property userData Local user profile and preferences.
+ * @property quotaState Cloud storage usage details for the account.
+ * @property currentAccount Current authenticated account details.
+ * @property passkeyCreationState State for passkey creation workflow.
+ * @property exportState State for export workflow and destination.
+ * @property syncStatus Latest sync status from the sync manager.
+ * @property isAuthenticated Whether the user is authenticated.
+ * @property isBackgroundSyncEnabled Whether background sync is enabled.
+ */
 data class SettingsUiState(
     val userData: UserData,
     val quotaState: CloudStorageQuota,
@@ -17,17 +28,12 @@ data class SettingsUiState(
     val passkeyCreationState: PasskeyCreationState,
     val exportState: ExportState = ExportState.Idle,
     val syncStatus: SyncStatus? = null,
-    val isAuthenticated: Boolean = false
+    val isAuthenticated: Boolean = false,
+    val isBackgroundSyncEnabled: Boolean = true
 )
 
 // Extension functions to provide defaults when data is not available
-fun UserData?.orDefault(): UserData = this ?: UserData(
-    birthday = Clock.System.now(),
-    isOnboarded = true,
-    onboardedDate = Clock.System.now(),
-    securityLevel = AppSecurityLevel.NONE,
-    favoriteNotes = emptyList()
-)
+fun UserData?.orDefault(): UserData = this ?: UserData()
 
 fun LogDateAccount?.orDefault(): LogDateAccount = this ?: LogDateAccount(
     id = kotlin.uuid.Uuid.random(),
@@ -81,5 +87,3 @@ fun LogDateAccount.toPasskeyInfoList(): List<PasskeyInfo> {
 }
 
 // PasskeyCreationState moved to its own file
-
-

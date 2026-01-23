@@ -34,8 +34,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
-import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
 import app.logdate.feature.core.settings.ui.dialogs.ResetAppConfirmationDialog
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
@@ -47,6 +45,7 @@ import logdate.client.feature.core.generated.resources.settings_reset_app_descri
 import logdate.client.feature.core.generated.resources.settings_reset_app_title
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * Danger zone settings screen with destructive actions.
@@ -62,15 +61,17 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 fun DangerZoneSettingsScreen(
     onBack: () -> Unit,
     onAppReset: () -> Unit,
+    viewModel: SettingsViewModel = koinViewModel(),
+    isPotentialDetailPane: Boolean? = null,
 ) {
-    // Detect if we're in a large screen layout where this might be a detail pane
-    val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
-    val isPotentialDetailPane = windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND)
-    
+    val layoutInfo = LocalSettingsLayoutInfo.current
+    val resolvedIsDetailPane = isPotentialDetailPane ?: layoutInfo.isDetailPane
+
     DangerZoneSettingsContent(
         onBack = onBack,
-        onAppReset = onAppReset,
-        isPotentialDetailPane = isPotentialDetailPane
+        onAppReset = { viewModel.resetApp { onAppReset() } },
+        onClearData = { viewModel.clearLocalData() },
+        isPotentialDetailPane = resolvedIsDetailPane
     )
 }
 
@@ -79,11 +80,11 @@ fun DangerZoneSettingsScreen(
 private fun DangerZoneSettingsContent(
     onBack: () -> Unit,
     onAppReset: () -> Unit,
+    onClearData: () -> Unit,
     isPotentialDetailPane: Boolean = false
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     var showResetDialog by remember { mutableStateOf(false) }
-    var showDeleteAccountDialog by remember { mutableStateOf(false) }
     var showClearDataDialog by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -220,57 +221,6 @@ private fun DangerZoneSettingsContent(
                 }
             }
 
-            // Account Actions
-            item {
-                Column(
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm)
-                ) {
-                    Text(
-                        text = "Account Actions",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    MaterialContainer {
-                        // Delete Account
-                        SurfaceItem {
-                            ListItem(
-                                headlineContent = {
-                                    Text(
-                                        text = "Delete Account",
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                },
-                                supportingContent = {
-                                    Text(
-                                        text = "Permanently delete your account and all associated data",
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                    )
-                                },
-                                leadingContent = {
-                                    Icon(
-                                        Icons.Default.DeleteForever,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
-                                },
-                                trailingContent = {
-                                    Button(
-                                        onClick = { showDeleteAccountDialog = true },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.error
-                                        )
-                                    ) {
-                                        Text("Delete")
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-
             }
         }
 
@@ -281,52 +231,6 @@ private fun DangerZoneSettingsContent(
                 onConfirmation = {
                     onAppReset()
                     showResetDialog = false
-                }
-            )
-        }
-
-        // Delete Account Dialog
-        if (showDeleteAccountDialog) {
-            AlertDialog(
-                onDismissRequest = { showDeleteAccountDialog = false },
-                icon = {
-                    Icon(
-                        Icons.Default.WarningAmber,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                },
-                title = {
-                    Text(
-                        text = "Delete Account?",
-                        color = MaterialTheme.colorScheme.error
-                    )
-                },
-                text = {
-                    Text(
-                        text = "⚠️ This action cannot be undone.\n\n" +
-                                "This will permanently delete your account and all your data " +
-                                "from our servers.\n\n" +
-                                "Are you absolutely sure you want to continue?"
-                    )
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            // TODO: Implement account deletion
-                            showDeleteAccountDialog = false
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text("Yes, Delete My Account")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showDeleteAccountDialog = false }) {
-                        Text("Cancel")
-                    }
                 }
             )
         }
@@ -360,7 +264,7 @@ private fun DangerZoneSettingsContent(
                 confirmButton = {
                     Button(
                         onClick = {
-                            // TODO: Implement data clearing
+                            onClearData()
                             showClearDataDialog = false
                         },
                         colors = ButtonDefaults.buttonColors(
@@ -385,6 +289,7 @@ private fun DangerZoneSettingsContent(
 private fun DangerZoneSettingsScreenPreview() {
     DangerZoneSettingsContent(
         onBack = {},
-        onAppReset = {}
+        onAppReset = {},
+        onClearData = {}
     )
 }
