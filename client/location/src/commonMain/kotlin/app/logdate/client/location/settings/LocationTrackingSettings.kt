@@ -26,10 +26,5 @@ data class LocationTrackingSettings(
     /**
      * Whether to automatically track location when reviewing the timeline.
      */
-    val autoTrackForTimelineReview: Boolean = true,
-
-    /**
-     * Whether to show the location timeline in the UI.
-     */
-    val showLocationTimeline: Boolean? = true
+    val autoTrackForTimelineReview: Boolean = true
 )

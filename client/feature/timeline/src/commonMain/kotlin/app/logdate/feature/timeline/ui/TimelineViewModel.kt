@@ -6,6 +6,7 @@ import app.logdate.client.domain.notes.RemoveNoteUseCase
 import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
 import app.logdate.client.domain.timeline.GetTimelineBannerUseCase
 import app.logdate.client.domain.timeline.GetTimelineUseCase
+import app.logdate.client.domain.timeline.StreamingTimelineRequest
 import app.logdate.client.domain.timeline.TimelineBannerResult
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -274,7 +275,7 @@ class TimelineViewModel(
 
     // Use streaming timeline for incremental loading with immediate first paint
     val uiState: StateFlow<HomeTimelineUiState> = getStreamingTimeline(
-        GetStreamingTimelineUseCase.TimelineRequest.RecentTimeline()
+        StreamingTimelineRequest.RecentTimeline()
     )
         .combine(notesRepository.allNotesObserved) { timeline, allNotes ->
             val loadingState = when {
@@ -319,7 +320,8 @@ class TimelineViewModel(
                         is JournalNote.Audio -> AudioNoteUiState(
                             noteId = it.uid,
                             uri = it.mediaRef,
-                            timestamp = it.creationTimestamp
+                            timestamp = it.creationTimestamp,
+                            duration = it.durationMs ?: 0
                         )
                         is JournalNote.Video -> TextNoteUiState(
                             noteId = it.uid,
