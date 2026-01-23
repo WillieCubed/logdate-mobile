@@ -30,7 +30,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.uuid.Uuid
-import java.io.File
 
 /**
  * A repository for journal notes that stores data locally.
@@ -45,7 +44,7 @@ class OfflineFirstJournalNotesRepository(
     private val journalRepository: JournalRepository,
     private val syncManagerProvider: () -> SyncManager = { NoOpSyncManager },
     private val syncMetadataService: SyncMetadataService,
-    private val syncScope: CoroutineScope = CoroutineScope(Dispatchers.IO),
+    private val syncScope: CoroutineScope = CoroutineScope(Dispatchers.Default),
 ) : JournalNotesRepository, ExportableJournalContentRepository, SyncableJournalNotesRepository {
 
     override val allNotesObserved: Flow<List<JournalNote>> =
@@ -305,6 +304,12 @@ class OfflineFirstJournalNotesRepository(
         }
     }
 
+    override suspend fun updateMediaRef(noteId: Uuid, mediaRef: String) {
+        imageNoteDao.updateContentUri(noteId, mediaRef)
+        audioNoteDao.updateContentUri(noteId, mediaRef)
+        videoNoteDao.updateContentUri(noteId, mediaRef)
+    }
+
     private fun triggerContentSync() {
         syncScope.launch {
             try {
@@ -389,13 +394,7 @@ class OfflineFirstJournalNotesRepository(
         }
         val jsonContent = json.encodeToString(backup)
         
-        // Write to file
-        val file = File(destination)
-        if (file.exists() && !overwrite) {
-            throw IllegalStateException("File already exists and overwrite is set to false.")
-        }
-        
-        file.writeText(jsonContent)
+        writeExportFile(destination, jsonContent, overwrite)
     }
 }
 

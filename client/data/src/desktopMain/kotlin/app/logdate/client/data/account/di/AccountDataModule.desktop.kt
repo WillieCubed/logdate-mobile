@@ -1,7 +1,7 @@
 package app.logdate.client.data.account.di
 
-import app.logdate.client.data.account.DesktopPlatformInfoProvider
-import app.logdate.client.data.account.PlatformInfoProvider
+import app.logdate.client.sync.cloud.account.DesktopPlatformInfoProvider
+import app.logdate.client.sync.cloud.account.PlatformInfoProvider
 import app.logdate.client.data.account.passkey.DesktopPasskeyManager
 import app.logdate.client.domain.account.passkey.PasskeyManager
 import org.koin.dsl.module

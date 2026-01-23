@@ -36,7 +36,8 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
         val id: String,
         val type: String,
         val content: String,
-        val createdAt: Long
+        val createdAt: Long,
+        val durationMs: Long? = null
     )
     
     private fun EntryDraft.toSerializable(): SerializableEntryDraft {
@@ -61,7 +62,8 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
             id = this.uid.toString(),
             type = this.type.toString(),
             content = noteContent,
-            createdAt = this.creationTimestamp.toEpochMilliseconds()
+            createdAt = this.creationTimestamp.toEpochMilliseconds(),
+            durationMs = (this as? JournalNote.Audio)?.durationMs
         )
     }
     
@@ -101,7 +103,8 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
                 uid = noteId,
                 creationTimestamp = timestamp,
                 lastUpdated = timestamp,
-                mediaRef = content
+                mediaRef = content,
+                durationMs = durationMs
             )
             NoteType.IMAGE -> JournalNote.Image(
                 uid = noteId,
