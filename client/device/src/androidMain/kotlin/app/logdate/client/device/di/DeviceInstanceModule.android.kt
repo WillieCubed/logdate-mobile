@@ -1,6 +1,7 @@
 package app.logdate.client.device.di
 
 import app.logdate.client.datastore.KeyValueStorage
+import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.AndroidAccountManager
 import app.logdate.client.device.AndroidAppInfoProvider
 import app.logdate.client.device.AppInfoProvider
@@ -9,10 +10,14 @@ import app.logdate.client.device.PlatformAccountManager
 import app.logdate.client.device.identity.DefaultDeviceIdProvider
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.device.identity.di.deviceIdentityModule
+import app.logdate.client.device.storage.AndroidSecureStorage
+import app.logdate.client.device.storage.SecureSessionStorage
+import app.logdate.client.device.storage.SecureStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
@@ -30,6 +35,15 @@ actual val deviceInstanceModule: Module = module {
     // Create a CoroutineScope that uses the application dispatcher and supervisor job
     single {
         CoroutineScope(get<Job>() + Dispatchers.Default)
+    }
+
+    single<SecureStorage> { AndroidSecureStorage(androidContext()) }
+
+    single<SessionStorage> {
+        SecureSessionStorage(
+            secureStorage = get(),
+            scope = get()
+        )
     }
     
     // New device ID provider using KeyValueStorage

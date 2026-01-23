@@ -1,6 +1,7 @@
 package app.logdate.client.device.di
 
 import app.logdate.client.datastore.KeyValueStorage
+import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.AppInfoProvider
 import app.logdate.client.device.BuildConfigAppInfoProvider
 import app.logdate.client.device.IosAccountManager
@@ -9,6 +10,9 @@ import app.logdate.client.device.PlatformAccountManager
 import app.logdate.client.device.identity.DefaultDeviceIdProvider
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.device.identity.di.deviceIdentityModule
+import app.logdate.client.device.storage.IosSecureStorage
+import app.logdate.client.device.storage.SecureSessionStorage
+import app.logdate.client.device.storage.SecureStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -30,6 +34,15 @@ actual val deviceInstanceModule: Module = module {
     // Create a CoroutineScope that uses the application dispatcher and supervisor job
     single {
         CoroutineScope(get<Job>() + Dispatchers.Default)
+    }
+
+    single<SecureStorage> { IosSecureStorage() }
+
+    single<SessionStorage> {
+        SecureSessionStorage(
+            secureStorage = get(),
+            scope = get()
+        )
     }
     
     // New device ID provider using KeyValueStorage

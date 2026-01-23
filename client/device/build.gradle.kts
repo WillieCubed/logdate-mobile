@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.dokka)
     alias(libs.plugins.buildConfig)
+    alias(libs.plugins.kotlinx.serialization)
 }
 
 kotlin {
@@ -23,6 +24,7 @@ kotlin {
 
     sourceSets {
         val desktopMain by getting
+        val desktopTest by getting
 
         all {
             languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
@@ -45,6 +47,8 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.kotlinx.coroutines.android)
+            implementation(libs.androidx.datastore.preferences)
+            implementation(libs.androidx.security.crypto)
             implementation(project.dependencies.platform(libs.firebase.bom))
             implementation(libs.firebase.firestore)
             implementation(libs.firebase.installations)
@@ -53,6 +57,9 @@ kotlin {
         desktopMain.dependencies {
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.napier)
+        }
+        desktopTest.dependencies {
+            implementation(libs.mockk)
         }
     }
 }
