@@ -299,5 +299,5 @@ private fun EmptyLocationTimeline(
  * Formats coordinates to display with 6 decimal places
  */
 private fun formatCoordinates(latitude: Double, longitude: Double): String {
-    return "${String.format("%.6f", latitude)}, ${String.format("%.6f", longitude)}"
+    return "${formatCoordinateValue(latitude)}, ${formatCoordinateValue(longitude)}"
 }
