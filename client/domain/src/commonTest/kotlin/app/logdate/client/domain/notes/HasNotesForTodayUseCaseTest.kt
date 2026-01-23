@@ -121,5 +121,6 @@ class HasNotesForTodayUseCaseTest {
         override suspend fun removeById(noteId: Uuid) = Unit
         override suspend fun create(note: JournalNote, journalId: Uuid) = Unit
         override suspend fun removeFromJournal(noteId: Uuid, journalId: Uuid) = Unit
+        override suspend fun getNoteById(noteId: Uuid): JournalNote? = null
     }
 }

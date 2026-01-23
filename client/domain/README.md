@@ -35,6 +35,7 @@ Domain Module
 
 - `AddNoteUseCase`: Creates and stores journal notes
 - `GetTimelineUseCase`: Retrieves timeline data with proper formatting
+- `GetStreamingTimelineUseCase`: Streaming timeline with fast first paint (used by HomeViewModel)
 - `SummarizeJournalEntriesUseCase`: Generates summaries of journal content
 - `GetRewindUseCase`: Creates retrospective content from past entries
 - `ObserveLocationUseCase`: Monitors device location changes

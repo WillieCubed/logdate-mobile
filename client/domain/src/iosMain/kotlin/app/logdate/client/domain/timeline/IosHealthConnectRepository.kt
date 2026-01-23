@@ -1,5 +1,6 @@
 package app.logdate.client.domain.timeline
 
+import app.logdate.client.health.model.DayBounds
 import io.github.aakira.napier.Napier
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone

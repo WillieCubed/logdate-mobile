@@ -61,7 +61,11 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.koin.test)
             implementation(libs.ktor.client.mock)
-            implementation(libs.mockk)
+        }
+        val androidUnitTest by getting {
+            dependencies {
+                implementation(libs.mockk)
+            }
         }
     }
 }

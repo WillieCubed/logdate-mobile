@@ -43,28 +43,9 @@ class CreatePasskeyUseCase(
      * @return Result indicating success or failure
      */
     suspend operator fun invoke(request: CreatePasskeyRequest): CreatePasskeyResult {
-        // TODO: Implement actual passkey creation
-        Napier.d("Stub implementation of CreatePasskeyUseCase")
-        
-        return try {
-            // Fetch updated account info after creating passkey
-            val result = passkeyAccountRepository.getAccountInfo()
-            
-            if (result.isSuccess) {
-                CreatePasskeyResult.Success(result.getOrThrow())
-            } else {
-                val exception = result.exceptionOrNull()
-                CreatePasskeyResult.Error(
-                    message = exception?.message ?: "Failed to create passkey",
-                    cause = exception
-                )
-            }
-        } catch (e: Exception) {
-            Napier.e("Failed to create passkey", e)
-            CreatePasskeyResult.Error(
-                message = "Failed to create passkey: ${e.message}",
-                cause = e
-            )
-        }
+        Napier.w("Passkey creation for existing accounts is not available yet (name=${request.name}).")
+        return CreatePasskeyResult.Error(
+            message = "Adding passkeys from settings isn't supported yet."
+        )
     }
 }

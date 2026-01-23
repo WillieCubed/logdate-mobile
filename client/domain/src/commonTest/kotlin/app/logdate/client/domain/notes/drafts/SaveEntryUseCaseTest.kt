@@ -6,6 +6,7 @@ import app.logdate.client.domain.location.LogCurrentLocationUseCase
 import app.logdate.client.domain.world.LogLocationUseCase
 import app.logdate.client.location.ClientLocationProvider
 import app.logdate.client.media.MediaManager
+import app.logdate.client.media.MediaPayload
 import app.logdate.client.media.MediaObject
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
@@ -194,6 +195,7 @@ class SaveEntryUseCaseTest {
         override suspend fun removeById(noteId: Uuid) {}
         override suspend fun create(note: JournalNote, journalId: Uuid) {}
         override suspend fun removeFromJournal(noteId: Uuid, journalId: Uuid) {}
+        override suspend fun getNoteById(noteId: Uuid): JournalNote? = null
     }
 
     private class FakeJournalContentRepository : JournalContentRepository {
@@ -216,6 +218,13 @@ class SaveEntryUseCaseTest {
         override suspend fun getRecentMedia(): Flow<List<MediaObject>> = flowOf(emptyList())
         override suspend fun queryMediaByDate(start: Instant, end: Instant): Flow<List<MediaObject>> = flowOf(emptyList())
         override suspend fun addToDefaultCollection(uri: String) {}
+        override suspend fun readMedia(uri: String): MediaPayload = MediaPayload(
+            fileName = uri.substringAfterLast('/'),
+            mimeType = "application/octet-stream",
+            sizeBytes = 0,
+            data = ByteArray(0)
+        )
+        override suspend fun saveMedia(payload: MediaPayload): String = "file://stub/${payload.fileName}"
     }
 
     private class FakeLocationProvider : ClientLocationProvider {

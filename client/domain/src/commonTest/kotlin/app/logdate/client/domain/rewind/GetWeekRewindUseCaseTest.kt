@@ -16,6 +16,7 @@ import app.logdate.client.intelligence.generativeai.GenerativeAIResponse
 import app.logdate.client.intelligence.narrative.RewindSequencer
 import app.logdate.client.intelligence.narrative.WeekNarrativeSynthesizer
 import app.logdate.client.media.MediaManager
+import app.logdate.client.media.MediaPayload
 import app.logdate.client.media.MediaObject
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -320,6 +321,7 @@ class GetWeekRewindUseCaseTest {
         override suspend fun create(note: JournalNote, journalId: Uuid) {}
 
         override suspend fun removeFromJournal(noteId: Uuid, journalId: Uuid) {}
+        override suspend fun getNoteById(noteId: Uuid): JournalNote? = null
     }
 
     private class FakeIndexedMediaRepository : IndexedMediaRepository {
@@ -357,6 +359,15 @@ class GetWeekRewindUseCaseTest {
         override suspend fun queryMediaByDate(start: Instant, end: Instant): Flow<List<MediaObject>> = flowOf(emptyList())
 
         override suspend fun addToDefaultCollection(uri: String) {}
+
+        override suspend fun readMedia(uri: String): MediaPayload = MediaPayload(
+            fileName = uri.substringAfterLast('/'),
+            mimeType = "application/octet-stream",
+            sizeBytes = 0,
+            data = ByteArray(0)
+        )
+
+        override suspend fun saveMedia(payload: MediaPayload): String = "file://stub/${payload.fileName}"
     }
 
     private companion object {

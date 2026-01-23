@@ -1,6 +1,7 @@
 package app.logdate.client.domain.timeline
 
 import app.logdate.client.media.MediaManager
+import app.logdate.client.media.MediaPayload
 import app.logdate.client.media.MediaObject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -198,5 +199,12 @@ class GetMediaUrisUseCaseTest {
         override suspend fun exists(mediaId: String): Boolean = false
         override suspend fun getRecentMedia(): Flow<List<MediaObject>> = flowOf(emptyList())
         override suspend fun addToDefaultCollection(uri: String) = Unit
+        override suspend fun readMedia(uri: String): MediaPayload = MediaPayload(
+            fileName = uri.substringAfterLast('/'),
+            mimeType = "application/octet-stream",
+            sizeBytes = 0,
+            data = ByteArray(0)
+        )
+        override suspend fun saveMedia(payload: MediaPayload): String = "file://stub/${payload.fileName}"
     }
 }

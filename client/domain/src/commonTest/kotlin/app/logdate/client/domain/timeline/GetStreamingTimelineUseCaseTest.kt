@@ -13,6 +13,7 @@ import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
 import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
 import app.logdate.client.intelligence.generativeai.GenerativeAIResponse
 import app.logdate.client.media.MediaManager
+import app.logdate.client.media.MediaPayload
 import app.logdate.client.media.MediaObject
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.networking.NetworkState
@@ -59,7 +60,7 @@ class GetStreamingTimelineUseCaseTest {
             createTestNote("Recent note 3", Instant.fromEpochMilliseconds(dayMillis * 2))
         )
         mockNotesRepository.recentNotes = recentNotes
-        val request = GetStreamingTimelineUseCase.TimelineRequest.RecentTimeline()
+        val request = StreamingTimelineRequest.RecentTimeline()
         
         // When
         val result = useCase(request).first()
@@ -73,7 +74,7 @@ class GetStreamingTimelineUseCaseTest {
     fun `invoke with RecentTimeline should respect custom page size`() = runTest {
         // Given
         val customPageSize = 10
-        val request = GetStreamingTimelineUseCase.TimelineRequest.RecentTimeline(pageSize = customPageSize)
+        val request = StreamingTimelineRequest.RecentTimeline(pageSize = customPageSize)
         mockNotesRepository.recentNotes = emptyList()
         
         // When
@@ -90,7 +91,7 @@ class GetStreamingTimelineUseCaseTest {
         val note1 = createTestNote("Note 1", Instant.fromEpochMilliseconds(0))
         val note2 = createTestNote("Note 2", Instant.fromEpochMilliseconds(dayMillis))
         mockNotesRepository.recentNotes = listOf(note2, note1)
-        val request = GetStreamingTimelineUseCase.TimelineRequest.RecentTimeline(
+        val request = StreamingTimelineRequest.RecentTimeline(
             sortOrder = TimelineSortOrder.CHRONOLOGICAL
         )
         
@@ -113,7 +114,7 @@ class GetStreamingTimelineUseCaseTest {
             createTestNote("Range note 2", Instant.fromEpochMilliseconds(dayMillis * 2))
         )
         mockNotesRepository.notesInRange = notesInRange
-        val request = GetStreamingTimelineUseCase.TimelineRequest.TimelineInRange(start, end)
+        val request = StreamingTimelineRequest.TimelineInRange(start, end)
         
         // When
         val result = useCase(request).first()
@@ -135,7 +136,7 @@ class GetStreamingTimelineUseCaseTest {
         val note1 = createTestNote("Note 1", Instant.fromEpochMilliseconds(0))
         val note2 = createTestNote("Note 2", Instant.fromEpochMilliseconds(dayMillis))
         mockNotesRepository.notesInRange = listOf(note1, note2)
-        val request = GetStreamingTimelineUseCase.TimelineRequest.TimelineInRange(start, end)
+        val request = StreamingTimelineRequest.TimelineInRange(start, end)
         
         // When
         val result = useCase(request).first()
@@ -154,7 +155,7 @@ class GetStreamingTimelineUseCaseTest {
             createTestNote("Note 2", Instant.fromEpochMilliseconds(dayMillis))
         )
         mockNotesRepository.recentNotes = recentNotes
-        val request = GetStreamingTimelineUseCase.TimelineRequest.RecentTimeline()
+        val request = StreamingTimelineRequest.RecentTimeline()
         
         // When
         val result = useCase(request).first()
@@ -179,8 +180,8 @@ class GetStreamingTimelineUseCaseTest {
         mockNotesRepository.notesInRange = emptyList()
         
         // When
-        val recentResult = useCase(GetStreamingTimelineUseCase.TimelineRequest.RecentTimeline()).first()
-        val rangeResult = useCase(GetStreamingTimelineUseCase.TimelineRequest.TimelineInRange(
+        val recentResult = useCase(StreamingTimelineRequest.RecentTimeline()).first()
+        val rangeResult = useCase(StreamingTimelineRequest.TimelineInRange(
             Instant.fromEpochMilliseconds(1000),
             Instant.fromEpochMilliseconds(2000)
         )).first()
@@ -251,6 +252,7 @@ class GetStreamingTimelineUseCaseTest {
         override suspend fun removeById(noteId: Uuid) = Unit
         override suspend fun create(note: JournalNote, journalId: Uuid) = Unit
         override suspend fun removeFromJournal(noteId: Uuid, journalId: Uuid) = Unit
+        override suspend fun getNoteById(noteId: Uuid): JournalNote? = null
     }
 
     private class FakeGenerativeAICache : GenerativeAICache {
@@ -287,5 +289,12 @@ class GetStreamingTimelineUseCaseTest {
         override suspend fun getRecentMedia(): Flow<List<MediaObject>> = flowOf(emptyList())
         override suspend fun queryMediaByDate(start: Instant, end: Instant): Flow<List<MediaObject>> = flowOf(emptyList())
         override suspend fun addToDefaultCollection(uri: String) {}
+        override suspend fun readMedia(uri: String): MediaPayload = MediaPayload(
+            fileName = uri.substringAfterLast('/'),
+            mimeType = "application/octet-stream",
+            sizeBytes = 0,
+            data = ByteArray(0)
+        )
+        override suspend fun saveMedia(payload: MediaPayload): String = "file://stub/${payload.fileName}"
     }
 }

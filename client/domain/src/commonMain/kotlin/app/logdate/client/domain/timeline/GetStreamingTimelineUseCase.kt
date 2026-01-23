@@ -1,15 +1,27 @@
 package app.logdate.client.domain.timeline
 
 import app.logdate.client.repository.journals.JournalNotesRepository
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.transform
 import kotlinx.datetime.Instant
-import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+
+/**
+ * Request type for streaming timeline queries.
+ */
+sealed interface StreamingTimelineRequest {
+    data class RecentTimeline(
+        val sortOrder: TimelineSortOrder = TimelineSortOrder.REVERSE_CHRONOLOGICAL,
+        val pageSize: Int = 50
+    ) : StreamingTimelineRequest
+
+    data class TimelineInRange(
+        val start: Instant,
+        val end: Instant,
+        val sortOrder: TimelineSortOrder = TimelineSortOrder.REVERSE_CHRONOLOGICAL
+    ) : StreamingTimelineRequest
+}
 
 /**
  * A streaming version of GetTimelineUseCase that loads notes incrementally
@@ -23,10 +35,10 @@ class GetStreamingTimelineUseCase(
     /**
      * Gets streaming timeline based on the request type
      */
-    operator fun invoke(request: TimelineRequest): Flow<Timeline> {
+    operator fun invoke(request: StreamingTimelineRequest = StreamingTimelineRequest.RecentTimeline()): Flow<Timeline> {
         return when (request) {
-            is TimelineRequest.RecentTimeline -> getRecentTimeline(request.sortOrder, request.pageSize)
-            is TimelineRequest.TimelineInRange -> getTimelineInRange(request.start, request.end, request.sortOrder)
+            is StreamingTimelineRequest.RecentTimeline -> getRecentTimeline(request.sortOrder, request.pageSize)
+            is StreamingTimelineRequest.TimelineInRange -> getTimelineInRange(request.start, request.end, request.sortOrder)
         }
     }
 
@@ -92,18 +104,5 @@ class GetStreamingTimelineUseCase(
             TimelineSortOrder.CHRONOLOGICAL -> days.sortedBy { it.date }
             TimelineSortOrder.REVERSE_CHRONOLOGICAL -> days.sortedByDescending { it.date }
         }
-    }
-
-    sealed class TimelineRequest {
-        data class RecentTimeline(
-            val sortOrder: TimelineSortOrder = TimelineSortOrder.REVERSE_CHRONOLOGICAL,
-            val pageSize: Int = 50
-        ) : TimelineRequest()
-
-        data class TimelineInRange(
-            val start: Instant,
-            val end: Instant,
-            val sortOrder: TimelineSortOrder = TimelineSortOrder.REVERSE_CHRONOLOGICAL
-        ) : TimelineRequest()
     }
 }
