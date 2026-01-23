@@ -166,3 +166,9 @@ data object DangerZoneSettingsRoute : NavKey
  */
 @Serializable
 data object BirthdaySettingsRoute : NavKey
+
+/**
+ * Navigation route for advanced settings (server configuration, developer options).
+ */
+@Serializable
+data object AdvancedSettingsRoute : NavKey

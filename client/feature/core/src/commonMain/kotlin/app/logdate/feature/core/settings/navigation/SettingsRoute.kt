@@ -4,6 +4,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import app.logdate.feature.core.settings.ui.AccountSettingsScreen
+import app.logdate.feature.core.settings.ui.AdvancedSettingsScreen
 import app.logdate.feature.core.settings.ui.BirthdaySettingsScreen
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsScreen
 import app.logdate.feature.core.settings.ui.DataSettingsScreen
@@ -39,6 +40,9 @@ data object DangerZoneSettingsRoute
 
 @Serializable
 data object BirthdaySettingsRoute
+
+@Serializable
+data object AdvancedSettingsRoute
 
 /**
  * Navigates to the settings screen.
@@ -83,6 +87,10 @@ fun NavController.navigateToBirthdaySettings() {
     navigate(BirthdaySettingsRoute)
 }
 
+fun NavController.navigateToAdvancedSettings() {
+    navigate(AdvancedSettingsRoute)
+}
+
 /**
  * Navigates to the devices screen.
  */
@@ -125,6 +133,9 @@ fun NavGraphBuilder.settingsDestination(
             },
             onNavigateToLocation = {
                 navController.navigateToLocationSettings()
+            },
+            onNavigateToAdvanced = {
+                navController.navigateToAdvancedSettings()
             }
         )
     }
@@ -173,6 +184,12 @@ fun NavGraphBuilder.settingsDestination(
 
     composable<BirthdaySettingsRoute> {
         BirthdaySettingsScreen(
+            onBack = { navController.popBackStack() },
+        )
+    }
+
+    composable<AdvancedSettingsRoute> {
+        AdvancedSettingsScreen(
             onBack = { navController.popBackStack() },
         )
     }

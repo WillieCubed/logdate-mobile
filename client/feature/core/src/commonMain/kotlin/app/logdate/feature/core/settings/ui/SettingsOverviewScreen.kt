@@ -80,6 +80,7 @@ fun SettingsOverviewScreen(
     onNavigateToDevices: () -> Unit,
     onNavigateToDangerZone: () -> Unit,
     onNavigateToLocation: () -> Unit,
+    onNavigateToAdvanced: () -> Unit,
     modifier: Modifier = Modifier,
     selectedDetail: String? = null,
     isInTwoPaneMode: Boolean? = null,
@@ -89,7 +90,7 @@ fun SettingsOverviewScreen(
     val uiState by viewModel.uiState.collectAsState()
     val resolvedSelectedDetail = selectedDetail ?: layoutInfo.selectedDetail
     val resolvedIsInTwoPaneMode = isInTwoPaneMode ?: layoutInfo.isInTwoPaneMode
-    
+
     SettingsOverviewContent(
         onBack = onBack,
         onNavigateToProfile = onNavigateToProfile,
@@ -99,6 +100,7 @@ fun SettingsOverviewScreen(
         onNavigateToDevices = onNavigateToDevices,
         onNavigateToDangerZone = onNavigateToDangerZone,
         onNavigateToLocation = onNavigateToLocation,
+        onNavigateToAdvanced = onNavigateToAdvanced,
         userProfile = uiState.currentAccount.toUserProfile(),
         selectedDetail = resolvedSelectedDetail,
         isInTwoPaneMode = resolvedIsInTwoPaneMode,
@@ -117,6 +119,7 @@ private fun SettingsOverviewContent(
     onNavigateToDevices: () -> Unit,
     onNavigateToDangerZone: () -> Unit,
     onNavigateToLocation: () -> Unit,
+    onNavigateToAdvanced: () -> Unit,
     userProfile: UserProfile,
     selectedDetail: String? = null,
     isInTwoPaneMode: Boolean = false,
@@ -247,7 +250,18 @@ private fun SettingsOverviewContent(
                             isSelected = selectedDetail == "data"
                         )
                     }
-                    
+
+                    // Advanced Settings
+                    SurfaceItem {
+                        SettingsNavigationItem(
+                            title = "Advanced",
+                            description = "Server configuration and developer options",
+                            icon = { Icon(Icons.Default.DeveloperMode, contentDescription = null) },
+                            onClick = onNavigateToAdvanced,
+                            isSelected = selectedDetail == "advanced"
+                        )
+                    }
+
                     // Danger Zone
                     SurfaceItem {
                         SettingsNavigationItem(
@@ -322,6 +336,7 @@ private fun SettingsOverviewScreenPreview() {
         onNavigateToDevices = {},
         onNavigateToDangerZone = {},
         onNavigateToLocation = {},
+        onNavigateToAdvanced = {},
         userProfile = UserProfile(
             name = "John Doe",
             username = "johndoe",
@@ -344,6 +359,7 @@ private fun SettingsOverviewScreenPreviewNotSignedIn() {
         onNavigateToDevices = {},
         onNavigateToDangerZone = {},
         onNavigateToLocation = {},
+        onNavigateToAdvanced = {},
         userProfile = UserProfile(
             name = "",
             username = "",

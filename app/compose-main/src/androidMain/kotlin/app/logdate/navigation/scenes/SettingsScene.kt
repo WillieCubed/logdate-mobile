@@ -28,6 +28,7 @@ import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_L
 import app.logdate.feature.core.settings.ui.LocalSettingsLayoutInfo
 import app.logdate.feature.core.settings.ui.SettingsLayoutInfo
 import app.logdate.navigation.routes.core.AccountSettingsRoute
+import app.logdate.navigation.routes.core.AdvancedSettingsRoute
 import app.logdate.navigation.routes.core.BirthdaySettingsRoute
 import app.logdate.navigation.routes.core.DangerZoneSettingsRoute
 import app.logdate.navigation.routes.core.DataSettingsRoute
@@ -79,7 +80,8 @@ private object SettingsRouteConfig {
             is DevicesSettingsRoute,
             is LocationSettingsRoute,
             is BirthdaySettingsRoute,
-            is DangerZoneSettingsRoute -> SettingsRouteClassification.SettingsDetail
+            is DangerZoneSettingsRoute,
+            is AdvancedSettingsRoute -> SettingsRouteClassification.SettingsDetail
 
             else -> SettingsRouteClassification.Excluded
         }
@@ -103,6 +105,7 @@ private fun resolveSelectedDetail(routeKey: NavKey?): String? {
         is LocationSettingsRoute -> "location"
         is DangerZoneSettingsRoute -> "danger"
         is BirthdaySettingsRoute -> "birthday"
+        is AdvancedSettingsRoute -> "advanced"
         else -> null
     }
 }

@@ -135,6 +135,7 @@ import app.logdate.navigation.routes.DisplayNameSelectionRoute
 import app.logdate.navigation.routes.PasskeyCreationRoute
 import app.logdate.navigation.routes.UsernameSelectionRoute
 import app.logdate.navigation.routes.core.AccountSettingsRoute
+import app.logdate.navigation.routes.core.AdvancedSettingsRoute
 import app.logdate.navigation.routes.core.BirthdaySettingsRoute
 import app.logdate.navigation.routes.core.DangerZoneSettingsRoute
 import app.logdate.navigation.routes.core.DataSettingsRoute
@@ -334,7 +335,8 @@ private object RouteConfig {
             is DevicesSettingsRoute,
             is DangerZoneSettingsRoute,
             is BirthdaySettingsRoute,
-            is LocationSettingsRoute -> return RouteClassification.Excluded
+            is LocationSettingsRoute,
+            is AdvancedSettingsRoute -> return RouteClassification.Excluded
 
             // Cloud account setup flows - all should be excluded
             is CloudAccountIntroRoute,

@@ -453,11 +453,13 @@ class PasskeyApiClientTest {
         override val backendUrl: StateFlow<String> = MutableStateFlow("https://api.test.logdate.app").asStateFlow()
         override val apiVersion: StateFlow<String> = MutableStateFlow("v1").asStateFlow()
         override val apiBaseUrl: Flow<String> = MutableStateFlow("https://api.test.logdate.app/api/v1").asStateFlow()
-        
+        override val localServerAddress: StateFlow<String> = MutableStateFlow("localhost:8765").asStateFlow()
+
         override suspend fun updateBackendUrl(url: String) {}
         override suspend fun updateApiVersion(version: String) {}
+        override suspend fun updateLocalServerAddress(address: String) {}
         override suspend fun resetToDefaults() {}
-        
+
         override fun getCurrentBackendUrl(): String = "https://api.test.logdate.app"
         override fun getCurrentApiBaseUrl(): String = "https://api.test.logdate.app/api/v1"
     }

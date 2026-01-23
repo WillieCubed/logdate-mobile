@@ -5,6 +5,7 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entry
 import app.logdate.feature.core.profile.ui.ProfileScreen
 import app.logdate.feature.core.settings.ui.AccountSettingsScreen
+import app.logdate.feature.core.settings.ui.AdvancedSettingsScreen
 import app.logdate.feature.core.settings.ui.BirthdaySettingsScreen
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsScreen
 import app.logdate.feature.core.settings.ui.DataSettingsScreen
@@ -15,6 +16,7 @@ import app.logdate.feature.core.settings.ui.devices.DevicesScreen
 import app.logdate.navigation.MainAppNavigator
 import app.logdate.navigation.routes.ProfileRoute
 import app.logdate.navigation.routes.core.AccountSettingsRoute
+import app.logdate.navigation.routes.core.AdvancedSettingsRoute
 import app.logdate.navigation.routes.core.BirthdaySettingsRoute
 import app.logdate.navigation.routes.core.DangerZoneSettingsRoute
 import app.logdate.navigation.routes.core.DataSettingsRoute
@@ -103,6 +105,13 @@ fun MainAppNavigator.openDangerZoneSettings() {
     backStack.add(DangerZoneSettingsRoute)
 }
 
+/**
+ * Opens the advanced settings screen for server configuration and developer options.
+ */
+fun MainAppNavigator.openAdvancedSettings() {
+    backStack.add(AdvancedSettingsRoute)
+}
+
 
 /**
  * Provides the navigation routes for app settings-related screens.
@@ -118,6 +127,7 @@ fun MainAppNavigator.openDangerZoneSettings() {
  * @param onNavigateToDangerZone Callback to navigate to danger zone settings
  * @param onNavigateToLocation Callback to navigate to location settings
  * @param onNavigateToBirthdaySettings Callback to navigate to the birthday settings screen
+ * @param onNavigateToAdvanced Callback to navigate to advanced settings
  */
 fun EntryProviderBuilder<NavKey>.appSettingsRoutes(
     onBack: () -> Unit,
@@ -131,6 +141,7 @@ fun EntryProviderBuilder<NavKey>.appSettingsRoutes(
     onNavigateToDangerZone: () -> Unit,
     onNavigateToLocation: () -> Unit,
     onNavigateToBirthdaySettings: () -> Unit,
+    onNavigateToAdvanced: () -> Unit,
 ) {
     // Main settings overview screen
     entry<SettingsOverviewRoute>() { _ ->
@@ -142,7 +153,8 @@ fun EntryProviderBuilder<NavKey>.appSettingsRoutes(
             onNavigateToData = onNavigateToData,
             onNavigateToDangerZone = onNavigateToDangerZone,
             onNavigateToDevices = onNavigateToDevices,
-            onNavigateToLocation = onNavigateToLocation
+            onNavigateToLocation = onNavigateToLocation,
+            onNavigateToAdvanced = onNavigateToAdvanced
         )
     }
     
@@ -202,6 +214,13 @@ fun EntryProviderBuilder<NavKey>.appSettingsRoutes(
     // Location settings screen
     entry<LocationSettingsRoute>() { _ ->
         LocationSettingsScreen(
+            onBack = onBack,
+        )
+    }
+
+    // Advanced settings screen
+    entry<AdvancedSettingsRoute>() { _ ->
+        AdvancedSettingsScreen(
             onBack = onBack,
         )
     }

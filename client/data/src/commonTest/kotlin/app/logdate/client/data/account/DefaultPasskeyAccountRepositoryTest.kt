@@ -789,26 +789,33 @@ class DefaultPasskeyAccountRepositoryTest {
     class FakeConfigRepository : LogDateConfigRepository {
         private val _backendUrl = MutableStateFlow("https://api.logdate.app")
         private val _apiVersion = MutableStateFlow("v1")
-        
+        private val _localServerAddress = MutableStateFlow("localhost:8765")
+
         override val backendUrl: StateFlow<String> = _backendUrl.asStateFlow()
         override val apiVersion: StateFlow<String> = _apiVersion.asStateFlow()
         override val apiBaseUrl: Flow<String> = flow {
             emit("https://api.logdate.app/api/v1")
         }
-        
+        override val localServerAddress: StateFlow<String> = _localServerAddress.asStateFlow()
+
         override suspend fun updateBackendUrl(url: String) {
             _backendUrl.value = url
         }
-        
+
         override suspend fun updateApiVersion(version: String) {
             _apiVersion.value = version
         }
-        
+
+        override suspend fun updateLocalServerAddress(address: String) {
+            _localServerAddress.value = address
+        }
+
         override suspend fun resetToDefaults() {
             _backendUrl.value = "https://api.logdate.app"
             _apiVersion.value = "v1"
+            _localServerAddress.value = "localhost:8765"
         }
-        
+
         override fun getCurrentBackendUrl(): String = "https://api.logdate.app"
         override fun getCurrentApiBaseUrl(): String = "https://api.logdate.app/api/v1"
     }

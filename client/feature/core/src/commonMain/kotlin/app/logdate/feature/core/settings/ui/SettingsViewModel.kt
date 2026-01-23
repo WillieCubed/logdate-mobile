@@ -14,6 +14,9 @@ import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.database.clearAllLogDateTables
+import app.logdate.client.networking.ServerHealthChecker
+import app.logdate.shared.config.DefaultLogDateConfigRepository
+import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.CloudStorageQuota
 import app.logdate.feature.core.export.ExportLauncher
 import app.logdate.shared.model.LogDateAccount
@@ -49,6 +52,8 @@ class SettingsViewModel(
     private val sessionStorage: SessionStorage,
     private val preferencesDataSource: LogdatePreferencesDataSource,
     private val database: LogDateDatabase,
+    private val serverHealthChecker: ServerHealthChecker,
+    private val configRepository: LogDateConfigRepository,
 ) : ViewModel() {
     
     private val _passkeyRevocationState = MutableStateFlow<PasskeyRevocationState>(PasskeyRevocationState.Idle)
@@ -68,6 +73,13 @@ class SettingsViewModel(
 
     private val _syncStatusState = MutableStateFlow<SyncStatusState>(SyncStatusState.Idle)
     val syncStatusState: StateFlow<SyncStatusState> = _syncStatusState.asStateFlow()
+
+    private val _serverSelectionState = MutableStateFlow(
+        ServerSelectionState(
+            localServerAddress = DefaultLogDateConfigRepository.DEFAULT_LOCAL_SERVER_ADDRESS
+        )
+    )
+    val serverSelectionState: StateFlow<ServerSelectionState> = _serverSelectionState.asStateFlow()
 
     private val cloudQuotaFlow = observeCloudQuotaUseCase()
     private val sessionFlow = sessionStorage.getSessionFlow()
@@ -427,6 +439,118 @@ class SettingsViewModel(
                 Napier.i("Session cleared successfully")
             } catch (e: Exception) {
                 Napier.e("Failed to sign out", e)
+            }
+        }
+    }
+
+    /**
+     * Selects a server preset.
+     */
+    fun selectServerPreset(preset: ServerPreset) {
+        _serverSelectionState.update {
+            it.copy(
+                selectedPreset = preset,
+                validationState = ServerValidationState.Idle
+            )
+        }
+    }
+
+    /**
+     * Updates the local server address.
+     */
+    fun updateLocalServerAddress(address: String) {
+        _serverSelectionState.update {
+            it.copy(
+                localServerAddress = address,
+                validationState = ServerValidationState.Idle
+            )
+        }
+    }
+
+    /**
+     * Updates the custom server URL.
+     */
+    fun updateCustomServerUrl(url: String) {
+        _serverSelectionState.update {
+            it.copy(
+                customServerUrl = url,
+                validationState = ServerValidationState.Idle
+            )
+        }
+    }
+
+    /**
+     * Validates the server connection and saves the configuration if successful.
+     */
+    fun validateAndSaveServer() {
+        val currentState = _serverSelectionState.value
+
+        // For production, just save immediately
+        if (currentState.selectedPreset == ServerPreset.PRODUCTION) {
+            saveServerConfiguration(DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL)
+            return
+        }
+
+        // For non-production, validate first
+        val serverUrl = when (currentState.selectedPreset) {
+            ServerPreset.LOCAL -> {
+                val address = currentState.localServerAddress
+                if (address.startsWith("http")) address else "http://$address"
+            }
+            ServerPreset.CUSTOM -> currentState.customServerUrl
+            ServerPreset.PRODUCTION -> DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL
+        }
+
+        if (serverUrl.isBlank()) {
+            _serverSelectionState.update {
+                it.copy(validationState = ServerValidationState.Error("Server URL cannot be empty"))
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            _serverSelectionState.update {
+                it.copy(validationState = ServerValidationState.Validating)
+            }
+
+            val result = serverHealthChecker.checkServerHealth(serverUrl)
+
+            result.fold(
+                onSuccess = { healthInfo ->
+                    Napier.i("Server health check succeeded: $healthInfo")
+                    _serverSelectionState.update {
+                        it.copy(validationState = ServerValidationState.Success(healthInfo.version))
+                    }
+                    saveServerConfiguration(serverUrl)
+                },
+                onFailure = { error ->
+                    Napier.e("Server health check failed", error)
+                    _serverSelectionState.update {
+                        it.copy(
+                            validationState = ServerValidationState.Error(
+                                error.message ?: "Failed to connect to server"
+                            )
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    private fun saveServerConfiguration(serverUrl: String) {
+        viewModelScope.launch {
+            try {
+                configRepository.updateBackendUrl(serverUrl)
+
+                // Also save the local server address if using local preset
+                val currentState = _serverSelectionState.value
+                if (currentState.selectedPreset == ServerPreset.LOCAL) {
+                    configRepository.updateLocalServerAddress(currentState.localServerAddress)
+                }
+
+                Napier.i("Server configuration saved: $serverUrl")
+            } catch (e: Exception) {
+                Napier.e("Failed to save server configuration", e)
             }
         }
     }

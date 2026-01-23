@@ -38,6 +38,7 @@ kotlin {
         commonMain.dependencies {
             // Project dependencies
             implementation(projects.shared.model)
+            implementation(projects.shared.config)
             implementation(projects.client.ui)
             implementation(projects.client.util)
             implementation(projects.client.repository)

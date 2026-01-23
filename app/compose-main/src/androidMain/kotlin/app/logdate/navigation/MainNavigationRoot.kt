@@ -98,6 +98,7 @@ import app.logdate.navigation.routes.finishJournalCreation
 import app.logdate.navigation.routes.journalRoutes
 import app.logdate.navigation.routes.onboarding
 import app.logdate.navigation.routes.openAccountSettings
+import app.logdate.navigation.routes.openAdvancedSettings
 import app.logdate.navigation.routes.openBirthdaySettings
 import app.logdate.navigation.routes.openDangerZoneSettings
 import app.logdate.navigation.routes.openDataSettings
@@ -558,7 +559,8 @@ fun MainNavigationRoot(
                 onNavigateToDevices = mainAppNavigator::openDevicesSettings,
                 onNavigateToDangerZone = mainAppNavigator::openDangerZoneSettings,
                 onNavigateToLocation = mainAppNavigator::openLocationSettings,
-                onNavigateToBirthdaySettings = mainAppNavigator::openBirthdaySettings
+                onNavigateToBirthdaySettings = mainAppNavigator::openBirthdaySettings,
+                onNavigateToAdvanced = mainAppNavigator::openAdvancedSettings
             )
             cloudAccountSetup(
                 onBack = mainAppNavigator::goBack,
