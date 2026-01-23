@@ -19,7 +19,6 @@ This document defines the systematic approach for organizing and running end-to-
 - `AuthenticationFlowsE2ETest` - Passkey authentication
 - `EdgeCasesE2ETest` - Error handling edge cases
 - `BasicEndpointCoverageE2ETest` - API endpoint coverage
-- `StubEndpointsE2ETest` - Stub endpoint validation
 
 **How to Run**:
 ```bash

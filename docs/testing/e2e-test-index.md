@@ -35,7 +35,7 @@ See [E2E Test Organization Standard](./e2e-test-organization.md) for the complet
 Client-side tests verify complete user workflows on the Android app using Espresso, Compose testing, and activity scenarios.
 
 ### Location
-`app/compose-main/src/androidTest/kotlin/app/logdate/client/e2e/`
+`app/compose-main/src/androidInstrumentedTest/kotlin/app/logdate/client/e2e/`
 
 ### 1. Multi-Window Editor E2E Tests
 
@@ -141,17 +141,7 @@ Server-side tests verify API endpoints and backend functionality using Ktor's te
 ./gradlew :server:test -k "AuthenticationFlowsE2ETest"
 ```
 
-### 3. Stub Endpoints E2E Tests
-
-**File**: `stubs/StubEndpointsE2ETest.kt`
-
-**Scenario**: Stub/mock endpoints for testing
-
-```bash
-./gradlew :server:test -k "StubEndpointsE2ETest"
-```
-
-### 4. Basic Endpoint Coverage E2E Tests
+### 3. Basic Endpoint Coverage E2E Tests
 
 **File**: `basic-coverage/BasicEndpointCoverageE2ETest.kt`
 
@@ -161,7 +151,7 @@ Server-side tests verify API endpoints and backend functionality using Ktor's te
 ./gradlew :server:test -k "BasicEndpointCoverageE2ETest"
 ```
 
-### 5. Edge Cases E2E Tests
+### 4. Edge Cases E2E Tests
 
 **File**: `edge/EdgeCasesE2ETest.kt`
 
@@ -169,6 +159,17 @@ Server-side tests verify API endpoints and backend functionality using Ktor's te
 
 ```bash
 ./gradlew :server:test -k "EdgeCasesE2ETest"
+```
+
+### 5. Sync E2E Tests
+
+**File**: `sync/SyncE2ETest.kt`
+
+**Scenario**: Multi-device sync flow, conflict detection, and media download
+
+```bash
+./gradlew :server:test -k "SyncE2ETest"
+./tests/e2e/test-sync-e2e.sh
 ```
 
 ---
@@ -182,7 +183,7 @@ Server-side tests verify API endpoints and backend functionality using Ktor's te
 | AuthenticationFlowsE2ETest | Pure Server | `server/.../auth/` | ❌ None |
 | BasicEndpointCoverageE2ETest | Pure Server | `server/.../basic-coverage/` | ❌ None |
 | EdgeCasesE2ETest | Pure Server | `server/.../edge/` | ❌ None |
-| StubEndpointsE2ETest | Pure Server | `server/.../stubs/` | ❌ None |
+| SyncE2ETest | Pure Server | `server/.../sync/` | ✅ `test-sync-e2e.sh` |
 
 **Legend**:
 - **Client Gradle**: Android instrumented test + optional adb shell script
@@ -380,7 +381,7 @@ adb shell pm list packages | grep logdate
 To add a new e2e test:
 
 1. **Create test class** in appropriate directory:
-   - Client: `app/compose-main/src/androidTest/kotlin/app/logdate/client/e2e/`
+   - Client: `app/compose-main/src/androidInstrumentedTest/kotlin/app/logdate/client/e2e/`
    - Server: `server/src/test/kotlin/e2e/[category]/`
 
 2. **Name it with E2ETest suffix**: `MyFeatureE2ETest.kt`

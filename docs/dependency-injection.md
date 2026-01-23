@@ -130,7 +130,7 @@ actual val coreFeatureModule: Module = module {
     // ViewModels depend only on use cases and interfaces
     viewModel { AppViewModel(get(), get(), get()) }
     viewModel { SettingsViewModel(get(), get(), get(), get(), get()) }
-    viewModel { HomeViewModel(get()) }  // Injects use case interface
+    viewModel { HomeViewModel(get(), get(), get()) }  // Injects GetStreamingTimelineUseCase and other dependencies
 }
 ```
 
@@ -162,6 +162,7 @@ val domainModule: Module = module {
     factory { AddNoteUseCase(get(), get(), get(), get()) }  // Repository interfaces
     factory { RemoveNoteUseCase(get()) }                    // Repository interface
     factory { GetTimelineUseCase(get(), get()) }            // Repository interfaces
+    factory { GetStreamingTimelineUseCase(get(), get()) }  // Streaming timeline (fast first paint)
     factory { SummarizeJournalEntriesUseCase(get(), get()) }// Repository interfaces
     
     // Account management

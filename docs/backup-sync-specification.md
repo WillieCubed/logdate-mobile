@@ -405,7 +405,7 @@ When enqueuePending is called with new operation:
 suspend fun uploadJournal(accessToken: String, journal: Journal): Result<SyncUploadResult>
 suspend fun updateJournal(accessToken: String, journal: Journal): Result<SyncUploadResult>
 suspend fun deleteJournal(accessToken: String, journalId: Uuid): Result<Unit>
-suspend fun getJournalChanges(accessToken: String, since: Instant): Result<JournalSyncResult>
+suspend fun getJournalChanges(accessToken: String, since: Instant, limit: Int? = null): Result<JournalSyncResult>
 ```
 
 **Upload Request** (POST /sync/journals):
@@ -852,9 +852,9 @@ Step 2: Get Last Sync Cursor
 
 Step 3: Request Changes Per Entity Type
    │
-   ├─ cloudJournalDataSource.getJournalChanges(token, since: 2025-01-14T20:00:00Z)
+   ├─ cloudJournalDataSource.getJournalChanges(token, since: 2025-01-14T20:00:00Z, limit: 200)
    │  │
-   │  ├─ GET /sync/journals/changes?since=1705276800000
+   │  ├─ GET /sync/journals/changes?since=1705276800000&limit=200
    │  │
    │  └─ Response:
    │     {
@@ -867,7 +867,8 @@ Step 3: Request Changes Per Entity Type
    │         }
    │       ],
    │       "deletions": ["old-789"],
-   │       "lastTimestamp": 1705280400000
+   │       "lastTimestamp": 1705280400000,
+   │       "hasMore": false
    │     }
    │
    └─ Repeat for NOTE, ASSOCIATION
@@ -1318,7 +1319,7 @@ private suspend fun downloadJournals(accessToken: String): PartialSyncResult {
     val since = syncMetadataService.getLastSyncTime(EntityType.JOURNAL)
         ?: Instant.DISTANT_PAST
 
-    val syncResult = cloudJournalDataSource.getJournalChanges(accessToken, since)
+    val syncResult = cloudJournalDataSource.getJournalChanges(accessToken, since, limit = 200)
 
     // Apply changes
     for (change in syncResult.changes) {
@@ -1684,9 +1685,9 @@ sync_cursors:
   [entityType: JOURNAL, lastSyncTimestamp: 2025-01-14T20:00:00Z]
 
 // Next sync requests only changes since cursor
-GET /sync/journals/changes?since=1705276800000
+GET /sync/journals/changes?since=1705276800000&limit=200
 
-// Server returns only newer changes
+// Server returns only newer changes with hasMore for pagination
 // No duplicates, no missed updates
 ```
 

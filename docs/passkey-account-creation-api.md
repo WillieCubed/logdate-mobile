@@ -306,6 +306,55 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
+### Update Account Profile
+
+Update the current account's profile details (requires authentication).
+
+**Endpoint:** `PUT /accounts/me`
+
+**Headers:**
+```
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Request Body:**
+```json
+{
+  "displayName": "John Q. Doe",
+  "username": "johndoe123",
+  "bio": "Optional user bio"
+}
+```
+
+**Success Response:** `200 OK`
+```json
+{
+  "success": true,
+  "data": {
+    "id": "acc_1234567890",
+    "username": "johndoe123",
+    "displayName": "John Q. Doe",
+    "bio": "Optional user bio",
+    "passkeyCredentialIds": ["credentialId123"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+### Delete Passkey
+
+Remove a passkey credential from the current account (requires authentication).
+
+**Endpoint:** `DELETE /accounts/me/passkeys/{credentialId}`
+
+**Headers:**
+```
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Success Response:** `204 No Content`
+
 ### Check Username Availability
 
 Check if a username is available for registration.
