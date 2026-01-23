@@ -68,4 +68,7 @@ interface VideoNoteDao {
 
     @Query("UPDATE video_notes SET syncVersion = :syncVersion, lastSynced = :lastSynced WHERE uid = :noteId")
     suspend fun updateSyncMetadata(noteId: Uuid, syncVersion: Long, lastSynced: kotlinx.datetime.Instant)
+
+    @Query("UPDATE video_notes SET contentUri = :contentUri WHERE uid = :noteId")
+    suspend fun updateContentUri(noteId: Uuid, contentUri: String)
 }

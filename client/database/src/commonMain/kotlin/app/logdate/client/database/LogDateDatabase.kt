@@ -18,6 +18,7 @@ import app.logdate.client.database.dao.LocationHistoryDao
 import app.logdate.client.database.dao.SearchDao
 import app.logdate.client.database.dao.StorageMetadataDao
 import app.logdate.client.database.dao.TextNoteDao
+import app.logdate.client.database.dao.PlaceDao
 import app.logdate.client.database.dao.TranscriptionDao
 import app.logdate.client.database.dao.UserDevicesDao
 import app.logdate.client.database.dao.UserMediaDao
@@ -32,6 +33,7 @@ import app.logdate.client.database.entities.ImageNoteEntity
 import app.logdate.client.database.entities.JournalEntity
 import app.logdate.client.database.entities.JournalNoteCrossRef
 import app.logdate.client.database.entities.LocationLogEntity
+import app.logdate.client.database.entities.PlaceEntity
 import app.logdate.client.database.entities.StorageMetadataEntity
 import app.logdate.client.database.entities.TextNoteEntity
 import app.logdate.client.database.entities.TranscriptionEntity
@@ -61,6 +63,7 @@ import app.logdate.client.database.migrations.MIGRATION_18_19
 import app.logdate.client.database.migrations.MIGRATION_19_20
 import app.logdate.client.database.migrations.MIGRATION_1_2
 import app.logdate.client.database.migrations.MIGRATION_20_21
+import app.logdate.client.database.migrations.MIGRATION_21_22
 import app.logdate.client.database.migrations.MIGRATION_2_3
 import app.logdate.client.database.migrations.MIGRATION_3_4
 import app.logdate.client.database.migrations.MIGRATION_4_5
@@ -109,8 +112,9 @@ import kotlinx.coroutines.IO
         PendingUploadEntity::class,
         // Others
         TranscriptionEntity::class,
+        PlaceEntity::class,
     ],
-    version = 21, // Added sync metadata tables
+    version = 22, // Added location support to notes and places table
     exportSchema = true,
     autoMigrations = [
     ],
@@ -141,6 +145,7 @@ abstract class LogDateDatabase : RoomDatabase() {
     abstract fun transcriptionDao(): TranscriptionDao
     abstract fun searchDao(): SearchDao
     abstract fun syncMetadataDao(): SyncMetadataDao
+    abstract fun placeDao(): PlaceDao
 }
 
 /**
@@ -195,6 +200,7 @@ fun getRoomDatabase(
         MIGRATION_18_19,
         MIGRATION_19_20,
         MIGRATION_20_21,
+        MIGRATION_21_22,
     )
     .fallbackToDestructiveMigration(destroyTablesOnUpgrade)
     .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)
