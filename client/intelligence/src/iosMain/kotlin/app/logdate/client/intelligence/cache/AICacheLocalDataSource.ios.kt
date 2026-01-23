@@ -1,7 +1,8 @@
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+
 package app.logdate.client.intelligence.cache
 
 import io.github.aakira.napier.Napier
-import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSCachesDirectory
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSString
@@ -11,7 +12,6 @@ import platform.Foundation.NSUTF8StringEncoding
 import platform.Foundation.create
 import platform.Foundation.dataUsingEncoding
 import platform.Foundation.writeToFile
-import platform.Foundation.NSData
 
 private const val CACHE_DIR_NAME = "ai_cache"
 
@@ -27,7 +27,7 @@ class IOSAICacheLocalDataSource(
 
     override fun get(key: String): GenerativeAICacheEntry? {
         val filePath = filePathForKey(key)
-        val data = NSData.dataWithContentsOfFile(filePath) ?: return null
+        val data = NSFileManager.defaultManager.contentsAtPath(filePath) ?: return null
         val raw = NSString.create(data = data, encoding = NSUTF8StringEncoding) ?: return null
         return runCatching { codec.decode(raw.toString()) }
             .onFailure { error ->
@@ -65,7 +65,9 @@ class IOSAICacheLocalDataSource(
             .filterIsInstance<String>()
             .filter { it.endsWith(FILE_SUFFIX) }
             .mapNotNull { filename ->
-                val data = NSData.dataWithContentsOfFile("$cacheRootPath/$filename") ?: return@mapNotNull null
+                val data = NSFileManager.defaultManager
+                    .contentsAtPath("$cacheRootPath/$filename")
+                    ?: return@mapNotNull null
                 val raw = NSString.create(data = data, encoding = NSUTF8StringEncoding) ?: return@mapNotNull null
                 runCatching { codec.decode(raw.toString()) }
                     .onFailure { error ->
@@ -91,7 +93,6 @@ class IOSAICacheLocalDataSource(
                 fileManager.removeItemAtPath("$cacheRootPath/$fileName", error = null)
             }
     }
-    }
 
     private fun filePathForKey(key: String): String {
         return "$cacheRootPath/$FILE_PREFIX${sanitize(key)}$FILE_SUFFIX"
@@ -110,7 +111,6 @@ class IOSAICacheLocalDataSource(
     private fun sanitize(key: String): String = key.replace(unsafeChars, "_")
 }
 
-@OptIn(ExperimentalForeignApi::class)
 private fun defaultCachePath(): String {
     val fileManager = NSFileManager.defaultManager
     val url: NSURL? = fileManager.URLForDirectory(

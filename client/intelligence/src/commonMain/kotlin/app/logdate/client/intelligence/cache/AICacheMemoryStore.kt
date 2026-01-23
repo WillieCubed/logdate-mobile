@@ -12,10 +12,16 @@ class LruAICacheMemoryStore(
     private val maxEntries: Int,
     private val maxBytes: Long,
 ) : AICacheMemoryStore {
-    private val entries = LinkedHashMap<String, GenerativeAICacheEntry>(16, 0.75f, true)
+    private val entries = LinkedHashMap<String, GenerativeAICacheEntry>()
     private var currentBytes: Long = 0
 
-    override fun get(key: String): GenerativeAICacheEntry? = entries[key]
+    override fun get(key: String): GenerativeAICacheEntry? {
+        val value = entries[key] ?: return null
+        // Refresh LRU position by moving to the end of insertion order.
+        entries.remove(key)
+        entries[key] = value
+        return value
+    }
 
     override fun put(key: String, entry: GenerativeAICacheEntry) {
         val existing = entries.remove(key)
