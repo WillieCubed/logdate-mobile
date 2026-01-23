@@ -41,19 +41,78 @@
 - Avoid redundant comments when making code changes. Don't add comments that simply restate what the code does.
 - Keep modifications minimal and focused on addressing the issue at hand.
 
-## Git Commit Workflow
-- **CRITICAL**: Always combine `git restore --staged .`, `git add`, and `git commit` in a single command using `&&` to avoid race conditions with other agents
-- **Correct pattern**:
-  ```bash
-  git restore --staged . && git add file1.kt file2.kt && git commit -m "commit message"
-  ```
-- **Why**: Files may be modified by other processes between separate commands, causing commits to fail or include unintended changes
-- **Required steps in order**:
-  1. `git restore --staged .` - Unstage all files to ensure clean slate
-  2. `git add <files>` - Stage only the intended files
-  3. `git commit -m "message"` - Commit the staged files
+## Git Commit Standards
+
+Follow the commit message standards in `docs/reference/standards/commit-messages.md`.
+
+### Quick Reference
+
+**Format**: `type(scope): Brief description`
+
+**Types**: feat, fix, refactor, docs, style, test, chore, perf
+
+**Scopes**: See `docs/reference/standards/commit-scopes.md` for the authoritative list.
+
+**Common scopes** (feature scopes are primary):
+- `editor`, `timeline`, `onboarding`, `rewind`, `search`, `core` - Feature modules (preferred)
+- `app` - Main compose app
+- `wear` - Wear OS app
+- `server` - Backend server
+- `database`, `sync`, `auth`, `domain` - Client libraries
+
+**Rules**:
+- Title under 72 characters, imperative mood
+- Body required for meaningful changes (explains WHY, not just WHAT)
+- NEVER include phase numbers in commit messages
+- Use full clauses in body, not imperative fragments
+
+### Atomic Workflow (Required)
+
+**CRITICAL**: Always combine `git restore --staged .`, `git add`, and `git commit` in a single command using `&&` to avoid race conditions with other agents.
+
+```bash
+git restore --staged . && git add file1.kt file2.kt && git commit -m "$(cat <<'EOF'
+type(scope): Brief description
+
+Body explaining what changed and why. Use full clauses, not fragments.
+Lead with impact—what can users now do? Explain the problem solved,
+not just the implementation details.
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+EOF
+)"
+```
+
+**Why this pattern:**
+- Files may be modified by other processes between separate commands
+- `git restore --staged .` clears stale staging from other processes
+- All steps succeed or fail together using `&&`
+- Prevents race conditions with concurrent agents
+
+**Required steps in order:**
+1. `git restore --staged .` - Unstage all files to ensure clean slate
+2. `git add <files>` - Stage only the intended files (NEVER use `git add .` or `git add -A`)
+3. `git commit` - Commit with properly formatted message
 - **Never** run these commands separately in different tool calls
-- All three commands must be chained with `&&` in a single bash execution
+
+### Forbidden Practices
+
+🚨 **These are fireable offenses:**
+- `git add -A` / `git add .` / `git add *` — Stages everything indiscriminately
+- `git reset --hard` — Permanently destroys uncommitted work
+- `git push --force` — Destroys commit history on remote
+- `git commit --no-verify` — Bypasses critical quality enforcement
+- Phase numbers in commit messages (Phase 1, Phase 5, etc.)
+
+### Safe Alternatives
+
+| Goal | Safe Command |
+|------|--------------|
+| Undo last commit, keep changes | `git reset --soft HEAD~1` |
+| Unstage everything | `git reset HEAD` |
+| Discard changes in specific file | `git restore --source=HEAD -- path/to/file` |
+
+See `docs/reference/standards/git-guidelines.md` for full documentation
 
 ## KMP Guidelines
 - For UUIDs, use kotlin.uuid.Uuid with Uuid.random() for generating new UUIDs (NOT Java's UUID class)
