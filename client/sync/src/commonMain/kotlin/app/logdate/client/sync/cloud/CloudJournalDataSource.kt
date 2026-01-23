@@ -31,7 +31,7 @@ interface CloudJournalDataSource {
     /**
      * Downloads all journal metadata changes since the specified timestamp.
      */
-    suspend fun getJournalChanges(accessToken: String, since: Instant): Result<JournalSyncResult>
+    suspend fun getJournalChanges(accessToken: String, since: Instant, limit: Int? = null): Result<JournalSyncResult>
 }
 
 /**
@@ -40,7 +40,8 @@ interface CloudJournalDataSource {
 data class JournalSyncResult(
     val changes: List<Journal>,
     val deletions: List<Uuid>,
-    val lastSyncTimestamp: Instant
+    val lastSyncTimestamp: Instant,
+    val hasMore: Boolean = false
 )
 
 /**
@@ -74,12 +75,13 @@ class DefaultCloudJournalDataSource(
         return cloudApiClient.deleteJournal(accessToken, journalId.toString())
     }
     
-    override suspend fun getJournalChanges(accessToken: String, since: Instant): Result<JournalSyncResult> {
-        return cloudApiClient.getJournalChanges(accessToken, since.toEpochMilliseconds()).map { response ->
+    override suspend fun getJournalChanges(accessToken: String, since: Instant, limit: Int?): Result<JournalSyncResult> {
+        return cloudApiClient.getJournalChanges(accessToken, since.toEpochMilliseconds(), limit).map { response ->
             JournalSyncResult(
                 changes = response.changes.map { it.toJournal() },
                 deletions = response.deletions.map { Uuid.parse(it.id) },
-                lastSyncTimestamp = Instant.fromEpochMilliseconds(response.lastTimestamp)
+                lastSyncTimestamp = Instant.fromEpochMilliseconds(response.lastTimestamp),
+                hasMore = response.hasMore
             )
         }
     }

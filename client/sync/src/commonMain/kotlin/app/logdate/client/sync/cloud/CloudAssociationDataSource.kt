@@ -25,7 +25,7 @@ interface CloudAssociationDataSource {
     /**
      * Downloads all association changes since the specified timestamp.
      */
-    suspend fun getAssociationChanges(accessToken: String, since: Instant): Result<AssociationSyncResult>
+    suspend fun getAssociationChanges(accessToken: String, since: Instant, limit: Int? = null): Result<AssociationSyncResult>
 }
 
 /**
@@ -44,7 +44,8 @@ data class JournalContentAssociation(
 data class AssociationSyncResult(
     val additions: List<JournalContentAssociation>,
     val deletions: List<JournalContentAssociation>,
-    val lastSyncTimestamp: Instant
+    val lastSyncTimestamp: Instant,
+    val hasMore: Boolean = false
 )
 
 /**
@@ -81,8 +82,8 @@ class DefaultCloudAssociationDataSource(
         return cloudApiClient.deleteAssociations(accessToken, request)
     }
     
-    override suspend fun getAssociationChanges(accessToken: String, since: Instant): Result<AssociationSyncResult> {
-        return cloudApiClient.getAssociationChanges(accessToken, since.toEpochMilliseconds()).map { response ->
+    override suspend fun getAssociationChanges(accessToken: String, since: Instant, limit: Int?): Result<AssociationSyncResult> {
+        return cloudApiClient.getAssociationChanges(accessToken, since.toEpochMilliseconds(), limit).map { response ->
             AssociationSyncResult(
                 additions = response.changes.filter { !it.isDeleted }.map { it.toAssociation() },
                 deletions = response.deletions.map { 
@@ -92,7 +93,8 @@ class DefaultCloudAssociationDataSource(
                         createdAt = Instant.fromEpochMilliseconds(it.deletedAt)
                     )
                 },
-                lastSyncTimestamp = Instant.fromEpochMilliseconds(response.lastTimestamp)
+                lastSyncTimestamp = Instant.fromEpochMilliseconds(response.lastTimestamp),
+                hasMore = response.hasMore
             )
         }
     }

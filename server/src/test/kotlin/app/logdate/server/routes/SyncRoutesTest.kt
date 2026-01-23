@@ -2,15 +2,16 @@ package app.logdate.server.routes
 
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.module
-import io.ktor.client.call.body
+import app.logdate.shared.model.sync.MediaDownloadResponse
+import app.logdate.shared.model.sync.MediaUploadResponse
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.koin.ktor.ext.getKoin
+import java.util.Base64
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,8 +21,7 @@ class SyncRoutesTest {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    private fun authHeader(tokenService: JwtTokenService): String {
-        val accountId = UUID.randomUUID().toString()
+    private fun authHeader(tokenService: JwtTokenService, accountId: String = UUID.randomUUID().toString()): String {
         return "Bearer ${tokenService.generateAccessToken(accountId)}"
     }
 
@@ -38,6 +38,7 @@ class SyncRoutesTest {
         )
     }
 
+
     @Serializable
     private data class ContentChangesPayload(
         val data: ChangesData
@@ -46,7 +47,8 @@ class SyncRoutesTest {
         data class ChangesData(
             val changes: List<ContentChange>,
             val deletions: List<ContentDeletion>,
-            val lastTimestamp: Long
+            val lastTimestamp: Long,
+            val hasMore: Boolean = false
         )
 
         @Serializable
@@ -127,7 +129,7 @@ class SyncRoutesTest {
             module()
             tokenService = getKoin().get()
         }
-        val authHeader = authHeader(tokenService)
+        val authHeader = authHeader(tokenService, "multi-device-user")
 
         // seed initial content
         client.post("/api/v1/sync/content") {
@@ -142,7 +144,7 @@ class SyncRoutesTest {
                   "mediaUri": null,
                   "createdAt": 1,
                   "lastUpdated": 1,
-                  "deviceId": "dev-1"
+                  "deviceId": "device-a"
                 }
                 """.trimIndent()
             )
@@ -158,7 +160,7 @@ class SyncRoutesTest {
                   "content": "second",
                   "mediaUri": null,
                   "lastUpdated": 2,
-                  "deviceId": "dev-1",
+                  "deviceId": "device-b",
                   "versionConstraint": {
                     "type": "known",
                     "serverVersion": 0
@@ -207,6 +209,40 @@ class SyncRoutesTest {
         }
         val payload = json.decodeFromString<ContentChangesPayload>(changes.bodyAsText())
         assertTrue(payload.data.deletions.any { it.id == "note-3" })
+    }
+
+    @Test
+    fun `content changes paginates and reports hasMore`() = testApplication {
+        lateinit var tokenService: JwtTokenService
+        application {
+            module()
+            tokenService = getKoin().get()
+        }
+        val authHeader = authHeader(tokenService)
+
+        val payloads = listOf(
+            """{ "id": "note-p1", "type": "TEXT", "content": "one", "mediaUri": null, "createdAt": 1, "lastUpdated": 1, "deviceId": "dev-1" }""",
+            """{ "id": "note-p2", "type": "TEXT", "content": "two", "mediaUri": null, "createdAt": 2, "lastUpdated": 2, "deviceId": "dev-1" }""",
+            """{ "id": "note-p3", "type": "TEXT", "content": "three", "mediaUri": null, "createdAt": 3, "lastUpdated": 3, "deviceId": "dev-1" }"""
+        )
+
+        payloads.forEach { payload ->
+            val upload = client.post("/api/v1/sync/content") {
+                header(HttpHeaders.Authorization, authHeader)
+                contentType(ContentType.Application.Json)
+                setBody(payload)
+            }
+            assertEquals(HttpStatusCode.OK, upload.status)
+        }
+
+        val changes = client.get("/api/v1/sync/content/changes?since=0&limit=2") {
+            header(HttpHeaders.Authorization, authHeader)
+        }
+        assertEquals(HttpStatusCode.OK, changes.status)
+
+        val payload = json.decodeFromString<ContentChangesPayload>(changes.bodyAsText())
+        assertEquals(2, payload.data.changes.size)
+        assertTrue(payload.data.hasMore)
     }
 
     @Serializable
@@ -405,6 +441,46 @@ class SyncRoutesTest {
             header(HttpHeaders.Authorization, authHeader)
         }
         assertEquals(HttpStatusCode.OK, changes.status)
+    }
+
+    @Test
+    fun `media upload and download returns bytes`() = testApplication {
+        lateinit var tokenService: JwtTokenService
+        application {
+            module()
+            tokenService = getKoin().get()
+        }
+        val authHeader = authHeader(tokenService)
+        val bytes = byteArrayOf(1, 2, 3, 4)
+        val encoded = Base64.getEncoder().encodeToString(bytes)
+
+        val upload = client.post("/api/v1/sync/media") {
+            header(HttpHeaders.Authorization, authHeader)
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {
+                  "contentId": "note-media",
+                  "fileName": "photo.jpg",
+                  "mimeType": "image/jpeg",
+                  "sizeBytes": ${bytes.size},
+                  "data": "$encoded",
+                  "deviceId": "dev-1"
+                }
+                """.trimIndent()
+            )
+        }
+        assertEquals(HttpStatusCode.OK, upload.status)
+
+        val uploadPayload = json.decodeFromString<MediaUploadResponse>(upload.bodyAsText())
+        val download = client.get("/api/v1/sync/media/${uploadPayload.mediaId}") {
+            header(HttpHeaders.Authorization, authHeader)
+        }
+        assertEquals(HttpStatusCode.OK, download.status)
+
+        val downloadPayload = json.decodeFromString<MediaDownloadResponse>(download.bodyAsText())
+        assertEquals(bytes.size.toLong(), downloadPayload.sizeBytes)
+        assertTrue(downloadPayload.data.contentEquals(bytes))
     }
 
     @Test

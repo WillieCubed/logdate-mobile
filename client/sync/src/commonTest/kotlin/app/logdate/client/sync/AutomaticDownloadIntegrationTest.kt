@@ -1,5 +1,6 @@
 package app.logdate.client.sync
 
+import app.logdate.client.media.StubMediaManager
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.sync.cloud.AssociationChange
 import app.logdate.client.sync.cloud.AssociationChangesResponse
@@ -80,11 +81,16 @@ class AutomaticDownloadIntegrationTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
             cloudAccountRepository = mockAccountRepository,
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = mockJournalRepository,
             journalNotesRepository = mockJournalNotesRepository,
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = fakeSyncMetadataService(),
             transactionManager = testSyncTransactionManager()
         )
@@ -142,11 +148,16 @@ class AutomaticDownloadIntegrationTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
             cloudAccountRepository = mockAccountRepository,
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = mockJournalRepository,
             journalNotesRepository = mockJournalNotesRepository,
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = fakeSyncMetadataService(),
             transactionManager = testSyncTransactionManager()
         )
@@ -191,11 +202,16 @@ class AutomaticDownloadIntegrationTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
             cloudAccountRepository = mockAccountRepository,
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = mockJournalRepository,
             journalNotesRepository = mockJournalNotesRepository,
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = fakeSyncMetadataService(),
             transactionManager = testSyncTransactionManager()
         )
@@ -240,11 +256,16 @@ class AutomaticDownloadIntegrationTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
             cloudAccountRepository = fakeAccountRepository(),
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = mockJournalRepository,
             journalNotesRepository = mockNotesRepository,
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = syncMetadataService,
             transactionManager = testSyncTransactionManager()
         )
@@ -270,11 +291,16 @@ class AutomaticDownloadIntegrationTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
             cloudAccountRepository = fakeAccountRepository(),
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = mockJournalRepository,
             journalNotesRepository = mockNotesRepository,
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = fakeSyncMetadataService(),
             transactionManager = testSyncTransactionManager()
         )
@@ -362,11 +388,16 @@ class AutomaticDownloadIntegrationTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
             cloudAccountRepository = fakeAccountRepository(),
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = mockJournalRepository,
             journalNotesRepository = failingNotesRepository,
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = syncMetadataService,
             transactionManager = testSyncTransactionManager()
         )
@@ -420,11 +451,16 @@ class AutomaticDownloadIntegrationTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
             cloudAccountRepository = fakeAccountRepository(),
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = mockJournalRepository,
             journalNotesRepository = mockNotesRepository,
             journalContentRepository = trackingContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = syncMetadataService,
             transactionManager = testSyncTransactionManager()
         )
@@ -480,11 +516,16 @@ class AutomaticDownloadIntegrationTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
             cloudAccountRepository = mockAccountRepository,
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = mockJournalRepository,
             journalNotesRepository = mockJournalNotesRepository,
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = fakeSyncMetadataService(),
             transactionManager = testSyncTransactionManager()
         )
@@ -537,11 +578,16 @@ class AutomaticDownloadIntegrationTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
             cloudAccountRepository = fakeAccountRepository(),
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = mockJournalRepository,
             journalNotesRepository = mockNotesRepository,
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = syncMetadataService,
             transactionManager = testSyncTransactionManager()
         )
@@ -567,11 +613,16 @@ class AutomaticDownloadIntegrationTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
             cloudAccountRepository = fakeAccountRepository(),
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = mockJournalRepository,
             journalNotesRepository = mockNotesRepository,
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = fakeSyncMetadataService(),
             transactionManager = testSyncTransactionManager()
         )
@@ -654,11 +705,16 @@ class AutomaticDownloadIntegrationTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
             cloudAccountRepository = mockAccountRepository,
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = mockJournalRepository,
             journalNotesRepository = mockJournalNotesRepository,
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = fakeSyncMetadataService(),
             transactionManager = testSyncTransactionManager()
         )
@@ -688,11 +744,16 @@ class AutomaticDownloadIntegrationTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
             cloudAccountRepository = mockAccountRepository,
             sessionStorage = fakeSessionStorage(authenticated = false),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = mockJournalRepository,
             journalNotesRepository = mockJournalNotesRepository,
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = fakeSyncMetadataService(),
             transactionManager = testSyncTransactionManager()
         )
@@ -724,11 +785,16 @@ class AutomaticDownloadIntegrationTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
             cloudAccountRepository = mockAccountRepository,
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = mockJournalRepository,
             journalNotesRepository = mockJournalNotesRepository,
             journalContentRepository = mockJournalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = fakeSyncMetadataService(),
             transactionManager = testSyncTransactionManager()
         )

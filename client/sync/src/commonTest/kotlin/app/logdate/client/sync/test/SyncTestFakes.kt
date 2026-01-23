@@ -2,6 +2,8 @@ package app.logdate.client.sync.test
 
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
+import app.logdate.client.media.MediaManager
+import app.logdate.client.media.StubMediaManager
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
@@ -17,10 +19,17 @@ import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.cloud.*
 import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.LastWriteWinsResolver
+import app.logdate.client.sync.conflict.SyncConflictRecord
+import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.MediaSyncRef
+import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.PendingUpload
+import app.logdate.client.sync.metadata.SyncDeadLetterRecord
+import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import app.logdate.shared.model.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -73,11 +82,16 @@ fun testDefaultSyncManager(
     cloudMediaDataSource: CloudMediaDataSource = DefaultCloudMediaDataSource(fakeCloudApiClient()),
     cloudAccountRepository: CloudAccountRepository = fakeAccountRepository(),
     sessionStorage: SessionStorage = fakeSessionStorage(),
+    mediaManager: MediaManager = StubMediaManager(),
+    mediaSyncRefStore: MediaSyncRefStore = InMemoryMediaSyncRefStore(),
     journalRepository: JournalRepository = FakeJournalRepository(),
     journalNotesRepository: JournalNotesRepository = FakeJournalNotesRepository(),
     journalContentRepository: JournalContentRepository = FakeJournalContentRepository(),
     journalConflictResolver: ConflictResolver<Journal> = lastWriteWinsResolver(),
     noteConflictResolver: ConflictResolver<JournalNote> = lastWriteWinsResolver(),
+    conflictStore: SyncConflictStore = InMemorySyncConflictStore(),
+    deadLetterStore: SyncDeadLetterStore = InMemorySyncDeadLetterStore(),
+    retryScheduleStore: SyncRetryScheduleStore = InMemorySyncRetryScheduleStore(),
     syncMetadataService: SyncMetadataService = fakeSyncMetadataService(),
     transactionManager: SyncTransactionManager = testSyncTransactionManager()
 ): DefaultSyncManager = DefaultSyncManager(
@@ -87,11 +101,16 @@ fun testDefaultSyncManager(
     cloudMediaDataSource = cloudMediaDataSource,
     cloudAccountRepository = cloudAccountRepository,
     sessionStorage = sessionStorage,
+    mediaManager = mediaManager,
+    mediaSyncRefStore = mediaSyncRefStore,
     journalRepository = journalRepository,
     journalNotesRepository = journalNotesRepository,
     journalContentRepository = journalContentRepository,
     journalConflictResolver = journalConflictResolver,
     noteConflictResolver = noteConflictResolver,
+    conflictStore = conflictStore,
+    deadLetterStore = deadLetterStore,
+    retryScheduleStore = retryScheduleStore,
     syncMetadataService = syncMetadataService,
     transactionManager = transactionManager
 )
@@ -169,7 +188,7 @@ class FakeCloudApiClient : CloudApiClient {
         return Result.success("new-access-token")
     }
 
-    override suspend fun getAccountInfo(accessToken: String): Result<AccountInfoResponse> {
+    override suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount> {
         methodCalls.add("getAccountInfo")
         return Result.failure(NotImplementedError("Use for sync testing only"))
     }
@@ -193,7 +212,7 @@ class FakeCloudApiClient : CloudApiClient {
         return deleteContentResponse
     }
 
-    override suspend fun getContentChanges(accessToken: String, since: Long): Result<ContentChangesResponse> {
+    override suspend fun getContentChanges(accessToken: String, since: Long, limit: Int?): Result<ContentChangesResponse> {
         methodCalls.add("getContentChanges")
         getContentChangesCalls.add(accessToken to since)
         return getContentChangesResponse
@@ -215,7 +234,7 @@ class FakeCloudApiClient : CloudApiClient {
         return deleteJournalResponse
     }
 
-    override suspend fun getJournalChanges(accessToken: String, since: Long): Result<JournalChangesResponse> {
+    override suspend fun getJournalChanges(accessToken: String, since: Long, limit: Int?): Result<JournalChangesResponse> {
         methodCalls.add("getJournalChanges")
         return getJournalChangesResponse
     }
@@ -226,7 +245,7 @@ class FakeCloudApiClient : CloudApiClient {
         return uploadAssociationsResponse
     }
 
-    override suspend fun getAssociationChanges(accessToken: String, since: Long): Result<AssociationChangesResponse> {
+    override suspend fun getAssociationChanges(accessToken: String, since: Long, limit: Int?): Result<AssociationChangesResponse> {
         methodCalls.add("getAssociationChanges")
         return getAssociationChangesResponse
     }
@@ -358,16 +377,21 @@ class FakeSessionStorage : SessionStorage {
  */
 class FakeSyncMetadataService : SyncMetadataService {
     private val pendingUploads = mutableMapOf<EntityType, MutableMap<String, PendingOperation>>()
+    private val retryCounts = mutableMapOf<EntityType, MutableMap<String, Int>>()
     private val syncTimes = mutableMapOf<EntityType, Instant>()
     private val _pendingCount = MutableStateFlow(0)
 
     override suspend fun getPendingUploads(entityType: EntityType): List<PendingUpload> =
         pendingUploads[entityType]
-            ?.map { (entityId, operation) -> PendingUpload(entityId, operation) }
+            ?.map { (entityId, operation) ->
+                val retryCount = retryCounts[entityType]?.get(entityId) ?: 0
+                PendingUpload(entityId, operation, retryCount)
+            }
             ?: emptyList()
 
     override suspend fun markAsSynced(entityId: String, entityType: EntityType, syncedAt: Instant, version: Long) {
         pendingUploads[entityType]?.remove(entityId)
+        retryCounts[entityType]?.remove(entityId)
         updatePendingCount()
     }
 
@@ -379,6 +403,7 @@ class FakeSyncMetadataService : SyncMetadataService {
 
     override suspend fun enqueuePending(entityId: String, entityType: EntityType, operation: PendingOperation) {
         pendingUploads.getOrPut(entityType) { mutableMapOf() }[entityId] = operation
+        retryCounts.getOrPut(entityType) { mutableMapOf() }.putIfAbsent(entityId, 0)
         updatePendingCount()
     }
 
@@ -391,6 +416,11 @@ class FakeSyncMetadataService : SyncMetadataService {
 
     override fun observePendingCount(): Flow<Int> = _pendingCount
 
+    override suspend fun incrementRetryCount(entityId: String, entityType: EntityType) {
+        val counts = retryCounts.getOrPut(entityType) { mutableMapOf() }
+        counts[entityId] = (counts[entityId] ?: 0) + 1
+    }
+
     private fun updatePendingCount() {
         _pendingCount.value = pendingUploads.values.sumOf { it.size }
     }
@@ -402,6 +432,7 @@ class FakeSyncMetadataService : SyncMetadataService {
 
     fun clear() {
         pendingUploads.clear()
+        retryCounts.clear()
         syncTimes.clear()
         _pendingCount.value = 0
     }
@@ -469,6 +500,21 @@ class FakeJournalNotesRepository : SyncableJournalNotesRepository {
         val index = notes.indexOfFirst { it.uid == note.uid }
         if (index >= 0) {
             notes[index] = note
+            _notesFlow.value = notes.toList()
+        }
+    }
+
+    override suspend fun updateMediaRef(noteId: Uuid, mediaRef: String) {
+        val index = notes.indexOfFirst { it.uid == noteId }
+        if (index >= 0) {
+            val current = notes[index]
+            val updated = when (current) {
+                is JournalNote.Image -> current.copy(mediaRef = mediaRef)
+                is JournalNote.Video -> current.copy(mediaRef = mediaRef)
+                is JournalNote.Audio -> current.copy(mediaRef = mediaRef)
+                else -> current
+            }
+            notes[index] = updated
             _notesFlow.value = notes.toList()
         }
     }
@@ -657,5 +703,77 @@ class TrackingSyncManager : SyncManager {
 class TestSyncTransactionManager : SyncTransactionManager {
     override suspend fun <T> withTransaction(block: suspend () -> T): T {
         return block()
+    }
+}
+
+class InMemoryMediaSyncRefStore : MediaSyncRefStore {
+    private val refs = mutableMapOf<String, MediaSyncRef>()
+
+    override suspend fun get(noteId: Uuid): MediaSyncRef? {
+        return refs[noteId.toString()]
+    }
+
+    override suspend fun upsert(ref: MediaSyncRef) {
+        refs[ref.noteId] = ref
+    }
+
+    override suspend fun delete(noteId: Uuid) {
+        refs.remove(noteId.toString())
+    }
+}
+
+class InMemorySyncConflictStore : SyncConflictStore {
+    private val conflicts = mutableMapOf<String, SyncConflictRecord>()
+
+    override suspend fun list(): List<SyncConflictRecord> {
+        return conflicts.values.toList()
+    }
+
+    override suspend fun add(record: SyncConflictRecord) {
+        conflicts[record.id] = record
+    }
+
+    override suspend fun remove(id: String) {
+        conflicts.remove(id)
+    }
+
+    override suspend fun clear() {
+        conflicts.clear()
+    }
+}
+
+class InMemorySyncDeadLetterStore : SyncDeadLetterStore {
+    private val deadLetters = mutableMapOf<String, SyncDeadLetterRecord>()
+
+    override suspend fun list(): List<SyncDeadLetterRecord> {
+        return deadLetters.values.toList()
+    }
+
+    override suspend fun add(record: SyncDeadLetterRecord) {
+        deadLetters[record.id] = record
+    }
+
+    override suspend fun remove(id: String) {
+        deadLetters.remove(id)
+    }
+
+    override suspend fun clear() {
+        deadLetters.clear()
+    }
+}
+
+class InMemorySyncRetryScheduleStore : SyncRetryScheduleStore {
+    private val schedule = mutableMapOf<String, Long>()
+
+    override suspend fun nextAttemptAt(entityType: EntityType, entityId: String): Long? {
+        return schedule["${entityType.name}:$entityId"]
+    }
+
+    override suspend fun setNextAttemptAt(entityType: EntityType, entityId: String, timestamp: Long) {
+        schedule["${entityType.name}:$entityId"] = timestamp
+    }
+
+    override suspend fun clear(entityType: EntityType, entityId: String) {
+        schedule.remove("${entityType.name}:$entityId")
     }
 }

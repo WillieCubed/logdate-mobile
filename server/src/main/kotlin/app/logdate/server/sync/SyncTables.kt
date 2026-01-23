@@ -4,10 +4,11 @@ import org.jetbrains.exposed.sql.Table
 
 object ContentSyncTable : Table("sync_content") {
     val id = varchar("id", 128)
-    val userId = uuid("user_id").nullable()
+    val userId = uuid("user_id")
     val type = varchar("type", 32)
     val content = text("content").nullable()
     val mediaUri = text("media_uri").nullable()
+    val durationMs = long("duration_ms").nullable()
     val createdAt = long("created_at")
     val lastUpdated = long("last_updated")
     val serverVersion = long("server_version")
@@ -20,7 +21,7 @@ object ContentSyncTable : Table("sync_content") {
 
 object JournalSyncTable : Table("sync_journals") {
     val id = varchar("id", 128)
-    val userId = uuid("user_id").nullable()
+    val userId = uuid("user_id")
     val title = varchar("title", 256)
     val description = text("description")
     val createdAt = long("created_at")
@@ -36,7 +37,7 @@ object JournalSyncTable : Table("sync_journals") {
 object AssociationSyncTable : Table("sync_associations") {
     val journalId = varchar("journal_id", 128)
     val contentId = varchar("content_id", 128)
-    val userId = uuid("user_id").nullable()
+    val userId = uuid("user_id")
     val createdAt = long("created_at")
     val serverVersion = long("server_version")
     val deviceId = varchar("device_id", 128)
@@ -49,7 +50,7 @@ object AssociationSyncTable : Table("sync_associations") {
 object MediaSyncTable : Table("sync_media") {
     val mediaId = varchar("media_id", 128)
     val contentId = varchar("content_id", 128)
-    val userId = uuid("user_id").nullable()
+    val userId = uuid("user_id")
     val fileName = varchar("file_name", 256)
     val mimeType = varchar("mime_type", 128)
     val sizeBytes = long("size_bytes")

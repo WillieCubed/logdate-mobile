@@ -1,6 +1,7 @@
 package app.logdate.client.sync.cloud
 
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.sync.VersionConstraint
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
@@ -89,6 +90,37 @@ class DefaultCloudContentDataSourceTest {
         assertEquals("IMAGE", request.type, "Should set correct note type")
         assertEquals(null, request.content, "Image note should have no text content")
         assertEquals(imageNote.mediaRef, request.mediaUri, "Should preserve media URI")
+    }
+
+    @Test
+    fun testUploadAudioNoteIncludesDuration() = runTest {
+        // Given
+        val accessToken = "test-token"
+        val audioNote = JournalNote.Audio(
+            uid = Uuid.random(),
+            mediaRef = "file:///test/audio.m4a",
+            durationMs = 5300,
+            creationTimestamp = Clock.System.now(),
+            lastUpdated = Clock.System.now()
+        )
+
+        mockApiClient.uploadContentResponse = Result.success(
+            ContentUploadResponse(
+                id = audioNote.uid.toString(),
+                serverVersion = 1,
+                uploadedAt = Clock.System.now().toEpochMilliseconds()
+            )
+        )
+
+        // When
+        val result = dataSource.uploadNote(accessToken, audioNote)
+
+        // Then
+        assertTrue(result.isSuccess, "Upload should succeed")
+        val (_, request) = mockApiClient.uploadCalls.first()
+        assertEquals("AUDIO", request.type, "Should set correct note type")
+        assertEquals(audioNote.mediaRef, request.mediaUri, "Should preserve media URI")
+        assertEquals(audioNote.durationMs, request.durationMs, "Should include duration")
     }
     
     @Test
@@ -191,9 +223,10 @@ class DefaultCloudContentDataSourceTest {
         assertTrue(result.isSuccess, "Get changes should succeed")
         assertEquals(1, mockApiClient.getChangesCalls.size, "Should make one API call")
         
-        val (token, timestamp) = mockApiClient.getChangesCalls.first()
+        val (token, timestamp, limit) = mockApiClient.getChangesCalls.first()
         assertEquals(accessToken, token, "Should use correct access token")
         assertEquals(since.toEpochMilliseconds(), timestamp, "Should pass correct timestamp")
+        assertEquals(null, limit, "Should not set a limit by default")
         
         val syncResult = result.getOrNull()!!
         assertEquals(1, syncResult.changes.size, "Should have one change")
@@ -203,6 +236,44 @@ class DefaultCloudContentDataSourceTest {
         val convertedNote = syncResult.changes.first()
         assertTrue(convertedNote is JournalNote.Text, "Should convert to correct note type")
         assertEquals(noteChange.content, (convertedNote as JournalNote.Text).content, "Should preserve content")
+    }
+
+    @Test
+    fun testGetContentChangesAudioIncludesDuration() = runTest {
+        // Given
+        val accessToken = "test-token"
+        val since = Clock.System.now()
+        val lastTimestamp = Clock.System.now().toEpochMilliseconds()
+        val durationMs = 4200L
+
+        val audioChange = ContentChange(
+            id = Uuid.random().toString(),
+            type = "AUDIO",
+            content = null,
+            mediaUri = "file:///test/audio.m4a",
+            durationMs = durationMs,
+            createdAt = Clock.System.now().toEpochMilliseconds(),
+            lastUpdated = Clock.System.now().toEpochMilliseconds(),
+            serverVersion = 2,
+            isDeleted = false
+        )
+
+        mockApiClient.contentChangesResponse = Result.success(
+            ContentChangesResponse(
+                changes = listOf(audioChange),
+                deletions = emptyList(),
+                lastTimestamp = lastTimestamp
+            )
+        )
+
+        // When
+        val result = dataSource.getContentChanges(accessToken, since)
+
+        // Then
+        assertTrue(result.isSuccess, "Get changes should succeed")
+        val syncResult = result.getOrNull()!!
+        val convertedNote = syncResult.changes.first() as JournalNote.Audio
+        assertEquals(durationMs, convertedNote.durationMs, "Should preserve duration")
     }
     
     @Test
@@ -264,7 +335,7 @@ private class MockCloudApiClientForContent : CloudApiClient {
     val uploadCalls = mutableListOf<Pair<String, ContentUploadRequest>>()
     val updateCalls = mutableListOf<Triple<String, String, ContentUpdateRequest>>()
     val deleteCalls = mutableListOf<Pair<String, String>>()
-    val getChangesCalls = mutableListOf<Pair<String, Long>>()
+    val getChangesCalls = mutableListOf<Triple<String, Long, Int?>>()
     
     override suspend fun uploadContent(accessToken: String, content: ContentUploadRequest): Result<ContentUploadResponse> {
         uploadCalls.add(accessToken to content)
@@ -281,8 +352,8 @@ private class MockCloudApiClientForContent : CloudApiClient {
         return deleteContentResponse
     }
     
-    override suspend fun getContentChanges(accessToken: String, since: Long): Result<ContentChangesResponse> {
-        getChangesCalls.add(accessToken to since)
+    override suspend fun getContentChanges(accessToken: String, since: Long, limit: Int?): Result<ContentChangesResponse> {
+        getChangesCalls.add(Triple(accessToken, since, limit))
         return contentChangesResponse
     }
     
@@ -295,11 +366,11 @@ private class MockCloudApiClientForContent : CloudApiClient {
         Result.failure(NotImplementedError())
     override suspend fun refreshAccessToken(refreshToken: String): Result<String> = 
         Result.failure(NotImplementedError())
-    override suspend fun getAccountInfo(accessToken: String): Result<AccountInfoResponse> = 
+    override suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount> = 
         Result.failure(NotImplementedError())
     override suspend fun uploadJournal(accessToken: String, journal: JournalUploadRequest): Result<JournalUploadResponse> = 
         Result.failure(NotImplementedError())
-    override suspend fun getJournalChanges(accessToken: String, since: Long): Result<JournalChangesResponse> = 
+    override suspend fun getJournalChanges(accessToken: String, since: Long, limit: Int?): Result<JournalChangesResponse> = 
         Result.failure(NotImplementedError())
     override suspend fun updateJournal(accessToken: String, journalId: String, journal: JournalUpdateRequest): Result<JournalUpdateResponse> = 
         Result.failure(NotImplementedError())
@@ -307,7 +378,7 @@ private class MockCloudApiClientForContent : CloudApiClient {
         Result.failure(NotImplementedError())
     override suspend fun uploadAssociations(accessToken: String, associations: AssociationUploadRequest): Result<AssociationUploadResponse> = 
         Result.failure(NotImplementedError())
-    override suspend fun getAssociationChanges(accessToken: String, since: Long): Result<AssociationChangesResponse> = 
+    override suspend fun getAssociationChanges(accessToken: String, since: Long, limit: Int?): Result<AssociationChangesResponse> = 
         Result.failure(NotImplementedError())
     override suspend fun deleteAssociations(accessToken: String, associations: AssociationDeleteRequest): Result<Unit> = 
         Result.failure(NotImplementedError())

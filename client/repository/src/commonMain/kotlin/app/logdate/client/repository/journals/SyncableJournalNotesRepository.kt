@@ -10,4 +10,5 @@ interface SyncableJournalNotesRepository : JournalNotesRepository {
     suspend fun createFromSync(note: JournalNote)
     suspend fun deleteFromSync(noteId: Uuid)
     suspend fun updateSyncMetadata(note: JournalNote, syncVersion: Long, syncedAt: Instant)
+    suspend fun updateMediaRef(noteId: Uuid, mediaRef: String)
 }

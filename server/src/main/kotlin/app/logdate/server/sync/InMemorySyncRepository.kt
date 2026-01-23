@@ -55,14 +55,25 @@ class InMemorySyncRepository : SyncRepository {
         lastTimestamp.set(deletedAt)
     }
 
-    override fun contentChanges(userId: UUID, since: Long): ChangeSet<ContentRecord, ContentDeletionMarker> {
-        val changes = content.forUser(userId).values
+    override fun contentChanges(userId: UUID, since: Long, limit: Int): ChangeSet<ContentRecord, ContentDeletionMarker> {
+        val changeRows = content.forUser(userId).values
             .filter { it.lastUpdated > since || it.serverVersion > since }
-            .map { it.copy() }
-        val deletions = contentDeletions.forUser(userId)
+            .sortedBy { it.lastUpdated }
+        val hasMoreChanges = changeRows.size > limit
+        val changes = changeRows.take(limit).map { it.copy() }
+
+        val deletionRows = contentDeletions.forUser(userId)
             .filterValues { it > since }
-            .map { ContentDeletionMarker(it.key, it.value) }
-        return ChangeSet(changes, deletions, lastTimestamp.get())
+            .toList()
+            .sortedBy { it.second }
+        val hasMoreDeletions = deletionRows.size > limit
+        val deletions = deletionRows.take(limit).map { ContentDeletionMarker(it.first, it.second) }
+
+        val lastTimestamp = listOfNotNull(
+            changes.maxOfOrNull { it.lastUpdated },
+            deletions.maxOfOrNull { it.deletedAt }
+        ).maxOrNull() ?: since
+        return ChangeSet(changes, deletions, lastTimestamp, hasMoreChanges || hasMoreDeletions)
     }
 
     // Journals
@@ -80,14 +91,25 @@ class InMemorySyncRepository : SyncRepository {
         lastTimestamp.set(deletedAt)
     }
 
-    override fun journalChanges(userId: UUID, since: Long): ChangeSet<JournalRecord, JournalDeletionMarker> {
-        val changes = journals.forUser(userId).values
+    override fun journalChanges(userId: UUID, since: Long, limit: Int): ChangeSet<JournalRecord, JournalDeletionMarker> {
+        val changeRows = journals.forUser(userId).values
             .filter { it.lastUpdated > since || it.serverVersion > since }
-            .map { it.copy() }
-        val deletions = journalDeletions.forUser(userId)
+            .sortedBy { it.lastUpdated }
+        val hasMoreChanges = changeRows.size > limit
+        val changes = changeRows.take(limit).map { it.copy() }
+
+        val deletionRows = journalDeletions.forUser(userId)
             .filterValues { it > since }
-            .map { JournalDeletionMarker(it.key, it.value) }
-        return ChangeSet(changes, deletions, lastTimestamp.get())
+            .toList()
+            .sortedBy { it.second }
+        val hasMoreDeletions = deletionRows.size > limit
+        val deletions = deletionRows.take(limit).map { JournalDeletionMarker(it.first, it.second) }
+
+        val lastTimestamp = listOfNotNull(
+            changes.maxOfOrNull { it.lastUpdated },
+            deletions.maxOfOrNull { it.deletedAt }
+        ).maxOrNull() ?: since
+        return ChangeSet(changes, deletions, lastTimestamp, hasMoreChanges || hasMoreDeletions)
     }
 
     // Associations
@@ -106,14 +128,25 @@ class InMemorySyncRepository : SyncRepository {
         lastTimestamp.set(deletedAt)
     }
 
-    override fun associationChanges(userId: UUID, since: Long): ChangeSet<AssociationRecord, AssociationDeletionMarker> {
-        val changes = associations.forUser(userId).values
+    override fun associationChanges(userId: UUID, since: Long, limit: Int): ChangeSet<AssociationRecord, AssociationDeletionMarker> {
+        val changeRows = associations.forUser(userId).values
             .filter { it.serverVersion > since || it.createdAt > since }
-            .map { it.copy() }
-        val deletions = associationDeletions.forUser(userId)
+            .sortedBy { it.createdAt }
+        val hasMoreChanges = changeRows.size > limit
+        val changes = changeRows.take(limit).map { it.copy() }
+
+        val deletionRows = associationDeletions.forUser(userId)
             .filterValues { it > since }
-            .map { (key, deletedAt) -> AssociationDeletionMarker(key, deletedAt) }
-        return ChangeSet(changes, deletions, lastTimestamp.get())
+            .toList()
+            .sortedBy { it.second }
+        val hasMoreDeletions = deletionRows.size > limit
+        val deletions = deletionRows.take(limit).map { (key, deletedAt) -> AssociationDeletionMarker(key, deletedAt) }
+
+        val lastTimestamp = listOfNotNull(
+            changes.maxOfOrNull { it.createdAt },
+            deletions.maxOfOrNull { it.deletedAt }
+        ).maxOrNull() ?: since
+        return ChangeSet(changes, deletions, lastTimestamp, hasMoreChanges || hasMoreDeletions)
     }
 
     // Media

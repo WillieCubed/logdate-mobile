@@ -49,6 +49,11 @@ interface SyncMetadataService {
      * Observes count of pending uploads for reactive UI updates.
      */
     fun observePendingCount(): Flow<Int>
+
+    /**
+     * Increments the retry count for a pending upload.
+     */
+    suspend fun incrementRetryCount(entityId: String, entityType: EntityType)
 }
 
 /**

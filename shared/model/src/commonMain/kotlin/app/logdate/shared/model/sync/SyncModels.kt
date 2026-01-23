@@ -2,6 +2,7 @@ package app.logdate.shared.model.sync
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.jvm.JvmInline
 
 /**
  * Identifier for the originating device of a sync operation.
@@ -45,6 +46,7 @@ data class ContentUploadRequest(
     val type: String, // TEXT, IMAGE, VIDEO, AUDIO
     val content: String?,
     val mediaUri: String?,
+    val durationMs: Long? = null,
     val createdAt: Long,
     val lastUpdated: Long,
     val syncVersion: Long = 0,
@@ -62,6 +64,7 @@ data class ContentUploadResponse(
 data class ContentUpdateRequest(
     val content: String? = null,
     val mediaUri: String? = null,
+    val durationMs: Long? = null,
     val lastUpdated: Long,
     val syncVersion: Long = 0,
     val deviceId: DeviceId = DeviceId.UNKNOWN,
@@ -79,7 +82,8 @@ data class ContentUpdateResponse(
 data class ContentChangesResponse(
     val changes: List<ContentChange>,
     val deletions: List<ContentDeletion>,
-    val lastTimestamp: Long
+    val lastTimestamp: Long,
+    val hasMore: Boolean = false
 )
 
 @Serializable
@@ -88,6 +92,7 @@ data class ContentChange(
     val type: String,
     val content: String? = null,
     val mediaUri: String? = null,
+    val durationMs: Long? = null,
     val createdAt: Long,
     val lastUpdated: Long,
     val serverVersion: Long,
@@ -139,7 +144,8 @@ data class JournalUpdateResponse(
 data class JournalChangesResponse(
     val changes: List<JournalChange>,
     val deletions: List<JournalDeletion>,
-    val lastTimestamp: Long
+    val lastTimestamp: Long,
+    val hasMore: Boolean = false
 )
 
 @Serializable
@@ -185,7 +191,8 @@ data class AssociationUploadResponse(
 data class AssociationChangesResponse(
     val changes: List<AssociationChange>,
     val deletions: List<AssociationDeletion>,
-    val lastTimestamp: Long
+    val lastTimestamp: Long,
+    val hasMore: Boolean = false
 )
 
 @Serializable

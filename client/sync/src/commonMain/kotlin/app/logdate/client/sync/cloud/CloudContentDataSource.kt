@@ -30,7 +30,7 @@ interface CloudContentDataSource {
     /**
      * Downloads all note changes since the specified timestamp.
      */
-    suspend fun getContentChanges(accessToken: String, since: Instant): Result<ContentSyncResult>
+    suspend fun getContentChanges(accessToken: String, since: Instant, limit: Int? = null): Result<ContentSyncResult>
 }
 
 /**
@@ -39,7 +39,8 @@ interface CloudContentDataSource {
 data class ContentSyncResult(
     val changes: List<JournalNote>,
     val deletions: List<Uuid>,
-    val lastSyncTimestamp: Instant
+    val lastSyncTimestamp: Instant,
+    val hasMore: Boolean = false
 )
 
 /**
@@ -73,12 +74,13 @@ class DefaultCloudContentDataSource(
         return cloudApiClient.deleteContent(accessToken, noteId.toString())
     }
     
-    override suspend fun getContentChanges(accessToken: String, since: Instant): Result<ContentSyncResult> {
-        return cloudApiClient.getContentChanges(accessToken, since.toEpochMilliseconds()).map { response ->
+    override suspend fun getContentChanges(accessToken: String, since: Instant, limit: Int?): Result<ContentSyncResult> {
+        return cloudApiClient.getContentChanges(accessToken, since.toEpochMilliseconds(), limit).map { response ->
             ContentSyncResult(
                 changes = response.changes.map { it.toJournalNote() },
                 deletions = response.deletions.map { Uuid.parse(it.id) },
-                lastSyncTimestamp = Instant.fromEpochMilliseconds(response.lastTimestamp)
+                lastSyncTimestamp = Instant.fromEpochMilliseconds(response.lastTimestamp),
+                hasMore = response.hasMore
             )
         }
     }
@@ -102,6 +104,10 @@ class DefaultCloudContentDataSource(
                 is JournalNote.Audio -> mediaRef
                 else -> null
             },
+            durationMs = when (this) {
+                is JournalNote.Audio -> durationMs
+                else -> null
+            },
             createdAt = creationTimestamp.toEpochMilliseconds(),
             lastUpdated = lastUpdated.toEpochMilliseconds(),
             syncVersion = syncVersion
@@ -118,6 +124,10 @@ class DefaultCloudContentDataSource(
                 is JournalNote.Image -> mediaRef
                 is JournalNote.Video -> mediaRef
                 is JournalNote.Audio -> mediaRef
+                else -> null
+            },
+            durationMs = when (this) {
+                is JournalNote.Audio -> durationMs
                 else -> null
             },
             lastUpdated = lastUpdated.toEpochMilliseconds(),
@@ -162,6 +172,7 @@ class DefaultCloudContentDataSource(
                 creationTimestamp = creationTimestamp,
                 lastUpdated = lastUpdated,
                 mediaRef = mediaUri ?: "",
+                durationMs = durationMs,
                 syncVersion = serverVersion
             )
             else -> throw IllegalArgumentException("Unknown content type: $type")

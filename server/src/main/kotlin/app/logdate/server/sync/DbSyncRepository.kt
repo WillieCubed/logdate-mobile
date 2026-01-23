@@ -38,6 +38,7 @@ class DbSyncRepository : SyncRepository {
                 it[type] = record.type
                 it[content] = record.content
                 it[mediaUri] = record.mediaUri
+                it[durationMs] = record.durationMs
                 it[createdAt] = record.createdAt
                 it[lastUpdated] = record.lastUpdated
                 it[ContentSyncTable.serverVersion] = serverVersion
@@ -50,6 +51,7 @@ class DbSyncRepository : SyncRepository {
                 it[type] = record.type
                 it[content] = record.content
                 it[mediaUri] = record.mediaUri
+                it[durationMs] = record.durationMs
                 it[lastUpdated] = record.lastUpdated
                 it[ContentSyncTable.serverVersion] = serverVersion
                 it[deviceId] = record.deviceId.value
@@ -82,21 +84,38 @@ class DbSyncRepository : SyncRepository {
         }
     }
 
-    override fun contentChanges(userId: UUID, since: Long): ChangeSet<ContentRecord, ContentDeletionMarker> = transaction {
-        val changes = ContentSyncTable.selectAll().where {
+    override fun contentChanges(userId: UUID, since: Long, limit: Int): ChangeSet<ContentRecord, ContentDeletionMarker> = transaction {
+        val changeRows = ContentSyncTable.selectAll().where {
             (ContentSyncTable.userId eq userId) and
+            (ContentSyncTable.deleted eq false) and
             ((ContentSyncTable.lastUpdated greater since) or (ContentSyncTable.serverVersion greater since))
-        }.mapNotNull { row ->
-            if (row[ContentSyncTable.deleted]) null else row.toContentRecord()
-        }
-        val deletions = ContentSyncTable.selectAll().where {
+        }.orderBy(ContentSyncTable.lastUpdated to SortOrder.ASC)
+            .limit(limit + 1)
+            .map { it.toContentRecord() }
+        val hasMoreChanges = changeRows.size > limit
+        val changes = changeRows.take(limit)
+
+        val deletionRows = ContentSyncTable.selectAll().where {
             (ContentSyncTable.userId eq userId) and
             (ContentSyncTable.deleted eq true) and
             (ContentSyncTable.deletedAt greater since)
-        }.map { row ->
-            ContentDeletionMarker(row[ContentSyncTable.id], row[ContentSyncTable.deletedAt] ?: currentTimestamp())
-        }
-        ChangeSet(changes, deletions, currentTimestamp())
+        }.orderBy(ContentSyncTable.deletedAt to SortOrder.ASC)
+            .limit(limit + 1)
+            .map { row ->
+                ContentDeletionMarker(
+                    row[ContentSyncTable.id],
+                    row[ContentSyncTable.deletedAt] ?: row[ContentSyncTable.lastUpdated]
+                )
+            }
+        val hasMoreDeletions = deletionRows.size > limit
+        val deletions = deletionRows.take(limit)
+
+        val lastTimestamp = listOfNotNull(
+            changes.maxOfOrNull { it.lastUpdated },
+            deletions.maxOfOrNull { it.deletedAt }
+        ).maxOrNull() ?: since
+
+        ChangeSet(changes, deletions, lastTimestamp, hasMoreChanges || hasMoreDeletions)
     }
 
     // --- Journals ---
@@ -154,21 +173,38 @@ class DbSyncRepository : SyncRepository {
         }
     }
 
-    override fun journalChanges(userId: UUID, since: Long): ChangeSet<JournalRecord, JournalDeletionMarker> = transaction {
-        val changes = JournalSyncTable.selectAll().where {
+    override fun journalChanges(userId: UUID, since: Long, limit: Int): ChangeSet<JournalRecord, JournalDeletionMarker> = transaction {
+        val changeRows = JournalSyncTable.selectAll().where {
             (JournalSyncTable.userId eq userId) and
+            (JournalSyncTable.deleted eq false) and
             ((JournalSyncTable.lastUpdated greater since) or (JournalSyncTable.serverVersion greater since))
-        }.mapNotNull { row ->
-            if (row[JournalSyncTable.deleted]) null else row.toJournalRecord()
-        }
-        val deletions = JournalSyncTable.selectAll().where {
+        }.orderBy(JournalSyncTable.lastUpdated to SortOrder.ASC)
+            .limit(limit + 1)
+            .map { it.toJournalRecord() }
+        val hasMoreChanges = changeRows.size > limit
+        val changes = changeRows.take(limit)
+
+        val deletionRows = JournalSyncTable.selectAll().where {
             (JournalSyncTable.userId eq userId) and
             (JournalSyncTable.deleted eq true) and
             (JournalSyncTable.deletedAt greater since)
-        }.map { row ->
-            JournalDeletionMarker(row[JournalSyncTable.id], row[JournalSyncTable.deletedAt] ?: currentTimestamp())
-        }
-        ChangeSet(changes, deletions, currentTimestamp())
+        }.orderBy(JournalSyncTable.deletedAt to SortOrder.ASC)
+            .limit(limit + 1)
+            .map { row ->
+                JournalDeletionMarker(
+                    row[JournalSyncTable.id],
+                    row[JournalSyncTable.deletedAt] ?: row[JournalSyncTable.lastUpdated]
+                )
+            }
+        val hasMoreDeletions = deletionRows.size > limit
+        val deletions = deletionRows.take(limit)
+
+        val lastTimestamp = listOfNotNull(
+            changes.maxOfOrNull { it.lastUpdated },
+            deletions.maxOfOrNull { it.deletedAt }
+        ).maxOrNull() ?: since
+
+        ChangeSet(changes, deletions, lastTimestamp, hasMoreChanges || hasMoreDeletions)
     }
 
     // --- Associations ---
@@ -235,24 +271,38 @@ class DbSyncRepository : SyncRepository {
         }
     }
 
-    override fun associationChanges(userId: UUID, since: Long): ChangeSet<AssociationRecord, AssociationDeletionMarker> = transaction {
-        val changes = AssociationSyncTable.selectAll().where {
+    override fun associationChanges(userId: UUID, since: Long, limit: Int): ChangeSet<AssociationRecord, AssociationDeletionMarker> = transaction {
+        val changeRows = AssociationSyncTable.selectAll().where {
             (AssociationSyncTable.userId eq userId) and
+            (AssociationSyncTable.deleted eq false) and
             ((AssociationSyncTable.serverVersion greater since) or (AssociationSyncTable.createdAt greater since))
-        }.mapNotNull { row ->
-            if (row[AssociationSyncTable.deleted]) null else row.toAssociationRecord()
-        }
-        val deletions = AssociationSyncTable.selectAll().where {
+        }.orderBy(AssociationSyncTable.createdAt to SortOrder.ASC)
+            .limit(limit + 1)
+            .map { it.toAssociationRecord() }
+        val hasMoreChanges = changeRows.size > limit
+        val changes = changeRows.take(limit)
+
+        val deletionRows = AssociationSyncTable.selectAll().where {
             (AssociationSyncTable.userId eq userId) and
             (AssociationSyncTable.deleted eq true) and
             (AssociationSyncTable.deletedAt greater since)
-        }.map { row ->
-            AssociationDeletionMarker(
-                AssociationKey(row[AssociationSyncTable.journalId], row[AssociationSyncTable.contentId]),
-                row[AssociationSyncTable.deletedAt] ?: currentTimestamp()
-            )
-        }
-        ChangeSet(changes, deletions, currentTimestamp())
+        }.orderBy(AssociationSyncTable.deletedAt to SortOrder.ASC)
+            .limit(limit + 1)
+            .map { row ->
+                AssociationDeletionMarker(
+                    AssociationKey(row[AssociationSyncTable.journalId], row[AssociationSyncTable.contentId]),
+                    row[AssociationSyncTable.deletedAt] ?: row[AssociationSyncTable.createdAt]
+                )
+            }
+        val hasMoreDeletions = deletionRows.size > limit
+        val deletions = deletionRows.take(limit)
+
+        val lastTimestamp = listOfNotNull(
+            changes.maxOfOrNull { it.createdAt },
+            deletions.maxOfOrNull { it.deletedAt }
+        ).maxOrNull() ?: since
+
+        ChangeSet(changes, deletions, lastTimestamp, hasMoreChanges || hasMoreDeletions)
     }
 
     // --- Media ---
@@ -306,6 +356,7 @@ class DbSyncRepository : SyncRepository {
         type = this[ContentSyncTable.type],
         content = this[ContentSyncTable.content],
         mediaUri = this[ContentSyncTable.mediaUri],
+        durationMs = this[ContentSyncTable.durationMs],
         createdAt = this[ContentSyncTable.createdAt],
         lastUpdated = this[ContentSyncTable.lastUpdated],
         serverVersion = this[ContentSyncTable.serverVersion],

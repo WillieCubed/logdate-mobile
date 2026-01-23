@@ -38,6 +38,7 @@ kotlin {
             implementation(projects.client.database)
             implementation(projects.client.datastore)
             implementation(projects.client.device)
+            implementation(projects.client.media)
             
             // External dependencies
             implementation(libs.kotlinx.datetime)

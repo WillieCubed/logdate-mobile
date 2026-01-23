@@ -1,6 +1,7 @@
 package app.logdate.client.sync.cloud
 
 import app.logdate.shared.model.AccountTokens
+import app.logdate.shared.model.AccountInfoResponse
 import app.logdate.shared.model.BeginAccountCreationData
 import app.logdate.shared.model.BeginAccountCreationRequest
 import app.logdate.shared.model.BeginAccountCreationResponse
@@ -14,6 +15,9 @@ import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.PasskeyUser
 import app.logdate.shared.model.RefreshTokenData
 import app.logdate.shared.model.RefreshTokenResponse
+import app.logdate.shared.model.UsernameAvailabilityData
+import app.logdate.shared.model.UsernameAvailabilityResponse
+import app.logdate.util.UuidSerializer
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -27,19 +31,24 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.uuid.Uuid
 
 /**
  * Tests for [LogDateCloudApiClient].
  */
 class BasicCloudApiClientTest {
     private val baseUrl = "https://api.logdate.example.com/v1"
-    private val json = Json { 
-        ignoreUnknownKeys = true 
+    private val json = Json {
+        ignoreUnknownKeys = true
         prettyPrint = false
+        serializersModule = SerializersModule {
+            contextual(Uuid::class, UuidSerializer)
+        }
     }
 
     @Test
@@ -48,12 +57,16 @@ class BasicCloudApiClientTest {
         val username = "testuser"
         val mockEngine = MockEngine { request ->
             // Verify the request URL is correct - now uses RESTful endpoint
-            assertEquals("$baseUrl/accounts/username/$username", request.url.toString(), "Request URL should target the username availability endpoint")
+            assertEquals("$baseUrl/accounts/username/$username/available", request.url.toString(), "Request URL should target the username availability endpoint")
             
-            // Return 404 Not Found to indicate username is available
+            val responseData = UsernameAvailabilityResponse(
+                success = true,
+                data = UsernameAvailabilityData(username = username, available = true)
+            )
+
             respond(
-                content = "",
-                status = HttpStatusCode.NotFound,
+                content = json.encodeToString(responseData),
+                status = HttpStatusCode.OK,
                 headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             )
         }
@@ -100,11 +113,15 @@ class BasicCloudApiClientTest {
         val username = "existinguser"
         val mockEngine = MockEngine { request ->
             // Verify the request URL is correct
-            assertEquals("$baseUrl/accounts/username/$username", request.url.toString(), "Request URL should target the username availability endpoint")
+            assertEquals("$baseUrl/accounts/username/$username/available", request.url.toString(), "Request URL should target the username availability endpoint")
             
-            // Return 200 OK to indicate username already exists
+            val responseData = UsernameAvailabilityResponse(
+                success = true,
+                data = UsernameAvailabilityData(username = username, available = false)
+            )
+
             respond(
-                content = "",
+                content = json.encodeToString(responseData),
                 status = HttpStatusCode.OK,
                 headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             )
@@ -173,22 +190,19 @@ class BasicCloudApiClientTest {
             assertEquals("$baseUrl/accounts/create/begin", req.url.toString(), "Request URL should target the begin account creation endpoint")
             
             // Create a successful response
-            val responseData = ApiResponse(
+            val responseData = BeginAccountCreationResponse(
                 success = true,
-                data = BeginAccountCreationResponse(
-                    success = true,
-                    data = BeginAccountCreationData(
-                        sessionToken = sessionToken,
-                        registrationOptions = PasskeyRegistrationOptions(
-                            challenge = challenge,
-                            user = PasskeyUser(
-                                id = "user-id-123",
-                                name = request.username,
-                                displayName = request.displayName
-                            ),
-                            excludeCredentials = emptyList(),
-                            timeout = 60000
-                        )
+                data = BeginAccountCreationData(
+                    sessionToken = sessionToken,
+                    registrationOptions = PasskeyRegistrationOptions(
+                        challenge = challenge,
+                        user = PasskeyUser(
+                            id = "user-id-123",
+                            name = request.username,
+                            displayName = request.displayName
+                        ),
+                        excludeCredentials = emptyList(),
+                        timeout = 60000
                     )
                 )
             )
@@ -237,23 +251,20 @@ class BasicCloudApiClientTest {
             assertEquals("$baseUrl/accounts/create/complete", req.url.toString(), "Request URL should target the complete account creation endpoint")
             
             // Create a successful response
-            val responseData = ApiResponse(
+            val responseData = CompleteAccountCreationResponse(
                 success = true,
-                data = CompleteAccountCreationResponse(
-                    success = true,
-                    data = CompleteAccountCreationData(
-                        account = LogDateAccount(
-                            username = "newuser",
-                            displayName = "New User",
-                            bio = "Testing the API",
-                            passkeyCredentialIds = listOf("credential-id-123"),
-                            createdAt = Clock.System.now(),
-                            updatedAt = Clock.System.now()
-                        ),
-                        tokens = AccountTokens(
-                            accessToken = "new-access-token",
-                            refreshToken = "new-refresh-token"
-                        )
+                data = CompleteAccountCreationData(
+                    account = LogDateAccount(
+                        username = "newuser",
+                        displayName = "New User",
+                        bio = "Testing the API",
+                        passkeyCredentialIds = listOf("credential-id-123"),
+                        createdAt = Clock.System.now(),
+                        updatedAt = Clock.System.now()
+                    ),
+                    tokens = AccountTokens(
+                        accessToken = "new-access-token",
+                        refreshToken = "new-refresh-token"
                     )
                 )
             )
@@ -296,16 +307,16 @@ class BasicCloudApiClientTest {
             // No debugging printlns - using descriptive assertion messages instead
             
             // Create a successful response with explicit data
-            val responseData = ApiResponse(
+            val responseData = AccountInfoResponse(
                 success = true,
-                data = AccountInfoResponse(
-                    id = "user-123",
+                data = LogDateAccount(
+                    id = Uuid.random(),
                     username = "testuser",
                     displayName = "Test User",
                     bio = "User profile for testing",
                     passkeyCredentialIds = listOf("credential-123"),
-                    createdAt = "2025-01-01T00:00:00Z",
-                    updatedAt = "2025-01-02T00:00:00Z"
+                    createdAt = Clock.System.now(),
+                    updatedAt = Clock.System.now()
                 )
             )
             
@@ -325,7 +336,6 @@ class BasicCloudApiClientTest {
         assertTrue(result.isSuccess, "API call should succeed, but got: ${result.exceptionOrNull()}")
         val response = result.getOrNull()
         assertTrue(response != null, "Response should not be null")
-        assertEquals("user-123", response?.id, "User ID should match")
         assertEquals("testuser", response?.username, "Username should match")
         assertEquals("Test User", response?.displayName, "Display name should match")
     }
@@ -336,6 +346,9 @@ class BasicCloudApiClientTest {
                 json(Json {
                     ignoreUnknownKeys = true
                     prettyPrint = false
+                    serializersModule = SerializersModule {
+                        contextual(Uuid::class, UuidSerializer)
+                    }
                 })
             }
         }

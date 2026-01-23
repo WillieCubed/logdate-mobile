@@ -1,12 +1,6 @@
 package app.logdate.client.sync.cloud
 
-import app.logdate.shared.model.BeginAccountCreationRequest
-import app.logdate.shared.model.BeginAccountCreationResponse
-import app.logdate.shared.model.CompleteAccountCreationRequest
-import app.logdate.shared.model.CompleteAccountCreationResponse
-import app.logdate.shared.model.RefreshTokenResponse
-import app.logdate.shared.model.RefreshTokenData
-import app.logdate.client.networking.httpClient
+import app.logdate.shared.model.*
 import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -33,11 +27,7 @@ class LogDateCloudApiClient(
 ) : CloudApiClient {
 
     /**
-     * Checks if a username is available for registration by attempting to get an account
-     * with the username. If a 404 is returned, the username is available. If a 200 is returned,
-     * the username is taken.
-     *
-     * This is a RESTful approach following proper HTTP semantics.
+     * Checks if a username is available for registration using the availability endpoint.
      *
      * @param username The username to check availability for.
      * @return Response indicating if the username is available.
@@ -45,22 +35,21 @@ class LogDateCloudApiClient(
      */
     override suspend fun checkUsernameAvailability(username: String): Result<CheckUsernameAvailabilityResponse> {
         return try {
-            val response = httpClient.get("$baseUrl/accounts/username/$username")
+            val response = httpClient.get("$baseUrl/accounts/username/$username/available")
             
             when (response.status) {
                 HttpStatusCode.OK -> {
-                    // Username exists, so it's not available
-                    Result.success(CheckUsernameAvailabilityResponse(
-                        username = username,
-                        available = false
-                    ))
-                }
-                HttpStatusCode.NotFound -> {
-                    // Username doesn't exist, so it's available
-                    Result.success(CheckUsernameAvailabilityResponse(
-                        username = username,
-                        available = true
-                    ))
+                    val responseBody = response.body<UsernameAvailabilityResponse>()
+                    if (responseBody.success) {
+                        Result.success(
+                            CheckUsernameAvailabilityResponse(
+                                username = responseBody.data.username,
+                                available = responseBody.data.available
+                            )
+                        )
+                    } else {
+                        handleApiError(response)
+                    }
                 }
                 else -> handleApiError(response)
             }
@@ -95,9 +84,9 @@ class LogDateCloudApiClient(
             
             when (response.status) {
                 HttpStatusCode.OK -> {
-                    val responseBody = response.body<ApiResponse<BeginAccountCreationResponse>>()
+                    val responseBody = response.body<BeginAccountCreationResponse>()
                     if (responseBody.success) {
-                        Result.success(responseBody.data)
+                        Result.success(responseBody)
                     } else {
                         handleApiError(response)
                     }
@@ -135,9 +124,9 @@ class LogDateCloudApiClient(
             
             when (response.status) {
                 HttpStatusCode.Created -> {
-                    val responseBody = response.body<ApiResponse<CompleteAccountCreationResponse>>()
+                    val responseBody = response.body<CompleteAccountCreationResponse>()
                     if (responseBody.success) {
-                        Result.success(responseBody.data)
+                        Result.success(responseBody)
                     } else {
                         handleApiError(response)
                     }
@@ -196,7 +185,7 @@ class LogDateCloudApiClient(
      * @return The account information if the request is successful.
      * @throws CloudApiException If the request fails.
      */
-    override suspend fun getAccountInfo(accessToken: String): Result<AccountInfoResponse> {
+    override suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount> {
         return try {
             Napier.d("Getting account info with token: ${accessToken.take(5)}...")
             
@@ -210,7 +199,7 @@ class LogDateCloudApiClient(
             when (response.status) {
                 HttpStatusCode.OK -> {
                     try {
-                        val responseBody = response.body<ApiResponse<AccountInfoResponse>>()
+                        val responseBody = response.body<AccountInfoResponse>()
                         Napier.d("Parsed response body with success=${responseBody.success}")
                         
                         if (responseBody.success) {
@@ -288,9 +277,10 @@ class LogDateCloudApiClient(
         }
     }
     
-    override suspend fun getContentChanges(accessToken: String, since: Long): Result<ContentChangesResponse> {
+    override suspend fun getContentChanges(accessToken: String, since: Long, limit: Int?): Result<ContentChangesResponse> {
         return try {
-            val response = httpClient.get("$baseUrl/sync/content/changes?since=$since") {
+            val limitParam = limit?.let { "&limit=$it" }.orEmpty()
+            val response = httpClient.get("$baseUrl/sync/content/changes?since=$since$limitParam") {
                 headers.append("Authorization", "Bearer $accessToken")
             }
             
@@ -382,9 +372,10 @@ class LogDateCloudApiClient(
         }
     }
     
-    override suspend fun getJournalChanges(accessToken: String, since: Long): Result<JournalChangesResponse> {
+    override suspend fun getJournalChanges(accessToken: String, since: Long, limit: Int?): Result<JournalChangesResponse> {
         return try {
-            val response = httpClient.get("$baseUrl/sync/journals/changes?since=$since") {
+            val limitParam = limit?.let { "&limit=$it" }.orEmpty()
+            val response = httpClient.get("$baseUrl/sync/journals/changes?since=$since$limitParam") {
                 headers.append("Authorization", "Bearer $accessToken")
             }
             
@@ -476,9 +467,10 @@ class LogDateCloudApiClient(
         }
     }
     
-    override suspend fun getAssociationChanges(accessToken: String, since: Long): Result<AssociationChangesResponse> {
+    override suspend fun getAssociationChanges(accessToken: String, since: Long, limit: Int?): Result<AssociationChangesResponse> {
         return try {
-            val response = httpClient.get("$baseUrl/sync/associations/changes?since=$since") {
+            val limitParam = limit?.let { "&limit=$it" }.orEmpty()
+            val response = httpClient.get("$baseUrl/sync/associations/changes?since=$since$limitParam") {
                 headers.append("Authorization", "Bearer $accessToken")
             }
             
@@ -572,37 +564,3 @@ class LogDateCloudApiClient(
 
     // No custom HttpClient needed as we use the app's shared httpClient
 }
-
-/**
- * Generic API response wrapper.
- */
-@kotlinx.serialization.Serializable
-data class ApiResponse<T>(
-    val success: Boolean,
-    val data: T
-)
-
-/**
- * API error response.
- */
-@kotlinx.serialization.Serializable
-data class ApiErrorResponse(
-    val error: ApiError
-)
-
-/**
- * API error details.
- */
-@kotlinx.serialization.Serializable
-data class ApiError(
-    val code: String,
-    val message: String
-)
-
-/**
- * Request to refresh an access token.
- */
-@kotlinx.serialization.Serializable
-data class RefreshTokenRequest(
-    val refreshToken: String
-)

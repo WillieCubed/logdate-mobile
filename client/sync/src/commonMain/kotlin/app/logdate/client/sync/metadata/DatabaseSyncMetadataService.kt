@@ -77,6 +77,10 @@ class DatabaseSyncMetadataService(
         return dao.observePendingCount()
     }
 
+    override suspend fun incrementRetryCount(entityId: String, entityType: EntityType) {
+        dao.incrementRetryCount(entityType.name, entityId)
+    }
+
     /**
      * Adds an entity to the pending upload queue.
      */

@@ -68,7 +68,46 @@ enum class NoteType {
     LOCATION,
 }
 
-//data class ImageMetadata
+/**
+ * Coordinates captured at note creation time.
+ */
+@Serializable
+data class NoteCoordinates(
+    val latitude: Double,
+    val longitude: Double,
+    val altitude: Double? = null,
+    val accuracy: Float? = null,
+)
+
+/**
+ * A semantic place reference (e.g., "Home", "Work").
+ */
+@Serializable
+data class NotePlace(
+    @Serializable(with = UuidSerializer::class)
+    val id: Uuid,
+    val name: String,
+    val latitude: Double,
+    val longitude: Double,
+)
+
+/**
+ * Location data for a note, combining raw coordinates with optional semantic place.
+ *
+ * The hybrid approach preserves:
+ * - Exact GPS coordinates at note creation (coordinates)
+ * - Optional semantic meaning for display (place)
+ */
+@Serializable
+data class NoteLocation(
+    val coordinates: NoteCoordinates? = null,
+    val place: NotePlace? = null,
+) {
+    val hasLocation: Boolean get() = coordinates != null || place != null
+    val displayName: String? get() = place?.name
+    val effectiveLatitude: Double? get() = coordinates?.latitude ?: place?.latitude
+    val effectiveLongitude: Double? get() = coordinates?.longitude ?: place?.longitude
+}
 
 /**
  * A generic container for user-added content.
@@ -87,6 +126,7 @@ sealed class JournalNote(
     abstract val creationTimestamp: Instant
     abstract val lastUpdated: Instant
     abstract val syncVersion: Long
+    abstract val location: NoteLocation?
 
     /**
      * A text note, like a unit of content on a microblog (e.g. post, tweet).
@@ -101,6 +141,7 @@ sealed class JournalNote(
         override val lastUpdated: Instant,
         val content: String,
         override val syncVersion: Long = 0,
+        override val location: NoteLocation? = null,
     ) : JournalNote(NoteType.TEXT)
 
     @Serializable
@@ -111,6 +152,7 @@ sealed class JournalNote(
         override val lastUpdated: Instant,
         val mediaRef: String,
         override val syncVersion: Long = 0,
+        override val location: NoteLocation? = null,
     ) : JournalNote(NoteType.IMAGE)
 
     @Serializable
@@ -121,15 +163,18 @@ sealed class JournalNote(
         override val lastUpdated: Instant,
         val mediaRef: String,
         override val syncVersion: Long = 0,
+        override val location: NoteLocation? = null,
     ) : JournalNote(NoteType.VIDEO)
 
     @Serializable
     data class Audio(
         val mediaRef: String,
+        val durationMs: Long? = null,
         @Serializable(with = UuidSerializer::class)
         override val uid: Uuid = Uuid.random(),
         override val creationTimestamp: Instant,
         override val lastUpdated: Instant,
         override val syncVersion: Long = 0,
+        override val location: NoteLocation? = null,
     ) : JournalNote(NoteType.AUDIO)
 }

@@ -12,6 +12,7 @@ import androidx.work.NetworkType
 import androidx.work.BackoffPolicy
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.Data
+import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.networking.NetworkState
@@ -20,6 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -105,7 +107,7 @@ class AndroidLogDateSyncWorker(
  * and delegates core sync functionality to DefaultSyncManager.
  *
  * Features:
- * - Automatic background sync enable/disable based on authentication state
+ * - Automatic background sync enable/disable based on authentication state and user preference
  * - Periodic background sync every 15 minutes (minimum allowed by Android)
  * - Immediate sync for user-triggered actions
  * - Network-aware scheduling (WiFi preferred, but cellular allowed)
@@ -114,15 +116,16 @@ class AndroidLogDateSyncWorker(
  * - Automatic sync retry on network restoration
  *
  * Background sync is automatically managed:
- * - When user signs in (SessionStorage.saveSession), background sync is enabled
- * - When user signs out (SessionStorage.clearSession), background sync is disabled
- * - No UI code needs to manually enable/disable sync
+ * - When user signs in and background sync is enabled in settings, periodic sync is enabled
+ * - When user signs out or disables background sync, periodic sync is disabled
+ * - No UI code needs to manually schedule WorkManager sync
  * - Network transitions (offline→online) automatically trigger sync retry if needed
  */
 class AndroidSyncManager(
     private val applicationContext: Context,
     private val defaultSyncManager: DefaultSyncManager,
     private val sessionStorage: SessionStorage,
+    private val preferencesDataSource: LogdatePreferencesDataSource,
     private val networkMonitor: NetworkAvailabilityMonitor
 ) : SyncManager {
 
@@ -133,15 +136,19 @@ class AndroidSyncManager(
     init {
         // Observe authentication state and automatically enable/disable background sync
         scope.launch {
-            sessionStorage.getSessionFlow()
-                .map { it != null }
+            combine(
+                sessionStorage.getSessionFlow().map { it != null },
+                preferencesDataSource.backgroundSyncEnabled
+            ) { isAuthenticated, isEnabled ->
+                isAuthenticated && isEnabled
+            }
                 .distinctUntilChanged()
-                .collect { isAuthenticated ->
-                    if (isAuthenticated) {
-                        Napier.i("User authenticated, enabling background sync")
+                .collect { shouldEnable ->
+                    if (shouldEnable) {
+                        Napier.i("Background sync enabled")
                         enableBackgroundSync()
                     } else {
-                        Napier.i("User signed out, disabling background sync")
+                        Napier.i("Background sync disabled")
                         disableBackgroundSync()
                     }
                 }

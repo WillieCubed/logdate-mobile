@@ -1,5 +1,6 @@
 package app.logdate.client.sync
 
+import app.logdate.client.media.StubMediaManager
 import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
 import app.logdate.client.sync.cloud.DefaultCloudJournalDataSource
 import app.logdate.client.sync.cloud.DefaultCloudAssociationDataSource
@@ -31,11 +32,16 @@ class NetworkRecoveryIntegrationTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
             cloudAccountRepository = fakeAccountRepository(),
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = fakeJournalRepository(),
             journalNotesRepository = fakeJournalNotesRepository(),
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = syncMetadataService,
             transactionManager = testSyncTransactionManager()
         )
@@ -66,11 +72,16 @@ class NetworkRecoveryIntegrationTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
             cloudAccountRepository = fakeAccountRepository(),
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = fakeJournalRepository(),
             journalNotesRepository = fakeJournalNotesRepository(),
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = syncMetadataService,
             transactionManager = testSyncTransactionManager()
         )
@@ -97,11 +108,16 @@ class NetworkRecoveryIntegrationTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(failingApiClient),
             cloudAccountRepository = fakeAccountRepository(),
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = fakeJournalRepository(),
             journalNotesRepository = fakeJournalNotesRepository(),
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = syncMetadataService,
             transactionManager = testSyncTransactionManager()
         )

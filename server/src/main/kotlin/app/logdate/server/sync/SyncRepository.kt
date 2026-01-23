@@ -12,6 +12,7 @@ data class ContentRecord(
     val type: String,
     val content: String?,
     val mediaUri: String?,
+    val durationMs: Long?,
     val createdAt: Long,
     val lastUpdated: Long,
     val serverVersion: Long,
@@ -52,7 +53,8 @@ data class MediaRecord(
 data class ChangeSet<T, D>(
     val changes: List<T>,
     val deletions: List<D>,
-    val lastTimestamp: Long
+    val lastTimestamp: Long,
+    val hasMore: Boolean = false
 )
 
 /**
@@ -66,18 +68,18 @@ interface SyncRepository {
     fun upsertContent(userId: UUID, record: ContentRecord): ContentRecord
     fun getContent(userId: UUID, id: String): ContentRecord?
     fun deleteContent(userId: UUID, id: String, deletedAt: Long)
-    fun contentChanges(userId: UUID, since: Long): ChangeSet<ContentRecord, ContentDeletionMarker>
+    fun contentChanges(userId: UUID, since: Long, limit: Int): ChangeSet<ContentRecord, ContentDeletionMarker>
 
     // Journals
     fun upsertJournal(userId: UUID, record: JournalRecord): JournalRecord
     fun getJournal(userId: UUID, id: String): JournalRecord?
     fun deleteJournal(userId: UUID, id: String, deletedAt: Long)
-    fun journalChanges(userId: UUID, since: Long): ChangeSet<JournalRecord, JournalDeletionMarker>
+    fun journalChanges(userId: UUID, since: Long, limit: Int): ChangeSet<JournalRecord, JournalDeletionMarker>
 
     // Associations
     fun upsertAssociations(userId: UUID, records: List<AssociationRecord>)
     fun deleteAssociations(userId: UUID, keys: List<AssociationKey>, deletedAt: Long)
-    fun associationChanges(userId: UUID, since: Long): ChangeSet<AssociationRecord, AssociationDeletionMarker>
+    fun associationChanges(userId: UUID, since: Long, limit: Int): ChangeSet<AssociationRecord, AssociationDeletionMarker>
 
     // Media
     fun upsertMedia(userId: UUID, record: MediaRecord): MediaRecord

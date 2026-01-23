@@ -1,10 +1,10 @@
 package app.logdate.client.sync.cloud
 
-
 import app.logdate.shared.model.BeginAccountCreationRequest
 import app.logdate.shared.model.BeginAccountCreationResponse
 import app.logdate.shared.model.CompleteAccountCreationRequest
 import app.logdate.shared.model.CompleteAccountCreationResponse
+import app.logdate.shared.model.LogDateAccount
 /**
  * Interface defining the API client for LogDate Cloud services.
  * 
@@ -13,9 +13,7 @@ import app.logdate.shared.model.CompleteAccountCreationResponse
  */
 interface CloudApiClient {
     /**
-     * Checks if a username is available for registration by attempting to get an account
-     * with the username. If a 404 is returned, the username is available. If a 200 is returned,
-     * the username is taken.
+     * Checks if a username is available for registration.
      *
      * @param username The username to check availability for.
      * @return Response indicating if the username is available.
@@ -67,7 +65,7 @@ interface CloudApiClient {
      * @return The account information if the request is successful.
      * @throws CloudApiException If the request fails.
      */
-    suspend fun getAccountInfo(accessToken: String): Result<AccountInfoResponse>
+    suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount>
     
     // Content Sync Operations
     /**
@@ -78,7 +76,7 @@ interface CloudApiClient {
     /**
      * Downloads content changes since the specified timestamp.
      */
-    suspend fun getContentChanges(accessToken: String, since: Long): Result<ContentChangesResponse>
+    suspend fun getContentChanges(accessToken: String, since: Long, limit: Int? = null): Result<ContentChangesResponse>
     
     /**
      * Updates existing content.
@@ -99,7 +97,7 @@ interface CloudApiClient {
     /**
      * Downloads journal changes since the specified timestamp.
      */
-    suspend fun getJournalChanges(accessToken: String, since: Long): Result<JournalChangesResponse>
+    suspend fun getJournalChanges(accessToken: String, since: Long, limit: Int? = null): Result<JournalChangesResponse>
     
     /**
      * Updates existing journal metadata.
@@ -120,7 +118,7 @@ interface CloudApiClient {
     /**
      * Downloads association changes since the specified timestamp.
      */
-    suspend fun getAssociationChanges(accessToken: String, since: Long): Result<AssociationChangesResponse>
+    suspend fun getAssociationChanges(accessToken: String, since: Long, limit: Int? = null): Result<AssociationChangesResponse>
     
     /**
      * Deletes specific associations.
@@ -146,20 +144,6 @@ interface CloudApiClient {
 data class CheckUsernameAvailabilityResponse(
     val available: Boolean,
     val username: String
-)
-
-/**
- * Response containing account information.
- */
-@kotlinx.serialization.Serializable
-data class AccountInfoResponse(
-    val id: String,
-    val username: String,
-    val displayName: String,
-    val bio: String?,
-    val passkeyCredentialIds: List<String>,
-    val createdAt: String,
-    val updatedAt: String
 )
 
 /**

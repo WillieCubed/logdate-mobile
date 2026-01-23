@@ -1,5 +1,6 @@
 package app.logdate.client.sync.test
 
+import app.logdate.client.media.StubMediaManager
 import app.logdate.client.sync.DefaultSyncManager
 import app.logdate.client.sync.cloud.ContentUploadRequest
 import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
@@ -167,11 +168,16 @@ class SyncTestFakesTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
             cloudAccountRepository = accountRepository,
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = journalRepository,
             journalNotesRepository = journalNotesRepository,
             journalContentRepository = journalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = fakeSyncMetadataService(),
             transactionManager = testSyncTransactionManager()
         )
@@ -201,11 +207,16 @@ class SyncTestFakesTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
             cloudAccountRepository = accountRepository,
             sessionStorage = fakeSessionStorage(authenticated = false),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = journalRepository,
             journalNotesRepository = journalNotesRepository,
             journalContentRepository = journalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = fakeSyncMetadataService(),
             transactionManager = testSyncTransactionManager()
         )
@@ -234,11 +245,16 @@ class SyncTestFakesTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
             cloudAccountRepository = accountRepository,
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = journalRepository,
             journalNotesRepository = journalNotesRepository,
             journalContentRepository = journalContentRepository,
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = fakeSyncMetadataService(),
             transactionManager = testSyncTransactionManager()
         )

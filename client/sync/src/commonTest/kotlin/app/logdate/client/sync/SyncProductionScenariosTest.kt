@@ -1,5 +1,6 @@
 package app.logdate.client.sync
 
+import app.logdate.client.media.StubMediaManager
 import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
 import app.logdate.client.sync.cloud.DefaultCloudJournalDataSource
 import app.logdate.client.sync.cloud.DefaultCloudAssociationDataSource
@@ -42,11 +43,16 @@ class SyncProductionScenariosTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
             cloudAccountRepository = fakeAccountRepository(),
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = fakeJournalRepository(),
             journalNotesRepository = notesRepository,
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = syncMetadataService,
             transactionManager = testSyncTransactionManager()
         )
@@ -87,11 +93,16 @@ class SyncProductionScenariosTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
             cloudAccountRepository = fakeAccountRepository(),
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = fakeJournalRepository(),
             journalNotesRepository = notesRepository,
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = syncMetadataService,
             transactionManager = testSyncTransactionManager()
         )
@@ -136,11 +147,16 @@ class SyncProductionScenariosTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
             cloudAccountRepository = fakeAccountRepository(),
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = fakeJournalRepository(),
             journalNotesRepository = notesRepository,
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = syncMetadataService,
             transactionManager = testSyncTransactionManager()
         )
@@ -181,11 +197,16 @@ class SyncProductionScenariosTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
             cloudAccountRepository = fakeAccountRepository(),
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = fakeJournalRepository(),
             journalNotesRepository = notesRepository,
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = syncMetadataService,
             transactionManager = testSyncTransactionManager()
         )
@@ -222,11 +243,16 @@ class SyncProductionScenariosTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
             cloudAccountRepository = fakeAccountRepository(),
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = journalRepository,
             journalNotesRepository = notesRepository,
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = syncMetadataService,
             transactionManager = testSyncTransactionManager()
         )
@@ -264,11 +290,16 @@ class SyncProductionScenariosTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
             cloudAccountRepository = fakeAccountRepository(),
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = fakeJournalRepository(),
             journalNotesRepository = fakeJournalNotesRepository("Note 1", "Note 2"),
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = syncMetadataService,
             transactionManager = testSyncTransactionManager()
         )
@@ -294,11 +325,16 @@ class SyncProductionScenariosTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
             cloudAccountRepository = fakeAccountRepository(),
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = fakeJournalRepository(),
             journalNotesRepository = fakeJournalNotesRepository(),
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = syncMetadataService,
             transactionManager = testSyncTransactionManager()
         )
@@ -335,11 +371,16 @@ class SyncProductionScenariosTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
             cloudAccountRepository = fakeAccountRepository(),
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = fakeJournalRepository(),
             journalNotesRepository = fakeJournalNotesRepository("Note 1"),
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = syncMetadataService,
             transactionManager = testSyncTransactionManager()
         )
@@ -366,11 +407,16 @@ class SyncProductionScenariosTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
             cloudAccountRepository = fakeAccountRepository(authenticated = false), // Simulate auth loss
             sessionStorage = fakeSessionStorage(authenticated = false),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = fakeJournalRepository(),
             journalNotesRepository = fakeJournalNotesRepository("Note"),
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = syncMetadataService,
             transactionManager = testSyncTransactionManager()
         )
@@ -396,11 +442,16 @@ class SyncProductionScenariosTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
             cloudAccountRepository = fakeAccountRepository(),
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = fakeJournalRepository(),
             journalNotesRepository = fakeJournalNotesRepository(),
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = syncMetadataService,
             transactionManager = testSyncTransactionManager()
         )
@@ -424,11 +475,16 @@ class SyncProductionScenariosTest {
             cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
             cloudAccountRepository = fakeAccountRepository(),
             sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
             journalRepository = fakeJournalRepository(),
             journalNotesRepository = fakeJournalNotesRepository(),
             journalContentRepository = fakeJournalContentRepository(),
             journalConflictResolver = lastWriteWinsResolver(),
             noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
             syncMetadataService = syncMetadataService,
             transactionManager = testSyncTransactionManager()
         )
