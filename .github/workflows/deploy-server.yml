@@ -1,12 +1,13 @@
 name: Deploy Server
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
-    paths:
-      - 'server/**'
-      - 'shared/**'
-      - 'Dockerfile'
+  push:
+    tags:
+      - '*'
   workflow_dispatch:
     inputs:
       environment:
@@ -20,17 +21,32 @@ on:
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  REGION: us-central1
-  SERVICE_NAME: logdate-server
+  REGION: ${{ vars.CLOUD_RUN_REGION || 'us-central1' }}
+  DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+concurrency:
+  group: deploy-server-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test:
-    uses: ./.github/workflows/ci.yml
-
   deploy:
     runs-on: ubuntu-latest
-    needs: test
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      ${{
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
+        github.event_name == 'workflow_dispatch'
+      }}
+    environment: >-
+      ${{
+        github.event_name == 'workflow_dispatch' && inputs.environment ||
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) && 'production' ||
+        'staging'
+      }}
+    env:
+      SERVICE_NAME: ${{ vars.CLOUD_RUN_SERVICE_NAME }}
+      DOMAIN: ${{ vars.CLOUD_RUN_DOMAIN }}
+      RUNTIME_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_SERVICE_ACCOUNT }}
 
     permissions:
       contents: read
@@ -38,38 +54,60 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+
+      - name: Validate deployment configuration
+        run: |
+          if [[ -z "${SERVICE_NAME}" || -z "${DOMAIN}" ]]; then
+            echo "CLOUD_RUN_SERVICE_NAME and CLOUD_RUN_DOMAIN must be set as environment variables in GitHub."
+            echo "Configure them in the 'staging' and 'production' environments."
+            exit 1
+          fi
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Configure Docker for Artifact Registry
         run: |
           gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
-      - name: Build Docker image
+      - name: Configure runtime service account
         run: |
-          docker build \
-            --target production \
-            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/logdate/${{ env.SERVICE_NAME }}:${{ github.sha }} \
-            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/logdate/${{ env.SERVICE_NAME }}:latest \
-            .
+          if [[ -n "${RUNTIME_SERVICE_ACCOUNT}" ]]; then
+            echo "SERVICE_ACCOUNT_FLAG=--service-account ${RUNTIME_SERVICE_ACCOUNT}" >> "$GITHUB_ENV"
+          else
+            echo "SERVICE_ACCOUNT_FLAG=" >> "$GITHUB_ENV"
+          fi
 
-      - name: Push Docker image
-        run: |
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/logdate/${{ env.SERVICE_NAME }}:${{ github.sha }}
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/logdate/${{ env.SERVICE_NAME }}:latest
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: production
+          push: true
+          tags: |
+            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/logdate/${{ env.SERVICE_NAME }}:${{ env.DEPLOY_SHA }}
+            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/logdate/${{ env.SERVICE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/logdate/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/logdate/${{ env.SERVICE_NAME }}:${{ env.DEPLOY_SHA }} \
             --platform managed \
             --region ${{ env.REGION }} \
+            $SERVICE_ACCOUNT_FLAG \
             --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" \
             --set-env-vars "DATABASE_USER=${{ secrets.DATABASE_USER }}" \
             --set-env-vars "DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}" \
@@ -77,12 +115,28 @@ jobs:
             --set-env-vars "GCS_BUCKET_NAME=${{ secrets.GCS_BUCKET_NAME }}" \
             --set-env-vars "GCS_PROJECT_ID=${{ env.PROJECT_ID }}" \
             --set-env-vars "REDIS_URL=${{ secrets.REDIS_URL }}" \
+            --set-env-vars "WEBAUTHN_RP_ID=${{ env.DOMAIN }}" \
+            --set-env-vars "WEBAUTHN_ORIGIN=https://${{ env.DOMAIN }}" \
             --allow-unauthenticated \
             --min-instances 0 \
             --max-instances 10 \
             --memory 512Mi \
             --cpu 1 \
             --timeout 60s
+
+      - name: Ensure domain mapping exists
+        run: |
+          if ! gcloud beta run domain-mappings describe \
+              --domain ${{ env.DOMAIN }} \
+              --region ${{ env.REGION }} 2>/dev/null; then
+            echo "Creating domain mapping for ${{ env.DOMAIN }}..."
+            gcloud beta run domain-mappings create \
+              --service ${{ env.SERVICE_NAME }} \
+              --domain ${{ env.DOMAIN }} \
+              --region ${{ env.REGION }}
+          else
+            echo "Domain mapping already exists"
+          fi
 
       - name: Verify deployment
         run: |
@@ -91,7 +145,18 @@ jobs:
             --region ${{ env.REGION }} \
             --format 'value(status.url)')
 
-          echo "Service URL: $SERVICE_URL"
+          echo "Cloud Run URL: $SERVICE_URL"
+          echo "Custom Domain: https://${{ env.DOMAIN }}"
 
-          # Health check
+          # Health check on Cloud Run URL
+          echo "Checking health on Cloud Run URL..."
           curl -f "$SERVICE_URL/health" || exit 1
+
+          # Check custom domain (may fail initially while SSL provisions)
+          echo "Checking custom domain (may take 15-30 min for SSL)..."
+          if curl -sf "https://${{ env.DOMAIN }}/health" --max-time 10; then
+            echo "Custom domain is working!"
+          else
+            echo "Custom domain not yet responding - SSL may still be provisioning"
+            echo "This is expected for new domain mappings. Check again in 15-30 minutes."
+          fi
