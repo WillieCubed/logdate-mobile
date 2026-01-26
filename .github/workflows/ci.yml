@@ -107,5 +107,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: server-jar
-          path: server/build/libs/*.jar
+          path: server/build/libs/logdate-server.jar
           retention-days: 7

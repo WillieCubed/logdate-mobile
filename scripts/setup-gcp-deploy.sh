@@ -14,14 +14,17 @@
 # Configuration priority (highest to lowest):
 #   1. Environment variables passed at runtime
 #   2. .env file in repo root (user overrides, gitignored)
-#   3. docs/environment/.env.example (checked-in defaults)
-#   4. Auto-detection (gcloud config, git remote)
+#   3. Shared tfvars config (infra/terraform/<env>.tfvars)
+#   4. docs/environment/.env.example (checked-in defaults)
+#   5. Auto-detection (gcloud config, git remote)
 
 set -euo pipefail
 
 # Resolve script and repo root directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+ENVIRONMENT="${ENVIRONMENT:-staging}"
+CONFIG_PATH="${CONFIG_PATH:-${REPO_ROOT}/infra/terraform/${ENVIRONMENT}.tfvars}"
 
 # Source configuration files (lower priority first, so higher priority overwrites)
 # .env.example provides checked-in defaults
@@ -38,6 +41,41 @@ if [[ -f "$REPO_ROOT/.env" ]]; then
     # shellcheck source=/dev/null
     source "$REPO_ROOT/.env"
     set +a
+fi
+
+# Shared tfvars config (if present)
+if [[ -f "$CONFIG_PATH" ]]; then
+    if command -v terraform &> /dev/null; then
+        TF_DIR="${REPO_ROOT}/infra/terraform"
+
+        tf_eval() {
+            terraform -chdir="$TF_DIR" console -var-file="$CONFIG_PATH" <<EOF | sed -e 's/^> //'
+$1
+EOF
+        }
+
+        tf_value() {
+            local value
+            value="$(tf_eval "var.$1" | sed '/^$/d' | tail -n 1)"
+            value="${value%\"}"
+            value="${value#\"}"
+            if [[ "$value" == "null" ]]; then
+                value=""
+            fi
+            echo "$value"
+        }
+
+        terraform -chdir="$TF_DIR" init -backend=false -input=false >/dev/null
+
+        GCP_PROJECT_ID="${GCP_PROJECT_ID:-$(tf_value project_id)}"
+        GCP_REGION="${GCP_REGION:-$(tf_value region)}"
+        CLOUD_RUN_SERVICE_NAME="${CLOUD_RUN_SERVICE_NAME:-$(tf_value service_name)}"
+        CLOUD_RUN_DOMAIN="${CLOUD_RUN_DOMAIN:-$(tf_value domain)}"
+        ARTIFACT_REGISTRY_REPO="${ARTIFACT_REGISTRY_REPO:-$(tf_value artifact_registry_repo)}"
+        GITHUB_REPO="${GITHUB_REPO:-$(tf_value github_repo)}"
+    else
+        echo "terraform not installed; skipping config file $CONFIG_PATH."
+    fi
 fi
 
 # Runtime environment variables take final precedence (already in env)

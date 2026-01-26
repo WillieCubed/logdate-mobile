@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7-labs
 # Multi-stage Dockerfile for LogDate Server
 # Optimized for both local development and Google Cloud Run production deployment
 
@@ -5,20 +6,22 @@
 FROM gradle:8.10.2-jdk17 AS build
 
 WORKDIR /app
+ENV GRADLE_USER_HOME=/home/gradle/.gradle
 
 # Copy gradle files first for better caching
-COPY gradle/ gradle/
-COPY gradlew gradlew.bat gradle.properties settings.gradle.kts ./
-COPY gradle/libs.versions.toml gradle/libs.versions.toml
+COPY --link gradle/ gradle/
+COPY --link gradlew gradlew.bat gradle.properties settings.gradle.kts ./
+COPY --link gradle/libs.versions.toml gradle/libs.versions.toml
 
 # Copy project structure and build files
-COPY build.gradle.kts ./
-COPY shared/ shared/
-COPY client/util/ client/util/
-COPY server/ server/
+COPY --link build.gradle.kts ./
+COPY --link shared/ shared/
+COPY --link client/util/ client/util/
+COPY --link server/ server/
 
-# Build the application
-RUN ./gradlew :server:build -x test --no-daemon
+# Build the application with cached Gradle dependencies
+RUN --mount=type=cache,target=/home/gradle/.gradle \
+    ./gradlew :server:build -x test --no-daemon --build-cache
 
 # Development stage (for docker-compose)
 FROM openjdk:17-jdk-slim AS development
@@ -32,10 +35,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy built application
-COPY --from=build /app/server/build/libs/*.jar app.jar
+COPY --link --from=build /app/server/build/libs/logdate-server.jar logdate-server.jar
 
 # Development environment variables
-ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
 ENV KTOR_DEVELOPMENT=true
 
 # Health check for development
@@ -44,42 +47,32 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+CMD ["java", "-jar", "logdate-server.jar"]
 
 # Production stage (for Cloud Run)
-FROM openjdk:17-jdk-slim AS production
+FROM eclipse-temurin:17-jre-jammy AS production
 
 WORKDIR /app
 
 # Create non-root user for security
-RUN groupadd -r logdate && useradd -r -g logdate logdate
+RUN groupadd -r logdate \
+    && useradd -r -g logdate -d /app -s /usr/sbin/nologin logdate
 
-# Install minimal required packages
-RUN apt-get update && apt-get install -y \
-    curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
-
-# Copy built application
-COPY --from=build /app/server/build/libs/*.jar app.jar
-
-# Change ownership to non-root user
-RUN chown -R logdate:logdate /app
+# Copy built application with locked-down permissions
+COPY --link --chown=logdate:logdate --chmod=0444 \
+    --from=build /app/server/build/libs/logdate-server.jar /app/logdate-server.jar
 USER logdate
 
 # Production JVM optimizations for Cloud Run
-ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XX:G1HeapRegionSize=16m -XX:+UseStringDeduplication -Djava.security.egd=file:/dev/./urandom"
+ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XX:G1HeapRegionSize=16m -XX:+UseStringDeduplication -Djava.security.egd=file:/dev/./urandom -Djava.io.tmpdir=/tmp"
 
 # Cloud Run configuration
 ENV PORT=8080
 ENV HOST=0.0.0.0
 ENV KTOR_DEVELOPMENT=false
 
-# Health check for production
-HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
-    CMD curl -f http://localhost:$PORT/health || exit 1
-
 EXPOSE $PORT
 
 # Use exec form for better signal handling
-CMD ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]
+ENTRYPOINT ["java"]
+CMD ["-jar", "/app/logdate-server.jar"]
