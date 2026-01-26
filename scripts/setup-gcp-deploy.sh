@@ -78,75 +78,164 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Resolve GitHub repo if not provided (auto-detect from git remote)
+# ============================================================================
+# Interactive prompts for missing values
+# ============================================================================
+
+# Prompt helper: prompt_value VAR_NAME "prompt text" ["default"]
+prompt_value() {
+    local var_name="$1" prompt_text="$2" default="${3:-}"
+    local current_val="${!var_name:-}"
+
+    # Already set — skip
+    [[ -n "$current_val" ]] && return
+
+    if [[ -n "$default" ]]; then
+        read -r -p "$prompt_text [$default]: " input
+        eval "$var_name=\"${input:-$default}\""
+    else
+        while true; do
+            read -r -p "$prompt_text: " input
+            if [[ -n "$input" ]]; then
+                eval "$var_name=\"$input\""
+                return
+            fi
+            echo "  A value is required."
+        done
+    fi
+}
+
+# Auto-detect GitHub repo from git remote
 if [[ -z "$GITHUB_REPO" ]]; then
     if command -v git &> /dev/null; then
         REPO_URL=$(git -C "$REPO_ROOT" config --get remote.origin.url 2>/dev/null || true)
-        if [[ "$REPO_URL" =~ github\.com[:/](.+?)(\.git)?$ ]]; then
+        if [[ "$REPO_URL" =~ github\.com[:/]([^/]+/[^/.]+) ]]; then
             GITHUB_REPO="${BASH_REMATCH[1]}"
         fi
     fi
 fi
 
-if [[ -z "$GITHUB_REPO" ]]; then
-    log_error "GITHUB_REPO is required (format: owner/repo)"
-    echo "Usage: GCP_PROJECT_ID=your-project-id GITHUB_REPO=owner/repo ./scripts/setup-gcp-deploy.sh"
-    exit 1
-fi
+# Prompt for anything still missing
+prompt_value PROJECT_ID  "GCP Project ID"
+prompt_value GITHUB_REPO "GitHub repo (owner/repo)"
+prompt_value REGION      "GCP region" "us-central1"
+prompt_value SERVICE_NAME "Cloud Run service name" "logdate-server"
+prompt_value DOMAIN      "Custom domain" "cloud.logdate.app"
+prompt_value ARTIFACT_REGISTRY_REPO "Artifact Registry repo name" "logdate"
 
-# Validate prerequisites
-if [[ -z "$PROJECT_ID" ]]; then
-    log_error "GCP_PROJECT_ID environment variable is required"
-    echo "Usage: GCP_PROJECT_ID=your-project-id ./scripts/setup-gcp-deploy.sh"
-    exit 1
-fi
+# ============================================================================
+# Prerequisite checks
+# ============================================================================
 
 if ! command -v gcloud &> /dev/null; then
-    log_error "gcloud CLI is not installed"
+    log_error "gcloud CLI is not installed. Install it from https://cloud.google.com/sdk/docs/install"
     exit 1
 fi
 
-# Check if authenticated
 if ! gcloud auth print-identity-token &> /dev/null; then
-    log_error "Not authenticated with gcloud. Run: gcloud auth login"
-    exit 1
-fi
-
-# Show configuration and confirm
-echo ""
-echo "=============================================="
-echo "GCP Deployment Setup - Configuration"
-echo "=============================================="
-echo ""
-echo "Sources (in priority order):"
-echo "  1. Runtime env vars"
-[[ -f "$REPO_ROOT/.env" ]] && echo "  2. $REPO_ROOT/.env (found)"
-echo "  3. docs/environment/.env.example (defaults)"
-echo "  4. Auto-detection (gcloud, git)"
-echo ""
-echo "Resolved values:"
-echo "  GCP_PROJECT_ID:        $PROJECT_ID"
-echo "  GCP_REGION:            $REGION"
-echo "  CLOUD_RUN_SERVICE_NAME: $SERVICE_NAME"
-echo "  CLOUD_RUN_DOMAIN:      $DOMAIN"
-echo "  GITHUB_REPO:           $GITHUB_REPO"
-echo "  ARTIFACT_REGISTRY_REPO: $ARTIFACT_REGISTRY_REPO"
-echo "=============================================="
-echo ""
-
-if [[ "${SKIP_CONFIRM:-}" != "true" ]]; then
-    read -p "Proceed with setup? [y/N] " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        log_info "Aborted."
+    log_warn "Not authenticated with gcloud."
+    read -r -p "Run 'gcloud auth login' now? [Y/n] " choice
+    if [[ "${choice:-y}" =~ ^[Nn]$ ]]; then
+        log_info "Aborted. Run 'gcloud auth login' and try again."
         exit 0
     fi
+    gcloud auth login
+fi
+
+# ============================================================================
+# Configuration review
+# ============================================================================
+
+# Allow re-prompting for any value during confirmation
+edit_value() {
+    local var_name="$1" label="$2"
+    local current="${!var_name}"
+    read -r -p "  $label [$current]: " input
+    if [[ -n "$input" ]]; then
+        eval "$var_name=\"$input\""
+    fi
+}
+
+show_config() {
+    echo ""
+    echo "=============================================="
+    echo "GCP Deployment Setup - Configuration"
+    echo "=============================================="
+    echo ""
+    echo "  1) GCP_PROJECT_ID:         $PROJECT_ID"
+    echo "  2) GCP_REGION:             $REGION"
+    echo "  3) CLOUD_RUN_SERVICE_NAME: $SERVICE_NAME"
+    echo "  4) CLOUD_RUN_DOMAIN:       $DOMAIN"
+    echo "  5) GITHUB_REPO:            $GITHUB_REPO"
+    echo "  6) ARTIFACT_REGISTRY_REPO: $ARTIFACT_REGISTRY_REPO"
+    echo ""
+    echo "=============================================="
+}
+
+if [[ "${SKIP_CONFIRM:-}" != "true" ]]; then
+    while true; do
+        show_config
+        echo ""
+        read -r -p "Proceed with this configuration? [Y/e/n] " confirm
+
+        case "${confirm:-y}" in
+            y|Y)
+                break
+                ;;
+            e|E)
+                echo ""
+                read -r -p "  Which value? (1-6): " field
+                case "$field" in
+                    1) edit_value PROJECT_ID  "GCP Project ID" ;;
+                    2) edit_value REGION      "GCP Region" ;;
+                    3) edit_value SERVICE_NAME "Service Name" ;;
+                    4) edit_value DOMAIN      "Domain" ;;
+                    5) edit_value GITHUB_REPO "GitHub Repo" ;;
+                    6) edit_value ARTIFACT_REGISTRY_REPO "Registry Repo" ;;
+                    *) echo "  Invalid selection" ;;
+                esac
+                ;;
+            n|N)
+                log_info "Aborted."
+                exit 0
+                ;;
+            *)
+                echo "  Invalid option. Enter Y, e, or n."
+                ;;
+        esac
+    done
+else
+    show_config
 fi
 
 log_info "Setting up GCP deployment infrastructure..."
 
 # Set the project
 gcloud config set project "$PROJECT_ID"
+
+# Verify billing is enabled
+log_info "Checking billing status..."
+BILLING_ENABLED=$(gcloud billing projects describe "$PROJECT_ID" --format="value(billingEnabled)" 2>/dev/null || true)
+if [[ "$BILLING_ENABLED" != "True" ]]; then
+    log_error "Billing is not enabled for project '$PROJECT_ID'."
+    echo ""
+    echo "  Enable billing at:"
+    echo "  https://console.cloud.google.com/billing/linkedaccount?project=$PROJECT_ID"
+    echo ""
+    read -r -p "Re-check billing status? [Y/n] " retry
+    if [[ "${retry:-y}" =~ ^[Nn]$ ]]; then
+        log_info "Aborted. Enable billing and re-run this script."
+        exit 0
+    fi
+
+    # Re-check
+    BILLING_ENABLED=$(gcloud billing projects describe "$PROJECT_ID" --format="value(billingEnabled)" 2>/dev/null || true)
+    if [[ "$BILLING_ENABLED" != "True" ]]; then
+        log_error "Billing still not enabled. Enable billing and re-run this script."
+        exit 1
+    fi
+fi
+log_info "Billing is enabled"
 
 # Enable required APIs
 log_info "Enabling required GCP APIs..."
