@@ -21,6 +21,11 @@ import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.uuid.Uuid
@@ -32,7 +37,10 @@ import org.koin.logger.slf4jLogger
 fun main() {
     val isDatabaseAvailable = initializeDatabase()
 
-    embeddedServer(Netty, port = SERVER_PORT, host = "0.0.0.0") {
+    val port = System.getenv("PORT")?.toIntOrNull() ?: SERVER_PORT
+    val host = System.getenv("HOST") ?: "0.0.0.0"
+
+    embeddedServer(Netty, port = port, host = host) {
         module(isDatabaseAvailable)
     }.start(wait = true)
 }
@@ -51,7 +59,9 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
         modules(serverModule(isDatabaseAvailable))
     }
 
+    var maintenanceJob: Job? = null
     monitor.subscribe(ApplicationStopped) {
+        maintenanceJob?.cancel()
         try {
             org.koin.core.context.stopKoin()
         } catch (_: Exception) {
@@ -65,6 +75,10 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     val accountRepository: AccountRepository by inject()
     val sessionManager: SessionManager by inject()
     val webAuthnService: WebAuthnPasskeyService by inject()
+
+    if (isDatabaseAvailable) {
+        maintenanceJob = startSyncMaintenance(syncRepository, syncMetrics)
+    }
 
     install(ContentNegotiation) {
         json(Json {
@@ -111,4 +125,61 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
             syncRoutes(syncRepository, tokenService, mediaStorage, syncMetrics)
         }
     }
+}
+
+private const val SYNC_PURGE_METRIC_NAME = "sync.maintenance.purge"
+private const val MILLIS_PER_HOUR = 60 * 60 * 1000L
+private const val MILLIS_PER_DAY = 24 * MILLIS_PER_HOUR
+
+private fun Application.startSyncMaintenance(
+    repository: SyncRepository,
+    metrics: SyncMetricsRegistry
+): Job? {
+    val enabled = readBooleanEnv("SYNC_TOMBSTONE_PURGE_ENABLED", defaultValue = true)
+    if (!enabled) {
+        log.info("Sync tombstone purge disabled by SYNC_TOMBSTONE_PURGE_ENABLED")
+        return null
+    }
+
+    val retentionDays = System.getenv("SYNC_TOMBSTONE_RETENTION_DAYS")?.toLongOrNull() ?: 30L
+    val intervalHours = System.getenv("SYNC_TOMBSTONE_PURGE_INTERVAL_HOURS")?.toLongOrNull() ?: 24L
+    val safeRetentionDays = retentionDays.coerceIn(1L, 3650L)
+    val safeIntervalHours = intervalHours.coerceAtLeast(1L)
+    val intervalMs = safeIntervalHours * MILLIS_PER_HOUR
+
+    log.info(
+        "Starting sync tombstone purge: retentionDays={}, intervalHours={}",
+        safeRetentionDays,
+        safeIntervalHours
+    )
+
+    return launch(Dispatchers.IO) {
+        while (isActive) {
+            val start = System.currentTimeMillis()
+            val cutoff = System.currentTimeMillis() - (safeRetentionDays * MILLIS_PER_DAY)
+            try {
+                val result = repository.purgeTombstonesOlderThan(cutoff)
+                metrics.recordOperation(SYNC_PURGE_METRIC_NAME, System.currentTimeMillis() - start, true)
+                log.info(
+                    "Purged sync tombstones older than {} days: content={}, journals={}, associations={}, media={}",
+                    safeRetentionDays,
+                    result.contentPurged,
+                    result.journalPurged,
+                    result.associationPurged,
+                    result.mediaPurged
+                )
+            } catch (e: Exception) {
+                metrics.recordOperation(SYNC_PURGE_METRIC_NAME, System.currentTimeMillis() - start, false)
+                log.error("Sync tombstone purge failed", e)
+            }
+            delay(intervalMs)
+        }
+    }
+}
+
+private fun readBooleanEnv(name: String, defaultValue: Boolean): Boolean {
+    val raw = System.getenv(name) ?: return defaultValue
+    return raw.equals("true", ignoreCase = true) ||
+        raw.equals("yes", ignoreCase = true) ||
+        raw == "1"
 }
