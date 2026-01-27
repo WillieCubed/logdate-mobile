@@ -40,4 +40,20 @@ class EnvironmentKeyring : EncryptionKeyring {
 
         return decoded
     }
+    
+    companion object {
+        fun fromEnvironmentOrNull(): EnvironmentKeyring? {
+            return try {
+                EnvironmentKeyring()
+            } catch (e: IllegalStateException) {
+                null
+            }
+        }
+    }
+}
+
+object NoOpKeyring : EncryptionKeyring {
+    private val dummyKey = EncryptionKey("noop", ByteArray(32))
+    override fun getActiveKey() = dummyKey
+    override fun getKey(keyId: String) = dummyKey
 }

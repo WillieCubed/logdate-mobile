@@ -62,7 +62,8 @@ class EncryptionService(
     companion object {
         fun fromEnvironment(): EncryptionService {
             val policy = EncryptionPolicy.fromEnvironment()
-            val keyring = EnvironmentKeyring()
+            val keyring = EnvironmentKeyring.fromEnvironmentOrNull()
+                ?: NoOpKeyring
             val codec = PayloadCodec(keyring)
             return EncryptionService(policy, codec)
         }

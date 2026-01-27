@@ -9,6 +9,10 @@ import app.logdate.shared.model.sync.AssociationDeleteRequest
 import app.logdate.shared.model.sync.AssociationDeletion
 import app.logdate.shared.model.sync.AssociationUploadRequest
 import app.logdate.shared.model.sync.AssociationUploadResponse
+import app.logdate.shared.model.sync.BackupInfoResponse
+import app.logdate.shared.model.sync.BackupListResponse
+import app.logdate.shared.model.sync.BackupUploadRequest
+import app.logdate.shared.model.sync.BackupUploadResponse
 import app.logdate.shared.model.sync.ContentChange
 import app.logdate.shared.model.sync.ContentChangesResponse
 import app.logdate.shared.model.sync.ContentDeletion
@@ -29,9 +33,13 @@ import app.logdate.shared.model.sync.MediaUploadResponse
 import app.logdate.shared.model.sync.VersionConstraint
 import app.logdate.server.sync.AssociationKey
 import app.logdate.server.sync.AssociationRecord
+import app.logdate.server.sync.BackupRecord
 import app.logdate.server.sync.ContentRecord
 import app.logdate.server.sync.GcsMediaStorage
 import app.logdate.server.sync.JournalRecord
+import app.logdate.server.crypto.EncryptionService
+import app.logdate.server.sync.MediaAccessPolicy
+import app.logdate.server.sync.MediaEncryptionService
 import app.logdate.server.sync.MediaRecord
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.sync.SyncRepository
@@ -56,6 +64,7 @@ private const val DEFAULT_SYNC_PAGE_SIZE = 200
 private const val MAX_SYNC_PAGE_SIZE = 500
 private const val METRIC_SYNC_STATUS = "sync.status"
 private const val METRIC_SYNC_METRICS = "sync.metrics"
+private const val METRIC_SYNC_METRICS_PROM = "sync.metrics.prometheus"
 private const val METRIC_CONTENT_UPLOAD = "sync.content.upload"
 private const val METRIC_CONTENT_CHANGES = "sync.content.changes"
 private const val METRIC_CONTENT_UPDATE = "sync.content.update"
@@ -69,6 +78,8 @@ private const val METRIC_ASSOCIATION_CHANGES = "sync.association.changes"
 private const val METRIC_ASSOCIATION_DELETE = "sync.association.delete"
 private const val METRIC_MEDIA_UPLOAD = "sync.media.upload"
 private const val METRIC_MEDIA_DOWNLOAD = "sync.media.download"
+private const val METRIC_SYNC_PURGE = "sync.maintenance.purge"
+private const val MILLIS_PER_DAY = 86_400_000L
 
 /**
  * Extracts and validates the user ID from the Authorization header.
@@ -125,7 +136,10 @@ fun Route.syncRoutes(
     repository: SyncRepository,
     tokenService: TokenService? = null,
     mediaStorage: GcsMediaStorage? = null,
-    metrics: SyncMetricsRegistry
+    metrics: SyncMetricsRegistry,
+    mediaAccessPolicy: MediaAccessPolicy = MediaAccessPolicy.fromEnvironment(),
+    mediaEncryption: MediaEncryptionService = MediaEncryptionService.fromEnvironment(),
+    encryptionService: EncryptionService = EncryptionService.fromEnvironment()
 ) {
     route("/sync") {
         // High-level status (used by smoke tests)
@@ -160,6 +174,24 @@ fun Route.syncRoutes(
                 success = true
             } finally {
                 metrics.recordOperation(METRIC_SYNC_METRICS, System.currentTimeMillis() - start, success)
+            }
+        }
+
+        get("/metrics/prometheus") {
+            val start = System.currentTimeMillis()
+            var success = false
+            try {
+                if (extractUserId(call, tokenService) == null) {
+                    return@get
+                }
+                val snapshot = metrics.snapshot()
+                call.respondText(
+                    snapshot.toPrometheus(),
+                    ContentType.Text.Plain
+                )
+                success = true
+            } finally {
+                metrics.recordOperation(METRIC_SYNC_METRICS_PROM, System.currentTimeMillis() - start, success)
             }
         }
 
@@ -219,7 +251,7 @@ fun Route.syncRoutes(
                             type = it.type,
                             content = it.content,
                             mediaUri = it.mediaUri,
-                            durationMs = it.durationMs,
+                            durationMs = it.durationMs ?: 0,
                             createdAt = it.createdAt,
                             lastUpdated = it.lastUpdated,
                             serverVersion = it.serverVersion,
@@ -523,6 +555,22 @@ fun Route.syncRoutes(
                     bytes = req.sizeBytes
                     Napier.d("Media upload for user $userId: ${req.fileName}")
                     val mediaId = UUID.randomUUID().toString()
+                    
+                    val encryptedPayload = runCatching {
+                        encryptionService.processMediaUpload(
+                            req.data,
+                            userId.toString(),
+                            mediaId,
+                            req.contentId
+                        )
+                    }.getOrElse { error ->
+                        Napier.e("Failed to encrypt media payload", error)
+                        return@post call.respond(
+                            HttpStatusCode.InternalServerError,
+                            error("MEDIA_ENCRYPT_FAILED", "Failed to encrypt media payload")
+                        )
+                    }
+                    
                     val storagePath = if (mediaStorage != null) {
                         runCatching {
                             mediaStorage.uploadMedia(
@@ -530,7 +578,7 @@ fun Route.syncRoutes(
                                 mediaId = UUID.fromString(mediaId),
                                 fileName = req.fileName,
                                 mimeType = req.mimeType,
-                                data = req.data
+                                data = encryptedPayload.data
                             )
                         }.getOrElse { error ->
                             Napier.e("Failed to upload media to external storage", error)
@@ -550,14 +598,19 @@ fun Route.syncRoutes(
                             fileName = req.fileName,
                             mimeType = req.mimeType,
                             sizeBytes = req.sizeBytes,
-                            data = if (storagePath == null) req.data else ByteArray(0),
+                            data = if (storagePath == null) encryptedPayload.data else ByteArray(0),
                             storagePath = storagePath,
                             createdAt = System.currentTimeMillis(),
                             serverVersion = 0L,
                             deviceId = req.deviceId
                         )
                     )
-                    val downloadUrl = buildMediaDownloadUrl(call, stored.mediaId)
+                    val downloadUrl = resolveMediaDownloadUrl(
+                        call,
+                        stored,
+                        mediaStorage,
+                        mediaAccessPolicy
+                    )
                     val response = MediaUploadResponse(
                         contentId = req.contentId,
                         mediaId = stored.mediaId,
@@ -588,7 +641,8 @@ fun Route.syncRoutes(
                     )
                     val record = repository.getMedia(userId, mediaId)
                         ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Media not found"))
-                    val payload = if (record.storagePath != null) {
+                    
+                    val encryptedPayload = if (record.storagePath != null) {
                         val storage = mediaStorage
                             ?: return@get call.respond(
                                 HttpStatusCode.InternalServerError,
@@ -602,6 +656,16 @@ fun Route.syncRoutes(
                     } else {
                         record.data
                     }
+                    
+                    val payload = runCatching {
+                        encryptionService.processMediaDownload(encryptedPayload, shouldDecrypt = true)
+                    }.getOrElse { error ->
+                        Napier.e("Failed to decrypt media payload for $mediaId", error)
+                        return@get call.respond(
+                            HttpStatusCode.InternalServerError,
+                            error("MEDIA_DECRYPT_FAILED", "Failed to decrypt media payload")
+                        )
+                    }
                     bytes = payload.size.toLong()
                     call.respond(
                         MediaDownloadResponse(
@@ -610,7 +674,12 @@ fun Route.syncRoutes(
                             mimeType = record.mimeType,
                             sizeBytes = record.sizeBytes,
                             data = payload,
-                            downloadUrl = buildMediaDownloadUrl(call, record.mediaId)
+                            downloadUrl = resolveMediaDownloadUrl(
+                                call,
+                                record,
+                                mediaStorage,
+                                mediaAccessPolicy
+                            )
                         )
                     )
                     success = true
@@ -624,6 +693,179 @@ fun Route.syncRoutes(
                 }
             }
         }
+
+        // Backups
+        route("/backups") {
+            post {
+                val start = System.currentTimeMillis()
+                var success = false
+                var bytes = 0L
+                try {
+                    val userId = extractUserId(call, tokenService) ?: return@post
+                    val req = call.receive<BackupUploadRequest>()
+                    bytes = req.data.size.toLong()
+                    
+                    val storage = mediaStorage ?: return@post call.respond(
+                        HttpStatusCode.InternalServerError,
+                        error("BACKUP_STORAGE_UNAVAILABLE", "Backup storage not configured")
+                    )
+                    
+                    val backupId = UUID.randomUUID()
+                    
+                    val encryptedData = runCatching {
+                        encryptionService.processBackupUpload(
+                            req.data,
+                            userId.toString(),
+                            backupId.toString()
+                        ).data
+                    }.getOrElse { error ->
+                        Napier.e("Failed to encrypt backup", error)
+                        return@post call.respond(
+                            HttpStatusCode.InternalServerError,
+                            error("BACKUP_ENCRYPT_FAILED", "Failed to encrypt backup")
+                        )
+                    }
+                    
+                    val storagePath = storage.uploadBackup(userId, backupId, encryptedData)
+                    
+                    val record = repository.createBackupRecord(
+                        userId,
+                        BackupRecord(
+                            id = backupId,
+                            userId = userId,
+                            deviceId = req.deviceId,
+                            manifest = req.manifest,
+                            storagePath = storagePath,
+                            createdAt = System.currentTimeMillis(),
+                            sizeBytes = bytes
+                        )
+                    )
+                    
+                    call.respond(
+                        BackupUploadResponse(
+                            id = record.id.toString(),
+                            createdAt = record.createdAt,
+                            sizeBytes = record.sizeBytes
+                        )
+                    )
+                    success = true
+                } finally {
+                    metrics.recordOperation("sync.backup.upload", System.currentTimeMillis() - start, success, bytes)
+                }
+            }
+
+            get {
+                val start = System.currentTimeMillis()
+                var success = false
+                try {
+                    val userId = extractUserId(call, tokenService) ?: return@get
+                    val backups = repository.listBackups(userId)
+                    call.respond(
+                        BackupListResponse(
+                            backups.map {
+                                BackupInfoResponse(
+                                    id = it.id.toString(),
+                                    deviceId = it.deviceId,
+                                    manifest = it.manifest,
+                                    createdAt = it.createdAt,
+                                    sizeBytes = it.sizeBytes,
+                                    downloadUrl = resolveBackupDownloadUrl(call, it, mediaStorage, mediaAccessPolicy)
+                                )
+                            }
+                        )
+                    )
+                    success = true
+                } finally {
+                    metrics.recordOperation("sync.backup.list", System.currentTimeMillis() - start, success)
+                }
+            }
+
+            get("/{backupId}") {
+                val start = System.currentTimeMillis()
+                var success = false
+                try {
+                    val userId = extractUserId(call, tokenService) ?: return@get
+                    val backupId = call.parameters["backupId"]?.let { UUID.fromString(it) } ?: return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        error("INVALID_ID", "Invalid backupId")
+                    )
+                    
+                    val record = repository.getBackupRecord(userId, backupId)
+                        ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Backup not found"))
+                        
+                    val storage = mediaStorage ?: return@get call.respond(
+                        HttpStatusCode.InternalServerError,
+                        error("BACKUP_STORAGE_UNAVAILABLE", "Backup storage not configured")
+                    )
+                    
+                    val encryptedData = storage.downloadMedia(record.storagePath)
+                        ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Backup file not found"))
+                    
+                    val decryptedData = runCatching {
+                        encryptionService.processBackupDownload(encryptedData, shouldDecrypt = true)
+                    }.getOrElse { error ->
+                        Napier.e("Failed to decrypt backup $backupId", error)
+                        return@get call.respond(
+                            HttpStatusCode.InternalServerError,
+                            error("BACKUP_DECRYPT_FAILED", "Failed to decrypt backup")
+                        )
+                    }
+                    
+                    call.respondBytes(decryptedData, ContentType.Application.OctetStream)
+                    success = true
+                } finally {
+                    metrics.recordOperation("sync.backup.download", System.currentTimeMillis() - start, success)
+                }
+            }
+
+            delete("/{backupId}") {
+                val start = System.currentTimeMillis()
+                var success = false
+                try {
+                    val userId = extractUserId(call, tokenService) ?: return@delete
+                    val backupId = call.parameters["backupId"]?.let { UUID.fromString(it) } ?: return@delete call.respond(
+                        HttpStatusCode.BadRequest,
+                        error("INVALID_ID", "Invalid backupId")
+                    )
+                    
+                    val record = repository.getBackupRecord(userId, backupId)
+                    if (record != null) {
+                        mediaStorage?.deleteMedia(record.storagePath)
+                        repository.deleteBackup(userId, backupId)
+                    }
+                    
+                    call.respond(HttpStatusCode.OK)
+                    success = true
+                } finally {
+                    metrics.recordOperation("sync.backup.delete", System.currentTimeMillis() - start, success)
+                }
+            }
+        }
+
+        // Maintenance
+        route("/maintenance") {
+            post("/purge") {
+                val start = System.currentTimeMillis()
+                var success = false
+                try {
+                    val userId = extractUserId(call, tokenService) ?: return@post
+                    val retentionDays = call.request.queryParameters["retentionDays"]?.toLongOrNull() ?: 30L
+                    if (retentionDays <= 0) {
+                        return@post call.respond(
+                            HttpStatusCode.BadRequest,
+                            error("INVALID_PARAMETER", "retentionDays must be > 0")
+                        )
+                    }
+                    val safeRetentionDays = retentionDays.coerceAtMost(3650L)
+                    val cutoff = System.currentTimeMillis() - (safeRetentionDays * MILLIS_PER_DAY)
+                    val result = repository.purgeTombstones(userId, cutoff)
+                    call.respond(simpleSuccess(result))
+                    success = true
+                } finally {
+                    metrics.recordOperation(METRIC_SYNC_PURGE, System.currentTimeMillis() - start, success)
+                }
+            }
+        }
     }
 }
 
@@ -633,4 +875,75 @@ private fun buildMediaDownloadUrl(call: ApplicationCall, mediaId: String): Strin
         (origin.scheme == "https" && origin.localPort == 443)
     val portPart = if (defaultPort) "" else ":${origin.localPort}"
     return "${origin.scheme}://${origin.localHost}$portPart/api/v1/sync/media/$mediaId"
+}
+
+private fun resolveMediaDownloadUrl(
+    call: ApplicationCall,
+    record: MediaRecord,
+    mediaStorage: GcsMediaStorage?,
+    accessPolicy: MediaAccessPolicy
+): String {
+    if (accessPolicy.useSignedUrls && mediaStorage != null && record.storagePath != null) {
+        return runCatching {
+            mediaStorage.getSignedDownloadUrl(record.storagePath, accessPolicy.signedUrlTtlHours)
+        }.getOrElse { error ->
+            Napier.e("Failed to generate signed URL for ${record.mediaId}", error)
+            buildMediaDownloadUrl(call, record.mediaId)
+        }
+    }
+    return buildMediaDownloadUrl(call, record.mediaId)
+}
+
+private fun resolveBackupDownloadUrl(
+    call: ApplicationCall,
+    record: BackupRecord,
+    mediaStorage: GcsMediaStorage?,
+    accessPolicy: MediaAccessPolicy
+): String {
+    if (accessPolicy.useSignedUrls && mediaStorage != null) {
+        return runCatching {
+            mediaStorage.getSignedDownloadUrl(record.storagePath, accessPolicy.signedUrlTtlHours)
+        }.getOrElse { error ->
+            Napier.e("Failed to generate signed URL for backup ${record.id}", error)
+            buildBackupDownloadUrl(call, record.id.toString())
+        }
+    }
+    return buildBackupDownloadUrl(call, record.id.toString())
+}
+
+private fun buildBackupDownloadUrl(call: ApplicationCall, backupId: String): String {
+    val origin = call.request.local
+    val defaultPort = (origin.scheme == "http" && origin.localPort == 80) ||
+        (origin.scheme == "https" && origin.localPort == 443)
+    val portPart = if (defaultPort) "" else ":${origin.localPort}"
+    return "${origin.scheme}://${origin.localHost}$portPart/api/v1/sync/backups/$backupId"
+}
+
+private fun app.logdate.server.sync.SyncMetricsSnapshot.toPrometheus(): String {
+    val builder = StringBuilder()
+    builder.appendLine("# HELP logdate_sync_conflicts_total Total sync conflicts detected.")
+    builder.appendLine("# TYPE logdate_sync_conflicts_total counter")
+    builder.appendLine("logdate_sync_conflicts_total $conflictCount")
+    builder.appendLine("# HELP logdate_sync_operation_success_total Successful sync operations by type.")
+    builder.appendLine("# TYPE logdate_sync_operation_success_total counter")
+    builder.appendLine("# HELP logdate_sync_operation_error_total Failed sync operations by type.")
+    builder.appendLine("# TYPE logdate_sync_operation_error_total counter")
+    builder.appendLine("# HELP logdate_sync_operation_duration_ms_total Total sync operation duration by type.")
+    builder.appendLine("# TYPE logdate_sync_operation_duration_ms_total counter")
+    builder.appendLine("# HELP logdate_sync_operation_bytes_total Total bytes processed by operation type.")
+    builder.appendLine("# TYPE logdate_sync_operation_bytes_total counter")
+
+    operations.forEach { operation ->
+        val label = escapeLabelValue(operation.name)
+        builder.appendLine("logdate_sync_operation_success_total{operation=\"$label\"} ${operation.successCount}")
+        builder.appendLine("logdate_sync_operation_error_total{operation=\"$label\"} ${operation.errorCount}")
+        builder.appendLine("logdate_sync_operation_duration_ms_total{operation=\"$label\"} ${operation.totalDurationMs}")
+        builder.appendLine("logdate_sync_operation_bytes_total{operation=\"$label\"} ${operation.totalBytes}")
+    }
+
+    return builder.toString()
+}
+
+private fun escapeLabelValue(value: String): String {
+    return value.replace("\\", "\\\\").replace("\"", "\\\"")
 }
