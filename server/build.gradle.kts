@@ -1,3 +1,5 @@
+import org.gradle.jvm.tasks.Jar
+
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlinx.serialization)
@@ -82,11 +84,14 @@ dependencies {
 
 // Test configuration
 tasks.test {
-    useJUnitPlatform()
     // Disable parallel test execution due to Koin global context
     systemProperty("junit.jupiter.execution.parallel.enabled", "false")
     maxParallelForks = 1
 
     // Testcontainers configuration
     systemProperty("testcontainers.reuse.enable", "true")
+}
+
+tasks.named<Jar>("jar") {
+    archiveFileName.set("logdate-server.jar")
 }

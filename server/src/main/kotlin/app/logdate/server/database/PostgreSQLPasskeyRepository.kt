@@ -2,6 +2,8 @@ package app.logdate.server.database
 
 import app.logdate.server.passkeys.PasskeyRepository
 import app.logdate.server.passkeys.StoredPasskeyData
+import app.logdate.server.util.toKotlinInstant
+import app.logdate.server.util.toKotlinxInstant
 import app.logdate.shared.model.PasskeyInfo
 import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.*
@@ -30,8 +32,8 @@ class PostgreSQLPasskeyRepository : PasskeyRepository {
                     it[PasskeysTable.signCount] = signCount
                     it[nickname] = info.nickname
                     it[deviceType] = info.deviceType
-                    it[createdAt] = info.createdAt
-                    it[lastUsedAt] = info.lastUsedAt
+                    it[createdAt] = info.createdAt.toKotlinxInstant()
+                    it[lastUsedAt] = info.lastUsedAt?.toKotlinxInstant()
                     it[isActive] = info.isActive
                     it[webauthnData] = "{}"
                 }
@@ -179,8 +181,8 @@ class PostgreSQLPasskeyRepository : PasskeyRepository {
                 it[this.signCount] = signCount
                 it[nickname] = passkey.nickname
                 it[deviceType] = passkey.deviceType
-                it[createdAt] = passkey.createdAt
-                it[lastUsedAt] = passkey.lastUsedAt
+                it[createdAt] = passkey.createdAt.toKotlinxInstant()
+                it[lastUsedAt] = passkey.lastUsedAt?.toKotlinxInstant()
                 it[isActive] = passkey.isActive
                 it[this.webauthnData] = webauthnData
             }
@@ -212,8 +214,8 @@ class PostgreSQLPasskeyRepository : PasskeyRepository {
             credentialId = this[PasskeysTable.credentialId],
             nickname = this[PasskeysTable.nickname],
             deviceType = this[PasskeysTable.deviceType],
-            createdAt = this[PasskeysTable.createdAt],
-            lastUsedAt = this[PasskeysTable.lastUsedAt],
+            createdAt = this[PasskeysTable.createdAt].toKotlinInstant(),
+            lastUsedAt = this[PasskeysTable.lastUsedAt]?.toKotlinInstant(),
             isActive = this[PasskeysTable.isActive]
         )
     }

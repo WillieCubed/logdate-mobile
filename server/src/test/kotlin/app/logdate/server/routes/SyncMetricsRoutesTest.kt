@@ -1,7 +1,7 @@
 package app.logdate.server.routes
 
 import app.logdate.server.auth.JwtTokenService
-import app.logdate.server.module
+import app.logdate.server.configureSyncTestApp
 import app.logdate.server.sync.SyncMetricsSnapshot
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -9,8 +9,7 @@ import io.ktor.http.*
 import io.ktor.server.testing.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import org.junit.jupiter.api.Test
-import org.koin.ktor.ext.getKoin
+import kotlin.test.Test
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -31,13 +30,8 @@ class SyncMetricsRoutesTest {
 
     @Test
     fun `sync metrics endpoint reports upload counts`() = testApplication {
-        lateinit var tokenService: JwtTokenService
-        application {
-            module()
-            tokenService = getKoin().get()
-        }
-        startApplication()
-        val authHeader = authHeader(tokenService)
+        val env = configureSyncTestApp()
+        val authHeader = authHeader(env.tokenService)
 
         val upload = client.post("/api/v1/sync/content") {
             header(HttpHeaders.Authorization, authHeader)

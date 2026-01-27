@@ -15,7 +15,7 @@ class DebugTest {
     fun debugApiV1BaseRoute() = testApplication {
         application { module() }
         
-        val response = client.get("/api/v1/journals")
+        val response = client.get("/api/v1/accounts/username/testuser/available")
         
         println("Status: ${response.status}")
         println("Body: ${response.bodyAsText()}")
@@ -38,11 +38,11 @@ class DebugTest {
     fun debugJsonStructure() = testApplication {
         application { module() }
         
-        val response = client.get("/api/v1/journals/{id}".replace("{id}", "test123"))
+        val response = client.get("/api/v1/accounts/username/invalid!/available")
         
         println("Status: ${response.status}")
         println("Body: ${response.bodyAsText()}")
         
-        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals(HttpStatusCode.BadRequest, response.status)
     }
 }

@@ -34,7 +34,7 @@ This document outlines the recommended Google Cloud services for hosting LogDate
   - Connection pooling and performance insights
 
 ### Storage
-- **Cloud Storage**: Media and asset storage
+- **Cloud Storage**: Media and asset storage (private bucket, optional signed URLs)
   - Global CDN integration
   - Lifecycle management for cost optimization
   - Signed URLs for secure direct uploads
@@ -104,6 +104,7 @@ This document outlines the recommended Google Cloud services for hosting LogDate
   - Customer-managed encryption keys
   - Automatic key rotation
   - Hardware security modules
+  - Optional CMEK for media uploads via `GCS_MEDIA_KMS_KEY`
 
 ## Monitoring & Operations
 
@@ -183,9 +184,9 @@ The architecture is designed to be cloud-agnostic:
 ## Deployment Pipeline
 
 ### CI/CD
-- **Cloud Build**: Automated builds and deployments
+- **Terraform (endgame)**: IaC for Cloud Run, IAM, and Artifact Registry
+- **GitHub Actions + gcloud (fallback)**: Emergency builds and deploys
 - **Artifact Registry**: Container image storage
-- **Cloud Deploy**: GitOps-style deployments
 
 ### Testing
 - **Cloud Build**: Automated testing

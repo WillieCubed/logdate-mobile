@@ -1,17 +1,19 @@
 package app.logdate.server.e2e.sync
 
 import app.logdate.server.auth.JwtTokenService
-import app.logdate.server.module
+import app.logdate.server.configureSyncTestApp
 import app.logdate.shared.model.sync.ContentChangesResponse
+import app.logdate.shared.model.sync.DeviceId
 import app.logdate.shared.model.sync.MediaDownloadResponse
+import app.logdate.shared.model.sync.MediaUploadRequest
 import app.logdate.shared.model.sync.MediaUploadResponse
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
 import kotlinx.serialization.json.Json
-import org.junit.jupiter.api.Test
-import org.koin.ktor.ext.getKoin
+import kotlinx.serialization.encodeToString
+import kotlin.test.Test
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -25,15 +27,9 @@ class SyncE2ETest {
 
     @Test
     fun `multi-device sync flow detects conflicts and downloads media`() = testApplication {
-        lateinit var tokenService: JwtTokenService
-        application {
-            module()
-            tokenService = getKoin().get()
-        }
-        startApplication()
-
+        val env = configureSyncTestApp()
         val accountId = UUID.randomUUID().toString()
-        val authHeader = "Bearer ${tokenService.generateAccessToken(accountId)}"
+        val authHeader = "Bearer ${env.tokenService.generateAccessToken(accountId)}"
 
         client.post("/api/v1/sync/journals") {
             header(HttpHeaders.Authorization, authHeader)
@@ -71,22 +67,18 @@ class SyncE2ETest {
         }
 
         val mediaBytes = byteArrayOf(9, 8, 7, 6)
-        val encoded = mediaBytes.joinToString(prefix = "[", postfix = "]")
+        val mediaRequest = MediaUploadRequest(
+            contentId = "note-e2e",
+            fileName = "media.png",
+            mimeType = "image/png",
+            sizeBytes = mediaBytes.size.toLong(),
+            data = mediaBytes,
+            deviceId = DeviceId("device-a")
+        )
         val mediaUpload = client.post("/api/v1/sync/media") {
             header(HttpHeaders.Authorization, authHeader)
             contentType(ContentType.Application.Json)
-            setBody(
-                """
-                {
-                  "contentId": "note-e2e",
-                  "fileName": "media.png",
-                  "mimeType": "image/png",
-                  "sizeBytes": ${mediaBytes.size},
-                  "data": $encoded,
-                  "deviceId": "device-a"
-                }
-                """.trimIndent()
-            )
+            setBody(json.encodeToString(mediaRequest))
         }
         assertEquals(HttpStatusCode.OK, mediaUpload.status)
         val mediaUploadPayload = json.decodeFromString<MediaUploadResponse>(mediaUpload.bodyAsText())

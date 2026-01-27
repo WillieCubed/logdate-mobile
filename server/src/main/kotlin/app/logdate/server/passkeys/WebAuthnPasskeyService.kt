@@ -1,8 +1,8 @@
 package app.logdate.server.passkeys
 
+import app.logdate.server.util.toKotlinInstant
 import app.logdate.shared.model.*
 import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import java.security.SecureRandom
 import java.util.*
 import kotlin.uuid.ExperimentalUuidApi
@@ -144,7 +144,7 @@ class WebAuthnPasskeyService(
                 credentialId = credentialId,
                 nickname = "Passkey",
                 deviceType = "platform",
-                createdAt = Clock.System.now(),
+                createdAt = Clock.System.now().toKotlinInstant(),
                 lastUsedAt = null,
                 isActive = true
             )
@@ -192,7 +192,7 @@ class WebAuthnPasskeyService(
             
             // Update last used time
             val updatedPasskey = storedPasskey.copy(
-                info = storedPasskey.info.copy(lastUsedAt = Clock.System.now())
+                info = storedPasskey.info.copy(lastUsedAt = Clock.System.now().toKotlinInstant())
             )
             
             // Update stored passkey

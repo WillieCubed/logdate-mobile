@@ -1,5 +1,6 @@
 package app.logdate.server.passkeys
 
+import app.logdate.server.util.toKotlinInstant
 import app.logdate.shared.model.*
 import kotlinx.datetime.Clock
 import kotlin.random.Random
@@ -109,7 +110,7 @@ class SimplePasskeyService(
                 credentialId = registrationResponse.id,
                 nickname = "Generated Passkey",
                 deviceType = "platform",
-                createdAt = Clock.System.now(),
+                createdAt = Clock.System.now().toKotlinInstant(),
                 lastUsedAt = null,
                 isActive = true
             )
@@ -144,7 +145,7 @@ class SimplePasskeyService(
             challenges[challenge] = challengeData.copy(isUsed = true)
             
             // Update last used time
-            val updatedPasskey = passkey.copy(lastUsedAt = Clock.System.now())
+            val updatedPasskey = passkey.copy(lastUsedAt = Clock.System.now().toKotlinInstant())
             passkeys[authenticationResponse.id] = updatedPasskey
             
             VerificationResult(success = true, userId = challengeData.userId)

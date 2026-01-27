@@ -1,6 +1,7 @@
 package app.logdate.server.database
 
 import app.logdate.server.auth.*
+import app.logdate.server.util.toKotlinxInstant
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import org.jetbrains.exposed.sql.*
@@ -32,8 +33,8 @@ class PostgreSQLSessionManager : SessionManager {
                 it[displayName] = session.displayName
                 it[bio] = session.bio
                 it[deviceInfo] = session.deviceInfo?.toString()
-                it[createdAt] = session.createdAt
-                it[expiresAt] = session.expiresAt
+                it[createdAt] = session.createdAt.toKotlinxInstant()
+                it[expiresAt] = session.expiresAt.toKotlinxInstant()
                 it[isUsed] = session.isUsed
             }
         }
@@ -181,8 +182,8 @@ class PostgreSQLSessionManager : SessionManager {
                 null // For now, keeping it simple
             },
             sessionType = SessionType.valueOf(this[SessionsTable.sessionType]),
-            createdAt = this[SessionsTable.createdAt],
-            expiresAt = this[SessionsTable.expiresAt],
+            createdAt = this[SessionsTable.createdAt].toKotlinxInstant(),
+            expiresAt = this[SessionsTable.expiresAt].toKotlinxInstant(),
             isUsed = this[SessionsTable.isUsed]
         )
     }

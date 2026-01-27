@@ -4,7 +4,6 @@ import app.logdate.server.passkeys.SimplePasskeyService
 import app.logdate.shared.model.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import kotlin.test.*
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid

@@ -6,6 +6,7 @@ import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.SessionType
 import app.logdate.server.auth.TokenService
 import app.logdate.server.passkeys.WebAuthnPasskeyService
+import app.logdate.server.util.toKotlinInstant
 import app.logdate.shared.model.*
 import io.github.aakira.napier.Napier
 import io.ktor.http.HttpStatusCode
@@ -554,8 +555,8 @@ private fun Account.toLogDateAccount(passkeyCredentialIds: List<String>): LogDat
         displayName = displayName,
         bio = bio,
         passkeyCredentialIds = passkeyCredentialIds,
-        createdAt = createdAt,
-        updatedAt = lastSignInAt ?: createdAt
+        createdAt = createdAt.toKotlinInstant(),
+        updatedAt = (lastSignInAt ?: createdAt).toKotlinInstant()
     )
 }
 
