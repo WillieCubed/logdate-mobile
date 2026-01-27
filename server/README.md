@@ -70,6 +70,15 @@ Server Module
 
 ## Development
 
+### Configuration
+
+See **[Environment Variables Documentation](docs/environment-variables.md)** for complete configuration reference.
+
+**Quick start:**
+1. Copy `../local.properties.example` to `../local.properties`
+2. Fill in required values (DATABASE_URL, JWT_SECRET, etc.)
+3. For production, see [Google Cloud Production Setup](docs/google-cloud-production.md)
+
 ### Running Tests
 ```bash
 # Run all server tests

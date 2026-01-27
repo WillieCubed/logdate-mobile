@@ -105,7 +105,14 @@ The fastest way to get the LogDate server running locally:
    cd logdate
    ```
 
-2. **Start the development environment**
+2. **Set up local configuration**
+   ```bash
+   cp local.properties.example local.properties
+   # Edit local.properties and fill in required values
+   # See server/docs/environment-variables.md for details
+   ```
+
+3. **Start the development environment**
    ```bash
    # Quick start (recommended)
    ./scripts/dev-start.sh
@@ -117,7 +124,7 @@ The fastest way to get the LogDate server running locally:
    docker-compose up logdate-postgres logdate-redis -d
    ```
 
-3. **Run the server**
+4. **Run the server**
    ```bash
    # Option 1: Run with Docker (full containerized setup)
    docker-compose --profile full-stack up
@@ -127,7 +134,7 @@ The fastest way to get the LogDate server running locally:
    ./gradlew :server:run
    ```
 
-4. **Access the application**
+5. **Access the application**
    - **Server API**: http://localhost:18080 (Docker) or http://localhost:8080 (local)
    - **Database**: localhost:15432 (logdate/logdate)
    - **Redis**: localhost:16379

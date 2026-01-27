@@ -1,5 +1,39 @@
 # Local properties template (copy to `local.properties` and keep untracked)
+
+# OpenAI API for AI features
 OPENAI_API_KEY=replace-with-openai-key
+
+# Database connection
 DATABASE_URL=jdbc:postgresql://localhost:15432/logdate
+DATABASE_USER=postgres
+DATABASE_PASSWORD=password
+
+# Google Maps for location features
 GOOGLE_MAPS_API_KEY=replace-with-google-maps-key
+
+# Meta/Facebook app ID
 metaAppId=replace-with-meta-app-id
+
+# Server security (generate with: openssl rand -base64 32)
+JWT_SECRET=dev-secret-key-not-for-production-minimum-32-characters-required
+
+# Server encryption (generate with: openssl rand -base64 32)
+# Optional for development, required for production
+SERVER_ENCRYPTION_KEY=optional-base64-encoded-32-byte-key-for-encryption
+SERVER_ENCRYPTION_KEY_ID=default
+ENCRYPTION_MODE=AT_REST_ONLY
+
+# Server configuration
+PORT=8080
+HOST=0.0.0.0
+
+# GCS (optional - only needed if using Google Cloud Storage)
+# GCS_PROJECT_ID=your-gcp-project-id
+# GCS_BUCKET_NAME=your-media-bucket
+# GCS_MEDIA_KMS_KEY=projects/your-project/locations/us/keyRings/your-ring/cryptoKeys/your-key
+
+# Sync maintenance (optional - defaults are fine for development)
+# SYNC_TOMBSTONE_PURGE_ENABLED=true
+# SYNC_TOMBSTONE_RETENTION_DAYS=30
+# SYNC_TOMBSTONE_PURGE_INTERVAL_HOURS=24
+
