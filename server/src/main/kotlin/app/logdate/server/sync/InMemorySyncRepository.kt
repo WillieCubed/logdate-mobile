@@ -20,6 +20,7 @@ class InMemorySyncRepository : SyncRepository {
     private val associations = ConcurrentHashMap<UUID, ConcurrentHashMap<AssociationKey, AssociationRecord>>()
     private val associationDeletions = ConcurrentHashMap<UUID, ConcurrentHashMap<AssociationKey, Long>>()
     private val media = ConcurrentHashMap<UUID, ConcurrentHashMap<String, MediaRecord>>()
+    private val backups = ConcurrentHashMap<UUID, ConcurrentHashMap<UUID, BackupRecord>>()
     private val lastTimestamp = AtomicLong(System.currentTimeMillis())
 
     private fun now(): Long {
@@ -57,8 +58,8 @@ class InMemorySyncRepository : SyncRepository {
 
     override fun contentChanges(userId: UUID, since: Long, limit: Int): ChangeSet<ContentRecord, ContentDeletionMarker> {
         val changeRows = content.forUser(userId).values
-            .filter { it.lastUpdated > since || it.serverVersion > since }
-            .sortedBy { it.lastUpdated }
+            .filter { it.serverVersion > since }
+            .sortedBy { it.serverVersion }
         val hasMoreChanges = changeRows.size > limit
         val changes = changeRows.take(limit).map { it.copy() }
 
@@ -70,7 +71,7 @@ class InMemorySyncRepository : SyncRepository {
         val deletions = deletionRows.take(limit).map { ContentDeletionMarker(it.first, it.second) }
 
         val lastTimestamp = listOfNotNull(
-            changes.maxOfOrNull { it.lastUpdated },
+            changes.maxOfOrNull { it.serverVersion },
             deletions.maxOfOrNull { it.deletedAt }
         ).maxOrNull() ?: since
         return ChangeSet(changes, deletions, lastTimestamp, hasMoreChanges || hasMoreDeletions)
@@ -93,8 +94,8 @@ class InMemorySyncRepository : SyncRepository {
 
     override fun journalChanges(userId: UUID, since: Long, limit: Int): ChangeSet<JournalRecord, JournalDeletionMarker> {
         val changeRows = journals.forUser(userId).values
-            .filter { it.lastUpdated > since || it.serverVersion > since }
-            .sortedBy { it.lastUpdated }
+            .filter { it.serverVersion > since }
+            .sortedBy { it.serverVersion }
         val hasMoreChanges = changeRows.size > limit
         val changes = changeRows.take(limit).map { it.copy() }
 
@@ -106,7 +107,7 @@ class InMemorySyncRepository : SyncRepository {
         val deletions = deletionRows.take(limit).map { JournalDeletionMarker(it.first, it.second) }
 
         val lastTimestamp = listOfNotNull(
-            changes.maxOfOrNull { it.lastUpdated },
+            changes.maxOfOrNull { it.serverVersion },
             deletions.maxOfOrNull { it.deletedAt }
         ).maxOrNull() ?: since
         return ChangeSet(changes, deletions, lastTimestamp, hasMoreChanges || hasMoreDeletions)
@@ -130,8 +131,8 @@ class InMemorySyncRepository : SyncRepository {
 
     override fun associationChanges(userId: UUID, since: Long, limit: Int): ChangeSet<AssociationRecord, AssociationDeletionMarker> {
         val changeRows = associations.forUser(userId).values
-            .filter { it.serverVersion > since || it.createdAt > since }
-            .sortedBy { it.createdAt }
+            .filter { it.serverVersion > since }
+            .sortedBy { it.serverVersion }
         val hasMoreChanges = changeRows.size > limit
         val changes = changeRows.take(limit).map { it.copy() }
 
@@ -143,7 +144,7 @@ class InMemorySyncRepository : SyncRepository {
         val deletions = deletionRows.take(limit).map { (key, deletedAt) -> AssociationDeletionMarker(key, deletedAt) }
 
         val lastTimestamp = listOfNotNull(
-            changes.maxOfOrNull { it.createdAt },
+            changes.maxOfOrNull { it.serverVersion },
             deletions.maxOfOrNull { it.deletedAt }
         ).maxOrNull() ?: since
         return ChangeSet(changes, deletions, lastTimestamp, hasMoreChanges || hasMoreDeletions)
@@ -160,4 +161,73 @@ class InMemorySyncRepository : SyncRepository {
     }
 
     override fun getMedia(userId: UUID, mediaId: String): MediaRecord? = media.forUser(userId)[mediaId]
+
+    // Backups
+    override fun createBackupRecord(userId: UUID, record: BackupRecord): BackupRecord {
+        backups.forUser(userId)[record.id] = record
+        return record
+    }
+
+    override fun getBackupRecord(userId: UUID, id: UUID): BackupRecord? = backups.forUser(userId)[id]
+
+    override fun listBackups(userId: UUID): List<BackupRecord> =
+        backups.forUser(userId).values.sortedByDescending { it.createdAt }
+
+    override fun deleteBackup(userId: UUID, id: UUID) {
+        backups.forUser(userId).remove(id)
+    }
+
+    override fun purgeTombstones(userId: UUID, olderThan: Long): SyncPurgeResult {
+        val contentPurged = contentDeletions.forUser(userId)
+            .filterValues { it < olderThan }
+            .also { it.keys.forEach(contentDeletions.forUser(userId)::remove) }
+            .size
+        val journalPurged = journalDeletions.forUser(userId)
+            .filterValues { it < olderThan }
+            .also { it.keys.forEach(journalDeletions.forUser(userId)::remove) }
+            .size
+        val associationPurged = associationDeletions.forUser(userId)
+            .filterValues { it < olderThan }
+            .also { it.keys.forEach(associationDeletions.forUser(userId)::remove) }
+            .size
+        val mediaPurged = 0
+
+        return SyncPurgeResult(
+            contentPurged = contentPurged,
+            journalPurged = journalPurged,
+            associationPurged = associationPurged,
+            mediaPurged = mediaPurged,
+            cutoff = olderThan
+        )
+    }
+
+    override fun purgeTombstonesOlderThan(olderThan: Long): SyncPurgeResult {
+        val contentPurged = purgeAll(contentDeletions, olderThan)
+        val journalPurged = purgeAll(journalDeletions, olderThan)
+        val associationPurged = purgeAll(associationDeletions, olderThan)
+        val mediaPurged = 0
+
+        return SyncPurgeResult(
+            contentPurged = contentPurged,
+            journalPurged = journalPurged,
+            associationPurged = associationPurged,
+            mediaPurged = mediaPurged,
+            cutoff = olderThan
+        )
+    }
+
+    private fun <K> purgeAll(
+        store: ConcurrentHashMap<UUID, ConcurrentHashMap<K, Long>>,
+        olderThan: Long
+    ): Int {
+        var purged = 0
+        store.values.forEach { entries ->
+            val toRemove = entries.filterValues { it < olderThan }.keys
+            toRemove.forEach { key ->
+                entries.remove(key)
+                purged++
+            }
+        }
+        return purged
+    }
 }

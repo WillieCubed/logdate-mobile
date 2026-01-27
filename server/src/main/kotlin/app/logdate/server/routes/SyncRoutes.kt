@@ -595,6 +595,7 @@ fun Route.syncRoutes(
                         MediaRecord(
                             mediaId = mediaId,
                             contentId = req.contentId,
+                            userId = userId,
                             fileName = req.fileName,
                             mimeType = req.mimeType,
                             sizeBytes = req.sizeBytes,
@@ -602,7 +603,10 @@ fun Route.syncRoutes(
                             storagePath = storagePath,
                             createdAt = System.currentTimeMillis(),
                             serverVersion = 0L,
-                            deviceId = req.deviceId
+                            deviceId = req.deviceId,
+                            encryptionVersion = 1,
+                            encryptionKeyId = "default",
+                            encryptionMode = "SERVER"
                         )
                     )
                     val downloadUrl = resolveMediaDownloadUrl(

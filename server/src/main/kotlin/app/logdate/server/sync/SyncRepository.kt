@@ -40,6 +40,7 @@ data class AssociationRecord(
 data class MediaRecord(
     val mediaId: String,
     val contentId: String,
+    val userId: UUID,
     val fileName: String,
     val mimeType: String,
     val sizeBytes: Long,
@@ -47,7 +48,20 @@ data class MediaRecord(
     val storagePath: String? = null,
     val createdAt: Long,
     val serverVersion: Long,
-    val deviceId: DeviceId
+    val deviceId: DeviceId,
+    val encryptionVersion: Int? = null,
+    val encryptionKeyId: String? = null,
+    val encryptionMode: String? = null
+)
+
+data class BackupRecord(
+    val id: UUID,
+    val userId: UUID,
+    val deviceId: String,
+    val manifest: String,
+    val storagePath: String,
+    val createdAt: Long,
+    val sizeBytes: Long
 )
 
 data class ChangeSet<T, D>(
@@ -84,6 +98,16 @@ interface SyncRepository {
     // Media
     fun upsertMedia(userId: UUID, record: MediaRecord): MediaRecord
     fun getMedia(userId: UUID, mediaId: String): MediaRecord?
+
+    // Backups
+    fun createBackupRecord(userId: UUID, record: BackupRecord): BackupRecord
+    fun getBackupRecord(userId: UUID, id: UUID): BackupRecord?
+    fun listBackups(userId: UUID): List<BackupRecord>
+    fun deleteBackup(userId: UUID, id: UUID)
+
+    // Maintenance
+    fun purgeTombstones(userId: UUID, olderThan: Long): SyncPurgeResult
+    fun purgeTombstonesOlderThan(olderThan: Long): SyncPurgeResult
 }
 
 data class SyncStatus(
@@ -97,3 +121,11 @@ data class ContentDeletionMarker(val id: String, val deletedAt: Long)
 data class JournalDeletionMarker(val id: String, val deletedAt: Long)
 data class AssociationKey(val journalId: String, val contentId: String)
 data class AssociationDeletionMarker(val key: AssociationKey, val deletedAt: Long)
+
+data class SyncPurgeResult(
+    val contentPurged: Int,
+    val journalPurged: Int,
+    val associationPurged: Int,
+    val mediaPurged: Int,
+    val cutoff: Long
+)

@@ -15,7 +15,8 @@ import java.util.concurrent.TimeUnit
  */
 class GcsMediaStorage(
     private val bucketName: String,
-    projectId: String? = null
+    projectId: String? = null,
+    private val kmsKeyName: String? = null
 ) {
     private val storage: Storage = StorageOptions.newBuilder()
         .apply { projectId?.let { setProjectId(it) } }
@@ -45,12 +46,46 @@ class GcsMediaStorage(
             .build()
 
         try {
-            storage.create(blobInfo, data)
+            val options = if (kmsKeyName != null) {
+                arrayOf(Storage.BlobTargetOption.kmsKeyName(kmsKeyName))
+            } else {
+                emptyArray()
+            }
+            storage.create(blobInfo, data, *options)
             Napier.d("Uploaded media to GCS: $storagePath (${data.size} bytes)")
             return storagePath
         } catch (e: Exception) {
             Napier.e("Failed to upload media to GCS: $storagePath", e)
             throw MediaStorageException("Failed to upload media", e)
+        }
+    }
+
+    /**
+     * Upload encrypted backup to GCS.
+     */
+    fun uploadBackup(
+        userId: UUID,
+        backupId: UUID,
+        data: ByteArray
+    ): String {
+        val storagePath = "users/$userId/backups/$backupId.enc"
+        val blobId = BlobId.of(bucketName, storagePath)
+        val blobInfo = BlobInfo.newBuilder(blobId)
+            .setContentType("application/octet-stream")
+            .build()
+
+        try {
+            val options = if (kmsKeyName != null) {
+                arrayOf(Storage.BlobTargetOption.kmsKeyName(kmsKeyName))
+            } else {
+                emptyArray()
+            }
+            storage.create(blobInfo, data, *options)
+            Napier.d("Uploaded backup to GCS: $storagePath (${data.size} bytes)")
+            return storagePath
+        } catch (e: Exception) {
+            Napier.e("Failed to upload backup to GCS: $storagePath", e)
+            throw MediaStorageException("Failed to upload backup", e)
         }
     }
 
@@ -143,7 +178,8 @@ class GcsMediaStorage(
         fun fromEnvironment(): GcsMediaStorage? {
             val bucketName = System.getenv("GCS_BUCKET_NAME") ?: return null
             val projectId = System.getenv("GCS_PROJECT_ID")
-            return GcsMediaStorage(bucketName, projectId)
+            val kmsKeyName = System.getenv("GCS_MEDIA_KMS_KEY") ?: System.getenv("GCS_KMS_KEY")
+            return GcsMediaStorage(bucketName, projectId, kmsKeyName)
         }
     }
 }
