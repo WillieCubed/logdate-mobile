@@ -48,6 +48,28 @@ actual class IosCryptoManager : CryptoManager {
         return bytes
     }
     
+    @OptIn(ExperimentalForeignApi::class)
+    override fun hmacSha256(key: ByteArray, data: ByteArray): ByteArray = memScoped {
+        val output = ByteArray(32) // SHA-256 = 32 bytes
+        
+        key.usePinned { keyPinned ->
+            data.usePinned { dataPinned ->
+                output.usePinned { outputPinned ->
+                    CCHmac(
+                        kCCHmacAlgSHA256,
+                        keyPinned.addressOf(0),
+                        key.size.toULong(),
+                        dataPinned.addressOf(0),
+                        data.size.toULong(),
+                        outputPinned.addressOf(0)
+                    )
+                }
+            }
+        }
+        
+        output
+    }
+    
     /**
      * AES-GCM encryption using iOS CommonCrypto.
      */

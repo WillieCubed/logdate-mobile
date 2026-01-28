@@ -1,0 +1,182 @@
+package app.logdate.client.device.crypto
+
+import app.logdate.client.datastore.SecureStorage
+import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
+
+class IdentityKeyManagerTest {
+    
+    private val mockSecureStorage = InMemorySecureStorage()
+    private val cryptoManager = FakeCryptoManager()
+    private val manager = IdentityKeyManager(mockSecureStorage, cryptoManager)
+    
+    @Test
+    fun testNoIdentityKeyInitially() = runTest {
+        assertFalse(manager.hasIdentityKey())
+    }
+    
+    @Test
+    fun testSetupNewIdentity() = runTest {
+        val phrase = manager.setupNewIdentity()
+        
+        assertEquals(12, phrase.words.size)
+        assertTrue(manager.hasIdentityKey())
+    }
+    
+    @Test
+    fun testGetIdentityKeyAfterSetup() = runTest {
+        manager.setupNewIdentity()
+        val key = manager.getIdentityKey()
+        
+        assertEquals(32, key.size)
+    }
+    
+    @Test
+    fun testRecoverIdentity() = runTest {
+        val phrase1 = manager.setupNewIdentity()
+        val key1 = manager.getIdentityKey()
+        
+        manager.clearIdentityKey()
+        assertFalse(manager.hasIdentityKey())
+        
+        manager.recoverIdentity(phrase1.words)
+        assertTrue(manager.hasIdentityKey())
+        
+        val key2 = manager.getIdentityKey()
+        assertTrue(key1.contentEquals(key2), "Same phrase should derive same key")
+    }
+    
+    @Test
+    fun testDeterministicKeyDerivation() = runTest {
+        val phrase = manager.setupNewIdentity()
+        val key1 = manager.getIdentityKey()
+        
+        manager.clearIdentityKey()
+        manager.recoverIdentity(phrase.words)
+        val key2 = manager.getIdentityKey()
+        
+        assertTrue(key1.contentEquals(key2))
+    }
+    
+    @Test
+    fun testGetIdentityKeyThrowsWhenNotSet() = runTest {
+        assertFailsWith<IdentityKeyNotFoundException> {
+            manager.getIdentityKey()
+        }
+    }
+    
+    @Test
+    fun testClearIdentityKey() = runTest {
+        manager.setupNewIdentity()
+        assertTrue(manager.hasIdentityKey())
+        
+        manager.clearIdentityKey()
+        assertFalse(manager.hasIdentityKey())
+    }
+}
+
+class KeyDerivationTest {
+    
+    private val cryptoManager = FakeCryptoManager()
+    private val keyDerivation = KeyDerivation(cryptoManager)
+    
+    @Test
+    fun testDeriveKey() {
+        val identityKey = ByteArray(32) { it.toByte() }
+        val key = keyDerivation.deriveKey(identityKey, "journal_entry", "uuid-123")
+        
+        assertEquals(32, key.size)
+    }
+    
+    @Test
+    fun testDeterministicDerivation() {
+        val identityKey = ByteArray(32) { it.toByte() }
+        
+        val key1 = keyDerivation.deriveKey(identityKey, "journal_entry", "uuid-123")
+        val key2 = keyDerivation.deriveKey(identityKey, "journal_entry", "uuid-123")
+        
+        assertTrue(key1.contentEquals(key2))
+    }
+    
+    @Test
+    fun testDifferentContextProducesDifferentKey() {
+        val identityKey = ByteArray(32) { it.toByte() }
+        
+        val key1 = keyDerivation.deriveKey(identityKey, "journal_entry", "uuid-123")
+        val key2 = keyDerivation.deriveKey(identityKey, "media_file", "uuid-123")
+        
+        assertFalse(key1.contentEquals(key2))
+    }
+    
+    @Test
+    fun testDifferentContentIdProducesDifferentKey() {
+        val identityKey = ByteArray(32) { it.toByte() }
+        
+        val key1 = keyDerivation.deriveKey(identityKey, "journal_entry", "uuid-123")
+        val key2 = keyDerivation.deriveKey(identityKey, "journal_entry", "uuid-456")
+        
+        assertFalse(key1.contentEquals(key2))
+    }
+}
+
+// Test implementations
+
+class InMemorySecureStorage : SecureStorage {
+    private val storage = mutableMapOf<String, ByteArray>()
+    
+    override suspend fun getBytes(key: String): ByteArray? = storage[key]
+    
+    override suspend fun putBytes(key: String, value: ByteArray) {
+        storage[key] = value
+    }
+    
+    override suspend fun remove(key: String) {
+        storage.remove(key)
+    }
+    
+    override suspend fun clear() {
+        storage.clear()
+    }
+}
+
+class FakeCryptoManager : CryptoManager {
+    private var phraseCounter = 0
+    
+    override suspend fun generateRecoveryPhrase(): List<String> {
+        phraseCounter++
+        return (1..12).map { "word$phraseCounter-$it" }
+    }
+    
+    override suspend fun deriveMasterKey(phrase: List<String>): ByteArray {
+        val combined = phrase.joinToString(",")
+        val hash = java.security.MessageDigest.getInstance("SHA-256").digest(combined.toByteArray())
+        return hash.copyOfRange(0, 32)
+    }
+    
+    override fun validateRecoveryPhrase(phrase: List<String>): Boolean {
+        return phrase.size == 12
+    }
+    
+    override fun encryptSink(sink: okio.Sink, key: ByteArray, iv: ByteArray): okio.Sink {
+        TODO("Not needed for tests")
+    }
+    
+    override fun decryptSource(source: okio.Source, key: ByteArray, iv: ByteArray): okio.Source {
+        TODO("Not needed for tests")
+    }
+    
+    override fun generateRandomBytes(size: Int): ByteArray {
+        return ByteArray(size) { it.toByte() }
+    }
+    
+    override fun hmacSha256(key: ByteArray, data: ByteArray): ByteArray {
+        val mac = javax.crypto.Mac.getInstance("HmacSHA256")
+        mac.init(javax.crypto.spec.SecretKeySpec(key, "HmacSHA256"))
+        return mac.doFinal(data)
+    }
+}

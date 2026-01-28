@@ -55,4 +55,10 @@ expect class CryptoManager() {
      * Generates a cryptographically secure random sequence of bytes for salts or IVs.
      */
     fun generateRandomBytes(size: Int): ByteArray
+    
+    /**
+     * Computes HMAC-SHA256 of data using the provided key.
+     * Used for HKDF and other operations.
+     */
+    internal fun hmacSha256(key: ByteArray, data: ByteArray): ByteArray
 }
