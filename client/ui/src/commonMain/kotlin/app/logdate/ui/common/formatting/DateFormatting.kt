@@ -1,6 +1,6 @@
 package app.logdate.ui.common.formatting
 
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
@@ -38,8 +38,8 @@ fun LocalDate.asRelativeDate(): String {
             if (this.dayOfWeek > today.dayOfWeek) "last $dayName" else dayName
         }
 
-        this.year == today.year -> "${month.asText()} $dayOfMonth"
-        else -> "${month.asText()} $dayOfMonth, $year"
+        this.year == today.year -> "${month.asText()} $day"
+        else -> "${month.asText()} $day, $year"
     }
 }
 
@@ -57,7 +57,7 @@ private fun Month.asText(): String = when (this) {
     Month.OCTOBER -> "October"
     Month.NOVEMBER -> "November"
     Month.DECEMBER -> "December"
-    else -> error("Unknown month: $this")
+    else -> name.lowercase().replaceFirstChar { it.uppercase() }
 }
 
 // TODO: Localize days of the week
@@ -69,5 +69,5 @@ private fun DayOfWeek.asText(): String = when (this) {
     DayOfWeek.FRIDAY -> "Friday"
     DayOfWeek.SATURDAY -> "Saturday"
     DayOfWeek.SUNDAY -> "Sunday"
-    else -> error("Unknown day of week: $this")
+    else -> name.lowercase().replaceFirstChar { it.uppercase() }
 }

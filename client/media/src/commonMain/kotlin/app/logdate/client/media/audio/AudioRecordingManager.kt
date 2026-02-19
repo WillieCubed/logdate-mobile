@@ -1,10 +1,8 @@
 package app.logdate.client.media.audio
 
 import app.logdate.client.media.audio.transcription.TranscriptionService
-import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Duration
-import kotlin.uuid.Uuid
 
 /**
  * Interface for audio recording functionality across platforms

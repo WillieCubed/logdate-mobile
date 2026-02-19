@@ -1,6 +1,6 @@
 package app.logdate.wear.recording
 
-import app.logdate.feature.editor.ui.audio.AudioPlaybackManager
+import app.logdate.client.media.audio.AudioPlaybackManager
 import io.github.aakira.napier.Napier
 
 /**

@@ -4,7 +4,8 @@ import app.logdate.client.repository.rewind.RewindGenerationManager
 import app.logdate.shared.model.RewindGenerationRequest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -24,7 +25,7 @@ class StubRewindGenerationManager : RewindGenerationManager {
             id = requestId,
             startTime = startTime,
             endTime = endTime,
-            requestTime = kotlinx.datetime.Clock.System.now(),
+            requestTime = Clock.System.now(),
             status = RewindGenerationRequest.Status.PENDING
         )
         activeRequests[requestId] = request

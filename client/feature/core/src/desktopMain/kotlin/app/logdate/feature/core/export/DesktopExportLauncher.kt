@@ -10,7 +10,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.koin.core.component.KoinComponent
@@ -21,6 +21,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import kotlinx.datetime.number
 
 /**
  * Desktop-specific implementation for launching data export using AWT FileDialog.
@@ -46,7 +47,7 @@ class DesktopExportLauncher : ExportLauncher, KoinComponent {
                 // Generate default filename with timestamp
                 val timestamp = Clock.System.now()
                     .toLocalDateTime(TimeZone.currentSystemDefault())
-                    .let { "${it.year}-${it.monthNumber.toString().padStart(2, '0')}-${it.dayOfMonth.toString().padStart(2, '0')}_${it.hour.toString().padStart(2, '0')}-${it.minute.toString().padStart(2, '0')}" }
+                    .let { "${it.year}-${it.month.number.toString().padStart(2, '0')}-${it.day.toString().padStart(2, '0')}_${it.hour.toString().padStart(2, '0')}-${it.minute.toString().padStart(2, '0')}" }
                 
                 val defaultFileName = "logdate_export_$timestamp.zip"
                 
@@ -158,6 +159,10 @@ class DesktopExportLauncher : ExportLauncher, KoinComponent {
             
             // Add drafts.json
             addZipEntry(zipOutputStream, "drafts.json", exportResult.drafts)
+
+            exportResult.mediaManifest?.let { manifest ->
+                addZipEntry(zipOutputStream, "media_manifest.json", manifest)
+            }
             
             // Add media files if available
             // This would involve downloading files from their source URIs and adding them to the zip

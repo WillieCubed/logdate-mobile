@@ -1,8 +1,9 @@
 package app.logdate.navigation.routes
 
-import androidx.navigation3.runtime.EntryProviderBuilder
+import app.logdate.navigation.routes.routeEntry
+
+import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
-import androidx.navigation3.runtime.entry
 import app.logdate.feature.onboarding.ui.CloudAccountSetupScreen
 import app.logdate.feature.onboarding.ui.MemoriesImportInfoScreen
 import app.logdate.feature.onboarding.ui.OnboardingCompletionScreen
@@ -38,7 +39,7 @@ fun MainAppNavigator.startOnboarding() {
  * @param onWelcomeBack Callback triggered when the user is welcomed back
  * @param onComplete Callback triggered when onboarding is complete
  */
-fun EntryProviderBuilder<NavKey>.onboarding(
+fun EntryProviderScope<NavKey>.onboarding(
     onBack: () -> Unit,
     onStartOnboarding: () -> Unit,
     onContinueToEntry: () -> Unit,
@@ -46,40 +47,40 @@ fun EntryProviderBuilder<NavKey>.onboarding(
     onWelcomeBack: () -> Unit,
     onComplete: () -> Unit,
 ) {
-    entry<OnboardingStart>() {
+    routeEntry<OnboardingStart>() {
         OnboardingStartScreen(
             onNext = onStartOnboarding,
             onStartFromBackup = onStartOnboarding
         )
     }
-    entry<PersonalIntroRoute>() {
+    routeEntry<PersonalIntroRoute>() {
         PersonalIntroScreen(
             onNext = onContinueToEntry,
             onBack = onBack
         )
     }
-    entry<OnboardingSignIn>() { _ ->
+    routeEntry<OnboardingSignIn>() { _ ->
         CloudAccountSetupScreen(
             onBack = onBack,
             onSkip = onContinueToEntry,
             onContinue = onWelcomeBack,
         )
     }
-    entry<OnboardingEntryRoute>() {
+    routeEntry<OnboardingEntryRoute>() {
 
     }
-    entry<OnboardingImportRoute>() {
+    routeEntry<OnboardingImportRoute>() {
         MemoriesImportInfoScreen(
             onBack = onBack,
             onContinue = onImportCompleted,
         )
     }
-    entry<OnboardingCompleteRoute>() {
+    routeEntry<OnboardingCompleteRoute>() {
         OnboardingCompletionScreen(
             onFinish = onComplete,
         )
     }
-    entry<OnboardingWelcomeBackRoute>() {
+    routeEntry<OnboardingWelcomeBackRoute>() {
         WelcomeBackScreen(
             onFinish = onComplete,
         )

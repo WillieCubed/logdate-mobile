@@ -8,6 +8,8 @@ import app.logdate.client.domain.account.passkey.PasskeyManager
 import app.logdate.client.domain.account.passkey.PasskeyRegistrationResult
 import app.logdate.client.domain.account.passkey.RegistrationOptions
 import io.github.aakira.napier.Napier
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.util.Base64
 import javax.swing.JOptionPane
 import javax.swing.SwingUtilities
@@ -189,12 +191,12 @@ class DesktopPasskeyManager : PasskeyManager {
      * Creates mock client data for WebAuthn operations.
      */
     private fun createMockClientData(challenge: String, rpId: String): String {
-        val clientData = JSONObject().apply {
+        val clientData = buildJsonObject {
             put("type", "webauthn.create")
             put("challenge", challenge)
             put("origin", "https://$rpId")
         }.toString()
-        
+
         return Base64.getEncoder().encodeToString(clientData.toByteArray())
     }
     

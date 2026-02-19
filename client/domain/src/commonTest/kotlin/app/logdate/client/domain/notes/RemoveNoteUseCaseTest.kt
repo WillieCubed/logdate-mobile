@@ -3,7 +3,7 @@ package app.logdate.client.domain.notes
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -82,7 +82,7 @@ class RemoveNoteUseCaseTest {
 
         override val allNotesObserved = kotlinx.coroutines.flow.flowOf(emptyList<JournalNote>())
         override fun observeNotesInJournal(journalId: Uuid) = kotlinx.coroutines.flow.flowOf(emptyList<JournalNote>())
-        override fun observeNotesInRange(start: kotlinx.datetime.Instant, end: kotlinx.datetime.Instant) =
+        override fun observeNotesInRange(start: kotlin.time.Instant, end: kotlin.time.Instant) =
             kotlinx.coroutines.flow.flowOf(emptyList<JournalNote>())
         override fun observeNotesPage(pageSize: Int, offset: Int) = kotlinx.coroutines.flow.flowOf(emptyList<JournalNote>())
         override fun observeNotesStream(pageSize: Int) = kotlinx.coroutines.flow.flowOf(emptyList<JournalNote>())

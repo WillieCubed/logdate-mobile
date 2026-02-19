@@ -100,7 +100,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
             try {
                 val status = mapOf(
                     "status" to "healthy",
-                    "timestamp" to kotlinx.datetime.Clock.System.now().toString(),
+                    "timestamp" to kotlin.time.Clock.System.now().toString(),
                     "version" to "1.0.0"
                 )
                 call.respond(status)
@@ -108,7 +108,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
                 val status = mapOf(
                     "status" to "unhealthy",
                     "error" to e.message,
-                    "timestamp" to kotlinx.datetime.Clock.System.now().toString()
+                    "timestamp" to kotlin.time.Clock.System.now().toString()
                 )
                 call.respond(io.ktor.http.HttpStatusCode.ServiceUnavailable, status)
             }

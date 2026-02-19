@@ -3,8 +3,8 @@ package app.logdate.client.health.datasource
 import app.logdate.client.health.model.SleepSession
 import app.logdate.client.health.model.TimeOfDay
 import io.github.aakira.napier.Napier
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlin.time.Duration
 

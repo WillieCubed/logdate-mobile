@@ -1,7 +1,7 @@
 package app.logdate.client.domain.timeline
 
 import app.logdate.client.repository.journals.JournalNote
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Adapter class that allows JournalNote instances to be used with the TimelineConfig's

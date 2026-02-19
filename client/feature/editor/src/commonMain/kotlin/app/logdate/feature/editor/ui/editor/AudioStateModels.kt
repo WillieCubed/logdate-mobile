@@ -44,23 +44,17 @@ enum class PlaybackState {
 /**
  * Get the playback state based on the isPlaying property for backward compatibility
  */
-val app.logdate.feature.editor.ui.editor.AudioBlockUiState.playbackState: PlaybackState
+val AudioBlockUiState.playbackState: PlaybackState
     get() = if (isPlaying) PlaybackState.PLAYING else PlaybackState.STOPPED
 
 /**
  * For backward compatibility, always return INACTIVE or COMPLETED based on whether there is content
  */
-val app.logdate.feature.editor.ui.editor.AudioBlockUiState.recordingState: RecordingState
+val AudioBlockUiState.recordingState: RecordingState
     get() = if (hasContent()) RecordingState.COMPLETED else RecordingState.INACTIVE
 
 /**
  * Determines if the block is in an active state (either playing or recording)
  */
-val app.logdate.feature.editor.ui.editor.AudioBlockUiState.isActive: Boolean
+val AudioBlockUiState.isActive: Boolean
     get() = isPlaying
-
-/**
- * Calculates the current progress of playback as a float between 0 and 1.
- * This is a placeholder that would be replaced with actual implementation.
- */
-fun app.logdate.feature.editor.ui.editor.AudioBlockUiState.getPlaybackProgress(): Float = 0f

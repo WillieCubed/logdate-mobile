@@ -69,7 +69,7 @@ class FakeTextNoteDao : TextNoteDao {
         updateFlow()
     }
 
-    override suspend fun updateSyncMetadata(noteId: Uuid, syncVersion: Long, lastSynced: kotlinx.datetime.Instant) {
+    override suspend fun updateSyncMetadata(noteId: Uuid, syncVersion: Long, lastSynced: kotlin.time.Instant) {
         val existing = notes[noteId] ?: return
         notes[noteId] = existing.copy(syncVersion = syncVersion, lastSynced = lastSynced)
         updateFlow()

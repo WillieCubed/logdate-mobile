@@ -1,39 +1,59 @@
 package app.logdate.feature.editor.ui.audio.expansion
 
 /**
- * Represents the three expansion states for audio memory display.
+ * Represents the four expansion states for audio memory display.
  *
- * The expansion flow is designed for progressive engagement:
- * 1. COLLAPSED: Minimal view in timeline (waveform + timestamp)
- * 2. SPATIAL_EXPANDED: First tap - spatial expansion with context
- * 3. ELEVATED: Second tap - floats above content with controls
- * 4. IMMERSIVE: Long press from elevated - full screen experience
+ * States are organized into two interaction groups:
+ *
+ * **Inline group** (within the timeline/editor flow):
+ * - [COLLAPSED] ↔ [SPATIAL_EXPANDED]: Bi-directional toggle, auto-expands on
+ *   playback start (configurable via `expandOnPlayback` parameter).
+ *
+ * **Overlay group** (modal, above the timeline):
+ * - [ELEVATED] → [IMMERSIVE]: One-directional progression.
+ *
+ * **Cross-group transitions:**
+ * - Long press from any inline state → [ELEVATED] (hold-to-preview, like Instagram grid preview)
+ * - Release / dismiss from [ELEVATED] → return to previous inline state
+ * - Swipe up or explicit action from [ELEVATED] → [IMMERSIVE]
+ * - Explicit fullscreen action from any inline state → [IMMERSIVE] directly
+ * - Close from [IMMERSIVE] → return to previous inline state
  */
 enum class AudioExpansionState {
     /**
-     * Default state in timeline.
-     * Shows: condensed waveform, duration, timestamp badge
+     * Default compact state in timeline.
+     * Shows: mini waveform, duration, play button.
      */
     COLLAPSED,
 
     /**
-     * First expansion state after tap.
-     * Shows: full waveform, play/pause, palette-colored background
-     * Spatial: Card lifts slightly, expands horizontally
+     * In-place expansion within the timeline flow.
+     * Shows: full waveform with palette colors, play/pause, context bar.
+     * Triggered by playback start (if `expandOnPlayback=true`) or explicit tap.
      */
     SPATIAL_EXPANDED,
 
     /**
-     * Second expansion after tap on SPATIAL_EXPANDED.
-     * Shows: Controls, scrubber, segment markers
-     * Spatial: Card elevates significantly, dims background
+     * Floating preview card above content (overlay).
+     * Shows: large waveform with segment markers, full controls, scrubber, quick actions.
+     * Triggered by long press from any inline state. Transient: release dismisses.
      */
     ELEVATED,
 
     /**
-     * Full-screen immersive mode (long press from ELEVATED).
-     * Shows: Large waveform, auto-hiding controls, contextual background
-     * Spatial: Fills screen, edge-to-edge palette gradient
+     * Full-screen immersive experience (overlay).
+     * Shows: edge-to-edge waveform, auto-hiding controls, palette gradient background.
+     * Triggered by swipe up from [ELEVATED] or explicit fullscreen action.
      */
-    IMMERSIVE
+    IMMERSIVE;
 }
+
+/** Whether this state renders inline within the timeline/editor flow. */
+val AudioExpansionState.isInline: Boolean
+    get() = this == AudioExpansionState.COLLAPSED ||
+            this == AudioExpansionState.SPATIAL_EXPANDED
+
+/** Whether this state renders as a modal overlay above the timeline. */
+val AudioExpansionState.isOverlay: Boolean
+    get() = this == AudioExpansionState.ELEVATED ||
+            this == AudioExpansionState.IMMERSIVE

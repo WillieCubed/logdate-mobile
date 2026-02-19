@@ -212,7 +212,7 @@ Database tests prioritize **data integrity** since the module handles user data 
 ### Core Features
 - [ ] Implement full-text search indexing
 - [ ] Add database backup/restore functionality
-- [ ] Implement database encryption for sensitive data
+- [x] Implement database encryption for sensitive data
 - [ ] Add database performance monitoring
 - [ ] Optimize query performance with additional indexes
 - [ ] Implement database integrity checks
@@ -241,7 +241,7 @@ Database tests prioritize **data integrity** since the module handles user data 
 
 ## Security Considerations
 
-- Sensitive data encryption at rest (planned)
+- Sensitive data encryption at rest (Android SQLCipher, iOS file protection, desktop encrypted file)
 - Proper SQL injection prevention via Room
 - Access control through repository pattern
 - Data sanitization for user inputs

@@ -6,40 +6,28 @@ import app.logdate.client.billing.model.LogDateBackupPlanOption
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.user.UserStateRepository
-import app.logdate.client.media.audio.AudioRecordingManager
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * A view model for the onboarding flow.
  */
 class OnboardingViewModel(
     private val journalNotesRepository: JournalNotesRepository,
-    private val audioRecordingManager: AudioRecordingManager,
     private val userStateRepository: UserStateRepository,
 //    private val notifier: Notifier,
 ) : ViewModel() {
 
-    private val _recorderState = MutableStateFlow(AudioRecorderUiState())
     private val _uiState = MutableStateFlow(OnboardingUiState())
 
     val uiState: StateFlow<OnboardingUiState> =
-        _uiState.combine(_recorderState) { uiState, recorderState ->
-            OnboardingUiState(
-                entrySubmitted = uiState.entrySubmitted,
-                planOption = uiState.planOption,
-                newEntryData = uiState.newEntryData.copy(
-                    recorderState = recorderState,
-                )
-            )
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), OnboardingUiState())
+        _uiState.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), OnboardingUiState())
 
     /**
      * Creates a new journal entry.
@@ -93,43 +81,6 @@ class OnboardingViewModel(
         }
     }
 
-    /**
-     * Starts recording audio.
-     */
-    fun startRecordingAudio() {
-        viewModelScope.launch {
-            val started = audioRecordingManager.startRecording()
-            if (started) {
-                _uiState.update {
-                    it.copy(
-                        newEntryData = it.newEntryData.copy(
-                            recorderState = AudioRecorderUiState(isRecording = true)
-                        )
-                    )
-                }
-            }
-        }
-    }
-
-    /**
-     * Stops recording audio.
-     */
-    fun stopRecordingAudio() {
-        viewModelScope.launch {
-            val recordedUri = audioRecordingManager.stopRecording()
-            _uiState.update {
-                it.copy(
-                    newEntryData = it.newEntryData.copy(
-                        recorderState = AudioRecorderUiState(
-                            isRecording = false,
-                            recordedAudio = recordedUri
-                        )
-                    )
-                )
-            }
-        }
-    }
-
     fun capturePhoto() {
 
     }
@@ -145,6 +96,5 @@ class OnboardingViewModel(
 
     override fun onCleared() {
         super.onCleared()
-        audioRecordingManager.release()
     }
 }

@@ -3,7 +3,7 @@ package app.logdate.client.database.entities
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * A log of a user's location at a given time using a given device.

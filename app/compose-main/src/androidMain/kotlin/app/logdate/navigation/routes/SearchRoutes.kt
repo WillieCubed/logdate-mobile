@@ -1,8 +1,9 @@
 package app.logdate.navigation.routes
 
-import androidx.navigation3.runtime.EntryProviderBuilder
+import app.logdate.navigation.routes.routeEntry
+
+import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
-import androidx.navigation3.runtime.entry
 import app.logdate.feature.search.ui.SearchScreen
 import app.logdate.navigation.MainAppNavigator
 import app.logdate.navigation.routes.core.SearchRoute
@@ -12,11 +13,11 @@ fun MainAppNavigator.openSearch() {
     backStack.add(SearchRoute)
 }
 
-fun EntryProviderBuilder<NavKey>.searchRoutes(
+fun EntryProviderScope<NavKey>.searchRoutes(
     onBack: () -> Unit,
     onNavigateToDay: (LocalDate) -> Unit,
 ) {
-    entry<SearchRoute> { _ ->
+    routeEntry<SearchRoute> { _ ->
         SearchScreen(
             onNavigateToDay = onNavigateToDay,
             onGoBack = onBack

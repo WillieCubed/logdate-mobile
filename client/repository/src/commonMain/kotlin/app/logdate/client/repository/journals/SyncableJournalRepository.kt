@@ -1,7 +1,7 @@
 package app.logdate.client.repository.journals
 
 import app.logdate.shared.model.Journal
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**

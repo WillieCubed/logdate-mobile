@@ -1,9 +1,12 @@
+@file:OptIn(ExperimentalEncodingApi::class)
+
 package app.logdate.client.device.crypto
 
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import okio.ByteString.Companion.toByteString
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * Encrypts and decrypts user content using the identity key.
@@ -34,16 +37,16 @@ class ContentEncryptionService(
         
         val iv = cryptoManager.generateRandomBytes(12)
         val aad = buildAAD(contentId)
-        val plaintextBytes = plaintext.encodeToByteArray(Charsets.UTF_8)
+        val plaintextBytes = plaintext.encodeToByteArray()
         
         val ciphertext = cryptoManager.aesGcmEncrypt(contentKey, iv, aad, plaintextBytes)
         
         return EncryptedEnvelope(
             version = ENVELOPE_VERSION,
             algorithm = ALGORITHM_AES_GCM,
-            iv = iv.toByteString().base64(),
-            ciphertext = ciphertext.toByteString().base64(),
-            aad = aad.toByteString().base64()
+            iv = iv.encodeBase64(),
+            ciphertext = ciphertext.encodeBase64(),
+            aad = aad.encodeBase64()
         ).also {
             Napier.d("Content encrypted: $contentId (${plaintext.length} bytes → ${it.ciphertext.length} bytes)")
         }
@@ -76,7 +79,7 @@ class ContentEncryptionService(
         
         val plaintext = cryptoManager.aesGcmDecrypt(contentKey, iv, aad, ciphertext)
         
-        return plaintext.decodeToString(Charsets.UTF_8).also {
+        return plaintext.decodeToString().also {
             Napier.d("Content decrypted: $contentId (${envelope.ciphertext.length} bytes → ${it.length} bytes)")
         }
     }
@@ -88,7 +91,7 @@ class ContentEncryptionService(
      * swapping encrypted values between different content IDs.
      */
     private fun buildAAD(contentId: String): ByteArray {
-        return "type=CONTENT|v=$ENVELOPE_VERSION|id=$contentId".encodeToByteArray(Charsets.UTF_8)
+        return "type=CONTENT|v=$ENVELOPE_VERSION|id=$contentId".encodeToByteArray()
     }
     
     companion object {
@@ -123,40 +126,9 @@ data class EncryptedEnvelope(
 )
 
 private fun String.decodeBase64(): ByteArray {
-    return okio.ByteString.decodeBase64(this)?.toByteArray() 
-        ?: throw IllegalArgumentException("Invalid base64 string")
+    return Base64.decode(this)
 }
 
-/**
- * Extends CryptoManager with platform-specific encryption methods.
- */
-internal fun CryptoManager.aesGcmEncrypt(
-    key: ByteArray,
-    iv: ByteArray,
-    aad: ByteArray,
-    plaintext: ByteArray
-): ByteArray {
-    return when (this) {
-        is AndroidCryptoManager -> this.aesGcmEncrypt(key, iv, aad, plaintext)
-        is DesktopCryptoManager -> this.aesGcmEncrypt(key, iv, aad, plaintext)
-        is IosCryptoManager -> this.aesGcmEncrypt(key, iv, aad, plaintext)
-        else -> throw UnsupportedOperationException("Encryption not supported on this platform")
-    }
-}
-
-/**
- * Extends CryptoManager with platform-specific decryption methods.
- */
-internal fun CryptoManager.aesGcmDecrypt(
-    key: ByteArray,
-    iv: ByteArray,
-    aad: ByteArray,
-    ciphertext: ByteArray
-): ByteArray {
-    return when (this) {
-        is AndroidCryptoManager -> this.aesGcmDecrypt(key, iv, aad, ciphertext)
-        is DesktopCryptoManager -> this.aesGcmDecrypt(key, iv, aad, ciphertext)
-        is IosCryptoManager -> this.aesGcmDecrypt(key, iv, aad, ciphertext)
-        else -> throw UnsupportedOperationException("Decryption not supported on this platform")
-    }
+private fun ByteArray.encodeBase64(): String {
+    return Base64.encode(this)
 }

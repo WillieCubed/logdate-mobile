@@ -84,10 +84,10 @@ fun SettingsOverviewScreen(
     modifier: Modifier = Modifier,
     selectedDetail: String? = null,
     isInTwoPaneMode: Boolean? = null,
-    viewModel: SettingsViewModel = koinViewModel(),
+    viewModel: AccountSettingsViewModel = koinViewModel(),
 ) {
     val layoutInfo = LocalSettingsLayoutInfo.current
-    val uiState by viewModel.uiState.collectAsState()
+    val accountState by viewModel.state.collectAsState()
     val resolvedSelectedDetail = selectedDetail ?: layoutInfo.selectedDetail
     val resolvedIsInTwoPaneMode = isInTwoPaneMode ?: layoutInfo.isInTwoPaneMode
 
@@ -101,7 +101,7 @@ fun SettingsOverviewScreen(
         onNavigateToDangerZone = onNavigateToDangerZone,
         onNavigateToLocation = onNavigateToLocation,
         onNavigateToAdvanced = onNavigateToAdvanced,
-        userProfile = uiState.currentAccount.toUserProfile(),
+        userProfile = accountState.currentAccount.toUserProfile(),
         selectedDetail = resolvedSelectedDetail,
         isInTwoPaneMode = resolvedIsInTwoPaneMode,
         modifier = modifier

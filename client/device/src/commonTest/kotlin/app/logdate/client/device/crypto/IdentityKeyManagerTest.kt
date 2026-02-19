@@ -1,6 +1,9 @@
 package app.logdate.client.device.crypto
 
-import app.logdate.client.datastore.SecureStorage
+import app.logdate.client.device.storage.SecureStorage
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -127,21 +130,35 @@ class KeyDerivationTest {
 // Test implementations
 
 class InMemorySecureStorage : SecureStorage {
-    private val storage = mutableMapOf<String, ByteArray>()
-    
-    override suspend fun getBytes(key: String): ByteArray? = storage[key]
-    
-    override suspend fun putBytes(key: String, value: ByteArray) {
+    private val storage = mutableMapOf<String, String>()
+    private val updates = MutableStateFlow<Map<String, String>>(emptyMap())
+
+    override suspend fun getString(key: String): String? = storage[key]
+
+    override suspend fun putString(key: String, value: String) {
         storage[key] = value
+        updates.value = storage.toMap()
     }
-    
+
     override suspend fun remove(key: String) {
         storage.remove(key)
+        updates.value = storage.toMap()
     }
-    
+
     override suspend fun clear() {
         storage.clear()
+        updates.value = emptyMap()
     }
+
+    override fun observeString(key: String): Flow<String?> {
+        return updates.map { it[key] }
+    }
+
+    override fun observeAll(): Flow<Map<String, String>> = updates
+
+    override suspend fun encrypt(data: ByteArray): ByteArray = data
+
+    override suspend fun decrypt(data: ByteArray): ByteArray? = data
 }
 
 class FakeCryptoManager : CryptoManager {
@@ -178,5 +195,23 @@ class FakeCryptoManager : CryptoManager {
         val mac = javax.crypto.Mac.getInstance("HmacSHA256")
         mac.init(javax.crypto.spec.SecretKeySpec(key, "HmacSHA256"))
         return mac.doFinal(data)
+    }
+
+    override fun aesGcmEncrypt(
+        key: ByteArray,
+        iv: ByteArray,
+        aad: ByteArray,
+        plaintext: ByteArray
+    ): ByteArray {
+        throw UnsupportedOperationException("AES-GCM encryption is not needed for this test.")
+    }
+
+    override fun aesGcmDecrypt(
+        key: ByteArray,
+        iv: ByteArray,
+        aad: ByteArray,
+        ciphertext: ByteArray
+    ): ByteArray {
+        throw UnsupportedOperationException("AES-GCM decryption is not needed for this test.")
     }
 }

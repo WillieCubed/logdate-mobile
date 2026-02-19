@@ -1,7 +1,7 @@
 package app.logdate.client.domain.location
 
 import app.logdate.client.repository.location.LocationHistoryRepository
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Use case to delete a specific location entry.

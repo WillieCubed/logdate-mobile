@@ -2,14 +2,14 @@ package app.logdate.client.networking
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 /**
  * A [NetworkAvailabilityMonitor] that functions on desktop (JVM) platforms.
  */
 class DesktopNetworkAvailabilityMonitor : NetworkAvailabilityMonitor {
     private val _networkState =
-        MutableStateFlow<NetworkState>(NetworkState.NotConnected(Clock.System.now()))
+        MutableStateFlow<NetworkState>(NetworkState.Connected(Clock.System.now()))
 
     // TODO: Implement this
     override fun isNetworkAvailable(): Boolean {

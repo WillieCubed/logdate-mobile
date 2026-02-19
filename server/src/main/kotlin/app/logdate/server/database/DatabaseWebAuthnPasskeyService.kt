@@ -3,7 +3,7 @@ package app.logdate.server.database
 import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.server.util.toKotlinInstant
 import app.logdate.shared.model.*
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.less

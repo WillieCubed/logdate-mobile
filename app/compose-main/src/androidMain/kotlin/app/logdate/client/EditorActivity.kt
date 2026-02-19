@@ -19,7 +19,6 @@ import io.github.aakira.napier.Napier
 import io.github.vinceglb.filekit.core.FileKit
 import kotlinx.coroutines.launch
 import org.koin.androidx.viewmodel.ext.android.viewModel
-import org.koin.compose.KoinContext
 import kotlin.uuid.Uuid
 
 /**
@@ -67,21 +66,19 @@ class EditorActivity : FragmentActivity() {
         setupLifecycleHandling()
 
         setContent {
-            KoinContext {
-                LogDateTheme {
-                    NoteEditorScreen(
-                        onNavigateBack = { finish() },
-                        onEntrySaved = {
-                            setResult(RESULT_OK)
-                            finish()
-                        },
-                        entryId = entryId,
-                        journalId = journalId,
-                        initialTextContent = initialText,
-                        attachments = attachmentUris,
-                        viewModel = viewModel
-                    )
-                }
+            LogDateTheme {
+                NoteEditorScreen(
+                    onNavigateBack = { finish() },
+                    onEntrySaved = {
+                        setResult(RESULT_OK)
+                        finish()
+                    },
+                    entryId = entryId,
+                    journalId = journalId,
+                    initialTextContent = initialText,
+                    attachments = attachmentUris,
+                    viewModel = viewModel
+                )
             }
         }
     }

@@ -55,9 +55,8 @@ class NetworkRecoveryIntegrationTest {
         assertTrue(failedResult.errors.isNotEmpty(), "Should have error information")
 
         // Verify last error is tracked
-        val lastError = syncManager.getLastSyncError()
-        assertTrue(lastError != null, "Should have recorded last sync error")
-        assertTrue(lastError?.message?.isNotEmpty() == true, "Error should have message")
+        val lastError = requireNotNull(syncManager.getLastSyncError()) { "Should have recorded last sync error" }
+        assertTrue(lastError.message.isNotEmpty(), "Error should have message")
     }
 
     @Test

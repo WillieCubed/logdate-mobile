@@ -1,7 +1,7 @@
 package app.logdate.util
 
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
@@ -26,7 +26,7 @@ fun LocalDate.Companion.now(
 fun LocalDateTime.toReadableDateShort(): String = format(LocalDateTime.Format {
     monthName(MonthNames.ENGLISH_FULL)
     char(' ')
-    dayOfMonth(Padding.SPACE)
+    day(Padding.SPACE)
     if (year != Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).year) {
         // TODO: Add support for multiple locales
         char(',')
@@ -38,7 +38,7 @@ fun LocalDateTime.toReadableDateShort(): String = format(LocalDateTime.Format {
 fun LocalDate.toReadableDateShort(): String = format(LocalDate.Format {
     monthName(MonthNames.ENGLISH_FULL)
     char(' ')
-    dayOfMonth(Padding.SPACE)
+    day(Padding.SPACE)
     if (year != Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).year) {
         // TODO: Add support for multiple locales
         char(',')
@@ -153,7 +153,10 @@ val Instant.weekOfYear: Int
  */
 val Instant.daysUntilNow: Int
     get() {
-        return this.daysUntil(Clock.System.now(), TimeZone.currentSystemDefault())
+        val timeZone = TimeZone.currentSystemDefault()
+        val startDate = toLocalDateTime(timeZone).date
+        val endDate = Clock.System.now().toLocalDateTime(timeZone).date
+        return startDate.daysUntil(endDate)
     }
 
 /**

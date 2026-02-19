@@ -185,6 +185,78 @@ class SyncProductionScenariosTest {
     }
 
     @Test
+    fun testOfflineQueueFlushesAfterReconnect() = runTest {
+        val offlineClient = FakeCloudApiClient().apply {
+            configureContentSyncFailure(Exception("Offline"))
+        }
+        val syncMetadataService = fakeSyncMetadataService()
+        val notesRepository = fakeJournalNotesRepository("Offline note")
+
+        val offlineSyncManager = DefaultSyncManager(
+            cloudContentDataSource = DefaultCloudContentDataSource(offlineClient),
+            cloudJournalDataSource = DefaultCloudJournalDataSource(offlineClient),
+            cloudAssociationDataSource = DefaultCloudAssociationDataSource(offlineClient),
+            cloudMediaDataSource = DefaultCloudMediaDataSource(offlineClient),
+            cloudAccountRepository = fakeAccountRepository(),
+            sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
+            journalRepository = fakeJournalRepository(),
+            journalNotesRepository = notesRepository,
+            journalContentRepository = fakeJournalContentRepository(),
+            journalConflictResolver = lastWriteWinsResolver(),
+            noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
+            syncMetadataService = syncMetadataService,
+            transactionManager = testSyncTransactionManager()
+        )
+
+        val note = notesRepository.allNotesObserved.first().first()
+        syncMetadataService.enqueuePending(
+            entityId = note.uid.toString(),
+            entityType = EntityType.NOTE,
+            operation = PendingOperation.CREATE
+        )
+
+        val offlineResult = offlineSyncManager.syncContent()
+        assertFalse(offlineResult.success, "Sync should fail while offline")
+        assertTrue(
+            syncMetadataService.getPendingUploads(EntityType.NOTE).isNotEmpty(),
+            "Pending uploads should remain queued while offline"
+        )
+
+        val onlineSyncManager = DefaultSyncManager(
+            cloudContentDataSource = DefaultCloudContentDataSource(fakeCloudApiClient()),
+            cloudJournalDataSource = DefaultCloudJournalDataSource(fakeCloudApiClient()),
+            cloudAssociationDataSource = DefaultCloudAssociationDataSource(fakeCloudApiClient()),
+            cloudMediaDataSource = DefaultCloudMediaDataSource(fakeCloudApiClient()),
+            cloudAccountRepository = fakeAccountRepository(),
+            sessionStorage = fakeSessionStorage(),
+            mediaManager = StubMediaManager(),
+            mediaSyncRefStore = InMemoryMediaSyncRefStore(),
+            journalRepository = fakeJournalRepository(),
+            journalNotesRepository = notesRepository,
+            journalContentRepository = fakeJournalContentRepository(),
+            journalConflictResolver = lastWriteWinsResolver(),
+            noteConflictResolver = lastWriteWinsResolver(),
+            conflictStore = InMemorySyncConflictStore(),
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
+            syncMetadataService = syncMetadataService,
+            transactionManager = testSyncTransactionManager()
+        )
+
+        val onlineResult = onlineSyncManager.syncContent()
+        assertTrue(onlineResult.success, "Sync should succeed after reconnect")
+        assertTrue(
+            syncMetadataService.getPendingUploads(EntityType.NOTE).isEmpty(),
+            "Pending uploads should clear after successful reconnect sync"
+        )
+    }
+
+    @Test
     fun testConcurrentUploadAndDownloadSync() = runTest {
         val apiClient = fakeCloudApiClient()
         val syncMetadataService = fakeSyncMetadataService()
@@ -344,18 +416,16 @@ class SyncProductionScenariosTest {
         val result1 = syncManager.syncContent()
         assertFalse(result1.success, "First sync should fail")
 
-        val error1 = syncManager.getLastSyncError()
-        assertTrue(error1 != null, "Should track first error")
+        requireNotNull(syncManager.getLastSyncError()) { "Should track first error" }
 
         // Second failure with different cause
         apiClient.configureContentSyncFailure(Exception("Server error - attempt 2"))
         val result2 = syncManager.syncContent()
         assertFalse(result2.success, "Second sync should fail")
 
-        val error2 = syncManager.getLastSyncError()
-        assertTrue(error2 != null, "Should track second error")
-        assertTrue(error2?.message?.contains("attempt 2") == true || error2?.message?.isNotEmpty() == true,
-            "Should track latest error")
+        val error2 = requireNotNull(syncManager.getLastSyncError()) { "Should track second error" }
+        val message = error2.message
+        assertTrue(message.contains("attempt 2") || message.isNotEmpty(), "Should track latest error")
     }
 
     @Test

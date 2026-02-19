@@ -49,7 +49,7 @@ Each module contains detailed documentation in its respective `README.md` file:
 - [`:client:sync`](client/sync/README.md) - Cross-device data synchronization
 - [`:client:intelligence`](client/intelligence/README.md) - AI and ML features
 - [`:client:location`](client/location/README.md) - Location services and context
-- [`:client:datastore`](client/datastore/README.md) - Preferences and settings storage
+- [`:client:logdate-datastore`](client/datastore/README.md) - Preferences and settings storage
 
 ### Client Features
 - [`:client:feature:editor`](client/feature/editor/README.md) - Entry creation and editing

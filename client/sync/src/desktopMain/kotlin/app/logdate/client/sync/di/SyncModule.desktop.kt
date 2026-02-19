@@ -3,8 +3,8 @@ package app.logdate.client.sync.di
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.sync.DefaultSyncManager
-import app.logdate.client.sync.DesktopSyncManager
 import app.logdate.client.sync.RoomSyncTransactionManager
+import app.logdate.client.sync.ForegroundSyncManager
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.cloud.di.cloudAccountModule
@@ -53,6 +53,6 @@ actual val syncModule: Module = module {
             transactionManager = get()
         )
     }
-    single<SyncManager> { DesktopSyncManager(get<DefaultSyncManager>()) }
+    single<SyncManager> { ForegroundSyncManager(get(), get(), get(), get()) }
     includes(quotaModule, cloudAccountModule, cloudModule, deviceInstanceModule, conflictResolverModule, app.logdate.client.media.di.mediaModule)
 }

@@ -1,10 +1,13 @@
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+
 package app.logdate.client.database
 
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSDocumentDirectory
 import platform.Foundation.NSFileManager
+import platform.Foundation.NSFileProtectionComplete
+import platform.Foundation.NSFileProtectionKey
 import platform.Foundation.NSUserDomainMask
 
 /**
@@ -13,13 +16,19 @@ import platform.Foundation.NSUserDomainMask
  * This creates a database in the user's documents directory.
  */
 fun getDatabaseBuilder(): RoomDatabase.Builder<LogDateDatabase> {
-    val dbFilePath = documentDirectory() + "/" + DATABASE_NAME
+    val dbFilePath = databaseFilePath()
     return Room.databaseBuilder<LogDateDatabase>(
         name = dbFilePath,
     )
 }
 
-@OptIn(ExperimentalForeignApi::class)
+fun protectDatabaseFile(path: String) {
+    val attributes: Map<Any?, Any?> = mapOf(NSFileProtectionKey to NSFileProtectionComplete)
+    NSFileManager.defaultManager.setAttributes(attributes, ofItemAtPath = path, error = null)
+}
+
+fun databaseFilePath(): String = documentDirectory() + "/" + DATABASE_NAME
+
 private fun documentDirectory(): String {
     val documentDirectory = NSFileManager.defaultManager.URLForDirectory(
         directory = NSDocumentDirectory,

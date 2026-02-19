@@ -14,7 +14,7 @@ import app.logdate.client.domain.export.ExportMediaFile
 import app.logdate.client.domain.export.ExportUserDataUseCase
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.catch
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.koin.core.component.KoinComponent
@@ -23,6 +23,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import kotlinx.datetime.number
 
 /**
  * WorkManager worker for exporting user data according to the LogDate export specification.
@@ -170,6 +171,12 @@ class ExportWorker(
                 zipOut.putNextEntry(ZipEntry("drafts.json"))
                 zipOut.write(exportData.drafts.toByteArray())
                 zipOut.closeEntry()
+
+                exportData.mediaManifest?.let { manifest ->
+                    zipOut.putNextEntry(ZipEntry("media_manifest.json"))
+                    zipOut.write(manifest.toByteArray())
+                    zipOut.closeEntry()
+                }
                 
                 // Add media files
                 // For each media file, we need to copy from the source URI to the ZIP
@@ -220,7 +227,7 @@ class ExportWorker(
     private fun saveToDownloads(exportData: ExportResult): String {
         val timestamp = Clock.System.now()
             .toLocalDateTime(TimeZone.currentSystemDefault())
-            .let { "${it.year}-${it.monthNumber.toString().padStart(2, '0')}-${it.dayOfMonth.toString().padStart(2, '0')}" }
+            .let { "${it.year}-${it.month.number.toString().padStart(2, '0')}-${it.day.toString().padStart(2, '0')}" }
         
         val fileName = "logdate-export-$timestamp.zip"
         
@@ -253,6 +260,12 @@ class ExportWorker(
                 zipOut.putNextEntry(ZipEntry("drafts.json"))
                 zipOut.write(exportData.drafts.toByteArray())
                 zipOut.closeEntry()
+
+                exportData.mediaManifest?.let { manifest ->
+                    zipOut.putNextEntry(ZipEntry("media_manifest.json"))
+                    zipOut.write(manifest.toByteArray())
+                    zipOut.closeEntry()
+                }
                 
                 // Add media files
                 // For each media file, we need to copy from the source URI to the ZIP

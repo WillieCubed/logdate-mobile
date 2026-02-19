@@ -35,7 +35,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import app.logdate.shared.model.user.AppSecurityLevel
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.common.DefaultSettingsContentContainer
@@ -62,25 +61,22 @@ import org.koin.compose.viewmodel.koinViewModel
 fun PrivacySettingsScreen(
     onBack: () -> Unit,
     onNavigateToLocationSettings: () -> Unit = {},
-    viewModel: SettingsViewModel = koinViewModel(),
+    viewModel: PrivacySettingsViewModel = koinViewModel(),
     isPotentialDetailPane: Boolean? = null,
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val state by viewModel.state.collectAsState()
     val revocationState by viewModel.passkeyRevocationState.collectAsState()
     val layoutInfo = LocalSettingsLayoutInfo.current
     val resolvedIsDetailPane = isPotentialDetailPane ?: layoutInfo.isDetailPane
-    
-    // Convert passkey credentials to PasskeyInfo objects using extension function
-    val passkeyInfoList = uiState.currentAccount.toPasskeyInfoList()
     
     val creationState by viewModel.passkeyCreationState.collectAsState()
     
     PrivacySettingsContent(
         onBack = onBack,
         onSetBiometricsEnabled = viewModel::setBiometricEnabled,
-        isBiometricsEnabled = uiState.userData.securityLevel == AppSecurityLevel.BIOMETRIC,
-        isAuthenticated = uiState.isAuthenticated,
-        passkeys = passkeyInfoList,
+        isBiometricsEnabled = state.isBiometricsEnabled,
+        isAuthenticated = state.isAuthenticated,
+        passkeys = state.passkeys,
         onCreatePasskey = { viewModel.createPasskey() },
         onRevokePasskey = { passkey -> viewModel.revokePasskey(passkey.id) },
         onNavigateToLocationSettings = onNavigateToLocationSettings,

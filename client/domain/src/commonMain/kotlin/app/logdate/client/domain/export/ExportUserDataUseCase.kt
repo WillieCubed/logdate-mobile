@@ -17,7 +17,7 @@ import app.logdate.shared.model.SerializableVideoBlock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -144,6 +144,8 @@ class ExportUserDataUseCase(
             val draftsJson = json.encodeToString(mapOf("drafts" to exportDrafts))
             val journalNotesJson = json.encodeToString(mapOf("journal_notes" to exportRelations))
             
+            val mediaManifestJson = json.encodeToString(ExportMediaManifest(mediaFiles))
+
             // Create the final export data
             val exportData = ExportResult(
                 metadata = metadataJson,
@@ -151,7 +153,8 @@ class ExportUserDataUseCase(
                 notes = notesJson,
                 journalNotes = journalNotesJson,
                 drafts = draftsJson,
-                mediaFiles = mediaFiles
+                mediaFiles = mediaFiles,
+                mediaManifest = mediaManifestJson
             )
             
             emit(ExportProgress.Completed(exportData))
@@ -164,7 +167,7 @@ class ExportUserDataUseCase(
     /**
      * Creates a standardized media path for export according to the specification.
      */
-    private fun createMediaPath(uri: String, timestamp: kotlinx.datetime.Instant): String {
+    private fun createMediaPath(uri: String, timestamp: kotlin.time.Instant): String {
         val year = timestamp.toString().substring(0, 4)
         val formattedTimestamp = timestamp.toString().replace(":", "-")
         val id = uri.substringAfterLast("/")
@@ -295,7 +298,8 @@ data class ExportResult(
     val notes: String,
     val journalNotes: String,
     val drafts: String,
-    val mediaFiles: List<ExportMediaFile>
+    val mediaFiles: List<ExportMediaFile>,
+    val mediaManifest: String? = null
 )
 
 /**

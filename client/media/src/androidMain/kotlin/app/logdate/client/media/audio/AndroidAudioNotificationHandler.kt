@@ -7,9 +7,9 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
+import app.logdate.client.media.R
 import io.github.aakira.napier.Napier
-import kotlinx.datetime.Clock
-import kotlin.time.ExperimentalTime
+import kotlin.time.Clock
 
 /**
  * Handler for audio recording notifications on Android.
@@ -43,10 +43,10 @@ class AndroidAudioNotificationHandler(
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Audio Recording",
+            context.getString(R.string.audio_recording_channel_name),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "Notifications for audio recording"
+            description = context.getString(R.string.audio_recording_notification_text)
             setSound(null, null)
             enableVibration(false)
         }
@@ -73,6 +73,7 @@ class AndroidAudioNotificationHandler(
     private fun createMainActivityIntent(): PendingIntent {
         val packageName = context.packageName
         val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
+        launchIntent?.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
 
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
@@ -82,20 +83,34 @@ class AndroidAudioNotificationHandler(
     /**
      * Creates a foreground notification for audio recording
      */
-    @OptIn(ExperimentalTime::class)
     fun createRecordingNotification(
         isRecording: Boolean = true,
         startTimeMillis: Long = Clock.System.now().toEpochMilliseconds(),
     ): Notification {
+        val titleRes = if (isRecording) {
+            R.string.audio_recording_notification_title
+        } else {
+            R.string.audio_recording_notification_title_paused
+        }
+        val textRes = if (isRecording) {
+            R.string.audio_recording_notification_text
+        } else {
+            R.string.audio_recording_notification_text_paused
+        }
+
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_btn_speak_now) // TODO: Use app icon here
-            .setContentTitle("Recording in progress")
-            .setContentText("Tap to go back to editor")
+            .setSmallIcon(context.applicationInfo.icon)
+            .setContentTitle(context.getString(titleRes))
+            .setContentText(context.getString(textRes))
             .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
             .setUsesChronometer(true)
             .setWhen(startTimeMillis)
             .setContentIntent(createMainActivityIntent())
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setSilent(true)
 
         // Add action buttons based on current state
@@ -103,14 +118,14 @@ class AndroidAudioNotificationHandler(
             // Add pause button when recording
             builder.addAction(
                 android.R.drawable.ic_media_pause,
-                "Pause",
+                context.getString(R.string.audio_recording_action_pause),
                 createActionIntent(ACTION_PAUSE)
             )
         } else {
             // Add resume button when paused
             builder.addAction(
                 android.R.drawable.ic_media_play,
-                "Resume",
+                context.getString(R.string.audio_recording_action_resume),
                 createActionIntent(ACTION_RESUME)
             )
         }
@@ -118,7 +133,7 @@ class AndroidAudioNotificationHandler(
         // Always add stop button
         builder.addAction(
             android.R.drawable.ic_delete,  // Using an alternative icon as a fallback
-            "Stop",
+            context.getString(R.string.audio_recording_action_stop),
             createActionIntent(ACTION_STOP)
         )
 

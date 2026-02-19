@@ -1,7 +1,7 @@
 package app.logdate.client.intelligence.rewind
 
 import app.logdate.shared.model.Rewind
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 class DefaultRewindGenerator : RewindGenerator {

@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.navigation3.runtime.NavKey
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
@@ -25,12 +26,17 @@ import app.logdate.feature.core.GlobalAppUiLoadingState
 import app.logdate.feature.core.GlobalAppUiState
 import app.logdate.feature.core.di.ActivityProvider
 import app.logdate.feature.core.export.AndroidExportLauncher
+import app.logdate.feature.core.restore.AndroidRestoreLauncher
+import app.logdate.client.media.audio.EXTRA_NOTE_ID
+import app.logdate.client.media.audio.EXTRA_NAV_SOURCE
+import app.logdate.client.media.audio.NAV_SOURCE_AUDIO_PLAYBACK
+import app.logdate.navigation.routes.core.NoteViewerRoute
 import io.github.vinceglb.filekit.core.FileKit
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
-import org.koin.compose.KoinContext
+import kotlin.uuid.Uuid
 
 /**
  * The main app activity.
@@ -49,8 +55,11 @@ class MainActivity : FragmentActivity() {
     private val biometricGatekeeper: BiometricGatekeeper by inject()
     private val activityProvider: ActivityProvider by inject()
     private val androidExportLauncher: AndroidExportLauncher by inject()
+    private val androidRestoreLauncher: AndroidRestoreLauncher by inject()
 
     private val viewModel by viewModel<AppViewModel>()
+
+    private var pendingNavKey by mutableStateOf<NavKey?>(null)
     
     // Register the document picker for export functionality
     private val createDocumentLauncher = registerForActivityResult(
@@ -62,6 +71,17 @@ class MainActivity : FragmentActivity() {
             null
         }
         androidExportLauncher.onExportDestinationSelected(uri)
+    }
+
+    private val openDocumentLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val uri = if (result.resultCode == RESULT_OK) {
+            result.data?.data
+        } else {
+            null
+        }
+        androidRestoreLauncher.onRestoreSourceSelected(uri)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -78,6 +98,8 @@ class MainActivity : FragmentActivity() {
         activityProvider.currentActivity = this
         androidExportLauncher.setupActivityResultLauncher(createDocumentLauncher)
         androidExportLauncher.setupWorkObserver(this)
+        androidRestoreLauncher.setupActivityResultLauncher(openDocumentLauncher)
+        androidRestoreLauncher.setupWorkObserver(this)
         
         // Set up multi-window support
         setupMultiWindowSupport()
@@ -99,15 +121,17 @@ class MainActivity : FragmentActivity() {
         }
 
         enableEdgeToEdge()
+        pendingNavKey = resolveNavKey(intent)
+
         setContent {
             val state = uiState
             if (state is GlobalAppUiLoadedState) {
-                KoinContext {
-                    MainActivityUiRoot(
-                        appUiState = state,
-                        onShowUnlockPrompt = viewModel::showNativeUnlockPrompt,
-                    )
-                }
+                MainActivityUiRoot(
+                    appUiState = state,
+                    onShowUnlockPrompt = viewModel::showNativeUnlockPrompt,
+                    pendingNavKey = pendingNavKey,
+                    onDeepLinkHandled = { pendingNavKey = null },
+                )
             }
         }
         
@@ -118,6 +142,7 @@ class MainActivity : FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleMultiWindowIntent(intent)
+        resolveNavKey(intent)?.let { pendingNavKey = it }
     }
     
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -169,6 +194,13 @@ class MainActivity : FragmentActivity() {
 //        callback.accept(assistantActionsProvider.supportedActions.map { it.toDirectAction() }
 //            .toMutableList())
 //    }
+}
+
+private fun resolveNavKey(intent: Intent?): NavKey? {
+    if (intent == null) return null
+    if (intent.getStringExtra(EXTRA_NAV_SOURCE) != NAV_SOURCE_AUDIO_PLAYBACK) return null
+    val noteId = intent.getStringExtra(EXTRA_NOTE_ID) ?: return null
+    return runCatching { NoteViewerRoute(Uuid.parse(noteId)) }.getOrNull()
 }
 
 @Preview

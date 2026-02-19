@@ -102,5 +102,5 @@ interface CloudQuotaManager {
      * Gets the last sync timestamp with the server.
      * Returns null if never synced.
      */
-    suspend fun getLastServerSyncTime(): kotlinx.datetime.Instant?
+    suspend fun getLastServerSyncTime(): kotlin.time.Instant?
 }

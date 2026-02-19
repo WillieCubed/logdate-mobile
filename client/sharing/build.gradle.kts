@@ -6,7 +6,7 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.android.library)
+    alias(libs.plugins.android.kmp.library)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlinx.serialization)
@@ -14,13 +14,19 @@ plugins {
 }
 
 kotlin {
-    androidTarget {
+    androidLibrary {
+        namespace = "app.logdate.client.sharing"
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
+        androidResources {
+            enable = true
+        }
+
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
     }
 
-    iosX64()
     iosArm64()
     iosSimulatorArm64()
 
@@ -39,8 +45,8 @@ kotlin {
             implementation(projects.client.repository)
             implementation(projects.shared.model)
             // Compose
-            implementation(compose.runtime)
-            implementation(compose.components.resources)
+            implementation(libs.compose.runtime)
+            implementation(libs.compose.components.resources)
             // External dependencies
             implementation(libs.napier)
             implementation(project.dependencies.platform(libs.koin.bom))
@@ -53,43 +59,6 @@ kotlin {
 }
 
 val configProperties = PropertiesLoader.loadProperties(project)
-
-android {
-    namespace = "app.logdate.client.sharing"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
-
-    // Needed to ensure manifest merger doesn't fail
-    // See https://developer.android.com/build/manage-manifests#inject_build_variables_into_the_manifest
-    defaultConfig {
-        manifestPlaceholders["META_APP_ID"] = ""
-    }
-
-    buildFeatures {
-        buildConfig = true
-    }
-    buildTypes {
-        getByName("debug") {
-            buildConfigField(
-                "String",
-                "META_APP_ID",
-                getConfigValue("metaAppId")
-            )
-        }
-        getByName("release") {
-            isMinifyEnabled = false
-
-            buildConfigField(
-                "String",
-                "META_APP_ID",
-                getConfigValue("metaAppId")
-            )
-        }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-}
 
 // TODO(build): Extract this to a shared build module
 object PropertiesLoader {

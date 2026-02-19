@@ -3,7 +3,7 @@ package app.logdate.client.domain.world
 import app.logdate.client.location.ClientLocationProvider
 import app.logdate.client.repository.timeline.ActivityTimelineRepository
 import app.logdate.shared.model.ActivityTimelineItem
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 

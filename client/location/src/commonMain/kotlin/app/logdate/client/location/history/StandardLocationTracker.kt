@@ -7,8 +7,8 @@ import app.logdate.shared.model.Location
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
@@ -41,8 +41,10 @@ class StandardLocationTracker(
         val startTime = date.atStartOfDayIn(TimeZone.currentSystemDefault())
         val endTime = date.plus(kotlinx.datetime.DatePeriod(days = 1))
             .atStartOfDayIn(TimeZone.currentSystemDefault())
-        
-        return locationHistoryRepository.getLocationHistoryBetween(startTime, endTime)
+
+        val startInstant = startTime
+        val endInstant = endTime
+        return locationHistoryRepository.getLocationHistoryBetween(startInstant, endInstant)
     }
     
     override suspend fun getLocationHistoryBetween(start: Instant, end: Instant): List<LocationHistoryItem> {

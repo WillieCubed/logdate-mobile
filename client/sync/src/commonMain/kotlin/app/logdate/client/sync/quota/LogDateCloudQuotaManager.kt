@@ -11,7 +11,7 @@ import app.logdate.shared.model.QuotaUsage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 /**
  * LogDate Cloud implementation of quota management.
@@ -27,7 +27,7 @@ class LogDateCloudQuotaManager(
 
     private val _quotaFlow = MutableStateFlow<CloudStorageQuota?>(null)
     private var cachedQuota: CloudStorageQuota? = null
-    private var lastServerSyncTime: kotlinx.datetime.Instant? = null
+    private var lastServerSyncTime: kotlin.time.Instant? = null
     
     override fun observeQuota(): Flow<CloudStorageQuota> = _quotaFlow.filterNotNull()
     
@@ -124,7 +124,7 @@ class LogDateCloudQuotaManager(
         }
     }
     
-    override suspend fun getLastServerSyncTime(): kotlinx.datetime.Instant? = lastServerSyncTime
+    override suspend fun getLastServerSyncTime(): kotlin.time.Instant? = lastServerSyncTime
     
     /**
      * Maps shared model QuotaUsage to sync layer CloudStorageQuota.

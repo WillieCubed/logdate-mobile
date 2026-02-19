@@ -10,7 +10,7 @@ import app.logdate.client.health.model.TimeOfDay
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
@@ -227,7 +227,9 @@ class DefaultLocalFirstHealthRepository(
             )
             val dayEnd = endDateTime.toInstant(timeZone)
             
-            return DayBounds(start = dayStart, end = dayEnd)
+            val dayStartInstant = dayStart
+            val dayEndInstant = dayEnd
+            return DayBounds(start = dayStartInstant, end = dayEndInstant)
             
         } catch (e: Exception) {
             Napier.e("Error getting sleep data", e)
@@ -265,7 +267,9 @@ class DefaultLocalFirstHealthRepository(
             val endDateTime = LocalDateTime(endDate, LocalTime(userDayEndHour, 0))
             val dayEnd = endDateTime.toInstant(timeZone)
             
-            return DayBounds(start = dayStart, end = dayEnd)
+            val dayStartInstant = dayStart
+            val dayEndInstant = dayEnd
+            return DayBounds(start = dayStartInstant, end = dayEndInstant)
         }
         
         return getDefaultDayBounds(date, timeZone)
@@ -283,6 +287,8 @@ class DefaultLocalFirstHealthRepository(
         val nextDay = date.plus(1, DateTimeUnit.DAY)
         val dayEnd = nextDay.atStartOfDayIn(timeZone)
         
-        return DayBounds(start = dayStart, end = dayEnd)
+        val dayStartInstant = dayStart
+        val dayEndInstant = dayEnd
+        return DayBounds(start = dayStartInstant, end = dayEndInstant)
     }
 }

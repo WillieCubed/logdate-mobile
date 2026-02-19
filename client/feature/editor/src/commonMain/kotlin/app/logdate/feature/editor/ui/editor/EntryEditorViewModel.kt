@@ -31,7 +31,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
@@ -418,9 +418,8 @@ class EntryEditorViewModel(
                             creationTimestamp = block.timestamp,
                             lastUpdated = Clock.System.now(),
                             mediaRef = block.uri ?: return@mapNotNull null,
-                            durationMs = block.duration.takeIf { it > 0 }
+                            durationMs = block.duration
                         )
-                        else -> null
                     }
                 }
                 
@@ -569,8 +568,6 @@ class EntryEditorViewModel(
         }
     }
     
-    // AudioRecordingViewModel is now provided by Koin DI directly
-
     /**
      * Sets the initial text content for a new note.
      * This creates a text block with the given content if there are no blocks yet.
@@ -750,14 +747,7 @@ fun JournalNote.toDomainBlock(): EntryBlockUiState {
             timestamp = creationTimestamp,
             location = null,
             uri = mediaRef,
-            duration = durationMs ?: 0
-        )
-
-        else -> TextBlockUiState(
-            id = uid,
-            timestamp = creationTimestamp,
-            location = null,
-            content = ""
+            duration = durationMs
         )
     }
 }

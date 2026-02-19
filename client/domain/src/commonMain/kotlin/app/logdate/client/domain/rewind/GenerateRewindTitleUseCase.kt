@@ -1,6 +1,6 @@
 package app.logdate.client.domain.rewind
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -66,7 +66,7 @@ class GenerateRewindTitleUseCase {
         return "${
             date.month.name.lowercase()
                 .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
-        } ${date.dayOfMonth}, ${date.year}"
+        } ${date.day}, ${date.year}"
     }
 }
 

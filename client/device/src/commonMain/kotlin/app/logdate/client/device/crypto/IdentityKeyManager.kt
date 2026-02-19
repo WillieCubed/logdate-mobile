@@ -1,6 +1,8 @@
 package app.logdate.client.device.crypto
 
-import app.logdate.client.datastore.SecureStorage
+import app.logdate.client.device.storage.SecureStorage
+import app.logdate.client.device.storage.getBytes
+import app.logdate.client.device.storage.putBytes
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.Serializable
 

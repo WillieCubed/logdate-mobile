@@ -3,7 +3,8 @@ package app.logdate.client.domain.notes
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import kotlinx.coroutines.flow.Flow
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
@@ -25,6 +26,9 @@ class FetchTodayNotesUseCase(
             .date
             .atStartOfDayIn(TimeZone.currentSystemDefault())
         val end = start + 24.hours
-        return repository.observeNotesInRange(start - buffer, end)
+        val startWithBuffer = start - buffer
+        val startInstant = startWithBuffer
+        val endInstant = end
+        return repository.observeNotesInRange(startInstant, endInstant)
     }
 }

@@ -3,7 +3,7 @@ package app.logdate.client.domain.timeline
 import app.logdate.client.health.model.DayBounds
 import io.github.aakira.napier.Napier
 import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
@@ -27,7 +27,9 @@ class DefaultHealthConnectRepository : HealthConnectRepository {
         val nextDay = date.plus(1, DateTimeUnit.DAY)
         val dayEnd = nextDay.atStartOfDayIn(timeZone)
         
-        return DayBounds(start = dayStart, end = dayEnd)
+        val dayStartInstant = dayStart
+        val dayEndInstant = dayEnd
+        return DayBounds(start = dayStartInstant, end = dayEndInstant)
     }
     
     override suspend fun isHealthConnectAvailable(): Boolean = false

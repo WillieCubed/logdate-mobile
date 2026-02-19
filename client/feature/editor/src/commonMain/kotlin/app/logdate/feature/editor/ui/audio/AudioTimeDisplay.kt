@@ -11,6 +11,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.logdate.feature.editor.ui.formatMediaDuration
 import kotlin.time.Duration
 
 /**
@@ -28,7 +29,7 @@ fun AudioTimeDisplay(
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = formatDuration(recordingDuration),
+            text = formatMediaDuration(recordingDuration.inWholeMilliseconds, true),
             style = MaterialTheme.typography.titleLarge.copy(
                 fontSize = 20.sp,
                 fontWeight = if (isRecording) FontWeight.Bold else FontWeight.Medium,
@@ -40,19 +41,4 @@ fun AudioTimeDisplay(
                 MaterialTheme.colorScheme.onSurface
         )
     }
-}
-
-/**
- * Formats a Duration into MM:SS format for display.
- */
-private fun formatDuration(duration: Duration): String {
-    val totalSeconds = duration.inWholeSeconds
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    
-    // Format without using String.format which might not be available on all platforms
-    val minutesStr = if (minutes < 10) "0$minutes" else "$minutes"
-    val secondsStr = if (seconds < 10) "0$seconds" else "$seconds"
-    
-    return "$minutesStr:$secondsStr"
 }

@@ -3,8 +3,8 @@ package app.logdate.feature.editor.ui.editor
 import app.logdate.feature.editor.ui.camera.CapturedMediaType
 import app.logdate.shared.model.Location
 import app.logdate.feature.editor.ui.formatMediaDuration
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**

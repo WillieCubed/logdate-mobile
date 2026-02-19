@@ -21,7 +21,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import app.logdate.ui.audio.LocalAudioPlaybackState
 import app.logdate.ui.audio.LocalTranscriptionState
 import app.logdate.ui.audio.TranscriptionState
 import app.logdate.ui.common.PlatformBackHandler
@@ -30,7 +29,7 @@ import app.logdate.ui.timeline.TimelineDaySelection
 import app.logdate.ui.timeline.TimelinePane
 import app.logdate.feature.timeline.ui.details.TimelineDayDetailPanel
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
@@ -61,15 +60,11 @@ fun TimelineRoute(
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    // Get the audio playback state from the ViewModel
-    val audioPlaybackState by viewModel.audioPlaybackState.collectAsState()
-
     // Get transcription state from the ViewModel
     val transcriptionState by viewModel.transcriptionState.collectAsState()
 
     // Provide both audio playback and transcription state to all descendants
     CompositionLocalProvider(
-        LocalAudioPlaybackState provides audioPlaybackState,
         LocalTranscriptionState provides transcriptionState
     ) {
         TimelineScreen(
@@ -248,4 +243,3 @@ private fun TimelineScreenPreview() {
         birthday = null,
     )
 }
-

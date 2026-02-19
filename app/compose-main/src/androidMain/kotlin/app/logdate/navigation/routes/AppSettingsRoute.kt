@@ -1,8 +1,9 @@
 package app.logdate.navigation.routes
 
-import androidx.navigation3.runtime.EntryProviderBuilder
+import app.logdate.navigation.routes.routeEntry
+
+import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
-import androidx.navigation3.runtime.entry
 import app.logdate.feature.core.profile.ui.ProfileScreen
 import app.logdate.feature.core.settings.ui.AccountSettingsScreen
 import app.logdate.feature.core.settings.ui.AdvancedSettingsScreen
@@ -129,7 +130,7 @@ fun MainAppNavigator.openAdvancedSettings() {
  * @param onNavigateToBirthdaySettings Callback to navigate to the birthday settings screen
  * @param onNavigateToAdvanced Callback to navigate to advanced settings
  */
-fun EntryProviderBuilder<NavKey>.appSettingsRoutes(
+fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onBack: () -> Unit,
     onAppReset: () -> Unit,
     onNavigateToCloudAccountCreation: () -> Unit,
@@ -144,7 +145,7 @@ fun EntryProviderBuilder<NavKey>.appSettingsRoutes(
     onNavigateToAdvanced: () -> Unit,
 ) {
     // Main settings overview screen
-    entry<SettingsOverviewRoute>() { _ ->
+    routeEntry<SettingsOverviewRoute>() { _ ->
         SettingsOverviewScreen(
             onBack = onBack,
             onNavigateToProfile = onNavigateToProfile,
@@ -159,21 +160,21 @@ fun EntryProviderBuilder<NavKey>.appSettingsRoutes(
     }
     
     // Profile screen with Material 3 Expressive design
-    entry<ProfileRoute>() { _ ->
+    routeEntry<ProfileRoute>() { _ ->
         ProfileScreen(
             onBack = onBack
         )
     }
 
     // Connected devices screen
-    entry<DevicesSettingsRoute>() { _ ->
+    routeEntry<DevicesSettingsRoute>() { _ ->
         DevicesScreen(
             onBackClick = onBack
         )
     }
     
     // Account management settings screen
-    entry<AccountSettingsRoute>() { _ ->
+    routeEntry<AccountSettingsRoute>() { _ ->
         AccountSettingsScreen(
             onBack = onBack,
             onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
@@ -182,14 +183,14 @@ fun EntryProviderBuilder<NavKey>.appSettingsRoutes(
     }
     
     // Birthday settings screen
-    entry<BirthdaySettingsRoute>() { _ ->
+    routeEntry<BirthdaySettingsRoute>() { _ ->
         BirthdaySettingsScreen(
             onBack = onBack
         )
     }
     
     // Privacy and security settings screen
-    entry<PrivacySettingsRoute>() { _ ->
+    routeEntry<PrivacySettingsRoute>() { _ ->
         PrivacySettingsScreen(
             onBack = onBack,
             onNavigateToLocationSettings = onNavigateToLocation
@@ -197,14 +198,14 @@ fun EntryProviderBuilder<NavKey>.appSettingsRoutes(
     }
     
     // Data and storage settings screen
-    entry<DataSettingsRoute>() { _ ->
+    routeEntry<DataSettingsRoute>() { _ ->
         DataSettingsScreen(
             onBack = onBack
         )
     }
     
     // Danger zone settings screen with destructive actions
-    entry<DangerZoneSettingsRoute>() { _ ->
+    routeEntry<DangerZoneSettingsRoute>() { _ ->
         DangerZoneSettingsScreen(
             onBack = onBack,
             onAppReset = onAppReset
@@ -212,14 +213,14 @@ fun EntryProviderBuilder<NavKey>.appSettingsRoutes(
     }
     
     // Location settings screen
-    entry<LocationSettingsRoute>() { _ ->
+    routeEntry<LocationSettingsRoute>() { _ ->
         LocationSettingsScreen(
             onBack = onBack,
         )
     }
 
     // Advanced settings screen
-    entry<AdvancedSettingsRoute>() { _ ->
+    routeEntry<AdvancedSettingsRoute>() { _ ->
         AdvancedSettingsScreen(
             onBack = onBack,
         )

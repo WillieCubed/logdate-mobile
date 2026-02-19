@@ -10,7 +10,8 @@ import app.logdate.shared.model.Location
 import app.logdate.shared.model.LocationAltitude
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 /**
  * Offline-first implementation of location history repository.
@@ -60,7 +61,7 @@ class OfflineFirstLocationHistoryRepository(
             val entity = LocationLogEntity(
                 userId = userId,
                 deviceId = deviceId,
-                timestamp = kotlinx.datetime.Clock.System.now(),
+                timestamp = Clock.System.now(),
                 location = Coordinates(
                     latitude = location.latitude,
                     longitude = location.longitude,

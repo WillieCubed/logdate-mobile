@@ -2,7 +2,11 @@ package app.logdate.client.database
 
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import app.logdate.client.device.storage.SecureStorage
+import kotlinx.coroutines.runBlocking
+import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermissions
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 
@@ -15,6 +19,57 @@ fun getDatabaseBuilder(): RoomDatabase.Builder<LogDateDatabase> {
     val dbFile = DATABASE_PATH
     return Room.databaseBuilder<LogDateDatabase>(
         name = dbFile.absolutePathString(),
+    )
+}
+
+fun protectDatabaseFile() {
+    val dbFile = DATABASE_PATH
+    if (!Files.exists(dbFile)) {
+        return
+    }
+    runCatching {
+        val permissions = PosixFilePermissions.fromString("rw-------")
+        Files.setPosixFilePermissions(dbFile, permissions)
+    }.onFailure {
+        // Non-POSIX filesystems (e.g. Windows) will throw.
+    }
+}
+
+fun prepareEncryptedDatabase(secureStorage: SecureStorage) {
+    val dbFile = DATABASE_PATH
+    val encryptedFile = encryptedDatabasePath()
+
+    if (Files.exists(dbFile) || !Files.exists(encryptedFile)) {
+        return
+    }
+
+    runCatching {
+        val encryptedBytes = Files.readAllBytes(encryptedFile)
+        val decrypted = runBlocking { secureStorage.decrypt(encryptedBytes) }
+        if (decrypted != null) {
+            Files.createDirectories(dbFile.parent)
+            Files.write(dbFile, decrypted)
+        }
+    }
+}
+
+fun scheduleDatabaseEncryption(secureStorage: SecureStorage) {
+    Runtime.getRuntime().addShutdownHook(
+        Thread {
+            val dbFile = DATABASE_PATH
+            val encryptedFile = encryptedDatabasePath()
+            if (!Files.exists(dbFile)) {
+                return@Thread
+            }
+
+            runCatching {
+                val plaintext = Files.readAllBytes(dbFile)
+                val encrypted = runBlocking { secureStorage.encrypt(plaintext) }
+                Files.createDirectories(encryptedFile.parent)
+                Files.write(encryptedFile, encrypted)
+                Files.deleteIfExists(dbFile)
+            }
+        }
     )
 }
 
@@ -50,3 +105,5 @@ private val DATABASE_PATH: Path
             )
         }
     }
+
+private fun encryptedDatabasePath(): Path = DATABASE_PATH.resolveSibling("$DATABASE_NAME.enc")

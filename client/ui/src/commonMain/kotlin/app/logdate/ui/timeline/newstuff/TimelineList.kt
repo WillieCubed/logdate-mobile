@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -228,7 +229,7 @@ internal fun BirthdayListItem(
 ) {
     val daysSinceBirthday by remember(birthDate) {
         derivedStateOf {
-            LocalDate.now().toEpochDays() - birthDate.toEpochDays()
+            (LocalDate.now().toEpochDays() - birthDate.toEpochDays()).toInt()
         }
     }
 
@@ -250,8 +251,9 @@ internal fun TimelineDayListItem(
     Column(
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         modifier = modifier
-            .clip(MaterialTheme.shapes.medium)
             .widthIn(min = 320.dp)
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
             .clickable {
                 onOpenDay(item.date)
             }
@@ -265,6 +267,7 @@ internal fun TimelineDayListItem(
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             shape = MaterialTheme.shapes.small,
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -274,9 +277,35 @@ internal fun TimelineDayListItem(
                     "In summary",
                     style = MaterialTheme.typography.labelLarge.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                 )
-                Text(item.summary, style = MaterialTheme.typography.bodyMedium)
+                if (item.isLoadingSummary) {
+                    SummaryLoadingPlaceholder()
+                } else {
+                    Text(item.summary, style = MaterialTheme.typography.bodyMedium)
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun SummaryLoadingPlaceholder(
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        modifier = modifier,
+    ) {
+        // Shimmer-like placeholder lines
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            shape = MaterialTheme.shapes.extraSmall,
+            modifier = Modifier.height(16.dp).widthIn(min = 280.dp),
+        ) {}
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            shape = MaterialTheme.shapes.extraSmall,
+            modifier = Modifier.height(16.dp).widthIn(min = 200.dp),
+        ) {}
     }
 }
 

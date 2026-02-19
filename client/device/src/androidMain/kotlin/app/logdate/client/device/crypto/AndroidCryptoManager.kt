@@ -9,7 +9,7 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-actual class AndroidCryptoManager : CryptoManager {
+class AndroidCryptoManager : CryptoManager {
     
     override suspend fun generateRecoveryPhrase(): List<String> {
         val entropy = ByteArray(16) // 128 bits = 12 words
@@ -57,7 +57,7 @@ actual class AndroidCryptoManager : CryptoManager {
     /**
      * AES-GCM encryption for content.
      */
-    fun aesGcmEncrypt(
+    override fun aesGcmEncrypt(
         key: ByteArray,
         iv: ByteArray,
         aad: ByteArray,
@@ -79,7 +79,7 @@ actual class AndroidCryptoManager : CryptoManager {
     /**
      * AES-GCM decryption for content.
      */
-    fun aesGcmDecrypt(
+    override fun aesGcmDecrypt(
         key: ByteArray,
         iv: ByteArray,
         aad: ByteArray,

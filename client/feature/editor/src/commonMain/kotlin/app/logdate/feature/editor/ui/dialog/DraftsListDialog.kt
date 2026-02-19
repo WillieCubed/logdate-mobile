@@ -281,7 +281,6 @@ private fun DraftListItemContent(
                 is JournalNote.Image -> "📷 Image"
                 is JournalNote.Video -> "🎥 Video"
                 is JournalNote.Audio -> "🎵 Audio"
-                else -> "Content"
             }
         } ?: "Empty draft"
 

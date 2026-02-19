@@ -6,8 +6,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
+import kotlin.time.Duration.Companion.seconds
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -134,8 +135,8 @@ class GetPastRewindsUseCaseTest {
         val now = Clock.System.now()
         val rewind1 = Rewind(
             uid = Uuid.random(),
-            startDate = Instant.fromEpochMilliseconds(now.toEpochMilliseconds() - 7000),
-            endDate = Instant.fromEpochMilliseconds(now.toEpochMilliseconds() - 6000),
+            startDate = now - 7.seconds,
+            endDate = now - 6.seconds,
             generationDate = now,
             label = "2024#01",
             title = "Short rewind",
@@ -143,8 +144,8 @@ class GetPastRewindsUseCaseTest {
         )
         val rewind2 = Rewind(
             uid = Uuid.random(),
-            startDate = Instant.fromEpochMilliseconds(now.toEpochMilliseconds() - 10000),
-            endDate = Instant.fromEpochMilliseconds(now.toEpochMilliseconds() - 1000),
+            startDate = now - 10.seconds,
+            endDate = now - 1.seconds,
             generationDate = now,
             label = "2024#02",
             title = "Long rewind",

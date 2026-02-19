@@ -22,8 +22,9 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
-import androidx.navigation3.ui.Scene
-import androidx.navigation3.ui.SceneStrategy
+import androidx.navigation3.scene.Scene
+import androidx.navigation3.scene.SceneStrategy
+import androidx.navigation3.scene.SceneStrategyScope
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
 import app.logdate.feature.core.settings.ui.LocalSettingsLayoutInfo
 import app.logdate.feature.core.settings.ui.SettingsLayoutInfo
@@ -36,6 +37,8 @@ import app.logdate.navigation.routes.core.DevicesSettingsRoute
 import app.logdate.navigation.routes.core.LocationSettingsRoute
 import app.logdate.navigation.routes.core.PrivacySettingsRoute
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
+import app.logdate.navigation.routes.routeClass
+import kotlin.reflect.KClass
 
 /**
  * CompositionLocal for providing AnimatedVisibilityScope throughout the settings scene.
@@ -69,19 +72,19 @@ private object SettingsRouteConfig {
     /**
      * Classifies a settings route based on its NavKey.
      */
-    fun classifyRoute(routeKey: NavKey): SettingsRouteClassification {
-        return when (routeKey) {
-            is SettingsOverviewRoute -> SettingsRouteClassification.SettingsList
+    fun classifyRoute(routeClass: KClass<out NavKey>?): SettingsRouteClassification {
+        return when (routeClass) {
+            SettingsOverviewRoute::class -> SettingsRouteClassification.SettingsList
 
             // Detail settings screens
-            is AccountSettingsRoute,
-            is PrivacySettingsRoute,
-            is DataSettingsRoute,
-            is DevicesSettingsRoute,
-            is LocationSettingsRoute,
-            is BirthdaySettingsRoute,
-            is DangerZoneSettingsRoute,
-            is AdvancedSettingsRoute -> SettingsRouteClassification.SettingsDetail
+            AccountSettingsRoute::class,
+            PrivacySettingsRoute::class,
+            DataSettingsRoute::class,
+            DevicesSettingsRoute::class,
+            LocationSettingsRoute::class,
+            BirthdaySettingsRoute::class,
+            DangerZoneSettingsRoute::class,
+            AdvancedSettingsRoute::class -> SettingsRouteClassification.SettingsDetail
 
             else -> SettingsRouteClassification.Excluded
         }
@@ -90,22 +93,22 @@ private object SettingsRouteConfig {
     /**
      * Determines if a route should always be full-screen regardless of screen size.
      */
-    fun isAlwaysFullscreen(routeKey: NavKey): Boolean {
+    fun isAlwaysFullscreen(routeClass: KClass<out NavKey>?): Boolean {
         // For now, only birthday settings should be fullscreen due to its specialized UI
-        return routeKey is BirthdaySettingsRoute
+        return routeClass == BirthdaySettingsRoute::class
     }
 }
 
-private fun resolveSelectedDetail(routeKey: NavKey?): String? {
-    return when (routeKey) {
-        is AccountSettingsRoute -> "account"
-        is PrivacySettingsRoute -> "privacy"
-        is DataSettingsRoute -> "data"
-        is DevicesSettingsRoute -> "devices"
-        is LocationSettingsRoute -> "location"
-        is DangerZoneSettingsRoute -> "danger"
-        is BirthdaySettingsRoute -> "birthday"
-        is AdvancedSettingsRoute -> "advanced"
+private fun resolveSelectedDetail(routeClass: KClass<out NavKey>?): String? {
+    return when (routeClass) {
+        AccountSettingsRoute::class -> "account"
+        PrivacySettingsRoute::class -> "privacy"
+        DataSettingsRoute::class -> "data"
+        DevicesSettingsRoute::class -> "devices"
+        LocationSettingsRoute::class -> "location"
+        DangerZoneSettingsRoute::class -> "danger"
+        BirthdaySettingsRoute::class -> "birthday"
+        AdvancedSettingsRoute::class -> "advanced"
         else -> null
     }
 }
@@ -113,12 +116,12 @@ private fun resolveSelectedDetail(routeKey: NavKey?): String? {
 /**
  * Creates a SettingsScene for the settings list only.
  */
-private fun <T : Any> createListOnlySettingsScene(
+private fun <T : NavKey> createListOnlySettingsScene(
     entry: NavEntry<T>,
     previousEntries: List<NavEntry<T>>,
-    onBack: (Int) -> Unit,
+    onBack: () -> Unit,
 ): SettingsScene<T> = SettingsScene(
-    key = Pair("SettingsScene", entry.key),
+    key = Pair("SettingsScene", entry.contentKey),
     previousEntries = previousEntries,
     listEntry = entry,
     detailEntry = null,
@@ -128,13 +131,13 @@ private fun <T : Any> createListOnlySettingsScene(
 /**
  * Creates a SettingsScene for list-detail layout.
  */
-private fun <T : Any> createListDetailSettingsScene(
+private fun <T : NavKey> createListDetailSettingsScene(
     listEntry: NavEntry<T>,
     detailEntry: NavEntry<T>,
     previousEntries: List<NavEntry<T>>,
-    onBack: (Int) -> Unit,
+    onBack: () -> Unit,
 ): SettingsScene<T> = SettingsScene(
-    key = Triple("SettingsScene", listEntry.key, detailEntry.key),
+    key = Triple("SettingsScene", listEntry.contentKey, detailEntry.contentKey),
     previousEntries = previousEntries,
     listEntry = listEntry,
     detailEntry = detailEntry,
@@ -144,12 +147,12 @@ private fun <T : Any> createListDetailSettingsScene(
 /**
  * Creates a SettingsScene for full-screen detail view.
  */
-private fun <T : Any> createDetailOnlySettingsScene(
+private fun <T : NavKey> createDetailOnlySettingsScene(
     entry: NavEntry<T>,
     previousEntries: List<NavEntry<T>>,
-    onBack: (Int) -> Unit,
+    onBack: () -> Unit,
 ): SettingsScene<T> = SettingsScene(
-    key = Pair("SettingsScene", entry.key),
+    key = Pair("SettingsScene", entry.contentKey),
     previousEntries = previousEntries,
     listEntry = entry,
     detailEntry = null,
@@ -179,12 +182,12 @@ private fun <T : Any> createDetailOnlySettingsScene(
  * @param listEntry The settings overview/list entry
  * @param detailEntry Optional detail entry for two-pane layouts
  */
-class SettingsScene<T : Any>(
+class SettingsScene<T : NavKey>(
     override val key: Any,
     override val previousEntries: List<NavEntry<T>>,
     val listEntry: NavEntry<T>,
     val detailEntry: NavEntry<T>? = null,
-    private val onBack: (Int) -> Unit,
+    private val onBack: () -> Unit,
 ) : Scene<T> {
     override val entries: List<NavEntry<T>> = if (detailEntry != null) {
         listOf(listEntry, detailEntry)
@@ -205,12 +208,12 @@ class SettingsScene<T : Any>(
     @Composable
     private fun SettingsSceneContent() {
         val navigator = rememberListDetailPaneScaffoldNavigator<Nothing>()
-        val hasListDetailContext = detailEntry != null && listEntry.key is SettingsOverviewRoute
+        val hasListDetailContext = detailEntry != null && listEntry.routeClass() == SettingsOverviewRoute::class
         val adaptiveInfo = currentWindowAdaptiveInfo()
         val windowSizeClass = adaptiveInfo.windowSizeClass
         val isInTwoPaneMode = windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND) &&
-            listEntry.key is SettingsOverviewRoute
-        val selectedDetail = resolveSelectedDetail(detailEntry?.key as? NavKey)
+            listEntry.routeClass() == SettingsOverviewRoute::class
+        val selectedDetail = resolveSelectedDetail(detailEntry?.routeClass())
 
         // Navigate to detail pane when we have a detail entry
         LaunchedEffect(detailEntry) {
@@ -221,7 +224,7 @@ class SettingsScene<T : Any>(
 
         // Ensure back navigation pops detail first when we have list+detail on the stack.
         BackHandler(enabled = hasListDetailContext) {
-            onBack(1)
+            onBack()
         }
 
         ListDetailPaneScaffold(
@@ -236,7 +239,7 @@ class SettingsScene<T : Any>(
                             isDetailPane = false
                         )
                     ) {
-                        listEntry.content.invoke(listEntry.key)
+                        listEntry.Content()
                     }
                 }
             },
@@ -249,7 +252,7 @@ class SettingsScene<T : Any>(
                             isDetailPane = true
                         )
                     ) {
-                        detailEntry?.content?.invoke(detailEntry.key)
+                        detailEntry?.Content()
                             ?: SettingsEmptyDetailPane()
                     }
                 }
@@ -303,12 +306,10 @@ private fun SettingsEmptyDetailPane() {
  *    - Carefully manages which entries are included in scene's entries list
  *    - Handles transitions between different settings screens appropriately
  */
-class SettingsSceneStrategy<T : Any> : SceneStrategy<T> {
+class SettingsSceneStrategy<T : NavKey> : SceneStrategy<T> {
     
-    @Composable
-    override fun calculateScene(
+    override fun SceneStrategyScope<T>.calculateScene(
         entries: List<NavEntry<T>>,
-        onBack: (Int) -> Unit,
     ): Scene<T>? {
         if (entries.isEmpty()) return null
 
@@ -316,7 +317,7 @@ class SettingsSceneStrategy<T : Any> : SceneStrategy<T> {
         val previousEntry = entries.getOrNull(entries.size - 2)
 
         // Classify the current route
-        val classification = SettingsRouteConfig.classifyRoute(lastEntry.key as NavKey)
+        val classification = SettingsRouteConfig.classifyRoute(lastEntry.routeClass())
 
         return when (classification) {
             SettingsRouteClassification.SettingsList -> {
@@ -330,13 +331,13 @@ class SettingsSceneStrategy<T : Any> : SceneStrategy<T> {
             SettingsRouteClassification.SettingsDetail -> {
                 // Check if we have a list entry as the previous entry
                 val listEntry = previousEntry?.takeIf {
-                    SettingsRouteConfig.classifyRoute(it.key as NavKey) == SettingsRouteClassification.SettingsList
+                    SettingsRouteConfig.classifyRoute(it.routeClass()) == SettingsRouteClassification.SettingsList
                 }
 
                 // Always create list-detail scene when we have both entries.
                 // The Scene's content uses ListDetailPaneScaffold which handles
                 // adaptive layout internally based on screen size.
-                if (listEntry != null && !SettingsRouteConfig.isAlwaysFullscreen(lastEntry.key as NavKey)) {
+                if (listEntry != null && !SettingsRouteConfig.isAlwaysFullscreen(lastEntry.routeClass())) {
                     createListDetailSettingsScene(
                         listEntry = listEntry,
                         detailEntry = lastEntry,

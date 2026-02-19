@@ -9,6 +9,7 @@ import platform.Foundation.NSTimeZone
 import platform.Foundation.currentLocale
 import platform.Foundation.dateWithTimeIntervalSince1970
 import platform.Foundation.localTimeZone
+import kotlinx.datetime.number
 
 /**
  * iOS implementation of localized date formatting.
@@ -25,8 +26,8 @@ actual fun formatDateLocalized(date: LocalDate): String {
     // Convert LocalDate to NSDate
     // First create an epoch timestamp for start of day in UTC
     val year = date.year
-    val month = date.monthNumber
-    val day = date.dayOfMonth
+    val month = date.month.number
+    val day = date.day
     
     // Create a date string that NSDateFormatter can parse
     val dateString = "$year-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T00:00:00Z"
@@ -42,6 +43,6 @@ actual fun formatDateLocalized(date: LocalDate): String {
         formatter.stringFromDate(nsDate)
     } else {
         // Fallback if conversion fails
-        "${date.month.name} ${date.dayOfMonth}, ${date.year}"
+        "${date.month.name} ${date.day}, ${date.year}"
     }
 }

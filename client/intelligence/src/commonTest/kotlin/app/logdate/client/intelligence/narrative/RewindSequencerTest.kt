@@ -6,7 +6,7 @@ import app.logdate.shared.model.Person
 import app.logdate.shared.model.RewindContent
 import app.logdate.shared.model.StoryBeat
 import app.logdate.shared.model.WeekNarrative
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

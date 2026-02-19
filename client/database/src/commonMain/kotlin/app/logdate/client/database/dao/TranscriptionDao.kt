@@ -100,7 +100,7 @@ interface TranscriptionDao {
         id: Uuid,
         status: TranscriptionStatus,
         errorMessage: String? = null,
-        timestamp: kotlinx.datetime.Instant
+        timestamp: kotlin.time.Instant
     ): Int
     
     /**
@@ -115,7 +115,7 @@ interface TranscriptionDao {
     suspend fun updateTranscriptionText(
         id: Uuid,
         text: String,
-        timestamp: kotlinx.datetime.Instant
+        timestamp: kotlin.time.Instant
     ): Int
     
     /**
@@ -134,7 +134,7 @@ interface TranscriptionDao {
         status: TranscriptionStatus,
         text: String?,
         errorMessage: String? = null,
-        timestamp: kotlinx.datetime.Instant
+        timestamp: kotlin.time.Instant
     ): Int {
         return if (text != null) {
             updateTranscriptionText(id, text, timestamp)

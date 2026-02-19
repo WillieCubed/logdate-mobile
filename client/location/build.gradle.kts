@@ -5,20 +5,23 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.android.library)
+    alias(libs.plugins.android.kmp.library)
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.dokka)
     alias(libs.plugins.kover)
 }
 
 kotlin {
-    androidTarget {
+    androidLibrary {
+        namespace = "app.logdate.client.location"
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
+
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
     }
 
-    iosX64()
     iosArm64()
     iosSimulatorArm64()
 
@@ -33,7 +36,7 @@ kotlin {
             // Project dependencies
             implementation(projects.shared.model)
             implementation(projects.client.database)
-            implementation(projects.client.datastore)
+            implementation(projects.client.logdateDatastore)
             implementation(projects.client.repository)
             implementation(projects.client.device)
             // External dependencies
@@ -60,31 +63,5 @@ kotlin {
             implementation(libs.androidx.work.runtime)
             implementation(libs.koin.androidx.workmanager)
         }
-    }
-}
-
-android {
-    namespace = "app.logdate.client.location"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
-    
-    defaultConfig {
-        minSdk = libs.versions.android.minSdk.get().toInt()
-    }
-
-    buildTypes {
-        getByName("release") {
-            isMinifyEnabled = false
-        }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-    
-    lint {
-        abortOnError = false
-        warningsAsErrors = false
-        // Ignore resource errors and API level warnings for now
-        disable += listOf("NewApi", "ObsoleteSdkInt", "MissingTranslation", "ResourceType")
     }
 }

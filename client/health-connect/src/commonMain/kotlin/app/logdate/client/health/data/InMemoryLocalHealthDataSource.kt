@@ -4,8 +4,8 @@ import app.logdate.client.health.model.DayBounds
 import app.logdate.client.health.model.SleepSession
 import app.logdate.client.health.model.TimeOfDay
 import io.github.aakira.napier.Napier
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime

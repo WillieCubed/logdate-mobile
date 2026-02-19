@@ -24,8 +24,15 @@ Encrypt local LogDate databases at rest on all supported platforms, with keys st
 
 ## Minimum viable implementation
 - Phase 1: Secure session/token storage (done) and encrypted media cache.
-- Phase 2: Android SQLCipher integration and migration path.
-- Phase 3: iOS + Desktop encrypted DB rollout with telemetry and rollback support.
+- Phase 2: Apply platform file protection/permissions for database files.
+- Phase 3: Android SQLCipher integration and migration path (implemented).
+- Phase 4: iOS file protection + desktop encrypted file wrapper (implemented); telemetry/rollback
+  support remains optional.
+
+## Current baseline (implemented)
+- Android: SQLCipher with per-device passphrase stored in SecureStorage.
+- iOS: database file protected with `NSFileProtectionComplete`.
+- Desktop: encrypted database file on shutdown + POSIX file permissions where supported.
 
 ## Open items
 - Decide SQLCipher licensing + dependency footprint.

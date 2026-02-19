@@ -32,7 +32,8 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.feature.editor.audio.model.AudioSegment
 import app.logdate.feature.editor.ui.audio.waveform.BezierAudioWaveform
-import kotlinx.datetime.Instant
+import app.logdate.feature.editor.ui.formatMediaDuration
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
@@ -121,7 +122,7 @@ fun SpatialExpandedAudioBlock(
                         horizontalAlignment = Alignment.End
                     ) {
                         Text(
-                            text = formatDuration(durationMs),
+                            text = formatMediaDuration(durationMs, false),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -134,17 +135,6 @@ fun SpatialExpandedAudioBlock(
                 }
             }
         }
-    }
-}
-
-private fun formatDuration(durationMs: Long): String {
-    val totalSeconds = durationMs / 1000
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    return if (minutes > 0) {
-        "$minutes:${seconds.toString().padStart(2, '0')}"
-    } else {
-        "0:${seconds.toString().padStart(2, '0')}"
     }
 }
 

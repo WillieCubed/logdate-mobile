@@ -5,31 +5,34 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.android.library)
+    alias(libs.plugins.android.kmp.library)
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.dokka)
     alias(libs.plugins.kover)
 }
 
 kotlin {
-    androidTarget {
+    androidLibrary {
+        namespace = "app.logdate.client.domain"
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
+        
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
     }
 
-    iosX64()
     iosArm64()
     iosSimulatorArm64()
 
     jvm()
 
     sourceSets {
+        val commonTest by getting
         all {
             languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
             compilerOptions.freeCompilerArgs.set(listOf("-Xexpect-actual-classes"))
         }
-        
         androidMain.dependencies {
             // Android Health Connect dependencies
             implementation(libs.androidx.health.connect)
@@ -45,12 +48,13 @@ kotlin {
             implementation(projects.client.intelligence)
             implementation(projects.client.networking)
             implementation(projects.client.device)
-            implementation(projects.client.datastore)
+            implementation(projects.client.logdateDatastore)
             implementation(projects.client.healthConnect)
             // External dependencies
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.kotlinx.datetime)
+            implementation(libs.okio)
             implementation(libs.napier)
             // Koin
             implementation(project.dependencies.platform(libs.koin.bom))
@@ -61,27 +65,10 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.koin.test)
             implementation(libs.ktor.client.mock)
+            implementation("com.squareup.okio:okio-fakefilesystem:3.9.0")
         }
-        val androidUnitTest by getting {
-            dependencies {
-                implementation(libs.mockk)
-            }
+        jvmTest.dependencies {
+            implementation(libs.mockk)
         }
-    }
-}
-
-android {
-    namespace = "app.logdate.client.domain"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
-
-    buildTypes {
-        getByName("release") {
-            isMinifyEnabled = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-        }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
     }
 }

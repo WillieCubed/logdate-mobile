@@ -6,7 +6,7 @@ import app.logdate.shared.model.LogDateAccount
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 class FakePasskeyAccountRepository : PasskeyAccountRepository {

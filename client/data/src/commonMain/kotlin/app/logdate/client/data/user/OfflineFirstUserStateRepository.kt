@@ -4,7 +4,7 @@ import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.shared.model.user.UserData
 import kotlinx.coroutines.flow.Flow
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 class OfflineFirstUserStateRepository(
     private val localDataSource: LogdatePreferencesDataSource,

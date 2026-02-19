@@ -1,8 +1,9 @@
 package app.logdate.navigation.routes
 
-import androidx.navigation3.runtime.EntryProviderBuilder
+import app.logdate.navigation.routes.routeEntry
+
+import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
-import androidx.navigation3.runtime.entry
 import app.logdate.client.domain.account.CheckUsernameAvailabilityUseCase
 import app.logdate.client.domain.account.CreatePasskeyAccountUseCase
 import app.logdate.client.domain.account.CreateRemoteAccountUseCase
@@ -25,7 +26,7 @@ data class ConsolidatedCloudAccountRoute(
 ) : NavKey
 
 /**
- * Extension function to add the consolidated cloud account setup route to an EntryProviderBuilder.
+ * Extension function to add the consolidated cloud account setup route to an EntryProviderScope.
  * 
  * Instead of multiple screens with separate routes, this uses a single route with a state
  * machine within the ViewModel to manage the multi-step flow.
@@ -34,12 +35,12 @@ data class ConsolidatedCloudAccountRoute(
  * @param onSetupCompleted Callback when the entire setup is completed
  * @param onSkip Callback when user chooses to skip (only available during onboarding)
  */
-fun EntryProviderBuilder<NavKey>.consolidatedCloudAccountSetup(
+fun EntryProviderScope<NavKey>.consolidatedCloudAccountSetup(
     onBack: () -> Unit,
     onSetupCompleted: () -> Unit,
     onSkip: () -> Unit
 ) {
-    entry<ConsolidatedCloudAccountRoute>() { route ->
+    routeEntry<ConsolidatedCloudAccountRoute>() { route ->
         // Inject the required use cases
         val checkUsernameAvailabilityUseCase = koinInject<CheckUsernameAvailabilityUseCase>()
         val createPasskeyAccountUseCase = koinInject<CreatePasskeyAccountUseCase>()

@@ -73,7 +73,7 @@ fun main() {
                 val health = HealthResponse(
                     status = "healthy",
                     database = testDatabase(),
-                    timestamp = kotlinx.datetime.Clock.System.now().toString(),
+                    timestamp = kotlin.time.Clock.System.now().toString(),
                     version = "test-1.0.0"
                 )
                 call.respond(health)

@@ -18,6 +18,7 @@ import app.logdate.client.data.media.OfflineIndexedMediaRepository
 import app.logdate.client.data.timeline.OfflineFirstActivityTimelineRepository
 import app.logdate.client.data.transcription.OfflineFirstTranscriptionRepository
 import app.logdate.client.data.location.OfflineFirstLocationHistoryRepository
+import app.logdate.client.data.maintenance.DataIntegrityService
 import app.logdate.client.data.location.StubLocationHistoryRepository
 import app.logdate.client.data.places.StubUserPlacesRepository
 import app.logdate.client.data.profile.OfflineFirstProfileRepository
@@ -137,4 +138,7 @@ actual val dataModule: Module = module {
 
     // Search
     single<SearchRepository> { OfflineFirstSearchRepository(get()) }
+
+    // Integrity
+    single { DataIntegrityService(get(), get(), get()) }
 }

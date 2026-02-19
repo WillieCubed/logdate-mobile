@@ -27,7 +27,6 @@ kotlin {
     }
 
     listOf(
-        iosX64(),
         iosArm64(),
         iosSimulatorArm64()
     ).forEach { iosTarget ->
@@ -69,15 +68,15 @@ kotlin {
             implementation(projects.client.healthConnect)
             implementation(projects.client.util)
             // External dependencies
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.material3AdaptiveNavigationSuite)
-            implementation(compose.ui)
-            implementation(compose.animation)
-            implementation(compose.materialIconsExtended)
-            implementation(compose.components.resources)
-            implementation(compose.components.uiToolingPreview)
+            implementation(libs.compose.runtime)
+            implementation(libs.compose.foundation)
+            implementation(libs.compose.material3)
+            implementation(libs.compose.material3.adaptive.navigation.suite)
+            implementation(libs.compose.ui)
+            implementation(libs.compose.animation)
+            implementation(libs.compose.material.icons.extended)
+            implementation(libs.compose.components.resources)
+            implementation(libs.compose.components.ui.tooling.preview)
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.androidx.navigation.compose)
@@ -92,7 +91,7 @@ kotlin {
             implementation(libs.filekit.compose)
         }
         androidMain.dependencies {
-            implementation(compose.preview)
+            implementation(libs.compose.ui.tooling.preview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.core.splashscreen)
             implementation(libs.androidx.lifecycle.viewmodel.navigation3)
@@ -113,6 +112,7 @@ kotlin {
             dependencies {
                 implementation(libs.kotlin.test)
                 implementation(libs.kotlin.test.junit)
+                implementation(libs.mockk)
             }
         }
 
@@ -179,15 +179,15 @@ android {
 }
 
 dependencies {
-    debugImplementation(compose.uiTooling)
+    debugImplementation(libs.compose.ui.tooling)
     // Add core library desugaring for Java 8+ APIs support on lower Android versions
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
     // Screenshot testing
     screenshotTestImplementation(libs.androidx.ui.tooling)
     screenshotTestImplementation(libs.screenshot.validation.api)
-    screenshotTestImplementation(compose.material3)
-    screenshotTestImplementation(compose.runtime)
-    screenshotTestImplementation(compose.foundation)
+    screenshotTestImplementation(libs.compose.material3)
+    screenshotTestImplementation(libs.compose.runtime)
+    screenshotTestImplementation(libs.compose.foundation)
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.test.manifest)
 }

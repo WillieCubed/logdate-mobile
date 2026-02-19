@@ -4,8 +4,8 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.sync.VersionConstraint
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -162,7 +162,7 @@ class DefaultCloudContentDataSourceTest {
         assertEquals(textNote.content, request.content, "Should preserve updated content")
         val constraint = request.versionConstraint
         assertTrue(constraint is VersionConstraint.Known, "Should include version constraint")
-        assertEquals(1, (constraint as VersionConstraint.Known).serverVersion, "Should pass current sync version")
+        assertEquals(1, constraint.serverVersion, "Should pass current sync version")
     }
     
     @Test
@@ -235,7 +235,7 @@ class DefaultCloudContentDataSourceTest {
         
         val convertedNote = syncResult.changes.first()
         assertTrue(convertedNote is JournalNote.Text, "Should convert to correct note type")
-        assertEquals(noteChange.content, (convertedNote as JournalNote.Text).content, "Should preserve content")
+        assertEquals(noteChange.content, convertedNote.content, "Should preserve content")
     }
 
     @Test

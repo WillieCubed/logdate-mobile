@@ -134,10 +134,10 @@ fun MainEditorContent(
  * and handles user interactions like text changes and focus events.
  */
 @Composable
-fun <T : EntryBlockUiState> BlockContent(
-    block: T,
+fun BlockContent(
+    block: EntryBlockUiState,
     onBlockFocused: (Uuid) -> Unit,
-    onBlockUpdated: (T) -> Unit,
+    onBlockUpdated: (EntryBlockUiState) -> Unit,
     onBlockDeleted: (Uuid) -> Unit,
     audioState: EditorRecorderState? = null,
     modifier: Modifier = Modifier,
@@ -152,9 +152,7 @@ fun <T : EntryBlockUiState> BlockContent(
                     block = block,
                     isExpanded = true,
                     onTextChanged = { newText ->
-                        onBlockUpdated(
-                            block.copy(content = newText) as T
-                        )
+                        onBlockUpdated(block.copy(content = newText))
                     },
                     onFocused = {
                         onBlockFocused(block.id)
@@ -167,7 +165,7 @@ fun <T : EntryBlockUiState> BlockContent(
                 app.logdate.feature.editor.ui.image.ImageBlockEditor(
                     block = block,
                     onBlockUpdated = { updatedBlock ->
-                        onBlockUpdated(updatedBlock as T)
+                        onBlockUpdated(updatedBlock)
                     },
                     onDeleteRequested = {
                         // Block deletion would be handled here
@@ -182,7 +180,7 @@ fun <T : EntryBlockUiState> BlockContent(
                 AudioBlockEditor(
                     block = block,
                     onBlockUpdated = { updatedBlock ->
-                        onBlockUpdated(updatedBlock as T)
+                        onBlockUpdated(updatedBlock)
                     },
                     onDeleteRequested = {
                         // Block deletion would be handled here
@@ -197,7 +195,7 @@ fun <T : EntryBlockUiState> BlockContent(
                 CameraBlockEditor(
                     block = block,
                     onBlockUpdated = { updatedBlock ->
-                        onBlockUpdated(updatedBlock as T)
+                        onBlockUpdated(updatedBlock)
                     },
                     onDeleteRequested = {
                         onBlockDeleted(block.id)
@@ -210,16 +208,12 @@ fun <T : EntryBlockUiState> BlockContent(
                 VideoBlockEditor(
                     block = block,
                     onBlockUpdated = { updatedBlock ->
-                        onBlockUpdated(updatedBlock as T)
+                        onBlockUpdated(updatedBlock)
                     },
                     onDeleteRequested = {
                         onBlockDeleted(block.id)
                     }
                 )
-            }
-
-            else -> {
-                Text("Unsupported block type: ${block::class.simpleName}")
             }
         }
     }

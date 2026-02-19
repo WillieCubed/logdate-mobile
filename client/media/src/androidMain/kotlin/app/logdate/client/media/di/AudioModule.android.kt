@@ -1,18 +1,15 @@
 package app.logdate.client.media.di
 
+import app.logdate.client.media.audio.AndroidAudioDurationResolver
+import app.logdate.client.media.audio.AndroidAudioPlaybackManager
 import app.logdate.client.media.audio.AndroidAudioRecordingManager
 import app.logdate.client.media.audio.AndroidAudioStorage
-import app.logdate.client.media.audio.AndroidEditorAudioRecorder
+import app.logdate.client.media.audio.AudioDurationResolver
+import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioRecordingManager
 import app.logdate.client.media.audio.AudioStorage
-import app.logdate.client.media.audio.EditorAudioRecorder
-import app.logdate.client.media.audio.EditorAudioRecorderConfig
 import app.logdate.client.media.audio.transcription.AndroidTranscriptionService
 import app.logdate.client.media.audio.transcription.TranscriptionService
-import app.logdate.client.media.audio.ui.AudioRecorderController
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -24,21 +21,9 @@ actual val audioModule: Module = module {
     single<AudioStorage> { AndroidAudioStorage(androidContext()) }
     // Provide the Android implementation of AudioRecordingManager as a singleton
     single<AudioRecordingManager> { AndroidAudioRecordingManager(androidContext(), get()) }
+    single<AudioPlaybackManager> { AndroidAudioPlaybackManager(androidContext()) }
+    single<AudioDurationResolver> { AndroidAudioDurationResolver(androidContext()) }
     
     // Provide the Android implementation of TranscriptionService
     factory<TranscriptionService> { AndroidTranscriptionService(androidContext()) }
-    // Provide the Android implementation of EditorAudioRecorder
-    single<EditorAudioRecorder> {
-        AndroidEditorAudioRecorder(
-            context = androidContext(),
-            config = EditorAudioRecorderConfig()
-        )
-    }
-    factory {
-        // Create AudioRecorderController with a dedicated coroutine scope
-        AudioRecorderController(
-            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        )
-    }
-
 }

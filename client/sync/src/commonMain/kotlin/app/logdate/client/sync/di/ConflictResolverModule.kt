@@ -3,7 +3,8 @@ package app.logdate.client.sync.di
 import app.logdate.client.database.dao.sync.SyncMetadataDao
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.sync.conflict.ConflictResolver
-import app.logdate.client.sync.conflict.LastWriteWinsResolver
+import app.logdate.client.sync.conflict.JournalConflictResolver
+import app.logdate.client.sync.conflict.JournalNoteConflictResolver
 import app.logdate.client.sync.metadata.DatabaseSyncMetadataService
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.shared.model.Journal
@@ -27,10 +28,10 @@ object SyncQualifiers {
 val conflictResolverModule: Module = module {
     // Conflict resolvers with named qualifiers
     single<ConflictResolver<Journal>>(named(SyncQualifiers.JOURNAL_CONFLICT_RESOLVER)) {
-        LastWriteWinsResolver()
+        JournalConflictResolver()
     }
     single<ConflictResolver<JournalNote>>(named(SyncQualifiers.NOTE_CONFLICT_RESOLVER)) {
-        LastWriteWinsResolver()
+        JournalNoteConflictResolver()
     }
 
     // Sync metadata service backed by Room database

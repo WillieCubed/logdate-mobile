@@ -1,7 +1,7 @@
 package app.logdate.shared.model
 
 import app.logdate.util.UuidSerializer
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid

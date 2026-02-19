@@ -170,7 +170,7 @@ class WearAudioRecordingManager(
             recordedAudioPath = null
             durationFlow.value = Duration.ZERO
             audioLevelFlow.value = 0f
-            recordingTarget = audioStorage.createRecordingTarget(null)
+            recordingTarget = audioStorage.createRecordingTarget()
 
             // Start foreground service
             context.startWearAudioRecordingService(recordingTarget?.path)

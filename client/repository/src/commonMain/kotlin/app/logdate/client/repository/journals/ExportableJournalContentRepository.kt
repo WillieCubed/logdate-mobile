@@ -1,6 +1,6 @@
 package app.logdate.client.repository.journals
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * A repository that can export its content to a file.

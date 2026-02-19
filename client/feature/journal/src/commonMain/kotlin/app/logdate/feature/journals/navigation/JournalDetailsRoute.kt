@@ -1,4 +1,5 @@
 @file:OptIn(ExperimentalSharedTransitionApi::class)
+@file:Suppress("DEPRECATION")
 
 package app.logdate.feature.journals.navigation
 
@@ -8,6 +9,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
+import androidx.navigation.toRoute
 import app.logdate.feature.journals.ui.detail.JournalDetailScreen
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import kotlinx.serialization.Serializable
@@ -24,7 +26,7 @@ data class JournalDetailsRoute(val journalId: String) {
 
 
 /**
- * Navigates to the journal detail screen.
+ * Navigation helper for the journal detail screen.
  *
  * @param journalId The ID of the journal to navigate to.
  */
@@ -32,7 +34,7 @@ fun NavController.navigateToJournal(journalId: String) {
     navigate(JournalDetailsRoute(journalId))
 }
 /**
- * Navigates to the journal detail screen.
+ * Navigation helper for the journal detail screen.
  *
  * @param journalId The ID of the journal to navigate to.
  */
@@ -41,9 +43,9 @@ fun NavController.navigateToJournal(journalId: Uuid) {
 }
 
 /**
- * Navigates to the new journal screen after creating a new journal.
+ * Navigation helper for the new journal completion flow.
  *
- * This pops the back stack to avoid going back to the new journal screen.
+ * This pops the back stack to avoid returning to the new journal screen.
  */
 fun NavController.navigateToJournalFromNew(journalId: Uuid) {
     navigate(JournalDetailsRoute(journalId)) {
@@ -53,14 +55,13 @@ fun NavController.navigateToJournalFromNew(journalId: Uuid) {
 
 
 /**
- * Defines the journal details route.
- *
+ * Navigation entry for journal details.
  */
 @Deprecated("Use Navigation 3 when possible.")
 fun NavGraphBuilder.journalDetailsRoute(
     onGoBack: () -> Unit,
     onJournalDeleted: () -> Unit,
-    onNavigateToNoteDetail: (noteId: Uuid, journalId: Uuid) -> Unit,
+    onNavigateToNoteDetail: (noteId: Uuid) -> Unit,
 ) {
     composable<JournalDetailsRoute>(
         enterTransition = {
@@ -77,8 +78,8 @@ fun NavGraphBuilder.journalDetailsRoute(
         CompositionLocalProvider(
             LocalNavAnimatedVisibilityScope provides this,
         ) {
-            // Parse the journalId from the route
-            val journalIdString = backStackEntry.arguments?.getString("journalId") ?: ""
+            val route = backStackEntry.toRoute<JournalDetailsRoute>()
+            val journalIdString = route.journalId
             JournalDetailScreen(
                 journalId = Uuid.parse(journalIdString),
                 onGoBack = onGoBack,

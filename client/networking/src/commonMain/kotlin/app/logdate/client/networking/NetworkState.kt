@@ -1,6 +1,6 @@
 package app.logdate.client.networking
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 sealed interface NetworkState {
     data class Connected(

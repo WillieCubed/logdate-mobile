@@ -1,12 +1,9 @@
 package app.logdate.client.media.audio
 
-import kotlin.uuid.Uuid
-
 /**
  * Result of preparing a file target for audio recording.
  */
 data class AudioRecordingTarget(
-    val noteId: Uuid?,
     val path: String,
 )
 
@@ -16,11 +13,10 @@ data class AudioRecordingTarget(
  */
 interface AudioStorage {
     /**
-     * Creates a recording target path for the given note ID.
-     * If [noteId] is null, a unique filename should be generated.
+     * Creates a recording target path.
+     * Implementations should generate a unique filename.
      */
     suspend fun createRecordingTarget(
-        noteId: Uuid?,
         extension: String = "m4a",
     ): AudioRecordingTarget
 }

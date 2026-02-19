@@ -1,7 +1,7 @@
 package app.logdate.client.database.entities.media
 
 import androidx.room.Embedded
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**

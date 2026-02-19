@@ -6,7 +6,7 @@ import app.logdate.shared.model.Person
 import app.logdate.shared.model.RewindContent
 import app.logdate.shared.model.WeekNarrative
 import io.github.aakira.napier.Napier
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**

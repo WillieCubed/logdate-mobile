@@ -2,20 +2,21 @@ package app.logdate.feature.editor.ui.audio
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.media.audio.AudioDurationResolver
+import app.logdate.client.media.audio.AudioPlaybackManager
+import app.logdate.client.media.audio.AudioPlaybackMetadata
 import app.logdate.client.media.audio.AudioRecordingManager as MediaAudioRecordingManager
-import app.logdate.client.repository.transcription.TranscriptionRepository
-import app.logdate.client.repository.transcription.TranscriptionStatus
+import app.logdate.client.media.audio.transcription.TranscriptionService
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.time.Duration
-import kotlin.uuid.Uuid
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Unified ViewModel for managing both audio recording and playback functionality.
@@ -25,13 +26,20 @@ import kotlin.uuid.Uuid
 class AudioViewModel(
     private val audioRecordingManager: MediaAudioRecordingManager,
     private val audioPlaybackManager: AudioPlaybackManager,
-    private val transcriptionRepository: TranscriptionRepository
+    private val audioDurationResolver: AudioDurationResolver,
+    private val transcriptionService: TranscriptionService,
 ) : ViewModel() {
     // StateFlow to expose immutable UI state
     private val _uiState = MutableStateFlow(AudioUiState())
     val uiState: StateFlow<AudioUiState> = _uiState.asStateFlow()
     private var audioLevelJob: Job? = null
     private var durationJob: Job? = null
+    private var transcriptionJob: Job? = null
+    
+    init {
+        audioRecordingManager.setTranscriptionService(transcriptionService)
+        startTranscriptionCollector()
+    }
 
     /**
      * Starts audio recording and updates the UI state.
@@ -52,6 +60,14 @@ class AudioViewModel(
                 }
 
                 startRecordingCollectors()
+                val transcriptionState = if (
+                    transcriptionService.supportsLiveTranscription ||
+                    transcriptionService.supportsFileTranscription
+                ) {
+                    AudioUiState.TranscriptionState.InProgress
+                } else {
+                    AudioUiState.TranscriptionState.NotRequested
+                }
                 _uiState.update {
                     it.copy(
                         isRecording = true,
@@ -59,6 +75,7 @@ class AudioViewModel(
                         isPlaying = false,
                         audioLevels = emptyList(),
                         duration = Duration.ZERO,
+                        transcriptionState = transcriptionState,
                         error = null
                     )
                 }
@@ -79,19 +96,27 @@ class AudioViewModel(
             try {
                 val uri = audioRecordingManager.stopRecording()
                 stopRecordingCollectors()
+                val resolvedDuration = uri?.let { audioDurationResolver.resolveDurationMs(it) }
+                    ?.milliseconds
 
                 _uiState.update { 
+                    val updatedTranscription = when (val state = it.transcriptionState) {
+                        is AudioUiState.TranscriptionState.Success -> state
+                        else -> if (transcriptionService.supportsFileTranscription) {
+                            AudioUiState.TranscriptionState.InProgress
+                        } else {
+                            AudioUiState.TranscriptionState.NotRequested
+                        }
+                    }
                     it.copy(
                         isRecording = false,
                         isPaused = false,
                         recordedAudioUri = uri,
+                        duration = resolvedDuration ?: it.duration,
+                        transcriptionState = updatedTranscription,
                     )
                 }
                 
-                // Auto-start transcription if URI and note ID are available
-                if (uri != null && _uiState.value.currentNoteId != null) {
-                    requestTranscription()
-                }
                 Napier.d("AudioViewModel: Recording stopped, URI: $uri")
             } catch (e: Exception) {
                 Napier.e("Failed to stop recording: ${e.message}", e)
@@ -160,18 +185,18 @@ class AudioViewModel(
     /**
      * Toggles playback between playing and paused states.
      */
-    fun togglePlayback(uri: String) {
+    fun togglePlayback(uri: String, metadata: AudioPlaybackMetadata? = null) {
         if (_uiState.value.isPlaying) {
             pausePlayback()
         } else {
-            startPlayback(uri)
+            startPlayback(uri, metadata)
         }
     }
     
     /**
      * Starts playing the audio from the given URI.
      */
-    fun startPlayback(uri: String) {
+    fun startPlayback(uri: String, metadata: AudioPlaybackMetadata? = null) {
         viewModelScope.launch {
             Napier.d("AudioViewModel: Starting playback of $uri")
             try {
@@ -189,6 +214,7 @@ class AudioViewModel(
                 
                 audioPlaybackManager.startPlayback(
                     uri = uri,
+                    metadata = metadata,
                     onProgressUpdated = { progress ->
                         _uiState.update { it.copy(playbackProgress = progress) }
                     },
@@ -234,92 +260,6 @@ class AudioViewModel(
     }
 
     /**
-     * Sets the current note ID for transcription.
-     * This should be called before requesting transcription.
-     * 
-     * @param noteId The UUID of the audio note.
-     */
-    fun setCurrentNoteId(noteId: Uuid) {
-        _uiState.update { it.copy(currentNoteId = noteId) }
-        
-        // Begin observing transcription for this note ID
-        viewModelScope.launch {
-            transcriptionRepository.observeTranscription(noteId)
-                .catch { e ->
-                    Napier.e("Error observing transcription", e)
-                }
-                .collect { transcriptionData ->
-                    if (transcriptionData != null) {
-                        _uiState.update { currentState ->
-                            val transcriptionUiState = when (transcriptionData.status) {
-                                TranscriptionStatus.PENDING -> AudioUiState.TranscriptionState.Pending
-                                TranscriptionStatus.IN_PROGRESS -> AudioUiState.TranscriptionState.InProgress
-                                TranscriptionStatus.COMPLETED -> {
-                                    val text = transcriptionData.text
-                                    if (text.isNullOrBlank()) {
-                                        AudioUiState.TranscriptionState.Error("No transcription text available")
-                                    } else {
-                                        AudioUiState.TranscriptionState.Success(text)
-                                    }
-                                }
-                                TranscriptionStatus.FAILED -> {
-                                    AudioUiState.TranscriptionState.Error(
-                                        transcriptionData.errorMessage ?: "Transcription failed"
-                                    )
-                                }
-                            }
-                            currentState.copy(transcriptionState = transcriptionUiState)
-                        }
-                    } else {
-                        _uiState.update { it.copy(transcriptionState = AudioUiState.TranscriptionState.NotRequested) }
-                    }
-                }
-        }
-    }
-    
-    /**
-     * Requests transcription for the current audio note.
-     * The note ID must be set using setCurrentNoteId before calling this method.
-     */
-    fun requestTranscription() {
-        val noteId = _uiState.value.currentNoteId
-        val audioUri = _uiState.value.recordedAudioUri ?: _uiState.value.currentUri
-        
-        if (noteId == null) {
-            Napier.e("Cannot request transcription: No note ID set")
-            _uiState.update { it.copy(error = "Cannot request transcription: No note ID set") }
-            return
-        }
-        
-        if (audioUri == null) {
-            Napier.e("Cannot request transcription: No audio URI available")
-            _uiState.update { it.copy(error = "Cannot request transcription: No audio URI available") }
-            return
-        }
-        
-        // Update UI state immediately to show requesting
-        _uiState.update { it.copy(transcriptionState = AudioUiState.TranscriptionState.InProgress) }
-        
-        // Request transcription
-        viewModelScope.launch {
-            try {
-                val result = transcriptionRepository.requestTranscription(noteId)
-                if (!result) {
-                    Napier.e("Failed to request transcription for note $noteId")
-                    _uiState.update { it.copy(
-                        transcriptionState = AudioUiState.TranscriptionState.Error("Failed to request transcription")
-                    )}
-                }
-            } catch (e: Exception) {
-                Napier.e("Error requesting transcription", e)
-                _uiState.update { it.copy(
-                    transcriptionState = AudioUiState.TranscriptionState.Error(e.message ?: "Unknown error")
-                )}
-            }
-        }
-    }
-
-    /**
      * Clean up resources when ViewModel is cleared.
      */
     override fun onCleared() {
@@ -327,6 +267,7 @@ class AudioViewModel(
         Napier.d("AudioViewModel: Being cleared")
         try {
             stopRecordingCollectors()
+            transcriptionJob?.cancel()
             audioRecordingManager.release()
             audioPlaybackManager.release()
         } catch (e: Exception) {
@@ -354,6 +295,7 @@ class AudioViewModel(
                 _uiState.update { it.copy(duration = duration) }
             }
         }
+        startTranscriptionCollector()
     }
 
     private fun stopRecordingCollectors() {
@@ -361,5 +303,16 @@ class AudioViewModel(
         durationJob?.cancel()
         audioLevelJob = null
         durationJob = null
+    }
+
+    private fun startTranscriptionCollector() {
+        if (transcriptionJob != null) return
+        transcriptionJob = viewModelScope.launch {
+            audioRecordingManager.getTranscriptionFlow().collect { text ->
+                if (!text.isNullOrBlank()) {
+                    _uiState.update { it.copy(transcriptionState = AudioUiState.TranscriptionState.Success(text)) }
+                }
+            }
+        }
     }
 }

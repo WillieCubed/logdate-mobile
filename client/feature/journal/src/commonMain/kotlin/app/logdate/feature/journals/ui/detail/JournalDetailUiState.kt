@@ -29,5 +29,5 @@ enum class SortOrder {
 data class EntryDisplayData(
     val id: kotlin.uuid.Uuid,
     val content: String,
-    val timestamp: kotlinx.datetime.Instant
+    val timestamp: kotlin.time.Instant
 )

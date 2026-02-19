@@ -2,7 +2,7 @@ package app.logdate.client.repository.profile
 
 import app.logdate.shared.model.profile.LogDateProfile
 import kotlinx.coroutines.flow.Flow
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Repository for managing local LogDate Profile data.

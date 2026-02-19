@@ -10,7 +10,7 @@ import app.logdate.client.repository.transcription.TranscriptionStatus
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.uuid.Uuid
 import app.logdate.client.database.entities.TranscriptionStatus as DbTranscriptionStatus
 

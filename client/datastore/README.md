@@ -1,4 +1,4 @@
-# `:client:datastore`
+# `:client:logdate-datastore`
 
 **Key-value preferences storage using DataStore**
 

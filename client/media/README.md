@@ -27,8 +27,7 @@ Media Module
 ### Audio Features
 
 - `AudioRecordingManager.kt` - Audio recording interface
-- `EditorAudioRecorder.kt` - Journal entry audio recording
-- `AudioRecorderController.kt` - UI controller for audio recording
+- `AudioPlaybackManager.kt` - Audio playback interface
 - `TranscriptionService.kt` - Speech-to-text functionality
 
 ### Platform-Specific
@@ -147,11 +146,11 @@ class AudioNoteViewModel(private val audioRecordingManager: AudioRecordingManage
 ```kotlin
 val mediaModule = module {
     single<MediaManager> { PlatformMediaManager(get()) }
-    single<AudioRecordingManager> { PlatformAudioRecordingManager(get()) }
-    factory { EditorAudioRecorder(get()) }
 }
 
 val audioModule = module {
+    single<AudioRecordingManager> { PlatformAudioRecordingManager(get()) }
+    single<AudioPlaybackManager> { PlatformAudioPlaybackManager() }
     factory<TranscriptionService> { PlatformTranscriptionService() }
 }
 ```

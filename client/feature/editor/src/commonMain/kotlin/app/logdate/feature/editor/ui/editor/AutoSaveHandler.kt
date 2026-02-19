@@ -9,7 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.delay
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 /**
  * Status of the autosave operation.
@@ -76,7 +76,6 @@ fun <T> rememberAutoSaveHandler(
                             is VideoBlockUiState -> "video:${block.uri ?: ""}"
                             is AudioBlockUiState -> "audio:${block.uri ?: ""}"
                             is CameraBlockUiState -> "camera:${block.uri ?: ""}"
-                            else -> block.toString()
                         }
                     }
                 }
@@ -232,7 +231,6 @@ private fun getBlocksHash(blocks: List<EntryBlockUiState>): String {
             is VideoBlockUiState -> "video:${block.id}:${block.uri ?: ""}"
             is AudioBlockUiState -> "audio:${block.id}:${block.uri ?: ""}"
             is CameraBlockUiState -> "camera:${block.id}:${block.uri ?: ""}"
-            else -> block.toString()
         }
     }
 }

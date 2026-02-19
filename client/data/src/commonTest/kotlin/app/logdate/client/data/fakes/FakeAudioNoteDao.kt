@@ -1,45 +1,45 @@
 package app.logdate.client.data.fakes
 
 import app.logdate.client.database.dao.AudioNoteDao
-import app.logdate.client.database.entities.VoiceNoteEntity
+import app.logdate.client.database.entities.AudioNoteEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
  * Fake implementation of [AudioNoteDao] for testing.
  */
 class FakeAudioNoteDao : AudioNoteDao {
-    private val notes = mutableMapOf<Uuid, VoiceNoteEntity>()
-    private val notesFlow = MutableStateFlow<List<VoiceNoteEntity>>(emptyList())
+    private val notes = mutableMapOf<Uuid, AudioNoteEntity>()
+    private val notesFlow = MutableStateFlow<List<AudioNoteEntity>>(emptyList())
     
-    override fun getNote(uid: Uuid): Flow<VoiceNoteEntity> {
+    override fun getNote(uid: Uuid): Flow<AudioNoteEntity> {
         return notesFlow.map { notes ->
             notes.find { it.uid == uid } ?: throw NoSuchElementException("Audio note with ID $uid not found")
         }
     }
     
-    override suspend fun getNoteOneOff(uid: Uuid): VoiceNoteEntity {
+    override suspend fun getNoteOneOff(uid: Uuid): AudioNoteEntity {
         return notes[uid] ?: throw NoSuchElementException("Audio note with ID $uid not found")
     }
     
-    override fun getAllNotes(): Flow<List<VoiceNoteEntity>> {
+    override fun getAllNotes(): Flow<List<AudioNoteEntity>> {
         return notesFlow
     }
     
-    override suspend fun getAll(): List<VoiceNoteEntity> {
+    override suspend fun getAll(): List<AudioNoteEntity> {
         return notes.values.toList()
     }
     
-    override fun getRecentNotes(limit: Int): Flow<List<VoiceNoteEntity>> {
+    override fun getRecentNotes(limit: Int): Flow<List<AudioNoteEntity>> {
         return notesFlow.map { notes ->
             notes.sortedByDescending { it.created }.take(limit)
         }
     }
     
-    override fun getNotesInRange(startTimestamp: Long, endTimestamp: Long): Flow<List<VoiceNoteEntity>> {
+    override fun getNotesInRange(startTimestamp: Long, endTimestamp: Long): Flow<List<AudioNoteEntity>> {
         return notesFlow.map { notes ->
             notes.filter {
                 val createdMillis = it.created.toEpochMilliseconds()
@@ -48,7 +48,7 @@ class FakeAudioNoteDao : AudioNoteDao {
         }
     }
     
-    override suspend fun addNote(note: VoiceNoteEntity) {
+    override suspend fun addNote(note: AudioNoteEntity) {
         notes[note.uid] = note
         updateFlow()
     }
@@ -63,9 +63,15 @@ class FakeAudioNoteDao : AudioNoteDao {
         updateFlow()
     }
 
-    override suspend fun updateSyncMetadata(noteId: Uuid, syncVersion: Long, lastSynced: kotlinx.datetime.Instant) {
+    override suspend fun updateSyncMetadata(noteId: Uuid, syncVersion: Long, lastSynced: Instant) {
         val existing = notes[noteId] ?: return
         notes[noteId] = existing.copy(syncVersion = syncVersion, lastSynced = lastSynced)
+        updateFlow()
+    }
+
+    override suspend fun updateContentUri(noteId: Uuid, contentUri: String) {
+        val existing = notes[noteId] ?: return
+        notes[noteId] = existing.copy(contentUri = contentUri)
         updateFlow()
     }
     

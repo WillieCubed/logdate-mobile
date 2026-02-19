@@ -15,7 +15,9 @@ logdate-export-YYYY-MM-DD.zip
 ├── metadata.json
 ├── journals.json
 ├── notes.json
+├── journal_notes.json
 ├── drafts.json
+├── media_manifest.json
 └── media/
     ├── YYYY/
     │   ├── YYYY-MM-DDTHH-MM-SS.sss+ZZZZ_[id].[extension]
@@ -112,6 +114,22 @@ Contains all notes across all journals:
 }
 ```
 
+### journal_notes.json
+
+Defines journal-to-note relationships for many-to-many associations:
+
+```json
+{
+  "journal_notes": [
+    {
+      "journalId": "journal-uuid",
+      "noteId": "note-uuid",
+      "addedAt": "2025-03-10T15:45:00.000+0000"
+    }
+  ]
+}
+```
+
 ### drafts.json
 
 Contains all draft entries that haven't been saved to a journal:
@@ -135,6 +153,21 @@ Contains all draft entries that haven't been saved to a journal:
       ]
     },
     // Additional drafts...
+  ]
+}
+```
+
+### media_manifest.json
+
+Maps original media URIs to their exported paths so restore can reconnect notes and drafts to media:
+
+```json
+{
+  "files": [
+    {
+      "exportPath": "media/2025/2025-06-01T10-20-00.000+0000_draft-img-1.jpg",
+      "sourceUri": "file:///var/mobile/Containers/Data/.../draft-img-1.jpg"
+    }
   ]
 }
 ```

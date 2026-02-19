@@ -104,6 +104,15 @@ data class EntryEditor(
 ) : NavKey
 
 /**
+ * Navigation route for opening a note by its ID.
+ */
+@Serializable
+data class NoteViewerRoute(
+    @Serializable(with = UuidSerializer::class)
+    val id: Uuid,
+) : NavKey
+
+/**
  * Routes for the rewind feature
  */
 @Serializable

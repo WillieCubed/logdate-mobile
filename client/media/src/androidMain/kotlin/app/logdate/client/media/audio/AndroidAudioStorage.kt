@@ -15,7 +15,6 @@ class AndroidAudioStorage(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : AudioStorage {
     override suspend fun createRecordingTarget(
-        noteId: Uuid?,
         extension: String,
     ): AudioRecordingTarget = withContext(ioDispatcher) {
         val safeExtension = extension.trimStart('.').ifBlank { "m4a" }
@@ -25,13 +24,13 @@ class AndroidAudioStorage(
             }
         }
 
-        val baseName = noteId?.toString() ?: "recording_${System.currentTimeMillis()}"
+        val baseName = "recording_${Uuid.random()}"
         val targetFile = File(directory, "$baseName.$safeExtension")
 
         if (targetFile.exists()) {
             targetFile.delete()
         }
 
-        AudioRecordingTarget(noteId = noteId, path = targetFile.absolutePath)
+        AudioRecordingTarget(path = targetFile.absolutePath)
     }
 }

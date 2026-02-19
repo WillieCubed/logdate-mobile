@@ -17,10 +17,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Note
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.outlined.PeopleAlt
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -45,9 +45,9 @@ import app.logdate.util.toReadableDateShort
 import app.logdate.util.weeksAgo
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownTypography
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.datetime.DatePeriod
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
@@ -165,7 +165,7 @@ private fun EntryDropdownMenu(
                 onOpenInNewWindow()
             },
             leadingIcon = {
-                Icon(imageVector = Icons.Default.OpenInNew, contentDescription = null)
+                Icon(imageVector = Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null)
             },
         )
         // TODO: Re-enable edit functionality when editing is implemented

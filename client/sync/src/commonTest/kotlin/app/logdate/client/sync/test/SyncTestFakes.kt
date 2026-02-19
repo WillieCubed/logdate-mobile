@@ -34,8 +34,8 @@ import app.logdate.shared.model.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 // =============================================================================
@@ -123,7 +123,7 @@ fun testDefaultSyncManager(
  * Fake CloudApiClient for sync testing.
  * All responses are successful by default; configure failures via [configureContentSyncFailure].
  */
-class FakeCloudApiClient : CloudApiClient {
+open class FakeCloudApiClient : CloudApiClient {
 
     var uploadContentResponse: Result<ContentUploadResponse> =
         Result.success(ContentUploadResponse("test-id", 1, Clock.System.now().toEpochMilliseconds()))

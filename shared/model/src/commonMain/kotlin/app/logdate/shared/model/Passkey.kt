@@ -12,8 +12,8 @@ data class PasskeyInfo(
     val credentialId: String,
     val nickname: String?,
     val deviceType: String, // "platform", "cross-platform"
-    val createdAt: kotlinx.datetime.Instant,
-    val lastUsedAt: kotlinx.datetime.Instant?,
+    val createdAt: kotlin.time.Instant,
+    val lastUsedAt: kotlin.time.Instant?,
     val isActive: Boolean = true
 )
 

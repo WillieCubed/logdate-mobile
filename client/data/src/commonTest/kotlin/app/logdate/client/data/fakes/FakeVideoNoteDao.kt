@@ -62,9 +62,15 @@ class FakeVideoNoteDao : VideoNoteDao {
         updateFlow()
     }
 
-    override suspend fun updateSyncMetadata(noteId: Uuid, syncVersion: Long, lastSynced: kotlinx.datetime.Instant) {
+    override suspend fun updateSyncMetadata(noteId: Uuid, syncVersion: Long, lastSynced: kotlin.time.Instant) {
         val existing = notes[noteId] ?: return
         notes[noteId] = existing.copy(syncVersion = syncVersion, lastSynced = lastSynced)
+        updateFlow()
+    }
+
+    override suspend fun updateContentUri(noteId: Uuid, contentUri: String) {
+        val existing = notes[noteId] ?: return
+        notes[noteId] = existing.copy(contentUri = contentUri)
         updateFlow()
     }
 

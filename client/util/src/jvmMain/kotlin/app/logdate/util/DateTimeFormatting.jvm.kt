@@ -1,13 +1,18 @@
 package app.logdate.util
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toJavaLocalDate
-import kotlinx.datetime.toJavaZoneId
+import kotlinx.datetime.number
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
+
+private fun LocalDate.toJavaLocalDate(): java.time.LocalDate =
+    java.time.LocalDate.of(year, month.number, day)
+
+private fun TimeZone.toJavaZoneId(): java.time.ZoneId =
+    java.time.ZoneId.of(id)
 
 
 /**

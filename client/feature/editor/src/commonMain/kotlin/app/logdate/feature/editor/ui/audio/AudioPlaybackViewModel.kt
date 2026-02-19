@@ -2,6 +2,8 @@ package app.logdate.feature.editor.ui.audio
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.media.audio.AudioPlaybackManager
+import app.logdate.client.media.audio.AudioPlaybackMetadata
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,18 +27,18 @@ class AudioPlaybackViewModel(
     /**
      * Toggles playback between playing and paused states.
      */
-    fun togglePlayback(uri: String) {
+    fun togglePlayback(uri: String, metadata: AudioPlaybackMetadata? = null) {
         if (_uiState.value.isPlaying) {
             pausePlayback()
         } else {
-            startPlayback(uri)
+            startPlayback(uri, metadata)
         }
     }
     
     /**
      * Starts playing the audio from the given URI.
      */
-    fun startPlayback(uri: String) {
+    fun startPlayback(uri: String, metadata: AudioPlaybackMetadata? = null) {
         viewModelScope.launch {
             Napier.d("AudioPlaybackViewModel: Starting playback of $uri")
             try {
@@ -44,6 +46,7 @@ class AudioPlaybackViewModel(
                 
                 audioPlaybackManager.startPlayback(
                     uri = uri,
+                    metadata = metadata,
                     onProgressUpdated = { progress ->
                         _uiState.update { it.copy(progress = progress) }
                     },

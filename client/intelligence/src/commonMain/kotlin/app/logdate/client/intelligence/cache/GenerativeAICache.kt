@@ -1,6 +1,6 @@
 package app.logdate.client.intelligence.cache
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 
 /**

@@ -1,9 +1,10 @@
 package app.logdate.client.domain.rewind
 
 import kotlinx.coroutines.flow.Flow
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.DayOfWeek
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.minus
@@ -41,8 +42,12 @@ class GetWeekRewindUseCase(
 
         return getRewindUseCase(
             RewindParams(
-                startOfWeek.atStartOfDayIn(timezone),
-                endOfWeek.atStartOfDayIn(timezone)
+                Instant.fromEpochMilliseconds(
+                    startOfWeek.atStartOfDayIn(timezone).toEpochMilliseconds()
+                ),
+                Instant.fromEpochMilliseconds(
+                    endOfWeek.atStartOfDayIn(timezone).toEpochMilliseconds()
+                )
             )
         )
     }

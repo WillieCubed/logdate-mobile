@@ -1,6 +1,6 @@
 package app.logdate.server.database
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import kotlin.uuid.ExperimentalUuidApi

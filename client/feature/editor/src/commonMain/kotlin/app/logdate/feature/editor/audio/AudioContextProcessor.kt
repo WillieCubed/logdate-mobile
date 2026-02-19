@@ -11,7 +11,8 @@ import app.logdate.feature.editor.audio.storage.WaveformStorage
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.Instant
+import kotlin.coroutines.CoroutineContext
+import kotlin.time.Instant
 
 /**
  * Processed audio context containing all derived data for visualization.
@@ -46,6 +47,7 @@ class AudioContextProcessor(
     private val segmentDetector: SegmentDetector = SegmentDetector(),
     private val daylightClassifier: DaylightClassifier = DaylightClassifier(),
     private val paletteGenerator: PaletteGenerator = PaletteGenerator(),
+    private val coroutineContext: CoroutineContext = Dispatchers.Default,
 ) {
     /**
      * Processes an audio file and returns its context for visualization.
@@ -67,7 +69,7 @@ class AudioContextProcessor(
         createdAt: Instant,
         latitude: Double?,
         longitude: Double?,
-    ): AudioContext = withContext(Dispatchers.Default) {
+    ): AudioContext = withContext(coroutineContext) {
         Napier.d { "Processing audio context for $audioUri" }
 
         // Load or extract amplitudes

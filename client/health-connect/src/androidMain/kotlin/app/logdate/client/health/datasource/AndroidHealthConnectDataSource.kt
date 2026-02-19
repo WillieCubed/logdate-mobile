@@ -12,11 +12,9 @@ import app.logdate.client.health.model.SleepStage
 import app.logdate.client.health.model.SleepStageType
 import app.logdate.client.health.model.TimeOfDay
 import io.github.aakira.napier.Napier
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toJavaInstant
-import kotlinx.datetime.toKotlinInstant
 import java.time.ZoneId
 import java.util.UUID
 
@@ -75,29 +73,28 @@ class AndroidHealthConnectDataSource(
         
         return try {
             val timeRangeFilter = TimeRangeFilter.between(
-                start.toJavaInstant(),
-                end.toJavaInstant()
+                start.toJavaTimeInstant(),
+                end.toJavaTimeInstant()
             )
-            
+
             val request = ReadRecordsRequest(
                 recordType = SleepSessionRecord::class,
                 timeRangeFilter = timeRangeFilter
             )
-            
+
             val response = client.readRecords(request)
-            
-            // Map Health Connect sleep sessions to our model
+
             response.records.map { record ->
                 SleepSession(
                     id = record.metadata.id,
-                    startTime = record.startTime.toKotlinInstant(),
-                    endTime = record.endTime.toKotlinInstant(),
+                    startTime = record.startTime.toKotlinxInstant(),
+                    endTime = record.endTime.toKotlinxInstant(),
                     sourceAppName = record.metadata.dataOrigin.packageName,
                     stages = record.stages.map { stage ->
                         SleepStage(
-                            type = SleepStageType.UNKNOWN, // Use UNKNOWN for now as we can't access the real values
-                            startTime = stage.startTime.toKotlinInstant(),
-                            endTime = stage.endTime.toKotlinInstant()
+                            type = SleepStageType.UNKNOWN,
+                            startTime = stage.startTime.toKotlinxInstant(),
+                            endTime = stage.endTime.toKotlinxInstant()
                         )
                     }
                 )
@@ -127,10 +124,9 @@ class AndroidHealthConnectDataSource(
                 return null
             }
             
-            // Extract wake-up times (end times of sleep sessions)
             val wakeUpTimes = sleepSessions.map { session ->
                 val zoneId = ZoneId.of(timeZone.id)
-                val dateTime = session.endTime.toJavaInstant().atZone(zoneId).toLocalTime()
+                val dateTime = session.endTime.toJavaTimeInstant().atZone(zoneId).toLocalTime()
                 
                 // Convert to hour and minute
                 dateTime.hour to dateTime.minute
@@ -172,10 +168,9 @@ class AndroidHealthConnectDataSource(
                 return null
             }
             
-            // Extract sleep times (start times of sleep sessions)
             val sleepTimes = sleepSessions.map { session ->
                 val zoneId = ZoneId.of(timeZone.id)
-                val dateTime = session.startTime.toJavaInstant().atZone(zoneId).toLocalTime()
+                val dateTime = session.startTime.toJavaTimeInstant().atZone(zoneId).toLocalTime()
                 
                 // Convert to hour and minute
                 dateTime.hour to dateTime.minute
@@ -198,13 +193,8 @@ class AndroidHealthConnectDataSource(
         }
     }
     
-    /**
-     * Maps Health Connect sleep stage to our model's sleep stage type.
-     */
     private fun mapSleepStageType(stage: String): SleepStageType {
         return when (stage) {
-            // Using our constants instead of the Health Connect API constants
-            // This is needed because we can't directly access the Health Connect API constants in our compilation environment
             "${SleepSessionConstants.STAGE_TYPE_AWAKE}" -> SleepStageType.AWAKE
             "${SleepSessionConstants.STAGE_TYPE_DEEP}" -> SleepStageType.DEEP
             "${SleepSessionConstants.STAGE_TYPE_LIGHT}" -> SleepStageType.LIGHT
@@ -213,3 +203,9 @@ class AndroidHealthConnectDataSource(
         }
     }
 }
+
+private fun Instant.toJavaTimeInstant(): java.time.Instant =
+    java.time.Instant.ofEpochSecond(epochSeconds, nanosecondsOfSecond.toLong())
+
+private fun java.time.Instant.toKotlinxInstant(): Instant =
+    Instant.fromEpochSeconds(epochSecond, nano.toLong())

@@ -1,5 +1,7 @@
 package app.logdate.navigation.routes
 
+import app.logdate.navigation.routes.routeEntry
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -23,9 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation3.runtime.EntryProviderBuilder
+import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
-import androidx.navigation3.runtime.entry
 import app.logdate.feature.rewind.ui.ImageRewindPanelUiState
 import app.logdate.feature.rewind.ui.RewindDetailUiState
 import app.logdate.feature.rewind.ui.RewindDetailViewModel
@@ -45,12 +46,12 @@ fun MainAppNavigator.navigateToRewind(id: Uuid) {
 /**
  * Provides the navigation routes for rewind-related screens.
  */
-fun EntryProviderBuilder<NavKey>.rewindRoutes(
+fun EntryProviderScope<NavKey>.rewindRoutes(
     onBack: () -> Unit,
     onNavigateToRewindDetail: (Uuid) -> Unit,
 ) {
     // Main Rewind overview screen - one of the primary tabs
-    entry<RewindList>(
+    routeEntry<RewindList>(
         metadata = HomeScene.homeScene() // Mark this as a home scene entry
     ) { _ ->
         RewindOverviewScreen(
@@ -59,7 +60,7 @@ fun EntryProviderBuilder<NavKey>.rewindRoutes(
     }
     
     // Rewind detail screen
-    entry<RewindDetailRoute>() { route ->
+    routeEntry<RewindDetailRoute>() { route ->
         PublicRewindDetailScreen(
             rewindId = route.id,
             onExitRewind = onBack

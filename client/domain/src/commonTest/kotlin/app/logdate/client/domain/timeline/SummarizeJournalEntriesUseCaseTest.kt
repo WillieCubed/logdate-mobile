@@ -19,8 +19,8 @@ import app.logdate.client.repository.journals.JournalNote
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.time.Duration.Companion.seconds
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -195,7 +195,7 @@ class SummarizeJournalEntriesUseCaseTest {
         assertEquals("Single note summary", (result as SummarizeJournalEntriesResult.Success).summary)
     }
 
-    private fun createTestNote(content: String, timestamp: kotlinx.datetime.Instant = Clock.System.now()) = JournalNote.Text(
+    private fun createTestNote(content: String, timestamp: kotlin.time.Instant = Clock.System.now()) = JournalNote.Text(
         uid = Uuid.random(),
         content = content,
         creationTimestamp = timestamp,

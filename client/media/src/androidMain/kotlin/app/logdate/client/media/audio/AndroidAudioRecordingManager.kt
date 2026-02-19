@@ -100,7 +100,7 @@ class AndroidAudioRecordingManager(
         }
         
         try {
-            recordingTarget = audioStorage.createRecordingTarget(null)
+            recordingTarget = audioStorage.createRecordingTarget()
             // Start foreground service for recording
             context.startAudioRecordingService(recordingTarget?.path)
             

@@ -3,8 +3,7 @@ package app.logdate.feature.core.settings.ui
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import kotlinx.datetime.Instant
-import kotlinx.datetime.toJavaInstant
+import kotlin.time.Instant
 
 actual fun formatPasskeyLastUsed(lastUsed: Instant): String {
     if (lastUsed == Instant.DISTANT_PAST) {
@@ -13,5 +12,8 @@ actual fun formatPasskeyLastUsed(lastUsed: Instant): String {
 
     val formatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
         .withZone(ZoneId.systemDefault())
-    return formatter.format(lastUsed.toJavaInstant())
+    return formatter.format(lastUsed.toJavaTimeInstant())
 }
+
+private fun Instant.toJavaTimeInstant(): java.time.Instant =
+    java.time.Instant.ofEpochSecond(epochSeconds, nanosecondsOfSecond.toLong())

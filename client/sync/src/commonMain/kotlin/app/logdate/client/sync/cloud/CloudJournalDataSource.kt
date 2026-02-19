@@ -2,7 +2,7 @@ package app.logdate.client.sync.cloud
 
 import app.logdate.shared.model.Journal
 import app.logdate.shared.model.sync.VersionConstraint
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**

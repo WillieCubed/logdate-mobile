@@ -7,7 +7,7 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.shared.model.Person
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.transform
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime

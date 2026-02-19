@@ -66,7 +66,7 @@ import app.logdate.ui.theme.Spacing
 import kotlin.time.Duration
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
@@ -146,12 +146,13 @@ fun MemorySelectionScreen(
                         enter = fadeIn(),
                         exit = fadeOut()
                     ) {
+                        val visibilityScope = this
                         expandedMemory?.let { memory ->
                             with(sharedTransitionScope) {
                                 ExpandedMemoryOverlay(
                                     memory = memory,
                                     onDismiss = { expandedMemory = null },
-                                    animatedVisibilityScope = this@AnimatedVisibility,
+                                    animatedVisibilityScope = visibilityScope,
                                 )
                             }
                         }

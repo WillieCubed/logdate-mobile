@@ -4,7 +4,7 @@ import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.networking.NetworkState
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 /**
  * Fake implementation of NetworkAvailabilityMonitor for comprehensive testing.

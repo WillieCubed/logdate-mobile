@@ -10,6 +10,9 @@ import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
 import app.logdate.client.sync.cloud.DefaultCloudJournalDataSource
 import app.logdate.client.sync.cloud.DefaultCloudAssociationDataSource
 import app.logdate.client.sync.cloud.DefaultCloudMediaDataSource
+import app.logdate.client.sync.crypto.MediaPayloadCrypto
+import app.logdate.client.sync.crypto.MediaPayloadKeyProvider
+import app.logdate.client.sync.crypto.StoredMediaPayloadCrypto
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -33,5 +36,7 @@ val cloudModule = module {
     single<CloudContentDataSource> { DefaultCloudContentDataSource(get()) }
     single<CloudJournalDataSource> { DefaultCloudJournalDataSource(get()) }
     single<CloudAssociationDataSource> { DefaultCloudAssociationDataSource(get()) }
-    single<CloudMediaDataSource> { DefaultCloudMediaDataSource(get()) }
+    single { MediaPayloadKeyProvider(get(), get()) }
+    single<MediaPayloadCrypto> { StoredMediaPayloadCrypto(get()) }
+    single<CloudMediaDataSource> { DefaultCloudMediaDataSource(get(), get()) }
 }

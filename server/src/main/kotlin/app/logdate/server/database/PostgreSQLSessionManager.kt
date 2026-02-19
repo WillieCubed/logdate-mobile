@@ -2,8 +2,8 @@ package app.logdate.server.database
 
 import app.logdate.server.auth.*
 import app.logdate.server.util.toKotlinxInstant
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.less

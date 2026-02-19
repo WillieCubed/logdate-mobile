@@ -15,8 +15,8 @@ import app.logdate.feature.location.timeline.ui.model.LocationTimelineUiState
 import app.logdate.shared.model.Location
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.days

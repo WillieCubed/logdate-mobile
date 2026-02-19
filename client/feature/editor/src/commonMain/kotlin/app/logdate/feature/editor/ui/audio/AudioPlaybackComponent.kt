@@ -1,6 +1,7 @@
 package app.logdate.feature.editor.ui.audio
 
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,6 +19,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,14 +28,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import io.github.aakira.napier.Napier
+import app.logdate.client.media.audio.AudioDurationResolver
+import app.logdate.feature.editor.audio.AudioContextProcessor
+import app.logdate.feature.editor.ui.formatMediaDuration
 import org.koin.compose.koinInject
-import kotlinx.coroutines.delay
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -55,8 +60,31 @@ fun AudioPlaybackComponent(
     transcriptionText: String? = null,
     viewModel: AudioViewModel = koinInject()
 ) {
+    val audioContextProcessor: AudioContextProcessor = koinInject()
+    val durationResolver: AudioDurationResolver = koinInject()
     // Get the current UI state from the view model
     val uiState by viewModel.uiState.collectAsState()
+
+    val resolvedDuration by produceState(initialValue = Duration.ZERO, key1 = audioUri) {
+        val durationMs = durationResolver.resolveDurationMs(audioUri)
+        value = durationMs?.milliseconds ?: Duration.ZERO
+    }
+
+    val waveformAmplitudes by produceState(
+        initialValue = emptyList<Float>(),
+        key1 = audioUri,
+        key2 = resolvedDuration
+    ) {
+        value = runCatching {
+            audioContextProcessor.process(
+                audioUri = audioUri,
+                durationMs = resolvedDuration.inWholeMilliseconds,
+                createdAt = Clock.System.now(),
+                latitude = null,
+                longitude = null
+            ).amplitudes
+        }.getOrElse { emptyList() }
+    }
     
     // Create playback state that manages playback
     val playbackState = remember {
@@ -64,7 +92,7 @@ fun AudioPlaybackComponent(
         AudioPlaybackState(
             audioUri = audioUri,
             initialIsPlaying = initiallyPlaying,
-            initialTotalDuration = Duration.parse("3m0s"),
+            initialTotalDuration = Duration.ZERO,
             onStartPlayback = { viewModel.startPlayback(audioUri) },
             onStopPlayback = { viewModel.pausePlayback() },
             onSeek = { duration, totalDuration ->
@@ -83,12 +111,17 @@ fun AudioPlaybackComponent(
     LaunchedEffect(audioUri) {
         playbackState.updateLoadingState(true)
         
-        // We already set the initial duration in the rememberAudioPlaybackState call
         playbackState.updateLoadingState(false)
         
         // Start playback if initially playing
         if (initiallyPlaying) {
             playbackState.startPlayback()
+        }
+    }
+
+    LaunchedEffect(resolvedDuration) {
+        if (resolvedDuration > Duration.ZERO) {
+            playbackState.updateTotalDuration(resolvedDuration)
         }
     }
     
@@ -163,18 +196,40 @@ fun AudioPlaybackComponent(
         
         // Audio waveform display if enabled
         if (waveformEnabled) {
-            // Just a placeholder for now - could be a real waveform visualization
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp)
                     .padding(bottom = 8.dp)
             ) {
-                // Show progress line within waveform
+                AudioWaveformComponent(
+                    audioLevels = waveformAmplitudes,
+                    waveformColor = MaterialTheme.colorScheme.primary,
+                    minHeight = 48.dp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (playbackState.progressPercentage > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(playbackState.progressPercentage)
+                            .height(48.dp)
+                            .align(Alignment.CenterStart)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                    )
+                }
+
                 Slider(
                     value = playbackState.progressPercentage,
                     onValueChange = { playbackState.seekToPercentage(it) },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.Center),
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+                        inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    )
                 )
             }
         }
@@ -224,7 +279,7 @@ fun AudioPlaybackComponent(
             
             // Time display
             Text(
-                text = formatDuration(playbackState.progress),
+                text = formatMediaDuration(playbackState.progress.inWholeMilliseconds, true),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.width(40.dp)
@@ -243,26 +298,11 @@ fun AudioPlaybackComponent(
             
             // Total duration
             Text(
-                text = formatDuration(playbackState.totalDuration),
+                text = formatMediaDuration(playbackState.totalDuration.inWholeMilliseconds, true),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.width(40.dp)
             )
         }
     }
-}
-
-/**
- * Formats a Duration into MM:SS format
- */
-private fun formatDuration(duration: Duration): String {
-    val totalSeconds = duration.inWholeSeconds
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    
-    // Format without using String.format
-    val minutesStr = if (minutes < 10) "0$minutes" else "$minutes"
-    val secondsStr = if (seconds < 10) "0$seconds" else "$seconds"
-    
-    return "$minutesStr:$secondsStr"
 }

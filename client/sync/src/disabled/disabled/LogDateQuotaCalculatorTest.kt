@@ -9,9 +9,9 @@ import app.logdate.client.database.entities.ImageNoteEntity
 import app.logdate.client.database.entities.JournalEntity
 import app.logdate.client.database.entities.TextNoteEntity
 import app.logdate.client.database.entities.VideoNoteEntity
-import app.logdate.client.database.entities.VoiceNoteEntity
+import app.logdate.client.database.entities.AudioNoteEntity
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -167,7 +167,7 @@ class LogDateQuotaCalculatorTest {
     fun `calculateCategoryUsage validates file sizes and throws on unreasonably large size`() = runTest {
         val now = Clock.System.now()
         mockVoiceNoteDao.notes = listOf(
-            VoiceNoteEntity(
+            AudioNoteEntity(
                 contentUri = "huge.wav",
                 fileSizeBytes = 20L * 1024L * 1024L * 1024L, // 20GB - too large
                 uid = Uuid.random(),
@@ -332,9 +332,9 @@ class MockVideoNoteDao : VideoNoteDao {
 }
 
 class MockAudioNoteDao : AudioNoteDao {
-    var notes: List<VoiceNoteEntity> = emptyList()
+    var notes: List<AudioNoteEntity> = emptyList()
     
-    override suspend fun getAll(): List<VoiceNoteEntity> = notes
+    override suspend fun getAll(): List<AudioNoteEntity> = notes
     
     // Unused methods for testing
     override fun getNote(uid: Uuid) = TODO()
@@ -343,7 +343,7 @@ class MockAudioNoteDao : AudioNoteDao {
     override fun getRecentNotes(limit: Int) = TODO()
     override fun getNotesPage(limit: Int, offset: Int) = TODO()
     override fun getNotesInRange(startTimestamp: Long, endTimestamp: Long) = TODO()
-    override suspend fun addNote(note: VoiceNoteEntity) = TODO()
+    override suspend fun addNote(note: AudioNoteEntity) = TODO()
     override suspend fun removeNote(noteId: Uuid) = TODO()
     override suspend fun removeNote(noteIds: List<Uuid>) = TODO()
 }

@@ -1,5 +1,7 @@
 package app.logdate.feature.editor.ui.audio
 
+import app.logdate.client.media.audio.AudioPlaybackManager
+import app.logdate.client.media.audio.AudioPlaybackMetadata
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +33,7 @@ class StubAudioPlaybackManager : AudioPlaybackManager {
     
     override fun startPlayback(
         uri: String,
+        metadata: AudioPlaybackMetadata?,
         onProgressUpdated: (Float) -> Unit,
         onPlaybackCompleted: () -> Unit
     ) {

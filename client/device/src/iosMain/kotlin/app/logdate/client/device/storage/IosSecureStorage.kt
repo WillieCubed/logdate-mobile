@@ -4,11 +4,13 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
+import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
 import platform.CoreCrypto.CCCrypt
@@ -21,12 +23,18 @@ import platform.CoreCrypto.kCCOptionPKCS7Padding
 import platform.CoreCrypto.kCCSuccess
 import platform.CoreFoundation.CFDictionaryRef
 import platform.CoreFoundation.CFTypeRefVar
+import platform.CoreFoundation.CFRelease
 import platform.CoreFoundation.kCFBooleanTrue
 import platform.Foundation.NSData
+import platform.Foundation.NSDictionary
+import platform.Foundation.NSMutableDictionary
+import platform.Foundation.NSCopyingProtocol
+import platform.Foundation.CFBridgingRetain
 import platform.Foundation.base64EncodedStringWithOptions
 import platform.Foundation.create
 import platform.Foundation.NSString
 import platform.Foundation.NSUTF8StringEncoding
+import platform.Foundation.CFBridgingRelease
 import platform.Security.SecItemAdd
 import platform.Security.SecItemCopyMatching
 import platform.Security.SecItemDelete
@@ -50,7 +58,7 @@ import platform.posix.memcpy
 /**
  * iOS implementation of SecureStorage using the Keychain.
  */
-@OptIn(ExperimentalForeignApi::class)
+@OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 class IosSecureStorage(
     private val serviceName: String = "app.logdate"
 ) : SecureStorage {
@@ -81,7 +89,7 @@ class IosSecureStorage(
 
     override suspend fun clear() {
         val query = baseQuery(null)
-        val status = SecItemDelete(query as CFDictionaryRef)
+        val status = withKeychainDictionary(query) { cfQuery -> SecItemDelete(cfQuery) }
         if (status != errSecSuccess) {
             Napier.w("Failed to clear keychain: status=$status")
         }
@@ -120,12 +128,12 @@ class IosSecureStorage(
         query[kSecMatchLimit] = kSecMatchLimitOne
 
         val result = alloc<CFTypeRefVar>()
-        val status = SecItemCopyMatching(query as CFDictionaryRef, result.ptr)
+        val status = withKeychainDictionary(query) { cfQuery -> SecItemCopyMatching(cfQuery, result.ptr) }
         if (status != errSecSuccess) {
             return@memScoped null
         }
-        val data = result.value as? NSData ?: return@memScoped null
-        val string = NSString.create(data, NSUTF8StringEncoding) as String
+        val data = CFBridgingRelease(result.value) as? NSData ?: return@memScoped null
+        val string = NSString.create(data, NSUTF8StringEncoding)?.toString()
         return@memScoped string
     }
 
@@ -133,11 +141,15 @@ class IosSecureStorage(
         val data = value.toNSData()
         val query = baseQuery(key).toMutableMap()
         query[kSecValueData] = data
-        val status = SecItemAdd(query as CFDictionaryRef, null)
+        val status = withKeychainDictionary(query) { cfQuery -> SecItemAdd(cfQuery, null) }
         if (status == errSecDuplicateItem) {
             val updateQuery = baseQuery(key)
-            val attributes = mapOf(kSecValueData to data)
-            val updateStatus = SecItemUpdate(updateQuery as CFDictionaryRef, attributes as CFDictionaryRef)
+            val attributes = mapOf<Any?, Any?>(kSecValueData to data)
+            val updateStatus = withKeychainDictionary(updateQuery) { cfUpdateQuery ->
+                withKeychainDictionary(attributes) { cfAttributes ->
+                    SecItemUpdate(cfUpdateQuery, cfAttributes)
+                }
+            }
             if (updateStatus != errSecSuccess) {
                 Napier.w("Failed to update keychain item: status=$updateStatus")
             }
@@ -147,7 +159,7 @@ class IosSecureStorage(
     }
 
     private fun deleteKeychain(key: String) {
-        val status = SecItemDelete(baseQuery(key) as CFDictionaryRef)
+        val status = withKeychainDictionary(baseQuery(key)) { cfQuery -> SecItemDelete(cfQuery) }
         if (status != errSecSuccess && status != errSecItemNotFound) {
             Napier.w("Failed to delete keychain item: status=$status")
         }
@@ -161,6 +173,30 @@ class IosSecureStorage(
             query[kSecAttrAccount] = key
         }
         return query
+    }
+
+    private inline fun <T> withKeychainDictionary(
+        query: Map<Any?, Any?>,
+        block: (CFDictionaryRef) -> T
+    ): T {
+        // Security framework functions take CoreFoundation dictionaries. In Kotlin/Native these are C pointers,
+        // so we create an Objective-C NSDictionary and bridge it to a CFDictionaryRef.
+        val nsQuery = NSMutableDictionary()
+        query.forEach { (key, value) ->
+            if (key != null && value != null) {
+                val copyKey = key as? NSCopyingProtocol
+                    ?: error("Keychain query key does not conform to NSCopyingProtocol.")
+                nsQuery.setObject(value, forKey = copyKey)
+            }
+        }
+        val retained = CFBridgingRetain(nsQuery)
+            ?: error("CFBridgingRetain returned null for keychain query dictionary")
+        try {
+            val cfQuery: CFDictionaryRef = retained.reinterpret()
+            return block(cfQuery)
+        } finally {
+            CFRelease(retained)
+        }
     }
 
     private fun getOrCreateEncryptionKey(): ByteArray {

@@ -42,7 +42,7 @@ class FakeJournalDao : JournalDao {
         updateFlow()
     }
 
-    override suspend fun updateSyncMetadata(journalId: Uuid, syncVersion: Long, lastSynced: kotlinx.datetime.Instant) {
+    override suspend fun updateSyncMetadata(journalId: Uuid, syncVersion: Long, lastSynced: kotlin.time.Instant) {
         val existing = journals[journalId] ?: return
         journals[journalId] = existing.copy(syncVersion = syncVersion, lastSynced = lastSynced)
         updateFlow()

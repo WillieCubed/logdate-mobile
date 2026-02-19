@@ -4,6 +4,7 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
@@ -23,13 +24,15 @@ class FetchNotesForDayUseCase(
     ): Flow<List<JournalNote>> {
         val start = date.atStartOfDayIn(TimeZone.currentSystemDefault())
         val end = start + 24.hours
+        val startInstant = start
+        val endInstant = end
         
         io.github.aakira.napier.Napier.d(
             tag = "FetchNotesForDayUseCase",
             message = "Fetching notes for date $date, start: $start, end: $end"
         )
         
-        val notesFlow = repository.observeNotesInRange(start, end)
+        val notesFlow = repository.observeNotesInRange(startInstant, endInstant)
         
         // Add logging to track the notes being returned
         return notesFlow.map { notes ->

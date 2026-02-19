@@ -6,6 +6,7 @@ import app.logdate.client.domain.rewind.GetRewindUseCase
 import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindContent
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -14,7 +15,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.uuid.Uuid
@@ -37,6 +38,7 @@ import kotlin.uuid.Uuid
  *
  * @param getRewindUseCase Use case for retrieving rewind data
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class RewindDetailViewModel(
     private val getRewindUseCase: GetRewindUseCase,
 //    savedStateHandle: SavedStateHandle,
@@ -238,10 +240,10 @@ class RewindDetailViewModel(
             kotlinx.datetime.Month.OCTOBER -> "Oct"
             kotlinx.datetime.Month.NOVEMBER -> "Nov"
             kotlinx.datetime.Month.DECEMBER -> "Dec"
-            else -> "Unknown" // Should never happen, but required for exhaustiveness
+            else -> localDateTime.month.name.lowercase().replaceFirstChar { it.uppercase() }.take(3)
         }
 
-        return "$month ${localDateTime.dayOfMonth}, ${localDateTime.year}"
+        return "$month ${localDateTime.day}, ${localDateTime.year}"
     }
 
     /**
@@ -268,12 +270,12 @@ class RewindDetailViewModel(
             kotlinx.datetime.Month.OCTOBER -> "October"
             kotlinx.datetime.Month.NOVEMBER -> "November"
             kotlinx.datetime.Month.DECEMBER -> "December"
-            else -> "Unknown" // Should never happen, but required for exhaustiveness
+            else -> startLocal.month.name.lowercase().replaceFirstChar { it.uppercase() }
         }
 
         // If same month
         if (startLocal.month == endLocal.month && startLocal.year == endLocal.year) {
-            return "$startMonth ${startLocal.dayOfMonth}-${endLocal.dayOfMonth}, ${startLocal.year}"
+            return "$startMonth ${startLocal.day}-${endLocal.day}, ${startLocal.year}"
         }
 
         // Different months
@@ -290,10 +292,10 @@ class RewindDetailViewModel(
             kotlinx.datetime.Month.OCTOBER -> "October"
             kotlinx.datetime.Month.NOVEMBER -> "November"
             kotlinx.datetime.Month.DECEMBER -> "December"
-            else -> "Unknown" // Should never happen, but required for exhaustiveness
+            else -> endLocal.month.name.lowercase().replaceFirstChar { it.uppercase() }
         }
 
-        return "$startMonth ${startLocal.dayOfMonth} - $endMonth ${endLocal.dayOfMonth}, ${endLocal.year}"
+        return "$startMonth ${startLocal.day} - $endMonth ${endLocal.day}, ${endLocal.year}"
     }
 
     /**

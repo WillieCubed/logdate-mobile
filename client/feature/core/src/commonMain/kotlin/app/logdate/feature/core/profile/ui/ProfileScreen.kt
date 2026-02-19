@@ -71,7 +71,7 @@ import app.logdate.util.formatDateLocalized
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import app.logdate.shared.model.profile.LogDateProfile
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
 

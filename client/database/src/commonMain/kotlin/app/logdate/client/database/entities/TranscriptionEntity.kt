@@ -4,13 +4,13 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
  * Entity for storing transcriptions of audio notes.
  * 
- * This entity is linked to a [VoiceNoteEntity] via the [noteId] field.
+ * This entity is linked to a [AudioNoteEntity] via the [noteId] field.
  * The transcription can be in multiple states:
  * - PENDING: Transcription has been requested but not started
  * - IN_PROGRESS: Transcription is currently being processed
@@ -21,7 +21,7 @@ import kotlin.uuid.Uuid
     tableName = "transcriptions",
     foreignKeys = [
         ForeignKey(
-            entity = VoiceNoteEntity::class,
+            entity = AudioNoteEntity::class,
             parentColumns = ["uid"],
             childColumns = ["noteId"],
             onDelete = ForeignKey.CASCADE
@@ -33,7 +33,7 @@ import kotlin.uuid.Uuid
 )
 data class TranscriptionEntity(
     /**
-     * The ID of the voice note this transcription belongs to.
+     * The ID of the audio note this transcription belongs to.
      */
     val noteId: Uuid,
     

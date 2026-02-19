@@ -21,7 +21,7 @@ import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.TimelineLine
 import app.logdate.util.daysUntilNow
 import app.logdate.util.toReadableDateShort
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import logdate.client.feature.timeline.generated.resources.Res
 import logdate.client.feature.timeline.generated.resources.timeline_origin_day_birthday_message
 import logdate.client.feature.timeline.generated.resources.timeline_origin_day_counter

@@ -61,7 +61,7 @@ import org.koin.compose.viewmodel.koinViewModel
 fun DangerZoneSettingsScreen(
     onBack: () -> Unit,
     onAppReset: () -> Unit,
-    viewModel: SettingsViewModel = koinViewModel(),
+    viewModel: DangerZoneSettingsViewModel = koinViewModel(),
     isPotentialDetailPane: Boolean? = null,
 ) {
     val layoutInfo = LocalSettingsLayoutInfo.current

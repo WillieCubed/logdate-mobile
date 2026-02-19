@@ -51,9 +51,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.plus
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 
@@ -200,6 +202,7 @@ class HomeViewModel(
                 date = day.date,
                 people = day.people.map(Person::toUiState),
                 events = day.events,
+                isLoadingSummary = day.tldr.isEmpty(),
                 notes = if (day.date == selectedDayDate) {
                     // Only include notes for the selected day
                     notes.map {
@@ -218,7 +221,7 @@ class HomeViewModel(
                                 noteId = it.uid,
                                 uri = it.mediaRef,
                                 timestamp = it.creationTimestamp,
-                                duration = it.durationMs ?: 0,
+                                duration = it.durationMs,
                             )
                             is JournalNote.Video -> VideoNoteUiState(
                                 noteId = it.uid,
@@ -244,22 +247,13 @@ class HomeViewModel(
             TimelineDaySelection.NotSelected -> null
         }
         
-        println("Updating HomeViewModel state: selectedDay=$selectedDay, selection=$selection")
-
-        // Detect loading state based on placeholder summaries (e.g., "3 entries")
-        val hasPlaceholderSummaries = items.any { it.summary.contains("entries") }
-
         HomeTimelineUiState(
             items = items,
             selectedItem = selection,
             selectedDay = selectedDay,
             showEmptyState = items.isEmpty(),
-            isLoading = items.isEmpty(),
-            loadingState = when {
-                items.isEmpty() -> TimelineLoadingState.InitialLoading
-                hasPlaceholderSummaries -> TimelineLoadingState.LoadingContent
-                else -> TimelineLoadingState.Loaded
-            }
+            isLoading = false,
+            loadingState = if (items.isEmpty()) TimelineLoadingState.InitialLoading else TimelineLoadingState.Loaded
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeTimelineUiState())
         
@@ -303,14 +297,14 @@ class HomeViewModel(
         
         // Create time range for the day
         val tz = TimeZone.currentSystemDefault()
-        val start = date.atStartOfDayIn(tz)
-        val end = start + kotlin.time.Duration.parse("24h")
+        val startInstant = date.atStartOfDayIn(tz)
+        val endInstant = date.plus(1, DateTimeUnit.DAY).atStartOfDayIn(tz)
         
         // Simply fetch notes for this date range
         viewModelScope.launch {
             try {
                 // Direct repository call for simplicity
-                val notes = notesRepository.observeNotesInRange(start, end).first()
+                val notes = notesRepository.observeNotesInRange(startInstant, endInstant).first()
                 
                 io.github.aakira.napier.Napier.d(
                     tag = "HomeViewModel", 

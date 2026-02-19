@@ -49,50 +49,6 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * Server preset options for connecting to LogDate servers.
- */
-enum class ServerPreset {
-    /** Official LogDate Cloud production server */
-    PRODUCTION,
-    /** Local development server */
-    LOCAL,
-    /** Custom user-specified server */
-    CUSTOM
-}
-
-/**
- * State for server selection in Advanced Settings.
- *
- * @property selectedPreset The currently selected server preset
- * @property localServerAddress The address for the local development server
- * @property customServerUrl The URL for a custom server
- * @property validationState The current validation state
- */
-data class ServerSelectionState(
-    val selectedPreset: ServerPreset = ServerPreset.PRODUCTION,
-    val localServerAddress: String = "localhost:8765",
-    val customServerUrl: String = "",
-    val validationState: ServerValidationState = ServerValidationState.Idle
-)
-
-/**
- * Validation states for server connection testing.
- */
-sealed class ServerValidationState {
-    /** No validation in progress */
-    data object Idle : ServerValidationState()
-
-    /** Validation is in progress */
-    data object Validating : ServerValidationState()
-
-    /** Validation succeeded */
-    data class Success(val serverVersion: String?) : ServerValidationState()
-
-    /** Validation failed */
-    data class Error(val message: String) : ServerValidationState()
-}
-
-/**
  * Advanced settings screen for developer and power-user options.
  *
  * This screen provides:
@@ -106,7 +62,7 @@ sealed class ServerValidationState {
 @Composable
 fun AdvancedSettingsScreen(
     onBack: () -> Unit,
-    viewModel: SettingsViewModel = koinViewModel(),
+    viewModel: AdvancedSettingsViewModel = koinViewModel(),
     isPotentialDetailPane: Boolean? = null,
 ) {
     val layoutInfo = LocalSettingsLayoutInfo.current

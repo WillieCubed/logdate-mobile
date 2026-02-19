@@ -7,7 +7,7 @@ import androidx.room.Query
 import app.logdate.client.database.entities.rewind.RewindGenerationRequestEntity
 import app.logdate.client.database.entities.rewind.RewindGenerationRequestEntity.Status
 import kotlinx.coroutines.flow.Flow
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**

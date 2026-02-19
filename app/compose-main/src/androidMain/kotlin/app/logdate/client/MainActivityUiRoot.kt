@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.core.GlobalAppUiLoadedState
 import app.logdate.feature.core.requiresUnlock
 import app.logdate.navigation.MainAppNavigator
@@ -25,11 +26,14 @@ import app.logdate.ui.theme.LogDateTheme
 fun MainActivityUiRoot(
     appUiState: GlobalAppUiLoadedState,
     onShowUnlockPrompt: () -> Unit,
+    pendingNavKey: NavKey? = null,
+    onDeepLinkHandled: () -> Unit = {},
     mainAppNavigator: MainAppNavigator = rememberMainAppNavigator(initialRoute = NavigationStart),
 ) {
     var hasRequestedUnlock by remember { mutableStateOf(false) }
+    var hasHandledInitialNavigation by remember { mutableStateOf(false) }
 
-    LaunchedEffect(appUiState.isOnboarded, appUiState.requiresUnlock) {
+    LaunchedEffect(appUiState.isOnboarded, appUiState.requiresUnlock, pendingNavKey) {
         if (!appUiState.isOnboarded) {
 //        // Ensure that onboarding is completed before proceeding
             mainAppNavigator.startOnboarding()
@@ -43,7 +47,19 @@ fun MainActivityUiRoot(
             return@LaunchedEffect
         }
         hasRequestedUnlock = false
-        mainAppNavigator.navigateHomeFromLaunch()
+        if (pendingNavKey != null) {
+            if (!mainAppNavigator.backStack.contains(pendingNavKey)) {
+                mainAppNavigator.navigateHomeFromLaunch()
+                mainAppNavigator.backStack.add(pendingNavKey)
+            }
+            onDeepLinkHandled()
+            hasHandledInitialNavigation = true
+        } else {
+            if (!hasHandledInitialNavigation) {
+                mainAppNavigator.navigateHomeFromLaunch()
+                hasHandledInitialNavigation = true
+            }
+        }
     }
 
     LogDateTheme {

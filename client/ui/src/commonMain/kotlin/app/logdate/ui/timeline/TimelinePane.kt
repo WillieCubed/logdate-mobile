@@ -32,7 +32,7 @@ import app.logdate.ui.timeline.newstuff.EndOfTimelineUiState
 import app.logdate.ui.timeline.newstuff.TimelineList
 import app.logdate.util.now
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -64,7 +64,7 @@ fun TimelinePane(
             // TODO: Likely fix this redundancy
             if (birthday != null && birthday != Instant.DISTANT_PAST) {
                 val birthDate = birthday.toLocalDateTime(TimeZone.currentSystemDefault()).date
-                val daysSinceBirth = LocalDate.now().toEpochDays() - birthDate.toEpochDays()
+                val daysSinceBirth = (LocalDate.now().toEpochDays() - birthDate.toEpochDays()).toInt()
                 EndOfTimelineUiState.BirthdayCelebration(birthDate, daysSinceBirth)
             } else {
                 EndOfTimelineUiState.DiscoveryEasterEgg

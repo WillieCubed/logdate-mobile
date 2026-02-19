@@ -3,7 +3,7 @@ package app.logdate.feature.core.profile.ui
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.profile.LogDateProfile
 import app.logdate.shared.model.user.UserData
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * UI state for the profile screen with local-first approach.

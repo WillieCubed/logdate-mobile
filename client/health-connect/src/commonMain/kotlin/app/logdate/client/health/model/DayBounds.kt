@@ -1,6 +1,6 @@
 package app.logdate.client.health.model
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Represents the bounds of a day, as determined by sleep patterns or user preferences.

@@ -1,0 +1,119 @@
+package app.logdate.client.sync
+
+import app.logdate.client.datastore.LogdatePreferencesDataSource
+import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.networking.NetworkAvailabilityMonitor
+import app.logdate.client.networking.NetworkState
+import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+
+/**
+ * Foreground-only sync manager for platforms without OS background schedulers.
+ */
+@OptIn(FlowPreview::class)
+class ForegroundSyncManager(
+    private val defaultSyncManager: DefaultSyncManager,
+    private val sessionStorage: SessionStorage,
+    private val preferencesDataSource: LogdatePreferencesDataSource,
+    private val networkMonitor: NetworkAvailabilityMonitor,
+    private val syncScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+) : SyncManager {
+
+    private var periodicJob: Job? = null
+
+    init {
+        syncScope.launch {
+            combine(
+                sessionStorage.getSessionFlow().map { it != null },
+                preferencesDataSource.backgroundSyncEnabled
+            ) { isAuthenticated, isEnabled ->
+                isAuthenticated && isEnabled
+            }
+                .distinctUntilChanged()
+                .collect { shouldEnable ->
+                    if (shouldEnable) {
+                        startPeriodicSync()
+                    } else {
+                        stopPeriodicSync()
+                    }
+                }
+        }
+
+        syncScope.launch {
+            var lastNetworkState: NetworkState? = null
+            networkMonitor.observeNetwork()
+                .debounce(2000)
+                .distinctUntilChanged()
+                .collect { currentState ->
+                    if (lastNetworkState is NetworkState.NotConnected && currentState is NetworkState.Connected) {
+                        handleNetworkRestored()
+                    }
+                    lastNetworkState = currentState
+                }
+        }
+    }
+
+    override fun sync(startNow: Boolean) {
+        if (startNow) {
+            syncScope.launch { defaultSyncManager.fullSync() }
+        } else {
+            startPeriodicSync()
+        }
+    }
+
+    override suspend fun uploadPendingChanges(): SyncResult = defaultSyncManager.uploadPendingChanges()
+
+    override suspend fun downloadRemoteChanges(): SyncResult = defaultSyncManager.downloadRemoteChanges()
+
+    override suspend fun syncContent(): SyncResult = defaultSyncManager.syncContent()
+
+    override suspend fun syncJournals(): SyncResult = defaultSyncManager.syncJournals()
+
+    override suspend fun syncAssociations(): SyncResult = defaultSyncManager.syncAssociations()
+
+    override suspend fun fullSync(): SyncResult = defaultSyncManager.fullSync()
+
+    override suspend fun getSyncStatus(): SyncStatus = defaultSyncManager.getSyncStatus()
+
+    private fun startPeriodicSync() {
+        if (periodicJob?.isActive == true) {
+            return
+        }
+        periodicJob = syncScope.launch {
+            while (isActive) {
+                defaultSyncManager.fullSync()
+                delay(PERIODIC_SYNC_INTERVAL_MS)
+            }
+        }
+        Napier.d("Foreground sync scheduler enabled")
+    }
+
+    private fun stopPeriodicSync() {
+        periodicJob?.cancel()
+        periodicJob = null
+        Napier.d("Foreground sync scheduler disabled")
+    }
+
+    private suspend fun handleNetworkRestored() {
+        val lastError = defaultSyncManager.getLastSyncError()
+        if (lastError != null && lastError.type != SyncErrorType.AUTHENTICATION_ERROR) {
+            Napier.d("Retrying sync after network restoration")
+            defaultSyncManager.fullSync()
+        }
+    }
+
+    companion object {
+        private const val PERIODIC_SYNC_INTERVAL_MS = 15 * 60 * 1000L
+    }
+}

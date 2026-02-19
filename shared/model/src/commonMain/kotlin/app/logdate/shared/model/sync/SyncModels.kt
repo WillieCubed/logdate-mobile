@@ -46,7 +46,7 @@ data class ContentUploadRequest(
     val type: String, // TEXT, IMAGE, VIDEO, AUDIO
     val content: String?,
     val mediaUri: String?,
-    val durationMs: Long? = null,
+    val durationMs: Long = 0,
     val createdAt: Long,
     val lastUpdated: Long,
     val syncVersion: Long = 0,
@@ -64,7 +64,7 @@ data class ContentUploadResponse(
 data class ContentUpdateRequest(
     val content: String? = null,
     val mediaUri: String? = null,
-    val durationMs: Long? = null,
+    val durationMs: Long = 0,
     val lastUpdated: Long,
     val syncVersion: Long = 0,
     val deviceId: DeviceId = DeviceId.UNKNOWN,
@@ -92,7 +92,7 @@ data class ContentChange(
     val type: String,
     val content: String? = null,
     val mediaUri: String? = null,
-    val durationMs: Long? = null,
+    val durationMs: Long = 0,
     val createdAt: Long,
     val lastUpdated: Long,
     val serverVersion: Long,
@@ -250,4 +250,33 @@ data class MediaDownloadResponse(
     val sizeBytes: Long,
     val data: ByteArray,
     val downloadUrl: String
+)
+
+@Serializable
+data class BackupUploadRequest(
+    val deviceId: String,
+    val manifest: String,
+    val data: ByteArray
+)
+
+@Serializable
+data class BackupUploadResponse(
+    val id: String,
+    val createdAt: Long,
+    val sizeBytes: Long
+)
+
+@Serializable
+data class BackupInfoResponse(
+    val id: String,
+    val deviceId: String,
+    val manifest: String,
+    val createdAt: Long,
+    val sizeBytes: Long,
+    val downloadUrl: String
+)
+
+@Serializable
+data class BackupListResponse(
+    val backups: List<BackupInfoResponse>
 )

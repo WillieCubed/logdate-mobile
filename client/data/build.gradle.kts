@@ -5,19 +5,21 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.android.library)
+    alias(libs.plugins.android.kmp.library)
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.dokka)
 }
 
 kotlin {
-    androidTarget {
+    androidLibrary {
+        namespace = "app.logdate.client.data"
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
     }
 
-    iosX64()
     iosArm64()
     iosSimulatorArm64()
 
@@ -37,7 +39,7 @@ kotlin {
             implementation(projects.client.domain)
             implementation(projects.client.repository)
             implementation(projects.client.database)
-            implementation(projects.client.datastore)
+            implementation(projects.client.logdateDatastore)
             implementation(projects.client.device)
             implementation(projects.client.networking)
             implementation(projects.client.permissions)
@@ -69,20 +71,5 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.koin.test)
         }
-    }
-}
-
-android {
-    namespace = "app.logdate.client.data"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
-
-    buildTypes {
-        getByName("release") {
-            isMinifyEnabled = false
-        }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
     }
 }

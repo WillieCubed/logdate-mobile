@@ -3,7 +3,7 @@ package app.logdate.ui.timeline
 import app.logdate.ui.location.PlaceUiState
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.util.now
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlin.uuid.Uuid
 

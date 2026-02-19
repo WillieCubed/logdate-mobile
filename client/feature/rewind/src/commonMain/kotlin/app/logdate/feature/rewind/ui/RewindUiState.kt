@@ -1,7 +1,7 @@
 package app.logdate.feature.rewind.ui
 
 import app.logdate.shared.model.Person
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 sealed interface RewindUiState {

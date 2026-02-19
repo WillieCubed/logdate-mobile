@@ -12,7 +12,7 @@ import app.logdate.client.sync.test.*
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.test.assertEquals

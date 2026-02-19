@@ -74,7 +74,7 @@ interface ImageNoteDao {
     suspend fun removeNote(noteIds: List<Uuid>)
 
     @Query("UPDATE image_notes SET syncVersion = :syncVersion, lastSynced = :lastSynced WHERE uid = :noteId")
-    suspend fun updateSyncMetadata(noteId: Uuid, syncVersion: Long, lastSynced: kotlinx.datetime.Instant)
+    suspend fun updateSyncMetadata(noteId: Uuid, syncVersion: Long, lastSynced: kotlin.time.Instant)
 
     @Query("UPDATE image_notes SET contentUri = :contentUri WHERE uid = :noteId")
     suspend fun updateContentUri(noteId: Uuid, contentUri: String)

@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.cinterop.BetaInteropApi::class)
+
 package app.logdate.feature.core.export
 
 import app.logdate.client.domain.export.ExportMediaFile
@@ -13,7 +15,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.koin.core.component.KoinComponent
@@ -28,6 +30,7 @@ import platform.Foundation.dataUsingEncoding
 import platform.Foundation.writeToFile
 import platform.UIKit.UIActivityViewController
 import platform.UIKit.UIViewController
+import kotlinx.datetime.number
 
 /**
  * iOS-specific implementation for launching data export.
@@ -129,7 +132,7 @@ class IosExportLauncher(
         val timestamp = Clock.System.now()
             .toLocalDateTime(TimeZone.currentSystemDefault())
             .let {
-                "${it.year}-${it.monthNumber.toString().padStart(2, '0')}-${it.dayOfMonth.toString().padStart(2, '0')}_" +
+                "${it.year}-${it.month.number.toString().padStart(2, '0')}-${it.day.toString().padStart(2, '0')}_" +
                     "${it.hour.toString().padStart(2, '0')}-${it.minute.toString().padStart(2, '0')}"
             }
         val basePath = NSTemporaryDirectory().trimEnd('/')
@@ -150,6 +153,9 @@ class IosExportLauncher(
         writeJsonFile(exportDirPath, "notes.json", result.notes)
         writeJsonFile(exportDirPath, "journal_notes.json", result.journalNotes)
         writeJsonFile(exportDirPath, "drafts.json", result.drafts)
+        result.mediaManifest?.let { manifest ->
+            writeJsonFile(exportDirPath, "media_manifest.json", manifest)
+        }
 
         result.mediaFiles.forEach { mediaFile ->
             copyMediaFile(exportDirPath, mediaFile)

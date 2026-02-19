@@ -79,7 +79,7 @@ private fun getCategoryColor(categoryName: String): Color {
     }
 }
 
-// Removed duplicate method: CloudStorageQuota?.orDefault() is defined in SettingsUiState.kt
+// CloudStorageQuota?.orDefault() is defined in SettingsUiMappers.kt
 
 /**
  * Maps a CloudStorageQuota to a QuotaUsageUi model for the DataSettingsScreen.

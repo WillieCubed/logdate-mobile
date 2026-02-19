@@ -2,7 +2,7 @@ package app.logdate.client.repository.rewind
 
 import app.logdate.shared.model.RewindGenerationRequest
 import kotlinx.coroutines.flow.Flow
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**

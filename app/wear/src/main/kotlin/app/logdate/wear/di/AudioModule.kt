@@ -7,7 +7,7 @@ import app.logdate.wear.data.storage.StorageSpaceChecker
 import app.logdate.wear.presentation.audio.AudioRecordingViewModel
 import app.logdate.wear.recording.WearAudioRecordingManager
 import app.logdate.wear.repository.WearJournalNotesRepository
-import org.koin.androidx.viewmodel.dsl.viewModel
+import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
 /**

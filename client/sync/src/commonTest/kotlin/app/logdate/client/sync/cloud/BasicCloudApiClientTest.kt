@@ -28,7 +28,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
@@ -102,9 +102,10 @@ class BasicCloudApiClientTest {
         
         // Then
         assertFalse(result.isSuccess, "Result should be failure for server error")
-        val exception = result.exceptionOrNull()
-        assertTrue(exception is CloudApiException, "Exception should be CloudApiException")
-        assertEquals("SERVER_ERROR", (exception as CloudApiException).errorCode, "Error code should match server response")
+        val cloudException = requireNotNull(result.exceptionOrNull() as? CloudApiException) {
+            "Exception should be CloudApiException"
+        }
+        assertEquals("SERVER_ERROR", cloudException.errorCode, "Error code should match server response")
     }
 
     @Test
@@ -134,8 +135,7 @@ class BasicCloudApiClientTest {
         
         // Then
         assertTrue(result.isSuccess, "Username availability check should succeed even when username exists")
-        val response = result.getOrNull()
-        assertTrue(response != null, "Response object should not be null")
+        val response = requireNotNull(result.getOrNull()) { "Response object should not be null" }
         assertEquals(username, response.username, "Username in response should match requested username")
         assertFalse(response.available, "Username should be marked as unavailable")
     }
@@ -221,10 +221,9 @@ class BasicCloudApiClientTest {
         
         // Then
         assertTrue(result.isSuccess, "Account creation initiation should succeed")
-        val response = result.getOrNull()
-        assertTrue(response != null, "Response object should not be null")
-        assertEquals(sessionToken, response?.data?.sessionToken, "Session token should match expected value")
-        assertEquals(challenge, response?.data?.registrationOptions?.challenge, "Challenge should match expected value")
+        val response = requireNotNull(result.getOrNull()) { "Response object should not be null" }
+        assertEquals(sessionToken, response.data.sessionToken, "Session token should match expected value")
+        assertEquals(challenge, response.data.registrationOptions.challenge, "Challenge should match expected value")
     }
     
     @Test
@@ -283,11 +282,10 @@ class BasicCloudApiClientTest {
         
         // Then
         assertTrue(result.isSuccess, "Account creation completion should succeed")
-        val response = result.getOrNull()
-        assertTrue(response != null, "Response object should not be null")
-        assertEquals("newuser", response?.data?.account?.username, "Username should match expected value")
-        assertEquals("new-access-token", response?.data?.tokens?.accessToken, "Access token should match expected value")
-        assertEquals("new-refresh-token", response?.data?.tokens?.refreshToken, "Refresh token should match expected value")
+        val response = requireNotNull(result.getOrNull()) { "Response object should not be null" }
+        assertEquals("newuser", response.data.account.username, "Username should match expected value")
+        assertEquals("new-access-token", response.data.tokens.accessToken, "Access token should match expected value")
+        assertEquals("new-refresh-token", response.data.tokens.refreshToken, "Refresh token should match expected value")
     }
     
     @Test
@@ -334,10 +332,9 @@ class BasicCloudApiClientTest {
         
         // Then
         assertTrue(result.isSuccess, "API call should succeed, but got: ${result.exceptionOrNull()}")
-        val response = result.getOrNull()
-        assertTrue(response != null, "Response should not be null")
-        assertEquals("testuser", response?.username, "Username should match")
-        assertEquals("Test User", response?.displayName, "Display name should match")
+        val response = requireNotNull(result.getOrNull()) { "Response should not be null" }
+        assertEquals("testuser", response.username, "Username should match")
+        assertEquals("Test User", response.displayName, "Display name should match")
     }
     
     private fun createApiClient(mockEngine: MockEngine): LogDateCloudApiClient {

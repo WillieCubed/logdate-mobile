@@ -43,7 +43,7 @@ Sync Module
 - Network-aware sync timing
 
 ### Conflict Resolution
-- Last-write-wins strategy
+- Field-aware merges with manual escalation for divergent data
 - Manual conflict resolution UI
 - Automatic merge for compatible changes
 - Conflict history tracking
@@ -63,8 +63,8 @@ Sync Module
 
 ### Platform Dependencies
 - **Android**: WorkManager for background sync
-- **Desktop**: Scheduled executor services
-- **iOS**: Background app refresh
+- **Desktop**: Scheduled sync while app is running
+- **iOS**: BGAppRefresh background tasks
 
 ## Sync Architecture
 
@@ -116,13 +116,11 @@ Resolution Applied
 - **Network Callbacks**: Sync on connectivity changes
 
 ### Desktop
-- **Scheduled Executors**: Periodic sync scheduling
-- **File System Watchers**: Real-time change detection
+- **Foreground Scheduler**: Periodic sync while app is running
 - **Application Lifecycle**: Sync on app focus
 
 ### iOS
-- **Background App Refresh**: Periodic sync
-- **Push Notifications**: Remote sync triggers
+- **BGAppRefresh**: Scheduled background refreshes
 - **App State Changes**: Sync on app lifecycle events
 
 ## TODOs

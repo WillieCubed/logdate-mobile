@@ -1,6 +1,6 @@
 package app.logdate.server.auth
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlin.uuid.ExperimentalUuidApi

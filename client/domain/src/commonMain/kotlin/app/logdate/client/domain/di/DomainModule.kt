@@ -3,6 +3,7 @@ package app.logdate.client.domain.di
 import app.logdate.client.domain.app.GetAppInfoUseCase
 import app.logdate.client.domain.entities.ExtractPeopleUseCase
 import app.logdate.client.domain.export.ExportUserDataUseCase
+import app.logdate.client.domain.restore.RestoreUserDataUseCase
 import app.logdate.client.domain.journals.DeleteJournalUseCase
 import app.logdate.client.domain.journals.GetCurrentUserJournalsUseCase
 import app.logdate.client.domain.journals.GetDefaultSelectedJournalsUseCase
@@ -31,8 +32,6 @@ import app.logdate.client.domain.rewind.GenerateRewindTitleUseCase
 import app.logdate.client.domain.rewind.GetPastRewindsUseCase
 import app.logdate.client.domain.rewind.GetRewindUseCase
 import app.logdate.client.domain.rewind.GetWeekRewindUseCase
-import app.logdate.client.media.MediaManager
-import app.logdate.client.media.StubMediaManager
 import app.logdate.client.repository.media.IndexedMediaRepository
 import app.logdate.client.repository.rewind.RewindGenerationManager
 import app.logdate.client.domain.di.StubIndexedMediaRepository
@@ -62,6 +61,7 @@ val domainModule: Module = module {
 
     // Export
     factory { ExportUserDataUseCase(get(), get(), get(), get(), get(), get()) }
+    factory { RestoreUserDataUseCase(get(), get(), get()) }
 
     // Notes
     factory { AddNoteUseCase(
@@ -94,9 +94,6 @@ val domainModule: Module = module {
     
     // Media indexing
     factory { IndexMediaForPeriodUseCase(get(), get()) }
-    
-    // Media manager for accessing device media
-    single<MediaManager> { StubMediaManager() }
     
     // Note: The actual implementations for these repositories are provided by the platform-specific
     // data modules. These stub implementations are provided as fallbacks for testing.
