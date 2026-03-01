@@ -16,13 +16,14 @@ private const val INSTAGRAM_STORY_INTENT = "com.instagram.share.ADD_TO_STORY"
  * Minimum dimensions 720x1280. Recommended image ratios 9:16 or 9:18. Videos can be 1080p and up to
  * 20 seconds in duration.
  * @param stickerAsset Uri to an image asset (JPG, PNG). Recommended dimensions: 640x480.
+ * @param metaAppId The Meta App ID for Instagram sharing attribution.
  */
 internal fun createInstagramStoryIntent(
     backgroundAsset: Uri,
     stickerAsset: Uri,
+    metaAppId: String = System.getProperty("META_APP_ID") ?: "",
 ) = Intent(INSTAGRAM_STORY_INTENT).apply {
-    val sourceApplication: String = BuildConfig.META_APP_ID
-    putExtra("source_application", sourceApplication)
+    putExtra("source_application", metaAppId)
     putExtra("interactive_asset_uri", stickerAsset)
     setDataAndType(backgroundAsset, "image/jpeg")
     setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

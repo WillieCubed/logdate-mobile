@@ -127,7 +127,7 @@ class AndroidAccountManager(
             val future = accountManager.removeAccount(systemAccount, null, null)
             val result = future.result
             
-            val success = (result as? Bundle)?.getBoolean(AccountManager.KEY_BOOLEAN_RESULT, false) ?: false
+            val success = result
             if (success) {
                 Napier.i("Successfully removed LogDate account from Android AccountManager: $username")
                 Result.success(Unit)

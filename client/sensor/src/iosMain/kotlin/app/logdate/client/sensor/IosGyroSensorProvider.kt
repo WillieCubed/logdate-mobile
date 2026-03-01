@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.shareIn
+import kotlinx.cinterop.ExperimentalForeignApi
 import platform.CoreMotion.CMMotionManager
 import platform.CoreMotion.CMRotationRate
 import platform.Foundation.NSOperationQueue
@@ -13,6 +14,7 @@ import platform.Foundation.NSOperationQueue
  * iOS implementation of [GyroSensorProvider] using CoreMotion.
  */
 @Suppress("CAST_NEVER_SUCCEEDS")
+@OptIn(ExperimentalForeignApi::class)
 class IosGyroSensorProvider(
     coroutineScope: CoroutineScope
 ) : GyroSensorProvider {

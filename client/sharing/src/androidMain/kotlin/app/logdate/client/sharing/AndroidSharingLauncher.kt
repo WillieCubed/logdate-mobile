@@ -7,7 +7,8 @@ import androidx.core.net.toUri
 import app.logdate.client.media.MediaManager
 import app.logdate.client.repository.journals.JournalRepository
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
@@ -21,7 +22,7 @@ class AndroidSharingLauncher(
     private val mediaManager: MediaManager,
     private val journalRepository: JournalRepository,
     private val shareAssetGenerator: ShareAssetInterface,
-    private val coroutineScope: CoroutineScope = GlobalScope, // TODO: Use app-bound scope
+    private val coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
 ) : SharingLauncher {
     /**
      * Shares a journal to Instagram as a story.
