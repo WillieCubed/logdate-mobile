@@ -2,7 +2,6 @@ package app.logdate.feature.editor.ui.audio
 
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.ZERO
-import kotlin.uuid.Uuid
 
 /**
  * Data class representing the UI state for audio recording and playback.
@@ -22,9 +21,6 @@ data class AudioUiState(
     
     // Shared state
     val error: String? = null,
-    
-    // Note ID - used for transcription
-    val currentNoteId: Uuid? = null,
     
     // Transcription state
     val transcriptionState: TranscriptionState = TranscriptionState.NotRequested

@@ -3,8 +3,8 @@ package app.logdate.feature.editor.ui.editor
 import app.logdate.feature.editor.ui.camera.CapturedMediaType
 import app.logdate.shared.model.Location
 import app.logdate.feature.editor.ui.formatMediaDuration
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -12,25 +12,18 @@ import kotlin.uuid.Uuid
  * Each block represents a discrete piece of content within a journal entry.
  */
 sealed interface EntryBlockUiState {
-    /**
-     * Unique identifier for the block.
-     */
     val id: Uuid
-
-    /**
-     * Timestamp when the block was created.
-     */
     val timestamp: Instant
-
-    /**
-     * Location data associated with the block, if any.
-     */
     val location: Location?
-
-    /**
-     * Returns true if the block has content that can be saved.
-     */
     fun hasContent(): Boolean
+}
+
+/**
+ * Sub-interface for blocks backed by a media URI (image, video, audio, camera).
+ */
+sealed interface MediaBlockUiState : EntryBlockUiState {
+    val uri: String?
+    val caption: String
 }
 
 /**
@@ -52,9 +45,9 @@ data class ImageBlockUiState(
     override val id: Uuid = Uuid.random(),
     override val timestamp: Instant = Clock.System.now(),
     override val location: Location? = null,
-    val uri: String? = null,
-    val caption: String = ""
-) : EntryBlockUiState {
+    override val uri: String? = null,
+    override val caption: String = ""
+) : MediaBlockUiState {
     override fun hasContent(): Boolean = uri != null
 }
 
@@ -74,11 +67,11 @@ data class CameraBlockUiState(
     override val id: Uuid = Uuid.random(),
     override val timestamp: Instant = Clock.System.now(),
     override val location: Location? = null,
-    val uri: String? = null,
-    val caption: String = "",
+    override val uri: String? = null,
+    override val caption: String = "",
     val mediaType: CapturedMediaType = CapturedMediaType.PHOTO,
     val durationMs: Long = 0
-) : EntryBlockUiState {
+) : MediaBlockUiState {
     override fun hasContent(): Boolean = uri != null
 
     /**
@@ -105,10 +98,10 @@ data class VideoBlockUiState(
     override val id: Uuid = Uuid.random(),
     override val timestamp: Instant = Clock.System.now(),
     override val location: Location? = null,
-    val uri: String? = null,
-    val caption: String = "",
+    override val uri: String? = null,
+    override val caption: String = "",
     val durationMs: Long = 0
-) : EntryBlockUiState {
+) : MediaBlockUiState {
     override fun hasContent(): Boolean = uri != null
 
     /**
@@ -127,11 +120,10 @@ data class AudioBlockUiState(
     override val id: Uuid = Uuid.random(),
     override val timestamp: Instant = Clock.System.now(),
     override val location: Location? = null,
-    val uri: String? = null,
-    val caption: String = "",
-    val duration: Long = 0, // Duration in milliseconds
+    override val uri: String? = null,
+    override val caption: String = "",
+    val duration: Long = 0,
     val transcription: String = "",
-    val isPlaying: Boolean = false,
-) : EntryBlockUiState {
+) : MediaBlockUiState {
     override fun hasContent(): Boolean = uri != null
 }

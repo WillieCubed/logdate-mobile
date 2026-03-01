@@ -13,8 +13,9 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.core.spring
-import androidx.compose.runtime.collectAsState
-import org.koin.compose.viewmodel.koinViewModel
+import androidx.compose.runtime.produceState
+import app.logdate.feature.editor.audio.AudioContextProcessor
+import org.koin.compose.koinInject
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,11 +57,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
-import kotlin.time.Duration.Companion.milliseconds
+import app.logdate.feature.editor.ui.formatMediaDuration
 
 // Default height constants for audio visualizations
 private val COLLAPSED_WAVEFORM_MIN_HEIGHT = 32.dp
 private val EXPANDED_WAVEFORM_MIN_HEIGHT = 180.dp
+private const val COLLAPSED_WAVEFORM_BARS = 15
+private const val EXPANDED_WAVEFORM_BARS = 60
 
 /**
  * A Material Design 3 component for displaying and interacting with audio blocks.
@@ -81,13 +84,39 @@ private val EXPANDED_WAVEFORM_MIN_HEIGHT = 180.dp
 @Composable
 fun AudioBlockContent(
     block: AudioBlockUiState,
-    isExpanded: Boolean, // TODO: Ignore this, keep internal, maybe leave isExpanded as override
+    isExpanded: Boolean,
+    isPlaying: Boolean,
     onPlayPauseClicked: () -> Unit,
     onDeleteClicked: () -> Unit,
     onSeekPositionChanged: (Float) -> Unit,
     playbackProgress: Float = 0f,
     modifier: Modifier = Modifier,
 ) {
+    val audioContextProcessor: AudioContextProcessor = koinInject()
+    val waveformAmplitudes by produceState(
+        initialValue = emptyList<Float>(),
+        block.uri,
+        block.duration,
+        block.timestamp,
+        block.location
+    ) {
+        val uri = block.uri
+        if (uri.isNullOrBlank()) {
+            value = emptyList()
+            return@produceState
+        }
+
+        value = runCatching {
+            audioContextProcessor.process(
+                audioUri = uri,
+                durationMs = block.duration,
+                createdAt = block.timestamp,
+                latitude = block.location?.latitude,
+                longitude = block.location?.longitude
+            ).amplitudes
+        }.getOrElse { emptyList() }
+    }
+
     // Track expanded state internally, with external override capability via isExpanded parameter
     var isCollapsedInternal by remember { mutableStateOf(!isExpanded) }
 
@@ -146,28 +175,23 @@ fun AudioBlockContent(
             if (!isCollapsedInternal) {
                 ExpandedAudioContent(
                     block = block,
+                    isPlaying = isPlaying,
                     progress = playbackProgress,
-                    onPlayPauseClicked = {
-                        // Just bubble up the event to the parent
-                        onPlayPauseClicked()
-                    },
+                    onPlayPauseClicked = onPlayPauseClicked,
                     onDeleteClicked = onDeleteClicked,
-                    onProgressChanged = { newPosition -> 
-                        // Just bubble up the event to the parent
-                        onSeekPositionChanged(newPosition)
-                    },
+                    onProgressChanged = onSeekPositionChanged,
                     playButtonScale = playButtonScale,
+                    waveformAmplitudes = waveformAmplitudes,
                     animatedVisibilityScope = this@AnimatedContent,
                     sharedTransitionScope = this@SharedTransitionLayout,
                 )
             } else {
                 CollapsedAudioContent(
                     block = block,
-                    onPlayPauseClicked = {
-                        // Just bubble up the event to the parent
-                        onPlayPauseClicked()
-                    },
+                    isPlaying = isPlaying,
+                    onPlayPauseClicked = onPlayPauseClicked,
                     playButtonScale = playButtonScale,
+                    waveformAmplitudes = waveformAmplitudes,
 //                    modifier = Modifier.fillMaxWidth(),
                     animatedVisibilityScope = this@AnimatedContent,
                     sharedTransitionScope = this@SharedTransitionLayout,
@@ -183,8 +207,10 @@ fun AudioBlockContent(
 @Composable
 private fun CollapsedAudioContent(
     block: AudioBlockUiState,
+    isPlaying: Boolean,
     onPlayPauseClicked: () -> Unit,
     playButtonScale: Float,
+    waveformAmplitudes: List<Float>,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
     modifier: Modifier = Modifier,
@@ -203,7 +229,7 @@ private fun CollapsedAudioContent(
         ) {
             // Play/Pause button - using shared element transition and animated shape
             AnimatedPlayPauseButton(
-                isPlaying = block.isPlaying,
+                isPlaying = isPlaying,
                 onClick = onPlayPauseClicked,
                 modifier = Modifier
                     .size(40.dp)
@@ -239,9 +265,10 @@ private fun CollapsedAudioContent(
                 if (block.uri != null) {
                     // Simplified waveform for collapsed state that scales to fit container
                     AudioWaveformComponent(
-                        audioLevels = generateSimpleWaveform(block.uri.hashCode()),
+                        audioLevels = waveformAmplitudes,
                         isRecording = false,
                         waveformColor = MaterialTheme.colorScheme.primary,
+                        maxBars = COLLAPSED_WAVEFORM_BARS,
                         minHeight = COLLAPSED_WAVEFORM_MIN_HEIGHT,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -251,7 +278,7 @@ private fun CollapsedAudioContent(
             // Audio duration - only show if there's actual audio
             if (block.uri != null) {
                 Text(
-                    text = formatDuration(block.duration.milliseconds),
+                    text = formatMediaDuration(block.duration, true),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -273,11 +300,13 @@ private fun CollapsedAudioContent(
 @Composable
 private fun ExpandedAudioContent(
     block: AudioBlockUiState,
+    isPlaying: Boolean,
     progress: Float,
     onPlayPauseClicked: () -> Unit,
     onDeleteClicked: () -> Unit,
     onProgressChanged: (Float) -> Unit,
     playButtonScale: Float,
+    waveformAmplitudes: List<Float>,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
     modifier: Modifier = Modifier,
@@ -336,10 +365,11 @@ private fun ExpandedAudioContent(
                     if (block.uri != null) {
                         // Detailed waveform for expanded state that scales to container
                         AudioWaveformComponent(
-                            audioLevels = generateDetailedWaveform(block.uri.hashCode()),
+                            audioLevels = waveformAmplitudes,
                             isRecording = false,
                             waveformColor = MaterialTheme.colorScheme.primary,
                             strokeWidth = 3.dp, // Slightly thicker lines for better visibility
+                            maxBars = EXPANDED_WAVEFORM_BARS,
                             minHeight = EXPANDED_WAVEFORM_MIN_HEIGHT,
                             modifier = Modifier.fillMaxSize()
                         )
@@ -348,6 +378,7 @@ private fun ExpandedAudioContent(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth(progress)
+                                .align(Alignment.CenterStart)
                                 .height(180.dp)
                                 .background(
                                     MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
@@ -362,7 +393,7 @@ private fun ExpandedAudioContent(
 
                     // Centered play button overlay for easier access with animated shape
                     AnimatedPlayPauseButton(
-                        isPlaying = block.isPlaying,
+                        isPlaying = isPlaying,
                         onClick = onPlayPauseClicked,
                         modifier = Modifier
                             .size(72.dp) // Larger button
@@ -388,7 +419,7 @@ private fun ExpandedAudioContent(
                 if (block.uri != null) {
                     // Current position
                     Text(
-                        text = formatDuration((block.duration * progress).toLong().milliseconds),
+                        text = formatMediaDuration((block.duration * progress).toLong(), true),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.width(48.dp)
@@ -408,7 +439,7 @@ private fun ExpandedAudioContent(
 
                     // Total duration
                     Text(
-                        text = formatDuration(block.duration.milliseconds),
+                        text = formatMediaDuration(block.duration, true),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
@@ -450,24 +481,6 @@ private fun ExpandedAudioContent(
     }
 }
 
-/**
- * Generate a simple waveform pattern for display in collapsed state.
- * This is a placeholder that would be replaced with real waveform data.
- */
-private fun generateSimpleWaveform(seed: Int): List<Float> {
-    val random = kotlin.random.Random(seed)
-    return List(15) { random.nextFloat() * 0.6f + 0.2f }
-}
-
-/**
- * Generate a more detailed waveform pattern for display in expanded state.
- * This is a placeholder that would be replaced with real waveform data.
- */
-private fun generateDetailedWaveform(seed: Int): List<Float> {
-    val random = kotlin.random.Random(seed)
-    return List(60) { random.nextFloat() * 0.7f + 0.15f }
-}
-
 // AnimatedPlayPauseButton moved to its own file
 
 /**
@@ -489,19 +502,4 @@ private fun PlayPauseAnimatedIcon(
         contentDescription = if (isPlaying) "Pause" else "Play",
         modifier = modifier.size(iconSize)
     )
-}
-
-/**
- * Formats a Duration into MM:SS format for display.
- */
-private fun formatDuration(duration: kotlin.time.Duration): String {
-    val totalSeconds = duration.inWholeSeconds
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-
-    // Format without using String.format
-    val minutesStr = if (minutes < 10) "0$minutes" else "$minutes"
-    val secondsStr = if (seconds < 10) "0$seconds" else "$seconds"
-
-    return "$minutesStr:$secondsStr"
 }

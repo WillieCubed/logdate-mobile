@@ -42,9 +42,11 @@ import androidx.compose.material.icons.rounded.Replay10
 import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.feature.editor.audio.model.AudioSegment
 import app.logdate.feature.editor.ui.audio.waveform.BezierAudioWaveform
-import kotlinx.datetime.Instant
+import app.logdate.feature.editor.ui.formatMediaDuration
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.number
 
 /**
  * Second expansion state - elevated card with full controls.
@@ -171,7 +173,7 @@ fun ElevatedAudioCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = formatDuration(durationMs),
+                            text = formatMediaDuration(durationMs, false),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -229,16 +231,9 @@ fun ElevatedAudioCard(
     }
 }
 
-private fun formatDuration(durationMs: Long): String {
-    val totalSeconds = durationMs / 1000
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    return "$minutes:${seconds.toString().padStart(2, '0')}"
-}
-
 private fun formatProgress(progress: Float, durationMs: Long): String {
     val currentMs = (progress * durationMs).toLong()
-    return formatDuration(currentMs)
+    return formatMediaDuration(currentMs, false)
 }
 
 private fun formatDateTime(instant: Instant): String {
@@ -246,5 +241,5 @@ private fun formatDateTime(instant: Instant): String {
     val months = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
     val hour = if (local.hour == 0) 12 else if (local.hour > 12) local.hour - 12 else local.hour
     val amPm = if (local.hour < 12) "AM" else "PM"
-    return "${months[local.monthNumber - 1]} ${local.dayOfMonth}, $hour:${local.minute.toString().padStart(2, '0')} $amPm"
+    return "${months[local.month.number - 1]} ${local.day}, $hour:${local.minute.toString().padStart(2, '0')} $amPm"
 }

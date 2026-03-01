@@ -7,9 +7,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import app.logdate.client.media.audio.AudioPlaybackMetadata
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.editor.RecordingState
+import app.logdate.util.formatDateLocalized
 import io.github.aakira.napier.Napier
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -55,6 +59,15 @@ fun AudioBlockEditor(
             List(20) { 0.1f } 
         }
     }
+
+    val playbackMetadata = remember(block) {
+        val subtitle = formatDateLocalized(block.timestamp.toLocalDateTime(TimeZone.currentSystemDefault()).date)
+        AudioPlaybackMetadata(
+            title = block.caption.ifBlank { "Audio Recording" },
+            subtitle = subtitle,
+            noteId = block.id,
+        )
+    }
     
     // Function to handle saving a recorded audio file
     val handleSaveRecording = { uri: String ->
@@ -79,22 +92,18 @@ fun AudioBlockEditor(
     // Use AudioPermissionWrapper to handle permissions
     AudioPermissionWrapper {
         if (hasExistingAudio) {
+            val audioUri = block.uri ?: return@AudioPermissionWrapper
             AudioBlockContent(
                 block = block,
                 isExpanded = true,
+                isPlaying = audioUiState.isPlaying,
                 playbackProgress = audioUiState.playbackProgress,
                 onPlayPauseClicked = {
-                    // Handle play/pause toggle here in the intermediate component
-                    if (block.uri != null) {
-                        audioViewModel.togglePlayback(block.uri)
-                    }
-                    onBlockUpdated(block.copy(isPlaying = !block.isPlaying))
+                    audioViewModel.togglePlayback(audioUri, playbackMetadata)
                 },
                 onSeekPositionChanged = { position ->
                     // Handle seek position change here
-                    if (block.uri != null) {
-                        audioViewModel.seekTo(position)
-                    }
+                    audioViewModel.seekTo(position)
                 },
                 onDeleteClicked = onDeleteRequested,
                 modifier = Modifier.fillMaxWidth()

@@ -8,7 +8,7 @@ import app.logdate.feature.editor.ui.editor.EntryBlockUiState
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.feature.editor.ui.editor.VideoBlockUiState
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 /**
  * Maps a JournalNote domain model to an EntryBlockData UI model.
@@ -43,14 +43,7 @@ fun JournalNote.toDomainBlock(): EntryBlockUiState {
             timestamp = creationTimestamp,
             location = null,
             uri = mediaRef,
-            duration = durationMs ?: 0
-        )
-
-        else -> TextBlockUiState(
-            id = uid,
-            timestamp = creationTimestamp,
-            location = null,
-            content = ""
+            duration = durationMs
         )
     }
 }
@@ -119,10 +112,8 @@ fun EntryBlockUiState.toJournalNote(): JournalNote? {
                 creationTimestamp = timestamp,
                 lastUpdated = now,
                 mediaRef = uri ?: return null,
-                durationMs = duration.takeIf { it > 0 }
+                durationMs = duration
             )
         }
-        
-        else -> null
     }
 }

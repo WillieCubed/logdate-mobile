@@ -10,7 +10,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -30,7 +29,6 @@ import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.feature.editor.ui.editor.VideoBlockUiState
 import app.logdate.feature.editor.ui.layout.EntryEditorSurface
 import app.logdate.feature.editor.ui.state.BlocksUiState
-import app.logdate.feature.editor.ui.state.EditorRecorderState
 import app.logdate.feature.editor.ui.text.TextBlockContent
 import app.logdate.feature.editor.ui.video.VideoBlockEditor
 import app.logdate.ui.common.conditional
@@ -91,16 +89,9 @@ fun MainEditorContent(
                     // Render each block using the BlockContent composable
                     BlockContent(
                         block = block,
-                        onBlockFocused = { blockId ->
-                            uiState.textState.onBlockFocused(blockId)
-                        },
-                        onBlockUpdated = { updatedBlock ->
-                            uiState.onUpdateBlock(updatedBlock)
-                        },
-                        onBlockDeleted = { blockId ->
-                            uiState.onDeleteBlock(blockId)
-                        },
-                        audioState = uiState.audioState,
+                        onBlockFocused = uiState.onBlockFocused,
+                        onBlockUpdated = uiState.onUpdateBlock,
+                        onBlockDeleted = uiState.onDeleteBlock,
                         modifier = Modifier
                             .animateItem()  // Add smooth add/remove animations
                             .conditional(true) {
@@ -134,12 +125,11 @@ fun MainEditorContent(
  * and handles user interactions like text changes and focus events.
  */
 @Composable
-fun <T : EntryBlockUiState> BlockContent(
-    block: T,
+fun BlockContent(
+    block: EntryBlockUiState,
     onBlockFocused: (Uuid) -> Unit,
-    onBlockUpdated: (T) -> Unit,
+    onBlockUpdated: (EntryBlockUiState) -> Unit,
     onBlockDeleted: (Uuid) -> Unit,
-    audioState: EditorRecorderState? = null,
     modifier: Modifier = Modifier,
 ) {
     EntryEditorSurface(
@@ -152,9 +142,7 @@ fun <T : EntryBlockUiState> BlockContent(
                     block = block,
                     isExpanded = true,
                     onTextChanged = { newText ->
-                        onBlockUpdated(
-                            block.copy(content = newText) as T
-                        )
+                        onBlockUpdated(block.copy(content = newText))
                     },
                     onFocused = {
                         onBlockFocused(block.id)
@@ -163,63 +151,35 @@ fun <T : EntryBlockUiState> BlockContent(
             }
 
             is ImageBlockUiState -> {
-                // Use the ImageBlockEditor to handle image display and editing
                 app.logdate.feature.editor.ui.image.ImageBlockEditor(
                     block = block,
-                    onBlockUpdated = { updatedBlock ->
-                        onBlockUpdated(updatedBlock as T)
-                    },
-                    onDeleteRequested = {
-                        // Block deletion would be handled here
-                        // In a full implementation, this would call a method on the viewModel
-                        // For now it's a placeholder
-                    }
+                    onBlockUpdated = onBlockUpdated,
+                    onDeleteRequested = { onBlockDeleted(block.id) }
                 )
             }
 
             is AudioBlockUiState -> {
-                // Use the AudioBlockEditor to handle both recording and playback
                 AudioBlockEditor(
                     block = block,
-                    onBlockUpdated = { updatedBlock ->
-                        onBlockUpdated(updatedBlock as T)
-                    },
-                    onDeleteRequested = {
-                        // Block deletion would be handled here
-                        // In a full implementation, this would call a method on the viewModel
-                        // For now it's a placeholder
-                    }
+                    onBlockUpdated = onBlockUpdated,
+                    onDeleteRequested = { onBlockDeleted(block.id) }
                 )
             }
 
             is CameraBlockUiState -> {
-                // Use CameraBlockEditor for camera-captured media
                 CameraBlockEditor(
                     block = block,
-                    onBlockUpdated = { updatedBlock ->
-                        onBlockUpdated(updatedBlock as T)
-                    },
-                    onDeleteRequested = {
-                        onBlockDeleted(block.id)
-                    }
+                    onBlockUpdated = onBlockUpdated,
+                    onDeleteRequested = { onBlockDeleted(block.id) }
                 )
             }
 
             is VideoBlockUiState -> {
-                // Use VideoBlockEditor for video content
                 VideoBlockEditor(
                     block = block,
-                    onBlockUpdated = { updatedBlock ->
-                        onBlockUpdated(updatedBlock as T)
-                    },
-                    onDeleteRequested = {
-                        onBlockDeleted(block.id)
-                    }
+                    onBlockUpdated = onBlockUpdated,
+                    onDeleteRequested = { onBlockDeleted(block.id) }
                 )
-            }
-
-            else -> {
-                Text("Unsupported block type: ${block::class.simpleName}")
             }
         }
     }

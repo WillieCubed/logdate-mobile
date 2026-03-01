@@ -48,7 +48,8 @@ val editorFeatureModule: Module = module {
     includes(audioModule)
     
     // AudioRecordingManager is provided by client.media audioModule at the app level.
-    // AudioPlaybackManager and ImagePickerService are provided by platformEditorModule.
+    // AudioPlaybackManager is provided by the app-level audioModule.
+    // ImagePickerService is provided by platformEditorModule.
     
     // Provide mediator as a singleton to ensure consistent state across components
     singleOf(::EditorMediatorImpl) bind EditorMediator::class

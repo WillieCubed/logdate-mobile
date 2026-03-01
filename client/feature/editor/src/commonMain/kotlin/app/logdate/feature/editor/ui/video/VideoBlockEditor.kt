@@ -1,21 +1,12 @@
 package app.logdate.feature.editor.ui.video
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,6 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.editor.ui.common.DeleteMediaButton
+import app.logdate.feature.editor.ui.common.MediaCaptionField
 import app.logdate.feature.editor.ui.editor.VideoBlockUiState
 import app.logdate.feature.editor.ui.formatMediaDuration
 import io.github.aakira.napier.Napier
@@ -90,22 +83,11 @@ private fun VideoDisplayContent(
                     .clip(RoundedCornerShape(8.dp))
             )
 
-            IconButton(
+            DeleteMediaButton(
                 onClick = onDeleteRequested,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.7f),
-                        shape = RoundedCornerShape(4.dp)
-                    )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete video",
-                    tint = MaterialTheme.colorScheme.inverseOnSurface
-                )
-            }
+                contentDescription = "Delete video",
+                modifier = Modifier.align(Alignment.TopEnd)
+            )
 
             if (block.durationMs > 0) {
                 Surface(
@@ -125,17 +107,9 @@ private fun VideoDisplayContent(
             }
         }
 
-        OutlinedTextField(
-            value = block.caption,
-            onValueChange = { newCaption ->
-                onBlockUpdated(block.copy(caption = newCaption))
-            },
-            placeholder = { Text("Add a caption...") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-            textStyle = MaterialTheme.typography.bodyMedium,
-            maxLines = 3
+        MediaCaptionField(
+            caption = block.caption,
+            onCaptionChanged = { onBlockUpdated(block.copy(caption = it)) }
         )
     }
 }

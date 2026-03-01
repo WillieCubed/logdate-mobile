@@ -1,19 +1,11 @@
 package app.logdate.feature.editor.ui.image
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -23,6 +15,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.editor.ui.common.DeleteMediaButton
+import app.logdate.feature.editor.ui.common.MediaCaptionField
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
@@ -94,37 +88,16 @@ fun ImageBlockEditor(
                         .clip(RoundedCornerShape(8.dp))
                 )
                 
-                // Delete button overlay
-                IconButton(
+                DeleteMediaButton(
                     onClick = onDeleteRequested,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .background(
-                            color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.7f),
-                            shape = RoundedCornerShape(4.dp)
-                        )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete image",
-                        tint = MaterialTheme.colorScheme.inverseOnSurface
-                    )
-                }
+                    contentDescription = "Delete image",
+                    modifier = Modifier.align(Alignment.TopEnd)
+                )
             }
-            
-            // Caption field
-            OutlinedTextField(
-                value = block.caption,
-                onValueChange = { newCaption ->
-                    onBlockUpdated(block.copy(caption = newCaption))
-                },
-                placeholder = { Text("Add a caption...") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                textStyle = MaterialTheme.typography.bodyMedium,
-                maxLines = 3
+
+            MediaCaptionField(
+                caption = block.caption,
+                onCaptionChanged = { onBlockUpdated(block.copy(caption = it)) }
             )
         }
     } else {

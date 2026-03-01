@@ -1,7 +1,7 @@
 package app.logdate.feature.editor.audio.color
 
 import app.logdate.feature.editor.audio.model.DaylightPeriod
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime

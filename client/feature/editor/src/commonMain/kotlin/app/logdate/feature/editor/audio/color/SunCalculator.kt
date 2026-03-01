@@ -9,6 +9,7 @@ import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.sin
 import kotlin.math.tan
+import kotlinx.datetime.number
 
 /**
  * Sunrise, sunset, and solar noon times for a given date and location.
@@ -37,7 +38,7 @@ object SunCalculator {
      * @return SunTimes containing sunrise, sunset, and solar noon
      */
     fun calculate(latitude: Double, longitude: Double, date: LocalDate): SunTimes {
-        val julianDay = calculateJulianDay(date.year, date.monthNumber, date.dayOfMonth)
+        val julianDay = calculateJulianDay(date.year, date.month.number, date.day)
         val julianCentury = (julianDay - 2451545.0) / 36525.0
 
         val geomMeanLongSun = (280.46646 + julianCentury * (36000.76983 + 0.0003032 * julianCentury)) % 360
