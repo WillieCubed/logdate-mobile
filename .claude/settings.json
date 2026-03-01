@@ -1,0 +1,89 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".githooks/block-rogue-configs.sh",
+            "statusMessage": "Checking protected config files..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".githooks/block-rogue-configs.sh",
+            "statusMessage": "Checking protected config files..."
+          },
+          {
+            "type": "command",
+            "command": ".githooks/commit-message-checklist.sh",
+            "statusMessage": "Validating commit message..."
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "deny": [
+      "Bash(git add -A*)",
+      "Bash(git add --all*)",
+      "Bash(git add .*)",
+      "Bash(git add \\*)",
+      "Bash(git commit -a*)",
+      "Bash(git commit --all*)",
+      "Bash(git commit --no-verify*)",
+      "Bash(git commit -n *)",
+      "Bash(git push --force*)",
+      "Bash(git push -f *)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean -f*)",
+      "Bash(git checkout -- .)",
+      "Bash(git restore .)",
+      "Bash(rm -rf .git*)",
+      "Bash(rm -rf *)"
+    ],
+    "allow": [
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git branch*)",
+      "Bash(git restore --staged*)",
+      "Bash(git restore --staged . &&*)",
+      "Bash(git add client/*)",
+      "Bash(git add server/*)",
+      "Bash(git add app/*)",
+      "Bash(git add shared/*)",
+      "Bash(git add docs/*)",
+      "Bash(git add scripts/*)",
+      "Bash(git add tests/*)",
+      "Bash(git add .githooks/*)",
+      "Bash(git add .claude/*)",
+      "Bash(git add .gitignore*)",
+      "Bash(git add .editorconfig*)",
+      "Bash(git add allowed-scopes.txt*)",
+      "Bash(git add CLAUDE.md*)",
+      "Bash(git add AGENTS.md*)",
+      "Bash(git add README.md*)",
+      "Bash(git add *.md)",
+      "Bash(git add *.kt)",
+      "Bash(git add *.kts)",
+      "Bash(git add *.txt)",
+      "Bash(git add *.sh)",
+      "Bash(git add *.toml)",
+      "Bash(git add *.xml)",
+      "Bash(git add *.json)",
+      "Bash(git commit -m*)",
+      "Bash(git push origin*)",
+      "Bash(git push -u origin*)",
+      "Bash(./gradlew*)",
+      "Bash(./run*)",
+      "Bash(bash scripts/*)"
+    ]
+  }
+}
