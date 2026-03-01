@@ -1,6 +1,7 @@
 package app.logdate.wear.recording
 
-import app.logdate.feature.editor.ui.audio.AudioPlaybackManager
+import app.logdate.client.media.audio.AudioPlaybackManager
+import app.logdate.client.media.audio.AudioPlaybackMetadata
 import io.github.aakira.napier.Napier
 
 /**
@@ -14,6 +15,7 @@ class StubAudioPlaybackManager : AudioPlaybackManager {
     
     override fun startPlayback(
         uri: String,
+        metadata: AudioPlaybackMetadata?,
         onProgressUpdated: (Float) -> Unit,
         onPlaybackCompleted: () -> Unit
     ) {

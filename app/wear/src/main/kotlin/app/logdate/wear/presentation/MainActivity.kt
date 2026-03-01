@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation3.runtime.NavKey
-import androidx.navigation3.runtime.entry
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import androidx.wear.compose.material3.Button
@@ -93,9 +92,10 @@ fun WearApp() {
         
         NavDisplay(
             backStack = backStack,
-            onBack = { count ->
-                val entriesToRemove = count.coerceAtMost(backStack.size - 1)
-                repeat(entriesToRemove) { backStack.removeAt(backStack.lastIndex) }
+            onBack = {
+                if (backStack.size > 1) {
+                    backStack.removeAt(backStack.lastIndex)
+                }
             },
             entryProvider = entryProvider {
                 entry<WearHomeRoute> {

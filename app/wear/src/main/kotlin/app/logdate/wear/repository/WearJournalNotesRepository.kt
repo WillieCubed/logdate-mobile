@@ -6,8 +6,8 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.datetime.Instant
 import java.io.File
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -25,82 +25,21 @@ class WearJournalNotesRepository(
     
     /**
      * Creates a new note and stores it locally on the watch.
-     * For audio notes, copies the temporary recording to permanent storage.
      */
     suspend fun create(note: JournalNote): Uuid {
         try {
-            // Handle different note types
-            val processedNote = when (note) {
-                is JournalNote.Audio -> processAudioNote(note)
-                else -> note
-            }
-            
             // Add to our local cache
             val currentNotes = notes.value.toMutableList()
-            currentNotes.add(processedNote)
+            currentNotes.add(note)
             notes.value = currentNotes
             
             // Log success
-            Napier.d("Note created on Wear OS: ${processedNote.uid}")
+            Napier.d("Note created on Wear OS: ${note.uid}")
             
-            return processedNote.uid
+            return note.uid
         } catch (e: Exception) {
             Napier.e("Failed to create note on Wear OS", e)
             throw e
-        }
-    }
-    
-    /**
-     * Process an audio note by moving the temporary recording file to a permanent location.
-     */
-    private suspend fun processAudioNote(note: JournalNote.Audio): JournalNote.Audio {
-        val sourceFile = File(note.mediaRef)
-        if (!sourceFile.exists()) {
-            Napier.e("Audio file doesn't exist: ${note.mediaRef}")
-            return note
-        }
-        
-        try {
-            // Create directory for audio files if it doesn't exist
-            val audioDir = File(context.filesDir, "audio_notes")
-            if (!audioDir.exists()) {
-                audioDir.mkdirs()
-            }
-            
-            // Create a permanent file with the note's UUID
-            val destFile = File(audioDir, "${note.uid}.m4a")
-
-            if (sourceFile.absolutePath == destFile.absolutePath) {
-                Napier.d("Audio file already in destination: ${destFile.absolutePath}")
-                return note
-            }
-
-            if (destFile.exists()) {
-                destFile.delete()
-            }
-            
-            val moved = sourceFile.renameTo(destFile)
-            if (!moved) {
-                // Copy the file
-                sourceFile.inputStream().use { input ->
-                    destFile.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                }
-                sourceFile.delete()
-            }
-            
-            // If copy was successful, create new note with updated path
-            return if (destFile.exists()) {
-                Napier.d("Audio file copied to: ${destFile.absolutePath}")
-                note.copy(mediaRef = destFile.absolutePath)
-            } else {
-                Napier.e("Failed to copy audio file")
-                note
-            }
-        } catch (e: Exception) {
-            Napier.e("Error processing audio note", e)
-            return note
         }
     }
     

@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package app.logdate.wear.presentation.audio
 
 import androidx.compose.foundation.layout.*
