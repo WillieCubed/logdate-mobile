@@ -1,7 +1,7 @@
 package app.logdate.client.repository.media
 
 import kotlinx.coroutines.flow.Flow
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.time.Duration
 import kotlin.uuid.Uuid
 

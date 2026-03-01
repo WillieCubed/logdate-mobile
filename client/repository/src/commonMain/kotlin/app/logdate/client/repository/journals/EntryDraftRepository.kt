@@ -4,7 +4,7 @@ package app.logdate.client.repository.journals
 
 import app.logdate.util.UuidSerializer
 import kotlinx.coroutines.flow.Flow
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid

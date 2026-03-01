@@ -2,7 +2,7 @@ package app.logdate.client.repository.user
 
 import app.logdate.shared.model.user.UserData
 import kotlinx.coroutines.flow.Flow
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 interface UserStateRepository {
     val userData: Flow<UserData>

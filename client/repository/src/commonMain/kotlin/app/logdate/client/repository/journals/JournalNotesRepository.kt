@@ -2,7 +2,7 @@ package app.logdate.client.repository.journals
 
 import app.logdate.util.UuidSerializer
 import kotlinx.coroutines.flow.Flow
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
@@ -169,7 +169,7 @@ sealed class JournalNote(
     @Serializable
     data class Audio(
         val mediaRef: String,
-        val durationMs: Long? = null,
+        val durationMs: Long = 0,
         @Serializable(with = UuidSerializer::class)
         override val uid: Uuid = Uuid.random(),
         override val creationTimestamp: Instant,

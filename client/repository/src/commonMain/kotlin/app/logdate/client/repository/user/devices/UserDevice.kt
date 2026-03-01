@@ -1,6 +1,6 @@
 package app.logdate.client.repository.user.devices
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * A user's device.

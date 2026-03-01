@@ -2,7 +2,7 @@ package app.logdate.client.repository.location
 
 import app.logdate.shared.model.Location
 import kotlinx.coroutines.flow.Flow
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Repository for managing location history and logging.

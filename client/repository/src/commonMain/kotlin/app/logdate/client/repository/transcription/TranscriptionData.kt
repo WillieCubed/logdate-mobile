@@ -1,6 +1,6 @@
 package app.logdate.client.repository.transcription
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
