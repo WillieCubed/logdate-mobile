@@ -4,7 +4,8 @@ import app.logdate.client.database.dao.sync.SyncMetadataDao
 import app.logdate.client.database.entities.sync.PendingUploadEntity
 import app.logdate.client.database.entities.sync.SyncCursorEntity
 import kotlinx.coroutines.flow.Flow
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 /**
  * Room-backed implementation of [SyncMetadataService].
@@ -52,7 +53,7 @@ class DatabaseSyncMetadataService(
             return
         }
 
-        val createdAt = existing?.createdAt ?: kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+        val createdAt = existing?.createdAt ?: Clock.System.now().toEpochMilliseconds()
         val retryCount = existing?.retryCount ?: 0
         dao.insertPending(
             PendingUploadEntity(
@@ -94,7 +95,7 @@ class DatabaseSyncMetadataService(
                 entityType = entityType.name,
                 entityId = entityId,
                 operation = operation,
-                createdAt = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+                createdAt = Clock.System.now().toEpochMilliseconds()
             )
         )
     }

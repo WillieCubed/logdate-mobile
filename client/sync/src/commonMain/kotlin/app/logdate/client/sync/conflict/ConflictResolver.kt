@@ -1,6 +1,6 @@
 package app.logdate.client.sync.conflict
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Strategy for resolving conflicts between local and remote versions of entities.

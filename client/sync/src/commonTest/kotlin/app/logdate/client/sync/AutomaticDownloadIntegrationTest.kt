@@ -22,10 +22,10 @@ import app.logdate.client.sync.test.*
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.test.assertEquals
@@ -283,6 +283,7 @@ class AutomaticDownloadIntegrationTest {
         val mockNotesRepository = FakeJournalNotesRepository()
         val mockJournalRepository = FakeJournalRepository()
         val mockJournalContentRepository = FakeJournalContentRepository()
+        val syncMetadataService = fakeSyncMetadataService()
 
         val syncManager = DefaultSyncManager(
             cloudContentDataSource = DefaultCloudContentDataSource(mockApiClient),
@@ -301,7 +302,7 @@ class AutomaticDownloadIntegrationTest {
             conflictStore = InMemorySyncConflictStore(),
             deadLetterStore = InMemorySyncDeadLetterStore(),
             retryScheduleStore = InMemorySyncRetryScheduleStore(),
-            syncMetadataService = fakeSyncMetadataService(),
+            syncMetadataService = syncMetadataService,
             transactionManager = testSyncTransactionManager()
         )
 
@@ -325,6 +326,7 @@ class AutomaticDownloadIntegrationTest {
             content = "Local update after sync"
         )
         mockNotesRepository.create(localNote)
+        syncMetadataService.addPending(localNote.uid, EntityType.NOTE)
 
         mockApiClient.getContentChangesResponse = Result.success(
             ContentChangesResponse(
@@ -605,6 +607,7 @@ class AutomaticDownloadIntegrationTest {
         val mockNotesRepository = FakeJournalNotesRepository()
         val mockJournalRepository = FakeJournalRepository()
         val mockJournalContentRepository = FakeJournalContentRepository()
+        val syncMetadataService = fakeSyncMetadataService()
 
         val syncManager = DefaultSyncManager(
             cloudContentDataSource = DefaultCloudContentDataSource(mockApiClient),
@@ -623,7 +626,7 @@ class AutomaticDownloadIntegrationTest {
             conflictStore = InMemorySyncConflictStore(),
             deadLetterStore = InMemorySyncDeadLetterStore(),
             retryScheduleStore = InMemorySyncRetryScheduleStore(),
-            syncMetadataService = fakeSyncMetadataService(),
+            syncMetadataService = syncMetadataService,
             transactionManager = testSyncTransactionManager()
         )
 
@@ -648,6 +651,7 @@ class AutomaticDownloadIntegrationTest {
             lastUpdated = lastSyncTime.plus(1.seconds)
         )
         mockJournalRepository.create(localJournal)
+        syncMetadataService.addPending(localJournal.id, EntityType.JOURNAL)
 
         mockApiClient.getJournalChangesResponse = Result.success(
             JournalChangesResponse(

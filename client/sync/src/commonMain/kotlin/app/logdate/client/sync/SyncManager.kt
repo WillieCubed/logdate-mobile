@@ -1,6 +1,6 @@
 package app.logdate.client.sync
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * A generic interface for syncing the client with the user's remote data.

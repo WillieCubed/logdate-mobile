@@ -19,6 +19,7 @@ import app.logdate.client.networking.NetworkState
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.combine
@@ -121,6 +122,7 @@ class AndroidLogDateSyncWorker(
  * - No UI code needs to manually schedule WorkManager sync
  * - Network transitions (offline→online) automatically trigger sync retry if needed
  */
+@OptIn(FlowPreview::class)
 class AndroidSyncManager(
     private val applicationContext: Context,
     private val defaultSyncManager: DefaultSyncManager,

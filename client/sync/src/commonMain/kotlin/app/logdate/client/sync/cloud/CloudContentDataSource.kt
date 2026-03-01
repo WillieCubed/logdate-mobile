@@ -2,7 +2,7 @@ package app.logdate.client.sync.cloud
 
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.shared.model.sync.VersionConstraint
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -106,7 +106,7 @@ class DefaultCloudContentDataSource(
             },
             durationMs = when (this) {
                 is JournalNote.Audio -> durationMs
-                else -> null
+                else -> 0
             },
             createdAt = creationTimestamp.toEpochMilliseconds(),
             lastUpdated = lastUpdated.toEpochMilliseconds(),
@@ -128,7 +128,7 @@ class DefaultCloudContentDataSource(
             },
             durationMs = when (this) {
                 is JournalNote.Audio -> durationMs
-                else -> null
+                else -> 0
             },
             lastUpdated = lastUpdated.toEpochMilliseconds(),
             syncVersion = syncVersion,

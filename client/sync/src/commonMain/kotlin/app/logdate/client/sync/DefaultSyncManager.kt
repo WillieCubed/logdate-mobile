@@ -42,8 +42,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -654,6 +654,19 @@ class DefaultSyncManager(
         )
     }
 
+    private fun conflictTimestamps(
+        localSyncVersion: Long,
+        localUpdatedAt: Instant,
+        remoteSyncVersion: Long,
+        remoteUpdatedAt: Instant
+    ): Pair<Instant, Instant> {
+        return if (localSyncVersion > 0L && remoteSyncVersion > 0L) {
+            Instant.fromEpochMilliseconds(localSyncVersion) to Instant.fromEpochMilliseconds(remoteSyncVersion)
+        } else {
+            localUpdatedAt to remoteUpdatedAt
+        }
+    }
+
     private suspend fun shouldAttempt(entityType: EntityType, entityId: String): Boolean {
         val nextAttemptAt = retryScheduleStore.nextAttemptAt(entityType, entityId) ?: return true
         return Clock.System.now().toEpochMilliseconds() >= nextAttemptAt
@@ -826,7 +839,7 @@ class DefaultSyncManager(
                                 recordConflict(
                                     entityType = EntityType.JOURNAL,
                                     entityId = journal.id.toString(),
-                                    reason = error.message ?: "Journal conflict",
+                                    reason = error.message.orEmpty().ifBlank { "Journal conflict" },
                                     localVersion = journal.syncVersion,
                                     remoteVersion = null,
                                     localUpdatedAt = journal.lastUpdated,
@@ -1022,7 +1035,7 @@ class DefaultSyncManager(
                                 recordConflict(
                                     entityType = EntityType.NOTE,
                                     entityId = note.uid.toString(),
-                                    reason = error.message ?: "Content conflict",
+                                    reason = error.message.orEmpty().ifBlank { "Content conflict" },
                                     localVersion = note.syncVersion,
                                     remoteVersion = null,
                                     localUpdatedAt = note.lastUpdated,
@@ -1240,11 +1253,33 @@ class DefaultSyncManager(
                             val existingJournal = localJournals[journal.id]
 
                             if (existingJournal != null) {
+                                val hasPendingLocal = pendingJournals.contains(journal.id.toString())
+                                if (hasPendingLocal) {
+                                    conflictsResolved++
+                                    Napier.w("Skipping journal update for ${journal.id} due to local pending changes")
+                                    recordConflict(
+                                        entityType = EntityType.JOURNAL,
+                                        entityId = journal.id.toString(),
+                                        reason = "Local pending changes vs remote update",
+                                        localVersion = existingJournal.syncVersion,
+                                        remoteVersion = journal.syncVersion,
+                                        localUpdatedAt = existingJournal.lastUpdated,
+                                        remoteUpdatedAt = journal.lastUpdated
+                                    )
+                                    continue
+                                }
+
+                                val (localTimestamp, remoteTimestamp) = conflictTimestamps(
+                                    localSyncVersion = existingJournal.syncVersion,
+                                    localUpdatedAt = existingJournal.lastUpdated,
+                                    remoteSyncVersion = journal.syncVersion,
+                                    remoteUpdatedAt = journal.lastUpdated
+                                )
                                 val resolution = journalConflictResolver.resolve(
                                     local = existingJournal,
                                     remote = journal,
-                                    localTimestamp = existingJournal.lastUpdated,
-                                    remoteTimestamp = journal.lastUpdated
+                                    localTimestamp = localTimestamp,
+                                    remoteTimestamp = remoteTimestamp
                                 )
 
                                 when (resolution) {
@@ -1267,6 +1302,11 @@ class DefaultSyncManager(
                                         } else {
                                             journalRepository.update(resolution.merged)
                                         }
+                                        syncMetadataService.enqueuePending(
+                                            entityId = journal.id.toString(),
+                                            entityType = EntityType.JOURNAL,
+                                            operation = PendingOperation.UPDATE
+                                        )
                                         localJournals[journal.id] = resolution.merged
                                         conflictsResolved++
                                         Napier.d("Resolved conflict for journal ${journal.id}: merged")
@@ -1310,11 +1350,21 @@ class DefaultSyncManager(
                         try {
                             val localJournal = localJournals[journalId]
                             val hasPendingLocal = localJournal != null &&
-                                (pendingJournals.contains(journalId.toString()) || localJournal.lastUpdated > since)
+                                pendingJournals.contains(journalId.toString())
 
                             if (hasPendingLocal) {
+                                val journal = requireNotNull(localJournal)
                                 conflictsResolved++
                                 Napier.w("Skipping journal deletion for $journalId due to local changes")
+                                recordConflict(
+                                    entityType = EntityType.JOURNAL,
+                                    entityId = journalId.toString(),
+                                    reason = "Local pending changes vs remote deletion",
+                                    localVersion = journal.syncVersion,
+                                    remoteVersion = null,
+                                    localUpdatedAt = journal.lastUpdated,
+                                    remoteUpdatedAt = null
+                                )
                                 continue
                             }
 
@@ -1404,11 +1454,33 @@ class DefaultSyncManager(
                             val existingNote = localNotes[note.uid]
 
                             if (existingNote != null) {
+                                val hasPendingLocal = pendingNotes.contains(note.uid.toString())
+                                if (hasPendingLocal) {
+                                    conflictsResolved++
+                                    Napier.w("Skipping note update for ${note.uid} due to local pending changes")
+                                    recordConflict(
+                                        entityType = EntityType.NOTE,
+                                        entityId = note.uid.toString(),
+                                        reason = "Local pending changes vs remote update",
+                                        localVersion = existingNote.syncVersion,
+                                        remoteVersion = note.syncVersion,
+                                        localUpdatedAt = existingNote.lastUpdated,
+                                        remoteUpdatedAt = note.lastUpdated
+                                    )
+                                    continue
+                                }
+
+                                val (localTimestamp, remoteTimestamp) = conflictTimestamps(
+                                    localSyncVersion = existingNote.syncVersion,
+                                    localUpdatedAt = existingNote.lastUpdated,
+                                    remoteSyncVersion = note.syncVersion,
+                                    remoteUpdatedAt = note.lastUpdated
+                                )
                                 val resolution = noteConflictResolver.resolve(
                                     local = existingNote,
                                     remote = note,
-                                    localTimestamp = existingNote.lastUpdated,
-                                    remoteTimestamp = note.lastUpdated
+                                    localTimestamp = localTimestamp,
+                                    remoteTimestamp = remoteTimestamp
                                 )
 
                                 when (resolution) {
@@ -1435,6 +1507,11 @@ class DefaultSyncManager(
                                             journalNotesRepository.remove(existingNote)
                                             journalNotesRepository.create(resolution.merged)
                                         }
+                                        syncMetadataService.enqueuePending(
+                                            entityId = existingNote.uid.toString(),
+                                            entityType = EntityType.NOTE,
+                                            operation = PendingOperation.UPDATE
+                                        )
                                         localNotes[note.uid] = resolution.merged
                                         conflictsResolved++
                                         Napier.d("Resolved conflict for note ${note.uid}: merged")
@@ -1478,11 +1555,21 @@ class DefaultSyncManager(
                         try {
                             val localNote = localNotes[noteId]
                             val hasPendingLocal = localNote != null &&
-                                (pendingNotes.contains(noteId.toString()) || localNote.lastUpdated > since)
+                                pendingNotes.contains(noteId.toString())
 
                             if (hasPendingLocal) {
+                                val note = requireNotNull(localNote)
                                 conflictsResolved++
                                 Napier.w("Skipping note deletion for $noteId due to local changes")
+                                recordConflict(
+                                    entityType = EntityType.NOTE,
+                                    entityId = noteId.toString(),
+                                    reason = "Local pending changes vs remote deletion",
+                                    localVersion = note.syncVersion,
+                                    remoteVersion = null,
+                                    localUpdatedAt = note.lastUpdated,
+                                    remoteUpdatedAt = null
+                                )
                                 continue
                             }
 
@@ -1572,6 +1659,15 @@ class DefaultSyncManager(
                             if (pendingAssociations.contains(pendingKey)) {
                                 conflictsResolved++
                                 Napier.w("Skipping association add for $pendingKey due to local pending changes")
+                                recordConflict(
+                                    entityType = EntityType.ASSOCIATION,
+                                    entityId = pendingKey,
+                                    reason = "Local pending changes vs remote association add",
+                                    localVersion = null,
+                                    remoteVersion = association.syncVersion,
+                                    localUpdatedAt = null,
+                                    remoteUpdatedAt = null
+                                )
                                 continue
                             }
 
@@ -1606,6 +1702,15 @@ class DefaultSyncManager(
                             if (pendingAssociations.contains(pendingKey)) {
                                 conflictsResolved++
                                 Napier.w("Skipping association delete for $pendingKey due to local pending changes")
+                                recordConflict(
+                                    entityType = EntityType.ASSOCIATION,
+                                    entityId = pendingKey,
+                                    reason = "Local pending changes vs remote association delete",
+                                    localVersion = null,
+                                    remoteVersion = null,
+                                    localUpdatedAt = null,
+                                    remoteUpdatedAt = null
+                                )
                                 continue
                             }
 

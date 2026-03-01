@@ -1,6 +1,8 @@
 package app.logdate.client.sync.cloud
 
-import kotlinx.datetime.Instant
+import app.logdate.client.sync.crypto.MediaPayloadCrypto
+import app.logdate.client.sync.crypto.NoOpMediaPayloadCrypto
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -69,16 +71,22 @@ data class MediaUploadResult(
  * Default implementation of CloudMediaDataSource using the CloudApiClient.
  */
 class DefaultCloudMediaDataSource(
-    private val cloudApiClient: CloudApiClient
+    private val cloudApiClient: CloudApiClient,
+    private val mediaPayloadCrypto: MediaPayloadCrypto = NoOpMediaPayloadCrypto
 ) : CloudMediaDataSource {
     
     override suspend fun uploadMedia(accessToken: String, media: MediaFile): Result<MediaUploadResult> {
+        val encrypted = try {
+            mediaPayloadCrypto.encrypt(media.data)
+        } catch (error: Exception) {
+            return Result.failure(error)
+        }
         val request = MediaUploadRequest(
             contentId = media.contentId.toString(),
             fileName = media.fileName,
             mimeType = media.mimeType,
             sizeBytes = media.sizeBytes,
-            data = media.data
+            data = encrypted
         )
         
         return cloudApiClient.uploadMedia(accessToken, request).map { response ->
@@ -91,14 +99,25 @@ class DefaultCloudMediaDataSource(
     }
     
     override suspend fun downloadMedia(accessToken: String, mediaId: String): Result<MediaFile> {
-        return cloudApiClient.downloadMedia(accessToken, mediaId).map { response ->
-            MediaFile(
-                contentId = Uuid.parse(response.contentId),
-                fileName = response.fileName,
-                mimeType = response.mimeType,
-                sizeBytes = response.sizeBytes,
-                data = response.data
-            )
-        }
+        val responseResult = cloudApiClient.downloadMedia(accessToken, mediaId)
+        return responseResult.fold(
+            onSuccess = { response ->
+                try {
+                    val decrypted = mediaPayloadCrypto.decrypt(response.data)
+                    Result.success(
+                        MediaFile(
+                            contentId = Uuid.parse(response.contentId),
+                            fileName = response.fileName,
+                            mimeType = response.mimeType,
+                            sizeBytes = response.sizeBytes,
+                            data = decrypted
+                        )
+                    )
+                } catch (error: Exception) {
+                    Result.failure(error)
+                }
+            },
+            onFailure = { error -> Result.failure(error) }
+        )
     }
 }

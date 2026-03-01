@@ -1,7 +1,7 @@
 package app.logdate.client.sync.metadata
 
 import kotlinx.coroutines.flow.Flow
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
