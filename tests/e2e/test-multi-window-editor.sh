@@ -118,7 +118,7 @@ check_prerequisites() {
 
     # Check app is installed
     if ! adb shell pm list packages | grep -q "$PACKAGE_NAME"; then
-        print_fail "App not installed. Install it first with: ./gradlew :app:compose-main:installDebug"
+        print_fail "App not installed. Install it first with: ./gradlew :app:android-main:installDebug"
         exit 1
     fi
     print_pass "App installed ($PACKAGE_NAME)"

@@ -120,7 +120,7 @@ run_test() {
 
             print_info "Running multi-window editor e2e tests..."
 
-            local cmd="./gradlew :app:compose-main:connectedAndroidTest -k \"MultiWindowEditorE2ETest\""
+            local cmd="./gradlew :app:compose-main:androidConnectedCheck -k \"MultiWindowEditorE2ETest\""
 
             if [ "$VERBOSE" = true ] || [ "$ENABLE_DEBUG" = true ]; then
                 cmd="$cmd --info"
@@ -174,7 +174,7 @@ run_test() {
 
             # Run client tests
             print_info "Running client e2e tests..."
-            ./gradlew :app:compose-main:connectedAndroidTest $([ "$VERBOSE" = true ] && echo "--info" || echo "")
+            ./gradlew :app:compose-main:androidConnectedCheck $([ "$VERBOSE" = true ] && echo "--info" || echo "")
             print_success "Client tests completed"
 
             print_success "All e2e tests completed"

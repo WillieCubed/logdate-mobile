@@ -19,10 +19,15 @@ fi
 
 SYNC_BASE_URL=${SYNC_BASE_URL:-"http://localhost:8080/api/v1"}
 SYNC_TOKEN=${SYNC_TOKEN:-""}
+SYNC_SUMMARY_OUTPUT=${SYNC_SUMMARY_OUTPUT:-""}
 
 if [ -z "$SYNC_TOKEN" ]; then
     echo "SYNC_TOKEN is required"
     exit 1
 fi
 
-SYNC_BASE_URL="$SYNC_BASE_URL" SYNC_TOKEN="$SYNC_TOKEN" k6 run tests/load/sync-load.k6.js
+if [ -n "$SYNC_SUMMARY_OUTPUT" ]; then
+    SYNC_BASE_URL="$SYNC_BASE_URL" SYNC_TOKEN="$SYNC_TOKEN" k6 run --summary-export "$SYNC_SUMMARY_OUTPUT" tests/load/sync-load.k6.js
+else
+    SYNC_BASE_URL="$SYNC_BASE_URL" SYNC_TOKEN="$SYNC_TOKEN" k6 run tests/load/sync-load.k6.js
+fi

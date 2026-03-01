@@ -9,7 +9,8 @@ LogDate follows clean architecture principles with a modular, feature-based desi
 ```
 LogDate Project
 ├── 📱 App Targets
-│   ├── compose-main (Android, iOS, Desktop)
+│   ├── android-main (Android entry point)
+│   ├── compose-main (shared Android/iOS/Desktop UI)
 │   └── wear (Wear OS)
 ├── 🔧 Client Infrastructure
 │   ├── data, database, networking
@@ -39,7 +40,8 @@ LogDate Project
 Each module contains detailed documentation in its respective `README.md` file:
 
 ### App Modules
-- [`:app:compose-main`](app/compose-main/README.md) - Main cross-platform application
+- [`:app:android-main`](app/android-main/) - Android application wrapper/entry point
+- [`:app:compose-main`](app/compose-main/README.md) - Shared Compose Multiplatform app module (Android/iOS/Desktop)
 - [`:app:wear`](app/wear/README.md) - Wear OS companion app with Material 3 UI
 
 ### Client Infrastructure
@@ -49,7 +51,7 @@ Each module contains detailed documentation in its respective `README.md` file:
 - [`:client:sync`](client/sync/README.md) - Cross-device data synchronization
 - [`:client:intelligence`](client/intelligence/README.md) - AI and ML features
 - [`:client:location`](client/location/README.md) - Location services and context
-- [`:client:datastore`](client/datastore/README.md) - Preferences and settings storage
+- [`:client:logdate-datastore`](client/datastore/README.md) - Preferences and settings storage
 
 ### Client Features
 - [`:client:feature:editor`](client/feature/editor/README.md) - Entry creation and editing
@@ -94,6 +96,9 @@ Each module contains detailed documentation in its respective `README.md` file:
 - JDK 17 or higher
 - Xcode (for iOS development)
 - Docker and Docker Compose (for server development)
+- Android Platform-Tools (`adb`) for device/debug workflows on Android.
+  - macOS install: `brew install --cask android-platform-tools`
+  - See `docs/environment/setup.md` for links to Android and Homebrew references.
 
 ### Quick Start with Docker
 
@@ -153,7 +158,7 @@ If you prefer to set up dependencies manually:
 
 3. **Firebase Setup**
    - Follow the [Firebase documentation](https://firebase.google.com/docs/android/setup)
-   - Add your `google-services.json` to `app/compose-main/`
+   - Add your `google-services.json` to `app/android-main/`
 
 4. **Open in Android Studio**
    - Open the project in Android Studio
@@ -180,10 +185,10 @@ docker-compose --profile full-stack up
 ### Client Applications
 ```bash
 # Build Android app
-./gradlew :app:compose-main:assembleDebug
+./gradlew :app:android-main:assembleDebug
 
 # Build and install Android app
-./gradlew :app:compose-main:installDebug
+./gradlew :app:android-main:installDebug
 
 # Build and install Wear OS app
 ./gradlew :app:wear:installDebug

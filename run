@@ -25,21 +25,21 @@ dev|dev:status|Show status of dev services|./scripts/dev-status.sh
 dev|dev:reset|Reset dev environment (deletes data)|./scripts/dev-reset.sh
 dev|dev:logs|Follow logs from dev services|./scripts/dev-logs.sh
 
-build|build:android|Build Android debug APK|./gradlew :app:compose-main:assembleDebug
-build|build:android:release|Build Android release APK|./gradlew :app:compose-main:assembleRelease
+build|build:android|Build Android debug APK|./gradlew :app:android-main:assembleDebug
+build|build:android:release|Build Android release APK|./gradlew :app:android-main:assembleRelease
 build|build:desktop|Build desktop app for current OS|./gradlew :app:compose-main:packageDistributionForCurrentOS
 build|build:wear|Build Wear OS debug APK|./gradlew :app:wear:assembleDebug
 build|build:server|Build server JAR|./gradlew :server:build
 build|build:server:docker|Build server Docker image locally|docker build --target production -t logdate-server:local .
 build|build:all|Build all modules|./gradlew build
 
-run|run:android|Install and run on connected Android device|./gradlew :app:compose-main:installDebug
+run|run:android|Install and run on connected Android device|./gradlew :app:android-main:installDebug
 run|run:desktop|Run desktop app|./gradlew :app:compose-main:run
 run|run:server|Run server locally|./gradlew :server:run
 run|run:wear|Install and run on connected Wear device|./gradlew :app:wear:installDebug
 
 test|test|Run all unit tests|./gradlew test
-test|test:android|Run Android unit tests|./gradlew :app:compose-main:testDebugUnitTest
+test|test:android|Run Android unit tests|./gradlew :app:compose-main:allTests
 test|test:server|Run server tests|./gradlew :server:test
 test|test:coverage|Generate test coverage report|./gradlew koverHtmlReport
 test|test:verify|Verify coverage meets threshold|./gradlew koverVerify

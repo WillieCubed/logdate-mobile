@@ -4,7 +4,8 @@ This directory contains modules for final build targets and application entry po
 
 ## Available Applications
 
-- [`:app:compose-main`](./compose-main/README.md) - The main cross-platform LogDate application built with Compose Multiplatform, supporting Android, iOS, and Desktop platforms.
+- [`:app:android-main`](./android-main/) - Android application wrapper and entry point.
+- [`:app:compose-main`](./compose-main/README.md) - Shared Compose Multiplatform module for Android/iOS/Desktop UI and app logic.
 - [`:app:wear`](./wear/README.md) - The companion Wear OS application for quick journaling from smartwatches.
 
 ## Architecture
@@ -16,10 +17,10 @@ Each application module provides the platform-specific entry points, navigation 
 ### Android Main App
 ```bash
 # Build debug APK
-./gradlew :app:compose-main:assembleDebug
+./gradlew :app:android-main:assembleDebug
 
 # Install on connected device
-./gradlew :app:compose-main:installDebug
+./gradlew :app:android-main:installDebug
 ```
 
 ### Wear OS App

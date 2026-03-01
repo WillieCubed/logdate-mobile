@@ -1,12 +1,12 @@
 # LogDate Development Guide
 
 ## Build Commands
-- Build: `./gradlew :app:compose-main:assembleDebug`
+- Build: `./gradlew :app:android-main:assembleDebug`
 - Run tests: `./gradlew test`
 - Run single test: `./gradlew :module:test --tests "package.TestClass.testMethod"`
 - Lint: `./gradlew lint`
 - Documentation: `./gradlew dokkaHtmlMultiModule`
-- Run Android app: `./gradlew :app:compose-main:installDebug`
+- Run Android app: `./gradlew :app:android-main:installDebug`
 - Run Desktop app: `./gradlew :app:compose-main:run`
 
 ## Test Coverage Commands  

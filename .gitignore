@@ -25,3 +25,6 @@ captures
 !infra/terraform/*.tfvars
 
 **/.claude/settings.local.json
+
+# Firebase local config
+**/google-services.json
