@@ -1166,7 +1166,7 @@ client/feature/core/src/
 │   │   └── ExportLauncher.kt                           [platform interface]
 │   └── settings/ui/
 │       ├── DataSettingsScreen.kt                       [UI composable]
-│       └── SettingsViewModel.kt
+│       └── DataSettingsViewModel.kt
 ├── androidMain/kotlin/app/logdate/feature/core/
 │   ├── export/
 │   │   ├── AndroidExportLauncher.kt

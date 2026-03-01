@@ -21,7 +21,7 @@ See [E2E Test Organization Standard](./e2e-test-organization.md) for the complet
 ./gradlew :server:test -k "E2ETest"
 
 # Run specific e2e test suite
-./gradlew :app:compose-main:connectedAndroidTest -k "TestClassName"
+./gradlew :app:compose-main:androidConnectedCheck -k "TestClassName"
 
 # Run with verbose output
 ./gradlew connectedAndroidTest --info
@@ -62,17 +62,17 @@ Client-side tests verify complete user workflows on the Android app using Espres
 
 ```bash
 # Run all multi-window editor tests
-./gradlew :app:compose-main:connectedAndroidTest -k "MultiWindowEditorE2ETest"
+./gradlew :app:compose-main:androidConnectedCheck -k "MultiWindowEditorE2ETest"
 
 # Run specific test
-./gradlew :app:compose-main:connectedAndroidTest -k "testOpenEntryInNewWindow"
+./gradlew :app:compose-main:androidConnectedCheck -k "testOpenEntryInNewWindow"
 
 # Run with debugging enabled
-./gradlew :app:compose-main:connectedAndroidTest -k "MultiWindowEditorE2ETest" --debug
+./gradlew :app:compose-main:androidConnectedCheck -k "MultiWindowEditorE2ETest" --debug
 
 # Run with connected device (verify with: adb devices)
 adb devices
-./gradlew :app:compose-main:connectedAndroidTest -k "MultiWindowEditorE2ETest"
+./gradlew :app:compose-main:androidConnectedCheck -k "MultiWindowEditorE2ETest"
 ```
 
 **ADB Shell Testing**:
@@ -263,7 +263,7 @@ Configuration: `.github/workflows/ci.yml`
 
 ```bash
 # Run with napier debug logging
-./gradlew :app:compose-main:connectedAndroidTest \
+./gradlew :app:compose-main:androidConnectedCheck \
   -k "MultiWindowEditorE2ETest" \
   --info
 
@@ -297,7 +297,7 @@ adb shell dumpsys meminfo app.logdate | tail -20
 ### Stop on First Failure
 
 ```bash
-./gradlew :app:compose-main:connectedAndroidTest \
+./gradlew :app:compose-main:androidConnectedCheck \
   -k "MultiWindowEditorE2ETest" \
   --no-parallel \
   --fail-fast
@@ -321,10 +321,10 @@ Before running E2E tests, verify:
 
 ```bash
 # Build debug APK
-./gradlew :app:compose-main:assembleDebug
+./gradlew :app:android-main:assembleDebug
 
 # Ensure app is installed
-adb install -r ./app/compose-main/build/outputs/apk/debug/app-debug.apk
+adb install -r ./app/android-main/build/outputs/apk/debug/app-debug.apk
 
 # Clear app data before test
 adb shell pm clear app.logdate
@@ -336,7 +336,7 @@ adb shell am start -n "app.logdate/.MainActivity"
 adb shell input keyevent KEYCODE_HOME
 
 # Now run e2e tests
-./gradlew :app:compose-main:connectedAndroidTest -k "MultiWindowEditorE2ETest"
+./gradlew :app:compose-main:androidConnectedCheck -k "MultiWindowEditorE2ETest"
 ```
 
 ---
@@ -356,7 +356,7 @@ adb devices  # Should list device
 android.testInstrumentationRunnerArguments.timeout=60000
 
 # Or run with extended timeout
-./gradlew :app:compose-main:connectedAndroidTest \
+./gradlew :app:compose-main:androidConnectedCheck \
   -Pandroid.testInstrumentationRunnerArguments.timeout=120000
 ```
 

@@ -281,7 +281,7 @@ fun EditorAudioWrapper(
     modifier: Modifier = Modifier
 ) {
     // Inject ViewModel at this level
-    val audioViewModel = koinViewModel<AudioRecordingViewModel>()
+    val audioViewModel = koinViewModel<AudioViewModel>()
     
     // Connect state callbacks to ViewModel
     AudioEditorContent(

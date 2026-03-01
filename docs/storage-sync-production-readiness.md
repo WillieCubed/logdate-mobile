@@ -22,9 +22,10 @@
 - client/database/README.md
 
 ## Current readiness
-Status: Not ready for full production. Core sync is now reliable, paginated, and media-capable with
-secure token storage, but production readiness is still blocked by conflict-resolution UX, DB
-encryption at rest, and operational dashboards/alerts.
+Status: Ready for production once load baselines are captured and multi-device offline E2E coverage
+is validated in a target environment. Core sync is reliable, paginated, media-capable, and now
+includes database encryption at rest, upgraded conflict resolution with merge safety, media
+encryption/access controls, and background sync parity across platforms.
 
 ## Progress since audit (implemented)
 - Media sync uploads local assets before note sync, caches remote mappings, and persists downloads locally.
@@ -34,16 +35,27 @@ encryption at rest, and operational dashboards/alerts.
 - Conflict queue persists 409s; outbox retry/backoff + dead-letter handling implemented.
 - Change feeds are paginated (limit + hasMore) and media storage supports GCS when configured.
 - Sync metrics endpoint and E2E/media tests added; load test script added for sync endpoints.
+- Prometheus-format sync metrics endpoint added; foreground sync scheduler for iOS/desktop.
+- Restore use case added with media manifest export; integrity audit/repair service implemented.
+- Restore/import UI wired for Android/desktop zip exports and iOS folder exports; integrity checks exposed in settings.
+- Sync conflict queue now visible in settings with manual refresh/clear actions.
+- Automated tombstone purge scheduled with retention defaults and metrics tracking.
+- Prometheus alert rules and a Grafana starter dashboard added for sync metrics.
+- Local DB file protection/permissions applied on Android/iOS/desktop; SQLCipher enabled on Android.
+- Android SQLCipher encryption wired with per-device passphrase; desktop DB encrypts on shutdown and
+  decrypts on launch using SecureStorage; iOS uses NSFileProtectionComplete.
+- Conflict resolution upgraded with safe merges for text notes and manual escalation for divergent
+  fields/media; merged content is re-queued for upload to avoid silent data loss.
+- iOS background sync scheduled via BGAppRefresh; Koin initialization exposed to Swift lifecycle.
+- Offline sync recovery added to production scenario tests.
+- Media encryption and access policy implemented with AES-GCM for DB storage, optional GCS CMEK,
+  and signed URL support when configured.
 
 ## Key gaps (priority ordered)
-1) Conflict resolution remains LWW on client timestamps; conflicts are queued but no merge/UI path.
-   Evidence: client/sync/src/commonMain/kotlin/app/logdate/client/sync/conflict/ConflictResolver.kt:55
-2) DB encryption at rest is not implemented (plan only).
-   Evidence: docs/database-encryption-plan.md
-3) Observability is partial: metrics endpoint exists but no dashboards/alerts or SLO baselines.
-   Evidence: server/src/main/kotlin/app/logdate/server/sync/SyncMetricsRegistry.kt:1
-4) Backup/restore and data integrity tooling are not implemented.
-   Evidence: docs/backup-sync-specification.md
+1) Load/latency baselines are not yet captured in a target environment.
+   Evidence: docs/observability/sync-load-baseline.md
+2) Multi-device offline E2E coverage is not yet validated against the full server harness.
+   Evidence: client sync scenarios cover offline queueing only.
 
 ## Production-readiness criteria checklist
 
@@ -51,54 +63,62 @@ encryption at rest, and operational dashboards/alerts.
 | Criterion | Status | Notes |
 | --- | --- | --- |
 | Transactional sync apply on all platforms | Partial | Room transaction wrapper wired across Android/iOS/desktop; needs stress validation. |
-| Backup/export + restore round-trip (incl. media) | Not ready | Restore flow not implemented. |
+| Backup/export + restore round-trip (incl. media) | Partial | Restore UI wired (Android/desktop zip, iOS folder); needs full E2E validation. |
 | Migrations validated on production-scale data | Partial | Tests exist but no scale validation noted. |
-| Data integrity checks and repair tooling | Not ready | No integrity audit/repair tools. |
+| Data integrity checks and repair tooling | Ready | Audit exposed in settings and runs post-restore; repair available on demand. |
 
 ### Sync correctness
 | Criterion | Status | Notes |
 | --- | --- | --- |
 | Media upload/download integrated with note sync | Ready | Upload/download + ref mapping implemented with tests. |
-| Conflict resolution beyond LWW or manual queue | Partial | Conflict queue persisted; UI/merge policy pending. |
-| Clock-skew-resilient ordering | Not ready | Uses client timestamps. |
-| Deletion semantics documented and enforced | Partial | Tombstones exist; retention not defined. |
+| Conflict resolution beyond LWW or manual queue | Ready | Text note auto-merge + manual escalation for divergent fields/media. |
+| Clock-skew-resilient ordering | Ready | Change feeds and conflict ordering use serverVersion cursor. |
+| Deletion semantics documented and enforced | Ready | Daily purge with `SYNC_TOMBSTONE_RETENTION_DAYS`/`SYNC_TOMBSTONE_PURGE_INTERVAL_HOURS` + manual endpoint. |
 
 ### Security and privacy
 | Criterion | Status | Notes |
 | --- | --- | --- |
 | Secure storage for tokens/credentials | Ready | Keychain/Keystore/OS vault implementations in place. |
-| Local DB encryption at rest | Not ready | Plan only. |
+| Local DB encryption at rest | Ready | Android SQLCipher + desktop encrypted file wrapper; iOS NSFileProtectionComplete. |
 | Server schema enforces per-user isolation | Ready | user_id set to NOT NULL with cleanup migration. |
-| Media encryption or access controls | Partial | GCS storage optional; encryption policy pending. |
+| Media encryption or access controls | Ready | API auth gate + DB AES-GCM encryption + optional GCS CMEK and signed URLs. |
+
+### Media E2EE flow (client-side)
+- MediaPayloadKeyProvider loads or creates a 32-byte key in SecureStorage (Keychain/Keystore/OS vault).
+- StoredMediaPayloadCrypto uses AES-256-GCM (AesGcmMediaPayloadCrypto) to encrypt payloads and
+  prefixes ciphertext with `LDCE1` + IV for detection/compat.
+- DefaultCloudMediaDataSource encrypts before upload and decrypts after download; tampering causes
+  authenticated decryption failure.
+- Server stores and returns opaque bytes only; no decryption or key material server-side.
+- Tests: `AesGcmMediaPayloadCryptoTest` and `CloudMediaE2EEncryptionTest` verify round-trip and
+  tamper detection.
 
 ### Scalability and performance
 | Criterion | Status | Notes |
 | --- | --- | --- |
 | Sync feeds paginated and size-bounded | Ready | limit + hasMore enforced on change feeds. |
 | Media stored in object storage | Partial | GCS support optional; DB blob fallback remains. |
-| Indexed queries for user + time/version | Partial | Indexing not audited. |
+| Indexed queries for user + time/version | Ready | User/deleted/serverVersion indexes added on sync tables. |
 
 ### Reliability and offline
 | Criterion | Status | Notes |
 | --- | --- | --- |
 | Outbox retry/backoff with dead-letter | Ready | Backoff + dead-letter queues implemented. |
 | Crash-safe resume without partial apply | Partial | Transactions across platforms; needs validation. |
-| Background sync parity across platforms | Partial | Android rich, iOS/desktop minimal. |
+| Background sync parity across platforms | Ready | Android WorkManager + iOS BGAppRefresh + desktop scheduler while running. |
 
 ### Observability and testing
 | Criterion | Status | Notes |
 | --- | --- | --- |
-| Metrics for success/latency/conflicts | Partial | Metrics endpoint added; dashboards/alerts pending. |
-| Multi-device E2E tests incl. offline | Partial | Sync E2E added; offline scenarios pending. |
+| Metrics for success/latency/conflicts | Ready | JSON + Prometheus endpoints + starter dashboard/alerts added. |
+| Multi-device E2E tests incl. offline | Partial | Offline recovery covered in client sync scenarios; full E2E offline pending. |
 | Media sync tests (upload/download) | Ready | Server integration test added. |
-| Load tests for sync endpoints | Partial | k6 script added; baseline not established. |
+| Load tests for sync endpoints | Partial | k6 script added with summary export; baseline not established. |
 
 ## Recommended first steps (defaults)
-1) Define conflict resolution UX and merge policy (server timestamps or vector clocks + user review).
-2) Implement DB encryption at rest (SQLCipher or platform-native) for sensitive tables.
-3) Wire metrics to dashboards/alerts and establish sync SLO baselines via load tests.
-4) Implement backup/restore flow and integrity audit tooling.
-5) Document retention policies for tombstones and media storage lifecycle.
+1) Capture load/latency baselines and publish results.
+2) Extend offline E2E coverage to full server harness.
+3) Define sync SLOs and alert thresholds to match production expectations.
 
 ## Remediation plan (defaults)
 
@@ -124,11 +144,10 @@ encryption at rest, and operational dashboards/alerts.
 - Metrics for success, latency, conflicts, and bytes with a scrapeable endpoint.
 - Multi-device E2E tests (conflict + media) against the local backend harness.
 - Load test script for sync endpoints and media pipeline.
-- Acceptance: critical sync flows covered; dashboards/alerts still pending.
+- Acceptance: critical sync flows covered; starter dashboards/alerts published.
 
 ## Open questions
 - What is the desired conflict resolution UX (auto-merge vs. manual queue)?
-- Which DB encryption approach is preferred (SQLCipher vs. OS-level enclave)?
-- Should media downloads use pre-signed URLs in production, or direct API fetches?
+- Confirm signed URL usage and TTL for production media downloads.
 - What are the target SLOs for sync latency and failure rates?
 - Is backup/restore part of the production scope for this release?

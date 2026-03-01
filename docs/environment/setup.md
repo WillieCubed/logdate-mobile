@@ -38,6 +38,22 @@ POSTGRES_DB=logdate
 REDIS_PORT=16379
 ```
 
+## Android tooling (macOS)
+
+For Android development and debugging you need Android Platform-Tools (`adb`, `fastboot`).
+
+Install on macOS with Homebrew:
+```bash
+brew update
+brew install --cask android-platform-tools
+adb version
+```
+
+References:
+- Android Debug Bridge docs: https://developer.android.com/guide/developing/tools/adb
+- Android Platform-Tools releases: https://developer.android.com/tools/releases/platform-tools
+- Homebrew cask (`android-platform-tools`): https://formulae.brew.sh/cask/android-platform-tools
+
 ## CI configuration
 
 - Store secrets in the CI secret manager (never in the repo).
