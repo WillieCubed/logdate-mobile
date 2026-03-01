@@ -51,9 +51,11 @@ fun LogDateAppRoot(
             CompositionLocalProvider(
                 LocalSharedTransitionScope provides this,
             ) {
-                LogDateNavHost(
-                    navController = navController,
-               )
+                AudioPlaybackProvider {
+                    LogDateNavHost(
+                        navController = navController,
+                    )
+                }
             }
         }
     }

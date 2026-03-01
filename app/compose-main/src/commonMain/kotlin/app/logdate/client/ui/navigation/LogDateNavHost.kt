@@ -73,17 +73,20 @@ internal fun LogDateNavHost(
             onOpenJournal = navController::navigateToJournal,
             onCreateJournal = navController::navigateToJournalCreation,
         )
-        journalDetailsRoute(
-            onGoBack = {
-                navController.popBackStack()
-            },
-            onJournalDeleted = {
-                navController.navigateToJournalsOverview()
-            },
-            onNavigateToNoteDetail = { noteId, journalId ->
-                navController.navigateToNoteDetail(noteId, journalId)
-            },
-        )
+        @Suppress("DEPRECATION")
+        run {
+            journalDetailsRoute(
+                onGoBack = {
+                    navController.popBackStack()
+                },
+                onJournalDeleted = {
+                    navController.navigateToJournalsOverview()
+                },
+                onNavigateToNoteDetail = { noteId ->
+                    navController.navigateToNoteDetail(noteId)
+                },
+            )
+        }
         journalSettingsRoute(
             onGoBack = {
                 navController.popBackStack()

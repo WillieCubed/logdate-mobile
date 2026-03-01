@@ -11,6 +11,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.EditorActivity
 import app.logdate.client.media.audio.AudioRecordingManager
 import app.logdate.client.media.audio.transcription.TranscriptionService
+import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.permissions.PermissionManager
 import app.logdate.client.permissions.PermissionResult
 import app.logdate.client.permissions.PermissionStatus
@@ -19,12 +20,14 @@ import app.logdate.client.repository.transcription.TranscriptionData
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.transcription.TranscriptionStatus
 import app.logdate.di.appModule
-import app.logdate.feature.editor.ui.audio.AudioPlaybackManager
+import app.logdate.client.media.audio.AudioPlaybackManager
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -54,6 +57,7 @@ class AudioRecordingE2ETest {
         single<AudioRecordingManager> { fakeRecordingManager }
         single<AudioPlaybackManager> { FakeAudioPlaybackManager() }
         single<TranscriptionRepository> { FakeTranscriptionRepository() }
+        single<TranscriptionService> { FakeTranscriptionService() }
         single<PermissionManager> { GrantedPermissionManager() }
     }
 
@@ -148,6 +152,31 @@ private class FakeAudioPlaybackManager : AudioPlaybackManager {
     override fun stopPlayback() = Unit
 
     override fun seekTo(position: Float) = Unit
+
+    override fun release() = Unit
+}
+
+private class FakeTranscriptionService : TranscriptionService {
+    private val transcriptionFlow = MutableSharedFlow<TranscriptionResult>(replay = 1)
+
+    override fun getTranscriptionFlow(): SharedFlow<TranscriptionResult> = transcriptionFlow
+
+    override suspend fun startLiveTranscription(): Boolean = true
+
+    override suspend fun stopLiveTranscription() = Unit
+
+    override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult =
+        TranscriptionResult.Success("Test transcription")
+
+    override fun cancelTranscription() = Unit
+
+    override fun getSupportedLanguages(): List<String> = emptyList()
+
+    override fun setLanguage(languageCode: String) = Unit
+
+    override val supportsLiveTranscription: Boolean = true
+
+    override val supportsFileTranscription: Boolean = true
 
     override fun release() = Unit
 }

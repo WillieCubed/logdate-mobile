@@ -11,7 +11,6 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.navigation3.runtime.NavKey
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * Tests for the onBack handler logic in MainNavigationRoot.
@@ -25,21 +24,11 @@ class OnBackHandlerLogicTest {
      * Replicates the onBack handler logic from MainNavigationRoot for testing.
      * This allows us to unit test the behavior without needing Compose.
      */
-    private fun simulateOnBack(backStack: MutableList<NavKey>, keysToRemove: Int) {
+    private fun simulateOnBack(backStack: MutableList<NavKey>) {
         val mainTabRoutes = HomeTab.entries.map { it.route }
 
-        if (keysToRemove >= backStack.size) {
-            // Special case: trying to remove all entries (would result in empty backstack)
-            val entriesToRemove = (backStack.size - 1).coerceAtLeast(0)
-            repeat(entriesToRemove) {
-                backStack.removeLastOrNull()
-            }
-        } else {
-            // Normal case: remove the requested number of entries
-            repeat(keysToRemove) {
-                backStack.removeLastOrNull()
-            }
-        }
+        // Normal case: remove a single entry
+        backStack.removeLastOrNull()
 
         // Safety check: ensure we always have at least one main tab in the backstack
         if (backStack.isEmpty() || backStack.none { it in mainTabRoutes }) {
@@ -51,10 +40,10 @@ class OnBackHandlerLogicTest {
     // Empty backstack protection
 
     @Test
-    fun `onBack prevents empty backstack when removing all entries`() {
+    fun `onBack prevents empty backstack when removing last entry`() {
         val backStack = mutableStateListOf<NavKey>(TimelineListRoute, EntryEditor())
 
-        simulateOnBack(backStack, keysToRemove = 2)
+        simulateOnBack(backStack)
 
         assertEquals(1, backStack.size)
         assertEquals(TimelineListRoute, backStack.first())
@@ -64,7 +53,7 @@ class OnBackHandlerLogicTest {
     fun `onBack adds Timeline when backstack becomes empty after removal`() {
         val backStack = mutableStateListOf<NavKey>(EntryEditor())
 
-        simulateOnBack(backStack, keysToRemove = 1)
+        simulateOnBack(backStack)
 
         assertEquals(1, backStack.size)
         assertEquals(TimelineListRoute, backStack.first())
@@ -74,7 +63,7 @@ class OnBackHandlerLogicTest {
     fun `onBack adds Timeline when backstack is already empty`() {
         val backStack = mutableStateListOf<NavKey>()
 
-        simulateOnBack(backStack, keysToRemove = 0)
+        simulateOnBack(backStack)
 
         assertEquals(1, backStack.size)
         assertEquals(TimelineListRoute, backStack.first())
@@ -86,7 +75,7 @@ class OnBackHandlerLogicTest {
     fun `onBack resets to Timeline when no main tab remains after removal`() {
         val backStack = mutableStateListOf<NavKey>(SettingsOverviewRoute, EntryEditor())
 
-        simulateOnBack(backStack, keysToRemove = 1)
+        simulateOnBack(backStack)
 
         assertEquals(1, backStack.size)
         assertEquals(TimelineListRoute, backStack.first())
@@ -96,20 +85,21 @@ class OnBackHandlerLogicTest {
     fun `onBack preserves existing main tab when present`() {
         val backStack = mutableStateListOf<NavKey>(JournalList, EntryEditor())
 
-        simulateOnBack(backStack, keysToRemove = 1)
+        simulateOnBack(backStack)
 
         assertEquals(1, backStack.size)
         assertEquals(JournalList, backStack.first())
     }
 
     @Test
-    fun `onBack preserves any main tab not just Timeline`() {
+    fun `onBack preserves main tab and keeps remaining entries`() {
         val backStack = mutableStateListOf<NavKey>(RewindList, SettingsOverviewRoute, EntryEditor())
 
-        simulateOnBack(backStack, keysToRemove = 2)
+        simulateOnBack(backStack)
 
-        assertEquals(1, backStack.size)
+        assertEquals(2, backStack.size)
         assertEquals(RewindList, backStack.first())
+        assertEquals(SettingsOverviewRoute, backStack[1])
     }
 
     // Normal back navigation
@@ -118,7 +108,7 @@ class OnBackHandlerLogicTest {
     fun `onBack removes single entry in normal case`() {
         val backStack = mutableStateListOf<NavKey>(TimelineListRoute, JournalList, EntryEditor())
 
-        simulateOnBack(backStack, keysToRemove = 1)
+        simulateOnBack(backStack)
 
         assertEquals(2, backStack.size)
         assertEquals(TimelineListRoute, backStack[0])
@@ -126,25 +116,25 @@ class OnBackHandlerLogicTest {
     }
 
     @Test
-    fun `onBack removes multiple entries when requested`() {
+    fun `onBack removes only one entry per action`() {
         val backStack = mutableStateListOf<NavKey>(TimelineListRoute, JournalList, SettingsOverviewRoute, EntryEditor())
 
-        simulateOnBack(backStack, keysToRemove = 2)
+        simulateOnBack(backStack)
 
-        assertEquals(2, backStack.size)
+        assertEquals(3, backStack.size)
         assertEquals(TimelineListRoute, backStack[0])
         assertEquals(JournalList, backStack[1])
+        assertEquals(SettingsOverviewRoute, backStack[2])
     }
 
     @Test
-    fun `onBack with zero keys does nothing except safety check`() {
+    fun `onBack removes last entry and keeps main tab`() {
         val backStack = mutableStateListOf<NavKey>(TimelineListRoute, EntryEditor())
 
-        simulateOnBack(backStack, keysToRemove = 0)
+        simulateOnBack(backStack)
 
-        assertEquals(2, backStack.size)
+        assertEquals(1, backStack.size)
         assertEquals(TimelineListRoute, backStack[0])
-        assertEquals(EntryEditor(), backStack[1])
     }
 
     // Edge cases for the editor back navigation bug fix
@@ -153,7 +143,7 @@ class OnBackHandlerLogicTest {
     fun `onBack from editor returns to Timeline when Timeline was parent`() {
         val backStack = mutableStateListOf<NavKey>(TimelineListRoute, EntryEditor())
 
-        simulateOnBack(backStack, keysToRemove = 1)
+        simulateOnBack(backStack)
 
         assertEquals(1, backStack.size)
         assertEquals(TimelineListRoute, backStack.first())
@@ -163,7 +153,7 @@ class OnBackHandlerLogicTest {
     fun `onBack from editor returns to Journals when Journals was parent`() {
         val backStack = mutableStateListOf<NavKey>(JournalList, EntryEditor())
 
-        simulateOnBack(backStack, keysToRemove = 1)
+        simulateOnBack(backStack)
 
         assertEquals(1, backStack.size)
         assertEquals(JournalList, backStack.first())
@@ -173,7 +163,7 @@ class OnBackHandlerLogicTest {
     fun `onBack from editor adds Timeline when editor was only entry`() {
         val backStack = mutableStateListOf<NavKey>(EntryEditor())
 
-        simulateOnBack(backStack, keysToRemove = 1)
+        simulateOnBack(backStack)
 
         assertEquals(1, backStack.size)
         assertEquals(TimelineListRoute, backStack.first())
@@ -183,60 +173,46 @@ class OnBackHandlerLogicTest {
     fun `onBack from settings resets to Timeline when no main tab in stack`() {
         val backStack = mutableStateListOf<NavKey>(NavigationStart, SettingsOverviewRoute)
 
-        simulateOnBack(backStack, keysToRemove = 1)
-
-        assertEquals(1, backStack.size)
-        assertEquals(TimelineListRoute, backStack.first())
-    }
-
-    // Excessive removal requests
-
-    @Test
-    fun `onBack handles request to remove more entries than exist`() {
-        val backStack = mutableStateListOf<NavKey>(TimelineListRoute, EntryEditor())
-
-        simulateOnBack(backStack, keysToRemove = 10)
+        simulateOnBack(backStack)
 
         assertEquals(1, backStack.size)
         assertEquals(TimelineListRoute, backStack.first())
     }
 
     @Test
-    fun `onBack handles request to remove exactly all entries`() {
-        val backStack = mutableStateListOf<NavKey>(TimelineListRoute, JournalList, EntryEditor())
+    fun `onBack handles empty stack safely`() {
+        val backStack = mutableStateListOf<NavKey>()
 
-        simulateOnBack(backStack, keysToRemove = 3)
+        simulateOnBack(backStack)
 
         assertEquals(1, backStack.size)
-        assertTrue(backStack.first() in HomeTab.entries.map { it.route })
+        assertEquals(TimelineListRoute, backStack.first())
     }
 
-    // Scene-based removal scenarios (two-pane layouts)
-
     @Test
-    fun `onBack with two entries removed preserves main tab`() {
+    fun `onBack with two entries leaves a main tab`() {
         val backStack = mutableStateListOf<NavKey>(TimelineListRoute, JournalList)
 
-        simulateOnBack(backStack, keysToRemove = 2)
+        simulateOnBack(backStack)
 
         assertEquals(1, backStack.size)
-        assertTrue(backStack.first() in HomeTab.entries.map { it.route })
+        assertEquals(TimelineListRoute, backStack.first())
     }
 
     @Test
     fun `onBack maintains backstack integrity through multiple calls`() {
         val backStack = mutableStateListOf<NavKey>(TimelineListRoute, JournalList, SettingsOverviewRoute, EntryEditor())
 
-        simulateOnBack(backStack, keysToRemove = 1)
+        simulateOnBack(backStack)
         assertEquals(3, backStack.size)
 
-        simulateOnBack(backStack, keysToRemove = 1)
+        simulateOnBack(backStack)
         assertEquals(2, backStack.size)
 
-        simulateOnBack(backStack, keysToRemove = 1)
+        simulateOnBack(backStack)
         assertEquals(1, backStack.size)
 
-        simulateOnBack(backStack, keysToRemove = 1)
+        simulateOnBack(backStack)
         assertEquals(1, backStack.size)
         assertEquals(TimelineListRoute, backStack.first())
     }

@@ -60,18 +60,18 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
-import androidx.navigation3.runtime.entry
 import androidx.navigation3.runtime.entryProvider
-import androidx.navigation3.runtime.rememberSavedStateNavEntryDecorator
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.navigation3.scene.Scene
+import androidx.navigation3.scene.SceneStrategy
+import androidx.navigation3.scene.SceneStrategyScope
 import androidx.navigation3.ui.NavDisplay
-import androidx.navigation3.ui.Scene
-import androidx.navigation3.ui.SceneStrategy
-import androidx.navigation3.ui.rememberSceneSetupNavEntryDecorator
 import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.navigation.routes.appSettingsRoutes
 import app.logdate.navigation.routes.cloudAccountSetup
@@ -82,6 +82,7 @@ import app.logdate.navigation.routes.UsernameSelectionRoute
 import app.logdate.navigation.routes.core.JournalList
 import app.logdate.navigation.routes.core.NavigationStart
 import app.logdate.navigation.routes.core.NewJournalRoute
+import app.logdate.navigation.routes.core.NoteViewerRoute
 import app.logdate.navigation.routes.core.OnboardingCompleteRoute
 import app.logdate.navigation.routes.core.OnboardingImportRoute
 import app.logdate.navigation.routes.core.OnboardingWelcomeBackRoute
@@ -116,11 +117,15 @@ import app.logdate.navigation.routes.resetApp
 import app.logdate.navigation.routes.rewindRoutes
 import app.logdate.navigation.routes.searchRoutes
 import app.logdate.navigation.routes.timelineRoutes
+import app.logdate.navigation.routes.routeEntry
+import app.logdate.navigation.routes.routeClass
 import app.logdate.navigation.scenes.HomeSceneStrategy
 import app.logdate.navigation.scenes.HomeTab
 import app.logdate.navigation.scenes.SettingsSceneStrategy
 import io.github.aakira.napier.Napier
-import org.koin.compose.viewmodel.koinViewModel
+import app.logdate.feature.journals.ui.detail.NoteViewerScreen
+import app.logdate.navigation.routes.core.TimelineDetail
+import kotlin.reflect.KClass
 
 /**
  * CompositionLocal for providing SharedTransitionScope throughout the navigation hierarchy.
@@ -128,6 +133,14 @@ import org.koin.compose.viewmodel.koinViewModel
  * explicitly passing it through parameters.
  */
 val LocalSharedTransitionScope = staticCompositionLocalOf<SharedTransitionScope?> { null }
+
+private fun sceneRouteClass(scene: Scene<NavKey>?): KClass<out NavKey>? {
+    return scene?.entries?.lastOrNull()?.routeClass()
+}
+
+private fun isMainTabRoute(routeClass: KClass<out NavKey>?): Boolean {
+    return HomeTab.entries.any { it.route::class == routeClass }
+}
 
 /**
  * Creates the forward navigation transition specification that implements Material Design 3
@@ -179,20 +192,14 @@ val LocalSharedTransitionScope = staticCompositionLocalOf<SharedTransitionScope?
  * - **Expressive**: Motion conveys the app's spatial navigation model
  * - **Purposeful**: Each transition type serves a specific navigation context
  */
-private fun createForwardTransitionSpec(): AnimatedContentTransitionScope<*>.() -> ContentTransform = { 
+private fun createForwardTransitionSpec(): AnimatedContentTransitionScope<Scene<NavKey>>.() -> ContentTransform = { 
     // Access current and target states from the transition scope
-    val from = initialState
-    val to = targetState
+    val fromRoute = sceneRouteClass(initialState)
+    val toRoute = sceneRouteClass(targetState)
     
     // Classify routes as main tabs for transition decision-making
-    val isFromMainTab = when (from) {
-        TimelineListRoute, JournalList, RewindList -> true
-        else -> false
-    }
-    val isToMainTab = when (to) {
-        TimelineListRoute, JournalList, RewindList -> true
-        else -> false
-    }
+    val isFromMainTab = isMainTabRoute(fromRoute)
+    val isToMainTab = isMainTabRoute(toRoute)
     
     when {
         // Tab-to-tab navigation ONLY: fade between main home destinations
@@ -250,13 +257,12 @@ private fun createForwardTransitionSpec(): AnimatedContentTransitionScope<*>.() 
  * - Tab switching uses non-directional fades (lateral movement)
  * - Returns to tabs use fades (spatial reset to navigation context)
  */
-private fun createBackTransitionSpec(): AnimatedContentTransitionScope<*>.() -> ContentTransform = { 
+private fun createBackTransitionSpec(): AnimatedContentTransitionScope<Scene<NavKey>>.() -> ContentTransform = { 
     // Access current and target states from the transition scope
-    val to = targetState
+    val toRoute = sceneRouteClass(targetState)
     
     // Check if we're returning to a main tab
-    val mainTabRoutes = HomeTab.entries.map { it.route }
-    val isToMainTab = to in mainTabRoutes
+    val isToMainTab = isMainTabRoute(toRoute)
     
     when {
         // Returning to main tab: spatial reset with fade
@@ -291,13 +297,12 @@ private fun createBackTransitionSpec(): AnimatedContentTransitionScope<*>.() -> 
  * to ensure consistent user experience whether using gesture navigation
  * or traditional back button interaction.
  */
-private fun createPredictiveBackTransitionSpec(): AnimatedContentTransitionScope<*>.() -> ContentTransform = { 
+private fun createPredictiveBackTransitionSpec(): AnimatedContentTransitionScope<Scene<NavKey>>.(Int) -> ContentTransform = { _ ->
     // Access current and target states from the transition scope
-    val to = targetState
+    val toRoute = sceneRouteClass(targetState)
     
     // Use identical logic to popTransitionSpec for consistency
-    val mainTabRoutes = HomeTab.entries.map { it.route }
-    val isToMainTab = to in mainTabRoutes
+    val isToMainTab = isMainTabRoute(toRoute)
     
     when {
         // Returning to main tab: fade transition (matches popTransitionSpec)
@@ -391,14 +396,16 @@ private fun createSceneStrategy(
     
     return remember(homeStrategy, settingsStrategy) {
         object : SceneStrategy<NavKey> {
-            @Composable
-            override fun calculateScene(
+            override fun SceneStrategyScope<NavKey>.calculateScene(
                 entries: List<NavEntry<NavKey>>,
-                onBack: (Int) -> Unit
             ): Scene<NavKey>? {
                 // Strategy chain execution: Settings → Home → NavDisplay Default
-                val settingsScene = settingsStrategy.calculateScene(entries, onBack)
-                return settingsScene ?: homeStrategy.calculateScene(entries, onBack)
+                val settingsScene = with(settingsStrategy) {
+                    this@calculateScene.calculateScene(entries)
+                }
+                return settingsScene ?: with(homeStrategy) {
+                    this@calculateScene.calculateScene(entries)
+                }
             }
         }
     }
@@ -433,14 +440,22 @@ private fun createSceneStrategy(
  * 
  * @param mainAppNavigator The navigator that manages the app's navigation state and provides
  *   navigation functions for moving between routes
- * @param homeViewModel The shared view model that maintains state for the main home tabs
- *   and coordinates data across the primary navigation destinations
  */
 @Composable
 fun MainNavigationRoot(
     mainAppNavigator: MainAppNavigator,
-    homeViewModel: HomeViewModel = koinViewModel(),
 ) {
+    val hasTimelineRoute = mainAppNavigator.backStack.any { route ->
+        route is TimelineListRoute || route is TimelineDetail
+    }
+    val homeViewModel: HomeViewModel? = if (hasTimelineRoute) {
+        // Create HomeViewModel only if timeline routes are currently in the backstack,
+        // so we avoid DB-heavy initialization during onboarding and non-home flows.
+        org.koin.compose.viewmodel.koinViewModel()
+    } else {
+        null
+    }
+
     // Remember the selected tab across recompositions
     val selectedTab = rememberSaveable { mutableStateOf(HomeTab.TIMELINE) }
 
@@ -454,34 +469,19 @@ fun MainNavigationRoot(
         popTransitionSpec = createBackTransitionSpec(),
         predictivePopTransitionSpec = createPredictiveBackTransitionSpec(),
         entryDecorators = listOf(
-            rememberSceneSetupNavEntryDecorator(),
-            rememberSavedStateNavEntryDecorator(),
+            rememberSaveableStateHolderNavEntryDecorator(rememberSaveableStateHolder()),
             rememberViewModelStoreNavEntryDecorator()
         ),
-        sceneStrategy = sceneStrategy,
+        sceneStrategies = listOf(sceneStrategy),
         backStack = mainAppNavigator.backStack,
-        onBack = { keysToRemove ->
-            Napier.d("Navigation: onBack called, keys to remove: $keysToRemove, current backstack size: ${mainAppNavigator.backStack.size}")
+        onBack = {
+            Napier.d("Navigation: onBack called, current backstack size: ${mainAppNavigator.backStack.size}")
             Napier.d("Navigation: Current backstack entries: ${mainAppNavigator.backStack.map { it::class.simpleName }}")
             
-            // Navigation 3 pattern: Simply remove the requested entries and let Scene Strategy handle recalculation
-            // Only prevent removal if it would result in a completely empty backstack
-            if (keysToRemove >= mainAppNavigator.backStack.size) {
-                // Special case: trying to remove all entries (would result in empty backstack)
-                // Remove all but one to allow app to continue with a main tab
-                val entriesToRemove = (mainAppNavigator.backStack.size - 1).coerceAtLeast(0)
-                Napier.w("Navigation: Requested to remove $keysToRemove entries but only removing $entriesToRemove to prevent empty backstack")
-                repeat(entriesToRemove) {
-                    val removedEntry = mainAppNavigator.backStack.removeLastOrNull()
-                    Napier.d("Navigation: Removed entry: ${removedEntry?.let { it::class.simpleName }}")
-                }
-            } else {
-                // Normal case: remove the requested number of entries
-                Napier.d("Navigation: Removing $keysToRemove entries (normal back navigation)")
-                repeat(keysToRemove) {
-                    val removedEntry = mainAppNavigator.backStack.removeLastOrNull()
-                    Napier.d("Navigation: Removed entry: ${removedEntry?.let { it::class.simpleName }}")
-                }
+            // Navigation 3 pattern: remove a single entry per back action
+            val removed = mainAppNavigator.safelyRemoveLastEntry()
+            if (!removed) {
+                Napier.w("Navigation: Did not remove entry (backstack size too small)")
             }
 
             // Safety check: ensure we always have at least one main tab in the backstack
@@ -497,11 +497,17 @@ fun MainNavigationRoot(
             Napier.d("Navigation: HomeSceneStrategy will recalculate scene based on new backstack state")
         },
         entryProvider = entryProvider {
-            entry<NavigationStart> { _ ->
+            routeEntry<NavigationStart> { _ ->
                 // This is the initial entry, which can be used to stall the app during startup.
                 Column(modifier = Modifier.fillMaxSize()) {
                     // Placeholder content while the app is loading
                 }
+            }
+            routeEntry<NoteViewerRoute> { route ->
+                NoteViewerScreen(
+                    noteId = route.id,
+                    onGoBack = mainAppNavigator::goBack,
+                )
             }
             onboarding(
                 onBack = mainAppNavigator::goBack,
@@ -516,22 +522,23 @@ fun MainNavigationRoot(
                 onOpenJournalDetail = mainAppNavigator::openJournalDetail,
                 onCreateJournal = { mainAppNavigator.backStack.add(NewJournalRoute) },
                 onJournalDeleted = { mainAppNavigator.backStack.removeLastOrNull() },
-                onNavigateToNoteDetail = { journalId, noteId ->
-                    // TODO: Implement note detail navigation once the UI is added
-                    // This would navigate to a note detail screen with the specific journal and note ID
+                onNavigateToNoteDetail = { noteId ->
+                    mainAppNavigator.backStack.add(NoteViewerRoute(noteId))
                 },
                 onNavigateToJournalSettings = mainAppNavigator::openJournalSettings,
                 onNavigateToShareJournal = mainAppNavigator::openShareJournal,
                 onJournalCreated = mainAppNavigator::finishJournalCreation
             )
-            timelineRoutes(
-                openEntryEditor = mainAppNavigator::openEntryEditor,
-                onOpenTimelineDetail = mainAppNavigator::openTimelineDetail,
-                onCloseTimelineDetail = mainAppNavigator::goBack,
-                onOpenSettings = mainAppNavigator::openSettings,
-                onOpenSearch = mainAppNavigator::openSearch,
-                homeViewModel = homeViewModel,
-            )
+            homeViewModel?.let { safeHomeViewModel ->
+                timelineRoutes(
+                    openEntryEditor = mainAppNavigator::openEntryEditor,
+                    onOpenTimelineDetail = mainAppNavigator::openTimelineDetail,
+                    onCloseTimelineDetail = mainAppNavigator::goBack,
+                    onOpenSettings = mainAppNavigator::openSettings,
+                    onOpenSearch = mainAppNavigator::openSearch,
+                    homeViewModel = safeHomeViewModel,
+                )
+            }
             searchRoutes(
                 onBack = mainAppNavigator::goBack,
                 onNavigateToDay = mainAppNavigator::openTimelineDetail,

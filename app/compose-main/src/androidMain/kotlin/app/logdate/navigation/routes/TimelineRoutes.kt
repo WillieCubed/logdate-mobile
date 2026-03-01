@@ -1,5 +1,7 @@
 package app.logdate.navigation.routes
 
+import app.logdate.navigation.routes.routeEntry
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -13,9 +15,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation3.runtime.EntryProviderBuilder
+import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
-import androidx.navigation3.runtime.entry
 import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.feature.timeline.ui.details.TimelineDayDetailPanel
 import app.logdate.navigation.MainAppNavigator
@@ -36,7 +37,7 @@ fun MainAppNavigator.openTimelineDetail(
     backStack.add(TimelineDetail(day))
 }
 
-fun EntryProviderBuilder<NavKey>.timelineRoutes(
+fun EntryProviderScope<NavKey>.timelineRoutes(
     openEntryEditor: () -> Unit,
     onOpenTimelineDetail: (day: LocalDate) -> Unit,
     onCloseTimelineDetail: () -> Unit,
@@ -45,7 +46,7 @@ fun EntryProviderBuilder<NavKey>.timelineRoutes(
     homeViewModel: HomeViewModel,
 ) {
     // The home screen
-    entry<TimelineListRoute>(
+    routeEntry<TimelineListRoute>(
         metadata = HomeScene.homeScene()
     ) { _ ->
         TimelinePaneScreen(
@@ -59,7 +60,7 @@ fun EntryProviderBuilder<NavKey>.timelineRoutes(
             viewModel = homeViewModel
         )
     }
-    entry<TimelineDetail> { route ->
+    routeEntry<TimelineDetail> { route ->
         // Explicitly fetch notes for the selected day when entering this screen
         LaunchedEffect(route.day) {
             homeViewModel.selectDay(route.day)

@@ -1,8 +1,9 @@
 package app.logdate.navigation.routes
 
-import androidx.navigation3.runtime.EntryProviderBuilder
+import app.logdate.navigation.routes.routeEntry
+
+import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
-import androidx.navigation3.runtime.entry
 import app.logdate.feature.journals.ui.JournalClickCallback
 import app.logdate.feature.journals.ui.JournalsOverviewScreen
 import app.logdate.feature.journals.ui.creation.JournalCreationScreen
@@ -66,17 +67,17 @@ fun MainAppNavigator.finishJournalCreation(
 /**
  * Provides the navigation routes for journal-related screens.
  */
-fun EntryProviderBuilder<NavKey>.journalRoutes(
+fun EntryProviderScope<NavKey>.journalRoutes(
     onBack: () -> Unit,
     onOpenJournalDetail: JournalClickCallback,
     onCreateJournal: () -> Unit,
     onJournalDeleted: () -> Unit,
-    onNavigateToNoteDetail: (Uuid, Uuid) -> Unit,
+    onNavigateToNoteDetail: (Uuid) -> Unit,
     onNavigateToJournalSettings: (Uuid) -> Unit = {},
     onNavigateToShareJournal: (Uuid) -> Unit = {},
     onJournalCreated: (Uuid) -> Unit = {},
 ) {
-    entry<JournalList>(
+    routeEntry<JournalList>(
         metadata = HomeScene.homeScene() // Mark this as a home scene entry
     ) {
         JournalsOverviewScreen(
@@ -87,7 +88,7 @@ fun EntryProviderBuilder<NavKey>.journalRoutes(
         )
     }
     // Make sure we properly pass the journalId parameter to JournalDetailScreen
-    entry<JournalDetail>() { route ->
+    routeEntry<JournalDetail>() { route ->
         JournalDetailScreen(
             journalId = route.id,
             onGoBack = onBack,
@@ -97,20 +98,20 @@ fun EntryProviderBuilder<NavKey>.journalRoutes(
             onNavigateToShare = onNavigateToShareJournal,
         )
     }
-    entry<JournalSettings>() { settings ->
+    routeEntry<JournalSettings>() { settings ->
         JournalSettingsScreen(
             journalId = settings.journalId,
             onGoBack = onBack,
             onJournalDeleted = onJournalDeleted,
         )
     }
-    entry<ShareJournal>() { route ->
+    routeEntry<ShareJournal>() { route ->
         app.logdate.feature.journals.ui.share.ShareJournalScreen(
             journalId = route.journalId.toString(),
             onGoBack = onBack,
         )
     }
-    entry<NewJournalRoute>() { _ ->
+    routeEntry<NewJournalRoute>() { _ ->
         JournalCreationScreen(
             onGoBack = onBack,
             onJournalCreated = onJournalCreated

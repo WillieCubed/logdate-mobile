@@ -1,8 +1,9 @@
 package app.logdate.navigation.routes
 
-import androidx.navigation3.runtime.EntryProviderBuilder
+import app.logdate.navigation.routes.routeEntry
+
+import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
-import androidx.navigation3.runtime.entry
 import app.logdate.feature.core.account.ui.AccountCreationCompletionScreen
 import app.logdate.feature.core.account.ui.AccountOnboardingViewModel
 import app.logdate.feature.core.account.ui.AccountScreen
@@ -13,7 +14,7 @@ import app.logdate.feature.core.account.ui.UsernameSelectionScreen
 import org.koin.compose.koinInject
 
 /**
- * Extension function to add cloud account setup routes to an EntryProviderBuilder.
+ * Extension function to add cloud account setup routes to an EntryProviderScope.
  *
  * This function defines all the screens in the cloud account setup flow and their
  * navigation connections. It follows the pattern used in other features of the app.
@@ -25,7 +26,7 @@ import org.koin.compose.koinInject
  * @param onSetupCompleted Callback when the entire setup is completed
  * @param onSkip Callback when user chooses to skip (only available during onboarding)
  */
-fun EntryProviderBuilder<NavKey>.cloudAccountSetup(
+fun EntryProviderScope<NavKey>.cloudAccountSetup(
     onBack: () -> Unit,
     onUsernameSelected: () -> Unit,
     onDisplayNameSelected: () -> Unit,
@@ -34,7 +35,7 @@ fun EntryProviderBuilder<NavKey>.cloudAccountSetup(
     onSkip: () -> Unit
 ) {
     // Cloud Account Intro Screen
-    entry<CloudAccountIntroRoute>() { route ->
+    routeEntry<CloudAccountIntroRoute>() { route ->
         // Display the intro screen with ViewModel
         CloudAccountIntroScreen(
             isFromOnboarding = route.isFromOnboarding,
@@ -48,7 +49,7 @@ fun EntryProviderBuilder<NavKey>.cloudAccountSetup(
     // but will be unused with the new consolidated approach
     
     // Username Selection Screen
-    entry<UsernameSelectionRoute>() {
+    routeEntry<UsernameSelectionRoute>() {
         // Display the username selection screen
         UsernameSelectionScreen(
             onContinue = onDisplayNameSelected,
@@ -57,7 +58,7 @@ fun EntryProviderBuilder<NavKey>.cloudAccountSetup(
     }
     
     // Display Name Selection Screen
-    entry<DisplayNameSelectionRoute>() {
+    routeEntry<DisplayNameSelectionRoute>() {
         // Display the display name selection screen
         DisplayNameSelectionScreen(
             onContinue = onPasskeyCreated,
@@ -66,7 +67,7 @@ fun EntryProviderBuilder<NavKey>.cloudAccountSetup(
     }
     
     // Passkey Creation Screen
-    entry<PasskeyCreationRoute>() {
+    routeEntry<PasskeyCreationRoute>() {
         // Display the passkey creation screen
         PasskeyCreationScreen(
             onComplete = onSetupCompleted,
@@ -75,7 +76,7 @@ fun EntryProviderBuilder<NavKey>.cloudAccountSetup(
     }
     
     // Account Creation Completion Screen
-    entry<AccountCreationCompletionRoute>() {
+    routeEntry<AccountCreationCompletionRoute>() {
         // Display the account creation completion screen
         AccountCreationCompletionScreen(
             onFinish = onSetupCompleted

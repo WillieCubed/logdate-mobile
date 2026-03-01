@@ -15,7 +15,7 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
-        android:name=".LogdateApplication"
+        android:name="app.logdate.client.LogdateApplication"
         android:allowBackup="true"
         android:appCategory="productivity"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -33,7 +33,7 @@
             android:value="true" />
 
         <activity
-            android:name=".MainActivity"
+            android:name="app.logdate.client.MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|mnc|colorMode|density|fontScale|fontWeightAdjustment|keyboard|layoutDirection|locale|mcc|navigation|smallestScreenSize|touchscreen|uiMode"
             android:exported="true"
             android:theme="@style/Theme.LogDate"
@@ -94,7 +94,7 @@
         </activity>
         
         <activity
-            android:name=".EditorActivity"
+            android:name="app.logdate.client.EditorActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|mnc|colorMode|density|fontScale|fontWeightAdjustment|keyboard|layoutDirection|locale|mcc|navigation|smallestScreenSize|touchscreen|uiMode"
             android:exported="true"
             android:theme="@style/Theme.LogDate"
