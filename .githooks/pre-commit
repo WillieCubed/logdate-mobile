@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# pre-commit hook - Validates staged files before committing
+#
+# Checks:
+# 1. Sensitive file guard (reject secrets, keystores, credentials)
+# 2. Kotlin lint via ktlint on affected modules
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+errors=()
+
+# Get list of staged files
+staged_files="$(git diff --cached --name-only --diff-filter=ACMR)"
+
+if [[ -z "$staged_files" ]]; then
+    exit 0
+fi
+
+# ============================================================================
+# 1. Sensitive file guard
+# ============================================================================
+
+sensitive_patterns=(
+    '\.env$'
+    'local\.properties$'
+    '\.keystore$'
+    '\.jks$'
+    'google-services\.json$'
+    'credentials\.json$'
+    'apikey'
+    'secret'
+    '\.pem$'
+    '\.p12$'
+)
+
+sensitive_found=()
+for pattern in "${sensitive_patterns[@]}"; do
+    matches="$(echo "$staged_files" | grep -iE "$pattern" || true)"
+    if [[ -n "$matches" ]]; then
+        while IFS= read -r match; do
+            sensitive_found+=("$match")
+        done <<< "$matches"
+    fi
+done
+
+if [[ ${#sensitive_found[@]} -gt 0 ]]; then
+    errors+=("SENSITIVE FILES: The following files may contain secrets and should not be committed:")
+    for f in "${sensitive_found[@]}"; do
+        errors+=("  - $f")
+    done
+    errors+=("  If intentional, add to .gitignore or use git update-index --assume-unchanged")
+fi
+
+# ============================================================================
+# 2. Kotlin lint (ktlint) on affected modules
+# ============================================================================
+
+# Collect Kotlin/KTS files
+kt_files="$(echo "$staged_files" | grep -E '\.(kt|kts)$' || true)"
+
+if [[ -n "$kt_files" ]]; then
+    # Resolve affected Gradle modules from file paths
+    modules=()
+    seen_modules=()
+
+    while IFS= read -r file; do
+        # Walk up from file to find the nearest build.gradle.kts
+        dir="$(dirname "$file")"
+        while [[ "$dir" != "." && "$dir" != "/" ]]; do
+            if [[ -f "$dir/build.gradle.kts" ]]; then
+                # Convert directory path to Gradle module path
+                # e.g., client/feature/timeline -> :client:feature:timeline
+                module=":$(echo "$dir" | tr '/' ':')"
+
+                # Deduplicate
+                already_seen=false
+                for seen in "${seen_modules[@]+"${seen_modules[@]}"}"; do
+                    if [[ "$seen" == "$module" ]]; then
+                        already_seen=true
+                        break
+                    fi
+                done
+
+                if [[ "$already_seen" == "false" ]]; then
+                    modules+=("$module")
+                    seen_modules+=("$module")
+                fi
+                break
+            fi
+            dir="$(dirname "$dir")"
+        done
+    done <<< "$kt_files"
+
+    if [[ ${#modules[@]} -gt 0 ]]; then
+        # Build ktlintCheck tasks for affected modules
+        ktlint_tasks=()
+        for mod in "${modules[@]}"; do
+            ktlint_tasks+=("${mod}:ktlintCheck")
+        done
+
+        echo "Running ktlint on affected modules: ${modules[*]}"
+        if ! ./gradlew "${ktlint_tasks[@]}" --quiet 2>&1; then
+            errors+=("KTLINT: Kotlin lint check failed. Run './gradlew ktlintFormat' to auto-fix.")
+        fi
+    fi
+fi
+
+# ============================================================================
+# Report errors
+# ============================================================================
+
+if [[ ${#errors[@]} -gt 0 ]]; then
+    echo ""
+    echo "=========================================="
+    echo "  PRE-COMMIT VALIDATION FAILED"
+    echo "=========================================="
+    echo ""
+    for err in "${errors[@]}"; do
+        echo "  $err"
+    done
+    echo ""
+    echo "=========================================="
+    echo ""
+    exit 1
+fi
+
+exit 0

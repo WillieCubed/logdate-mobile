@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# commit-msg hook - Validates commit message format, scope, and content rules
+#
+# Checks:
+# 1. Conventional commit format: type(scope): description
+# 2. Title length <= 72 characters
+# 3. Scope against allowed-scopes.txt
+# 4. No phase numbers (forbidden)
+# 5. Imperative mood warning
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+COMMIT_MSG_FILE="$1"
+COMMIT_MSG="$(cat "$COMMIT_MSG_FILE")"
+
+# Skip merge commits and fixup/squash commits
+if [[ "$COMMIT_MSG" =~ ^Merge ]] || [[ "$COMMIT_MSG" =~ ^fixup! ]] || [[ "$COMMIT_MSG" =~ ^squash! ]]; then
+    exit 0
+fi
+
+TITLE="$(head -n 1 "$COMMIT_MSG_FILE")"
+errors=()
+
+# 1. Conventional commit format
+VALID_TYPES="feat|fix|refactor|docs|style|test|chore|perf"
+if ! echo "$TITLE" | grep -qE "^($VALID_TYPES)(\(.+\))?!?: .+"; then
+    errors+=("FORMAT: Commit title must follow conventional commit format:")
+    errors+=("  type(scope): description")
+    errors+=("  Valid types: feat, fix, refactor, docs, style, test, chore, perf")
+    errors+=("  Example: feat(timeline): add date grouping for notes")
+fi
+
+# 2. Title length
+title_len=${#TITLE}
+if [[ $title_len -gt 72 ]]; then
+    errors+=("LENGTH: Title is $title_len chars (max 72). Shorten the description.")
+fi
+
+# 3. Scope validation
+if echo "$TITLE" | grep -qE "^($VALID_TYPES)\((.+)\)"; then
+    scope="$(echo "$TITLE" | sed -E "s/^($VALID_TYPES)\(([^)]+)\).*/\2/")"
+    if ! "$REPO_ROOT/scripts/validation/validate-commit-scope.sh" "$scope" 2>&1; then
+        errors+=("SCOPE: See suggestions above.")
+    fi
+fi
+
+# 4. Phase number ban
+if echo "$COMMIT_MSG" | grep -qiE "phase[[:space:]]+[0-9]"; then
+    errors+=("PHASE: Phase numbers are forbidden in commit messages.")
+    errors+=("  Describe what changed, not which phase it belongs to.")
+fi
+
+# 5. Imperative mood warning (soft - does not block)
+desc="$(echo "$TITLE" | sed -E "s/^($VALID_TYPES)(\([^)]+\))?!?: //")"
+if echo "$desc" | grep -qE "^(Added|Fixed|Updated|Removed|Changed|Implemented|Created|Deleted|Moved|Renamed) "; then
+    echo ""
+    echo "WARNING: Use imperative mood in commit title."
+    echo "  Instead of: \"$desc\""
+    first_word="$(echo "$desc" | awk '{print $1}')"
+    # Suggest imperative form
+    imperative="$(echo "$first_word" | sed -E 's/ed$//; s/d$//')"
+    rest="$(echo "$desc" | sed "s/^$first_word //")"
+    echo "  Try: \"${imperative^} $rest\""
+    echo ""
+fi
+
+# Report errors and exit
+if [[ ${#errors[@]} -gt 0 ]]; then
+    echo ""
+    echo "=========================================="
+    echo "  COMMIT MESSAGE VALIDATION FAILED"
+    echo "=========================================="
+    echo ""
+    for err in "${errors[@]}"; do
+        echo "  $err"
+    done
+    echo ""
+    echo "  See: docs/reference/standards/commit-messages.md"
+    echo "=========================================="
+    echo ""
+    exit 1
+fi
+
+exit 0
