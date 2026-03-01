@@ -81,7 +81,7 @@ kotlin {
             implementation(libs.compose.animation)
             implementation(libs.compose.material.icons.extended)
             implementation(libs.compose.components.resources)
-            implementation(libs.compose.components.ui.tooling.preview)
+            implementation(libs.compose.ui.tooling.preview)
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.androidx.navigation.compose)
@@ -178,6 +178,12 @@ addToFirstExistingConfiguration(
     "screenshotTestImplementation",
     "androidScreenshotTestImplementation"
 )
+
+compose.resources {
+    publicResClass = true
+    generateResClass = always
+    packageOfResClass = "logdate.app.composemain.generated.resources"
+}
 addToFirstExistingConfiguration(
     libs.compose.material3,
     "screenshotTestImplementation",

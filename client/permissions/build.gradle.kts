@@ -40,6 +40,7 @@ kotlin {
             implementation(libs.compose.material3)
             implementation(libs.compose.material.icons.extended)
             implementation(libs.compose.ui)
+            implementation(libs.compose.components.resources)
             implementation(projects.shared.model)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
@@ -55,4 +56,10 @@ kotlin {
             implementation(libs.koin.android)
         }
     }
+}
+
+compose.resources {
+    publicResClass = true
+    generateResClass = always
+    packageOfResClass = "logdate.client.permissions.generated.resources"
 }

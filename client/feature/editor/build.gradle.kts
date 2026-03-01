@@ -59,7 +59,7 @@ kotlin {
             implementation(libs.compose.material3.adaptive.navigation.suite)
             implementation(libs.compose.ui)
             implementation(libs.compose.components.resources)
-            implementation(libs.compose.components.ui.tooling.preview)
+            implementation(libs.compose.ui.tooling.preview)
             // Core dependencies
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.core)

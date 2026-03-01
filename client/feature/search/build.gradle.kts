@@ -49,7 +49,7 @@ kotlin {
             implementation(libs.compose.material.icons.extended)
             implementation(libs.compose.material3)
             implementation(libs.compose.components.resources)
-            implementation(libs.compose.components.ui.tooling.preview)
+            implementation(libs.compose.ui.tooling.preview)
 
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.datetime)
@@ -75,3 +75,8 @@ kotlin {
     }
 }
 
+compose.resources {
+    publicResClass = true
+    generateResClass = always
+    packageOfResClass = "logdate.client.feature.search.generated.resources"
+}

@@ -70,3 +70,9 @@ kotlin {
         }
     }
 }
+
+compose.resources {
+    publicResClass = true
+    generateResClass = always
+    packageOfResClass = "logdate.client.feature.location.timeline.generated.resources"
+}

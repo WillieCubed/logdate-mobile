@@ -55,7 +55,7 @@ kotlin {
             implementation(libs.compose.material3.adaptive.navigation.suite)
             implementation(libs.compose.ui)
             implementation(libs.compose.components.resources)
-            implementation(libs.compose.components.ui.tooling.preview)
+            implementation(libs.compose.ui.tooling.preview)
             // External dependencies
             implementation(libs.material3.adaptive)
             implementation(libs.material3.adaptive.layout)
@@ -95,4 +95,5 @@ dependencies {
 compose.resources {
     publicResClass = true
     generateResClass = always
+    packageOfResClass = "logdate.client.ui.generated.resources"
 }
