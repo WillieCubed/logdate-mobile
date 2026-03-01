@@ -6,17 +6,15 @@ import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.SyncMetadataService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 class FakeSyncMetadataService : SyncMetadataService {
-    private val pendingUploads = mutableMapOf<EntityType, MutableMap<String, PendingOperation>>()
+    private val pendingUploads = mutableMapOf<EntityType, MutableMap<String, PendingUpload>>()
     private val syncTimes = mutableMapOf<EntityType, Instant>()
     private val _pendingCount = MutableStateFlow(0)
 
     override suspend fun getPendingUploads(entityType: EntityType): List<PendingUpload> {
-        return pendingUploads[entityType]
-            ?.map { (entityId, operation) -> PendingUpload(entityId, operation) }
-            ?: emptyList()
+        return pendingUploads[entityType]?.values?.toList() ?: emptyList()
     }
 
     override suspend fun markAsSynced(
@@ -41,23 +39,32 @@ class FakeSyncMetadataService : SyncMetadataService {
         operation: PendingOperation
     ) {
         val existing = pendingUploads[entityType]?.get(entityId)
-        val resolved = resolveOperation(existing, operation)
+        val resolved = resolveOperation(existing?.operation, operation)
         if (resolved == null) {
             pendingUploads[entityType]?.remove(entityId)
         } else {
-            pendingUploads.getOrPut(entityType) { mutableMapOf() }[entityId] = resolved
+            val retryCount = existing?.retryCount ?: 0
+            pendingUploads.getOrPut(entityType) { mutableMapOf() }[entityId] =
+                PendingUpload(entityId, resolved, retryCount)
         }
         updatePendingCount()
     }
 
     override suspend fun resetSyncStatus(entityId: String, entityType: EntityType) {
-        enqueuePending(entityId, entityType, PendingOperation.UPDATE)
+        pendingUploads.getOrPut(entityType) { mutableMapOf() }[entityId] =
+            PendingUpload(entityId, PendingOperation.UPDATE, retryCount = 0)
         updatePendingCount()
     }
 
     override suspend fun getPendingCount(): Int = pendingUploads.values.sumOf { it.size }
 
     override fun observePendingCount(): Flow<Int> = _pendingCount
+
+    override suspend fun incrementRetryCount(entityId: String, entityType: EntityType) {
+        val existing = pendingUploads[entityType]?.get(entityId) ?: return
+        pendingUploads.getOrPut(entityType) { mutableMapOf() }[entityId] =
+            existing.copy(retryCount = existing.retryCount + 1)
+    }
 
     private fun updatePendingCount() {
         _pendingCount.value = pendingUploads.values.sumOf { it.size }

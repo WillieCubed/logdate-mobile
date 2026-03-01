@@ -3,7 +3,7 @@ package app.logdate.client.data.notes.drafts
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteType
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -37,7 +37,7 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
         val type: String,
         val content: String,
         val createdAt: Long,
-        val durationMs: Long? = null
+        val durationMs: Long = 0
     )
     
     private fun EntryDraft.toSerializable(): SerializableEntryDraft {
@@ -63,7 +63,7 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
             type = this.type.toString(),
             content = noteContent,
             createdAt = this.creationTimestamp.toEpochMilliseconds(),
-            durationMs = (this as? JournalNote.Audio)?.durationMs
+            durationMs = (this as? JournalNote.Audio)?.durationMs ?: 0
         )
     }
     

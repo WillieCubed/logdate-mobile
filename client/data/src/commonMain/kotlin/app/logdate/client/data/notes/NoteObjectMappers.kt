@@ -3,10 +3,11 @@ package app.logdate.client.data.notes
 import app.logdate.client.database.entities.ImageNoteEntity
 import app.logdate.client.database.entities.TextNoteEntity
 import app.logdate.client.database.entities.VideoNoteEntity
-import app.logdate.client.database.entities.VoiceNoteEntity
+import app.logdate.client.database.entities.AudioNoteEntity
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
+import io.github.aakira.napier.Napier
 import kotlin.uuid.Uuid
 
 /**
@@ -110,9 +111,7 @@ fun JournalNote.Video.toEntity() = VideoNoteEntity(
     placeId = location?.place?.id,
 )
 
-// TODO: Rename VoiceNoteEntity to AudioNoteEntity to better represent general audio content
-//       rather than specifically voice recordings
-fun VoiceNoteEntity.toModel(): JournalNote.Audio {
+fun AudioNoteEntity.toModel(): JournalNote.Audio {
     val result = JournalNote.Audio(
         uid = uid,
         mediaRef = contentUri,
@@ -124,7 +123,7 @@ fun VoiceNoteEntity.toModel(): JournalNote.Audio {
     )
 
     // Add debug logging for audio note conversion
-    io.github.aakira.napier.Napier.d(
+    Napier.d(
         tag = "NoteObjectMappers",
         message = "CONVERTING AUDIO NOTE: Entity with UID $uid and URI $contentUri created at $created converted to model"
     )
@@ -132,7 +131,7 @@ fun VoiceNoteEntity.toModel(): JournalNote.Audio {
     return result
 }
 
-fun JournalNote.Audio.toEntity() = VoiceNoteEntity(
+fun JournalNote.Audio.toEntity() = AudioNoteEntity(
     uid = uid,
     contentUri = mediaRef,
     created = creationTimestamp,

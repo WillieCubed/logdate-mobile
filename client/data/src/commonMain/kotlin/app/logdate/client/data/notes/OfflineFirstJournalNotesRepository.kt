@@ -24,8 +24,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -37,7 +37,6 @@ import kotlin.uuid.Uuid
 class OfflineFirstJournalNotesRepository(
     private val textNoteDao: TextNoteDao,
     private val imageNoteDao: ImageNoteDao,
-    // TODO: Rename VoiceNoteDao to AudioNoteDao to better represent general audio content
     private val audioNoteDao: AudioNoteDao,
     private val videoNoteDao: VideoNoteDao,
     private val journalContentDao: JournalContentDao,
@@ -50,8 +49,8 @@ class OfflineFirstJournalNotesRepository(
     override val allNotesObserved: Flow<List<JournalNote>> =
         textNoteDao.getAllNotes().combine(
             imageNoteDao.getAllNotes()
-                .combine(audioNoteDao.getAllNotes()) { imageNotes, voiceNotes ->
-                    imageNotes.map { it.toModel() } + voiceNotes.map { it.toModel() }
+                .combine(audioNoteDao.getAllNotes()) { imageNotes, audioNotes ->
+                    imageNotes.map { it.toModel() } + audioNotes.map { it.toModel() }
                 }
                 .combine(videoNoteDao.getAllNotes()) { imageAndAudioNotes, videoNotes ->
                     imageAndAudioNotes + videoNotes.map { it.toModel() }
@@ -75,8 +74,8 @@ class OfflineFirstJournalNotesRepository(
         return textNoteDao.getNotesInRange(startMillis, endMillis)
             .combine(
                 imageNoteDao.getNotesInRange(startMillis, endMillis)
-                    .combine(audioNoteDao.getNotesInRange(startMillis, endMillis)) { imageNotes, voiceNotes ->
-                        imageNotes.map { it.toModel() } + voiceNotes.map { it.toModel() }
+                    .combine(audioNoteDao.getNotesInRange(startMillis, endMillis)) { imageNotes, audioNotes ->
+                        imageNotes.map { it.toModel() } + audioNotes.map { it.toModel() }
                     }
                     .combine(videoNoteDao.getNotesInRange(startMillis, endMillis)) { imageAndAudioNotes, videoNotes ->
                         imageAndAudioNotes + videoNotes.map { it.toModel() }
@@ -95,9 +94,9 @@ class OfflineFirstJournalNotesRepository(
                 val imageModels = imageNotes.map { it.toModel() }
                 textModels + imageModels
             }
-            .combine(audioNoteDao.getAllNotes()) { initialNotes, voiceNotes ->
-                val voiceModels = voiceNotes.map { it.toModel() }
-                initialNotes + voiceModels
+            .combine(audioNoteDao.getAllNotes()) { initialNotes, audioNotes ->
+                val audioModels = audioNotes.map { it.toModel() }
+                initialNotes + audioModels
             }
             .combine(videoNoteDao.getAllNotes()) { initialNotes, videoNotes ->
                 val videoModels = videoNotes.map { it.toModel() }
@@ -117,8 +116,8 @@ class OfflineFirstJournalNotesRepository(
         return textNoteDao.getRecentNotes(limit)
             .combine(
                 imageNoteDao.getRecentNotes(limit)
-                    .combine(audioNoteDao.getRecentNotes(limit)) { imageNotes, voiceNotes ->
-                        imageNotes.map { it.toModel() } + voiceNotes.map { it.toModel() }
+                    .combine(audioNoteDao.getRecentNotes(limit)) { imageNotes, audioNotes ->
+                        imageNotes.map { it.toModel() } + audioNotes.map { it.toModel() }
                     }
                     .combine(videoNoteDao.getRecentNotes(limit)) { imageAndAudioNotes, videoNotes ->
                         imageAndAudioNotes + videoNotes.map { it.toModel() }
@@ -132,10 +131,10 @@ class OfflineFirstJournalNotesRepository(
 
     override suspend fun getNoteById(noteId: Uuid): JournalNote? {
         // Try each note type DAO until we find the note
-        textNoteDao.getNoteOneOff(noteId)?.toModel()?.let { return it }
-        imageNoteDao.getNoteOneOff(noteId)?.toModel()?.let { return it }
-        audioNoteDao.getNoteOneOff(noteId)?.toModel()?.let { return it }
-        videoNoteDao.getNoteOneOff(noteId)?.toModel()?.let { return it }
+        runCatching { textNoteDao.getNoteOneOff(noteId).toModel() }.getOrNull()?.let { return it }
+        runCatching { imageNoteDao.getNoteOneOff(noteId).toModel() }.getOrNull()?.let { return it }
+        runCatching { audioNoteDao.getNoteOneOff(noteId).toModel() }.getOrNull()?.let { return it }
+        runCatching { videoNoteDao.getNoteOneOff(noteId).toModel() }.getOrNull()?.let { return it }
         return null
     }
 

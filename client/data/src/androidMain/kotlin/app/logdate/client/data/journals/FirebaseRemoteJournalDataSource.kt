@@ -1,8 +1,7 @@
 package app.logdate.client.data.journals
 
 import app.logdate.shared.model.Journal
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlin.coroutines.suspendCoroutine
 
 /**
@@ -10,7 +9,7 @@ import kotlin.coroutines.suspendCoroutine
  */
 class FirebaseRemoteJournalDataSource : RemoteJournalDataSource {
 
-    private val db = Firebase.firestore
+    private val db = FirebaseFirestore.getInstance()
 
     private companion object {
         private const val JOURNALS_COLLECTION = "journals"

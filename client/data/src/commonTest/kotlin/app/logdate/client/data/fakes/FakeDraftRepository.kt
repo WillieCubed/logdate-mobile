@@ -4,7 +4,7 @@ import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.shared.model.EditorDraft
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**

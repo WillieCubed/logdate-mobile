@@ -5,7 +5,7 @@ import app.logdate.client.repository.user.devices.UserDevice
 import app.logdate.client.repository.user.devices.UserDeviceRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 /**
  * Stub implementation of [UserDeviceRepository].

@@ -6,8 +6,8 @@ import app.logdate.shared.model.profile.LogDateProfile
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 /**
  * Offline-first implementation of ProfileRepository using DataStore for persistence.
@@ -23,7 +23,7 @@ class OfflineFirstProfileRepository(
         preferencesDataSource.userData.map { userData ->
             LogDateProfile(
                 displayName = userData.displayName,
-                birthday = userData.birthday?.takeIf { it != Instant.DISTANT_PAST },
+                birthday = userData.birthday.takeIf { it != Instant.DISTANT_PAST },
                 profilePhotoUri = userData.profilePhotoUri,
                 bio = userData.bio,
                 originalBio = userData.originalBio,
@@ -41,7 +41,7 @@ class OfflineFirstProfileRepository(
                 onSuccess = { userData ->
                     val updatedProfile = LogDateProfile(
                         displayName = userData.displayName,
-                        birthday = userData.birthday?.takeIf { it != Instant.DISTANT_PAST },
+                        birthday = userData.birthday.takeIf { it != Instant.DISTANT_PAST },
                         profilePhotoUri = userData.profilePhotoUri,
                         bio = userData.bio,
                         originalBio = userData.originalBio,
@@ -75,7 +75,7 @@ class OfflineFirstProfileRepository(
                 onSuccess = { userData ->
                     val updatedProfile = LogDateProfile(
                         displayName = userData.displayName,
-                        birthday = userData.birthday?.takeIf { it != Instant.DISTANT_PAST },
+                        birthday = userData.birthday.takeIf { it != Instant.DISTANT_PAST },
                         profilePhotoUri = userData.profilePhotoUri,
                         bio = userData.bio,
                         originalBio = userData.originalBio,
@@ -109,7 +109,7 @@ class OfflineFirstProfileRepository(
                 onSuccess = { userData ->
                     val updatedProfile = LogDateProfile(
                         displayName = userData.displayName,
-                        birthday = userData.birthday?.takeIf { it != Instant.DISTANT_PAST },
+                        birthday = userData.birthday.takeIf { it != Instant.DISTANT_PAST },
                         profilePhotoUri = userData.profilePhotoUri,
                         bio = userData.bio,
                         originalBio = userData.originalBio,
@@ -143,7 +143,7 @@ class OfflineFirstProfileRepository(
                 onSuccess = { userData ->
                     val updatedProfile = LogDateProfile(
                         displayName = userData.displayName,
-                        birthday = userData.birthday?.takeIf { it != Instant.DISTANT_PAST },
+                        birthday = userData.birthday.takeIf { it != Instant.DISTANT_PAST },
                         profilePhotoUri = userData.profilePhotoUri,
                         bio = userData.bio,
                         originalBio = userData.originalBio,
@@ -173,7 +173,7 @@ class OfflineFirstProfileRepository(
             val userData = preferencesDataSource.getCurrentUserData()
             LogDateProfile(
                 displayName = userData.displayName,
-                birthday = userData.birthday?.takeIf { it != Instant.DISTANT_PAST },
+                birthday = userData.birthday.takeIf { it != Instant.DISTANT_PAST },
                 profilePhotoUri = userData.profilePhotoUri,
                 bio = userData.bio,
                 originalBio = userData.originalBio,

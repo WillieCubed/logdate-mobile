@@ -14,8 +14,10 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -134,12 +136,12 @@ class OfflineFirstJournalNotesRepositoryTest {
     @Test
     fun observeNotesInRange_filtersNotesByTimeRange() = runTest {
         val now = Clock.System.now()
-        val hourAgo = Instant.fromEpochMilliseconds(now.toEpochMilliseconds() - 3600000)
-        val hourFromNow = Instant.fromEpochMilliseconds(now.toEpochMilliseconds() + 3600000)
+        val hourAgo = now - 1.hours
+        val hourFromNow = now + 1.hours
         
         val noteInRange = createTestTextNote().copy(creationTimestamp = now)
         val noteOutOfRange = createTestTextNote().copy(
-            creationTimestamp = Instant.fromEpochMilliseconds(now.toEpochMilliseconds() - 7200000)
+            creationTimestamp = now - 2.hours
         )
         
         textNoteDao.addNote(noteInRange.toEntity())
@@ -165,9 +167,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         repeat(5) { index ->
             val note = createTestTextNote().copy(
                 content = "Note $index",
-                creationTimestamp = Instant.fromEpochMilliseconds(
-                    Clock.System.now().toEpochMilliseconds() + index * 1000
-                )
+                creationTimestamp = Clock.System.now() + index.seconds
             )
             textNoteDao.addNote(note.toEntity())
         }
