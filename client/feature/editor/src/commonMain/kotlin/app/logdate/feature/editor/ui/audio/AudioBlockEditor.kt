@@ -92,7 +92,7 @@ fun AudioBlockEditor(
     // Use AudioPermissionWrapper to handle permissions
     AudioPermissionWrapper {
         if (hasExistingAudio) {
-            val audioUri = block.uri ?: return@AudioPermissionWrapper
+            val audioUri = block.uri
             AudioBlockContent(
                 block = block,
                 isExpanded = true,

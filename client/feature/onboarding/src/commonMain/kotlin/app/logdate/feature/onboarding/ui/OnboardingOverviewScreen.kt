@@ -38,7 +38,7 @@ import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import logdate.client.ui.generated.resources.book_open
 import org.jetbrains.compose.resources.painterResource
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.Preview
 import logdate.client.ui.generated.resources.Res as coreRes
 
 @OptIn(ExperimentalMaterial3Api::class)

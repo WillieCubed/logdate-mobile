@@ -30,7 +30,7 @@ import logdate.client.feature.onboarding.generated.resources.Res
 import logdate.client.feature.onboarding.generated.resources.onboarding_notifications_confirmation_content
 import logdate.client.feature.onboarding.generated.resources.onboarding_notifications_confirmation_title
 import org.jetbrains.compose.resources.stringResource
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.Preview
 
 @Composable
 fun OnboardingNotificationConfirmationScreen(

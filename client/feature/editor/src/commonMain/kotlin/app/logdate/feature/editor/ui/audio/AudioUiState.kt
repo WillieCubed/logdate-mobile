@@ -57,10 +57,9 @@ data class AudioUiState(
     
     // Compatibility properties to maintain backward compatibility
     val transcription: String?
-        get() = if (transcriptionState is TranscriptionState.Success) {
-            (transcriptionState as TranscriptionState.Success).text
-        } else {
-            null
+        get() = when (val state = transcriptionState) {
+            is TranscriptionState.Success -> state.text
+            else -> null
         }
     
     val transcriptionInProgress: Boolean
