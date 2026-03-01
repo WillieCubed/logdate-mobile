@@ -2,7 +2,7 @@ package app.logdate.client.health.data
 
 import app.logdate.client.health.model.SleepSession
 import app.logdate.client.health.model.TimeOfDay
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 
 /**

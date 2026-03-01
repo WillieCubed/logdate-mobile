@@ -3,7 +3,7 @@ package app.logdate.client.health
 import app.logdate.client.health.model.DayBounds
 import app.logdate.client.health.model.SleepSession
 import app.logdate.client.health.model.TimeOfDay
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 
