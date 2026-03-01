@@ -1,9 +1,10 @@
 package app.logdate.util
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.number
 
 /**
  * Returns a formatted time string for this [Instant] based on the current system time zone.
@@ -26,8 +27,8 @@ actual val Instant.asTime: String
 @JsExport
 actual fun formatDateLocalized(date: LocalDate): String {
     // JavaScript date expects a zero-based month (January is 0)
-    val jsMonth = date.monthNumber - 1
-    val jsDate = js("new Date(date.year, jsMonth, date.dayOfMonth)")
+    val jsMonth = date.month.number - 1
+    val jsDate = js("new Date(date.year, jsMonth, date.day)")
     
     // Use Intl.DateTimeFormat for proper localization
     // This will use the browser's locale settings

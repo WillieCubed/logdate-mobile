@@ -1,9 +1,9 @@
 package app.logdate.util
 
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.DateTimePeriod
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
@@ -84,8 +84,8 @@ class DateTimeFormattingTest {
         val systemNow = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
         
         assertEquals(systemNow.year, today.year, "Year should match system time")
-        assertEquals(systemNow.monthNumber, today.monthNumber, "Month should match system time")
-        assertEquals(systemNow.dayOfMonth, today.dayOfMonth, "Day should match system time")
+        assertEquals(systemNow.month, today.month, "Month should match system time")
+        assertEquals(systemNow.day, today.day, "Day should match system time")
     }
     
     /**
