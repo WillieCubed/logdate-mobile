@@ -8,13 +8,10 @@ import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import app.logdate.client.health.model.DayBounds
 import io.github.aakira.napier.Napier
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
-import kotlinx.datetime.toJavaInstant
-import kotlinx.datetime.toJavaLocalDate
-import kotlinx.datetime.toKotlinInstant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
@@ -54,9 +51,11 @@ class AndroidHealthConnectRepository(
         
         try {
             // Look at sleep data from previous 30 days to establish patterns
-            val endTime = date.plusDays(1).atStartOfDayIn(timeZone)
-            val startTime = date.minusDays(30).atStartOfDayIn(timeZone)
-            
+            val endTimeKt = date.plusDays(1).atStartOfDayIn(timeZone)
+            val startTimeKt = date.minusDays(30).atStartOfDayIn(timeZone)
+            val endTime = Instant.fromEpochSeconds(endTimeKt.epochSeconds, endTimeKt.nanosecondsOfSecond)
+            val startTime = Instant.fromEpochSeconds(startTimeKt.epochSeconds, startTimeKt.nanosecondsOfSecond)
+
             val sleepSessions = readSleepSessions(startTime, endTime)
             
             if (sleepSessions.isEmpty()) {

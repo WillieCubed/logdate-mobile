@@ -5,7 +5,7 @@ import app.logdate.client.media.MediaObject
 import app.logdate.client.repository.media.IndexedMediaRepository
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Use case to automatically index media from a specific time period.

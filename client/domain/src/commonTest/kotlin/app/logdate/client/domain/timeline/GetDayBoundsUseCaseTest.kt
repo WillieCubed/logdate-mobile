@@ -10,7 +10,7 @@ import app.logdate.client.health.LocalFirstHealthRepository
 import app.logdate.client.health.model.DayBounds
 import app.logdate.client.health.model.SleepSession
 import app.logdate.client.health.model.TimeOfDay
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 class GetDayBoundsUseCaseTest {
 

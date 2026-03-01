@@ -3,7 +3,7 @@ package app.logdate.client.domain.account
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.shared.model.LogDateAccount
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

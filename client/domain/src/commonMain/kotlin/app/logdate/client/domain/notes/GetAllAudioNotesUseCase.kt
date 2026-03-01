@@ -27,8 +27,8 @@ class GetAllAudioNotesUseCase(
     /**
      * Returns a flow of all audio notes within a specific date range.
      */
-    operator fun invoke(startTimestamp: kotlinx.datetime.Instant, 
-                        endTimestamp: kotlinx.datetime.Instant): Flow<List<JournalNote.Audio>> {
+    operator fun invoke(startTimestamp: kotlin.time.Instant, 
+                        endTimestamp: kotlin.time.Instant): Flow<List<JournalNote.Audio>> {
         return notesRepository.observeNotesInRange(startTimestamp, endTimestamp)
             .map { notes ->
                 notes.filterIsInstance<JournalNote.Audio>()

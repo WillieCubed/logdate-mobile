@@ -4,7 +4,7 @@ import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.client.repository.media.IndexedMediaRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration

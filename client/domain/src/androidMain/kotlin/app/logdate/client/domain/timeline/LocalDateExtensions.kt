@@ -1,11 +1,11 @@
 package app.logdate.client.domain.timeline
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
-import kotlinx.datetime.toKotlinInstant
 import java.time.ZoneId
+import kotlinx.datetime.number
 
 /**
  * Extension functions for LocalDate to work with java.time conversions
@@ -31,7 +31,7 @@ fun LocalDate.minusDays(days: Long): LocalDate {
  * Convert this LocalDate to a java.time.LocalDate.
  */
 fun LocalDate.toJavaLocalDate(): java.time.LocalDate {
-    return java.time.LocalDate.of(year, monthNumber, dayOfMonth)
+    return java.time.LocalDate.of(year, month.number, day)
 }
 
 /**
@@ -42,7 +42,7 @@ fun java.time.LocalDate.toKotlinLocalDate(): LocalDate {
 }
 
 /**
- * Convert java.time.Instant to kotlinx.datetime.Instant.
+ * Convert java.time.Instant to kotlin.time.Instant.
  */
 fun java.time.Instant.toKotlinInstant(): Instant {
     return Instant.fromEpochSeconds(
@@ -52,7 +52,7 @@ fun java.time.Instant.toKotlinInstant(): Instant {
 }
 
 /**
- * Convert kotlinx.datetime.Instant to java.time.Instant.
+ * Convert kotlin.time.Instant to java.time.Instant.
  */
 fun Instant.toJavaInstant(): java.time.Instant {
     return java.time.Instant.ofEpochSecond(

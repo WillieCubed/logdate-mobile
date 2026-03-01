@@ -3,7 +3,7 @@ package app.logdate.client.domain.quota
 import app.logdate.shared.model.CloudObjectType
 import app.logdate.shared.model.CloudQuotaManager
 import app.logdate.shared.model.CloudStorageQuota
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlinx.coroutines.flow.Flow

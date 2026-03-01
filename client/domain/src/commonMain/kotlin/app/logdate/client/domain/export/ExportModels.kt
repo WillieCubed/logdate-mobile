@@ -1,7 +1,7 @@
 package app.logdate.client.domain.export
 
 import app.logdate.shared.model.Journal
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 
 /**
@@ -104,5 +104,11 @@ data class ExportFileStructure(
     val notesFile: String = "notes.json",
     val journalNotesFile: String = "journal_notes.json",
     val draftsFile: String = "drafts.json",
+    val mediaManifestFile: String = "media_manifest.json",
     val mediaFolder: String = "media"
+)
+
+@Serializable
+data class ExportMediaManifest(
+    val files: List<ExportMediaFile>
 )

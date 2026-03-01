@@ -3,7 +3,7 @@ package app.logdate.client.domain.timeline
 import app.logdate.client.repository.journals.JournalNotesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
@@ -47,7 +47,7 @@ class GetStreamingTimelineUseCase(
         pageSize: Int
     ): Flow<Timeline> {
         // Simplified approach: Fast first paint with recent notes, then enhance with full data
-        return notesRepository.observeRecentNotes(20)
+        return notesRepository.observeRecentNotes(pageSize)
             .map { recentNotes ->
                 // Create immediate basic timeline for first paint
                 createBasicTimeline(recentNotes, sortOrder)
@@ -87,7 +87,7 @@ class GetStreamingTimelineUseCase(
             TimelineDay(
                 start = entries.minOf { it.creationTimestamp },
                 end = entries.maxOf { it.creationTimestamp },
-                tldr = "${entries.size} entries",
+                tldr = "", // Empty - UI will show loading placeholder via isLoadingSummary
                 date = date,
                 people = emptyList(),
                 events = emptyList(),

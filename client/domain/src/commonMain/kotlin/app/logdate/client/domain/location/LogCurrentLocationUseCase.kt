@@ -2,7 +2,7 @@ package app.logdate.client.domain.location
 
 import app.logdate.client.location.ClientLocationProvider
 import app.logdate.client.repository.location.LocationHistoryRepository
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 /**
  * Use case to log the current location to location history with automatic
