@@ -23,7 +23,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.Preview
 
 /**
  * A Material You-themed container that automatically applies spacing between its children,

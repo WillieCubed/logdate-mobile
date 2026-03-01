@@ -66,9 +66,8 @@ fun AudioPlayerComponent(audioId: Uuid, audioUri: String) {
 
 ## Integration Notes
 
-- The provider only manages the playback state - you'll need to implement the actual audio playback functionality based on your platform.
-- Use platform-specific code (expect/actual pattern) to implement the actual audio playback in the `AudioPlaybackProvider`.
-- The current implementation simulates audio playback for demonstration purposes.
+- The provider wires into the platform-specific `AudioPlaybackManager` via Koin to handle real playback.
+- Ensure the app-level audio module is included so playback implementations are registered per platform.
 
 ## Best Practices
 

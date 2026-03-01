@@ -25,9 +25,9 @@ import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.conditional
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.asTime
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import kotlin.time.Clock
+import kotlin.time.Instant
+import androidx.compose.ui.tooling.preview.Preview
 
 /**
  * A timeline item represents a "day", where a day represents a block of connected events

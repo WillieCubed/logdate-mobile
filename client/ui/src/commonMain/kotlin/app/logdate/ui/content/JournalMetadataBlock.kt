@@ -11,7 +11,7 @@ import androidx.compose.ui.Alignment
 import app.logdate.ui.content.audience.MiniProfileIcons
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.theme.Spacing
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.Preview
 import kotlin.uuid.Uuid
 
 
