@@ -138,7 +138,7 @@ fun OnboardingOverviewScreen(
 
 ```kotlin
 val onboardingFeatureModule = module {
-    viewModel { OnboardingViewModel(get(), get(), get()) }
+    viewModel { OnboardingViewModel(get(), get()) }
     viewModel { WelcomeBackViewModel(get()) }
     viewModel { MemorySelectionViewModel(get()) }
 }
