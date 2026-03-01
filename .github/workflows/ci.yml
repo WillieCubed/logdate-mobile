@@ -81,6 +81,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      - name: Check hardcoded Compose literals
+        run: ./scripts/check_hardcoded_compose_literals.sh
+
       - name: Run lint
         run: ./gradlew lint
         continue-on-error: true
