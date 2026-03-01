@@ -1,7 +1,7 @@
 package app.logdate.client.networking
 
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -54,7 +54,6 @@ class NetworkStateTest {
         val state = NetworkState.Connected(timestamp)
         
         assertEquals(timestamp, state.lastConnected)
-        assertTrue(state is NetworkState.Connected)
     }
 
     /**
@@ -74,7 +73,6 @@ class NetworkStateTest {
         val state = NetworkState.NotConnected(timestamp)
         
         assertEquals(timestamp, state.lastConnected)
-        assertTrue(state is NetworkState.NotConnected)
     }
 
     @Test

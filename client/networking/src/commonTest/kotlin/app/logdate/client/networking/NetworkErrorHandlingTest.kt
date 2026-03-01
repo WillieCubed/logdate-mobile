@@ -16,7 +16,7 @@ import io.ktor.utils.io.ByteReadChannel
 import kotlinx.io.IOException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
