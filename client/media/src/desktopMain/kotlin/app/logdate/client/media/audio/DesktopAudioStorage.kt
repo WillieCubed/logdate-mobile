@@ -13,13 +13,12 @@ import kotlin.uuid.Uuid
  */
 class DesktopAudioStorage : AudioStorage {
     override suspend fun createRecordingTarget(
-        noteId: Uuid?,
         extension: String,
     ): AudioRecordingTarget = withContext(Dispatchers.IO) {
         val safeExtension = extension.trimStart('.').ifBlank { "wav" }
         val directory = resolveAudioDirectory().also { Files.createDirectories(it) }
 
-        val baseName = noteId?.toString() ?: "recording_${System.currentTimeMillis()}"
+        val baseName = "recording_${Uuid.random()}"
         val targetPath = directory.resolve("$baseName.$safeExtension")
 
         val targetFile = targetPath.toFile()
@@ -27,7 +26,7 @@ class DesktopAudioStorage : AudioStorage {
             targetFile.delete()
         }
 
-        AudioRecordingTarget(noteId = noteId, path = targetFile.absolutePath)
+        AudioRecordingTarget(path = targetFile.absolutePath)
     }
 
     private fun resolveAudioDirectory(): Path {

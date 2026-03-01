@@ -1,4 +1,7 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+@file:OptIn(
+    kotlinx.cinterop.BetaInteropApi::class,
+    kotlinx.cinterop.ExperimentalForeignApi::class
+)
 
 package app.logdate.client.media.audio
 
@@ -65,7 +68,7 @@ class IosAudioRecordingManager(
                 return false
             }
 
-            recordingTarget = audioStorage.createRecordingTarget(null)
+            recordingTarget = audioStorage.createRecordingTarget()
             recordingURL = recordingTarget?.path?.let { NSURL.fileURLWithPath(it) }
 
             val settings = mutableMapOf<Any?, Any?>()
@@ -88,7 +91,7 @@ class IosAudioRecordingManager(
             }
 
             if (recorderError != null) {
-                Napier.e("Failed to create audio recorder: ${recorderError?.localizedDescription}")
+                Napier.e("Failed to create audio recorder: ${recorderError.localizedDescription}")
                 return false
             }
 

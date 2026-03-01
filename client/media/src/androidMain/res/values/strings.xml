@@ -1,0 +1,11 @@
+<resources>
+    <string name="audio_playback_channel_name">Audio playback</string>
+    <string name="audio_recording_channel_name">Audio recording</string>
+    <string name="audio_recording_notification_title">Recording audio</string>
+    <string name="audio_recording_notification_text">Tap to return to your entry</string>
+    <string name="audio_recording_notification_title_paused">Recording paused</string>
+    <string name="audio_recording_notification_text_paused">Tap to resume or return to your entry</string>
+    <string name="audio_recording_action_pause">Pause</string>
+    <string name="audio_recording_action_resume">Resume</string>
+    <string name="audio_recording_action_stop">Stop</string>
+</resources>

@@ -1,7 +1,8 @@
 package app.logdate.client.media
 
 import kotlinx.coroutines.flow.Flow
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
+import kotlin.time.Duration
 
 interface MediaManager {
     /**
@@ -98,6 +99,6 @@ sealed interface MediaObject {
         /**
          * The duration of the video.
          */
-        val duration: kotlin.time.Duration,
+        val duration: Duration,
     ) : MediaObject
 }

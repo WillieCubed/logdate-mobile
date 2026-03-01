@@ -78,7 +78,7 @@ class DesktopAudioRecordingManager(
         if (recordingActive) return false
         
         try {
-            recordingTarget = audioStorage.createRecordingTarget(null, extension = "wav")
+            recordingTarget = audioStorage.createRecordingTarget(extension = "wav")
             // Set up audio format and data line
             val info = DataLine.Info(TargetDataLine::class.java, audioFormat)
             

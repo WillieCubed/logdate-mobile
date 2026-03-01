@@ -5,7 +5,6 @@ package app.logdate.client.media.audio
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.Clock
 import platform.Foundation.NSApplicationSupportDirectory
 import platform.Foundation.NSDocumentDirectory
 import platform.Foundation.NSFileManager
@@ -17,7 +16,6 @@ import kotlin.uuid.Uuid
  */
 class IosAudioStorage : AudioStorage {
     override suspend fun createRecordingTarget(
-        noteId: Uuid?,
         extension: String,
     ): AudioRecordingTarget = withContext(Dispatchers.Default) {
         val safeExtension = extension.trimStart('.').ifBlank { "m4a" }
@@ -49,8 +47,7 @@ class IosAudioStorage : AudioStorage {
             error = null,
         )
 
-        val timestamp = Clock.System.now().toEpochMilliseconds()
-        val baseName = noteId?.toString() ?: "recording_$timestamp"
+        val baseName = "recording_${Uuid.random()}"
         val targetUrl = requireNotNull(audioDir.URLByAppendingPathComponent("$baseName.$safeExtension")) {
             "Unable to resolve audio recording URL."
         }
@@ -61,6 +58,6 @@ class IosAudioStorage : AudioStorage {
             throw IllegalStateException("Unable to resolve audio recording path.")
         }
 
-        AudioRecordingTarget(noteId = noteId, path = path)
+        AudioRecordingTarget(path = path)
     }
 }

@@ -1,7 +1,7 @@
 package app.logdate.client.media.di
 
+import app.logdate.client.media.IosMediaManager
 import app.logdate.client.media.MediaManager
-import app.logdate.client.media.StubMediaManager
 import app.logdate.client.media.audio.transcription.IosTranscriptionManager
 import app.logdate.client.media.audio.transcription.TranscriptionManager
 import org.koin.core.module.Module
@@ -14,8 +14,7 @@ actual val mediaModule: Module = module {
     // Include the audio module only
     includes(audioModule)
     
-    // TODO: Implement iOS MediaManager
-    single<MediaManager> { StubMediaManager() }
+    single<MediaManager> { IosMediaManager() }
 
     // Transcription manager for iOS
     single<TranscriptionManager> { 
