@@ -1,0 +1,117 @@
+# LogDate Agent Guidelines
+
+> Principles, workflow, and non-negotiables for any AI agent working in this repository.
+
+## Development Workflow
+
+All changes land directly on `main`. There are no long-lived feature branches. This demands extreme commit discipline — every commit must leave `main` in a shippable state. Incomplete features are gated behind feature flags, not hidden in branches.
+
+Every change follows this process. No exceptions.
+
+### 1. Understand
+
+Before writing any code, determine:
+
+- **What type of change is this?** Feature (`feat`), bug fix (`fix`), refactor (`refactor`), or maintenance (`chore`)? This determines the commit type.
+- **What user-facing behavior does this serve?** LogDate is a client app — changes are always in service of the user. A feature may span multiple modules (UI, domain, data, networking), and that's expected. Think in terms of the feature, not the module boundary.
+- **What already exists?** Read the affected code. Check for existing utilities and patterns before creating new ones.
+
+### 2. Plan
+
+Design the approach before writing code. For non-trivial changes:
+
+- Brainstorm interactively with the developer to clarify requirements, trade-offs, and scope.
+- Trace the feature across layers: what UI changes, what domain logic, what data/repository changes?
+- Keep the scope tight — one logical feature or fix, even if it touches several modules.
+
+### 3. Write Tests First
+
+Tests define the contract for the change. Write them before the implementation.
+
+- Write tests that describe the expected behavior.
+- If the implementation doesn't exist yet, create stubs or interfaces so the tests compile. Tests should fail because the behavior isn't implemented, not because the code doesn't build.
+- For features spanning multiple modules, write tests at the appropriate layer: unit tests for domain logic, integration tests for repository/data interactions.
+
+```bash
+# Run tests for affected modules
+./gradlew :client:feature:timeline:test :client:repository:test
+```
+
+### 4. Implement
+
+Build the implementation to satisfy the tests.
+
+- Follow existing patterns. Consistency matters more than novelty.
+- Keep it minimal — implement what the tests require, nothing more.
+- Work across module boundaries as needed. A single feature touching `client/feature/`, `client/domain/`, and `client/repository/` is normal.
+- **Gate incomplete features behind feature flags.** Every commit lands on `main`, so partially-built features must be invisible to users. Structure code so flagged paths are easy to find and remove once the feature ships.
+
+### 5. Iterate Until Green
+
+Run tests and quality checks. Fix failures. Repeat.
+
+```bash
+# Run tests for all affected modules
+./gradlew :client:feature:timeline:test :client:domain:test
+
+# Kotlin lint
+./gradlew ktlintCheck
+
+# Full build
+./gradlew :app:android-main:assembleDebug
+```
+
+All tests must pass and quality gates must succeed before committing.
+
+### 6. Review
+
+Get feedback from the developer before committing. Walk through the changes, confirm the approach is correct, and adjust if needed.
+
+### 7. Commit
+
+Each commit should read like a changelog entry — a single, distinct change that a user of the app would recognize. Scope to the primary feature module, even if the commit touches supporting modules.
+
+Because every commit lands on `main`, every commit must leave the app in a shippable state. If the feature isn't ready for users, it must be behind a feature flag. A commit that breaks `main` is unacceptable regardless of how correct the code is.
+
+For staging safety and commit mechanics, see [git guidelines](./docs/reference/standards/git-guidelines.md).
+
+## Non-Negotiable Principles
+
+### You Touch It, You Fix It
+
+If you modify ANY file, leave it better than you found it. Fix all lint violations, compile errors, and broken tests in that file. No exceptions — "that was already there" is not acceptable.
+
+### Honesty Over Completion
+
+Never claim success with unresolved errors. Never lie by omission. Always check exit codes — non-zero is a failure. If you cannot complete a task, say so clearly rather than producing broken output.
+
+### Commit Messages Describe User Impact
+
+Write `feat` commits as if consumed by the general public. The test: "Can I do something different because of this?" Focus on behavior, not implementation. Capitalize proper nouns (API, Kotlin, Android, Compose, Gradle, etc.).
+
+**Good**: `feat(editor): add voice recording playback controls`
+**Bad**: `feat(editor): implement MediaPlayer service layer with coroutine scope`
+
+### Minimal, Focused Changes
+
+Keep modifications focused on the task. Don't add comments that restate code. Don't refactor surrounding code unless asked. Don't over-engineer.
+
+## Key References
+
+| Topic | Location |
+|-------|----------|
+| Build commands | `./run help` |
+| Commit message format | `docs/reference/standards/commit-messages.md` |
+| Valid commit scopes | `allowed-scopes.txt` and `docs/reference/standards/commit-scopes.md` |
+| Git workflow & safety | `docs/reference/standards/git-guidelines.md` |
+
+## Code Conventions
+
+- **Logging**: Napier only. Never `System.out`, `println`, or `Log.d`.
+- **UUIDs**: `kotlin.uuid.Uuid` with `Uuid.random()`, not Java's UUID.
+- **Dates**: `kotlinx.datetime.Instant`.
+- **Serialization**: `kotlinx.serialization`.
+- **DI**: Constructor injection with Koin.
+- **State**: Sealed classes/interfaces for UI state.
+- **Error handling**: try-catch with Napier. Prefer nullable returns over exceptions.
+- **Imports**: `kotlin.*` > `androidx.*`/`kotlinx.*` > `app.logdate.*`. No wildcards.
