@@ -1,0 +1,51 @@
+# LogDate Commit Scopes
+# Authoritative machine-readable list. Human docs: docs/reference/standards/commit-scopes.md
+# Lines starting with # and blank lines are ignored.
+
+# Feature scopes (primary - prefer these for user-facing changes)
+core
+editor
+journal
+location-timeline
+onboarding
+rewind
+search
+timeline
+
+# App scopes
+app
+wear
+server
+
+# Client library scopes
+auth
+billing
+data
+database
+datastore
+device
+domain
+health-connect
+intelligence
+location
+media
+networking
+permissions
+sensor
+sharing
+sync
+theme
+ui
+util
+
+# Shared module scopes
+activitypub
+
+# Cross-cutting scopes
+infra
+build
+ios
+android
+desktop
+platform
+client
