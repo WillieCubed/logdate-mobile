@@ -7,7 +7,7 @@ import androidx.room.Query
 import androidx.room.Update
 import app.logdate.client.database.entities.LocationLogEntity
 import kotlinx.coroutines.flow.Flow
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 @Dao
 interface LocationHistoryDao {

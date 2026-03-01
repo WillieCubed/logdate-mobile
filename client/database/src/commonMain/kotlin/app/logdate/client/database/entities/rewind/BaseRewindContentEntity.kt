@@ -2,7 +2,7 @@ package app.logdate.client.database.entities.rewind
 
 import androidx.room.ColumnInfo
 import androidx.room.PrimaryKey
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
