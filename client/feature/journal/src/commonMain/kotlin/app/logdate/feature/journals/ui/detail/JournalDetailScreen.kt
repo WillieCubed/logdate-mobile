@@ -64,7 +64,6 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 import logdate.client.feature.journal.generated.resources.*
-import logdate.client.feature.journal.generated.resources.Res
 /**
  * The main screen to view a journal's contents.
  */

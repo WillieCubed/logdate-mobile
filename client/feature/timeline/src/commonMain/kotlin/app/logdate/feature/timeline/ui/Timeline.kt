@@ -63,7 +63,6 @@ import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
 import logdate.client.feature.timeline.generated.resources.*
-import logdate.client.feature.timeline.generated.resources.Res
 /**
  * Checks that there is an entry within the past eight hours.
  */

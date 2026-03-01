@@ -32,7 +32,6 @@ import logdate.client.feature.onboarding.generated.resources.onboarding_notifica
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import logdate.client.feature.onboarding.generated.resources.*
-import logdate.client.feature.onboarding.generated.resources.Res
 @Composable
 fun OnboardingNotificationConfirmationScreen(
     onBack: () -> Unit,

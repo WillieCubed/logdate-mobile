@@ -36,7 +36,6 @@ import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
 import logdate.client.feature.onboarding.generated.resources.*
-import logdate.client.feature.onboarding.generated.resources.Res
 /**
  * The last screen of the onboarding flow.
  *

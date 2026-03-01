@@ -41,7 +41,6 @@ import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
 import logdate.client.feature.core.generated.resources.*
-import logdate.client.feature.core.generated.resources.Res
 /**
  * Main settings overview screen that displays navigation options to different settings sections.
  * This is the entry point for the settings flow and provides access to all specific settings areas.

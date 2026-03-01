@@ -47,7 +47,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.journal.generated.resources.*
-import logdate.client.feature.journal.generated.resources.Res
 @Composable
 fun JournalCreationScreen(
     onGoBack: () -> Unit,
