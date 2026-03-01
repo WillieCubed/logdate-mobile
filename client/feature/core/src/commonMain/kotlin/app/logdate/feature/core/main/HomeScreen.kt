@@ -25,8 +25,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
+import app.logdate.client.domain.recommendation.HomeRecommendation
 import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.ui.timeline.TimelineSuggestionBlock
 import app.logdate.feature.journals.ui.JournalClickCallback
 import app.logdate.feature.journals.ui.JournalsOverviewScreen
 import app.logdate.feature.location.timeline.ui.LocationTimelineScreen
@@ -90,6 +93,7 @@ fun HomeScreen(
                     onShareMemory = {},
                     onOpenDay = { date -> viewModel.selectDay(date) },
                     onProfileClick = onOpenSettings,
+                    timelineSuggestion = uiState.timelineSuggestion,
                     // onHistoryClick handled in TimelinePaneScreen
                     modifier = Modifier
                         .applyScreenStyles()
@@ -179,10 +183,20 @@ internal fun HomeScaffoldWrapper(
 }
 
 
+/**
+ * ViewModel for the home screen.
+ *
+ * Combines the streaming timeline, per-day note selection, and the home recommendation signal
+ * into a single [HomeTimelineUiState] flow. The recommendation is produced by
+ * [GetHomeRecommendationUseCase], which aggregates multiple data signals (today's entries,
+ * unfinished drafts, etc.) and converts the result into a [TimelineSuggestionBlock] for
+ * display at the top of the timeline.
+ */
 class HomeViewModel(
     private val getStreamingTimelineUseCase: GetStreamingTimelineUseCase,
     private val fetchNotesForDayUseCase: app.logdate.client.domain.notes.FetchNotesForDayUseCase,
     private val notesRepository: app.logdate.client.repository.journals.JournalNotesRepository,
+    private val getHomeRecommendation: GetHomeRecommendationUseCase,
 ) : ViewModel() {
     private val _selectedItemUiState =
         MutableStateFlow<TimelineDaySelection>(TimelineDaySelection.NotSelected)
@@ -194,8 +208,9 @@ class HomeViewModel(
         getStreamingTimelineUseCase(),
         selectedNotes,
         _selectedItemUiState,
-        selectedDayFlow
-    ) { timeline, notes, selection, selectedDayDate ->
+        selectedDayFlow,
+        getHomeRecommendation(),
+    ) { timeline, notes, selection, selectedDayDate, recommendation ->
         val items = timeline.days.map { day ->
             TimelineDayUiState(
                 summary = day.tldr,
@@ -235,7 +250,7 @@ class HomeViewModel(
                 }
             )
         }
-        
+
         // Determine the selected day based on the current selection state
         val selectedDay = when (selection) {
             is TimelineDaySelection.Selected -> {
@@ -246,12 +261,24 @@ class HomeViewModel(
             }
             TimelineDaySelection.NotSelected -> null
         }
-        
+
         HomeTimelineUiState(
             items = items,
             selectedItem = selection,
             selectedDay = selectedDay,
             showEmptyState = items.isEmpty(),
+            timelineSuggestion = when (recommendation) {
+                is HomeRecommendation.CompleteYourDraft -> TimelineSuggestionBlock.OngoingEvent(
+                    memoryId = recommendation.draftId.toString(),
+                    message = "You have an unfinished entry." +
+                        recommendation.notePreview?.let { " \"${it.take(60)}\"" }.orEmpty(),
+                )
+                is HomeRecommendation.CaptureToday -> TimelineSuggestionBlock.OngoingEvent(
+                    memoryId = "",
+                    message = recommendation.message,
+                )
+                HomeRecommendation.None -> null
+            },
             isLoading = false,
             loadingState = if (items.isEmpty()) TimelineLoadingState.InitialLoading else TimelineLoadingState.Loaded
         )

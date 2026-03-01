@@ -43,6 +43,7 @@ import app.logdate.client.domain.timeline.GetTimelineUseCase
 import app.logdate.client.domain.timeline.SummarizeJournalEntriesUseCase
 import app.logdate.client.domain.di.healthDomainModule
 import app.logdate.client.domain.di.locationDomainModule
+import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -135,4 +136,7 @@ val domainModule: Module = module {
 
     // Search
     factory { SearchEntriesUseCase(get()) }
+
+    // Recommendations
+    factory { GetHomeRecommendationUseCase(get(), get()) }
 }

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -40,6 +41,7 @@ import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelineSuggestionBlock
+import app.logdate.ui.timeline.TimelineSuggestionBlockType
 import app.logdate.ui.timeline.TimelineSuggestionBlockUiState
 import app.logdate.util.now
 import coil3.compose.AsyncImage
@@ -69,34 +71,65 @@ sealed class EndOfTimelineUiState {
     data object DiscoveryEasterEgg : EndOfTimelineUiState()
 }
 
+/**
+ * Scrollable list of timeline days with an optional suggestion block at the top.
+ *
+ * @param items Timeline days to display, ordered most-recent first.
+ * @param endOfTimelineState Content shown at the bottom of the list (birthday or easter egg).
+ * @param onOpenDay Called when the user taps a day row.
+ * @param timelineSuggestion When non-null, a prompt card is shown at the top of the list.
+ *   [TimelineSuggestionBlock.OngoingEvent] renders as a "Happening Now" prompt;
+ *   [TimelineSuggestionBlock.PastMoment] renders as an "Update" prompt for a past day.
+ *   Pass null to hide the card entirely.
+ * @param onAddToMemory Called when the user accepts the suggestion for a given memory ID.
+ * @param onShare Called when the user shares the suggestion for a given memory ID.
+ */
 @Composable
 fun TimelineList(
     items: List<TimelineDayUiState>,
     endOfTimelineState: EndOfTimelineUiState,
     onOpenDay: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
-    showSuggestedEntryBlock: Boolean = true,
+    timelineSuggestion: TimelineSuggestionBlock? = null,
     onAddToMemory: (memoryId: String) -> Unit = {},
     onShare: (memoryId: String) -> Unit = {},
     listState: LazyListState = rememberLazyListState(),
 ) {
+    val suggestionBlockState: TimelineSuggestionBlockUiState? = when (timelineSuggestion) {
+        is TimelineSuggestionBlock.OngoingEvent -> TimelineSuggestionBlockUiState(
+            memoryId = timelineSuggestion.memoryId,
+            type = TimelineSuggestionBlockType.HAPPENING_NOW,
+            message = timelineSuggestion.message,
+            location = timelineSuggestion.location,
+            people = timelineSuggestion.people,
+            mediaUris = timelineSuggestion.mediaUris,
+        )
+        is TimelineSuggestionBlock.PastMoment -> TimelineSuggestionBlockUiState(
+            memoryId = timelineSuggestion.memoryId,
+            type = TimelineSuggestionBlockType.UPDATE,
+            message = timelineSuggestion.message,
+            location = timelineSuggestion.location,
+            people = timelineSuggestion.people,
+            mediaUris = timelineSuggestion.mediaUris,
+        )
+        null -> null
+    }
+
     LazyColumn(
         modifier = modifier.safeDrawingPadding(),
         state = listState,
-//        contentPadding = PaddingValues(vertical = Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(Spacing.xl),
     ) {
         item {
-            AnimatedVisibility(visible = showSuggestedEntryBlock) {
-                TimelineSuggestionBlock(
-                    state = TimelineSuggestionBlockUiState(
-                        memoryId = "1",
-                        message = "You haven't added any memories today.",
-                    ),
-                    onAddToMemory = onAddToMemory,
-                    onShare = onShare,
-                    modifier = Modifier.padding(Spacing.lg)
-                )
+            AnimatedVisibility(visible = suggestionBlockState != null) {
+                suggestionBlockState?.let { blockState ->
+                    TimelineSuggestionBlock(
+                        state = blockState,
+                        onAddToMemory = onAddToMemory,
+                        onShare = onShare,
+                        modifier = Modifier.padding(Spacing.lg)
+                    )
+                }
             }
         }
 
@@ -228,7 +261,7 @@ internal fun BirthdayListItem(
 ) {
     val daysSinceBirthday by remember(birthDate) {
         derivedStateOf {
-            LocalDate.now().toEpochDays() - birthDate.toEpochDays()
+            (LocalDate.now().toEpochDays() - birthDate.toEpochDays()).toInt()
         }
     }
 
@@ -250,8 +283,9 @@ internal fun TimelineDayListItem(
     Column(
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         modifier = modifier
-            .clip(MaterialTheme.shapes.medium)
             .widthIn(min = 320.dp)
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
             .clickable {
                 onOpenDay(item.date)
             }
@@ -265,6 +299,7 @@ internal fun TimelineDayListItem(
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             shape = MaterialTheme.shapes.small,
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -274,9 +309,35 @@ internal fun TimelineDayListItem(
                     "In summary",
                     style = MaterialTheme.typography.labelLarge.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                 )
-                Text(item.summary, style = MaterialTheme.typography.bodyMedium)
+                if (item.isLoadingSummary) {
+                    SummaryLoadingPlaceholder()
+                } else {
+                    Text(item.summary, style = MaterialTheme.typography.bodyMedium)
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun SummaryLoadingPlaceholder(
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        modifier = modifier,
+    ) {
+        // Shimmer-like placeholder lines
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            shape = MaterialTheme.shapes.extraSmall,
+            modifier = Modifier.height(16.dp).widthIn(min = 280.dp),
+        ) {}
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            shape = MaterialTheme.shapes.extraSmall,
+            modifier = Modifier.height(16.dp).widthIn(min = 200.dp),
+        ) {}
     }
 }
 

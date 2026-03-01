@@ -32,11 +32,11 @@ import app.logdate.ui.timeline.newstuff.EndOfTimelineUiState
 import app.logdate.ui.timeline.newstuff.TimelineList
 import app.logdate.util.now
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.Preview
 
 data class TimelineUiState(
     val items: List<TimelineDayUiState> = emptyList(),
@@ -49,7 +49,7 @@ fun TimelinePane(
     onNewEntry: () -> Unit,
     onShareMemory: (memoryId: String) -> Unit,
     onOpenDay: (LocalDate) -> Unit,
-    showSuggestedEntryBlock: Boolean = true,
+    timelineSuggestion: TimelineSuggestionBlock? = null,
     listState: LazyListState = rememberLazyListState(),
     onSearchClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
@@ -64,7 +64,7 @@ fun TimelinePane(
             // TODO: Likely fix this redundancy
             if (birthday != null && birthday != Instant.DISTANT_PAST) {
                 val birthDate = birthday.toLocalDateTime(TimeZone.currentSystemDefault()).date
-                val daysSinceBirth = LocalDate.now().toEpochDays() - birthDate.toEpochDays()
+                val daysSinceBirth = (LocalDate.now().toEpochDays() - birthDate.toEpochDays()).toInt()
                 EndOfTimelineUiState.BirthdayCelebration(birthDate, daysSinceBirth)
             } else {
                 EndOfTimelineUiState.DiscoveryEasterEgg
@@ -94,7 +94,7 @@ fun TimelinePane(
             TimelineList(
                 items = uiState.items,
                 onOpenDay = onOpenDay,
-                showSuggestedEntryBlock = showSuggestedEntryBlock,
+                timelineSuggestion = timelineSuggestion,
                 onAddToMemory = onAddToMemory,
                 onShare = onShareMemory,
                 modifier = Modifier.consumeWindowInsets(paddingValues),
@@ -164,7 +164,10 @@ private fun TimelinePanePreview() {
         onOpenDay = {},
         onNewEntry = {},
         onShareMemory = {},
-        showSuggestedEntryBlock = true,
+        timelineSuggestion = TimelineSuggestionBlock.OngoingEvent(
+            memoryId = "",
+            message = "You haven't added any memories today.",
+        ),
         // Use a sample birthday for preview
         birthday = Instant.fromEpochMilliseconds(1655342400000), // June 16, 2022
     )

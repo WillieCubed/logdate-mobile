@@ -97,7 +97,7 @@ actual val coreFeatureModule: Module = module {
             get()
         )
     }
-    viewModel { HomeViewModel(get(), get(), get()) }
+    viewModel { HomeViewModel(get(), get(), get(), get()) }
     viewModel { CloudAccountOnboardingViewModel(get(), get(), get()) }
     // TODO(ios): Wire location settings UX and platform permissions; keep settings storage available for now.
     viewModel { LocationSettingsViewModel(get()) }
