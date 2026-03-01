@@ -1,6 +1,6 @@
 package app.logdate.shared.model.user
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 
 /**

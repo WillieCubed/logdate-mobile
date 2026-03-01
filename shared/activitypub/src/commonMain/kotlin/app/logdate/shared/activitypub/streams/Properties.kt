@@ -1,6 +1,6 @@
 package app.logdate.shared.activitypub.streams
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.time.Duration
 
 /**

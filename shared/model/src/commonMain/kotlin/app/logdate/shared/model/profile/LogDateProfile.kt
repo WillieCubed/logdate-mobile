@@ -1,6 +1,6 @@
 package app.logdate.shared.model.profile
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 
 /**
