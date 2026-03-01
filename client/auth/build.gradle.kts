@@ -5,19 +5,21 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.android.library)
+    alias(libs.plugins.android.kmp.library)
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.dokka)
 }
 
 kotlin {
-    androidTarget {
+    android {
+        namespace = "app.logdate.client.auth"
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
     }
 
-    iosX64()
     iosArm64()
     iosSimulatorArm64()
 
@@ -37,20 +39,5 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.koin.android)
         }
-    }
-}
-
-android {
-    namespace = "app.logdate.client.auth"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
-
-    buildTypes {
-        getByName("release") {
-            isMinifyEnabled = true
-        }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
     }
 }

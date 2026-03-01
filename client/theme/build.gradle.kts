@@ -5,20 +5,23 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.android.library)
+    alias(libs.plugins.android.kmp.library)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.dokka)
 }
 
 kotlin {
-    androidTarget {
+    android {
+        namespace = "app.logdate.client.theme"
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
+
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
     }
 
-    iosX64()
     iosArm64()
     iosSimulatorArm64()
 
@@ -28,38 +31,19 @@ kotlin {
         val desktopMain by getting
 
         androidMain.dependencies {
-            implementation(compose.preview)
+            implementation(libs.compose.ui.tooling.preview)
         }
         commonMain.dependencies {
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material)
-            implementation(compose.ui)
-            implementation(compose.material3)
-            implementation(compose.components.resources)
-            implementation(compose.components.uiToolingPreview)
+            implementation(libs.compose.runtime)
+            implementation(libs.compose.foundation)
+            implementation(libs.compose.material)
+            implementation(libs.compose.ui)
+            implementation(libs.compose.material3)
+            implementation(libs.compose.components.resources)
+            implementation(libs.compose.components.ui.tooling.preview)
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
         }
-    }
-}
-
-android {
-
-    namespace = "app.logdate.client.theme"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
-
-    defaultConfig {
-        minSdk = libs.versions.android.minSdk.get().toInt()
-    }
-    buildTypes {
-        getByName("release") {
-            isMinifyEnabled = true
-        }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
     }
 }

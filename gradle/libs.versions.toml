@@ -1,14 +1,17 @@
 [versions]
 # Build Plugin Versions
 filekitCompose = "0.8.8"
-kotlin = "2.1.21"
-dokkaGradlePlugin = "1.9.20"
-compose-multiplatform = "1.7.0"
-agp = "8.13.2"
-googleServicesPlugin = "4.4.2"
-buildConfigPlugin = "5.3.5"
-kover = "0.8.3"
-screenshot = "0.0.1-alpha12"
+kotlin = "2.3.20-RC"
+dokkaGradlePlugin = "2.2.0-Beta"
+compose-multiplatform = "1.11.0-alpha03"
+compose-material3 = "1.11.0-alpha03"
+compose-material-icons = "1.7.3"
+agp = "9.0.1"
+googleServicesPlugin = "4.4.4"
+buildConfigPlugin = "6.0.7"
+kover = "0.9.7"
+screenshot = "0.0.1-alpha13"
+benManesVersions = "0.53.0"
 
 # Android Build Versions
 android-compileSdk = "36"
@@ -16,100 +19,102 @@ android-minSdk = "30"
 android-targetSdk = "36"
 
 # Android Test Versions
-androidx-test-ext-junit = "1.2.1"
-androidx-test-runner = "1.6.2"
-androidx-test-core = "1.6.1"
+androidx-test-ext-junit = "1.3.0"
+androidx-test-runner = "1.7.0"
+androidx-test-core = "1.7.0"
 
 # Common (Multiplatform) Dependencies
-ksp = "2.1.21-2.0.1"
+ksp = "2.3.6"
 junit = "4.13.2"
-kotlinx-coroutines = "1.9.0"
-kotlinx-serialization = "1.7.3"
-kotlinx-datetime = "0.6.1"
-ktor = "3.0.1"
-logback = "1.5.11"
-androidx-navigation-compose = "2.8.0-alpha10"
-nav3Core = "1.0.0-alpha03"
-material3AdaptiveNav3 = "1.0.0-SNAPSHOT"
-lifecycleViewmodelNav3 = "1.0.0-alpha01"
+kotlinx-coroutines = "1.10.2"
+kotlinx-serialization = "1.10.0"
+kotlinx-datetime = "0.7.1"
+ktor = "3.4.0"
+logback = "1.5.32"
+androidx-navigation-compose = "2.9.2"
+nav3Core = "1.1.0-alpha05"
+material3AdaptiveNav3 = "1.3.0-alpha09"
+lifecycleViewmodelNav3 = "2.11.0-alpha01"
 
-coil = "3.0.2"
-koin = "4.0.0"
-koin-annotations-bom = "1.4.0"
+coil = "3.4.0"
+koin = "4.2.0-RC1"
+koin-annotations-bom = "2.3.2-Beta1"
 
-material = "1.12.0"
-material3-adaptive = "1.0.0"
+material = "1.14.0-alpha09"
+material3-adaptive = "1.3.0-alpha05"
 adaptiveNavigationSuite = "1.3.1"
 
 
-room = "2.7.1"
-sqlite = "2.5.1"
-datastore = "1.1.7"
-paging = "3.3.6"
+room = "2.8.4"
+sqlite = "2.6.2"
+sqlcipher = "4.13.0"
+datastore = "1.3.0-alpha06"
+paging = "3.4.1"
 
 napier = "2.7.1"
 
-multiplatformMarkdownRenderer = "0.25.0"
-webauthn4j = "0.29.2.RELEASE"
-jwtKt = "1.1.0"
+multiplatformMarkdownRenderer = "0.39.2"
+webauthn4j = "0.31.0.RELEASE"
+jwtKt = "1.2.1"
 
 # Database Dependencies
 exposed = "0.57.0"
-postgresql = "42.7.4"
-hikariCP = "6.0.0"
-flyway = "10.21.0"
+postgresql = "42.7.10"
+hikariCP = "7.0.2"
+flyway = "12.0.3"
 
 # Testing Dependencies
-testcontainers = "1.19.0"
-mockk = "1.13.8"
-turbine = "1.0.0"
+testcontainers = "2.0.3"
+mockk = "1.14.9"
+turbine = "1.2.1"
 
 # Android Dependencies
-androidx-activityCompose = "1.10.1"
-androidx-lifecycle = "2.9.0"
-androidx-window = "1.3.0"
-androidxCamera = "1.5.0-beta01"
+androidx-activityCompose = "1.13.0-rc01"
+androidx-lifecycle = "2.10.0-alpha08"
+androidx-window = "1.6.0-alpha01"
+androidxCamera = "1.6.0-rc01"
 androidxCameraViewfinderCompose = "1.0.0-alpha02"
-androidxBiometric = "1.2.0-alpha05"
-androidxCoreSplashScreen = "1.0.1"
-androidxWork = "2.10.1"
-healthConnect = "1.1.0-rc02"
-media3 = "1.5.1"
+androidxBiometric = "1.4.0-alpha02"
+androidxCoreSplashScreen = "1.2.0"
+androidxWork = "2.11.1"
+healthConnect = "1.2.0-alpha02"
+media3 = "1.10.0-beta01"
 
 playServicesLocation = "21.3.0"
-playServicesMaps = "19.2.0"
+playServicesMaps = "20.0.0"
 playInstallReferrer = "2.2"
 playAppUpdate = "2.1.0"
-playServicesInstantApps = "18.1.0"
-billingKtx = "7.1.1"
-googleMapsPlaces = "4.3.1"
-googleMapsCompose = "6.1.0"
-androidxCredentials = "1.5.0"
-androidx-security-crypto = "1.0.0"
+playServicesInstantApps = "18.2.0"
+billingKtx = "8.3.0"
+googleMapsPlaces = "5.1.1"
+googleMapsCompose = "8.2.0"
+androidxCredentials = "1.6.0-rc02"
+androidx-security-crypto = "1.1.0"
 
-accompanist = "0.36.0"
-firebase-bom = "33.15.0"
-firebase-perf-plugin = "1.4.2"
+accompanist = "0.37.3"
+firebase-bom = "34.10.0"
+firebase-perf-plugin = "2.0.2"
 
 # Others
-versioningPlugin = "1.9.20"
+versioningPlugin = "2.2.0-Beta"
 playServicesWearable = "19.0.0"
-composeBom = "2025.06.00"
-composeMaterial = "1.4.1"
+composeBom = "2026.02.01"
+composeMaterial = "1.6.0-beta01"
 composeFoundation = "1.4.1"
 wearToolingPreview = "1.0.0"
-wearComposeMaterial3 = "1.5.0-beta03"
-wearComposeFoundation = "1.5.0-beta03"
-wearComposeNavigation = "1.5.0-beta03"
-tiles = "1.5.0"
-tilesMaterial = "1.5.0"
-tilesTooling = "1.5.0"
-tilesToolingPreview = "1.5.0"
-horologistComposeTools = "0.6.17"
-horologistTiles = "0.6.17"
-watchfaceComplicationsDataSourceKtx = "1.2.1"
-uiAndroid = "1.8.2"
+wearComposeMaterial3 = "1.6.0-beta01"
+wearComposeFoundation = "1.6.0-beta01"
+wearComposeNavigation = "1.6.0-beta01"
+tiles = "1.6.0-rc01"
+tilesMaterial = "1.6.0-rc01"
+tilesTooling = "1.6.0-rc01"
+tilesToolingPreview = "1.6.0-rc01"
+horologistComposeTools = "0.8.3-alpha"
+horologistTiles = "0.8.3-alpha"
+watchfaceComplicationsDataSourceKtx = "1.3.0"
+uiAndroid = "1.11.0-alpha06"
 kotlinxUuid = "0.0.15"
+okio = "3.16.4"
 
 
 [libraries]
@@ -121,6 +126,19 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-lifecycle-viewmodel = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-viewmodel", version.ref = "androidx-lifecycle" }
 androidx-lifecycle-runtime-compose = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "androidx-lifecycle" }
 material = { module = "com.google.android.material:material", version.ref = "material" }
+compose-runtime = { group = "org.jetbrains.compose.runtime", name = "runtime", version.ref = "compose-multiplatform" }
+compose-foundation = { group = "org.jetbrains.compose.foundation", name = "foundation", version.ref = "compose-multiplatform" }
+compose-animation = { group = "org.jetbrains.compose.animation", name = "animation", version.ref = "compose-multiplatform" }
+compose-material = { group = "org.jetbrains.compose.material", name = "material", version.ref = "compose-multiplatform" }
+compose-material-icons-extended = { group = "org.jetbrains.compose.material", name = "material-icons-extended", version.ref = "compose-material-icons" }
+compose-material3 = { group = "org.jetbrains.compose.material3", name = "material3", version.ref = "compose-material3" }
+compose-material3-adaptive-navigation-suite = { group = "org.jetbrains.compose.material3", name = "material3-adaptive-navigation-suite", version.ref = "compose-material3" }
+compose-ui = { group = "org.jetbrains.compose.ui", name = "ui", version.ref = "compose-multiplatform" }
+compose-ui-tooling = { group = "org.jetbrains.compose.ui", name = "ui-tooling", version.ref = "compose-multiplatform" }
+compose-ui-tooling-preview = { group = "org.jetbrains.compose.ui", name = "ui-tooling-preview", version.ref = "compose-multiplatform" }
+compose-components-resources = { group = "org.jetbrains.compose.components", name = "components-resources", version.ref = "compose-multiplatform" }
+compose-components-ui-tooling-preview = { group = "org.jetbrains.compose.components", name = "components-ui-tooling-preview", version.ref = "compose-multiplatform" }
+compose-desktop = { group = "org.jetbrains.compose.desktop", name = "desktop", version.ref = "compose-multiplatform" }
 material3-adaptive = { group = "org.jetbrains.compose.material3.adaptive", name = "adaptive", version.ref = "material3-adaptive" }
 material3-adaptive-layout = { group = "org.jetbrains.compose.material3.adaptive", name = "adaptive-layout", version.ref = "material3-adaptive" }
 material3-adaptive-navigation = { group = "org.jetbrains.compose.material3.adaptive", name = "adaptive-navigation", version.ref = "material3-adaptive" }
@@ -180,6 +198,7 @@ room-compiler = { group = "androidx.room", name = "room-compiler", version.ref =
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
 sqlite-bundled = { group = "androidx.sqlite", name = "sqlite-bundled", version.ref = "sqlite" }
+sqlcipher-android = { group = "net.zetetic", name = "sqlcipher-android", version.ref = "sqlcipher" }
 
 # Datastore
 androidx-datastore = { group = "androidx.datastore", name = "datastore", version.ref = "datastore" }
@@ -195,6 +214,7 @@ androidx-paging-compose = { group = "androidx.paging", name = "paging-compose", 
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 coil-network-ktor3 = { group = "io.coil-kt.coil3", name = "coil-network-ktor3", version.ref = "coil" }
 coil-video = { group = "io.coil-kt.coil3", name = "coil-video", version.ref = "coil" }
+okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
 
 napier = { group = "io.github.aakira", name = "napier", version.ref = "napier" }
 
@@ -218,7 +238,7 @@ flyway-database-postgresql = { group = "org.flywaydb", name = "flyway-database-p
 
 # Testing Libraries
 testcontainers-testcontainers = { group = "org.testcontainers", name = "testcontainers", version.ref = "testcontainers" }
-testcontainers-postgresql = { group = "org.testcontainers", name = "postgresql", version.ref = "testcontainers" }
+testcontainers-postgresql = { group = "org.testcontainers", name = "testcontainers-postgresql", version.ref = "testcontainers" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 
@@ -248,6 +268,7 @@ androidx-health-connect = { group = "androidx.health.connect", name = "connect-c
 media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
 media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3" }
 media3-common = { group = "androidx.media3", name = "media3-common", version.ref = "media3" }
+media3-session = { group = "androidx.media3", name = "media3-session", version.ref = "media3" }
 
 ## AndroidX Test
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidx-test-ext-junit" }
@@ -321,6 +342,7 @@ compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "
 kotlinx-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
+android-kmp-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
@@ -331,3 +353,4 @@ kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 buildConfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildConfigPlugin" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 screenshot = { id = "com.android.compose.screenshot", version.ref = "screenshot" }
+benManesVersions = { id = "com.github.ben-manes.versions", version.ref = "benManesVersions" }

@@ -5,7 +5,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.android.library)
+    alias(libs.plugins.android.kmp.library)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlinx.serialization)
@@ -13,14 +13,17 @@ plugins {
 }
 
 kotlin {
-    androidTarget {
+    android {
+        namespace = "app.logdate.client.feature.journal"
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
+
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
     }
 
     listOf(
-        iosX64(),
         iosArm64(),
         iosSimulatorArm64()
     )
@@ -40,20 +43,21 @@ kotlin {
             implementation(projects.shared.model)
             implementation(projects.client.ui)
             implementation(projects.client.repository)
-            implementation(projects.client.datastore)
+            implementation(projects.client.logdateDatastore)
             implementation(projects.client.domain)
             implementation(projects.client.sharing)
             implementation(projects.client.util)
+            implementation(projects.client.media)
             implementation(projects.client.feature.editor)
             // Compose plugin dependencies
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.materialIconsExtended)
-            implementation(compose.material3)
-            implementation(compose.material3AdaptiveNavigationSuite)
-            implementation(compose.ui)
-            implementation(compose.components.resources)
-            implementation(compose.components.uiToolingPreview)
+            implementation(libs.compose.runtime)
+            implementation(libs.compose.foundation)
+            implementation(libs.compose.material.icons.extended)
+            implementation(libs.compose.material3)
+            implementation(libs.compose.material3.adaptive.navigation.suite)
+            implementation(libs.compose.ui)
+            implementation(libs.compose.components.resources)
+            implementation(libs.compose.components.ui.tooling.preview)
             // Core dependencies
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.core)
@@ -69,8 +73,13 @@ kotlin {
             implementation(libs.napier)
         }
 
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
+        }
+
         androidMain.dependencies {
-            implementation(compose.preview)
+            implementation(libs.compose.ui.tooling.preview)
             implementation(libs.koin.android)
             implementation(libs.accompanist.permissions)
         }
@@ -78,23 +87,5 @@ kotlin {
 }
 
 dependencies {
-    debugImplementation(compose.uiTooling)
-}
-
-android {
-    namespace = "app.logdate.client.feature.journal"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
-
-    defaultConfig {
-        minSdk = libs.versions.android.minSdk.get().toInt()
-    }
-    buildTypes {
-        getByName("release") {
-            isMinifyEnabled = true
-        }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
+    androidRuntimeClasspath(libs.compose.ui.tooling)
 }

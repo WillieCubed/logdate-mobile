@@ -63,7 +63,7 @@ dependencies {
     implementation(libs.flyway.database.postgresql)
 
     // Google Cloud Storage
-    implementation("com.google.cloud:google-cloud-storage:2.30.1")
+    implementation("com.google.cloud:google-cloud-storage:2.64.0")
 
     // Koin DI
     implementation(platform(libs.koin.bom))

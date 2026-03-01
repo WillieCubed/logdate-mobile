@@ -5,19 +5,22 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.android.library)
+    alias(libs.plugins.android.kmp.library)
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.dokka)
 }
 
 kotlin {
-    androidTarget {
+    android {
+        namespace = "app.logdate.client.sync"
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
+        
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
     }
 
-    iosX64()
     iosArm64()
     iosSimulatorArm64()
 
@@ -36,7 +39,7 @@ kotlin {
             implementation(projects.client.networking)
             implementation(projects.client.repository)
             implementation(projects.client.database)
-            implementation(projects.client.datastore)
+            implementation(projects.client.logdateDatastore)
             implementation(projects.client.device)
             implementation(projects.client.media)
             
@@ -60,7 +63,8 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.ktor.client.mock)
-            implementation(projects.client.datastore)
+            implementation(projects.client.logdateDatastore)
+            implementation(projects.client.util)
         }
         androidMain.dependencies {
             implementation(libs.kotlinx.coroutines.android)
@@ -74,34 +78,8 @@ kotlin {
             implementation(project.dependencies.platform(libs.firebase.bom))
             implementation(libs.firebase.firestore)
         }
-        androidInstrumentedTest.dependencies {
-            implementation(libs.androidx.work.testing)
-        }
         desktopMain.dependencies {
             implementation(libs.kotlinx.coroutines.swing)
         }
     }
-}
-
-android {
-    namespace = "app.logdate.client.sync"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
-
-    buildTypes {
-        getByName("release") {
-            isMinifyEnabled = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules/test.pro")
-        }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-    
-//    testOptions {
-//        unitTests {
-//            isIncludeAndroidResources = true
-//            isReturnDefaultValues = true
-//        }
-//    }
 }

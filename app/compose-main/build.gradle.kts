@@ -7,27 +7,30 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.android.application)
+    alias(libs.plugins.android.kmp.library)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.dokka)
-    alias(libs.plugins.googleServices)
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.screenshot)
 }
 
 kotlin {
-    androidTarget {
+    android {
+        // TODO: Migrate to app.logdate.mobile once we have ability to migrate
+        namespace = "co.reasonabletech.logdate"
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
+        androidResources {
+            enable = true
+            noCompress += listOf("cvr")
+        }
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
-        // Configure screenshot tests to use the test source set tree
-        @OptIn(ExperimentalKotlinGradlePluginApi::class)
-        instrumentedTestVariant.sourceSetTree.set(org.jetbrains.kotlin.gradle.plugin.KotlinSourceSetTree.test)
     }
 
     listOf(
-        iosX64(),
         iosArm64(),
         iosSimulatorArm64()
     ).forEach { iosTarget ->
@@ -57,6 +60,7 @@ kotlin {
             implementation(projects.client.feature.locationTimeline)
             implementation(projects.client.feature.search)
             implementation(projects.client.data)
+            implementation(projects.client.database)
             implementation(projects.client.ui)
             implementation(projects.client.theme)
             implementation(projects.client.networking) // TODO: See if this can be hoisted down
@@ -69,15 +73,15 @@ kotlin {
             implementation(projects.client.healthConnect)
             implementation(projects.client.util)
             // External dependencies
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.material3AdaptiveNavigationSuite)
-            implementation(compose.ui)
-            implementation(compose.animation)
-            implementation(compose.materialIconsExtended)
-            implementation(compose.components.resources)
-            implementation(compose.components.uiToolingPreview)
+            implementation(libs.compose.runtime)
+            implementation(libs.compose.foundation)
+            implementation(libs.compose.material3)
+            implementation(libs.compose.material3.adaptive.navigation.suite)
+            implementation(libs.compose.ui)
+            implementation(libs.compose.animation)
+            implementation(libs.compose.material.icons.extended)
+            implementation(libs.compose.components.resources)
+            implementation(libs.compose.components.ui.tooling.preview)
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.androidx.navigation.compose)
@@ -92,7 +96,7 @@ kotlin {
             implementation(libs.filekit.compose)
         }
         androidMain.dependencies {
-            implementation(compose.preview)
+            implementation(libs.compose.ui.tooling.preview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.core.splashscreen)
             implementation(libs.androidx.lifecycle.viewmodel.navigation3)
@@ -109,14 +113,31 @@ kotlin {
             implementation(libs.kotlinx.coroutines.swing)
         }
 
-        val androidUnitTest by getting {
-            dependencies {
-                implementation(libs.kotlin.test)
-                implementation(libs.kotlin.test.junit)
-            }
+        findByName("androidUnitTest")?.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlin.test.junit)
+            implementation(libs.mockk)
+        }
+        findByName("androidHostTest")?.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlin.test.junit)
+            implementation(libs.mockk)
         }
 
-        val androidInstrumentedTest by getting {
+        findByName("androidInstrumentedTest")?.apply {
+            kotlin.srcDir("src/androidInstrumentedTest/kotlin")
+            dependencies {
+                implementation(projects.client.permissions)
+                implementation(projects.client.repository)
+                implementation(libs.kotlin.test.junit)
+                implementation(libs.androidx.test.core)
+                implementation(libs.androidx.test.runner)
+                implementation(libs.androidx.test.ext.junit)
+                implementation(libs.androidx.ui.test.junit4)
+            }
+        }
+        findByName("androidDeviceTest")?.apply {
+            kotlin.srcDir("src/androidInstrumentedTest/kotlin")
             dependencies {
                 implementation(projects.client.permissions)
                 implementation(projects.client.repository)
@@ -130,67 +151,53 @@ kotlin {
     }
 }
 
-android {
-    namespace = "app.logdate.client"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
-
-    defaultConfig {
-        // TODO: Change to app.logdate
-        applicationId = "co.reasonabletech.logdate"
-        minSdk = libs.versions.android.minSdk.get().toInt()
-        targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "0.1.0"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-    packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
-            // Exclude duplicate classes from different libraries
-            pickFirsts += "**/*.properties"
-            pickFirsts += "META-INF/DEPENDENCIES"
-            pickFirsts += "META-INF/LICENSE"
-            pickFirsts += "META-INF/LICENSE.txt"
-            pickFirsts += "META-INF/LICENSE.md"
-            pickFirsts += "META-INF/NOTICE"
-            pickFirsts += "META-INF/NOTICE.txt"
-            pickFirsts += "META-INF/INDEX.LIST"
-        }
-    }
-    buildTypes {
-        getByName("release") {
-            isMinifyEnabled = true
-            isDebuggable = false
-        }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-        // Enable core library desugaring for health-connect
-        isCoreLibraryDesugaringEnabled = true
-    }
-    // Use the new recommended source set layout
-    sourceSets {
-        getByName("androidTest") {
-            java.srcDirs("src/androidInstrumentedTest/kotlin")
-        }
-    }
-    experimentalProperties["android.experimental.enableScreenshotTest"] = true
+fun addToFirstExistingConfiguration(
+    dependency: Any,
+    vararg configurationNames: String
+) {
+    val targetConfiguration = configurationNames.firstOrNull { name ->
+        configurations.findByName(name) != null
+    } ?: return
+    dependencies.add(targetConfiguration, dependency)
 }
 
-dependencies {
-    debugImplementation(compose.uiTooling)
-    // Add core library desugaring for Java 8+ APIs support on lower Android versions
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
-    // Screenshot testing
-    screenshotTestImplementation(libs.androidx.ui.tooling)
-    screenshotTestImplementation(libs.screenshot.validation.api)
-    screenshotTestImplementation(compose.material3)
-    screenshotTestImplementation(compose.runtime)
-    screenshotTestImplementation(compose.foundation)
-    androidTestImplementation(libs.androidx.ui.test.junit4)
-    debugImplementation(libs.androidx.ui.test.manifest)
-}
+addToFirstExistingConfiguration(
+    libs.compose.ui.tooling,
+    "debugImplementation",
+    "androidDebugImplementation"
+)
+
+// Screenshot testing
+addToFirstExistingConfiguration(
+    libs.androidx.ui.tooling,
+    "screenshotTestImplementation",
+    "androidScreenshotTestImplementation"
+)
+addToFirstExistingConfiguration(
+    libs.screenshot.validation.api,
+    "screenshotTestImplementation",
+    "androidScreenshotTestImplementation"
+)
+addToFirstExistingConfiguration(
+    libs.compose.material3,
+    "screenshotTestImplementation",
+    "androidScreenshotTestImplementation"
+)
+addToFirstExistingConfiguration(
+    libs.compose.runtime,
+    "screenshotTestImplementation",
+    "androidScreenshotTestImplementation"
+)
+addToFirstExistingConfiguration(
+    libs.compose.foundation,
+    "screenshotTestImplementation",
+    "androidScreenshotTestImplementation"
+)
+addToFirstExistingConfiguration(
+    libs.androidx.ui.test.manifest,
+    "debugImplementation",
+    "androidDebugImplementation"
+)
 
 // Workaround for Google Compose Screenshot Testing + KMP compatibility issue.
 // The screenshot plugin doesn't properly set moduleName for KMP projects, causing

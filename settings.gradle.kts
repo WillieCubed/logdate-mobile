@@ -20,6 +20,9 @@ pluginManagement {
         }
     }
 }
+plugins {
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+}
 
 dependencyResolutionManagement {
     repositories {
@@ -41,6 +44,7 @@ dependencyResolutionManagement {
 // End build targets
 include(":app:compose-main")
 include(":app:wear")
+include(":app:android-main")
 // Core client modules
 include(":client:data")
 include(":client:ui")
@@ -48,7 +52,8 @@ include(":client:theme")
 include(":client:domain")
 include(":client:repository")
 include(":client:database")
-include(":client:datastore")
+include(":client:logdate-datastore")
+project(":client:logdate-datastore").projectDir = file("client/datastore")
 include(":client:networking")
 include(":client:intelligence")
 include(":client:location")

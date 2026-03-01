@@ -5,20 +5,26 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.android.library)
+    alias(libs.plugins.android.kmp.library)
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.dokka)
     alias(libs.plugins.kover)
 }
 
 kotlin {
-    androidTarget {
+    applyDefaultHierarchyTemplate()
+
+    android {
+        namespace = "app.logdate.client.sensor"
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
+        
+        
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
     }
 
-    iosX64()
     iosArm64()
     iosSimulatorArm64()
 
@@ -27,7 +33,6 @@ kotlin {
     sourceSets {
         all {
             languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
-            languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi")
             compilerOptions.freeCompilerArgs.set(listOf("-Xexpect-actual-classes"))
         }
         commonMain.dependencies {
@@ -53,47 +58,6 @@ kotlin {
             }
         }
 
-        androidUnitTest.dependencies {
-            implementation(libs.kotlin.test.junit)
-            implementation(libs.kotlinx.coroutines.test)
-            implementation(libs.androidx.test.core)
-            implementation(libs.androidx.test.runner)
-            implementation(libs.androidx.test.rules)
-        }
 
-        androidInstrumentedTest.dependencies {
-            implementation(libs.kotlin.test.junit)
-            implementation(libs.kotlinx.coroutines.test)
-            implementation(libs.androidx.test.core)
-            implementation(libs.androidx.test.runner)
-            implementation(libs.androidx.test.rules)
-
-        }
-    }
-}
-
-android {
-    namespace = "app.logdate.client.sensor"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
-
-    defaultConfig {
-        minSdk = libs.versions.android.minSdk.get().toInt()
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-
-    buildTypes {
-        getByName("release") {
-            isMinifyEnabled = false
-        }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    // Disable lint checks for now
-    lint {
-        abortOnError = false
     }
 }

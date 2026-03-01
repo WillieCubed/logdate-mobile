@@ -1,6 +1,3 @@
-import org.jetbrains.dokka.gradle.DokkaMultiModuleTask
-import org.jetbrains.dokka.gradle.DokkaTaskPartial
-
 plugins {
     // this is necessary to avoid the plugins to be loaded multiple times
     // in each subproject's classloader
@@ -8,11 +5,12 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform) apply false
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.android.kmp.library) apply false
     alias(libs.plugins.composeMultiplatform) apply false
     alias(libs.plugins.compose.compiler) apply false
     alias(libs.plugins.dokka) apply false
-    alias(libs.plugins.kotlin.android) apply false
     alias(libs.plugins.kover)
+    alias(libs.plugins.benManesVersions)
 }
 
 subprojects {
@@ -25,21 +23,8 @@ subprojects {
     dependencies {
         // TODO: Figure out how to migrate to version catalog in build configuration
         //noinspection UseTomlInstead
-        dokkaPlugin("org.jetbrains.dokka:versioning-plugin:1.9.20")
+        dokkaPlugin("org.jetbrains.dokka:versioning-plugin:2.2.0-Beta")
     }
-}
-
-tasks.withType<DokkaTaskPartial>().configureEach {
-    dokkaSourceSets.configureEach {
-        outputDirectory.set(layout.buildDirectory.dir("dokka/${name}"))
-        includes.from("README.md")
-    }
-}
-
-tasks.withType<DokkaMultiModuleTask>().configureEach {
-    moduleName.set(project.name)
-    outputDirectory.set(layout.buildDirectory.dir("dokka/$name"))
-    includes.from("docs")
 }
 
 // Kover configuration for test coverage
