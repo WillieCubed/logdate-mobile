@@ -1,6 +1,6 @@
 package app.logdate.feature.core.settings.ui.devices
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Formats a device's last-active timestamp for display in settings.

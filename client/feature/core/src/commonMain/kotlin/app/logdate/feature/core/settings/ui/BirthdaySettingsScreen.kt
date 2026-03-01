@@ -55,8 +55,8 @@ import app.logdate.feature.core.settings.ui.BirthdayUpdateState
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
 import io.github.aakira.napier.Napier
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.floor
 import kotlin.time.Duration.Companion.days
@@ -71,7 +71,7 @@ import kotlin.time.Duration.Companion.days
 @Composable
 fun BirthdaySettingsScreen(
     onBack: () -> Unit,
-    viewModel: SettingsViewModel = koinViewModel(),
+    viewModel: AccountSettingsViewModel = koinViewModel(),
 ) {
     // Observe birthday update state to know when save completes
     val birthdayUpdateState by viewModel.birthdayUpdateState.collectAsState()
@@ -94,7 +94,7 @@ fun BirthdaySettingsScreen(
 
     // Get initial birthday from userData just once
     val initialBirthday = remember {
-        val currentBirthday = viewModel.uiState.value.userData.birthday
+        val currentBirthday = viewModel.state.value.userData.birthday
         if (currentBirthday == Instant.DISTANT_PAST) {
             // Approximately 20 years in days (365.25 days/year * 20 years)
             Clock.System.now().minus(7305.days)

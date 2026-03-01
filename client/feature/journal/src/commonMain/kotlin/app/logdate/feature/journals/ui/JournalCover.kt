@@ -30,8 +30,8 @@ import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateShort
-import kotlinx.datetime.Clock
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import kotlin.time.Clock
+import androidx.compose.ui.tooling.preview.Preview
 import kotlin.uuid.Uuid
 
 /**

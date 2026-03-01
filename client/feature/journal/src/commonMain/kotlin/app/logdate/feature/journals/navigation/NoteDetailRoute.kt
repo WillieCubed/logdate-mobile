@@ -8,31 +8,31 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
-import app.logdate.feature.journals.ui.detail.NoteDetailScreen
+import androidx.navigation.toRoute
+import app.logdate.feature.journals.ui.detail.NoteViewerScreen
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
 /**
- * Route for viewing a note's details.
+ * Route for viewing a note by ID.
  */
 @Serializable
-data class NoteDetailRoute(val noteId: String, val journalId: String) {
-    constructor(noteId: Uuid, journalId: Uuid) : this(noteId.toString(), journalId.toString())
+data class NoteDetailRoute(val noteId: String) {
+    constructor(noteId: Uuid) : this(noteId.toString())
 }
 
 /**
- * Navigates to the note detail screen.
+ * Navigation helper for opening a note by ID.
  *
  * @param noteId The ID of the note to navigate to.
- * @param journalId The ID of the journal containing the note.
  */
-fun NavController.navigateToNoteDetail(noteId: Uuid, journalId: Uuid) {
-    navigate(NoteDetailRoute(noteId, journalId))
+fun NavController.navigateToNoteDetail(noteId: Uuid) {
+    navigate(NoteDetailRoute(noteId))
 }
 
 /**
- * Defines the note detail route.
+ * Navigation entry for note viewing.
  */
 fun NavGraphBuilder.noteDetailRoute(
     onGoBack: () -> Unit,
@@ -49,10 +49,13 @@ fun NavGraphBuilder.noteDetailRoute(
             )
         }
     ) { backStackEntry ->
+        val route = backStackEntry.toRoute<NoteDetailRoute>()
+        val noteId = Uuid.parse(route.noteId)
         CompositionLocalProvider(
             LocalNavAnimatedVisibilityScope provides this,
         ) {
-            NoteDetailScreen(
+            NoteViewerScreen(
+                noteId = noteId,
                 onGoBack = onGoBack,
             )
         }

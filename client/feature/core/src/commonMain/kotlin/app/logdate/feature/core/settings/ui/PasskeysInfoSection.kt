@@ -28,9 +28,9 @@ import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.MaterialContainerScope
 import app.logdate.ui.theme.Spacing
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import kotlin.time.Clock
+import kotlin.time.Instant
+import androidx.compose.ui.tooling.preview.Preview
 
 /**
  * UI-facing metadata for a passkey credential.

@@ -40,11 +40,11 @@ import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.theme.Spacing
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -64,17 +64,19 @@ fun AccountSettingsScreen(
     onBack: () -> Unit,
     onNavigateToCloudAccountCreation: () -> Unit,
     onNavigateToBirthdaySettings: () -> Unit,
-    viewModel: SettingsViewModel = koinViewModel(),
+    accountViewModel: AccountSettingsViewModel = koinViewModel(),
+    privacyViewModel: PrivacySettingsViewModel = koinViewModel(),
     isPotentialDetailPane: Boolean? = null,
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val birthdayUpdateState by viewModel.birthdayUpdateState.collectAsState()
-    val profileUpdateState by viewModel.profileUpdateState.collectAsState()
+    val accountState by accountViewModel.state.collectAsState()
+    val birthdayUpdateState by accountViewModel.birthdayUpdateState.collectAsState()
+    val profileUpdateState by accountViewModel.profileUpdateState.collectAsState()
+    val privacyState by privacyViewModel.state.collectAsState()
     val layoutInfo = LocalSettingsLayoutInfo.current
     val resolvedIsDetailPane = isPotentialDetailPane ?: layoutInfo.isDetailPane
-    val isAuthenticated = uiState.isAuthenticated
+    val isAuthenticated = accountState.isAuthenticated
     val onCreatePasskey = if (isAuthenticated) {
-        viewModel::createPasskey
+        privacyViewModel::createPasskey
     } else {
         onNavigateToCloudAccountCreation
     }
@@ -83,13 +85,13 @@ fun AccountSettingsScreen(
         onBack = onBack,
         onCreatePasskey = onCreatePasskey,
         onNavigateToBirthdaySettings = onNavigateToBirthdaySettings,
-        userProfile = uiState.currentAccount.toUserProfile(),
-        passkeys = uiState.currentAccount.toPasskeyInfoList(),
-        userData = uiState.userData,
+        userProfile = accountState.currentAccount.toUserProfile(),
+        passkeys = privacyState.passkeys,
+        userData = accountState.userData,
         isAuthenticated = isAuthenticated,
-        onUpdateProfile = viewModel::updateProfile,
-        onRevokePasskey = { passkey -> viewModel.revokePasskey(passkey.id) },
-        onSignOut = viewModel::signOut,
+        onUpdateProfile = accountViewModel::updateProfile,
+        onRevokePasskey = { passkey -> privacyViewModel.revokePasskey(passkey.id) },
+        onSignOut = accountViewModel::signOut,
         birthdayUpdateState = birthdayUpdateState,
         profileUpdateState = profileUpdateState,
         isPotentialDetailPane = resolvedIsDetailPane

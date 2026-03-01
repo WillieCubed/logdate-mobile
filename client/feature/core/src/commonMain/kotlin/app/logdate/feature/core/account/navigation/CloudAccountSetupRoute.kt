@@ -6,7 +6,7 @@ import androidx.navigation.compose.composable
 import app.logdate.feature.core.account.ui.CloudAccountSetupScreen
 import app.logdate.feature.core.account.ui.CloudAccountSetupViewModel
 import kotlinx.serialization.Serializable
-import org.koin.compose.viewmodel.koinViewModel
+import org.koin.compose.koinInject
 
 @Serializable
 data object CloudAccountSetupRoute
@@ -20,7 +20,7 @@ fun NavGraphBuilder.cloudAccountSetupRoute(
     onSkip: () -> Unit,
 ) {
     composable<CloudAccountSetupRoute> {
-        val viewModel: CloudAccountSetupViewModel = koinViewModel()
+        val viewModel = koinInject<CloudAccountSetupViewModel>()
         CloudAccountSetupScreen(
             viewModel = viewModel,
             onComplete = onComplete,

@@ -35,7 +35,11 @@ Core Feature Module
 
 ### Settings System
 
-- `SettingsViewModel.kt` - Settings state management
+- `AccountSettingsViewModel.kt` - Account & profile settings
+- `PrivacySettingsViewModel.kt` - Privacy and security settings
+- `DataSettingsViewModel.kt` - Data, sync, export/restore
+- `AdvancedSettingsViewModel.kt` - Server configuration
+- `DangerZoneSettingsViewModel.kt` - Destructive actions
 - `SettingsOverviewScreen.kt` - Main settings screen
 - `AccountSettingsScreen.kt` - Account management
 - `PrivacySettingsScreen.kt` - Privacy controls
@@ -88,7 +92,7 @@ Core Feature Module
 - `:client:ui` - Shared UI components
 - `:client:repository` - Data access
 - `:client:permissions` - Permission handling
-- `:client:datastore` - Preferences storage
+- `:client:logdate-datastore` - Preferences storage
 - **Compose Multiplatform**: UI framework
 - **Material 3 Adaptive**: Responsive design components
 
@@ -121,15 +125,20 @@ fun HomeScreen(
 ### Settings Integration
 
 ```kotlin
-val settingsViewModel: SettingsViewModel = koinViewModel()
+val accountViewModel: AccountSettingsViewModel = koinViewModel()
+val privacyViewModel: PrivacySettingsViewModel = koinViewModel()
+val dataViewModel: DataSettingsViewModel = koinViewModel()
 
-// Access user preferences
-val uiState by settingsViewModel.uiState.collectAsStateWithLifecycle()
+val accountState by accountViewModel.state.collectAsStateWithLifecycle()
+val privacyState by privacyViewModel.state.collectAsStateWithLifecycle()
+val dataState by dataViewModel.uiState.collectAsStateWithLifecycle()
 
-// Settings screens
 AccountSettingsScreen(
-    uiState = uiState,
-    onUpdateSettings = { settingsViewModel.updateSettings(it) }
+    onBack = { /* ... */ },
+    onNavigateToCloudAccountCreation = { /* ... */ },
+    onNavigateToBirthdaySettings = { /* ... */ },
+    accountViewModel = accountViewModel,
+    privacyViewModel = privacyViewModel
 )
 ```
 
@@ -142,10 +151,15 @@ actual val coreFeatureModule: Module = module {
     includes(devicesModule)
     
     single<BiometricGatekeeper> { AndroidBiometricGatekeeper() }
-    single<ExportLauncher> { AndroidExportLauncher(get(), get()) }
+    single<ExportLauncher> { AndroidExportLauncher(androidContext()) }
+    single<RestoreLauncher> { AndroidRestoreLauncher(androidContext()) }
     
     viewModel { AppViewModel(get(), get(), get()) }
-    viewModel { SettingsViewModel(get(), get(), get(), get(), get(), get()) }
+    viewModel { AccountSettingsViewModel(get(), get(), get(), get(), get(), get()) }
+    viewModel { PrivacySettingsViewModel(get(), get(), get(), get(), get()) }
+    viewModel { DataSettingsViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { AdvancedSettingsViewModel(get(), get()) }
+    viewModel { DangerZoneSettingsViewModel(get(), get(), get(), get()) }
     viewModel { HomeViewModel(get(), get(), get()) }  // GetStreamingTimelineUseCase + dependencies
     viewModel { CloudAccountOnboardingViewModel(get(), get(), get()) }
 }

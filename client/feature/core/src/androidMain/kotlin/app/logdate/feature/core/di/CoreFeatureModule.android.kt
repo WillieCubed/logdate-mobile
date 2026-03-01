@@ -3,6 +3,7 @@ package app.logdate.feature.core.di
 import android.app.Activity
 import app.logdate.client.domain.di.accountModule
 import app.logdate.client.domain.di.domainModule
+import app.logdate.client.location.di.locationSettingsModule
 import app.logdate.feature.core.AndroidBiometricGatekeeper
 import app.logdate.feature.core.AppViewModel
 import app.logdate.feature.core.BiometricGatekeeper
@@ -10,10 +11,16 @@ import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
 import app.logdate.feature.core.account.ui.SaveAccountSetupDataUseCase
 import app.logdate.feature.core.export.AndroidExportLauncher
 import app.logdate.feature.core.export.ExportLauncher
+import app.logdate.feature.core.restore.AndroidRestoreLauncher
+import app.logdate.feature.core.restore.RestoreLauncher
 import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.feature.core.profile.ui.ProfileViewModel
+import app.logdate.feature.core.settings.ui.AccountSettingsViewModel
+import app.logdate.feature.core.settings.ui.AdvancedSettingsViewModel
+import app.logdate.feature.core.settings.ui.DataSettingsViewModel
+import app.logdate.feature.core.settings.ui.DangerZoneSettingsViewModel
 import app.logdate.feature.core.settings.ui.LocationSettingsViewModel
-import app.logdate.feature.core.settings.ui.SettingsViewModel
+import app.logdate.feature.core.settings.ui.PrivacySettingsViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.factoryOf
@@ -28,6 +35,7 @@ actual val coreFeatureModule: Module = module {
     includes(domainModule)
     includes(accountModule)
     includes(devicesModule)
+    includes(locationSettingsModule)
     
     // TODO: Refactor to separate auth module
     single<BiometricGatekeeper> { AndroidBiometricGatekeeper() }
@@ -40,12 +48,53 @@ actual val coreFeatureModule: Module = module {
     // Create AndroidExportLauncher and expose it both as itself and as ExportLauncher interface
     single<ExportLauncher> { AndroidExportLauncher(androidContext()) }
     single { AndroidExportLauncher(androidContext()) }
+    single<RestoreLauncher> { AndroidRestoreLauncher(androidContext()) }
+    single { AndroidRestoreLauncher(androidContext()) }
 
     // Account setup helpers
     factoryOf(::SaveAccountSetupDataUseCase)
 
     viewModel { AppViewModel(get(), get(), get()) }
-    viewModel { SettingsViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    viewModel {
+        AccountSettingsViewModel(
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get()
+        )
+    }
+    viewModel {
+        PrivacySettingsViewModel(
+            get(),
+            get(),
+            get(),
+            get(),
+            get()
+        )
+    }
+    viewModel {
+        DataSettingsViewModel(
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get()
+        )
+    }
+    viewModel { AdvancedSettingsViewModel(get(), get()) }
+    viewModel {
+        DangerZoneSettingsViewModel(
+            get(),
+            get(),
+            get(),
+            get()
+        )
+    }
     viewModel { HomeViewModel(get(), get(), get()) }
     viewModel { CloudAccountOnboardingViewModel(get(), get(), get()) }
     viewModel { LocationSettingsViewModel(get()) }

@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package app.logdate.feature.journals.ui.detail
 
 import androidx.lifecycle.SavedStateHandle
@@ -45,12 +47,10 @@ class JournalDetailViewModel(
     init {
         try {
             val routeData = savedStateHandle.toRoute<JournalDetailsRoute>()
-            routeData.journalId?.let { idString ->
-                try {
-                    _journalId.value = Uuid.parse(idString)
-                } catch (e: Exception) {
-                    // Invalid UUID in route, leave as null
-                }
+            try {
+                _journalId.value = Uuid.parse(routeData.journalId)
+            } catch (e: Exception) {
+                // Invalid UUID in route, leave as null
             }
         } catch (e: Exception) {
             // No route data, leave as null

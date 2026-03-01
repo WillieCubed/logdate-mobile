@@ -20,8 +20,8 @@ import androidx.compose.ui.text.style.TextAlign
 import app.logdate.feature.journals.ui.list.JournalsListDialog
 import app.logdate.shared.model.Journal
 import app.logdate.ui.theme.Spacing
-import kotlinx.datetime.Clock
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import kotlin.time.Clock
+import androidx.compose.ui.tooling.preview.Preview
 
 /**
  * A button that displays "See More" and opens a dialog with a full list of journals when clicked.

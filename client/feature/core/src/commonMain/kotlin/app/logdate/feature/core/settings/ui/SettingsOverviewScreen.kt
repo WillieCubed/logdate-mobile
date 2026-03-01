@@ -38,7 +38,7 @@ import app.logdate.feature.core.settings.ui.LocalSettingsLayoutInfo
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.screen_title_settings
 import org.jetbrains.compose.resources.stringResource
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -84,10 +84,10 @@ fun SettingsOverviewScreen(
     modifier: Modifier = Modifier,
     selectedDetail: String? = null,
     isInTwoPaneMode: Boolean? = null,
-    viewModel: SettingsViewModel = koinViewModel(),
+    viewModel: AccountSettingsViewModel = koinViewModel(),
 ) {
     val layoutInfo = LocalSettingsLayoutInfo.current
-    val uiState by viewModel.uiState.collectAsState()
+    val accountState by viewModel.state.collectAsState()
     val resolvedSelectedDetail = selectedDetail ?: layoutInfo.selectedDetail
     val resolvedIsInTwoPaneMode = isInTwoPaneMode ?: layoutInfo.isInTwoPaneMode
 
@@ -101,7 +101,7 @@ fun SettingsOverviewScreen(
         onNavigateToDangerZone = onNavigateToDangerZone,
         onNavigateToLocation = onNavigateToLocation,
         onNavigateToAdvanced = onNavigateToAdvanced,
-        userProfile = uiState.currentAccount.toUserProfile(),
+        userProfile = accountState.currentAccount.toUserProfile(),
         selectedDetail = resolvedSelectedDetail,
         isInTwoPaneMode = resolvedIsInTwoPaneMode,
         modifier = modifier

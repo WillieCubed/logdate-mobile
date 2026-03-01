@@ -72,7 +72,7 @@ fun JournalDetailScreen(
     journalId: Uuid,
     onGoBack: () -> Unit,
     onJournalDeleted: () -> Unit,
-    onNavigateToNoteDetail: (noteId: Uuid, journalId: Uuid) -> Unit = { _, _ -> },
+    onNavigateToNoteDetail: (noteId: Uuid) -> Unit = { _ -> },
     onNavigateToSettings: (journalId: Uuid) -> Unit = {},
     onNavigateToShare: (journalId: Uuid) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -235,7 +235,7 @@ fun JournalDetailScreen(
                                     content = entry.content,
                                     timestamp = entry.timestamp,
                                     onClick = { 
-                                        onNavigateToNoteDetail(entry.id, successState.journalId)
+                                        onNavigateToNoteDetail(entry.id)
                                     }
                                 )
                             }
@@ -307,7 +307,7 @@ internal fun JournalDetailPlaceholder() {
 @Composable
 private fun JournalEntryItem(
     content: String,
-    timestamp: kotlinx.datetime.Instant,
+    timestamp: kotlin.time.Instant,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {

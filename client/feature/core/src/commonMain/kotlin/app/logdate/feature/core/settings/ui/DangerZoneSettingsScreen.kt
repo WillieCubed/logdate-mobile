@@ -44,7 +44,7 @@ import logdate.client.feature.core.generated.resources.action_reset_app
 import logdate.client.feature.core.generated.resources.settings_reset_app_description
 import logdate.client.feature.core.generated.resources.settings_reset_app_title
 import org.jetbrains.compose.resources.stringResource
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -61,7 +61,7 @@ import org.koin.compose.viewmodel.koinViewModel
 fun DangerZoneSettingsScreen(
     onBack: () -> Unit,
     onAppReset: () -> Unit,
-    viewModel: SettingsViewModel = koinViewModel(),
+    viewModel: DangerZoneSettingsViewModel = koinViewModel(),
     isPotentialDetailPane: Boolean? = null,
 ) {
     val layoutInfo = LocalSettingsLayoutInfo.current
@@ -140,6 +140,27 @@ private fun DangerZoneSettingsContent(
                     )
 
                     MaterialContainer {
+                        SurfaceItem {
+                            ListItem(
+                                headlineContent = {
+                                    Text("Before you reset")
+                                },
+                                supportingContent = {
+                                    Text(
+                                        "Export and verify a backup from Data & Storage. " +
+                                            "Without a backup, encrypted local data may be unrecoverable."
+                                    )
+                                },
+                                leadingContent = {
+                                    Icon(
+                                        Icons.Default.WarningAmber,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            )
+                        }
+
                         // Reset App Item
                         SurfaceItem {
                             ListItem(

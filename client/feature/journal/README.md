@@ -31,7 +31,7 @@ Journal Feature
 - `JournalCover.kt` - Journal cover presentation
 - `JournalCoverFlowCarousel.kt` - Interactive journal carousel
 - `JournalList.kt` - Scrollable journal collection
-- `NoteDetailScreen.kt` - Individual note viewing
+- `NoteViewerScreen.kt` - Individual note viewing
 
 ### Journal Management
 
@@ -50,7 +50,7 @@ Journal Feature
 - `JournalsNavRoute.kt` - Main navigation entry point
 - `JournalDetailsRoute.kt` - Detail view navigation
 - `JournalCreationRoute.kt` - Creation flow navigation
-- `NoteDetailRoute.kt` - Note detail navigation
+- `NoteDetailRoute.kt` - Note viewing navigation
 
 ## Features
 
@@ -146,7 +146,22 @@ val journalsFeatureModule: Module = module {
     viewModel { JournalsOverviewViewModel(get()) }
     viewModel { JournalCreationViewModel(get(), get()) }
     viewModel { JournalDetailViewModel(get(), get(), get(), get()) }
-    viewModel { NoteDetailViewModel(get(), get(), get()) }
+    viewModel { (noteId: Uuid) ->
+        NoteViewerViewModel(
+            noteId = noteId,
+            notesRepository = get(),
+            removeNoteUseCase = get(),
+        )
+    }
+    viewModel { (noteId: Uuid) ->
+        AudioNoteViewerViewModel(
+            noteId = noteId,
+            notesRepository = get(),
+            audioContextProcessor = get(),
+            durationResolver = get(),
+            audioPlaybackManager = get(),
+        )
+    }
     viewModel { JournalSettingsViewModel(get(), get(), get(), get()) }
     viewModel { ShareJournalViewModel(get(), get()) }
 }

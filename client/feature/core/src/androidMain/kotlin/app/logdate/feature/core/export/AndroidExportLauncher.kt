@@ -13,10 +13,11 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import io.github.aakira.napier.Napier
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import java.util.UUID
+import kotlinx.datetime.number
 
 /**
  * Android-specific implementation for launching data export using Storage Access Framework and WorkManager.
@@ -96,7 +97,7 @@ class AndroidExportLauncher(
         // Generate default filename with timestamp
         val timestamp = Clock.System.now()
             .toLocalDateTime(TimeZone.currentSystemDefault())
-            .let { "${it.year}-${it.monthNumber.toString().padStart(2, '0')}-${it.dayOfMonth.toString().padStart(2, '0')}_${it.hour.toString().padStart(2, '0')}-${it.minute.toString().padStart(2, '0')}" }
+            .let { "${it.year}-${it.month.number.toString().padStart(2, '0')}-${it.day.toString().padStart(2, '0')}_${it.hour.toString().padStart(2, '0')}-${it.minute.toString().padStart(2, '0')}" }
         
         val defaultFileName = "logdate_export_$timestamp.json"
         
