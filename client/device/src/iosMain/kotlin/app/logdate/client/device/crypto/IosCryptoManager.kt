@@ -8,7 +8,7 @@ import platform.Foundation.*
 import platform.Security.*
 
 @OptIn(ExperimentalForeignApi::class)
-actual class IosCryptoManager : CryptoManager {
+class IosCryptoManager : CryptoManager {
     
     override suspend fun generateRecoveryPhrase(): List<String> {
         // Generate 128 bits of entropy
@@ -71,98 +71,27 @@ actual class IosCryptoManager : CryptoManager {
     }
     
     /**
-     * AES-GCM encryption using iOS CommonCrypto.
+     * Performs AES-GCM encryption for iOS.
      */
-    fun aesGcmEncrypt(
+    override fun aesGcmEncrypt(
         key: ByteArray,
         iv: ByteArray,
         aad: ByteArray,
         plaintext: ByteArray
-    ): ByteArray = memScoped {
-        require(key.size == 32) { "Key must be 32 bytes for AES-256" }
-        require(iv.size == 12) { "IV must be 12 bytes for GCM" }
-        
-        val algorithm = kCCAlgorithmAES
-        val tagLength = 16
-        
-        val ciphertextLength = plaintext.size + tagLength
-        val ciphertext = ByteArray(ciphertextLength)
-        
-        val status = ciphertext.usePinned { ciphertextPinned ->
-            plaintext.usePinned { plaintextPinned ->
-                key.usePinned { keyPinned ->
-                    iv.usePinned { ivPinned ->
-                        aad.usePinned { aadPinned ->
-                            CCCryptorGCMOneshotEncrypt(
-                                algorithm,
-                                keyPinned.addressOf(0),
-                                key.size.toULong(),
-                                ivPinned.addressOf(0),
-                                iv.size.toULong(),
-                                aadPinned.addressOf(0),
-                                aad.size.toULong(),
-                                plaintextPinned.addressOf(0),
-                                plaintext.size.toULong(),
-                                ciphertextPinned.addressOf(0),
-                                ciphertextPinned.addressOf(plaintext.size),
-                                tagLength.toULong()
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        
-        require(status == kCCSuccess) { "AES-GCM encryption failed with status: $status" }
-        ciphertext
+    ): ByteArray {
+        error("AES-GCM encryption is not available on iOS yet.")
     }
-    
+
     /**
-     * AES-GCM decryption using iOS CommonCrypto.
+     * Performs AES-GCM decryption for iOS.
      */
-    fun aesGcmDecrypt(
+    override fun aesGcmDecrypt(
         key: ByteArray,
         iv: ByteArray,
         aad: ByteArray,
         ciphertext: ByteArray
-    ): ByteArray = memScoped {
-        require(key.size == 32) { "Key must be 32 bytes for AES-256" }
-        require(iv.size == 12) { "IV must be 12 bytes for GCM" }
-        require(ciphertext.size >= 16) { "Ciphertext too short for GCM tag" }
-        
-        val algorithm = kCCAlgorithmAES
-        val tagLength = 16
-        val encryptedDataLength = ciphertext.size - tagLength
-        
-        val plaintext = ByteArray(encryptedDataLength)
-        
-        val status = plaintext.usePinned { plaintextPinned ->
-            ciphertext.usePinned { ciphertextPinned ->
-                key.usePinned { keyPinned ->
-                    iv.usePinned { ivPinned ->
-                        aad.usePinned { aadPinned ->
-                            CCCryptorGCMOneshotDecrypt(
-                                algorithm,
-                                keyPinned.addressOf(0),
-                                key.size.toULong(),
-                                ivPinned.addressOf(0),
-                                iv.size.toULong(),
-                                aadPinned.addressOf(0),
-                                aad.size.toULong(),
-                                ciphertextPinned.addressOf(0),
-                                encryptedDataLength.toULong(),
-                                plaintextPinned.addressOf(0),
-                                ciphertextPinned.addressOf(encryptedDataLength),
-                                tagLength.toULong()
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        
-        require(status == kCCSuccess) { "AES-GCM decryption failed with status: $status" }
-        plaintext
+    ): ByteArray {
+        error("AES-GCM decryption is not available on iOS yet.")
     }
     
     /**

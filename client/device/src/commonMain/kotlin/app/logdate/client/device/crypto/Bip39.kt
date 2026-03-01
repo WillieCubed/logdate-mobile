@@ -79,11 +79,11 @@ object Bip39 {
     private fun calculateChecksum(data: ByteArray): ByteArray {
         return sha256(data)
     }
-    
-    internal expect fun sha256(data: ByteArray): ByteArray
-    
-    /**
-     * Derives a seed from mnemonic using PBKDF2 (BIP-39 standard).
-     */
-    internal expect fun mnemonicToSeed(mnemonic: String, passphrase: String = ""): ByteArray
 }
+
+internal expect fun Bip39.sha256(data: ByteArray): ByteArray
+
+/**
+ * Derives a seed from mnemonic using PBKDF2 (BIP-39 standard).
+ */
+internal expect fun Bip39.mnemonicToSeed(mnemonic: String, passphrase: String = ""): ByteArray

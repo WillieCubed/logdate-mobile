@@ -127,7 +127,7 @@ class TestCryptoManager : CryptoManager {
         return mac.doFinal(data)
     }
     
-    fun aesGcmEncrypt(
+    override fun aesGcmEncrypt(
         key: ByteArray,
         iv: ByteArray,
         aad: ByteArray,
@@ -146,7 +146,7 @@ class TestCryptoManager : CryptoManager {
         return cipher.doFinal(plaintext)
     }
     
-    fun aesGcmDecrypt(
+    override fun aesGcmDecrypt(
         key: ByteArray,
         iv: ByteArray,
         aad: ByteArray,

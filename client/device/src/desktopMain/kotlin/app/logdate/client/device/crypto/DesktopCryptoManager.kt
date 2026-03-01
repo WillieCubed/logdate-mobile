@@ -9,7 +9,7 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-actual class DesktopCryptoManager : CryptoManager {
+class DesktopCryptoManager : CryptoManager {
     
     override suspend fun generateRecoveryPhrase(): List<String> {
         val entropy = ByteArray(16) // 128 bits = 12 words
@@ -57,7 +57,7 @@ actual class DesktopCryptoManager : CryptoManager {
     /**
      * AES-GCM encryption using JCE.
      */
-    fun aesGcmEncrypt(
+    override fun aesGcmEncrypt(
         key: ByteArray,
         iv: ByteArray,
         aad: ByteArray,
@@ -79,7 +79,7 @@ actual class DesktopCryptoManager : CryptoManager {
     /**
      * AES-GCM decryption using JCE.
      */
-    fun aesGcmDecrypt(
+    override fun aesGcmDecrypt(
         key: ByteArray,
         iv: ByteArray,
         aad: ByteArray,
