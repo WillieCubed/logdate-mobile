@@ -1,7 +1,7 @@
 package app.logdate.client.database.converters
 
 import androidx.room.TypeConverter
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Converts date-like objects into a format that can be stored in the database.

@@ -8,7 +8,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import app.logdate.client.database.entities.JournalEntity
 import app.logdate.client.database.entities.TextNoteEntity
 import app.logdate.client.database.migrations.AppDatabaseMigrations
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith

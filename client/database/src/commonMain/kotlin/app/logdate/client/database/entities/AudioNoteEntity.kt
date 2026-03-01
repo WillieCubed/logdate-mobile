@@ -5,11 +5,11 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 @Entity(
-    tableName = "voice_notes",
+    tableName = "audio_notes",
     foreignKeys = [
         ForeignKey(
             entity = PlaceEntity::class,
@@ -23,12 +23,12 @@ import kotlin.uuid.Uuid
         Index("latitude", "longitude")
     ]
 )
-data class VoiceNoteEntity(
+data class AudioNoteEntity(
     val contentUri: String,
     /**
      * Duration of the audio in milliseconds.
      */
-    val durationMs: Long? = null,
+    val durationMs: Long = 0,
     @PrimaryKey
     override val uid: Uuid = Uuid.random(),
     override val lastUpdated: Instant,
