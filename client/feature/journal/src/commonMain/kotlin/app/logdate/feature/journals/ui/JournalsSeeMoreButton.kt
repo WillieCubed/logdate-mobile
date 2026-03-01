@@ -22,7 +22,9 @@ import app.logdate.shared.model.Journal
 import app.logdate.ui.theme.Spacing
 import kotlin.time.Clock
 import androidx.compose.ui.tooling.preview.Preview
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.journal.generated.resources.*
+import logdate.client.feature.journal.generated.resources.Res
 /**
  * A button that displays "See More" and opens a dialog with a full list of journals when clicked.
  *
@@ -53,7 +55,7 @@ fun JournalsSeeMoreButton(
             modifier = Modifier.padding(end = Spacing.sm)
         )
         Text(
-            text = "See All Journals",
+            text = stringResource(Res.string.see_all_journals),
             textAlign = TextAlign.Center
         )
     }

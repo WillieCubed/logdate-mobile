@@ -41,8 +41,9 @@ import org.koin.compose.koinInject
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * A component that displays and controls audio playback.
  * Includes a play/pause button, progress slider, and time display.
@@ -175,7 +176,7 @@ fun AudioPlaybackComponent(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Generating transcription...",
+                            text = stringResource(Res.string.generating_transcription),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

@@ -45,7 +45,9 @@ import logdate.client.feature.journal.generated.resources.note_stack_add
 import org.jetbrains.compose.resources.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.journal.generated.resources.*
+import logdate.client.feature.journal.generated.resources.Res
 @Composable
 fun JournalCreationScreen(
     onGoBack: () -> Unit,
@@ -108,10 +110,10 @@ fun JournalCreationScreenContent(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("New Journal") },
+                title = { Text(stringResource(Res.string.new_journal)) },
                 navigationIcon = {
                     IconButton(onClick = { onGoBack() }) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(Res.string.back))
                     }
                 },
             )
@@ -137,7 +139,7 @@ fun JournalCreationScreenContent(
                         .fillMaxWidth()
                         .focusRequester(titleFocusRequester),
                     value = title,
-                    label = { Text("Add a title") },
+                    label = { Text(stringResource(Res.string.add_a_title)) },
                     onValueChange = {
                         title = it
                     },
@@ -152,7 +154,7 @@ fun JournalCreationScreenContent(
                     ),
                 )
                 Column {
-                    Text("What is this for?", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(Res.string.what_is_this_for), style = MaterialTheme.typography.bodyMedium)
                     OutlinedTextField(
                         textStyle = MaterialTheme.typography.bodyLarge,
                         minLines = 3,
@@ -160,7 +162,7 @@ fun JournalCreationScreenContent(
                             .fillMaxWidth()
                             .focusRequester(descriptionFocusRequester),
                         value = contentDescription,
-                        placeholder = { Text("Description") },
+                        placeholder = { Text(stringResource(Res.string.description)) },
                         label = { },
                         onValueChange = {
                             contentDescription = it
@@ -183,7 +185,7 @@ fun JournalCreationScreenContent(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
-                    Text("Add memories", style = MaterialTheme.typography.labelMedium)
+                    Text(stringResource(Res.string.add_memories), style = MaterialTheme.typography.labelMedium)
                     ContainerButton(
                         onClick = ::handleSelectMedia,
                         icon = {
@@ -213,7 +215,7 @@ fun JournalCreationScreenContent(
                 onClick = ::handleNewJournal,
                 enabled = canFinish,
             ) {
-                Text("Finish")
+                Text(stringResource(Res.string.finish))
             }
         }
     }

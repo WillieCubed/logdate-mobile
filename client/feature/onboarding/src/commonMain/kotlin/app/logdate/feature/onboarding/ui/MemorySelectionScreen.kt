@@ -68,7 +68,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import androidx.compose.ui.tooling.preview.Preview
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.onboarding.generated.resources.*
+import logdate.client.feature.onboarding.generated.resources.Res
 /**
  * UI state for the memory selection screen.
  */
@@ -111,12 +113,12 @@ fun MemorySelectionScreen(
                 modifier = modifier,
                 topBar = {
                     TopAppBar(
-                        title = { Text("Select Memories") },
+                        title = { Text(stringResource(Res.string.select_memories)) },
                         navigationIcon = {
                             IconButton(onClick = onBack) {
                                 Icon(
                                     Icons.AutoMirrored.Default.ArrowBack,
-                                    contentDescription = "Back"
+                                    contentDescription = stringResource(Res.string.back)
                                 )
                             }
                         },
@@ -190,13 +192,13 @@ private fun SharedTransitionScope.MemorySelectionContent(
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
                 Text(
-                    text = "Choose memories to import",
+                    text = stringResource(Res.string.choose_memories_to_import),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Medium,
                 )
 
                 Text(
-                    text = "We've found some photos and videos that might have special meaning to you. Select the ones you'd like to import.",
+                    text = stringResource(Res.string.weve_found_some_photos_and_videos_that_might_have_special_meaning_to_you_select_the_ones_youd_like_to_import),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -222,7 +224,7 @@ private fun SharedTransitionScope.MemorySelectionContent(
         if (uiState.allMemories.isNotEmpty()) {
             item {
                 Text(
-                    text = "All memories",
+                    text = stringResource(Res.string.all_memories),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -253,7 +255,12 @@ private fun SharedTransitionScope.MemorySelectionContent(
                     .fillMaxWidth()
                     .padding(top = Spacing.lg),
             ) {
-                Text("Continue with ${uiState.selectedMemoryIds.size} memories")
+                Text(
+                    stringResource(
+                        Res.string.continue_with_memories_count,
+                        uiState.selectedMemoryIds.size
+                    )
+                )
             }
         }
     }
@@ -290,14 +297,14 @@ private fun SharedTransitionScope.AICuratedMemoriesSection(
                     )
             )
             Text(
-                text = "Moments that might matter most",
+                text = stringResource(Res.string.moments_that_might_matter_most),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
         }
 
         Text(
-            text = "Our AI identified these as potentially meaningful memories based on visual content, timing, and context.",
+            text = stringResource(Res.string.our_ai_identified_these_as_potentially_meaningful_memories_based_on_visual_content_timing_and_context),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -515,7 +522,7 @@ private fun SharedTransitionScope.MemoryThumbnail(
                     is MediaObject.Video -> {
                         Icon(
                             Icons.Default.PlayArrow,
-                            contentDescription = "Video",
+                            contentDescription = stringResource(Res.string.video),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -546,7 +553,7 @@ private fun SharedTransitionScope.MemoryThumbnail(
                 ) {
                     Icon(
                         Icons.Default.Check,
-                        contentDescription = "Selected",
+                        contentDescription = stringResource(Res.string.selected),
                         tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(16.dp),
                     )
@@ -603,7 +610,7 @@ private fun SharedTransitionScope.ExpandedMemoryOverlay(
                         ) {
                             Icon(
                                 Icons.Default.PlayArrow,
-                                contentDescription = "Video",
+                                contentDescription = stringResource(Res.string.video),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(48.dp),
                             )

@@ -47,7 +47,9 @@ import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.theme.Spacing
 import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 /**
  * Advanced settings screen for developer and power-user options.
  *
@@ -100,10 +102,10 @@ private fun AdvancedSettingsContent(
         topBar = {
             if (!isPotentialDetailPane) {
                 TopAppBar(
-                    title = { Text("Advanced") },
+                    title = { Text(stringResource(Res.string.advanced)) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
                         }
                     },
                     scrollBehavior = scrollBehavior,
@@ -120,7 +122,7 @@ private fun AdvancedSettingsContent(
                 if (isPotentialDetailPane) {
                     item {
                         Text(
-                            text = "Advanced",
+                            text = stringResource(Res.string.advanced),
                             style = MaterialTheme.typography.headlineSmall,
                             modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)
                         )
@@ -156,7 +158,7 @@ private fun ServerSelectionSection(
         verticalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
         Text(
-            text = "Server Configuration",
+            text = stringResource(Res.string.server_configuration),
             style = MaterialTheme.typography.titleMedium
         )
 
@@ -179,7 +181,7 @@ private fun ServerSelectionSection(
                     )
                     Spacer(modifier = Modifier.width(Spacing.sm))
                     Text(
-                        text = "You are using a non-production server. Your data will not sync with LogDate Cloud.",
+                        text = stringResource(Res.string.you_are_using_a_non_production_server_your_data_will_not_sync_with_logdate_cloud),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onTertiaryContainer
                     )
@@ -209,8 +211,8 @@ private fun ServerSelectionSection(
                     OutlinedTextField(
                         value = serverSelectionState.localServerAddress,
                         onValueChange = onUpdateLocalAddress,
-                        label = { Text("Server Address") },
-                        placeholder = { Text("localhost:8765") },
+                        label = { Text(stringResource(Res.string.server_address)) },
+                        placeholder = { Text(stringResource(Res.string.localhost_8765)) },
                         singleLine = true,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -229,8 +231,8 @@ private fun ServerSelectionSection(
                     OutlinedTextField(
                         value = serverSelectionState.customServerUrl,
                         onValueChange = onUpdateCustomUrl,
-                        label = { Text("Server URL") },
-                        placeholder = { Text("https://your-server.example.com") },
+                        label = { Text(stringResource(Res.string.server_url)) },
+                        placeholder = { Text(stringResource(Res.string.https_your_server_example_com)) },
                         singleLine = true,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -268,7 +270,7 @@ private fun ServerSelectionSection(
                 )
                 Spacer(modifier = Modifier.width(Spacing.sm))
                 Text(
-                    text = "Switching servers keeps your local data intact. Data is stored separately per server and will not automatically sync between different servers.",
+                    text = stringResource(Res.string.switching_servers_keeps_your_local_data_intact_data_is_stored_separately_per_server_and_will_not_automatically_sync_between_different_servers),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -332,7 +334,7 @@ private fun ValidationStatusSection(
                 is ServerValidationState.Idle -> {
                     if (isValidationNeeded) {
                         Text(
-                            text = "Test connection before saving",
+                            text = stringResource(Res.string.test_connection_before_saving),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -348,7 +350,7 @@ private fun ValidationStatusSection(
                         )
                         Spacer(modifier = Modifier.width(Spacing.sm))
                         Text(
-                            text = "Testing connection...",
+                            text = stringResource(Res.string.testing_connection),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

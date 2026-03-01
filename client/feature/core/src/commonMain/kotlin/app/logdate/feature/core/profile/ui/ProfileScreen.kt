@@ -74,7 +74,9 @@ import app.logdate.shared.model.profile.LogDateProfile
 import kotlin.time.Instant
 import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 /**
  * Material 3 Expressive profile screen featuring a cookie-shaped profile photo,
  * headline-sized display name with inline editing, and organized information sections.
@@ -152,15 +154,15 @@ private fun ProfileScreenContent(
             .nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
-                title = { Text("Profile") },
+                title = { Text(stringResource(Res.string.profile)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
                     }
                 },
                 actions = {
                     IconButton(onClick = onRefresh) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh profile")
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(Res.string.refresh_profile))
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -262,7 +264,7 @@ private fun ProfileHeader(
         ) {
             Icon(
                 imageVector = Icons.Default.AccountCircle,
-                contentDescription = "Profile photo",
+                contentDescription = stringResource(Res.string.profile_photo),
                 modifier = Modifier.size(80.dp),
                 tint = MaterialTheme.colorScheme.onPrimaryContainer
             )
@@ -281,7 +283,7 @@ private fun ProfileHeader(
                     OutlinedTextField(
                         value = editedName,
                         onValueChange = { editedName = it },
-                        label = { Text("Display Name") },
+                        label = { Text(stringResource(Res.string.display_name)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -290,10 +292,10 @@ private fun ProfileHeader(
                         horizontalArrangement = Arrangement.spacedBy(Spacing.md)
                     ) {
                         IconButton(onClick = onCancelEditing) {
-                            Icon(Icons.Default.Close, contentDescription = "Cancel")
+                            Icon(Icons.Default.Close, contentDescription = stringResource(Res.string.cancel))
                         }
                         IconButton(onClick = { onSaveDisplayName(editedName) }) {
-                            Icon(Icons.Default.Check, contentDescription = "Save")
+                            Icon(Icons.Default.Check, contentDescription = stringResource(Res.string.save))
                         }
                     }
                 }
@@ -326,7 +328,7 @@ private fun ProfileHeader(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Edit,
-                            contentDescription = "Edit display name",
+                            contentDescription = stringResource(Res.string.edit_display_name),
                             modifier = Modifier.size(20.dp),
                             tint = MaterialTheme.colorScheme.primary
                         )
@@ -338,7 +340,7 @@ private fun ProfileHeader(
         // Username (only show if user has cloud account)
         profile.username?.let { username ->
             Text(
-                text = "@$username",
+                text = stringResource(Res.string.username_handle, username),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -358,7 +360,7 @@ private fun AccountInformationSection(
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
                 Text(
-                    text = "Account Information",
+                    text = stringResource(Res.string.account_information),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -397,7 +399,7 @@ private fun AccountInformationSection(
                     
                     Column {
                         Text(
-                            text = "Authentication",
+                            text = stringResource(Res.string.authentication),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -430,7 +432,7 @@ private fun PersonalInformationSection(
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
                 Text(
-                    text = "Personal Information",
+                    text = stringResource(Res.string.personal_information),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )

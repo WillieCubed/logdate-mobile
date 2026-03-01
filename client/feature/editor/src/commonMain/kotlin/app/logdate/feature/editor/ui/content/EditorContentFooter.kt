@@ -37,7 +37,9 @@ import app.logdate.feature.editor.ui.layout.rememberOverscrollDetector
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * A footer component for the editor content that includes an expandable toolbar
  * which appears when the user overscrolls past the bottom of the content.
@@ -97,7 +99,7 @@ fun EditorContentFooter(
             // Toolbar content - block type buttons
             BlockTypeButton(
                 icon = Icons.Rounded.TextFields,
-                contentDescription = "Add Text",
+                contentDescription = stringResource(Res.string.add_text),
                 onClick = {
                     onAddBlock(BlockType.TEXT)
                     collapseToolbar(coroutineScope, expanded) { expanded = false }
@@ -106,7 +108,7 @@ fun EditorContentFooter(
             
             BlockTypeButton(
                 icon = Icons.Rounded.Image,
-                contentDescription = "Add Image",
+                contentDescription = stringResource(Res.string.add_image),
                 onClick = {
                     onAddBlock(BlockType.IMAGE)
                     collapseToolbar(coroutineScope, expanded) { expanded = false }
@@ -115,7 +117,7 @@ fun EditorContentFooter(
             
             BlockTypeButton(
                 icon = Icons.Rounded.AudioFile,
-                contentDescription = "Add Audio",
+                contentDescription = stringResource(Res.string.add_audio),
                 onClick = {
                     onAddBlock(BlockType.AUDIO)
                     collapseToolbar(coroutineScope, expanded) { expanded = false }
@@ -124,7 +126,7 @@ fun EditorContentFooter(
             
             BlockTypeButton(
                 icon = Icons.Rounded.VideoFile,
-                contentDescription = "Add Video",
+                contentDescription = stringResource(Res.string.add_video),
                 onClick = {
                     onAddBlock(BlockType.VIDEO)
                     collapseToolbar(coroutineScope, expanded) { expanded = false }
@@ -133,7 +135,7 @@ fun EditorContentFooter(
             
             BlockTypeButton(
                 icon = Icons.Rounded.Camera,
-                contentDescription = "Take Photo",
+                contentDescription = stringResource(Res.string.take_photo),
                 onClick = {
                     onAddBlock(BlockType.CAMERA)
                     collapseToolbar(coroutineScope, expanded) { expanded = false }

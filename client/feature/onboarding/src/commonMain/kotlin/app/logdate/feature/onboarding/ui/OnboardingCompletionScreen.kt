@@ -35,7 +35,8 @@ import logdate.client.feature.onboarding.generated.resources.action_onboarding_c
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
-
+import logdate.client.feature.onboarding.generated.resources.*
+import logdate.client.feature.onboarding.generated.resources.Res
 /**
  * The last screen of the onboarding flow.
  *
@@ -116,7 +117,7 @@ private fun CompletionStreakContent(
                 verticalArrangement = Arrangement.spacedBy(48.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("One more thing...", style = MaterialTheme.typography.headlineMedium)
+                Text(stringResource(Res.string.one_more_thing), style = MaterialTheme.typography.headlineMedium)
                 Column(
                     verticalArrangement = Arrangement.spacedBy(app.logdate.ui.theme.Spacing.xl),
                     horizontalAlignment = Alignment.CenterHorizontally,

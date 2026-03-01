@@ -26,7 +26,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.aakira.napier.Napier
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 @Composable
 fun rememberSurfaceRequestState(): MutableState<SurfaceRequest?> {
     return remember { mutableStateOf<SurfaceRequest?>(null) }
@@ -46,7 +48,7 @@ actual fun LiveCameraPreview(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "Camera permission not granted",
+                text = stringResource(Res.string.camera_permission_not_granted),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -116,7 +118,7 @@ actual fun LiveCameraPreview(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "Loading camera...",
+                text = stringResource(Res.string.loading_camera),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }

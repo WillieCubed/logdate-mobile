@@ -18,7 +18,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * iOS stub implementation of video player content.
  * Video playback is not yet implemented on iOS.
@@ -47,7 +49,7 @@ actual fun VideoPlayerContent(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Video playback not available on iOS yet",
+                    text = stringResource(Res.string.video_playback_not_available_on_ios_yet),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
@@ -86,7 +88,7 @@ actual fun VideoPickerContent(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Video not available on iOS yet",
+                    text = stringResource(Res.string.video_not_available_on_ios_yet),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )

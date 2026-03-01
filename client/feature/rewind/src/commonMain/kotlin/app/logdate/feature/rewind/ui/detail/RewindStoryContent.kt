@@ -29,7 +29,9 @@ import app.logdate.feature.rewind.ui.SubtitledRewindPanelUiState
 import app.logdate.feature.rewind.ui.TextNoteRewindPanelUiState
 import app.logdate.feature.rewind.ui.TransitionRewindPanelUiState
 import coil3.compose.AsyncImage
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.rewind.generated.resources.*
+import logdate.client.feature.rewind.generated.resources.Res
 /**
  * Main content renderer for rewind story panels.
  * 
@@ -129,7 +131,7 @@ fun RewindStoryContent(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Unsupported panel type",
+                    text = stringResource(Res.string.unsupported_panel_type),
                     color = Color.White
                 )
             }

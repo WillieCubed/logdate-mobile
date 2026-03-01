@@ -24,7 +24,9 @@ import androidx.compose.ui.unit.Dp
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import androidx.compose.ui.tooling.preview.Preview
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.*
+import logdate.client.ui.generated.resources.Res
 /**
  * A Material You-themed container that automatically applies spacing between its children,
  * gives each child a surface background, and rounds the entire container.
@@ -200,7 +202,7 @@ private fun MaterialContainerPreview() {
             verticalArrangement = Arrangement.spacedBy(Spacing.xl)
         ) {
             Text(
-                text = "MaterialContainer Examples",
+                text = stringResource(Res.string.materialcontainer_examples),
                 style = MaterialTheme.typography.headlineMedium
             )
 
@@ -214,11 +216,11 @@ private fun MaterialContainerPreview() {
                         Icon(Icons.Default.Home, contentDescription = null)
                         Column {
                             Text(
-                                text = "Home",
+                                text = stringResource(Res.string.home),
                                 style = MaterialTheme.typography.titleMedium
                             )
                             Text(
-                                text = "Navigate to home screen",
+                                text = stringResource(Res.string.navigate_to_home_screen),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -235,11 +237,11 @@ private fun MaterialContainerPreview() {
                         Icon(Icons.Default.Person, contentDescription = null)
                         Column {
                             Text(
-                                text = "Profile",
+                                text = stringResource(Res.string.profile),
                                 style = MaterialTheme.typography.titleMedium
                             )
                             Text(
-                                text = "Manage your profile settings",
+                                text = stringResource(Res.string.manage_your_profile_settings),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -251,7 +253,7 @@ private fun MaterialContainerPreview() {
             MaterialContainer {
                 SurfaceItem {
                     Text(
-                        text = "Section 1",
+                        text = stringResource(Res.string.section_1),
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
@@ -264,7 +266,7 @@ private fun MaterialContainerPreview() {
 
                 SurfaceItem {
                     Text(
-                        text = "Section 2",
+                        text = stringResource(Res.string.section_2),
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
@@ -272,11 +274,11 @@ private fun MaterialContainerPreview() {
 
             SimpleMaterialContainer {
                 Text(
-                    text = "Simple container item 1",
+                    text = stringResource(Res.string.simple_container_item_1),
                     style = MaterialTheme.typography.bodyLarge
                 )
                 Text(
-                    text = "Simple container item 2",
+                    text = stringResource(Res.string.simple_container_item_2),
                     style = MaterialTheme.typography.bodyLarge
                 )
             }

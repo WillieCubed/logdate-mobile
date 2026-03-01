@@ -22,7 +22,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import androidx.compose.ui.tooling.preview.Preview
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 @Composable
 fun UsernameSetupScreen(
     username: String,
@@ -80,7 +82,7 @@ private fun UsernameSetupContent(
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Go back"
+                        contentDescription = stringResource(Res.string.go_back)
                     )
                 }
                 
@@ -92,7 +94,7 @@ private fun UsernameSetupContent(
                 )
                 
                 Text(
-                    text = "2 of 3",
+                    text = stringResource(Res.string.text_2_of_3),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -106,14 +108,14 @@ private fun UsernameSetupContent(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Choose your username",
+                    text = stringResource(Res.string.choose_your_username),
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
                 
                 Text(
-                    text = "Your unique address on the LogDate network. This is how others will find and mention you.",
+                    text = stringResource(Res.string.your_unique_address_on_the_logdate_network_this_is_how_others_will_find_and_mention_you),
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -128,10 +130,10 @@ private fun UsernameSetupContent(
                 OutlinedTextField(
                     value = username,
                     onValueChange = onUsernameChange,
-                    label = { Text("Username") },
-                    placeholder = { Text("your_username") },
-                    prefix = { Text("@") },
-                    suffix = { Text("@logdate.app") },
+                    label = { Text(stringResource(Res.string.username)) },
+                    placeholder = { Text(stringResource(Res.string.your_username)) },
+                    prefix = { Text(stringResource(Res.string.at)) },
+                    suffix = { Text(stringResource(Res.string.at_logdate_app)) },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.AlternateEmail,
@@ -149,21 +151,21 @@ private fun UsernameSetupContent(
                             UsernameAvailability.Available -> {
                                 Icon(
                                     imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = "Username available",
+                                    contentDescription = stringResource(Res.string.username_available),
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
                             UsernameAvailability.Taken -> {
                                 Icon(
                                     imageVector = Icons.Default.Cancel,
-                                    contentDescription = "Username taken",
+                                    contentDescription = stringResource(Res.string.username_taken),
                                     tint = MaterialTheme.colorScheme.error
                                 )
                             }
                             UsernameAvailability.Error -> {
                                 Icon(
                                     imageVector = Icons.Default.Warning,
-                                    contentDescription = "Error checking username",
+                                    contentDescription = stringResource(Res.string.error_checking_username),
                                     tint = MaterialTheme.colorScheme.error
                                 )
                             }
@@ -173,14 +175,19 @@ private fun UsernameSetupContent(
                     supportingText = {
                         when (usernameAvailability) {
                             UsernameAvailability.Available -> Text(
-                                text = "✓ Username is available",
+                                text = stringResource(Res.string.username_is_available_2),
                                 color = MaterialTheme.colorScheme.primary
                             )
                             UsernameAvailability.Taken -> Text(
-                                text = "Username is already taken",
+                                text = stringResource(Res.string.username_is_already_taken),
                                 color = MaterialTheme.colorScheme.error
                             )
-                            else -> Text("Your unique address will be @$username@logdate.app")
+                            else -> Text(
+                                stringResource(
+                                    Res.string.unique_address_username,
+                                    username
+                                )
+                            )
                         }
                     },
                     isError = usernameAvailability == UsernameAvailability.Taken,
@@ -222,7 +229,7 @@ private fun UsernameSetupContent(
                                 modifier = Modifier.size(20.dp)
                             )
                             Text(
-                                text = "Connected to the Fediverse",
+                                text = stringResource(Res.string.connected_to_the_fediverse),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer
@@ -230,7 +237,7 @@ private fun UsernameSetupContent(
                         }
                         
                         Text(
-                            text = "LogDate uses ActivityPub, the same technology that powers Mastodon, Pixelfed, and other social networks. This means you can interact with a global community while keeping control of your data.",
+                            text = stringResource(Res.string.logdate_uses_activitypub_the_same_technology_that_powers_mastodon_pixelfed_and_other_social_networks_this_means_you_can_interact_with_a_global_community_while_keeping_control_of_your_data),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onTertiaryContainer
                         )
@@ -262,7 +269,7 @@ private fun UsernameSetupContent(
                         verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                     ) {
                         Text(
-                            text = "💡 Username tips:",
+                            text = stringResource(Res.string.username_tips),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -282,7 +289,7 @@ private fun UsernameSetupContent(
             enabled = isValid && username.isNotBlank() && usernameAvailability == UsernameAvailability.Available,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Continue")
+            Text(stringResource(Res.string.continue))
         }
     }
 }

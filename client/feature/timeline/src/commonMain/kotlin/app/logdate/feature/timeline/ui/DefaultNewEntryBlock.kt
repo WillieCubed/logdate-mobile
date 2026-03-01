@@ -18,7 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import androidx.compose.ui.tooling.preview.Preview
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.timeline.generated.resources.*
+import logdate.client.feature.timeline.generated.resources.Res
 @Composable
 internal fun DefaultNewEntryBlock(
     onNewEntry: () -> Unit,
@@ -56,7 +58,7 @@ internal fun DefaultNewEntryBlock(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 Icon(Icons.Default.Add, null, modifier = Modifier.padding(end = Spacing.sm))
-                Text("Add new entry")
+                Text(stringResource(Res.string.add_new_entry))
             }
         }
     }

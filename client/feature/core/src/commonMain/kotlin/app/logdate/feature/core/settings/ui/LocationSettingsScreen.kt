@@ -41,7 +41,9 @@ import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.theme.Spacing
 import org.koin.compose.viewmodel.koinViewModel
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 /**
  * Screen for managing location tracking settings.
  *
@@ -106,10 +108,10 @@ private fun LocationSettingsContent(
             // Only show top bar with back button in single-pane mode
             if (!isPotentialDetailPane) {
                 TopAppBar(
-                    title = { Text("Location Settings") },
+                    title = { Text(stringResource(Res.string.location_settings)) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
                         }
                     },
                     scrollBehavior = scrollBehavior,
@@ -127,7 +129,7 @@ private fun LocationSettingsContent(
                 if (isPotentialDetailPane) {
                     item {
                         Text(
-                            text = "Location Settings",
+                            text = stringResource(Res.string.location_settings),
                             style = MaterialTheme.typography.headlineSmall,
                             modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)
                         )
@@ -142,7 +144,7 @@ private fun LocationSettingsContent(
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                 ) {
                     Text(
-                        text = "Location Services",
+                        text = stringResource(Res.string.location_services),
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(vertical = Spacing.sm)
                     )
@@ -180,7 +182,7 @@ private fun LocationSettingsContent(
                         verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                     ) {
                         Text(
-                            text = "Tracking Interval",
+                            text = stringResource(Res.string.tracking_interval),
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.padding(vertical = Spacing.sm)
                         )
@@ -223,9 +225,9 @@ private fun LocationSettingsContent(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text("15 min", style = MaterialTheme.typography.labelMedium)
-                                        Text("30 min", style = MaterialTheme.typography.labelMedium)
-                                        Text("60 min", style = MaterialTheme.typography.labelMedium)
+                                        Text(stringResource(Res.string.text_15_min), style = MaterialTheme.typography.labelMedium)
+                                        Text(stringResource(Res.string.text_30_min), style = MaterialTheme.typography.labelMedium)
+                                        Text(stringResource(Res.string.text_60_min), style = MaterialTheme.typography.labelMedium)
                                         Text(
                                             "120 min",
                                             style = MaterialTheme.typography.labelMedium
@@ -253,7 +255,7 @@ private fun LocationSettingsContent(
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                 ) {
                     Text(
-                        text = "Location Timeline",
+                        text = stringResource(Res.string.location_timeline),
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(vertical = Spacing.sm)
                     )
@@ -270,7 +272,7 @@ private fun LocationSettingsContent(
                         ) {
                             Icon(
                                 Icons.Default.Timeline,
-                                contentDescription = "View Timeline",
+                                contentDescription = stringResource(Res.string.view_timeline),
                                 tint = MaterialTheme.colorScheme.primary
                             )
 

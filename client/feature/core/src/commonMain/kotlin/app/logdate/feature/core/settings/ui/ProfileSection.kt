@@ -36,7 +36,9 @@ import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.theme.Spacing
 import androidx.compose.ui.tooling.preview.Preview
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 data class UserProfile(
     val name: String,
     val username: String, // @handle without the @
@@ -64,12 +66,12 @@ fun ProfileSection(
                 verticalArrangement = Arrangement.spacedBy(Spacing.xs)
             ) {
                 Text(
-                    text = "Profile",
+                    text = stringResource(Res.string.profile),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = "Manage your display name and username.",
+                    text = stringResource(Res.string.manage_your_display_name_and_username),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -131,7 +133,7 @@ fun ProfileSection(
                 if (isPreview && navigateAction != null) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                        contentDescription = "Go to account settings",
+                        contentDescription = stringResource(Res.string.go_to_account_settings),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else if (profile.isEditable) {
@@ -140,7 +142,7 @@ fun ProfileSection(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Edit,
-                            contentDescription = "Edit profile",
+                            contentDescription = stringResource(Res.string.edit_profile),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -207,7 +209,7 @@ private fun EditProfileDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text("Edit Profile")
+            Text(stringResource(Res.string.edit_profile_2))
         },
         text = {
             Column(
@@ -219,8 +221,8 @@ private fun EditProfileDialog(
                         displayName = it
                         displayNameError = null
                     },
-                    label = { Text("Display Name") },
-                    placeholder = { Text("Your full name") },
+                    label = { Text(stringResource(Res.string.display_name)) },
+                    placeholder = { Text(stringResource(Res.string.your_full_name)) },
                     supportingText = displayNameError?.let { { Text(it) } },
                     isError = displayNameError != null,
                     keyboardOptions = KeyboardOptions(
@@ -239,10 +241,15 @@ private fun EditProfileDialog(
                         username = cleanUsername
                         usernameError = null
                     },
-                    label = { Text("Username") },
-                    placeholder = { Text("username") },
+                    label = { Text(stringResource(Res.string.username)) },
+                    placeholder = { Text(stringResource(Res.string.username_2)) },
                     supportingText = usernameError?.let { { Text(it) } } ?: {
-                        Text("This will be your @${username.ifEmpty { "username" }}")
+                        Text(
+                            stringResource(
+                                Res.string.profile_username_hint,
+                                username.ifEmpty { "username" }
+                            )
+                        )
                     },
                     isError = usernameError != null,
                     keyboardOptions = KeyboardOptions(
@@ -270,12 +277,12 @@ private fun EditProfileDialog(
                     }
                 }
             ) {
-                Text("Save")
+                Text(stringResource(Res.string.save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(Res.string.cancel))
             }
         }
     )

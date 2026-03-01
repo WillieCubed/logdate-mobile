@@ -23,7 +23,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlin.time.Duration
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * A component that displays the active recording interface with controls.
  * Matches the design from the provided mockup.
@@ -58,7 +60,7 @@ fun ActiveRecordingDisplay(
                     .padding(16.dp)
             ) {
                 Text(
-                    text = "Public speaking sucks so much, you know? I had to give a presentation today on the ethics of AI, and it's already bad enough this was a group project, but of course one of our team members just didn't",
+                    text = stringResource(Res.string.public_speaking_sucks_so_much_you_know_i_had_to_give_a_presentation_today_on_the_ethics_of_ai_and_its_already_bad_enough_this_was_a_group_project_but_of_course_one_of_our_team_members_just_didnt),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -117,7 +119,7 @@ fun ActiveRecordingDisplay(
                         modifier = Modifier.weight(1f).padding(end = 4.dp),
                         shape = RoundedCornerShape(24.dp)
                     ) {
-                        Text("Restart")
+                        Text(stringResource(Res.string.restart))
                     }
                     
                     // Pause/Resume button
@@ -139,7 +141,7 @@ fun ActiveRecordingDisplay(
                             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     ) {
-                        Text("Finish")
+                        Text(stringResource(Res.string.finish))
                     }
                 }
             }

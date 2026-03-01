@@ -27,7 +27,9 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * A Material 3 carousel that allows the user to view selected media items.
  *
@@ -98,7 +100,7 @@ internal fun MediaCarouselItem(
             Icon(
                 modifier = Modifier.size(24.dp),
                 imageVector = Icons.Default.Delete,
-                contentDescription = "Delete",
+                contentDescription = stringResource(Res.string.delete),
                 tint = MaterialTheme.colorScheme.inverseOnSurface,
             )
         }

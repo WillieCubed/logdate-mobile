@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="allow_location_access">Allow Location Access</string>
+    <string name="location_permission_required">Location Permission Required</string>
+    <string name="open_settings">Open Settings</string>
+    <string name="privacy_first">🔒 Privacy First</string>
+    <string name="your_location_data_is_stored_locally_on_your_device_and_is_never_shared_without_your_explicit_consent">Your location data is stored locally on your device and is never shared without your explicit consent.</string>
+</resources>

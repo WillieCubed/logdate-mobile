@@ -25,7 +25,8 @@ import androidx.compose.ui.unit.dp
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.action_reset_app
 import org.jetbrains.compose.resources.stringResource
-
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 /**
  * Dialog for confirming application reset.
  * This shows a warning to the user about the consequences of resetting the app,
@@ -121,7 +122,7 @@ fun DangerConfirmationDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismissRequest) {
-                Text("Cancel")
+                Text(stringResource(Res.string.cancel))
             }
         }
     )

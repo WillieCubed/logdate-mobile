@@ -62,8 +62,8 @@ import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
-
-
+import logdate.client.feature.timeline.generated.resources.*
+import logdate.client.feature.timeline.generated.resources.Res
 /**
  * Checks that there is an entry within the past eight hours.
  */
@@ -158,7 +158,7 @@ private fun EntryDropdownMenu(
     ) {
         DropdownMenuItem(
             text = {
-                Text("Open in New Window")
+                Text(stringResource(Res.string.open_in_new_window))
             },
             onClick = {
                 onDismiss()
@@ -180,7 +180,7 @@ private fun EntryDropdownMenu(
 //        )
         DropdownMenuItem(
             text = {
-                Text("Delete")
+                Text(stringResource(Res.string.delete))
             },
             onClick = onDelete,
             leadingIcon = {
@@ -207,27 +207,36 @@ private fun TimelineItemMetadataBlock(
     ) {
         if (metadata.peopleSeen > 0) {
             MetadataItem(
-                text = "${metadata.peopleSeen} people",
+                text = stringResource(
+                    Res.string.metadata_people_count,
+                    metadata.peopleSeen
+                ),
                 icon = {
-                    Icon(imageVector = Icons.Outlined.PeopleAlt, contentDescription = "People")
+                    Icon(imageVector = Icons.Outlined.PeopleAlt, contentDescription = stringResource(Res.string.people))
                 },
             )
         }
         if (metadata.placesVisited > 0) {
             MetadataItem(
-                text = "${metadata.placesVisited} places",
+                text = stringResource(
+                    Res.string.metadata_places_count,
+                    metadata.placesVisited
+                ),
                 icon = {
-                    Icon(imageVector = Icons.Default.LocationOn, contentDescription = "Places")
+                    Icon(imageVector = Icons.Default.LocationOn, contentDescription = stringResource(Res.string.places))
                 },
             )
         }
         if (metadata.notesRecorded > 0) {
             MetadataItem(
-                text = "${metadata.notesRecorded} notes",
+                text = stringResource(
+                    Res.string.metadata_notes_count,
+                    metadata.notesRecorded
+                ),
                 icon = {
                     Icon(
                         imageVector = Icons.AutoMirrored.Default.Note,
-                        contentDescription = "Notes"
+                        contentDescription = stringResource(Res.string.notes)
                     )
                 },
             )
@@ -317,7 +326,7 @@ private fun TimelineContentItem(
                         },
                     )
                     IconButton(onClick = { showOptions = true }) {
-                        Icon(imageVector = Icons.Default.MoreVert, contentDescription = "More")
+                        Icon(imageVector = Icons.Default.MoreVert, contentDescription = stringResource(Res.string.more))
                     }
                 }
             }

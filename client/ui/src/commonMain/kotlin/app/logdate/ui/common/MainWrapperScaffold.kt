@@ -19,7 +19,9 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.*
+import logdate.client.ui.generated.resources.Res
 /**
  * A scaffold that wraps the main content of the app.
  *
@@ -74,7 +76,7 @@ fun MainWrapperScaffoldPreview() {
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
-            Text("Sample Content")
+            Text(stringResource(Res.string.sample_content))
         }
     }
 }

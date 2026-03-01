@@ -34,7 +34,9 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import app.logdate.ui.theme.Spacing
 import androidx.compose.ui.tooling.preview.Preview
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 @Composable
 fun CloudAccountSignInScreen(
     onSignIn: (username: String, serverUrl: String) -> Unit,
@@ -140,7 +142,7 @@ private fun CloudAccountSignInContent(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Cloud,
-                            contentDescription = "LogDate Cloud",
+                            contentDescription = stringResource(Res.string.logdate_cloud),
                             modifier = Modifier.size(48.dp),
                             tint = MaterialTheme.colorScheme.onPrimary
                         )
@@ -149,7 +151,7 @@ private fun CloudAccountSignInContent(
                 
                 // Title
                 Text(
-                    text = "Sign In to LogDate Cloud",
+                    text = stringResource(Res.string.sign_in_to_logdate_cloud),
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
@@ -185,10 +187,10 @@ private fun CloudAccountSignInContent(
                                     color = MaterialTheme.colorScheme.onPrimary,
                                     strokeWidth = 2.dp
                                 )
-                                Text("Signing In...")
+                                Text(stringResource(Res.string.signing_in))
                             }
                         } else {
-                            Text("Sign In with Passkey")
+                            Text(stringResource(Res.string.sign_in_with_passkey))
                         }
                     }
                     
@@ -196,7 +198,7 @@ private fun CloudAccountSignInContent(
                         onClick = onAccountRecovery,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Account Recovery")
+                        Text(stringResource(Res.string.account_recovery))
                     }
                 }
             }
@@ -210,7 +212,7 @@ private fun CloudAccountSignInContent(
                     horizontalArrangement = Arrangement.spacedBy(Spacing.md)
                 ) {
                     Text(
-                        text = "Privacy Policy",
+                        text = stringResource(Res.string.privacy_policy),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary,
                         textDecoration = TextDecoration.Underline,
@@ -218,13 +220,13 @@ private fun CloudAccountSignInContent(
                     )
                     
                     Text(
-                        text = "•",
+                        text = stringResource(Res.string.text_4),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     
                     Text(
-                        text = "Terms of Service",
+                        text = stringResource(Res.string.terms_of_service),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary,
                         textDecoration = TextDecoration.Underline,
@@ -264,7 +266,7 @@ private fun UsernameWithServerField(
         verticalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
         Text(
-            text = "Username",
+            text = stringResource(Res.string.username),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium
         )
@@ -278,7 +280,7 @@ private fun UsernameWithServerField(
                     value = username,
                     onValueChange = onUsernameChange,
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("your-username") },
+                    placeholder = { Text(stringResource(Res.string.your_username_2)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Text,
@@ -287,7 +289,7 @@ private fun UsernameWithServerField(
                 )
                 
                 Text(
-                    text = "@",
+                    text = stringResource(Res.string.at),
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(horizontal = Spacing.sm),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -344,7 +346,7 @@ private fun UsernameWithServerField(
                         border = null
                     ) {
                         Text(
-                            text = "Double-click to use a custom server",
+                            text = stringResource(Res.string.double_click_to_use_a_custom_server),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.inverseOnSurface,
                             modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs)
@@ -374,13 +376,13 @@ private fun RecoveryPopup(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Account Recovery",
+                text = stringResource(Res.string.account_recovery),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
             
             Text(
-                text = "Coming soon! Account recovery features are being developed.",
+                text = stringResource(Res.string.coming_soon_account_recovery_features_are_being_developed),
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -390,7 +392,7 @@ private fun RecoveryPopup(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Got it")
+                Text(stringResource(Res.string.got_it))
             }
         }
     }

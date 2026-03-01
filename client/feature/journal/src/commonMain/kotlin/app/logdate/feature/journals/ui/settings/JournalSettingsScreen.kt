@@ -70,7 +70,9 @@ import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.journal.generated.resources.*
+import logdate.client.feature.journal.generated.resources.Res
 /**
  * A settings screen that allows a user to change various properties of a journal.
  * Implements scroll behavior that adapts the top app bar to the scroll state.
@@ -100,7 +102,7 @@ fun JournalSettingsScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Text("Loading...")
+                Text(stringResource(Res.string.loading))
             }
         }
 
@@ -110,12 +112,12 @@ fun JournalSettingsScreen(
             Scaffold(
                 topBar = {
                     TopAppBar(
-                        title = { Text("Journal Settings") },
+                        title = { Text(stringResource(Res.string.journal_settings)) },
                         navigationIcon = {
                             IconButton(onClick = onGoBack) {
                                 Icon(
                                     Icons.AutoMirrored.Default.ArrowBack,
-                                    contentDescription = "Back"
+                                    contentDescription = stringResource(Res.string.back)
                                 )
                             }
                         },
@@ -153,7 +155,7 @@ fun JournalSettingsScreen(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Save,
-                                        contentDescription = "Save changes"
+                                        contentDescription = stringResource(Res.string.save_changes)
                                     )
                                 }
                             }
@@ -235,14 +237,14 @@ private fun JournalPrivacySettings(
         verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
         Text(
-            text = "Privacy",
+            text = stringResource(Res.string.privacy),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary
         )
         
         // Privacy settings content would go here
         Text(
-            text = "Journal privacy settings will appear here in future updates.",
+            text = stringResource(Res.string.journal_privacy_settings_will_appear_here_in_future_updates),
             style = MaterialTheme.typography.bodyMedium
         )
     }
@@ -258,7 +260,7 @@ private fun JournalDangerZone(
         verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
         Text(
-            text = "Danger Zone",
+            text = stringResource(Res.string.danger_zone),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.error
         )
@@ -273,10 +275,10 @@ private fun JournalDangerZone(
         ) {
             Icon(
                 imageVector = Icons.Default.Delete,
-                contentDescription = "Delete Journal",
+                contentDescription = stringResource(Res.string.delete_journal),
                 modifier = Modifier.padding(end = Spacing.sm)
             )
-            Text("Delete Journal")
+            Text(stringResource(Res.string.delete_journal))
         }
     }
 }
@@ -337,10 +339,10 @@ private fun JournalOverviewSection(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Share,
-                        contentDescription = "Share Journal",
+                        contentDescription = stringResource(Res.string.share_journal),
                         modifier = Modifier.padding(end = Spacing.sm)
                     )
-                    Text("Share Journal")
+                    Text(stringResource(Res.string.share_journal))
                 }
             }
         }
@@ -356,12 +358,12 @@ private fun JournalNameField(
     OutlinedTextField(
         value = journalName,
         onValueChange = { onNameChange(it) },
-        label = { Text("Journal Name") },
+        label = { Text(stringResource(Res.string.journal_name)) },
         textStyle = MaterialTheme.typography.headlineMedium,
         modifier = modifier.fillMaxWidth(),
         singleLine = true,
         supportingText = { 
-            Text("Enter a descriptive name for your journal") 
+            Text(stringResource(Res.string.enter_a_descriptive_name_for_your_journal)) 
         }
     )
 }
@@ -385,7 +387,7 @@ fun DeleteConfirmationDialog(
             )
         },
         title = {
-            Text("Delete Journal")
+            Text(stringResource(Res.string.delete_journal))
         },
         text = {
             Text(
@@ -399,12 +401,12 @@ fun DeleteConfirmationDialog(
                     contentColor = MaterialTheme.colorScheme.error
                 )
             ) {
-                Text("Delete")
+                Text(stringResource(Res.string.delete))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismissRequest) {
-                Text("Cancel")
+                Text(stringResource(Res.string.cancel))
             }
         },
         onDismissRequest = onDismissRequest

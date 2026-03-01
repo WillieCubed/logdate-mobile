@@ -33,7 +33,9 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import org.koin.compose.viewmodel.koinViewModel
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 /**
  * Screen for selecting a username during account creation.
  * 
@@ -82,12 +84,12 @@ fun UsernameSelectionScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Choose a Username",
+                text = stringResource(Res.string.choose_a_username),
                 style = MaterialTheme.typography.headlineMedium
             )
             
             Text(
-                text = "This username will identify you on LogDate Cloud. You can change it later.",
+                text = stringResource(Res.string.this_username_will_identify_you_on_logdate_cloud_you_can_change_it_later),
                 style = MaterialTheme.typography.bodyMedium
             )
             
@@ -96,7 +98,7 @@ fun UsernameSelectionScreen(
             OutlinedTextField(
                 value = uiState.username,
                 onValueChange = { viewModel.onUsernameChanged(it) },
-                label = { Text("Username") },
+                label = { Text(stringResource(Res.string.username)) },
                 isError = uiState.usernameError != null,
                 supportingText = uiState.usernameError?.let { { Text(it) } },
                 modifier = Modifier
@@ -132,18 +134,18 @@ fun UsernameSelectionScreen(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = uiState.canCheckUsernameAvailability
             ) {
-                Text("Check Availability")
+                Text(stringResource(Res.string.check_availability))
             }
             
             if (uiState.usernameAvailability == UsernameAvailability.AVAILABLE) {
                 Text(
-                    text = "Username is available!",
+                    text = stringResource(Res.string.username_is_available_3),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )
             } else if (uiState.usernameAvailability == UsernameAvailability.TAKEN) {
                 Text(
-                    text = "Username is already taken",
+                    text = stringResource(Res.string.username_is_already_taken),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error
                 )
@@ -159,14 +161,14 @@ fun UsernameSelectionScreen(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = uiState.canContinueFromUsername
             ) {
-                Text("Continue")
+                Text(stringResource(Res.string.continue))
             }
             
             TextButton(
                 onClick = onBack,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Back")
+                Text(stringResource(Res.string.back))
             }
         }
     }

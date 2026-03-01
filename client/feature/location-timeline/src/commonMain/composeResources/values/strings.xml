@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="close">Close</string>
+    <string name="current_location">Current Location</string>
+    <string name="current_location_unavailable">Current location unavailable</string>
+    <string name="delete_location">Delete location</string>
+    <string name="enable">Enable</string>
+    <string name="enable_location_access_to_see_your_current_location">Enable location access to see your current location</string>
+    <string name="location_timeline">Location Timeline</string>
+    <string name="locations_will_appear_here_when_you_create_notes">Locations will appear here when you create notes</string>
+    <string name="no_location_history_yet">No location history yet</string>
+    <string name="unable_to_load_location_timeline">Unable to load location timeline</string>
+    <string name="your_location_timeline_will_appear_here_as_you_move_around">Your location timeline will appear here as you move around</string>
+    <string name="coordinates_label">Coordinates: %1$s</string>
+    <string name="stayed_for_duration">Stayed for %1$s</string>
+</resources>

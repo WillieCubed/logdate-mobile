@@ -17,7 +17,9 @@ import app.logdate.feature.core.GlobalAppUiLoadedState
 import app.logdate.feature.core.GlobalAppUiLoadingState
 import app.logdate.feature.core.GlobalAppUiState
 import org.koin.compose.viewmodel.koinViewModel
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.app.composemain.generated.resources.*
+import logdate.app.composemain.generated.resources.Res
 @Composable
 internal fun MainWindow(
     appState: LogDateApplicationState,
@@ -79,7 +81,7 @@ private fun MainWindowContent(
             onShowUnlockPrompt = viewModel::showNativeUnlockPrompt,
         )
     } else {
-        Text("Loading...")
+        Text(stringResource(Res.string.loading))
     }
 }
 

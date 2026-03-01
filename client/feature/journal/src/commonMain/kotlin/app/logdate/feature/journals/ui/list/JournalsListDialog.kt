@@ -17,7 +17,9 @@ import app.logdate.shared.model.Journal
 import app.logdate.ui.theme.Spacing
 import kotlin.time.Clock
 import androidx.compose.ui.tooling.preview.Preview
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.journal.generated.resources.*
+import logdate.client.feature.journal.generated.resources.Res
 /**
  * A dialog that displays a scrollable list of all available journals.
  *
@@ -38,7 +40,7 @@ fun JournalsListDialog(
         properties = properties,
         title = {
             Text(
-                text = "All Journals",
+                text = stringResource(Res.string.all_journals),
                 style = MaterialTheme.typography.headlineSmall
             )
         },
@@ -48,7 +50,7 @@ fun JournalsListDialog(
             ) {
                 if (journals.isEmpty()) {
                     Text(
-                        text = "You don't have any journals yet.",
+                        text = stringResource(Res.string.you_dont_have_any_journals_yet),
                         style = MaterialTheme.typography.bodyMedium
                     )
                 } else {
@@ -72,7 +74,7 @@ fun JournalsListDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close")
+                Text(stringResource(Res.string.close))
             }
         }
     )

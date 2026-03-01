@@ -19,7 +19,9 @@ import app.logdate.feature.editor.ui.common.MediaCaptionField
 import app.logdate.feature.editor.ui.editor.VideoBlockUiState
 import app.logdate.feature.editor.ui.formatMediaDuration
 import io.github.aakira.napier.Napier
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * Editor component for video blocks.
  * Displays either the video with playback controls and caption editing,
@@ -85,7 +87,7 @@ private fun VideoDisplayContent(
 
             DeleteMediaButton(
                 onClick = onDeleteRequested,
-                contentDescription = "Delete video",
+                contentDescription = stringResource(Res.string.delete_video),
                 modifier = Modifier.align(Alignment.TopEnd)
             )
 

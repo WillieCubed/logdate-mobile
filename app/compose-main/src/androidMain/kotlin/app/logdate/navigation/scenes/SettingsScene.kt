@@ -39,7 +39,9 @@ import app.logdate.navigation.routes.core.PrivacySettingsRoute
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
 import app.logdate.navigation.routes.routeClass
 import kotlin.reflect.KClass
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.app.composemain.generated.resources.*
+import logdate.app.composemain.generated.resources.Res
 /**
  * CompositionLocal for providing AnimatedVisibilityScope throughout the settings scene.
  */
@@ -281,7 +283,7 @@ private fun SettingsEmptyDetailPane() {
         contentAlignment = androidx.compose.ui.Alignment.Center
     ) {
         androidx.compose.material3.Text(
-            text = "Select a setting to configure",
+            text = stringResource(Res.string.select_a_setting_to_configure),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

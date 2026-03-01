@@ -48,7 +48,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.ui.theme.Spacing
 import androidx.compose.ui.tooling.preview.Preview
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 @Composable
 fun PasskeyAuthenticationScreen(
     viewModel: PasskeyAuthenticationViewModel,
@@ -107,12 +109,12 @@ private fun PasskeyAuthenticationContent(
             IconButton(onClick = onNavigateBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Default.ArrowBack,
-                    contentDescription = "Go back"
+                    contentDescription = stringResource(Res.string.go_back)
                 )
             }
             
             Text(
-                text = "Sign In",
+                text = stringResource(Res.string.sign_in),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
@@ -141,13 +143,13 @@ private fun PasskeyAuthenticationContent(
                             tint = MaterialTheme.colorScheme.onErrorContainer
                         )
                         Text(
-                            text = "Passkeys Not Supported",
+                            text = stringResource(Res.string.passkeys_not_supported),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onErrorContainer
                         )
                     }
                     Text(
-                        text = "Your device doesn't support passkeys. Please use a device with biometric authentication or a security key.",
+                        text = stringResource(Res.string.your_device_doesnt_support_passkeys_please_use_a_device_with_biometric_authentication_or_a_security_key),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
@@ -171,13 +173,13 @@ private fun PasskeyAuthenticationContent(
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = "Welcome Back",
+                        text = stringResource(Res.string.welcome_back),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
                 Text(
-                    text = "Sign in to your LogDate Cloud account using your passkey.",
+                    text = stringResource(Res.string.sign_in_to_your_logdate_cloud_account_using_your_passkey),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -188,7 +190,7 @@ private fun PasskeyAuthenticationContent(
         OutlinedTextField(
             value = uiState.username,
             onValueChange = onUsernameChange,
-            label = { Text("Username (Optional)") },
+            label = { Text(stringResource(Res.string.username_optional)) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.Person,
@@ -196,7 +198,7 @@ private fun PasskeyAuthenticationContent(
                 )
             },
             supportingText = { 
-                Text("Providing your username helps find your passkey faster") 
+                Text(stringResource(Res.string.providing_your_username_helps_find_your_passkey_faster)) 
             },
             keyboardOptions = KeyboardOptions(
                 imeAction = ImeAction.Done,
@@ -237,7 +239,7 @@ private fun PasskeyAuthenticationContent(
                     IconButton(onClick = onClearError) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Dismiss",
+                            contentDescription = stringResource(Res.string.dismiss),
                             tint = MaterialTheme.colorScheme.onErrorContainer
                         )
                     }
@@ -290,7 +292,7 @@ private fun PasskeyAuthenticationContent(
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(Spacing.sm))
-                    Text("Sign In without Username")
+                    Text(stringResource(Res.string.sign_in_without_username))
                 }
             }
         }
@@ -309,7 +311,7 @@ private fun PasskeyAuthenticationContent(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Don't have an account?",
+                    text = stringResource(Res.string.dont_have_an_account),
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center
                 )
@@ -324,7 +326,7 @@ private fun PasskeyAuthenticationContent(
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(Spacing.sm))
-                    Text("Create Account")
+                    Text(stringResource(Res.string.create_account))
                 }
             }
         }
@@ -340,7 +342,7 @@ private fun PasskeyAuthenticationContent(
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
                 Text(
-                    text = "About Passkeys",
+                    text = stringResource(Res.string.about_passkeys),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )

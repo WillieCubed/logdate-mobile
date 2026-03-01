@@ -26,7 +26,9 @@ import app.logdate.navigation.routes.core.TimelineListRoute
 import app.logdate.navigation.scenes.HomeScene
 import kotlinx.datetime.LocalDate
 import org.koin.compose.viewmodel.koinViewModel
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.app.composemain.generated.resources.*
+import logdate.app.composemain.generated.resources.Res
 fun MainAppNavigator.openTimeline() {
     backStack.add(TimelineListRoute)
 }
@@ -102,7 +104,7 @@ fun TimelineDetailPlaceholder() {
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "Select an entry to view details",
+            text = stringResource(Res.string.select_an_entry_to_view_details),
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier
                 .fillMaxSize(),

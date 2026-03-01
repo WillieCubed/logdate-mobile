@@ -62,7 +62,9 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.rewind.generated.resources.*
+import logdate.client.feature.rewind.generated.resources.Res
 /**
  * The main rewind screen content that displays a vertically scrollable list of floating cards.
  * 
@@ -420,7 +422,7 @@ fun NextCardIndicator(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "↓",
+                    text = stringResource(Res.string.text),
                     style = MaterialTheme.typography.titleMedium
                 )
             }
@@ -484,18 +486,18 @@ fun EndOfListSurprise(
             verticalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
             Text(
-                text = "🎉",
+                text = stringResource(Res.string.text_2),
                 style = MaterialTheme.typography.displayLarge
             )
             Text(
-                text = "Congrats, you've reached the end!",
+                text = stringResource(Res.string.congrats_youve_reached_the_end),
                 style = MaterialTheme.typography.headlineSmall,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Medium
             )
             Text(
-                text = "You've reviewed all your weekly rewinds",
+                text = stringResource(Res.string.youve_reviewed_all_your_weekly_rewinds),
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -538,18 +540,18 @@ fun EmptyRewindContent(
             verticalArrangement = Arrangement.spacedBy(Spacing.xl)
         ) {
             Text(
-                text = "Go live a little, will ya?",
+                text = stringResource(Res.string.go_live_a_little_will_ya),
                 style = MaterialTheme.typography.headlineMedium,
                 textAlign = TextAlign.Center
             )
             Text(
-                text = "Still working on the Rewind. Go touch some grass in the meantime.",
+                text = stringResource(Res.string.still_working_on_the_rewind_go_touch_some_grass_in_the_meantime),
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Button(onClick = onTouchGrass) {
-                Text("Share something")
+                Text(stringResource(Res.string.share_something))
             }
         }
     }

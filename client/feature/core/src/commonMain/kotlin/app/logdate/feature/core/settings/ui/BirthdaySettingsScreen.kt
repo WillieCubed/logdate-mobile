@@ -60,7 +60,9 @@ import kotlin.time.Instant
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.floor
 import kotlin.time.Duration.Companion.days
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 /**
  * A full-screen birthday selection screen with Material You styling.
  * 
@@ -162,17 +164,17 @@ fun BirthdaySettingsScreen(
             .nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
-                title = { Text("Birthday") },
+                title = { Text(stringResource(Res.string.birthday)) },
                 navigationIcon = {
                     IconButton(onClick = onSave) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Save and go back")
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.save_and_go_back))
                     }
                 },
                 actions = {
                     // Only show save button if changes have been made
                     if (hasChanges) {
                         IconButton(onClick = onSave) {
-                            Icon(Icons.Default.Check, contentDescription = "Save")
+                            Icon(Icons.Default.Check, contentDescription = stringResource(Res.string.save))
                         }
                     }
                 },
@@ -208,14 +210,14 @@ fun BirthdaySettingsScreen(
                     )
                     Spacer(modifier = Modifier.size(Spacing.sm))
                     Text(
-                        text = "When were you born?",
+                        text = stringResource(Res.string.when_were_you_born),
                         style = MaterialTheme.typography.headlineMedium,
                         textAlign = TextAlign.Center
                     )
                 }
                 
                 Text(
-                    text = "This helps us personalize your experience",
+                    text = stringResource(Res.string.this_helps_us_personalize_your_experience),
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center,

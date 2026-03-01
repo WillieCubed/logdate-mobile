@@ -22,7 +22,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.PlatformDimensions
 import app.logdate.ui.theme.Spacing
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * A cross-platform immersive editor layout that provides a focused editing experience.
  * This component handles platform-specific screen dimensions and creates a responsive
@@ -50,7 +52,7 @@ import app.logdate.ui.theme.Spacing
  *         FilledTonalIconButton(onClick = { navController.popBackStack() }) {
  *             Icon(
  *                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
- *                 contentDescription = "Back"
+ *                 contentDescription = stringResource(Res.string.back)
  *             )
  *         }
  *     },

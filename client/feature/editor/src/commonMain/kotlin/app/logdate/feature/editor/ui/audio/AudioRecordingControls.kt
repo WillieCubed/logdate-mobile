@@ -28,7 +28,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.editor.RecordingState
 import kotlin.time.Duration
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * Audio recording controls that display current recording state, buttons,
  * and visualizations.
@@ -135,11 +137,11 @@ fun AudioRecordingControls(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Stop,
-                    contentDescription = "Stop Recording",
+                    contentDescription = stringResource(Res.string.stop_recording),
                     modifier = Modifier.size(24.dp)
                 )
                 Text(
-                    text = "Stop",
+                    text = stringResource(Res.string.stop),
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 8.dp)
                 )
@@ -157,11 +159,11 @@ fun AudioRecordingControls(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Mic,
-                    contentDescription = "Start Recording",
+                    contentDescription = stringResource(Res.string.start_recording),
                     modifier = Modifier.size(24.dp)
                 )
                 Text(
-                    text = "Record",
+                    text = stringResource(Res.string.record),
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 8.dp)
                 )

@@ -32,7 +32,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 /**
  * Main container screen that manages the cloud account setup flow.
  */
@@ -76,7 +78,7 @@ fun CloudAccountSetupScreen(
                         IconButton(onClick = { viewModel.goToPreviousStep() }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back"
+                                contentDescription = stringResource(Res.string.back)
                             )
                         }
                     }
@@ -146,7 +148,7 @@ private fun IntroContent(
         Spacer(modifier = Modifier.weight(1f))
         
         Text(
-            text = "Create a Cloud Account",
+            text = stringResource(Res.string.create_a_cloud_account),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )
@@ -154,7 +156,7 @@ private fun IntroContent(
         Spacer(modifier = Modifier.height(16.dp))
         
         Text(
-            text = "Create an account to sync your journals across devices and unlock additional features.",
+            text = stringResource(Res.string.create_an_account_to_sync_your_journals_across_devices_and_unlock_additional_features),
             style = MaterialTheme.typography.bodyLarge
         )
         
@@ -164,7 +166,7 @@ private fun IntroContent(
             onClick = onContinue,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Continue")
+            Text(stringResource(Res.string.continue))
         }
         
         Spacer(modifier = Modifier.height(8.dp))
@@ -173,7 +175,7 @@ private fun IntroContent(
             onClick = onSkip,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Skip for now")
+            Text(stringResource(Res.string.skip_for_now))
         }
     }
 }
@@ -196,14 +198,14 @@ private fun UsernameSelectionContent(
             .padding(16.dp)
     ) {
         Text(
-            text = "Choose a username",
+            text = stringResource(Res.string.choose_a_username_2),
             style = MaterialTheme.typography.titleLarge
         )
         
         Spacer(modifier = Modifier.height(8.dp))
         
         Text(
-            text = "This will be your unique identifier on LogDate Cloud.",
+            text = stringResource(Res.string.this_will_be_your_unique_identifier_on_logdate_cloud),
             style = MaterialTheme.typography.bodyMedium
         )
         
@@ -212,17 +214,17 @@ private fun UsernameSelectionContent(
         OutlinedTextField(
             value = username,
             onValueChange = onUsernameChange,
-            label = { Text("Username") },
+            label = { Text(stringResource(Res.string.username)) },
             isError = usernameError != null,
             supportingText = {
                 when {
                     usernameError != null -> Text(usernameError)
                     usernameAvailability == UsernameAvailability.AVAILABLE -> 
-                        Text("Username is available", color = MaterialTheme.colorScheme.primary)
+                        Text(stringResource(Res.string.username_is_available), color = MaterialTheme.colorScheme.primary)
                     usernameAvailability == UsernameAvailability.TAKEN -> 
-                        Text("Username is already taken", color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(Res.string.username_is_already_taken), color = MaterialTheme.colorScheme.error)
                     usernameAvailability == UsernameAvailability.ERROR ->
-                        Text("Error checking availability", color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(Res.string.error_checking_availability), color = MaterialTheme.colorScheme.error)
                 }
             },
             trailingIcon = {
@@ -240,7 +242,7 @@ private fun UsernameSelectionContent(
             enabled = username.isNotBlank() && !isCheckingAvailability,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Check Availability")
+            Text(stringResource(Res.string.check_availability))
         }
         
         Spacer(modifier = Modifier.weight(1f))
@@ -250,7 +252,7 @@ private fun UsernameSelectionContent(
             enabled = canProceed,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Continue")
+            Text(stringResource(Res.string.continue))
         }
     }
 }
@@ -272,7 +274,7 @@ private fun DisplayNameSelectionContent(
             .padding(16.dp)
     ) {
         Text(
-            text = "Complete Your Profile",
+            text = stringResource(Res.string.complete_your_profile),
             style = MaterialTheme.typography.titleLarge
         )
         
@@ -281,7 +283,7 @@ private fun DisplayNameSelectionContent(
         OutlinedTextField(
             value = displayName,
             onValueChange = onDisplayNameChange,
-            label = { Text("Display Name") },
+            label = { Text(stringResource(Res.string.display_name)) },
             isError = displayNameError != null,
             supportingText = displayNameError?.let { { Text(it) } },
             modifier = Modifier.fillMaxWidth()
@@ -292,7 +294,7 @@ private fun DisplayNameSelectionContent(
         OutlinedTextField(
             value = bio,
             onValueChange = onBioChange,
-            label = { Text("Bio (Optional)") },
+            label = { Text(stringResource(Res.string.bio_optional)) },
             maxLines = 3,
             modifier = Modifier.fillMaxWidth()
         )
@@ -304,7 +306,7 @@ private fun DisplayNameSelectionContent(
             enabled = canProceed,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Continue")
+            Text(stringResource(Res.string.continue))
         }
     }
 }
@@ -324,14 +326,14 @@ private fun PasskeyCreationContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Secure Your Account",
+            text = stringResource(Res.string.secure_your_account),
             style = MaterialTheme.typography.titleLarge
         )
         
         Spacer(modifier = Modifier.height(8.dp))
         
         Text(
-            text = "Create a passkey to securely sign in to your account across all your devices.",
+            text = stringResource(Res.string.create_a_passkey_to_securely_sign_in_to_your_account_across_all_your_devices),
             style = MaterialTheme.typography.bodyMedium
         )
         
@@ -340,10 +342,10 @@ private fun PasskeyCreationContent(
         if (isCreatingPasskey) {
             CircularProgressIndicator()
             Spacer(modifier = Modifier.height(16.dp))
-            Text("Creating your passkey...")
+            Text(stringResource(Res.string.creating_your_passkey))
         } else if (passkeyCreated) {
             Text(
-                text = "Passkey created successfully!",
+                text = stringResource(Res.string.passkey_created_successfully),
                 color = MaterialTheme.colorScheme.primary,
                 style = MaterialTheme.typography.bodyLarge
             )
@@ -356,7 +358,7 @@ private fun PasskeyCreationContent(
             enabled = canCreatePasskey && !isCreatingPasskey && !passkeyCreated,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Create Passkey")
+            Text(stringResource(Res.string.create_passkey))
         }
     }
 }
@@ -376,7 +378,7 @@ private fun CompletionContent(
         Spacer(modifier = Modifier.weight(1f))
         
         Text(
-            text = "Welcome to LogDate Cloud",
+            text = stringResource(Res.string.welcome_to_logdate_cloud),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )
@@ -384,7 +386,10 @@ private fun CompletionContent(
         Spacer(modifier = Modifier.height(16.dp))
         
         Text(
-            text = "Your account has been created successfully. You are now signed in as $username.",
+            text = stringResource(
+                Res.string.account_created_signed_in_as,
+                username
+            ),
             style = MaterialTheme.typography.bodyLarge
         )
         
@@ -394,7 +399,7 @@ private fun CompletionContent(
             onClick = onComplete,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Get Started")
+            Text(stringResource(Res.string.get_started))
         }
     }
 }

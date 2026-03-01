@@ -32,7 +32,9 @@ import app.logdate.ui.common.PeopleMetadataChip
 import app.logdate.ui.theme.Spacing
 import coil3.compose.AsyncImage
 import androidx.compose.ui.tooling.preview.Preview
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.*
+import logdate.client.ui.generated.resources.Res
 /**
  * Represents different types of timeline suggestion blocks that can be shown to users
  */
@@ -235,7 +237,7 @@ private fun SuggestionActions(
             ) {
                 AssistChip(
                     onClick = { onAddToMemory(memoryId) },
-                    label = { Text("Add to Memories") },
+                    label = { Text(stringResource(Res.string.add_to_memories)) },
                     leadingIcon = {
                         Icon(
                             Icons.Default.Add,
@@ -254,7 +256,7 @@ private fun SuggestionActions(
             ) {
                 AssistChip(
                     onClick = { onAddToMemory(memoryId) },
-                    label = { Text("Add to Memories") },
+                    label = { Text(stringResource(Res.string.add_to_memories)) },
                     leadingIcon = {
                         Icon(
                             Icons.Default.Add,
@@ -265,7 +267,7 @@ private fun SuggestionActions(
                 )
                 AssistChip(
                     onClick = { onShare(memoryId) },
-                    label = { Text("Share link") },
+                    label = { Text(stringResource(Res.string.share_link)) },
                     leadingIcon = {
                         Icon(
                             Icons.Default.AddLink,
@@ -296,7 +298,7 @@ private fun AssistChipsBlock(
         AssistChip(
             onClick = onAddToMemory,
             label = {
-                Text("Add to Memories")
+                Text(stringResource(Res.string.add_to_memories))
             },
             leadingIcon = {
                 Icon(
@@ -309,7 +311,7 @@ private fun AssistChipsBlock(
         AssistChip(
             onClick = onShare,
             label = {
-                Text("Share link")
+                Text(stringResource(Res.string.share_link))
             },
             leadingIcon = {
                 Icon(

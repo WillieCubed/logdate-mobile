@@ -42,7 +42,9 @@ import coil3.compose.AsyncImage
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 import kotlin.uuid.Uuid
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.journal.generated.resources.*
+import logdate.client.feature.journal.generated.resources.Res
 /**
  * Viewer screen that renders notes with type-specific presentation.
  */
@@ -91,12 +93,12 @@ fun NoteViewerScreen(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     Text(
-                        text = "Image",
+                        text = stringResource(Res.string.image),
                         style = MaterialTheme.typography.titleMedium
                     )
                     AsyncImage(
                         model = state.mediaRef,
-                        contentDescription = "Image note",
+                        contentDescription = stringResource(Res.string.image_note),
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = Spacing.xxl * 4),
@@ -113,7 +115,7 @@ fun NoteViewerScreen(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     Text(
-                        text = "Video",
+                        text = stringResource(Res.string.video),
                         style = MaterialTheme.typography.titleMedium
                     )
                     VideoPlayerContent(
@@ -223,7 +225,7 @@ private fun NoteViewerToolbar(
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
+                contentDescription = stringResource(Res.string.back),
             )
         }
     }
@@ -297,7 +299,7 @@ private fun ErrorContent(message: String) {
             verticalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
             Text(
-                text = "Error",
+                text = stringResource(Res.string.error),
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.error
             )

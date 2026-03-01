@@ -40,7 +40,8 @@ import logdate.client.feature.core.generated.resources.screen_title_settings
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
-
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 /**
  * Main settings overview screen that displays navigation options to different settings sections.
  * This is the entry point for the settings flow and provides access to all specific settings areas.
@@ -138,7 +139,7 @@ private fun SettingsOverviewContent(
                     title = { Text(stringResource(Res.string.screen_title_settings)) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
                         }
                     },
                     scrollBehavior = scrollBehavior,
@@ -156,7 +157,7 @@ private fun SettingsOverviewContent(
                 if (isInTwoPaneMode) {
                     item {
                         Text(
-                            text = "Settings",
+                            text = stringResource(Res.string.settings),
                             style = MaterialTheme.typography.headlineSmall,
                             modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)
                         )
@@ -178,7 +179,7 @@ private fun SettingsOverviewContent(
                 // Only show section title in single-pane mode
                 if (!isInTwoPaneMode) {
                     Text(
-                        text = "Settings",
+                        text = stringResource(Res.string.settings),
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm)
                     )
@@ -306,7 +307,10 @@ private fun SettingsNavigationItem(
         trailingContent = {
             Icon(
                 imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                contentDescription = "Navigate to $title"
+                contentDescription = stringResource(
+                    Res.string.navigate_to_title,
+                    title
+                )
             )
         },
         modifier = Modifier

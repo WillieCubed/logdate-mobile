@@ -41,7 +41,9 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.search.generated.resources.*
+import logdate.client.feature.search.generated.resources.Res
 /**
  * Search screen for searching across all entries.
  *
@@ -67,14 +69,14 @@ fun SearchScreen(
                     TextField(
                         value = query,
                         onValueChange = { viewModel.updateQuery(it) },
-                        placeholder = { Text("Search entries...") },
+                        placeholder = { Text(stringResource(Res.string.search_entries)) },
                         leadingIcon = {
-                            Icon(Icons.Default.Search, contentDescription = "Search")
+                            Icon(Icons.Default.Search, contentDescription = stringResource(Res.string.search))
                         },
                         trailingIcon = {
                             if (query.isNotEmpty()) {
                                 IconButton(onClick = { viewModel.clearSearch() }) {
-                                    Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                                    Icon(Icons.Default.Clear, contentDescription = stringResource(Res.string.clear_search))
                                 }
                             }
                         },
@@ -90,7 +92,7 @@ fun SearchScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onGoBack) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "Go back")
+                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(Res.string.go_back))
                     }
                 },
             )
@@ -148,7 +150,7 @@ private fun EmptySearchState(modifier: Modifier = Modifier) {
         modifier = modifier.fillMaxSize()
     ) {
         Text(
-            text = "Search for entries",
+            text = stringResource(Res.string.search_for_entries),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

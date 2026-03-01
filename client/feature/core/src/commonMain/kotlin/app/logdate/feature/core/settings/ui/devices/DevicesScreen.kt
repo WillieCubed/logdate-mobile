@@ -46,7 +46,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.koin.compose.koinInject
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 /**
  * Screen that displays device information and allows management of devices.
  */
@@ -103,10 +105,10 @@ fun DevicesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Devices") },
+                title = { Text(stringResource(Res.string.devices)) },
                 navigationIcon = {
                     TextButton(onClick = onBackClick) {
-                        Text("Back")
+                        Text(stringResource(Res.string.back))
                     }
                 }
             )
@@ -150,7 +152,7 @@ fun DevicesScreen(
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Reset Device ID")
+                        Text(stringResource(Res.string.reset_device_id))
                     }
                 }
             }
@@ -167,7 +169,7 @@ private fun LoadingState() {
     ) {
         CircularProgressIndicator()
         Spacer(modifier = Modifier.height(16.dp))
-        Text("Loading devices...")
+        Text(stringResource(Res.string.loading_devices))
     }
 }
 
@@ -225,7 +227,7 @@ private fun DeviceCard(
                     if (device.isCurrentDevice) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "(This device)",
+                            text = stringResource(Res.string.this_device),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -236,7 +238,7 @@ private fun DeviceCard(
                     IconButton(onClick = onRenameClick) {
                         Icon(
                             imageVector = Icons.Default.Edit,
-                            contentDescription = "Rename device"
+                            contentDescription = stringResource(Res.string.rename_device)
                         )
                     }
                     
@@ -244,7 +246,7 @@ private fun DeviceCard(
                         IconButton(onClick = onRemoveClick) {
                             Icon(
                                 imageVector = Icons.Default.Delete,
-                                contentDescription = "Remove device"
+                                contentDescription = stringResource(Res.string.remove_device)
                             )
                         }
                     }
@@ -254,17 +256,26 @@ private fun DeviceCard(
             Spacer(modifier = Modifier.height(8.dp))
             
             Text(
-                text = "Platform: ${device.platformName}",
+                text = stringResource(
+                    Res.string.platform_label,
+                    device.platformName
+                ),
                 style = MaterialTheme.typography.bodyMedium
             )
             
             Text(
-                text = "Last active: ${device.lastActiveFormatted}",
+                text = stringResource(
+                    Res.string.last_active_label,
+                    device.lastActiveFormatted
+                ),
                 style = MaterialTheme.typography.bodyMedium
             )
             
             Text(
-                text = "App version: ${device.appVersion}",
+                text = stringResource(
+                    Res.string.app_version_label,
+                    device.appVersion
+                ),
                 style = MaterialTheme.typography.bodyMedium
             )
         }
@@ -282,10 +293,10 @@ private fun RenameDeviceDialog(
     
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Rename Device") },
+        title = { Text(stringResource(Res.string.rename_device_2)) },
         text = {
             Column {
-                Text("Enter a new name for this device:")
+                Text(stringResource(Res.string.enter_a_new_name_for_this_device))
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = name,
@@ -293,7 +304,7 @@ private fun RenameDeviceDialog(
                         name = it
                         onNameChange(it)
                     },
-                    label = { Text("Device Name") },
+                    label = { Text(stringResource(Res.string.device_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -304,12 +315,12 @@ private fun RenameDeviceDialog(
                 onClick = onConfirm,
                 enabled = name.isNotBlank()
             ) {
-                Text("Rename")
+                Text(stringResource(Res.string.rename))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(Res.string.cancel))
             }
         }
     )
@@ -323,20 +334,25 @@ private fun RemoveDeviceDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Remove Device") },
+        title = { Text(stringResource(Res.string.remove_device_2)) },
         text = {
-            Text("Are you sure you want to remove \"$deviceName\" from your account? This device will no longer receive notifications or sync data.")
+            Text(
+                stringResource(
+                    Res.string.remove_device_confirmation,
+                    deviceName
+                )
+            )
         },
         confirmButton = {
             Button(
                 onClick = onConfirm,
             ) {
-                Text("Remove")
+                Text(stringResource(Res.string.remove))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(Res.string.cancel))
             }
         }
     )
@@ -349,20 +365,20 @@ private fun ResetDeviceIdDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Reset Device ID") },
+        title = { Text(stringResource(Res.string.reset_device_id)) },
         text = {
-            Text("Are you sure you want to reset this device's ID? This is primarily used for privacy purposes and will generate a new unique identifier for this device. This won't affect your data but may require re-syncing with LogDate Cloud.")
+            Text(stringResource(Res.string.are_you_sure_you_want_to_reset_this_devices_id_this_is_primarily_used_for_privacy_purposes_and_will_generate_a_new_unique_identifier_for_this_device_this_wont_affect_your_data_but_may_require_re_syncing_with_logdate_cloud))
         },
         confirmButton = {
             Button(
                 onClick = onConfirm,
             ) {
-                Text("Reset")
+                Text(stringResource(Res.string.reset))
             }
         },
         dismissButton = {
             OutlinedButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(Res.string.cancel))
             }
         }
     )

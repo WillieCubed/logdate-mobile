@@ -161,7 +161,9 @@ import app.logdate.navigation.routes.core.JournalDetail
 import androidx.compose.runtime.remember
 import app.logdate.navigation.routes.routeClass
 import kotlin.reflect.KClass
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.app.composemain.generated.resources.*
+import logdate.app.composemain.generated.resources.Res
 /**
  * CompositionLocal for providing AnimatedVisibilityScope throughout the home scene.
  */
@@ -649,7 +651,7 @@ class HomeScene<T : NavKey>(
                             if (!isDetailOnlyView) {
                                 SharedElementFAB(
                                     onClick = onNewEntry,
-                                    contentDescription = "New Entry",
+                                    contentDescription = stringResource(Res.string.new_entry),
                                     modifier = Modifier
                                         .align(Alignment.BottomEnd)
                                         .padding(16.dp)

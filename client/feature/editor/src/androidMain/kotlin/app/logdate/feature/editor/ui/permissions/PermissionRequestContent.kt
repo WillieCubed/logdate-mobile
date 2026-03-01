@@ -22,7 +22,9 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * A reusable component for requesting permissions with explanation.
  * 
@@ -51,7 +53,7 @@ fun PermissionRequestContent(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Permission Required",
+                    text = stringResource(Res.string.permission_required),
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -72,7 +74,7 @@ fun PermissionRequestContent(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "Grant Permission", 
+                        text = stringResource(Res.string.grant_permission), 
                         style = MaterialTheme.typography.labelLarge
                     )
                 }
@@ -84,7 +86,7 @@ fun PermissionRequestContent(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "Not Now",
+                        text = stringResource(Res.string.not_now),
                         style = MaterialTheme.typography.labelLarge
                     )
                 }

@@ -34,7 +34,9 @@ import kotlinx.datetime.LocalDate
 import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.timeline.generated.resources.*
+import logdate.client.feature.timeline.generated.resources.Res
 /**
  * Timeline screen showing journal entries for the current and past dates.
  *
@@ -98,17 +100,17 @@ internal fun DeleteEntryDialog(
     onConfirmDelete: () -> Unit,
 ) {
     AlertDialog(
-        title = { Text("Delete entry?") },
-        text = { Text("Are you sure you want to delete this entry?") },
+        title = { Text(stringResource(Res.string.delete_entry)) },
+        text = { Text(stringResource(Res.string.are_you_sure_you_want_to_delete_this_entry)) },
         onDismissRequest = onDismissRequest,
         dismissButton = {
             TextButton(onClick = onDismissRequest) {
-                Text("Cancel")
+                Text(stringResource(Res.string.cancel))
             }
         },
         confirmButton = {
             Button(onClick = onConfirmDelete) {
-                Text("Delete")
+                Text(stringResource(Res.string.delete))
             }
         },
     )

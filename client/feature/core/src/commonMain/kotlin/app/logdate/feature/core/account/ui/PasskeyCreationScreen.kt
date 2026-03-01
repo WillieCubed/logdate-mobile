@@ -39,7 +39,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.GenericLoadingScreen
 import org.koin.compose.viewmodel.koinViewModel
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 /**
  * Screen for creating a passkey during account setup.
  * 
@@ -93,7 +95,7 @@ fun PasskeyCreationScreen(
                     ) {
                         CircularProgressIndicator()
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("Creating your LogDate Cloud account...")
+                        Text(stringResource(Res.string.creating_your_logdate_cloud_account))
                     }
                 }
                 else -> {
@@ -115,13 +117,13 @@ fun PasskeyCreationScreen(
                         )
                         
                         Text(
-                            text = "Create a Passkey",
+                            text = stringResource(Res.string.create_a_passkey),
                             style = MaterialTheme.typography.headlineMedium,
                             textAlign = TextAlign.Center
                         )
                         
                         Text(
-                            text = "Passkeys are a secure way to sign in without passwords. " +
+                            text = stringResource(Res.string.passkeys_are_a_secure_way_to_sign_in_without_passwords) +
                                    "Your device will verify it's you using biometrics or a PIN.",
                             style = MaterialTheme.typography.bodyMedium,
                             textAlign = TextAlign.Center
@@ -143,7 +145,7 @@ fun PasskeyCreationScreen(
                             ) {
                                 CircularProgressIndicator()
                                 Text(
-                                    text = "Creating your passkey...",
+                                    text = stringResource(Res.string.creating_your_passkey),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                             }
@@ -156,7 +158,7 @@ fun PasskeyCreationScreen(
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !uiState.isCreatingPasskey && !uiState.isCreatingAccount
                         ) {
-                            Text("Create Passkey")
+                            Text(stringResource(Res.string.create_passkey))
                         }
                         
                         TextButton(
@@ -164,7 +166,7 @@ fun PasskeyCreationScreen(
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !uiState.isCreatingPasskey && !uiState.isCreatingAccount
                         ) {
-                            Text("Back")
+                            Text(stringResource(Res.string.back))
                         }
                     }
                 }

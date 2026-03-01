@@ -29,7 +29,9 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import kotlinx.coroutines.launch
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.*
+import logdate.client.ui.generated.resources.Res
 /**
  * A chip that displays the person's initials in a circle.
  */
@@ -96,7 +98,7 @@ fun PersonIcon(photoUri: String, name: String) {
     ) {
         AsyncImage(
             model = photoModel,
-            contentDescription = "Photo of $name",
+            contentDescription = stringResource(Res.string.photo_of_name, name),
             modifier = Modifier.size(48.dp),
         )
     }

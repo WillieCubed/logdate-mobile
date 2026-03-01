@@ -48,7 +48,9 @@ import coil3.compose.AsyncImage
 import kotlinx.datetime.LocalDate
 import kotlin.math.absoluteValue
 import kotlin.uuid.Uuid
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.*
+import logdate.client.ui.generated.resources.Res
 /**
  * UI state for the end of timeline section.
  */
@@ -183,7 +185,7 @@ internal fun TimeGapMessageItem(
             .padding(Spacing.lg),
     ) {
         Text(
-            text = "A long time passed...",
+            text = stringResource(Res.string.a_long_time_passed),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -216,11 +218,14 @@ internal fun EndOfTimelineItem(
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     Text(
-                        text = "Happy birthday.",
+                        text = stringResource(Res.string.happy_birthday),
                         style = MaterialTheme.typography.headlineMedium,
                     )
                     Text(
-                        text = "You've been on this journey for ${state.daysSinceBirth} days.",
+                        text = stringResource(
+                            Res.string.journey_days_count,
+                            state.daysSinceBirth
+                        ),
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -228,16 +233,16 @@ internal fun EndOfTimelineItem(
             }
             
             EndOfTimelineUiState.DiscoveryEasterEgg -> {
-                Text("You've reached the end", style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(Res.string.youve_reached_the_end), style = MaterialTheme.typography.titleLarge)
                 Column(
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     Text(
-                        text = "Congrats, curious explorer!",
+                        text = stringResource(Res.string.congrats_curious_explorer),
                         style = MaterialTheme.typography.headlineMedium,
                     )
                     Text(
-                        text = "Add your birthday in settings to see something special here.",
+                        text = stringResource(Res.string.add_your_birthday_in_settings_to_see_something_special_here),
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

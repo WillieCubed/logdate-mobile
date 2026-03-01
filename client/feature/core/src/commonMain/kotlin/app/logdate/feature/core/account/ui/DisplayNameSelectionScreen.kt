@@ -31,7 +31,9 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import org.koin.compose.viewmodel.koinViewModel
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 /**
  * Screen for selecting a display name during account creation.
  * 
@@ -78,12 +80,12 @@ fun DisplayNameSelectionScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Your Display Name",
+                text = stringResource(Res.string.your_display_name),
                 style = MaterialTheme.typography.headlineMedium
             )
             
             Text(
-                text = "This is how you'll appear to others. You can change this anytime.",
+                text = stringResource(Res.string.this_is_how_youll_appear_to_others_you_can_change_this_anytime),
                 style = MaterialTheme.typography.bodyMedium
             )
             
@@ -92,7 +94,7 @@ fun DisplayNameSelectionScreen(
             OutlinedTextField(
                 value = uiState.displayName,
                 onValueChange = { viewModel.onDisplayNameChanged(it) },
-                label = { Text("Display Name") },
+                label = { Text(stringResource(Res.string.display_name)) },
                 isError = uiState.displayNameError != null,
                 supportingText = uiState.displayNameError?.let { { Text(it) } },
                 modifier = Modifier
@@ -123,14 +125,14 @@ fun DisplayNameSelectionScreen(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = uiState.canContinueFromDisplayName
             ) {
-                Text("Continue")
+                Text(stringResource(Res.string.continue))
             }
             
             TextButton(
                 onClick = onBack,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Back")
+                Text(stringResource(Res.string.back))
             }
         }
     }

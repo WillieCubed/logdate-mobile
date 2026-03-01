@@ -6,6 +6,7 @@ import android.content.Context
 import androidx.core.app.NotificationCompat
 import androidx.work.ForegroundInfo
 import androidx.work.WorkManager
+import app.logdate.client.feature.core.R
 
 /**
  * Helper class for managing restore notifications in WorkManager.
@@ -31,12 +32,16 @@ class RestoreNotificationHelper(
             .createCancelPendingIntent(workId)
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle("Restoring Data")
+            .setContentTitle(context.getString(R.string.restore_title_progress))
             .setContentText(message)
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setOngoing(true)
             .setSilent(true)
-            .addAction(android.R.drawable.ic_delete, "Cancel", cancelIntent)
+            .addAction(
+                android.R.drawable.ic_delete,
+                context.getString(R.string.notification_action_cancel),
+                cancelIntent
+            )
             .build()
 
         return ForegroundInfo(
@@ -48,7 +53,7 @@ class RestoreNotificationHelper(
 
     fun createCompletionInfo(message: String): ForegroundInfo {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle("Restore Complete")
+            .setContentTitle(context.getString(R.string.restore_title_complete))
             .setContentText(message)
             .setSmallIcon(android.R.drawable.stat_sys_download_done)
             .setAutoCancel(true)
@@ -64,8 +69,8 @@ class RestoreNotificationHelper(
 
     fun createErrorInfo(errorMessage: String): ForegroundInfo {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle("Restore Failed")
-            .setContentText("Error: $errorMessage")
+            .setContentTitle(context.getString(R.string.restore_title_failed))
+            .setContentText(context.getString(R.string.error_with_message, errorMessage))
             .setSmallIcon(android.R.drawable.stat_notify_error)
             .setAutoCancel(true)
             .build()
@@ -80,10 +85,10 @@ class RestoreNotificationHelper(
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Data Restore",
+            context.getString(R.string.restore_channel_name),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "Restoring user data from backup"
+            description = context.getString(R.string.restore_channel_description)
             setSound(null, null)
         }
         notificationManager.createNotificationChannel(channel)

@@ -16,7 +16,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.rewind.ui.overview.RewindPreviewUiState
 import app.logdate.ui.theme.Spacing
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.rewind.generated.resources.*
+import logdate.client.feature.rewind.generated.resources.Res
 /**
  * Content layout for a rewind card with dates at the top and title at the bottom.
  * 
@@ -49,7 +51,7 @@ fun RewindCoverCard(
             modifier = Modifier.align(Alignment.TopStart)
         ) {
             Text(
-                text = "${rewind.start}",
+                text = rewind.start.toString(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (rewind.rewindAvailable) {
                     MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
@@ -58,7 +60,7 @@ fun RewindCoverCard(
                 }
             )
             Text(
-                text = "→",
+                text = stringResource(Res.string.text_3),
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (rewind.rewindAvailable) {
                     MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
@@ -67,7 +69,7 @@ fun RewindCoverCard(
                 }
             )
             Text(
-                text = "${rewind.end}",
+                text = rewind.end.toString(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (rewind.rewindAvailable) {
                     MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)

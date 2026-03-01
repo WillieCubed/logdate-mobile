@@ -15,7 +15,9 @@ import androidx.compose.ui.Modifier
 import app.logdate.ui.profiles.PersonIcon
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.theme.Spacing
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.timeline.generated.resources.*
+import logdate.client.feature.timeline.generated.resources.Res
 /**
  * A list of all people the user encountered on a given day.
  */
@@ -28,7 +30,7 @@ internal fun PeopleEncounteredSection(
         modifier = modifier.padding(horizontal = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Text("People Encountered", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(Res.string.people_encountered), style = MaterialTheme.typography.titleSmall)
         val showPeople = people.isNotEmpty()
         AnimatedVisibility(visible = showPeople) {
             LazyRow(
@@ -49,7 +51,7 @@ internal fun PeopleEncounteredSection(
             enter = fadeIn(),
             exit = fadeOut(),
         ) {
-            Text("No people encountered", style = MaterialTheme.typography.labelSmall)
+            Text(stringResource(Res.string.no_people_encountered), style = MaterialTheme.typography.labelSmall)
             // TODO: Add CTA to add people
         }
     }

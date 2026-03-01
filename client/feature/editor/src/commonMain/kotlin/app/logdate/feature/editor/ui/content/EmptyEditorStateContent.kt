@@ -28,7 +28,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 // Constants for spacing and sizing
 private val spacing = 16.dp
 private val cornerRadius = 16.dp
@@ -134,13 +136,13 @@ private fun TextEntrySurface(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.TextFields,
-                    contentDescription = "Start text entry",
+                    contentDescription = stringResource(Res.string.start_text_entry),
                     modifier = Modifier.size(48.dp),
                     tint = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Write something",
+                    text = stringResource(Res.string.write_something),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center
@@ -183,7 +185,7 @@ private fun AudioRecordingSurface(
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Rounded.Mic,
-                            contentDescription = "Record audio",
+                            contentDescription = stringResource(Res.string.record_audio),
                             tint = MaterialTheme.colorScheme.onSecondaryContainer,
                             modifier = Modifier.size(24.dp)
                         )
@@ -191,7 +193,7 @@ private fun AudioRecordingSurface(
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Record audio",
+                    text = stringResource(Res.string.record_audio),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     textAlign = TextAlign.Center
@@ -228,19 +230,19 @@ private fun CameraCaptureSurface(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.CameraAlt,
-                    contentDescription = "Capture photo or video",
+                    contentDescription = stringResource(Res.string.capture_photo_or_video),
                     modifier = Modifier.size(48.dp),
                     tint = MaterialTheme.colorScheme.onTertiaryContainer
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Capture",
+                    text = stringResource(Res.string.capture),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onTertiaryContainer,
                     textAlign = TextAlign.Center
                 )
                 Text(
-                    text = "Photo or video",
+                    text = stringResource(Res.string.photo_or_video),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f),
                     textAlign = TextAlign.Center
@@ -277,19 +279,19 @@ private fun PhotoSurface(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Image,
-                    contentDescription = "Add photo from gallery",
+                    contentDescription = stringResource(Res.string.add_photo_from_gallery),
                     modifier = Modifier.size(48.dp),
                     tint = MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Gallery",
+                    text = stringResource(Res.string.gallery),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                     textAlign = TextAlign.Center
                 )
                 Text(
-                    text = "Choose a photo",
+                    text = stringResource(Res.string.choose_a_photo),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                     textAlign = TextAlign.Center

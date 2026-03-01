@@ -35,7 +35,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import androidx.compose.ui.tooling.preview.Preview
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 @Composable
 fun QuotaUsageBlock(
     quotaUsage: StorageQuotaUi,
@@ -65,7 +67,7 @@ fun QuotaUsageBlock(
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
                 Text(
-                    text = "Total Usage",
+                    text = stringResource(Res.string.total_usage),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onTertiaryContainer,
                     fontWeight = FontWeight.Medium
@@ -231,7 +233,7 @@ private fun QuotaUsageBlockPreview() {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Quota Usage Block",
+            text = stringResource(Res.string.quota_usage_block),
             style = MaterialTheme.typography.headlineMedium
         )
         QuotaUsageBlock(quotaUsage = mockQuotaUsage)

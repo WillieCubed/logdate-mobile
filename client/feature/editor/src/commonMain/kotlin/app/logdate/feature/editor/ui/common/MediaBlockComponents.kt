@@ -14,7 +14,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 @Composable
 fun DeleteMediaButton(
     onClick: () -> Unit,
@@ -47,7 +49,7 @@ fun MediaCaptionField(
     OutlinedTextField(
         value = caption,
         onValueChange = onCaptionChanged,
-        placeholder = { Text("Add a caption...") },
+        placeholder = { Text(stringResource(Res.string.add_a_caption)) },
         modifier = modifier
             .fillMaxWidth()
             .padding(top = 8.dp),

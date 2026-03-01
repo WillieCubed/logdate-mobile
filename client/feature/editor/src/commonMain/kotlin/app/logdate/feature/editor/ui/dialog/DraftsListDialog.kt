@@ -42,7 +42,9 @@ import app.logdate.ui.common.SwipeToAction
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import kotlin.uuid.Uuid
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * Material You style dialog for viewing and managing previous drafts.
  */
@@ -83,7 +85,7 @@ fun DraftsListDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Previous Drafts",
+                        text = stringResource(Res.string.previous_drafts),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -98,7 +100,7 @@ fun DraftsListDialog(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Delete,
-                                    contentDescription = "Delete All Drafts",
+                                    contentDescription = stringResource(Res.string.delete_all_drafts),
                                     tint = MaterialTheme.colorScheme.error
                                 )
                             }
@@ -112,7 +114,7 @@ fun DraftsListDialog(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Close",
+                                contentDescription = stringResource(Res.string.close),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -139,7 +141,7 @@ fun DraftsListDialog(
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text(
-                                    text = "Loading drafts...",
+                                    text = stringResource(Res.string.loading_drafts),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -203,13 +205,13 @@ private fun DraftsEmptyState() {
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "No drafts found",
+                text = stringResource(Res.string.no_drafts_found),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Start writing to create your first draft.",
+                text = stringResource(Res.string.start_writing_to_create_your_first_draft),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )
@@ -239,7 +241,7 @@ private fun SwipeToDeleteDraftItem(
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "Delete",
+                    text = stringResource(Res.string.delete),
                     style = MaterialTheme.typography.labelMedium
                 )
             }

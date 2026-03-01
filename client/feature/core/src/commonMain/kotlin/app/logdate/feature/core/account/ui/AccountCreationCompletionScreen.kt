@@ -23,6 +23,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 /**
  * Screen shown after successful account creation.
  * 
@@ -54,7 +57,7 @@ fun AccountCreationCompletionScreen(
             Spacer(modifier = Modifier.height(24.dp))
             
             Text(
-                text = "Account Created!",
+                text = stringResource(Res.string.account_created),
                 style = MaterialTheme.typography.headlineMedium,
                 textAlign = TextAlign.Center
             )
@@ -62,7 +65,7 @@ fun AccountCreationCompletionScreen(
             Spacer(modifier = Modifier.height(16.dp))
             
             Text(
-                text = "Your LogDate Cloud account has been successfully created. " +
+                text = stringResource(Res.string.your_logdate_cloud_account_has_been_successfully_created) +
                        "You can now sync your data across all your devices.",
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center
@@ -74,7 +77,7 @@ fun AccountCreationCompletionScreen(
                 onClick = onFinish,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Get Started")
+                Text(stringResource(Res.string.get_started))
             }
         }
     }

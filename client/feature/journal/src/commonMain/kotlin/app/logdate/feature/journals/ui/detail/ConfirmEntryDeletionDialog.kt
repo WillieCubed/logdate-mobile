@@ -8,7 +8,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.journal.generated.resources.*
+import logdate.client.feature.journal.generated.resources.Res
 /**
  * A dialog that asks the user to confirm deletion of a journal entry.
  */
@@ -23,24 +25,24 @@ fun ConfirmEntryDeletionDialog(
             Icon(icon, contentDescription = null)
         },
         title = {
-            Text(text = "Delete Entry")
+            Text(text = stringResource(Res.string.delete_entry_2))
         },
         text = {
-            Text(text = "Are you sure you want to delete this entry? This action cannot be undone.")
+            Text(text = stringResource(Res.string.are_you_sure_you_want_to_delete_this_entry_this_action_cannot_be_undone))
         },
         onDismissRequest = onDismissRequest,
         confirmButton = {
             TextButton(
                 onClick = onConfirmation,
             ) {
-                Text("Delete")
+                Text(stringResource(Res.string.delete))
             }
         },
         dismissButton = {
             TextButton(
                 onClick = onDismissRequest,
             ) {
-                Text("Cancel")
+                Text(stringResource(Res.string.cancel))
             }
         }
     )

@@ -22,7 +22,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import androidx.compose.ui.tooling.preview.Preview
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 @Composable
 fun DisplayNameSetupScreen(
     displayName: String,
@@ -77,7 +79,7 @@ private fun DisplayNameSetupContent(
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Go back"
+                        contentDescription = stringResource(Res.string.go_back)
                     )
                 }
                 
@@ -89,7 +91,7 @@ private fun DisplayNameSetupContent(
                 )
                 
                 Text(
-                    text = "1 of 3",
+                    text = stringResource(Res.string.text_1_of_3),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -103,14 +105,14 @@ private fun DisplayNameSetupContent(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "What should we call you?",
+                    text = stringResource(Res.string.what_should_we_call_you),
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
                 
                 Text(
-                    text = "Your display name is how you'll appear to others when sharing journal entries. You can always change this later.",
+                    text = stringResource(Res.string.your_display_name_is_how_youll_appear_to_others_when_sharing_journal_entries_you_can_always_change_this_later),
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -125,8 +127,8 @@ private fun DisplayNameSetupContent(
                 OutlinedTextField(
                     value = displayName,
                     onValueChange = onDisplayNameChange,
-                    label = { Text("Display Name") },
-                    placeholder = { Text("Enter your name") },
+                    label = { Text(stringResource(Res.string.display_name)) },
+                    placeholder = { Text(stringResource(Res.string.enter_your_name)) },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.Person,
@@ -134,7 +136,7 @@ private fun DisplayNameSetupContent(
                         )
                     },
                     supportingText = {
-                        Text("This is how your name will appear to others")
+                        Text(stringResource(Res.string.this_is_how_your_name_will_appear_to_others))
                     },
                     keyboardOptions = KeyboardOptions(
                         imeAction = ImeAction.Done,
@@ -164,7 +166,7 @@ private fun DisplayNameSetupContent(
                         verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                     ) {
                         Text(
-                            text = "💡 Examples:",
+                            text = stringResource(Res.string.examples),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -184,7 +186,7 @@ private fun DisplayNameSetupContent(
             enabled = isValid && displayName.isNotBlank(),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Continue")
+            Text(stringResource(Res.string.continue))
         }
     }
 }

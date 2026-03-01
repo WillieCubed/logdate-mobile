@@ -64,7 +64,9 @@ import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.onboarding.generated.resources.*
+import logdate.client.feature.onboarding.generated.resources.Res
 /**
  * Personal introduction screen that asks users to share their name and bio
  * in a playful, two-step flow with LLM-powered friendly responses.
@@ -164,7 +166,7 @@ private fun PersonalIntroContent(
         ) {
             Icon(
                 imageVector = Icons.Default.AccountCircle,
-                contentDescription = "Profile photo",
+                contentDescription = stringResource(Res.string.profile_photo),
                 modifier = Modifier.size(80.dp),
                 tint = MaterialTheme.colorScheme.onPrimaryContainer
             )
@@ -269,7 +271,7 @@ private fun NameStep(
         Spacer(modifier = Modifier.height(Spacing.md))
         
         Text(
-            text = "Who are you?",
+            text = stringResource(Res.string.who_are_you),
             style = MaterialTheme.typography.headlineLarge.copy(
                 fontWeight = FontWeight.Bold
             ),
@@ -278,7 +280,7 @@ private fun NameStep(
         )
         
         Text(
-            text = "Let's start with what we should call you",
+            text = stringResource(Res.string.lets_start_with_what_we_should_call_you),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
@@ -289,8 +291,8 @@ private fun NameStep(
         OutlinedTextField(
             value = name,
             onValueChange = onNameChanged,
-            label = { Text("Your name") },
-            placeholder = { Text("What should we call you?") },
+            label = { Text(stringResource(Res.string.your_name)) },
+            placeholder = { Text(stringResource(Res.string.what_should_we_call_you)) },
             isError = nameError != null,
             supportingText = nameError?.let { { Text(it) } },
             modifier = Modifier
@@ -316,14 +318,14 @@ private fun NameStep(
             enabled = canContinue,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Continue")
+            Text(stringResource(Res.string.continue))
         }
         
         TextButton(
             onClick = onBack,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Back")
+            Text(stringResource(Res.string.back))
         }
     }
 }
@@ -374,7 +376,7 @@ private fun BioStep(
         Spacer(modifier = Modifier.height(Spacing.md))
         
         Text(
-            text = "Tell us a bit about yourself!",
+            text = stringResource(Res.string.tell_us_a_bit_about_yourself),
             style = MaterialTheme.typography.headlineLarge.copy(
                 fontWeight = FontWeight.Bold
             ),
@@ -383,7 +385,7 @@ private fun BioStep(
         )
         
         Text(
-            text = "What makes you, you? Share whatever feels right",
+            text = stringResource(Res.string.what_makes_you_you_share_whatever_feels_right),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
@@ -394,8 +396,8 @@ private fun BioStep(
         OutlinedTextField(
             value = bio,
             onValueChange = onBioChanged,
-            label = { Text("About you") },
-            placeholder = { Text("I love coffee, hiking, and terrible movies...") },
+            label = { Text(stringResource(Res.string.about_you)) },
+            placeholder = { Text(stringResource(Res.string.i_love_coffee_hiking_and_terrible_movies)) },
             isError = bioError != null,
             supportingText = bioError?.let { { Text(it) } },
             modifier = Modifier
@@ -421,14 +423,14 @@ private fun BioStep(
             enabled = canContinue,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Let's see what I think!")
+            Text(stringResource(Res.string.lets_see_what_i_think))
         }
         
         TextButton(
             onClick = onBack,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Back")
+            Text(stringResource(Res.string.back))
         }
     }
 }
@@ -483,7 +485,10 @@ private fun LlmResponseStep(
                     verticalArrangement = Arrangement.spacedBy(Spacing.lg)
                 ) {
                     Text(
-                        text = "Nice to meet you, $userName!",
+                        text = stringResource(
+                            Res.string.nice_to_meet_you_name,
+                            userName
+                        ),
                         style = MaterialTheme.typography.headlineLarge.copy(
                             fontWeight = FontWeight.Bold
                         ),
@@ -514,14 +519,14 @@ private fun LlmResponseStep(
                     
                     if (isLoading) {
                         Text(
-                            text = "Setting up your profile...",
+                            text = stringResource(Res.string.setting_up_your_profile),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
                         )
                     } else {
                         Text(
-                            text = "Ready to start your journaling journey!",
+                            text = stringResource(Res.string.ready_to_start_your_journaling_journey),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.primary,
                             textAlign = TextAlign.Center,
@@ -537,7 +542,7 @@ private fun LlmResponseStep(
                     CircularProgressIndicator()
                     
                     Text(
-                        text = "Let me think about that...",
+                        text = stringResource(Res.string.let_me_think_about_that),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center

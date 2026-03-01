@@ -30,7 +30,9 @@ import app.logdate.navigation.routes.openSettings
 import app.logdate.navigation.routes.startOnboarding
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.theme.LogDateTheme
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.app.composemain.generated.resources.*
+import logdate.app.composemain.generated.resources.Res
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun MainActivityUiRoot(
@@ -93,7 +95,7 @@ fun MainActivityUiRoot(
                     val recovery = databaseStartupState
                     AlertDialog(
                         onDismissRequest = {},
-                        title = { Text("Encrypted data recovery required") },
+                        title = { Text(stringResource(Res.string.encrypted_data_recovery_required)) },
                         text = {
                             Text(
                                 "LogDate could not open your encrypted local database.\n\n" +
@@ -114,12 +116,12 @@ fun MainActivityUiRoot(
                                     }
                                 },
                             ) {
-                                Text("Open recovery tools")
+                                Text(stringResource(Res.string.open_recovery_tools))
                             }
                         },
                         dismissButton = {
                             TextButton(onClick = { showResetConfirmation = true }) {
-                                Text("Reset encrypted storage")
+                                Text(stringResource(Res.string.reset_encrypted_storage))
                             }
                         },
                     )
@@ -128,7 +130,7 @@ fun MainActivityUiRoot(
                 if (showResetConfirmation) {
                     AlertDialog(
                         onDismissRequest = { showResetConfirmation = false },
-                        title = { Text("Reset encrypted storage?") },
+                        title = { Text(stringResource(Res.string.reset_encrypted_storage_2)) },
                         text = {
                             Text(
                                 "This will clear the local encryption key and move the current " +
@@ -144,12 +146,12 @@ fun MainActivityUiRoot(
                                 },
                                 colors = ButtonDefaults.buttonColors(),
                             ) {
-                                Text("I understand, reset")
+                                Text(stringResource(Res.string.i_understand_reset))
                             }
                         },
                         dismissButton = {
                             TextButton(onClick = { showResetConfirmation = false }) {
-                                Text("Cancel")
+                                Text(stringResource(Res.string.cancel))
                             }
                         },
                     )

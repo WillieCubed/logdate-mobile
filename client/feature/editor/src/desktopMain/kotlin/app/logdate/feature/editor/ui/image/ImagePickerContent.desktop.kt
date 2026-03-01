@@ -26,7 +26,9 @@ import java.io.File
 import java.nio.file.Paths
 import javax.swing.SwingUtilities
 import kotlin.io.path.absolutePathString
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * Desktop implementation of the image picker content.
  * Provides a button to open a file dialog to select an image.
@@ -46,7 +48,7 @@ actual fun ImagePickerContent(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "Add an image to your entry",
+            text = stringResource(Res.string.add_an_image_to_your_entry),
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center
         )
@@ -69,10 +71,10 @@ actual fun ImagePickerContent(
         ) {
             Icon(
                 imageVector = Icons.Outlined.Image,
-                contentDescription = "Select image",
+                contentDescription = stringResource(Res.string.select_image),
                 modifier = Modifier.padding(end = 8.dp)
             )
-            Text("Select Image")
+            Text(stringResource(Res.string.select_image_2))
         }
     }
 }

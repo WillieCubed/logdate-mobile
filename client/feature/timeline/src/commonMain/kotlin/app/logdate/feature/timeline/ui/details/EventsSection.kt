@@ -15,7 +15,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import kotlin.time.Instant
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.timeline.generated.resources.*
+import logdate.client.feature.timeline.generated.resources.Res
 @Composable
 internal fun EventsSection(
     events: List<DayEvent>,
@@ -27,7 +29,7 @@ internal fun EventsSection(
         modifier = modifier.padding(horizontal = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Text("Events", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(Res.string.events), style = MaterialTheme.typography.titleSmall)
         // TODO: Find way to make this work
 //        LazyColumn {
 //            items(events) { event ->

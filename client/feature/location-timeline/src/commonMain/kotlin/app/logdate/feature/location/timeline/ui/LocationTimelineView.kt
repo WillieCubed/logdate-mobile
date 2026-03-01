@@ -39,7 +39,9 @@ import app.logdate.feature.location.timeline.ui.model.LocationTimelineItem
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineUiState
 import app.logdate.client.permissions.rememberLocationPermissionState
 import app.logdate.ui.theme.Spacing
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.location.timeline.generated.resources.*
+import logdate.client.feature.location.timeline.generated.resources.Res
 /**
  * A component that displays the user's location history as a list.
  * Optimized for both full screen and bottom sheet contexts.
@@ -84,7 +86,7 @@ fun LocationTimelineView(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text(
-                    text = "Unable to load location timeline",
+                    text = stringResource(Res.string.unable_to_load_location_timeline),
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Center
                 )
@@ -199,7 +201,7 @@ private fun LocationItemCard(
                 // Current location label
                 if (isCurrentLocation) {
                     Text(
-                        text = "Current Location",
+                        text = stringResource(Res.string.current_location),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Medium,
                         color = if (isCurrentLocation) MaterialTheme.colorScheme.primary 
@@ -229,7 +231,10 @@ private fun LocationItemCard(
                 // Always show coordinates for current location
                 if (isCurrentLocation) {
                     Text(
-                        text = "Coordinates: ${formatCoordinates(locationItem.latitude, locationItem.longitude)}",
+                        text = stringResource(
+                            Res.string.coordinates_label,
+                            formatCoordinates(locationItem.latitude, locationItem.longitude)
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                     )
@@ -247,7 +252,10 @@ private fun LocationItemCard(
                 // Duration (if available)
                 if (locationItem.duration != null) {
                     Text(
-                        text = "Stayed for ${locationItem.duration}",
+                        text = stringResource(
+                            Res.string.stayed_for_duration,
+                            locationItem.duration
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = if (isCurrentLocation)
                             MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
@@ -264,7 +272,7 @@ private fun LocationItemCard(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete location",
+                        contentDescription = stringResource(Res.string.delete_location),
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(18.dp)
                     )
@@ -306,12 +314,12 @@ private fun CurrentLocationPermissionCard(
             
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Current location unavailable",
+                    text = stringResource(Res.string.current_location_unavailable),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
                 Text(
-                    text = "Enable location access to see your current location",
+                    text = stringResource(Res.string.enable_location_access_to_see_your_current_location),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
                 )
@@ -324,7 +332,7 @@ private fun CurrentLocationPermissionCard(
                     contentColor = MaterialTheme.colorScheme.onSecondary
                 )
             ) {
-                Text("Enable", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(Res.string.enable), style = MaterialTheme.typography.labelMedium)
             }
         }
     }
@@ -360,13 +368,13 @@ private fun EmptyLocationHistoryCard(
             Spacer(modifier = Modifier.height(8.dp))
             
             Text(
-                text = "No location history yet",
+                text = stringResource(Res.string.no_location_history_yet),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
             Text(
-                text = "Locations will appear here when you create notes",
+                text = stringResource(Res.string.locations_will_appear_here_when_you_create_notes),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                 textAlign = TextAlign.Center

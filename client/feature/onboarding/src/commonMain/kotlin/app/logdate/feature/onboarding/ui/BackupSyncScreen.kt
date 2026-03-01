@@ -27,7 +27,8 @@ import logdate.client.feature.onboarding.generated.resources.section_title_backu
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
-
+import logdate.client.feature.onboarding.generated.resources.*
+import logdate.client.feature.onboarding.generated.resources.Res
 @Composable
 fun BackupSyncScreen(
     onBack: () -> Unit,
@@ -61,7 +62,7 @@ private fun BackupSyncScreenContent(
                             IconButton(onClick = onBack) {
                                 Icon(
                                     Icons.AutoMirrored.Default.ArrowBack,
-                                    contentDescription = "Back"
+                                    contentDescription = stringResource(Res.string.back)
                                 )
                             }
                         },
@@ -77,7 +78,7 @@ private fun BackupSyncScreenContent(
                         .padding(contentPadding)
                         .padding(Spacing.lg),
                 ) {
-                    Text("All your memories are stored securely on your device by default. Sign up for a LogDate Account so you never lose your memories.")
+                    Text(stringResource(Res.string.all_your_memories_are_stored_securely_on_your_device_by_default_sign_up_for_a_logdate_account_so_you_never_lose_your_memories))
                 }
             }
         },
@@ -92,7 +93,7 @@ private fun BackupSyncScreenContent(
                                 IconButton(onClick = onBack) {
                                     Icon(
                                         Icons.AutoMirrored.Default.ArrowBack,
-                                        contentDescription = "Back"
+                                        contentDescription = stringResource(Res.string.back)
                                     )
                                 }
                             },

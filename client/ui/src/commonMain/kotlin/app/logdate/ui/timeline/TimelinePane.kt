@@ -37,7 +37,9 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import androidx.compose.ui.tooling.preview.Preview
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.*
+import logdate.client.ui.generated.resources.Res
 data class TimelineUiState(
     val items: List<TimelineDayUiState> = emptyList(),
 )
@@ -141,10 +143,10 @@ internal fun ScrollToTopButton(
         ) {
             Icon(
                 imageVector = Icons.Filled.KeyboardArrowUp,
-                contentDescription = "Scroll to top",
+                contentDescription = stringResource(Res.string.scroll_to_top),
                 modifier = Modifier.padding(end = Spacing.sm),
             )
-            Text("Back to today")
+            Text(stringResource(Res.string.back_to_today))
         }
     }
 }

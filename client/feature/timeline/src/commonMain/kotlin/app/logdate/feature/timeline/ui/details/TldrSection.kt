@@ -12,7 +12,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.timeline.generated.resources.*
+import logdate.client.feature.timeline.generated.resources.Res
 /**
  * A summary of the events that occurred on a given day.
  */
@@ -25,7 +27,7 @@ internal fun TldrSection(
         modifier = modifier.padding(horizontal = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Text("TL;DR", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(Res.string.tl_dr), style = MaterialTheme.typography.titleSmall)
         Box(
             modifier = Modifier
                 .border(

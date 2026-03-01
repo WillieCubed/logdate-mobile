@@ -35,7 +35,9 @@ import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.editor.AutoSaveStatus
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * Top toolbar for the note editor.
  * Provides navigation, saving functionality, and access to additional options.
@@ -67,7 +69,7 @@ fun NoteEditorToolbar(
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back"
+                contentDescription = stringResource(Res.string.back)
             )
         }
 
@@ -92,7 +94,7 @@ fun NoteEditorToolbar(
             ) {
                 Icon(
                     imageVector = Icons.Default.Drafts,
-                    contentDescription = "Load drafts"
+                    contentDescription = stringResource(Res.string.load_drafts)
                 )
             }
 
@@ -102,7 +104,7 @@ fun NoteEditorToolbar(
             ) {
                 Icon(
                     imageVector = Icons.Default.Save,
-                    contentDescription = "Save entry"
+                    contentDescription = stringResource(Res.string.save_entry)
                 )
             }
 
@@ -110,7 +112,7 @@ fun NoteEditorToolbar(
             FilledTonalIconButton(onClick = { showMenu = true }) {
                 Icon(
                     imageVector = Icons.Default.MoreVert,
-                    contentDescription = "More options"
+                    contentDescription = stringResource(Res.string.more_options)
                 )
 
                 DropdownMenu(
@@ -119,7 +121,7 @@ fun NoteEditorToolbar(
                 ) {
                     // Additional menu options can be added here if needed
                     DropdownMenuItem(
-                        text = { Text("Manage drafts") },
+                        text = { Text(stringResource(Res.string.manage_drafts)) },
                         onClick = {
                             showMenu = false
                             onShowDrafts()
@@ -170,7 +172,7 @@ fun AutoSaveIndicator(
                 ) {
                     Icon(
                         imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Changes saved",
+                        contentDescription = stringResource(Res.string.changes_saved),
                         tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
                         modifier = Modifier.size(16.dp)
                     )
@@ -193,7 +195,7 @@ fun AutoSaveIndicator(
                 ) {
                     Icon(
                         imageVector = Icons.Default.ErrorOutline,
-                        contentDescription = "Error saving",
+                        contentDescription = stringResource(Res.string.error_saving),
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(16.dp)
                     )
@@ -202,7 +204,7 @@ fun AutoSaveIndicator(
             AutoSaveStatus.SAVING -> {
                 // Very subtle "Saving..." text
                 Text(
-                    text = "Saving...",
+                    text = stringResource(Res.string.saving),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )

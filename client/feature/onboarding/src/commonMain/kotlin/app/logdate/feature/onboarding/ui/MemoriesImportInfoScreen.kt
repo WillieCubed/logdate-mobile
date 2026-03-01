@@ -23,7 +23,9 @@ import androidx.compose.ui.text.style.TextAlign
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import androidx.compose.ui.tooling.preview.Preview
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.onboarding.generated.resources.*
+import logdate.client.feature.onboarding.generated.resources.Res
 /**
  * Screen that explains the memories import feature during onboarding.
  */
@@ -38,10 +40,10 @@ fun MemoriesImportInfoScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("Memories Import") },
+                title = { Text(stringResource(Res.string.memories_import)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(Res.string.back))
                     }
                 },
             )
@@ -58,7 +60,7 @@ fun MemoriesImportInfoScreen(
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
                 Text(
-                    text = "Now let's import your memories.",
+                    text = stringResource(Res.string.now_lets_import_your_memories),
                     style = MaterialTheme.typography.headlineMedium,
                     textAlign = TextAlign.Start,
                 )
@@ -67,12 +69,12 @@ fun MemoriesImportInfoScreen(
                     verticalArrangement = Arrangement.spacedBy(Spacing.md),
                 ) {
                     Text(
-                        text = "By importing your memories, you'll be able to see memories from your past.",
+                        text = stringResource(Res.string.by_importing_your_memories_youll_be_able_to_see_memories_from_your_past),
                         style = MaterialTheme.typography.bodyLarge,
                     )
                     
                     Text(
-                        text = "We've taken the effort of finding some photos from your past. You can choose which ones get backed up.",
+                        text = stringResource(Res.string.weve_taken_the_effort_of_finding_some_photos_from_your_past_you_can_choose_which_ones_get_backed_up),
                         style = MaterialTheme.typography.bodyLarge,
                     )
                 }
@@ -84,7 +86,7 @@ fun MemoriesImportInfoScreen(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth(),
             ) {
-                Text("Continue")
+                Text(stringResource(Res.string.continue))
             }
         }
     }

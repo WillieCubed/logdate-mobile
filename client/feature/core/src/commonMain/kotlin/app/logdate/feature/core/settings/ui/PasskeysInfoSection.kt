@@ -31,7 +31,9 @@ import app.logdate.ui.theme.Spacing
 import kotlin.time.Clock
 import kotlin.time.Instant
 import androidx.compose.ui.tooling.preview.Preview
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 /**
  * UI-facing metadata for a passkey credential.
  *
@@ -70,12 +72,12 @@ fun PasskeysInfoSection(
             modifier = Modifier.padding(Spacing.lg)
         ) {
             Text(
-                text = "Passkeys",
+                text = stringResource(Res.string.passkeys),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary
             )
             Text(
-                text = "Passkeys are a quick and secure way to sign into your LogDate Account.",
+                text = stringResource(Res.string.passkeys_are_a_quick_and_secure_way_to_sign_into_your_logdate_account),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -93,17 +95,17 @@ fun PasskeysInfoSection(
                         modifier = Modifier.padding(Spacing.lg),
                     ) {
                         Text(
-                            text = "Create a passkey",
+                            text = stringResource(Res.string.create_a_passkey_2),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "With passkeys, you don't need to remember your password. Instead, use your fingerprint, face, or screen lock to sign in.",
+                            text = stringResource(Res.string.with_passkeys_you_dont_need_to_remember_your_password_instead_use_your_fingerprint_face_or_screen_lock_to_sign_in),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "Learn more",
+                            text = stringResource(Res.string.learn_more),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -113,7 +115,7 @@ fun PasskeysInfoSection(
                 // Show passkeys status
                 UnsurfacedItem {
                     Text(
-                        text = "Your passkeys",
+                        text = stringResource(Res.string.your_passkeys),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -143,7 +145,7 @@ fun PasskeysInfoSection(
                             modifier = Modifier.size(18.dp)
                         )
                         Text(
-                            text = "Create Passkey",
+                            text = stringResource(Res.string.create_passkey),
                             modifier = Modifier.padding(start = Spacing.sm)
                         )
                     }
@@ -227,7 +229,7 @@ private fun MaterialContainerScope.PasskeyItem(
                             onClick = { onRevokePasskey(passkey) },
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("Delete")
+                            Text(stringResource(Res.string.delete))
                         }
                     }
                 }

@@ -27,7 +27,9 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import io.github.aakira.napier.Napier
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * Editor component for camera-captured media blocks.
  * Displays either the captured media with caption editing, or the camera capture UI.
@@ -117,7 +119,7 @@ private fun CapturedMediaContent(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(
                                 imageVector = Icons.Default.PlayArrow,
-                                contentDescription = "Play video",
+                                contentDescription = stringResource(Res.string.play_video),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
@@ -132,7 +134,7 @@ private fun CapturedMediaContent(
 
             DeleteMediaButton(
                 onClick = onDeleteRequested,
-                contentDescription = "Delete media",
+                contentDescription = stringResource(Res.string.delete_media),
                 modifier = Modifier.align(Alignment.TopEnd)
             )
         }

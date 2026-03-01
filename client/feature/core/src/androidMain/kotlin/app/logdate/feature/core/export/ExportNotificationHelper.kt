@@ -6,6 +6,7 @@ import android.content.Context
 import androidx.core.app.NotificationCompat
 import androidx.work.ForegroundInfo
 import androidx.work.WorkManager
+import app.logdate.client.feature.core.R
 
 /**
  * Helper class for managing export notifications in WorkManager.
@@ -32,13 +33,17 @@ class ExportNotificationHelper(
             .createCancelPendingIntent(workId)
             
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle("Exporting Data")
+            .setContentTitle(context.getString(R.string.export_title_progress))
             .setContentText(message)
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setProgress(100, progress, progress == 0)
             .setOngoing(true)
             .setSilent(true)
-            .addAction(android.R.drawable.ic_delete, "Cancel", cancelIntent)
+            .addAction(
+                android.R.drawable.ic_delete,
+                context.getString(R.string.notification_action_cancel),
+                cancelIntent
+            )
             .build()
             
         return ForegroundInfo(
@@ -50,8 +55,8 @@ class ExportNotificationHelper(
     
     fun createCompletionInfo(filePath: String): ForegroundInfo {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle("Export Complete")
-            .setContentText("Data exported to: $filePath")
+            .setContentTitle(context.getString(R.string.export_title_complete))
+            .setContentText(context.getString(R.string.export_text_path, filePath))
             .setSmallIcon(android.R.drawable.stat_sys_download_done)
             .setAutoCancel(true)
             .setSilent(true)
@@ -66,8 +71,8 @@ class ExportNotificationHelper(
     
     fun createErrorInfo(errorMessage: String): ForegroundInfo {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle("Export Failed")
-            .setContentText("Error: $errorMessage")
+            .setContentTitle(context.getString(R.string.export_title_failed))
+            .setContentText(context.getString(R.string.error_with_message, errorMessage))
             .setSmallIcon(android.R.drawable.stat_notify_error)
             .setAutoCancel(true)
             .build()
@@ -82,10 +87,10 @@ class ExportNotificationHelper(
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Data Export",
+            context.getString(R.string.export_channel_name),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "Exporting user data to file"
+            description = context.getString(R.string.export_channel_description)
             setSound(null, null)
         }
         notificationManager.createNotificationChannel(channel)

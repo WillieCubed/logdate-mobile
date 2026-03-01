@@ -29,7 +29,9 @@ import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.onboarding.generated.resources.*
+import logdate.client.feature.onboarding.generated.resources.Res
 data class NotificationPermissionUiState(
     val hasPermission: Boolean = false,
     val launchPermissionRequest: () -> Unit,
@@ -86,12 +88,12 @@ private fun OnboardingNotificationContent(
                 modifier = Modifier.fillMaxWidth(),
                 topBar = {
                     LargeTopAppBar(
-                        title = { Text("Journal notifications") },
+                        title = { Text(stringResource(Res.string.journal_notifications)) },
                         navigationIcon = {
                             IconButton(onClick = onBack) {
                                 Icon(
                                     Icons.AutoMirrored.Rounded.ArrowBack,
-                                    contentDescription = "Back"
+                                    contentDescription = stringResource(Res.string.back)
                                 )
                             }
                         },
@@ -132,12 +134,12 @@ private fun OnboardingNotificationContent(
                     modifier = Modifier.fillMaxWidth(),
                     topBar = {
                         LargeTopAppBar(
-                            title = { Text("Journal notifications") },
+                            title = { Text(stringResource(Res.string.journal_notifications)) },
                             navigationIcon = {
                                 IconButton(onClick = onBack) {
                                     Icon(
                                         Icons.AutoMirrored.Rounded.ArrowBack,
-                                        contentDescription = "Back"
+                                        contentDescription = stringResource(Res.string.back)
                                     )
                                 }
                             },
@@ -220,12 +222,12 @@ private fun ActionsContainer(
             modifier = Modifier.fillMaxWidth(),
             onClick = onEnableNotifications,
         ) {
-            Text(text = "Enable")
+            Text(text = stringResource(Res.string.enable))
         }
         TextButton(
             onClick = onSkipNotifications,
         ) {
-            Text(text = "Continue without notifications")
+            Text(text = stringResource(Res.string.continue_without_notifications))
         }
     }
 }

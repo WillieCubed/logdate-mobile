@@ -28,7 +28,9 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.journal.generated.resources.*
+import logdate.client.feature.journal.generated.resources.Res
 /**
  * A section that displays a list of notes associated with a journal.
  */
@@ -46,7 +48,7 @@ fun JournalNotesListSection(
             modifier = Modifier.padding(16.dp)
         ) {
             Text(
-                text = "Journal Entries",
+                text = stringResource(Res.string.journal_entries),
                 style = MaterialTheme.typography.titleMedium
             )
             
@@ -54,7 +56,7 @@ fun JournalNotesListSection(
             
             if (notes.isEmpty()) {
                 Text(
-                    text = "No entries in this journal yet",
+                    text = stringResource(Res.string.no_entries_in_this_journal_yet),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -133,7 +135,7 @@ private fun JournalNoteItem(
                     }
                     is JournalNote.Image -> {
                         Text(
-                            text = "Image note",
+                            text = stringResource(Res.string.image_note),
                             style = MaterialTheme.typography.bodyMedium
                         )
                         AsyncImage(
@@ -144,13 +146,13 @@ private fun JournalNoteItem(
                     }
                     is JournalNote.Video -> {
                         Text(
-                            text = "Video note",
+                            text = stringResource(Res.string.video_note),
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
                     is JournalNote.Audio -> {
                         Text(
-                            text = "Audio note",
+                            text = stringResource(Res.string.audio_note),
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }

@@ -13,7 +13,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.*
+import logdate.client.ui.generated.resources.Res
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimelineTopAppBar(
@@ -26,7 +28,7 @@ fun TimelineTopAppBar(
     TopAppBar(
         title = { 
             Text(
-                text = "Timeline",
+                text = stringResource(Res.string.timeline),
                 style = MaterialTheme.typography.titleLarge
             )
         },
@@ -34,19 +36,19 @@ fun TimelineTopAppBar(
             IconButton(onClick = onHistoryClick) {
                 Icon(
                     imageVector = Icons.Default.History,
-                    contentDescription = "Location History"
+                    contentDescription = stringResource(Res.string.location_history)
                 )
             }
             IconButton(onClick = onSearchClick) {
                 Icon(
                     imageVector = Icons.Default.Search,
-                    contentDescription = "Search"
+                    contentDescription = stringResource(Res.string.search)
                 )
             }
             IconButton(onClick = onSettingsClick) {
                 Icon(
                     imageVector = Icons.Default.Settings,
-                    contentDescription = "Settings"
+                    contentDescription = stringResource(Res.string.settings)
                 )
             }
         },

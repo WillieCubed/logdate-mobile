@@ -46,7 +46,9 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 /**
  * Account management settings screen.
  *
@@ -158,10 +160,10 @@ private fun AccountSettingsContent(
             // Only show top bar with back button in single-pane mode
             if (!isPotentialDetailPane) {
                 TopAppBar(
-                    title = { Text("Account & Profile") },
+                    title = { Text(stringResource(Res.string.account_and_profile)) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
                         }
                     },
                     scrollBehavior = scrollBehavior,
@@ -180,7 +182,7 @@ private fun AccountSettingsContent(
                 if (isPotentialDetailPane) {
                     item {
                         Text(
-                            text = "Account & Profile",
+                            text = stringResource(Res.string.account_and_profile),
                             style = MaterialTheme.typography.headlineSmall,
                             modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)
                         )
@@ -194,21 +196,21 @@ private fun AccountSettingsContent(
                         verticalArrangement = Arrangement.spacedBy(Spacing.md)
                     ) {
                         Text(
-                            text = "Profile Information",
+                            text = stringResource(Res.string.profile_information),
                             style = MaterialTheme.typography.titleMedium
                         )
 
                         TextField(
                             value = displayName,
                             onValueChange = { displayName = it },
-                            label = { Text("Display Name") },
+                            label = { Text(stringResource(Res.string.display_name)) },
                             modifier = Modifier.fillMaxWidth()
                         )
 
                         TextField(
                             value = username,
                             onValueChange = { username = it },
-                            label = { Text("Username") },
+                            label = { Text(stringResource(Res.string.username)) },
                             modifier = Modifier.fillMaxWidth()
                         )
 
@@ -246,7 +248,7 @@ private fun AccountSettingsContent(
                         verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                     ) {
                         Text(
-                            text = "Personal Information",
+                            text = stringResource(Res.string.personal_information),
                             style = MaterialTheme.typography.titleMedium
                         )
 
@@ -254,7 +256,7 @@ private fun AccountSettingsContent(
                         MaterialContainer {
                             SurfaceItem {
                                 ListItem(
-                                    headlineContent = { Text("Birthday") },
+                                    headlineContent = { Text(stringResource(Res.string.birthday)) },
                                     supportingContent = {
                                         val formattedBirthday = if (userData.birthday == Instant.DISTANT_PAST) {
                                             "Set your birthday!"
@@ -287,22 +289,22 @@ private fun AccountSettingsContent(
                             verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                         ) {
                             Text(
-                                text = "Account Actions",
+                                text = stringResource(Res.string.account_actions),
                                 style = MaterialTheme.typography.titleMedium
                             )
 
                             MaterialContainer {
                                 SurfaceItem {
                                     ListItem(
-                                        headlineContent = { Text("Sign out") },
+                                        headlineContent = { Text(stringResource(Res.string.sign_out)) },
                                         supportingContent = {
-                                            Text("Sign out of your LogDate Cloud account on this device")
+                                            Text(stringResource(Res.string.sign_out_of_your_logdate_cloud_account_on_this_device))
                                         },
                                         trailingContent = {
                                             Button(
                                                 onClick = { showSignOutDialog = true },
                                             ) {
-                                                Text("Sign out")
+                                                Text(stringResource(Res.string.sign_out))
                                             }
                                         }
                                     )
@@ -318,8 +320,8 @@ private fun AccountSettingsContent(
     if (showSignOutDialog) {
         AlertDialog(
             onDismissRequest = { showSignOutDialog = false },
-            title = { Text("Sign out?") },
-            text = { Text("You'll need to sign in again to sync data on this device.") },
+            title = { Text(stringResource(Res.string.sign_out_2)) },
+            text = { Text(stringResource(Res.string.youll_need_to_sign_in_again_to_sync_data_on_this_device)) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -327,12 +329,12 @@ private fun AccountSettingsContent(
                         showSignOutDialog = false
                     }
                 ) {
-                    Text("Sign out")
+                    Text(stringResource(Res.string.sign_out))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showSignOutDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(Res.string.cancel))
                 }
             }
         )

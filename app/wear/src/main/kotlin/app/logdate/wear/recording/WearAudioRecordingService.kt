@@ -165,8 +165,8 @@ class WearAudioRecordingService : Service() {
      * Creates the notification channel for recording service
      */
     private fun createNotificationChannel() {
-        val name = "Recording"
-        val description = "Audio recording notifications"
+        val name = getString(R.string.wear_recording_channel_name)
+        val description = getString(R.string.wear_recording_channel_description)
         val importance = NotificationManager.IMPORTANCE_DEFAULT
         val channel = NotificationChannel(NOTIFICATION_CHANNEL_ID, name, importance).apply {
             this.description = description
@@ -228,8 +228,12 @@ class WearAudioRecordingService : Service() {
     private fun createRecordingNotification(): Notification {
         return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher) // Use app icon as recording indicator
-            .setContentTitle("Recording Audio")
-            .setStyle(NotificationCompat.BigTextStyle().bigText("Recording in progress on your watch"))
+            .setContentTitle(getString(R.string.wear_recording_title))
+            .setStyle(
+                NotificationCompat.BigTextStyle().bigText(
+                    getString(R.string.wear_recording_in_progress)
+                )
+            )
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setOngoing(true)
             .setUsesChronometer(true)

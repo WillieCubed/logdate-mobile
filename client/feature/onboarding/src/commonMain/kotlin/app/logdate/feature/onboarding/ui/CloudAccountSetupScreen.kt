@@ -50,7 +50,9 @@ import app.logdate.ui.AdaptiveLayout
 import app.logdate.ui.theme.Spacing
 import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.onboarding.generated.resources.*
+import logdate.client.feature.onboarding.generated.resources.Res
 @Composable
 fun CloudAccountSetupScreen(
     onBack: () -> Unit,
@@ -95,10 +97,10 @@ private fun CloudAccountSetupContent(
                 modifier = modifier,
                 topBar = {
                     TopAppBar(
-                        title = { Text("Create Account") },
+                        title = { Text(stringResource(Res.string.create_account)) },
                         navigationIcon = {
                             IconButton(onClick = { onOptionSelected(CloudSetupOption.SETUP_SYNC) }) {
-                                Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "Back")
+                                Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(Res.string.back))
                             }
                         }
                     )
@@ -113,13 +115,13 @@ private fun CloudAccountSetupContent(
                     verticalArrangement = Arrangement.Center
                 ) {
                     Text(
-                        text = "Account creation will be implemented here",
+                        text = stringResource(Res.string.account_creation_will_be_implemented_here),
                         style = MaterialTheme.typography.bodyLarge,
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(Spacing.md))
                     Button(onClick = onContinue) {
-                        Text("Continue (Mock)")
+                        Text(stringResource(Res.string.continue_mock))
                     }
                 }
             }
@@ -130,10 +132,10 @@ private fun CloudAccountSetupContent(
                 modifier = modifier,
                 topBar = {
                     TopAppBar(
-                        title = { Text("Sign In") },
+                        title = { Text(stringResource(Res.string.sign_in)) },
                         navigationIcon = {
                             IconButton(onClick = { onOptionSelected(CloudSetupOption.SETUP_SYNC) }) {
-                                Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "Back")
+                                Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(Res.string.back))
                             }
                         }
                     )
@@ -148,13 +150,13 @@ private fun CloudAccountSetupContent(
                     verticalArrangement = Arrangement.Center
                 ) {
                     Text(
-                        text = "Sign in will be implemented here",
+                        text = stringResource(Res.string.sign_in_will_be_implemented_here),
                         style = MaterialTheme.typography.bodyLarge,
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(Spacing.md))
                     Button(onClick = onContinue) {
-                        Text("Continue (Mock)")
+                        Text(stringResource(Res.string.continue_mock))
                     }
                 }
             }
@@ -167,12 +169,12 @@ private fun CloudAccountSetupContent(
                     Scaffold(
                         topBar = {
                             LargeTopAppBar(
-                                title = { Text("Backup & Sync") },
+                                title = { Text(stringResource(Res.string.backup_and_sync)) },
                                 navigationIcon = {
                                     IconButton(onClick = onBack) {
                                         Icon(
                                             Icons.AutoMirrored.Default.ArrowBack,
-                                            contentDescription = "Back"
+                                            contentDescription = stringResource(Res.string.back)
                                         )
                                     }
                                 },
@@ -200,12 +202,12 @@ private fun CloudAccountSetupContent(
                             modifier = Modifier.fillMaxSize(),
                             topBar = {
                                 LargeTopAppBar(
-                                    title = { Text("Backup & Sync") },
+                                    title = { Text(stringResource(Res.string.backup_and_sync)) },
                                     navigationIcon = {
                                         IconButton(onClick = onBack) {
                                             Icon(
                                                 Icons.AutoMirrored.Default.ArrowBack,
-                                                contentDescription = "Back"
+                                                contentDescription = stringResource(Res.string.back)
                                             )
                                         }
                                     },
@@ -257,13 +259,13 @@ private fun InfoSection() {
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = "LogDate Cloud",
+                        text = stringResource(Res.string.logdate_cloud),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
                 Text(
-                    text = "Keep your memories safe and accessible across all your devices. LogDate Cloud syncs your entries, photos, and settings securely.",
+                    text = stringResource(Res.string.keep_your_memories_safe_and_accessible_across_all_your_devices_logdate_cloud_syncs_your_entries_photos_and_settings_securely),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -285,13 +287,13 @@ private fun InfoSection() {
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = "Secure with Passkeys",
+                        text = stringResource(Res.string.secure_with_passkeys),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
                 Text(
-                    text = "No passwords to remember. Use your device's biometric authentication (Face ID, Touch ID, or fingerprint) for secure, convenient access.",
+                    text = stringResource(Res.string.no_passwords_to_remember_use_your_devices_biometric_authentication_face_id_touch_id_or_fingerprint_for_secure_convenient_access),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -319,7 +321,7 @@ private fun MainContent(
         
         item {
             Text(
-                text = "Choose how you'd like to proceed:",
+                text = stringResource(Res.string.choose_how_youd_like_to_proceed),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(top = Spacing.md)
@@ -362,7 +364,7 @@ private fun MainContent(
             item {
                 HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.md))
                 Text(
-                    text = "Choose Your Storage Plan:",
+                    text = stringResource(Res.string.choose_your_storage_plan),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -407,7 +409,7 @@ private fun MainContent(
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(Spacing.sm))
-                        Text("Create Account")
+                        Text(stringResource(Res.string.create_account))
                     }
                 }
                 CloudSetupOption.SIGN_IN -> {
@@ -421,7 +423,7 @@ private fun MainContent(
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(Spacing.sm))
-                        Text("Sign In")
+                        Text(stringResource(Res.string.sign_in))
                     }
                 }
                 CloudSetupOption.SKIP -> {
@@ -432,10 +434,10 @@ private fun MainContent(
                             onClick = onSkip,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Continue Without Cloud Sync")
+                            Text(stringResource(Res.string.continue_without_cloud_sync))
                         }
                         Text(
-                            text = "You can always set up cloud sync later in Settings",
+                            text = stringResource(Res.string.you_can_always_set_up_cloud_sync_later_in_settings),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
@@ -445,7 +447,7 @@ private fun MainContent(
                 }
                 CloudSetupOption.SETUP_SYNC -> {
                     Text(
-                        text = "Setting up sync...",
+                        text = stringResource(Res.string.setting_up_sync),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -454,7 +456,7 @@ private fun MainContent(
                 }
                 null -> {
                     Text(
-                        text = "Select an option above to continue",
+                        text = stringResource(Res.string.select_an_option_above_to_continue),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -536,7 +538,7 @@ private fun CloudSetupOptionCard(
             if (isSelected) {
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
-                    contentDescription = "Selected",
+                    contentDescription = stringResource(Res.string.selected),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp)
                 )
@@ -577,7 +579,7 @@ private fun PlanOptionCard(
                         )
                     ) {
                         Text(
-                            text = "Recommended",
+                            text = stringResource(Res.string.recommended),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs)

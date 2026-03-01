@@ -19,7 +19,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import androidx.compose.ui.tooling.preview.Preview
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 @Composable
 fun CloudAccountWelcomeScreen(
     onContinue: () -> Unit,
@@ -68,7 +70,7 @@ private fun CloudAccountWelcomeContent(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Cloud,
-                        contentDescription = "LogDate Cloud",
+                        contentDescription = stringResource(Res.string.logdate_cloud),
                         modifier = Modifier.size(64.dp),
                         tint = MaterialTheme.colorScheme.onPrimary
                     )
@@ -81,14 +83,14 @@ private fun CloudAccountWelcomeContent(
                 verticalArrangement = Arrangement.spacedBy(Spacing.md)
             ) {
                 Text(
-                    text = "Welcome to LogDate Cloud",
+                    text = stringResource(Res.string.welcome_to_logdate_cloud),
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
                 
                 Text(
-                    text = "Connect your account to sync your journals, access them from anywhere, and unlock powerful cloud features.",
+                    text = stringResource(Res.string.connect_your_account_to_sync_your_journals_access_them_from_anywhere_and_unlock_powerful_cloud_features),
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -133,21 +135,21 @@ private fun CloudAccountWelcomeContent(
                 onClick = onContinue,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Create New Account")
+                Text(stringResource(Res.string.create_new_account))
             }
             
             OutlinedButton(
                 onClick = onSignIn,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Sign In to LogDate Cloud")
+                Text(stringResource(Res.string.sign_in_to_logdate_cloud))
             }
             
             TextButton(
                 onClick = onSkip,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Skip for now")
+                Text(stringResource(Res.string.skip_for_now))
             }
         }
     }

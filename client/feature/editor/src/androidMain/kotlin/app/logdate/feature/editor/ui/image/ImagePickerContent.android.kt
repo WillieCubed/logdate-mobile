@@ -39,7 +39,9 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * Android implementation of the image picker content.
  * Provides options to select an image from the gallery or take a photo.
@@ -178,7 +180,7 @@ actual fun ImagePickerContent(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Add an image to your entry",
+                    text = stringResource(Res.string.add_an_image_to_your_entry),
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Center
                 )
@@ -201,10 +203,10 @@ actual fun ImagePickerContent(
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.AddPhotoAlternate,
-                                contentDescription = "Choose from gallery",
+                                contentDescription = stringResource(Res.string.choose_from_gallery),
                                 modifier = Modifier.padding(bottom = 4.dp)
                             )
-                            Text("Gallery")
+                            Text(stringResource(Res.string.gallery))
                         }
                     }
                     
@@ -220,10 +222,10 @@ actual fun ImagePickerContent(
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.CameraAlt,
-                                contentDescription = "Take a photo",
+                                contentDescription = stringResource(Res.string.take_a_photo),
                                 modifier = Modifier.padding(bottom = 4.dp)
                             )
-                            Text("Camera")
+                            Text(stringResource(Res.string.camera))
                         }
                     }
                 }

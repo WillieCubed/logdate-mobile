@@ -15,7 +15,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.rewind.generated.resources.*
+import logdate.client.feature.rewind.generated.resources.Res
 @Composable
 fun PastRewindsRoute(onGoBack: () -> Unit) {
     PastRewindsScreen(onGoBack = onGoBack)
@@ -27,10 +29,10 @@ fun PastRewindsScreen(onGoBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Past rewind") },
+                title = { Text(stringResource(Res.string.past_rewind)) },
                 navigationIcon = {
                     IconButton(onClick = { onGoBack() }) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(Res.string.back))
                     }
                 },
             )

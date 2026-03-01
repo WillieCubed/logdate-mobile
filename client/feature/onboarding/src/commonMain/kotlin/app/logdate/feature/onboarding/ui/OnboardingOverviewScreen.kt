@@ -40,7 +40,9 @@ import logdate.client.ui.generated.resources.book_open
 import org.jetbrains.compose.resources.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import logdate.client.ui.generated.resources.Res as coreRes
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.onboarding.generated.resources.*
+import logdate.client.feature.onboarding.generated.resources.Res
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingOverviewScreen(
@@ -65,7 +67,7 @@ fun OnboardingOverviewScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(Res.string.back))
                     }
                 },
                 modifier = Modifier.then(if (useSplitScreen) Modifier.fillMaxHeight() else Modifier),
@@ -125,7 +127,7 @@ fun OnboardingOverviewScreen(
                         Button(
                             onClick = onNext,
                         ) {
-                            Text(text = "Continue")
+                            Text(text = stringResource(Res.string.continue))
                         }
                     }
                 }

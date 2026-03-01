@@ -45,7 +45,8 @@ import logdate.client.feature.core.generated.resources.settings_biometric_label
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
-
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 /**
  * Privacy and security settings screen.
  *
@@ -102,16 +103,23 @@ private fun PasskeyDeletionConfirmationDialog(
     if (passkey != null) {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Remove passkey?") },
-            text = { Text("This will remove your passkey from '${passkey.device}'. You'll no longer be able to use it to sign in.") },
+            title = { Text(stringResource(Res.string.remove_passkey)) },
+            text = {
+                Text(
+                    stringResource(
+                        Res.string.remove_passkey_from_device,
+                        passkey.device
+                    )
+                )
+            },
             confirmButton = {
                 TextButton(onClick = onConfirm) {
-                    Text("Remove")
+                    Text(stringResource(Res.string.remove))
                 }
             },
             dismissButton = {
                 TextButton(onClick = onDismiss) {
-                    Text("Cancel")
+                    Text(stringResource(Res.string.cancel))
                 }
             }
         )
@@ -134,7 +142,14 @@ private fun PasskeyOperationLoadingDialog(
     if (isLoading) {
         AlertDialog(
             onDismissRequest = { /* Prevent dismissal during operation */ },
-            title = { Text("$operation passkey...") },
+            title = {
+                Text(
+                    stringResource(
+                        Res.string.operation_passkey,
+                        operation
+                    )
+                )
+            },
             text = {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -228,10 +243,10 @@ private fun PrivacySettingsContent(
             // Only show top bar with back button in single-pane mode
             if (!isPotentialDetailPane) {
                 TopAppBar(
-                    title = { Text("Privacy & Security") },
+                    title = { Text(stringResource(Res.string.privacy_and_security)) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
                         }
                     },
                     scrollBehavior = scrollBehavior,
@@ -250,7 +265,7 @@ private fun PrivacySettingsContent(
                 if (isPotentialDetailPane) {
                     item {
                         Text(
-                            text = "Privacy & Security",
+                            text = stringResource(Res.string.privacy_and_security),
                             style = MaterialTheme.typography.headlineSmall,
                             modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)
                         )
@@ -264,7 +279,7 @@ private fun PrivacySettingsContent(
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                 ) {
                     Text(
-                        text = "App Security",
+                        text = stringResource(Res.string.app_security),
                         style = MaterialTheme.typography.titleMedium
                     )
                     
@@ -292,15 +307,15 @@ private fun PrivacySettingsContent(
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                 ) {
                     Text(
-                        text = "Location Privacy",
+                        text = stringResource(Res.string.location_privacy),
                         style = MaterialTheme.typography.titleMedium
                     )
                     
                     MaterialContainer {
                         SurfaceItem {
                             ListItem(
-                                headlineContent = { Text("Location Settings") },
-                                supportingContent = { Text("Manage location tracking and privacy preferences") },
+                                headlineContent = { Text(stringResource(Res.string.location_settings)) },
+                                supportingContent = { Text(stringResource(Res.string.manage_location_tracking_and_privacy_preferences)) },
                                 leadingContent = { 
                                     Icon(
                                         imageVector = Icons.Default.LocationOn,
@@ -311,7 +326,7 @@ private fun PrivacySettingsContent(
                                 trailingContent = {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                                        contentDescription = "Navigate to Location Settings"
+                                        contentDescription = stringResource(Res.string.navigate_to_location_settings)
                                     )
                                 },
                                 modifier = Modifier.clickable(onClick = onNavigateToLocationSettings)

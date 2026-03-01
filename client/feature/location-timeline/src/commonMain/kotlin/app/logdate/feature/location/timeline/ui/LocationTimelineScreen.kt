@@ -17,7 +17,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineItem
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineUiState
 import org.koin.compose.viewmodel.koinViewModel
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.location.timeline.generated.resources.*
+import logdate.client.feature.location.timeline.generated.resources.Res
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LocationTimelineScreen(
@@ -31,7 +33,7 @@ fun LocationTimelineScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Location Timeline",
+                        text = stringResource(Res.string.location_timeline),
                         style = MaterialTheme.typography.headlineMedium
                     )
                 },
@@ -89,7 +91,7 @@ private fun LocationTimelineContent(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text(
-                    text = "Unable to load location timeline",
+                    text = stringResource(Res.string.unable_to_load_location_timeline),
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -191,7 +193,7 @@ private fun LocationCard(
                 // Current location label
                 if (isCurrentLocation) {
                     Text(
-                        text = "Current Location",
+                        text = stringResource(Res.string.current_location),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Medium,
                         color = if (isCurrentLocation) MaterialTheme.colorScheme.primary 
@@ -221,7 +223,10 @@ private fun LocationCard(
                 // Always show coordinates for current location
                 if (isCurrentLocation) {
                     Text(
-                        text = "Coordinates: ${formatCoordinates(locationItem.latitude, locationItem.longitude)}",
+                        text = stringResource(
+                            Res.string.coordinates_label,
+                            formatCoordinates(locationItem.latitude, locationItem.longitude)
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                     )
@@ -239,7 +244,10 @@ private fun LocationCard(
                 // Duration (if available)
                 if (locationItem.duration != null) {
                     Text(
-                        text = "Stayed for ${locationItem.duration}",
+                        text = stringResource(
+                            Res.string.stayed_for_duration,
+                            locationItem.duration
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = if (isCurrentLocation)
                             MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
@@ -253,7 +261,7 @@ private fun LocationCard(
                 IconButton(onClick = onDelete) {
                     Icon(
                         imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete location",
+                        contentDescription = stringResource(Res.string.delete_location),
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
@@ -280,7 +288,7 @@ private fun EmptyLocationTimeline(
         Spacer(modifier = Modifier.height(16.dp))
         
         Text(
-            text = "No location history yet",
+            text = stringResource(Res.string.no_location_history_yet),
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -288,7 +296,7 @@ private fun EmptyLocationTimeline(
         Spacer(modifier = Modifier.height(8.dp))
         
         Text(
-            text = "Your location timeline will appear here as you move around",
+            text = stringResource(Res.string.your_location_timeline_will_appear_here_as_you_move_around),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
         )

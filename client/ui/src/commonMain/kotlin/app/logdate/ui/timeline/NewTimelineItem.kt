@@ -28,7 +28,9 @@ import app.logdate.util.asTime
 import kotlin.time.Clock
 import kotlin.time.Instant
 import androidx.compose.ui.tooling.preview.Preview
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.*
+import logdate.client.ui.generated.resources.Res
 /**
  * A timeline item represents a "day", where a day represents a block of connected events
  * spanning a maximum of roughly 24 hours.
@@ -86,7 +88,7 @@ fun NewTimelineItem(
                     }
                     if (showOptions) {
                         IconButton(onClick = onOptionsClick) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "Options")
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(Res.string.options))
                         }
                     }
                 }
@@ -153,8 +155,8 @@ fun NewTimelineItemPreview_MaxDetails() {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
                 ) {
-                    Text("10 places", style = MaterialTheme.typography.labelSmall)
-                    Text("2 people", style = MaterialTheme.typography.labelSmall)
+                    Text(stringResource(Res.string.text_10_places), style = MaterialTheme.typography.labelSmall)
+                    Text(stringResource(Res.string.text_2_people), style = MaterialTheme.typography.labelSmall)
                 }
             },
             summaryView = {
@@ -178,8 +180,8 @@ fun NewTimelineItemPreview_MinDetails() {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
                 ) {
-                    Text("10 places", style = MaterialTheme.typography.labelSmall)
-                    Text("2 people", style = MaterialTheme.typography.labelSmall)
+                    Text(stringResource(Res.string.text_10_places), style = MaterialTheme.typography.labelSmall)
+                    Text(stringResource(Res.string.text_2_people), style = MaterialTheme.typography.labelSmall)
                 }
             },
             summaryView = {

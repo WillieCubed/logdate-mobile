@@ -31,8 +31,9 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import androidx.compose.ui.tooling.preview.Preview
 import kotlin.uuid.Uuid
-
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.timeline.generated.resources.*
+import logdate.client.feature.timeline.generated.resources.Res
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimelineDayDetailPanel(
@@ -58,7 +59,7 @@ fun TimelineDayDetailPanel(
                 title = { Text(timestamp.toReadableDateShort()) },
                 navigationIcon = {
                     IconButton(onClick = onExit) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "Close")
+                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(Res.string.close))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors().copy(
@@ -68,7 +69,7 @@ fun TimelineDayDetailPanel(
                     IconButton(onClick = {
                         onOpenRewind()
                     }) {
-                        Icon(Icons.Default.History, contentDescription = "Rewind")
+                        Icon(Icons.Default.History, contentDescription = stringResource(Res.string.rewind))
                     }
                 },
             )

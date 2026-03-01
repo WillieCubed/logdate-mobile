@@ -21,7 +21,9 @@ import app.logdate.client.permissions.PermissionStatus
 import app.logdate.client.permissions.PermissionType
 import io.github.aakira.napier.Napier
 import org.koin.compose.koinInject
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * Desktop implementation of audio permission wrapper
  * 
@@ -70,7 +72,7 @@ actual fun AudioPermissionWrapper(
                 // In a real implementation, we would check the result of a system permission request
                 permissionGranted = true
             },
-            title = { Text("Microphone Access") },
+            title = { Text(stringResource(Res.string.microphone_access)) },
             text = {
                 Column {
                     Text(
@@ -97,7 +99,7 @@ actual fun AudioPermissionWrapper(
                         showPermissionDialog = false
                     }
                 ) {
-                    Text("Allow Access")
+                    Text(stringResource(Res.string.allow_access))
                 }
             },
             dismissButton = {
@@ -108,7 +110,7 @@ actual fun AudioPermissionWrapper(
                         permissionGranted = true
                     }
                 ) {
-                    Text("Continue Anyway")
+                    Text(stringResource(Res.string.continue_anyway))
                 }
             }
         )

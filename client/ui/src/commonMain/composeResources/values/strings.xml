@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="a_long_time_passed">A long time passed...</string>
+    <string name="add_to_memories">Add to Memories</string>
+    <string name="add_your_birthday_in_settings_to_see_something_special_here">Add your birthday in settings to see something special here.</string>
+    <string name="back_to_today">Back to today</string>
+    <string name="congrats_curious_explorer">Congrats, curious explorer!</string>
+    <string name="expanded_content">Expanded content</string>
+    <string name="happy_birthday">Happy birthday.</string>
+    <string name="home">Home</string>
+    <string name="location_history">Location History</string>
+    <string name="manage_your_profile_settings">Manage your profile settings</string>
+    <string name="materialcontainer_examples">MaterialContainer Examples</string>
+    <string name="navigate_to_home_screen">Navigate to home screen</string>
+    <string name="options">Options</string>
+    <string name="photo_of_name">Photo of %1$s</string>
+    <string name="profile">Profile</string>
+    <string name="sample_content">Sample Content</string>
+    <string name="scroll_to_top">Scroll to top</string>
+    <string name="search">Search</string>
+    <string name="section_1">Section 1</string>
+    <string name="section_2">Section 2</string>
+    <string name="settings">Settings</string>
+    <string name="share_link">Share link</string>
+    <string name="simple_container_item_1">Simple container item 1</string>
+    <string name="simple_container_item_2">Simple container item 2</string>
+    <string name="text_10_places">10 places</string>
+    <string name="text_2_people">2 people</string>
+    <string name="timeline">Timeline</string>
+    <string name="youve_reached_the_end">You&apos;ve reached the end</string>
+    <string name="journey_days_count">You&apos;ve been on this journey for %1$d days.</string>
+</resources>

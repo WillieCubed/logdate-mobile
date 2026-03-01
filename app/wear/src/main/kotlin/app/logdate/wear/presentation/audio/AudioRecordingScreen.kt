@@ -16,11 +16,13 @@ import androidx.wear.compose.material.SwipeToDismissBox
 import androidx.wear.compose.material.SwipeToDismissValue
 import androidx.wear.compose.material.rememberSwipeToDismissBoxState
 import androidx.wear.compose.material3.*
+import app.logdate.wear.R
 import app.logdate.wear.presentation.audio.components.AudioWaveform
 import app.logdate.wear.presentation.audio.components.RecordButton
 import app.logdate.wear.presentation.audio.components.RecordingTimer
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
+import androidx.compose.ui.res.stringResource
 
 /**
  * Main screen for audio recording on Wear OS.
@@ -159,7 +161,7 @@ fun AudioRecordingScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.Close,
-                                    contentDescription = "Cancel"
+                                    contentDescription = stringResource(R.string.cancel)
                                 )
                             }
                         }

@@ -12,6 +12,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.aakira.napier.Napier
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.onboarding.generated.resources.*
+import logdate.client.feature.onboarding.generated.resources.Res
+private val RecoveryPhraseWordPattern = Regex("^[a-z]+$")
 
 @Composable
 fun RecoveryPhraseEntryScreen(
@@ -20,7 +25,7 @@ fun RecoveryPhraseEntryScreen(
 ) {
     var phraseWords by remember { mutableStateOf(List(12) { "" }) }
     var isRecovering by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var errorMessageRes by remember { mutableStateOf<StringResource?>(null) }
 
     Column(
         modifier = Modifier
@@ -30,12 +35,12 @@ fun RecoveryPhraseEntryScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Enter Recovery Phrase",
+            text = stringResource(Res.string.enter_recovery_phrase),
             style = MaterialTheme.typography.headlineMedium
         )
 
         Text(
-            text = "Enter your 12-word recovery phrase to restore your encryption keys and decrypt your data.",
+            text = stringResource(Res.string.enter_your_12_word_recovery_phrase_to_restore_your_encryption_keys_and_decrypt_your_data),
             style = MaterialTheme.typography.bodyMedium
         )
 
@@ -52,8 +57,9 @@ fun RecoveryPhraseEntryScreen(
                         phraseWords = phraseWords.toMutableList().apply {
                             this[index] = newValue.lowercase().trim()
                         }
+                        errorMessageRes = null
                     },
-                    label = { Text("${index + 1}") },
+                    label = { Text((index + 1).toString()) },
                     singleLine = true,
                     enabled = !isRecovering,
                     modifier = Modifier.fillMaxWidth()
@@ -61,7 +67,7 @@ fun RecoveryPhraseEntryScreen(
             }
         }
 
-        if (errorMessage != null) {
+        errorMessageRes?.let { messageRes ->
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.errorContainer
@@ -69,7 +75,7 @@ fun RecoveryPhraseEntryScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = "❌ ${errorMessage}",
+                    text = stringResource(messageRes),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(12.dp)
@@ -86,7 +92,7 @@ fun RecoveryPhraseEntryScreen(
             ) {
                 CircularProgressIndicator()
                 Spacer(modifier = Modifier.height(12.dp))
-                Text("Deriving encryption keys...")
+                Text(stringResource(Res.string.deriving_encryption_keys))
             }
         }
 
@@ -94,18 +100,44 @@ fun RecoveryPhraseEntryScreen(
 
         Button(
             onClick = {
-                if (phraseWords.all { it.isNotBlank() }) {
-                    isRecovering = true
-                    errorMessage = null
-                    // TODO: Call IdentityKeyManager.recoverIdentity(phraseWords)
-                    Napier.d("Attempting recovery with phrase: ${phraseWords.take(3).map { "***" }}")
-                    onRecovered()
+                val normalizedWords = phraseWords.map { it.trim().lowercase() }
+                val validationError = validateRecoveryPhrase(normalizedWords)
+                if (validationError != null) {
+                    errorMessageRes = validationError
+                    return@Button
                 }
+
+                isRecovering = true
+                errorMessageRes = null
+                phraseWords = normalizedWords
+                // TODO: Call IdentityKeyManager.recoverIdentity(phraseWords)
+                Napier.d("Attempting recovery with phrase: ${normalizedWords.take(3).map { "***" }}")
+
+                runCatching(onRecovered)
+                    .onFailure { throwable ->
+                        val reason = throwable.message?.takeIf { it.isNotBlank() }
+                            ?: "Recovery flow failed"
+                        Napier.e("Recovery phrase flow failed: $reason", throwable)
+                        errorMessageRes = Res.string.recovery_error_unexpected
+                        onError(reason)
+                    }
+
+                isRecovering = false
             },
-            enabled = phraseWords.all { it.isNotBlank() } && !isRecovering,
+            enabled = !isRecovering,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Recover Account")
+            Text(stringResource(Res.string.recover_account))
         }
     }
+}
+
+private fun validateRecoveryPhrase(words: List<String>): StringResource? {
+    if (words.any { it.isBlank() }) {
+        return Res.string.recovery_error_missing_words
+    }
+    if (words.any { !RecoveryPhraseWordPattern.matches(it) }) {
+        return Res.string.recovery_error_invalid_word_format
+    }
+    return null
 }

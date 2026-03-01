@@ -25,7 +25,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.location.timeline.generated.resources.*
+import logdate.client.feature.location.timeline.generated.resources.Res
 /**
  * A bottom sheet that displays the user's location timeline.
  * 
@@ -103,7 +105,7 @@ private fun LocationHeaderWithClose(
         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
     ) {
         Text(
-            text = "Location Timeline",
+            text = stringResource(Res.string.location_timeline),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Medium,
             modifier = Modifier.weight(1f)
@@ -112,7 +114,7 @@ private fun LocationHeaderWithClose(
         IconButton(onClick = onDismiss) {
             Icon(
                 imageVector = Icons.Default.Close,
-                contentDescription = "Close"
+                contentDescription = stringResource(Res.string.close)
             )
         }
     }

@@ -46,7 +46,8 @@ import logdate.client.feature.core.generated.resources.settings_reset_app_title
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
-
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 /**
  * Danger zone settings screen with destructive actions.
  *
@@ -95,10 +96,10 @@ private fun DangerZoneSettingsContent(
             // Only show top bar with back button in single-pane mode
             if (!isPotentialDetailPane) {
                 TopAppBar(
-                    title = { Text("Danger Zone") },
+                    title = { Text(stringResource(Res.string.danger_zone)) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
                         }
                     },
                     scrollBehavior = scrollBehavior,
@@ -121,7 +122,7 @@ private fun DangerZoneSettingsContent(
                 if (isPotentialDetailPane) {
                     item {
                         Text(
-                            text = "Danger Zone",
+                            text = stringResource(Res.string.danger_zone),
                             style = MaterialTheme.typography.headlineSmall,
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)
@@ -134,7 +135,7 @@ private fun DangerZoneSettingsContent(
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                 ) {
                     Text(
-                        text = "Reset Actions",
+                        text = stringResource(Res.string.reset_actions),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -143,7 +144,7 @@ private fun DangerZoneSettingsContent(
                         SurfaceItem {
                             ListItem(
                                 headlineContent = {
-                                    Text("Before you reset")
+                                    Text(stringResource(Res.string.before_you_reset))
                                 },
                                 supportingContent = {
                                     Text(
@@ -205,13 +206,13 @@ private fun DangerZoneSettingsContent(
                             ListItem(
                                 headlineContent = {
                                     Text(
-                                        text = "Clear All Data",
+                                        text = stringResource(Res.string.clear_all_data),
                                         color = MaterialTheme.colorScheme.error
                                     )
                                 },
                                 supportingContent = {
                                     Text(
-                                        text = "Clear all your data while keeping your account",
+                                        text = stringResource(Res.string.clear_all_your_data_while_keeping_your_account),
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                     )
                                 },
@@ -233,7 +234,7 @@ private fun DangerZoneSettingsContent(
                                             contentColor = MaterialTheme.colorScheme.error
                                         )
                                     ) {
-                                        Text("Clear Data")
+                                        Text(stringResource(Res.string.clear_data))
                                     }
                                 }
                             )
@@ -269,7 +270,7 @@ private fun DangerZoneSettingsContent(
                 },
                 title = {
                     Text(
-                        text = "Clear All Data?",
+                        text = stringResource(Res.string.clear_all_data_2),
                         color = MaterialTheme.colorScheme.error
                     )
                 },
@@ -292,12 +293,12 @@ private fun DangerZoneSettingsContent(
                             containerColor = MaterialTheme.colorScheme.error
                         )
                     ) {
-                        Text("Yes, Clear All Data")
+                        Text(stringResource(Res.string.yes_clear_all_data))
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showClearDataDialog = false }) {
-                        Text("Cancel")
+                        Text(stringResource(Res.string.cancel))
                     }
                 }
             )

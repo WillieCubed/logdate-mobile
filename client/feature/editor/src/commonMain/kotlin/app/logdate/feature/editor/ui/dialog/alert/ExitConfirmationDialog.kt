@@ -19,7 +19,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import app.logdate.ui.theme.Spacing
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * Confirmation dialog that appears when a user tries to exit the editor with unsaved changes.
  * Provides options to cancel, save as draft, or exit without saving.
@@ -40,7 +42,7 @@ fun ExitConfirmationDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "Unsaved Changes",
+                text = stringResource(Res.string.unsaved_changes),
                 style = MaterialTheme.typography.headlineSmall
             )
         },
@@ -51,7 +53,7 @@ fun ExitConfirmationDialog(
                 verticalArrangement = Arrangement.spacedBy(Spacing.md)
             ) {
                 Text(
-                    text = "You have unsaved changes that will be lost if you exit now.",
+                    text = stringResource(Res.string.you_have_unsaved_changes_that_will_be_lost_if_you_exit_now),
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.bodyLarge
                 )
@@ -59,7 +61,7 @@ fun ExitConfirmationDialog(
                 Spacer(modifier = Modifier.height(Spacing.md))
                 
                 Text(
-                    text = "Would you like to save your changes as a draft?",
+                    text = stringResource(Res.string.would_you_like_to_save_your_changes_as_a_draft),
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.bodyLarge
                 )
@@ -72,19 +74,19 @@ fun ExitConfirmationDialog(
             ) {
                 // Cancel button - continue editing
                 TextButton(onClick = onDismiss) {
-                    Text("Cancel")
+                    Text(stringResource(Res.string.cancel))
                 }
                 
                 Spacer(modifier = Modifier.width(Spacing.sm))
                 
                 // Discard button - exit without saving
                 OutlinedButton(onClick = onDiscardAndExit) {
-                    Text("Discard")
+                    Text(stringResource(Res.string.discard))
                 }
                 
                 // Save as draft button - primary action
                 FilledTonalButton(onClick = onSaveAsDraft) {
-                    Text("Save Draft")
+                    Text(stringResource(Res.string.save_draft))
                 }
             }
         },

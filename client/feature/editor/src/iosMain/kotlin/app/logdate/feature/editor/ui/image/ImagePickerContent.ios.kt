@@ -26,7 +26,9 @@ import platform.UIKit.UIImagePickerControllerDelegateProtocol
 import platform.UIKit.UIImagePickerControllerSourceType
 import platform.UIKit.UINavigationControllerDelegateProtocol
 import platform.UIKit.UIViewController
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * iOS implementation of the image picker content.
  * Provides options to select an image from the photo library or take a photo.
@@ -47,7 +49,7 @@ actual fun ImagePickerContent(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "Add an image to your entry",
+            text = stringResource(Res.string.add_an_image_to_your_entry),
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center
         )
@@ -71,7 +73,7 @@ actual fun ImagePickerContent(
                     }
                 }
             ) {
-                Text("Photo Library")
+                Text(stringResource(Res.string.photo_library))
             }
             
             // Camera button
@@ -87,7 +89,7 @@ actual fun ImagePickerContent(
                     }
                 }
             ) {
-                Text("Camera")
+                Text(stringResource(Res.string.camera))
             }
         }
     }

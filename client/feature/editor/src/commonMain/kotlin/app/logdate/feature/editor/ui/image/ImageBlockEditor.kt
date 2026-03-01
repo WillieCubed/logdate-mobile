@@ -24,7 +24,9 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import io.github.aakira.napier.Napier
 import org.koin.compose.viewmodel.koinViewModel
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * A component that handles image display and editing within the editor.
  * 
@@ -90,7 +92,7 @@ fun ImageBlockEditor(
                 
                 DeleteMediaButton(
                     onClick = onDeleteRequested,
-                    contentDescription = "Delete image",
+                    contentDescription = stringResource(Res.string.delete_image),
                     modifier = Modifier.align(Alignment.TopEnd)
                 )
             }

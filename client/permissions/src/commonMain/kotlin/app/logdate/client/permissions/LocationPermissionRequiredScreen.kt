@@ -11,7 +11,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.permissions.generated.resources.*
+import logdate.client.permissions.generated.resources.Res
 @Composable
 fun LocationPermissionRequiredScreen(
     onPermissionGranted: () -> Unit,
@@ -43,7 +45,7 @@ fun LocationPermissionRequiredScreen(
         Spacer(modifier = Modifier.height(24.dp))
         
         Text(
-            text = "Location Permission Required",
+            text = stringResource(Res.string.location_permission_required),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
@@ -80,7 +82,7 @@ fun LocationPermissionRequiredScreen(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Open Settings")
+                Text(stringResource(Res.string.open_settings))
             }
         } else {
             // Show permission request button
@@ -94,7 +96,7 @@ fun LocationPermissionRequiredScreen(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Allow Location Access")
+                Text(stringResource(Res.string.allow_location_access))
             }
         }
         
@@ -112,7 +114,7 @@ fun LocationPermissionRequiredScreen(
                 modifier = Modifier.padding(16.dp)
             ) {
                 Text(
-                    text = "🔒 Privacy First",
+                    text = stringResource(Res.string.privacy_first),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.primary
@@ -121,7 +123,7 @@ fun LocationPermissionRequiredScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Text(
-                    text = "Your location data is stored locally on your device and is never shared without your explicit consent.",
+                    text = stringResource(Res.string.your_location_data_is_stored_locally_on_your_device_and_is_never_shared_without_your_explicit_consent),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

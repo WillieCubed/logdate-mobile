@@ -49,7 +49,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.ui.theme.Spacing
 import androidx.compose.ui.tooling.preview.Preview
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 @Composable
 fun PasskeyAccountCreationScreen(
     viewModel: PasskeyAccountCreationViewModel,
@@ -107,12 +109,12 @@ private fun PasskeyAccountCreationContent(
             IconButton(onClick = onNavigateBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Default.ArrowBack,
-                    contentDescription = "Go back"
+                    contentDescription = stringResource(Res.string.go_back)
                 )
             }
             
             Text(
-                text = "Create Account",
+                text = stringResource(Res.string.create_account),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
@@ -141,13 +143,13 @@ private fun PasskeyAccountCreationContent(
                             tint = MaterialTheme.colorScheme.onErrorContainer
                         )
                         Text(
-                            text = "Passkeys Not Supported",
+                            text = stringResource(Res.string.passkeys_not_supported),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onErrorContainer
                         )
                     }
                     Text(
-                        text = "Your device doesn't support passkeys. Please use a device with biometric authentication or a security key.",
+                        text = stringResource(Res.string.your_device_doesnt_support_passkeys_please_use_a_device_with_biometric_authentication_or_a_security_key),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
@@ -171,13 +173,13 @@ private fun PasskeyAccountCreationContent(
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = "Create LogDate Cloud Account",
+                        text = stringResource(Res.string.create_logdate_cloud_account),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
                 Text(
-                    text = "Create your account with a passkey for secure, password-free access to LogDate Cloud.",
+                    text = stringResource(Res.string.create_your_account_with_a_passkey_for_secure_password_free_access_to_logdate_cloud),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -188,7 +190,7 @@ private fun PasskeyAccountCreationContent(
         OutlinedTextField(
             value = uiState.username,
             onValueChange = onUsernameChange,
-            label = { Text("Username") },
+            label = { Text(stringResource(Res.string.username)) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.Person,
@@ -206,21 +208,21 @@ private fun PasskeyAccountCreationContent(
                     UsernameAvailability.Available -> {
                         Icon(
                             imageVector = Icons.Default.CheckCircle,
-                            contentDescription = "Username available",
+                            contentDescription = stringResource(Res.string.username_available),
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
                     UsernameAvailability.Taken -> {
                         Icon(
                             imageVector = Icons.Default.Cancel,
-                            contentDescription = "Username taken",
+                            contentDescription = stringResource(Res.string.username_taken),
                             tint = MaterialTheme.colorScheme.error
                         )
                     }
                     UsernameAvailability.Error -> {
                         Icon(
                             imageVector = Icons.Default.Warning,
-                            contentDescription = "Error checking username",
+                            contentDescription = stringResource(Res.string.error_checking_username),
                             tint = MaterialTheme.colorScheme.error
                         )
                     }
@@ -243,7 +245,7 @@ private fun PasskeyAccountCreationContent(
         OutlinedTextField(
             value = uiState.displayName,
             onValueChange = onDisplayNameChange,
-            label = { Text("Display Name") },
+            label = { Text(stringResource(Res.string.display_name)) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.Badge,
@@ -266,14 +268,14 @@ private fun PasskeyAccountCreationContent(
         OutlinedTextField(
             value = uiState.bio,
             onValueChange = onBioChange,
-            label = { Text("Bio (Optional)") },
+            label = { Text(stringResource(Res.string.bio_optional)) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.Description,
                     contentDescription = null
                 )
             },
-            supportingText = { Text("Tell others about yourself") },
+            supportingText = { Text(stringResource(Res.string.tell_others_about_yourself_2)) },
             keyboardOptions = KeyboardOptions(
                 imeAction = ImeAction.Done,
                 capitalization = KeyboardCapitalization.Sentences
@@ -312,7 +314,7 @@ private fun PasskeyAccountCreationContent(
                     IconButton(onClick = onClearError) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Dismiss",
+                            contentDescription = stringResource(Res.string.dismiss),
                             tint = MaterialTheme.colorScheme.onErrorContainer
                         )
                     }
@@ -359,7 +361,7 @@ private fun PasskeyAccountCreationContent(
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
                 Text(
-                    text = "About Passkeys",
+                    text = stringResource(Res.string.about_passkeys),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )

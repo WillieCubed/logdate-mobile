@@ -31,7 +31,9 @@ import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.conditional
 import app.logdate.ui.theme.Spacing
 import androidx.compose.ui.tooling.preview.Preview
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.*
+import logdate.client.ui.generated.resources.Res
 @Stable
 class SearchAppBarState(
     var query: String = "",
@@ -122,7 +124,7 @@ fun SearchBarBase(
                         .weight(1f)
                         .padding(end = 8.dp),
                 )
-                Icon(Icons.Default.Search, contentDescription = "Search")
+                Icon(Icons.Default.Search, contentDescription = stringResource(Res.string.search))
             }
             content()
         }
@@ -174,7 +176,7 @@ private fun SearchAppBarPreview() {
 private fun SearchAppBarPreview_Expanded() {
     SearchAppBar(expanded = true) {
         Box(Modifier.padding(16.dp)) {
-            Text("Expanded content")
+            Text(stringResource(Res.string.expanded_content))
         }
     }
 }

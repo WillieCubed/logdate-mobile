@@ -24,7 +24,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.ui.theme.Spacing
 import io.github.aakira.napier.Napier
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * Content component for text blocks in the editor.
  *
@@ -87,7 +89,7 @@ fun TextBlockContent(
                 Box(modifier = Modifier.padding(Spacing.md)) {
                     if (block.content.isEmpty() && !isExpanded) {
                         Text(
-                            text = "What's on your mind?",
+                            text = stringResource(Res.string.whats_on_your_mind),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )

@@ -44,7 +44,9 @@ import app.logdate.feature.rewind.ui.RewindPanelUiState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.rewind.generated.resources.*
+import logdate.client.feature.rewind.generated.resources.Res
 /**
  * A full-screen Instagram Stories-like interface for viewing rewind content.
  * 
@@ -202,7 +204,7 @@ fun RewindStoryView(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Close rewind",
+                        contentDescription = stringResource(Res.string.close_rewind),
                         tint = Color.White
                     )
                 }

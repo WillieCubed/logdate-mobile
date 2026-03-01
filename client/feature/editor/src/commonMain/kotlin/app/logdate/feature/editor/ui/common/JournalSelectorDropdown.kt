@@ -43,7 +43,9 @@ import androidx.compose.ui.unit.dp
 import app.logdate.shared.model.Journal
 import app.logdate.ui.theme.Spacing
 import kotlin.uuid.Uuid
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * A Material You styled dropdown component to select multiple journals to associate an entry with.
  *
@@ -227,7 +229,7 @@ private fun DropdownIndicators(selectedCount: Int) {
         // Expand icon
         Icon(
             Icons.Default.ExpandMore,
-            contentDescription = "Expand",
+            contentDescription = stringResource(Res.string.expand),
             tint = if (selectedCount > 0)
                 MaterialTheme.colorScheme.onPrimaryContainer
             else

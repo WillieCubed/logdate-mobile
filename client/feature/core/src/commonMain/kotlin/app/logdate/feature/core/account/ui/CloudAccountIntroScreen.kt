@@ -27,7 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.koin.compose.viewmodel.koinViewModel
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 /**
  * Introduction screen for LogDate Cloud account setup.
  * 
@@ -70,7 +72,7 @@ fun CloudAccountIntroScreen(
             )
             
             Text(
-                text = "LogDate Cloud",
+                text = stringResource(Res.string.logdate_cloud),
                 style = MaterialTheme.typography.headlineMedium,
                 textAlign = TextAlign.Center
             )
@@ -78,7 +80,7 @@ fun CloudAccountIntroScreen(
             Spacer(modifier = Modifier.height(16.dp))
             
             Text(
-                text = "Securely sync your journals, notes, and memories across all your devices.",
+                text = stringResource(Res.string.securely_sync_your_journals_notes_and_memories_across_all_your_devices),
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center
             )
@@ -101,7 +103,7 @@ fun CloudAccountIntroScreen(
                 onClick = onContinue,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Continue")
+                Text(stringResource(Res.string.continue))
             }
             
             if (isFromOnboarding) {
@@ -109,14 +111,14 @@ fun CloudAccountIntroScreen(
                     onClick = onSkip,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Skip for Now")
+                    Text(stringResource(Res.string.skip_for_now_2))
                 }
             } else {
                 TextButton(
                     onClick = onBack,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Not Now")
+                    Text(stringResource(Res.string.not_now))
                 }
             }
         }

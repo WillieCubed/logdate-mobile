@@ -62,7 +62,9 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.video.videoFramePercent
 import io.github.aakira.napier.Napier
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * Android implementation of video player content.
  * Uses ExoPlayer for production-quality video playback with proper lifecycle management.
@@ -170,7 +172,7 @@ actual fun VideoPlayerContent(
                         .crossfade(true)
                         .videoFramePercent(0.1)
                         .build(),
-                    contentDescription = "Video thumbnail",
+                    contentDescription = stringResource(Res.string.video_thumbnail),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -186,7 +188,7 @@ actual fun VideoPlayerContent(
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Default.PlayArrow,
-                            contentDescription = "Play video",
+                            contentDescription = stringResource(Res.string.play_video),
                             modifier = Modifier.size(36.dp),
                             tint = Color.Black
                         )
@@ -218,7 +220,7 @@ actual fun VideoPlayerContent(
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.Pause,
-                                contentDescription = "Pause video",
+                                contentDescription = stringResource(Res.string.pause_video),
                                 modifier = Modifier.size(36.dp),
                                 tint = Color.White
                             )
@@ -296,7 +298,7 @@ actual fun VideoPickerContent(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Add a video to your entry",
+                text = stringResource(Res.string.add_a_video_to_your_entry),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -306,7 +308,7 @@ actual fun VideoPickerContent(
             OutlinedButton(
                 onClick = { launchVideoPicker() }
             ) {
-                Text("Choose from gallery")
+                Text(stringResource(Res.string.choose_from_gallery))
             }
         }
     }

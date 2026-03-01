@@ -10,7 +10,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.onboarding.generated.resources.*
+import logdate.client.feature.onboarding.generated.resources.Res
 @Composable
 fun RecoveryPhraseSetupScreen(
     onPhraseContinue: (List<String>) -> Unit
@@ -49,12 +51,12 @@ private fun RecoveryPhraseDisplayContent(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "🔑 Your Recovery Phrase",
+            text = stringResource(Res.string.your_recovery_phrase),
             style = MaterialTheme.typography.headlineMedium
         )
 
         Text(
-            text = "Write these 12 words on paper and store them safely. You'll need them to recover your data if you lose your device.",
+            text = stringResource(Res.string.write_these_12_words_on_paper_and_store_them_safely_youll_need_them_to_recover_your_data_if_you_lose_your_device),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -76,7 +78,10 @@ private fun RecoveryPhraseDisplayContent(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "${index + 1}.",
+                            text = stringResource(
+                                Res.string.recovery_phrase_index,
+                                index + 1
+                            ),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.width(24.dp)
@@ -91,9 +96,18 @@ private fun RecoveryPhraseDisplayContent(
             }
         }
 
-        WarningCard(icon = "⚠️", text = "Never share your recovery phrase with anyone")
-        WarningCard(icon = "📝", text = "Write it down on paper - don't save digitally")
-        WarningCard(icon = "🔒", text = "Store it in a safe place")
+        WarningCard(
+            icon = "⚠️",
+            text = stringResource(Res.string.warning_recovery_phrase_never_share)
+        )
+        WarningCard(
+            icon = "📝",
+            text = stringResource(Res.string.warning_recovery_phrase_write_on_paper)
+        )
+        WarningCard(
+            icon = "🔒",
+            text = stringResource(Res.string.warning_recovery_phrase_store_safe)
+        )
 
         Spacer(modifier = Modifier.weight(1f))
 
@@ -106,7 +120,7 @@ private fun RecoveryPhraseDisplayContent(
                 onCheckedChange = { userConfirmed = it }
             )
             Text(
-                text = "I have written down my recovery phrase",
+                text = stringResource(Res.string.i_have_written_down_my_recovery_phrase),
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -116,7 +130,7 @@ private fun RecoveryPhraseDisplayContent(
             enabled = userConfirmed,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Continue")
+            Text(stringResource(Res.string.continue))
         }
     }
 }
@@ -146,12 +160,12 @@ private fun RecoveryPhraseVerificationContent(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Verify Your Recovery Phrase",
+            text = stringResource(Res.string.verify_your_recovery_phrase),
             style = MaterialTheme.typography.headlineMedium
         )
 
         Text(
-            text = "Enter the following words from your recovery phrase to confirm you've written it down correctly.",
+            text = stringResource(Res.string.enter_the_following_words_from_your_recovery_phrase_to_confirm_youve_written_it_down_correctly),
             style = MaterialTheme.typography.bodyMedium
         )
 
@@ -159,7 +173,14 @@ private fun RecoveryPhraseVerificationContent(
             OutlinedTextField(
                 value = userInputs[index] ?: "",
                 onValueChange = { userInputs = userInputs + (index to it) },
-                label = { Text("Word #${index + 1}") },
+                label = {
+                    Text(
+                        stringResource(
+                            Res.string.word_number,
+                            index + 1
+                        )
+                    )
+                },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -172,7 +193,7 @@ private fun RecoveryPhraseVerificationContent(
             enabled = allCorrect,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Verify & Continue")
+            Text(stringResource(Res.string.verify_and_continue))
         }
     }
 }

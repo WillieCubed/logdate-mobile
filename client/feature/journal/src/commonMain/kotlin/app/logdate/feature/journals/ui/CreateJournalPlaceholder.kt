@@ -23,7 +23,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.journal.generated.resources.*
+import logdate.client.feature.journal.generated.resources.Res
 /**
  * A placeholder journal cover that allows users to create a new journal.
  */
@@ -56,12 +58,12 @@ internal fun CreateJournalPlaceholder(
         ) {
             Icon(
                 Icons.Default.Add,
-                contentDescription = "Create new journal",
+                contentDescription = stringResource(Res.string.create_new_journal),
                 modifier = Modifier.size(48.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = "Create Journal",
+                text = stringResource(Res.string.create_journal),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

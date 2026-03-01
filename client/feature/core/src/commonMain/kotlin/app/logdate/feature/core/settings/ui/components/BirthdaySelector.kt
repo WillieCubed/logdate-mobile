@@ -22,7 +22,9 @@ import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 /**
  * Format a LocalDate according to the current locale.
  * This is implemented differently on each platform.
@@ -56,7 +58,7 @@ fun BirthdaySelector(
     
     // The list item that shows the current birthday and opens the date picker
     ListItem(
-        headlineContent = { Text("Birthday") },
+        headlineContent = { Text(stringResource(Res.string.birthday)) },
         supportingContent = { Text(formattedBirthday) },
         leadingContent = {
             Icon(
@@ -88,12 +90,12 @@ fun BirthdaySelector(
                         showDatePicker = false
                     }
                 ) {
-                    Text("Confirm")
+                    Text(stringResource(Res.string.confirm))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) {
-                    Text("Cancel")
+                    Text(stringResource(Res.string.cancel))
                 }
             }
         ) {

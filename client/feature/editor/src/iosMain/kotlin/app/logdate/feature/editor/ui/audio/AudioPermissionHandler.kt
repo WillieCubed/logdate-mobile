@@ -25,7 +25,9 @@ import app.logdate.client.permissions.PermissionStatus
 import app.logdate.client.permissions.PermissionType
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * iOS implementation of AudioPermissionWrapper.
  * 
@@ -74,7 +76,7 @@ actual fun AudioPermissionWrapper(
                 modifier = Modifier.padding(16.dp)
             ) {
                 Text(
-                    text = "LogDate needs access to your microphone to record audio.",
+                    text = stringResource(Res.string.logdate_needs_access_to_your_microphone_to_record_audio),
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center
                 )
@@ -84,7 +86,7 @@ actual fun AudioPermissionWrapper(
                 Button(
                     onClick = { requestPermissions() }
                 ) {
-                    Text("Grant Permission")
+                    Text(stringResource(Res.string.grant_permission))
                 }
             }
         }

@@ -58,7 +58,9 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import io.github.aakira.napier.Napier
 import org.koin.compose.viewmodel.koinViewModel
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * Android implementation of the camera capture content.
  * Shows an inline camera with controls for capturing photos/videos.
@@ -145,7 +147,7 @@ private fun CameraPermissionRequest(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Tap to enable camera",
+                    text = stringResource(Res.string.tap_to_enable_camera),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -216,7 +218,7 @@ private fun InlineCameraCapture(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Close camera",
+                        contentDescription = stringResource(Res.string.close_camera),
                         tint = Color.White
                     )
                 }
@@ -259,7 +261,7 @@ private fun InlineCameraCapture(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Cameraswitch,
-                        contentDescription = "Switch camera",
+                        contentDescription = stringResource(Res.string.switch_camera),
                         tint = if (uiState.isRecording) Color.Gray else Color.White
                     )
                 }
@@ -332,7 +334,7 @@ private fun PhotoVideoToggle(
         FilterChip(
             selected = currentMode == CaptureMode.PHOTO,
             onClick = { onModeChanged(CaptureMode.PHOTO) },
-            label = { Text("Photo") },
+            label = { Text(stringResource(Res.string.photo)) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.CameraAlt,
@@ -353,7 +355,7 @@ private fun PhotoVideoToggle(
         FilterChip(
             selected = currentMode == CaptureMode.VIDEO,
             onClick = { onModeChanged(CaptureMode.VIDEO) },
-            label = { Text("Video") },
+            label = { Text(stringResource(Res.string.video)) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.Videocam,

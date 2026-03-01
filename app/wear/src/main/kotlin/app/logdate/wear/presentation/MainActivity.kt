@@ -146,7 +146,7 @@ fun HomeScreen(onNavigateToAudio: () -> Unit) {
                     onClick = onNavigateToAudio,
                     modifier = Modifier.padding(top = 16.dp)
                 ) {
-                    Text("Record Audio")
+                    Text(stringResource(R.string.record_audio_2))
                 }
             }
         }

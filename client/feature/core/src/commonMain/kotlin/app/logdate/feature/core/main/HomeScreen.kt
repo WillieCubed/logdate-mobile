@@ -61,7 +61,9 @@ import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.plus
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 @Composable
 fun HomeScreen(
     onNewEntry: () -> Unit,
@@ -175,7 +177,7 @@ internal fun HomeScaffoldWrapper(
             ) {
                 Icon(
                     Icons.Default.EditNote,
-                    contentDescription = "Create new entry",
+                    contentDescription = stringResource(Res.string.create_new_entry),
                 )
             }
         }

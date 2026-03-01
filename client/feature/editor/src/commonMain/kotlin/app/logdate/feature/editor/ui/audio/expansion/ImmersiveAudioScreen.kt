@@ -55,7 +55,9 @@ import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.number
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * Full-screen immersive audio playback experience.
  *
@@ -125,7 +127,7 @@ fun ImmersiveAudioScreen(
         ) {
             Icon(
                 imageVector = Icons.Rounded.Close,
-                contentDescription = "Close",
+                contentDescription = stringResource(Res.string.close),
                 tint = Color.White.copy(alpha = 0.8f)
             )
         }
@@ -225,7 +227,7 @@ fun ImmersiveAudioScreen(
                         IconButton(onClick = onSkipBack) {
                             Icon(
                                 imageVector = Icons.Rounded.Replay10,
-                                contentDescription = "Skip back 10 seconds",
+                                contentDescription = stringResource(Res.string.skip_back_10_seconds),
                                 tint = Color.White,
                                 modifier = Modifier.size(32.dp)
                             )
@@ -258,7 +260,7 @@ fun ImmersiveAudioScreen(
                         IconButton(onClick = onSkipForward) {
                             Icon(
                                 imageVector = Icons.Rounded.Forward10,
-                                contentDescription = "Skip forward 10 seconds",
+                                contentDescription = stringResource(Res.string.skip_forward_10_seconds),
                                 tint = Color.White,
                                 modifier = Modifier.size(32.dp)
                             )

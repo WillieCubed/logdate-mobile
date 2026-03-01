@@ -58,7 +58,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.formatMediaDuration
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 // Default height constants for audio visualizations
 private val COLLAPSED_WAVEFORM_MIN_HEIGHT = 32.dp
 private val EXPANDED_WAVEFORM_MIN_HEIGHT = 180.dp
@@ -284,7 +286,7 @@ private fun CollapsedAudioContent(
                 )
             } else {
                 Text(
-                    text = "00:00",
+                    text = stringResource(Res.string.text_00_00),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) // Dimmed to indicate placeholder
                 )
@@ -339,7 +341,7 @@ private fun ExpandedAudioContent(
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.DeleteOutline,
-                        contentDescription = "Delete",
+                        contentDescription = stringResource(Res.string.delete),
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
@@ -450,7 +452,7 @@ private fun ExpandedAudioContent(
                 } else {
                     // Placeholder when no audio exists
                     Text(
-                        text = "No audio recorded yet. Use the microphone button to begin recording.",
+                        text = stringResource(Res.string.no_audio_recorded_yet_use_the_microphone_button_to_begin_recording),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),

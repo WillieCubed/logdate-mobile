@@ -49,7 +49,9 @@ import app.logdate.shared.model.Journal
 import app.logdate.ui.common.MaterialContainer
 import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.journal.generated.resources.*
+import logdate.client.feature.journal.generated.resources.Res
 /**
  * Screen for sharing a journal with others.
  * 
@@ -79,12 +81,12 @@ fun ShareJournalScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Share journal") },
+                title = { Text(stringResource(Res.string.share_journal_2)) },
                 navigationIcon = {
                     IconButton(onClick = onGoBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Go back"
+                            contentDescription = stringResource(Res.string.go_back)
                         )
                     }
                 }
@@ -98,7 +100,7 @@ fun ShareJournalScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Loading...")
+                    Text(stringResource(Res.string.loading))
                 }
             }
             is ShareJournalUiState.Error -> {
@@ -107,7 +109,7 @@ fun ShareJournalScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Failed to load journal")
+                    Text(stringResource(Res.string.failed_to_load_journal))
                 }
             }
             is ShareJournalUiState.Success -> {
@@ -169,7 +171,7 @@ private fun ShareJournalContent(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "This journal is available on the web. Anyone with the link can view it.",
+                        text = stringResource(Res.string.this_journal_is_available_on_the_web_anyone_with_the_link_can_view_it),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -213,7 +215,7 @@ private fun ShareJournalContent(
                     contentDescription = null
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(text = "Share")
+                Text(text = stringResource(Res.string.share))
             }
         }
         
@@ -230,12 +232,12 @@ private fun ShareJournalContent(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = "Also sharing to nearby LogDate contacts.",
+                text = stringResource(Res.string.also_sharing_to_nearby_logdate_contacts),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = "Bring your devices together to invite someone to add stuff.",
+                text = stringResource(Res.string.bring_your_devices_together_to_invite_someone_to_add_stuff),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center

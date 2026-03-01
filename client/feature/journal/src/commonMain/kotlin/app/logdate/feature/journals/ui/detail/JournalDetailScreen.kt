@@ -63,7 +63,8 @@ import logdate.client.feature.journal.generated.resources.delete_journal_title
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
-
+import logdate.client.feature.journal.generated.resources.*
+import logdate.client.feature.journal.generated.resources.Res
 /**
  * The main screen to view a journal's contents.
  */
@@ -125,7 +126,7 @@ fun JournalDetailScreen(
                             IconButton(onClick = { onGoBack() }) {
                                 Icon(
                                     Icons.AutoMirrored.Default.ArrowBack,
-                                    contentDescription = "Back"
+                                    contentDescription = stringResource(Res.string.back)
                                 )
                             }
                         },
@@ -157,7 +158,7 @@ fun JournalDetailScreen(
                             IconButton(onClick = { onNavigateToShare((state as JournalDetailUiState.Success).journalId) }) {
                                 Icon(
                                     Icons.Default.Share,
-                                    contentDescription = "Share journal"
+                                    contentDescription = stringResource(Res.string.share_journal_2)
                                 )
                             }
                             
@@ -165,7 +166,7 @@ fun JournalDetailScreen(
                             IconButton(onClick = { onNavigateToSettings((state as JournalDetailUiState.Success).journalId) }) {
                                 Icon(
                                     Icons.Default.Settings,
-                                    contentDescription = "Journal settings"
+                                    contentDescription = stringResource(Res.string.journal_settings_2)
                                 )
                             }
                             
@@ -173,7 +174,7 @@ fun JournalDetailScreen(
                             IconButton(onClick = { openDeleteConfirmation = true }) {
                                 Icon(
                                     Icons.Default.DeleteOutline,
-                                    contentDescription = "Delete journal"
+                                    contentDescription = stringResource(Res.string.delete_journal_2)
                                 )
                             }
                         },
@@ -192,7 +193,7 @@ fun JournalDetailScreen(
                             .padding(Spacing.lg),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("No entries in this journal yet")
+                        Text(stringResource(Res.string.no_entries_in_this_journal_yet))
                     }
                 } else {
                     Column(
@@ -284,7 +285,7 @@ fun DeleteConfirmationDialog(
             TextButton(
                 onClick = onDismissRequest,
             ) {
-                Text("Cancel")
+                Text(stringResource(Res.string.cancel))
             }
         }
     )

@@ -20,7 +20,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import androidx.compose.ui.tooling.preview.Preview
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 @Composable
 fun PasskeyAccountCreationFinalContent(
     displayName: String,
@@ -55,7 +57,7 @@ fun PasskeyAccountCreationFinalContent(
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Go back"
+                        contentDescription = stringResource(Res.string.go_back)
                     )
                 }
                 
@@ -67,7 +69,7 @@ fun PasskeyAccountCreationFinalContent(
                 )
                 
                 Text(
-                    text = "3 of 3",
+                    text = stringResource(Res.string.text_3_of_3),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -81,14 +83,14 @@ fun PasskeyAccountCreationFinalContent(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Almost ready!",
+                    text = stringResource(Res.string.almost_ready),
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
                 
                 Text(
-                    text = "Review your details and create your secure passkey to complete your LogDate Cloud account.",
+                    text = stringResource(Res.string.review_your_details_and_create_your_secure_passkey_to_complete_your_logdate_cloud_account),
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -107,7 +109,7 @@ fun PasskeyAccountCreationFinalContent(
                     verticalArrangement = Arrangement.spacedBy(Spacing.md)
                 ) {
                     Text(
-                        text = "Your LogDate Cloud Account",
+                        text = stringResource(Res.string.your_logdate_cloud_account),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -126,7 +128,7 @@ fun PasskeyAccountCreationFinalContent(
                         )
                         Column {
                             Text(
-                                text = "Display Name",
+                                text = stringResource(Res.string.display_name),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                             )
@@ -151,12 +153,15 @@ fun PasskeyAccountCreationFinalContent(
                         )
                         Column {
                             Text(
-                                text = "Username",
+                                text = stringResource(Res.string.username),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                             )
                             Text(
-                                text = "@$username@logdate.app",
+                                text = stringResource(
+                                    Res.string.unique_address_username,
+                                    username
+                                ),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
@@ -186,13 +191,13 @@ fun PasskeyAccountCreationFinalContent(
                                 tint = MaterialTheme.colorScheme.onErrorContainer
                             )
                             Text(
-                                text = "Passkeys Not Supported",
+                                text = stringResource(Res.string.passkeys_not_supported),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
                         }
                         Text(
-                            text = "Your device doesn't support passkeys. Please use a device with biometric authentication or a security key.",
+                            text = stringResource(Res.string.your_device_doesnt_support_passkeys_please_use_a_device_with_biometric_authentication_or_a_security_key),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onErrorContainer
                         )
@@ -204,15 +209,15 @@ fun PasskeyAccountCreationFinalContent(
             OutlinedTextField(
                 value = bio,
                 onValueChange = onBioChange,
-                label = { Text("Bio (Optional)") },
-                placeholder = { Text("Tell others about yourself...") },
+                label = { Text(stringResource(Res.string.bio_optional)) },
+                placeholder = { Text(stringResource(Res.string.tell_others_about_yourself)) },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Description,
                         contentDescription = null
                     )
                 },
-                supportingText = { Text("Share something about yourself with the LogDate community") },
+                supportingText = { Text(stringResource(Res.string.share_something_about_yourself_with_the_logdate_community)) },
                 keyboardOptions = KeyboardOptions(
                     imeAction = ImeAction.Done,
                     capitalization = KeyboardCapitalization.Sentences
@@ -251,7 +256,7 @@ fun PasskeyAccountCreationFinalContent(
                         IconButton(onClick = onClearError) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Dismiss",
+                                contentDescription = stringResource(Res.string.dismiss),
                                 tint = MaterialTheme.colorScheme.onErrorContainer
                             )
                         }
@@ -280,7 +285,7 @@ fun PasskeyAccountCreationFinalContent(
                             modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            text = "About Passkeys",
+                            text = stringResource(Res.string.about_passkeys),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -307,7 +312,7 @@ fun PasskeyAccountCreationFinalContent(
                     color = MaterialTheme.colorScheme.onPrimary
                 )
                 Spacer(modifier = Modifier.width(Spacing.sm))
-                Text("Creating Account...")
+                Text(stringResource(Res.string.creating_account))
             } else {
                 Icon(
                     imageVector = Icons.Default.Key,
@@ -315,7 +320,7 @@ fun PasskeyAccountCreationFinalContent(
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(Spacing.sm))
-                Text("Create Account with Passkey")
+                Text(stringResource(Res.string.create_account_with_passkey))
             }
         }
     }

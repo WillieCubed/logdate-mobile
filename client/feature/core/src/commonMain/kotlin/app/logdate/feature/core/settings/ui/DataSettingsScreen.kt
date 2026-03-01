@@ -48,7 +48,8 @@ import logdate.client.feature.core.generated.resources.settings_export_entries_l
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
-
+import logdate.client.feature.core.generated.resources.*
+import logdate.client.feature.core.generated.resources.Res
 /**
  * Data and storage settings screen.
  *
@@ -171,10 +172,10 @@ private fun DataSettingsContent(
             // Only show top bar with back button in single-pane mode
             if (!isPotentialDetailPane) {
                 TopAppBar(
-                    title = { Text("Data & Storage") },
+                    title = { Text(stringResource(Res.string.data_and_storage)) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
                         }
                     },
                     scrollBehavior = scrollBehavior,
@@ -193,7 +194,7 @@ private fun DataSettingsContent(
                 if (isPotentialDetailPane) {
                     item {
                         Text(
-                            text = "Data & Storage",
+                            text = stringResource(Res.string.data_and_storage),
                             style = MaterialTheme.typography.headlineSmall,
                             modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)
                         )
@@ -214,7 +215,7 @@ private fun DataSettingsContent(
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                 ) {
                     Text(
-                        text = "Data Management",
+                        text = stringResource(Res.string.data_management),
                         style = MaterialTheme.typography.titleMedium
                     )
                     MaterialContainer {
@@ -230,7 +231,10 @@ private fun DataSettingsContent(
                                             val path = exportState.path
                                             Spacer(modifier = Modifier.height(Spacing.xs))
                                             Text(
-                                                text = "Last export: $path",
+                                                text = stringResource(
+                                                    Res.string.last_export_path,
+                                                    path
+                                                ),
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
@@ -242,7 +246,7 @@ private fun DataSettingsContent(
                                         onClick = onExportContent,
                                         enabled = exportState != ExportState.Selecting
                                     ) {
-                                        Text("Export")
+                                        Text(stringResource(Res.string.export))
                                     }
                                 }
                             )
@@ -254,15 +258,15 @@ private fun DataSettingsContent(
 
                             val restoreInProgress = restoreState is RestoreState.Selecting || restoreState is RestoreState.Restoring
                             ListItem(
-                                headlineContent = { Text("Import backup") },
+                                headlineContent = { Text(stringResource(Res.string.import_backup)) },
                                 supportingContent = {
                                     Column {
-                                        Text("Restore entries from a LogDate export archive")
+                                        Text(stringResource(Res.string.restore_entries_from_a_logdate_export_archive))
                                         when (val state = restoreState) {
                                             is RestoreState.Selecting -> {
                                                 Spacer(modifier = Modifier.height(Spacing.xs))
                                                 Text(
-                                                    text = "Waiting for backup selection...",
+                                                    text = stringResource(Res.string.waiting_for_backup_selection),
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
@@ -270,7 +274,7 @@ private fun DataSettingsContent(
                                             is RestoreState.Restoring -> {
                                                 Spacer(modifier = Modifier.height(Spacing.xs))
                                                 Text(
-                                                    text = "Restoring backup...",
+                                                    text = stringResource(Res.string.restoring_backup),
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.primary
                                                 )
@@ -280,13 +284,36 @@ private fun DataSettingsContent(
                                                 val exportedAt = state.summary.exportDate?.toReadableDateTimeShort()
                                                 val summaryLine = buildString {
                                                     if (exportedAt != null) {
-                                                        append("Exported: ")
+                                                        append(
+                                                            stringResource(
+                                                                Res.string.exported_label
+                                                            )
+                                                        )
                                                         append(exportedAt)
-                                                        append(" | ")
+                                                        append(
+                                                            stringResource(
+                                                                Res.string.separator_pipe
+                                                            )
+                                                        )
                                                     }
-                                                    append("${state.summary.journalsImported} journals, ")
-                                                    append("${state.summary.notesImported} notes, ")
-                                                    append("${state.summary.mediaImported} media")
+                                                    append(
+                                                        stringResource(
+                                                            Res.string.journals_count_with_comma,
+                                                            state.summary.journalsImported
+                                                        )
+                                                    )
+                                                    append(
+                                                        stringResource(
+                                                            Res.string.notes_count_with_comma,
+                                                            state.summary.notesImported
+                                                        )
+                                                    )
+                                                    append(
+                                                        stringResource(
+                                                            Res.string.media_count,
+                                                            state.summary.mediaImported
+                                                        )
+                                                    )
                                                 }
                                                 Text(
                                                     text = summaryLine,
@@ -295,7 +322,10 @@ private fun DataSettingsContent(
                                                 )
                                                 if (state.summary.warnings.isNotEmpty()) {
                                                     Text(
-                                                        text = "Warnings: ${state.summary.warnings.size}",
+                                                        text = stringResource(
+                                                            Res.string.warnings_count,
+                                                            state.summary.warnings.size
+                                                        ),
                                                         style = MaterialTheme.typography.bodySmall,
                                                         color = MaterialTheme.colorScheme.error
                                                     )
@@ -319,11 +349,17 @@ private fun DataSettingsContent(
                                             onClick = onRestoreContent,
                                             enabled = !restoreInProgress
                                         ) {
-                                            Text(if (restoreInProgress) "Importing..." else "Import")
+                                            Text(
+                                                if (restoreInProgress) {
+                                                    stringResource(Res.string.importing)
+                                                } else {
+                                                    stringResource(Res.string.import)
+                                                }
+                                            )
                                         }
                                         if (restoreInProgress) {
                                             TextButton(onClick = onCancelRestore) {
-                                                Text("Cancel")
+                                                Text(stringResource(Res.string.cancel))
                                             }
                                         }
                                     }
@@ -345,13 +381,17 @@ private fun DataSettingsContent(
                                     it.pendingAssociationMalformed
                             } ?: 0
                             ListItem(
-                                headlineContent = { Text("Integrity check") },
+                                headlineContent = { Text(stringResource(Res.string.integrity_check)) },
                                 supportingContent = {
                                     Column {
-                                        Text("Audit and repair local links and sync metadata")
+                                        Text(stringResource(Res.string.audit_and_repair_local_links_and_sync_metadata))
                                         report?.let {
                                             Spacer(modifier = Modifier.height(Spacing.xs))
-                                            val summary = "Last check: ${it.checkedAt.toReadableDateTimeShort()} | $issueCount issues"
+                                            val summary = stringResource(
+                                                Res.string.last_check_issue_count,
+                                                it.checkedAt.toReadableDateTimeShort(),
+                                                issueCount
+                                            )
                                             Text(
                                                 text = summary,
                                                 style = MaterialTheme.typography.bodySmall,
@@ -374,13 +414,25 @@ private fun DataSettingsContent(
                                             onClick = onRunIntegrityCheck,
                                             enabled = !integrityState.isChecking
                                         ) {
-                                            Text(if (integrityState.isChecking) "Checking..." else "Check")
+                                            Text(
+                                                if (integrityState.isChecking) {
+                                                    stringResource(Res.string.checking)
+                                                } else {
+                                                    stringResource(Res.string.check)
+                                                }
+                                            )
                                         }
                                         TextButton(
                                             onClick = onRepairIntegrity,
                                             enabled = issueCount > 0 && !integrityState.isRepairing
                                         ) {
-                                            Text(if (integrityState.isRepairing) "Repairing..." else "Repair")
+                                            Text(
+                                                if (integrityState.isRepairing) {
+                                                    stringResource(Res.string.repairing)
+                                                } else {
+                                                    stringResource(Res.string.repair)
+                                                }
+                                            )
                                         }
                                     }
                                 }
@@ -397,23 +449,27 @@ private fun DataSettingsContent(
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                 ) {
                     Text(
-                        text = "Sync Conflicts",
+                        text = stringResource(Res.string.sync_conflicts),
                         style = MaterialTheme.typography.titleMedium
                     )
                     MaterialContainer {
                         Column {
                             val conflictCount = conflictsState.conflicts.size
                             ListItem(
-                                headlineContent = { Text("Queued conflicts") },
+                                headlineContent = { Text(stringResource(Res.string.queued_conflicts)) },
                                 supportingContent = {
                                     Column {
                                         Text(
                                             text = if (conflictsState.isLoading) {
-                                                "Loading conflicts..."
+                                                stringResource(Res.string.loading_conflicts)
                                             } else if (conflictCount == 0) {
-                                                "No conflicts waiting for review"
+                                                stringResource(Res.string.no_conflicts_waiting)
                                             } else {
-                                                "$conflictCount conflict${if (conflictCount == 1) "" else "s"} need review"
+                                                stringResource(
+                                                    Res.string.conflicts_need_review,
+                                                    conflictCount,
+                                                    if (conflictCount == 1) "" else "s"
+                                                )
                                             },
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -430,13 +486,13 @@ private fun DataSettingsContent(
                                 trailingContent = {
                                     Row {
                                         TextButton(onClick = onRefreshConflicts) {
-                                            Text("Refresh")
+                                            Text(stringResource(Res.string.refresh))
                                         }
                                         TextButton(
                                             onClick = onClearConflicts,
                                             enabled = conflictCount > 0
                                         ) {
-                                            Text("Clear")
+                                            Text(stringResource(Res.string.clear))
                                         }
                                     }
                                 }
@@ -449,7 +505,13 @@ private fun DataSettingsContent(
                                 )
                                 ListItem(
                                     headlineContent = {
-                                        Text("${conflict.entityType} ${conflict.entityId}")
+                                        Text(
+                                            stringResource(
+                                                Res.string.conflict_entity_with_id,
+                                                conflict.entityType,
+                                                conflict.entityId
+                                            )
+                                        )
                                     },
                                     supportingContent = {
                                         Column {
@@ -460,7 +522,10 @@ private fun DataSettingsContent(
                                             )
                                             val timestamp = Instant.fromEpochMilliseconds(conflict.detectedAt)
                                             Text(
-                                                text = "Detected ${timestamp.toReadableDateTimeShort()}",
+                                                text = stringResource(
+                                                    Res.string.detected_timestamp,
+                                                    timestamp.toReadableDateTimeShort()
+                                                ),
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
@@ -474,7 +539,10 @@ private fun DataSettingsContent(
                                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
                                 )
                                 Text(
-                                    text = "Showing 3 of $conflictCount conflicts",
+                                    text = stringResource(
+                                        Res.string.showing_three_of_conflicts,
+                                        conflictCount
+                                    ),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(Spacing.md)
@@ -515,17 +583,17 @@ private fun SyncSettingsSection(
         verticalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
         Text(
-            text = "Cloud Sync",
+            text = stringResource(Res.string.cloud_sync),
             style = MaterialTheme.typography.titleMedium
         )
 
         MaterialContainer {
             if (!isAuthenticated) {
                 ListItem(
-                    headlineContent = { Text("Sign in required") },
+                    headlineContent = { Text(stringResource(Res.string.sign_in_required)) },
                     supportingContent = {
                         Text(
-                            text = "Sign in to your LogDate Cloud account to enable sync",
+                            text = stringResource(Res.string.sign_in_to_your_logdate_cloud_account_to_enable_sync),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -533,12 +601,12 @@ private fun SyncSettingsSection(
             } else {
                 // Sync status
                 ListItem(
-                    headlineContent = { Text("Sync Status") },
+                    headlineContent = { Text(stringResource(Res.string.sync_status)) },
                     supportingContent = {
                         Column {
                             syncStatus?.let { status ->
                                 if (status.isSyncing) {
-                                    Text("Syncing...", color = MaterialTheme.colorScheme.primary)
+                                    Text(stringResource(Res.string.syncing), color = MaterialTheme.colorScheme.primary)
                                 } else {
                                     val statusText = if (status.hasErrors) {
                                         "Last sync failed: ${status.lastError?.message ?: "Unknown error"}"
@@ -556,7 +624,7 @@ private fun SyncSettingsSection(
                                         }
                                     )
                                 }
-                            } ?: Text("Loading...", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            } ?: Text(stringResource(Res.string.loading), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     },
                     trailingContent = {
@@ -564,15 +632,15 @@ private fun SyncSettingsSection(
                             onClick = onSyncNow,
                             enabled = syncStatus?.isSyncing != true
                         ) {
-                            Text("Sync Now")
+                            Text(stringResource(Res.string.sync_now))
                         }
                     }
                 )
 
                 // Background sync setting
                 ListItem(
-                    headlineContent = { Text("Background Sync") },
-                    supportingContent = { Text("Automatically sync your data in the background") },
+                    headlineContent = { Text(stringResource(Res.string.background_sync)) },
+                    supportingContent = { Text(stringResource(Res.string.automatically_sync_your_data_in_the_background)) },
                     trailingContent = {
                         Switch(
                             checked = isBackgroundSyncEnabled,

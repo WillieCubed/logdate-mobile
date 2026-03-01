@@ -28,7 +28,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * A fun and visually engaging empty state for audio blocks.
  * 
@@ -100,7 +102,7 @@ fun EmptyAudioBlockContent(
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Mic,
-                        contentDescription = "Record audio",
+                        contentDescription = stringResource(Res.string.record_audio),
                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier.size(30.dp)
                     )
@@ -111,7 +113,7 @@ fun EmptyAudioBlockContent(
             
             // Engaging prompt text
             Text(
-                text = "Tap to start recording",
+                text = stringResource(Res.string.tap_to_start_recording),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center

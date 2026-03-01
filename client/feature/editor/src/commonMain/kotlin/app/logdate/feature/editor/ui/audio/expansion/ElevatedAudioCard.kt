@@ -47,7 +47,9 @@ import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.number
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * Second expansion state - elevated card with full controls.
  *
@@ -188,7 +190,7 @@ fun ElevatedAudioCard(
                         IconButton(onClick = onSkipBack) {
                             Icon(
                                 imageVector = Icons.Rounded.Replay10,
-                                contentDescription = "Skip back 10 seconds",
+                                contentDescription = stringResource(Res.string.skip_back_10_seconds),
                                 tint = Color(palette.accentColor)
                             )
                         }
@@ -220,7 +222,7 @@ fun ElevatedAudioCard(
                         IconButton(onClick = onSkipForward) {
                             Icon(
                                 imageVector = Icons.Rounded.Forward10,
-                                contentDescription = "Skip forward 10 seconds",
+                                contentDescription = stringResource(Res.string.skip_forward_10_seconds),
                                 tint = Color(palette.accentColor)
                             )
                         }

@@ -20,7 +20,9 @@ import app.logdate.ui.timeline.TextNoteUiState
 import app.logdate.ui.timeline.VideoNoteUiState
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.timeline.generated.resources.*
+import logdate.client.feature.timeline.generated.resources.Res
 @Composable
 internal fun NotesListSection(
     notes: List<NoteUiState>,
@@ -30,7 +32,7 @@ internal fun NotesListSection(
         modifier = modifier.padding(horizontal = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Text("Notes", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(Res.string.notes), style = MaterialTheme.typography.titleSmall)
         notes.forEach { note ->
             when (note) {
                 is TextNoteUiState -> TextNoteSnippet(note)
@@ -138,7 +140,7 @@ private fun VideoNoteSnippet(uiState: VideoNoteUiState) {
                 // (which may display a thumbnail or first frame depending on the platform)
                 AsyncImage(
                     model = uiState.thumbnailUri ?: uiState.uri,
-                    contentDescription = "Video recording",
+                    contentDescription = stringResource(Res.string.video_recording),
                     modifier = Modifier.fillMaxWidth()
                 )
                 

@@ -28,7 +28,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * Displays transcription UI for an audio note, handling various transcription states.
  * This is a stateless UI component that receives its state and callbacks from the parent.
@@ -90,7 +92,7 @@ private fun TranscriptionNotAvailableUi(
             onClick = onRequestTranscription,
             modifier = Modifier.align(Alignment.CenterHorizontally)
         ) {
-            Text("Convert to Text")
+            Text(stringResource(Res.string.convert_to_text))
         }
     }
 }
@@ -107,7 +109,7 @@ private fun TranscriptionPendingUi(modifier: Modifier = Modifier) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "Transcription queued...",
+            text = stringResource(Res.string.transcription_queued),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -133,7 +135,7 @@ private fun TranscriptionInProgressUi(modifier: Modifier = Modifier) {
         Spacer(modifier = Modifier.width(8.dp))
         
         Text(
-            text = "Transcribing audio...",
+            text = stringResource(Res.string.transcribing_audio),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -185,7 +187,7 @@ private fun TranscriptionErrorUi(
         ) {
             Icon(
                 imageVector = Icons.Rounded.Error,
-                contentDescription = "Error",
+                contentDescription = stringResource(Res.string.error),
                 tint = MaterialTheme.colorScheme.error,
                 modifier = Modifier.size(16.dp)
             )
@@ -193,7 +195,7 @@ private fun TranscriptionErrorUi(
             Spacer(modifier = Modifier.width(8.dp))
             
             Text(
-                text = "We couldn't convert this recording to text",
+                text = stringResource(Res.string.we_couldnt_convert_this_recording_to_text),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error
             )
@@ -206,7 +208,7 @@ private fun TranscriptionErrorUi(
             ) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
-                    contentDescription = "Try again",
+                    contentDescription = stringResource(Res.string.try_again),
                     tint = MaterialTheme.colorScheme.primary
                 )
             }

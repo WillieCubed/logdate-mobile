@@ -30,7 +30,9 @@ import app.logdate.client.permissions.PermissionType
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.editor.generated.resources.*
+import logdate.client.feature.editor.generated.resources.Res
 /**
  * Wrapper component that handles audio recording permissions for Android.
  * If permissions are not granted, displays a request UI.
@@ -113,19 +115,19 @@ actual fun AudioPermissionWrapper(
                             permissionManager.openAppSettings()
                         }
                     ) {
-                        Text("Open App Settings")
+                        Text(stringResource(Res.string.open_app_settings))
                     }
                 } else {
                     Button(
                         onClick = { requestPermissions() }
                     ) {
-                        Text("Allow Microphone Access")
+                        Text(stringResource(Res.string.allow_microphone_access))
                     }
                     
                     Spacer(modifier = Modifier.height(8.dp))
                     
                     Text(
-                        text = "You can record audio notes after granting permission",
+                        text = stringResource(Res.string.you_can_record_audio_notes_after_granting_permission),
                         style = MaterialTheme.typography.bodySmall,
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)

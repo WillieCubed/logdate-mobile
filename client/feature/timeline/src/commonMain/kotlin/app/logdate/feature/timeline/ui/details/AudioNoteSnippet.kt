@@ -35,7 +35,9 @@ import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.util.toReadableDateTimeShort
 import kotlin.time.Duration.Companion.milliseconds
-
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.feature.timeline.generated.resources.*
+import logdate.client.feature.timeline.generated.resources.Res
 /**
  * Displays an audio note in the timeline with enhanced playback controls and transcription.
  * Uses the app-wide audio playback provider to ensure only one audio can play at a time.
@@ -122,7 +124,7 @@ fun AudioNoteSnippet(
                     ) {
                         // Audio note title
                         Text(
-                            text = "Voice Note",
+                            text = stringResource(Res.string.voice_note),
                             style = MaterialTheme.typography.titleSmall,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -148,7 +150,7 @@ fun AudioNoteSnippet(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Stop,
-                                contentDescription = "Stop",
+                                contentDescription = stringResource(Res.string.stop),
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -178,12 +180,20 @@ fun AudioNoteSnippet(
                         ) {
                             val currentTime = (audioPlaybackState.progress * duration.inWholeSeconds).toInt()
                             Text(
-                                text = "${currentTime / 60}:${(currentTime % 60).toString().padStart(2, '0')}",
+                                text = stringResource(
+                                    Res.string.timestamp_minutes_seconds,
+                                    currentTime / 60,
+                                    currentTime % 60
+                                ),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
-                                text = "${duration.inWholeMinutes}:${(duration.inWholeSeconds % 60).toString().padStart(2, '0')}",
+                                text = stringResource(
+                                    Res.string.timestamp_minutes_seconds,
+                                    duration.inWholeMinutes,
+                                    duration.inWholeSeconds % 60
+                                ),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -215,7 +225,7 @@ fun AudioNoteSnippet(
                                         strokeWidth = 2.dp
                                     )
                                     Text(
-                                        text = "Converting to text...",
+                                        text = stringResource(Res.string.converting_to_text),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -225,7 +235,7 @@ fun AudioNoteSnippet(
                             // Transcription completed successfully
                             transcriptionText != null -> {
                                 Text(
-                                    text = "Transcript:",
+                                    text = stringResource(Res.string.transcript),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(bottom = Spacing.xs)
@@ -249,7 +259,7 @@ fun AudioNoteSnippet(
                                     verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                                 ) {
                                     Text(
-                                        text = "Transcription failed",
+                                        text = stringResource(Res.string.transcription_failed),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.error
                                     )
@@ -258,7 +268,7 @@ fun AudioNoteSnippet(
                                         onClick = { transcriptionState.requestTranscription(uiState.noteId) },
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Text("Retry")
+                                        Text(stringResource(Res.string.retry))
                                     }
                                 }
                             }
@@ -269,7 +279,7 @@ fun AudioNoteSnippet(
                                     onClick = { transcriptionState.requestTranscription(uiState.noteId) },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Text("Convert to Text")
+                                    Text(stringResource(Res.string.convert_to_text))
                                 }
                             }
                         }
