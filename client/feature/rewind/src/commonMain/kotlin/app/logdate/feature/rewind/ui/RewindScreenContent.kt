@@ -56,7 +56,7 @@ import app.logdate.feature.rewind.ui.overview.RewindPreviewUiState
 import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.theme.Spacing
 import kotlinx.datetime.LocalDate
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.Preview
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
