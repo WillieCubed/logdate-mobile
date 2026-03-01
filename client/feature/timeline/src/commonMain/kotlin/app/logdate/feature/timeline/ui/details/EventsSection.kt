@@ -14,7 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 @Composable
 internal fun EventsSection(

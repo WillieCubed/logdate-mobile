@@ -11,9 +11,7 @@ import app.logdate.client.domain.timeline.TimelineBannerResult
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.user.UserStateRepository
-import app.logdate.feature.editor.ui.audio.AudioPlaybackManager
 import app.logdate.shared.model.Person
-import app.logdate.ui.audio.AudioPlaybackState
 import app.logdate.ui.audio.TranscriptionState
 import app.logdate.ui.profiles.toUiState
 import app.logdate.ui.timeline.AudioNoteUiState
@@ -36,8 +34,8 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import kotlin.time.Duration
 import kotlin.uuid.Uuid
+import kotlinx.datetime.number
 
 /**
  * A view model for the timeline overview screen.
@@ -49,25 +47,8 @@ class TimelineViewModel(
     private val notesRepository: JournalNotesRepository, // TODO: Consolidate with GetTimelineUseCase
     private val removeNoteUseCase: RemoveNoteUseCase,
     private val userStateRepository: UserStateRepository,
-    private val audioPlaybackManager: AudioPlaybackManager,
 ) : ViewModel() {
 
-    // Audio playback state
-    private val _audioPlaybackState = MutableStateFlow(
-        AudioPlaybackState(
-            currentlyPlayingId = null,
-            isPlaying = false,
-            progress = 0f,
-            duration = Duration.ZERO,
-            play = { id, uri -> play(id, uri) },
-            pause = { pause() },
-            stop = { stop() },
-            seekTo = { position -> seekTo(position) }
-        )
-    )
-    
-    val audioPlaybackState: StateFlow<AudioPlaybackState> = _audioPlaybackState.asStateFlow()
-    
     // Transcription state
     private val _transcriptionState = MutableStateFlow(
         TranscriptionState(
@@ -100,148 +81,6 @@ class TimelineViewModel(
     )
     
     val transcriptionState: StateFlow<TranscriptionState> = _transcriptionState.asStateFlow()
-    
-    // Platform-specific audio player implementation
-    // On Android, use MediaPlayer or ExoPlayer
-    // On iOS, use AVAudioPlayer
-    // On Desktop, use a platform-specific audio player library
-    
-    // For a real implementation, we would have platform-specific implementations 
-    // in the corresponding source sets (androidMain, iosMain, desktopMain)
-    // and use expect/actual pattern to provide platform-specific implementations
-    
-    // Example for Android:
-    // private var mediaPlayer: MediaPlayer? = null
-    
-    private fun play(id: Uuid, uri: String) {
-        viewModelScope.launch {
-            if (_audioPlaybackState.value.currentlyPlayingId != id) {
-                // Stop current playback before starting new one
-                stopCurrentPlayback()
-                
-                // Use AudioPlaybackManager from editor feature
-                audioPlaybackManager.startPlayback(
-                    uri = uri,
-                    onProgressUpdated = { progress ->
-                        _audioPlaybackState.update { currentState ->
-                            currentState.copy(progress = progress)
-                        }
-                    },
-                    onPlaybackCompleted = {
-                        onPlaybackCompleted()
-                    }
-                )
-                
-                _audioPlaybackState.update { currentState ->
-                    currentState.copy(
-                        currentlyPlayingId = id,
-                        isPlaying = true,
-                        progress = 0f
-                    )
-                }
-            } else {
-                // If already playing this audio but paused, resume playback
-                audioPlaybackManager.startPlayback(
-                    uri = uri,
-                    onProgressUpdated = { progress ->
-                        _audioPlaybackState.update { currentState ->
-                            currentState.copy(progress = progress)
-                        }
-                    },
-                    onPlaybackCompleted = {
-                        onPlaybackCompleted()
-                    }
-                )
-                
-                _audioPlaybackState.update { currentState ->
-                    currentState.copy(isPlaying = true)
-                }
-            }
-        }
-    }
-    
-    private fun pause() {
-        viewModelScope.launch {
-            // Use AudioPlaybackManager from editor feature
-            audioPlaybackManager.pausePlayback()
-            
-            _audioPlaybackState.update { currentState ->
-                currentState.copy(isPlaying = false)
-            }
-        }
-    }
-    
-    private fun stop() {
-        viewModelScope.launch {
-            stopCurrentPlayback()
-        }
-    }
-    
-    private fun stopCurrentPlayback() {
-        // Use AudioPlaybackManager from editor feature
-        audioPlaybackManager.stopPlayback()
-        
-        _audioPlaybackState.update { currentState ->
-            currentState.copy(
-                isPlaying = false,
-                currentlyPlayingId = null,
-                progress = 0f
-            )
-        }
-    }
-    
-    private fun seekTo(position: Float) {
-        viewModelScope.launch {
-            // Use AudioPlaybackManager from editor feature
-            audioPlaybackManager.seekTo(position)
-            
-            _audioPlaybackState.update { currentState ->
-                currentState.copy(progress = position)
-            }
-        }
-    }
-    
-    // Example of a method to start updating progress regularly
-    // private fun startProgressUpdates() {
-    //     viewModelScope.launch {
-    //         while (_audioPlaybackState.value.isPlaying && _audioPlaybackState.value.currentlyPlayingId != null) {
-    //             try {
-    //                 mediaPlayer?.let { player ->
-    //                     if (player.isPlaying) {
-    //                         val duration = player.duration
-    //                         val position = player.currentPosition
-    //                         val progress = position.toFloat() / duration.toFloat()
-    //                         
-    //                         _audioPlaybackState.update { currentState ->
-    //                             currentState.copy(progress = progress)
-    //                         }
-    //                     }
-    //                 }
-    //                 delay(100) // Update progress every 100ms
-    //             } catch (e: Exception) {
-    //                 // Handle error
-    //                 break
-    //             }
-    //         }
-    //     }
-    // }
-    
-    // Would be called when audio playback completes
-    private fun onPlaybackCompleted() {
-        _audioPlaybackState.update { 
-            it.copy(
-                isPlaying = false,
-                progress = 0f
-            ) 
-        }
-    }
-    
-    override fun onCleared() {
-        // Clean up resources when the ViewModel is cleared
-        stopCurrentPlayback()
-        audioPlaybackManager.release()
-        super.onCleared()
-    }
 
     private val _selectedItemUiState =
         MutableStateFlow<TimelineDaySelection>(TimelineDaySelection.NotSelected)
@@ -255,7 +94,7 @@ class TimelineViewModel(
         // TODO: Using epoch day 0 (1970-01-01) as a sentinel value could be problematic
         // if that's actually a valid date in the timeline. Consider using a more explicit
         // approach for selection/deselection.
-        _selectedItemUiState.value = if (date.toEpochDays() == 0) {
+        _selectedItemUiState.value = if (date.toEpochDays() == 0L) {
             TimelineDaySelection.NotSelected
         } else {
             TimelineDaySelection.DateSelected(date)
@@ -294,7 +133,7 @@ class TimelineViewModel(
                 val noteDate = noteDateTime.date
                 
                 // Create a string key in format "YYYY-MM-DD"
-                val dateKey = "${noteDate.year}-${noteDate.monthNumber}-${noteDate.dayOfMonth}"
+                val dateKey = "${noteDate.year}-${noteDate.month.number}-${noteDate.day}"
                 
                 if (!improvedNotesByDate.containsKey(dateKey)) {
                     improvedNotesByDate[dateKey] = mutableListOf()
@@ -321,7 +160,7 @@ class TimelineViewModel(
                             noteId = it.uid,
                             uri = it.mediaRef,
                             timestamp = it.creationTimestamp,
-                            duration = it.durationMs ?: 0
+                            duration = it.durationMs
                         )
                         is JournalNote.Video -> TextNoteUiState(
                             noteId = it.uid,
@@ -334,7 +173,7 @@ class TimelineViewModel(
             
             // Helper function to get notes for a specific day by components
             fun getNotesForDay(date: LocalDate): List<JournalNote> {
-                val dateKey = "${date.year}-${date.monthNumber}-${date.dayOfMonth}"
+                val dateKey = "${date.year}-${date.month.number}-${date.day}"
                 return improvedNotesByDate[dateKey] ?: emptyList()
             }
             
@@ -349,8 +188,8 @@ class TimelineViewModel(
                         people = day.people.map(Person::toUiState),
                         events = day.events,
                         notes = dayNotes.toUiState(),
-                        isLoadingSummary = day.tldr.contains("entries"),
-                        isLoadingPeople = day.people.isEmpty() && day.tldr.contains("entries")
+                        isLoadingSummary = day.tldr.isEmpty(),
+                        isLoadingPeople = day.people.isEmpty() && day.tldr.isEmpty()
                     )
                 },
                 selectedItem = _selectedItemUiState.value,
@@ -366,8 +205,8 @@ class TimelineViewModel(
                                 people = day.people.map(Person::toUiState),
                                 events = day.events,
                                 notes = notesForSelectedDay.toUiState(),
-                                isLoadingSummary = day.tldr.contains("entries"),
-                                isLoadingPeople = day.people.isEmpty() && day.tldr.contains("entries")
+                                isLoadingSummary = day.tldr.isEmpty(),
+                                isLoadingPeople = day.people.isEmpty() && day.tldr.isEmpty()
                             )
                         }
                     }
@@ -383,8 +222,8 @@ class TimelineViewModel(
                                 people = day.people.map(Person::toUiState),
                                 events = day.events,
                                 notes = notesForSelectedDay.toUiState(),
-                                isLoadingSummary = day.tldr.contains("entries"),
-                                isLoadingPeople = day.people.isEmpty() && day.tldr.contains("entries")
+                                isLoadingSummary = day.tldr.isEmpty(),
+                                isLoadingPeople = day.people.isEmpty() && day.tldr.isEmpty()
                             )
                         }
                     }

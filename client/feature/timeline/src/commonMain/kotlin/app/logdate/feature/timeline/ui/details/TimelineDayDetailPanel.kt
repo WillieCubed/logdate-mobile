@@ -26,10 +26,10 @@ import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.util.toReadableDateShort
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.Preview
 import kotlin.uuid.Uuid
 
 
