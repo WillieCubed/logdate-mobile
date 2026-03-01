@@ -5,7 +5,7 @@ import app.logdate.server.passkeys.StoredPasskeyData
 import app.logdate.server.util.toKotlinInstant
 import app.logdate.server.util.toKotlinxInstant
 import app.logdate.shared.model.PasskeyInfo
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction

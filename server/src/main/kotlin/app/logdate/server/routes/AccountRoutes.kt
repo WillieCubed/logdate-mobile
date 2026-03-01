@@ -23,7 +23,7 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.route
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.serialization.SerializationException
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid

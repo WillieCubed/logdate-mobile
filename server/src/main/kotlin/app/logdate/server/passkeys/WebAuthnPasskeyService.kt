@@ -2,7 +2,7 @@ package app.logdate.server.passkeys
 
 import app.logdate.server.util.toKotlinInstant
 import app.logdate.shared.model.*
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import java.security.SecureRandom
 import java.util.*
 import kotlin.uuid.ExperimentalUuidApi

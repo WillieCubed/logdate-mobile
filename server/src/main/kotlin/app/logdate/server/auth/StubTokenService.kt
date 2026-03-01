@@ -1,6 +1,6 @@
 package app.logdate.server.auth
 
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 
@@ -79,7 +79,7 @@ class StubTokenService(
             if (type != expectedType) return null
             
             val now = Clock.System.now()
-            val expiresAt = kotlinx.datetime.Instant.fromEpochSeconds(expiresAtSeconds)
+            val expiresAt = kotlin.time.Instant.fromEpochSeconds(expiresAtSeconds)
             
             if (now > expiresAt) return null
             
