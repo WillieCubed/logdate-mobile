@@ -7,7 +7,7 @@ import app.logdate.client.intelligence.cache.GenerativeAICache
 import app.logdate.client.intelligence.cache.GenerativeAICacheEntry
 import app.logdate.client.intelligence.cache.GenerativeAICacheEntryMetadata
 import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 /**

@@ -1,6 +1,6 @@
 package app.logdate.client.intelligence.cache
 
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.test.Test
 import kotlin.test.assertEquals
