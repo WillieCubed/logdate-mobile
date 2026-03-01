@@ -1,4 +1,7 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+@file:OptIn(
+    kotlinx.cinterop.BetaInteropApi::class,
+    kotlinx.cinterop.ExperimentalForeignApi::class
+)
 
 package app.logdate.feature.editor.audio.extraction
 
@@ -58,8 +61,8 @@ class IosAmplitudeExtractor : AmplitudeExtractor {
                 val errorPtr = alloc<ObjCObjectVar<NSError?>>()
                 val reader = AVAssetReader(asset, errorPtr.ptr)
                 val error = errorPtr.value
-                if (reader == null || error != null) {
-                    Napier.w { "Failed to create AVAssetReader for $uri: ${error?.localizedDescription}" }
+                if (error != null) {
+                    Napier.w { "Failed to create AVAssetReader for $uri: ${error.localizedDescription}" }
                     return@withContext emptyList()
                 }
 

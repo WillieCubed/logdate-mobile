@@ -13,7 +13,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.cinterop.useContents
+import kotlinx.coroutines.flow.filterNotNull
 import platform.CoreLocation.CLLocation
 import platform.CoreLocation.CLLocationManager
 import platform.CoreLocation.CLLocationManagerDelegateProtocol
@@ -46,7 +46,7 @@ class IosDeviceLocationTracker(
     }
     
     override fun observeLocationUpdates(): Flow<Location> {
-        return _locationUpdates.asStateFlow() as Flow<Location>
+        return _locationUpdates.asStateFlow().filterNotNull()
     }
     
     override fun isTrackingEnabled(): Boolean = isTrackingActive
