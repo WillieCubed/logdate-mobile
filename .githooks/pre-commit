@@ -95,15 +95,21 @@ if [[ -n "$kt_files" ]]; then
     done <<< "$kt_files"
 
     if [[ ${#modules[@]} -gt 0 ]]; then
-        # Build ktlintCheck tasks for affected modules
+        # Build ktlintCheck tasks for affected modules, skipping modules without ktlint
         ktlint_tasks=()
+        ktlint_modules=()
         for mod in "${modules[@]}"; do
-            ktlint_tasks+=("${mod}:ktlintCheck")
+            if ./gradlew "${mod}:tasks" --all --quiet 2>/dev/null | grep -q "ktlintCheck"; then
+                ktlint_tasks+=("${mod}:ktlintCheck")
+                ktlint_modules+=("$mod")
+            fi
         done
 
-        echo "Running ktlint on affected modules: ${modules[*]}"
-        if ! ./gradlew "${ktlint_tasks[@]}" --quiet 2>&1; then
-            errors+=("KTLINT: Kotlin lint check failed. Run './gradlew ktlintFormat' to auto-fix.")
+        if [[ ${#ktlint_tasks[@]} -gt 0 ]]; then
+            echo "Running ktlint on affected modules: ${ktlint_modules[*]}"
+            if ! ./gradlew "${ktlint_tasks[@]}" --quiet 2>&1; then
+                errors+=("KTLINT: Kotlin lint check failed. Run './gradlew ktlintFormat' to auto-fix.")
+            fi
         fi
     fi
 fi
