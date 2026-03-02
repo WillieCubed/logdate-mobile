@@ -24,7 +24,6 @@ These are the main scopes for user-facing features. **Prefer these scopes** for 
 
 | Directory | Scope |
 |-----------|-------|
-| `app/compose-main/` | `app` |
 | `app/wear/` | `wear` |
 | `server/` | `server` |
 

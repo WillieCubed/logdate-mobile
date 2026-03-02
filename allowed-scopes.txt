@@ -13,7 +13,6 @@ search
 timeline
 
 # App scopes
-app
 wear
 server
 
