@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.ui.content
 
 import androidx.compose.foundation.layout.Arrangement
@@ -7,13 +9,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
-//import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.ui.content.audience.MiniProfileIcons
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.theme.Spacing
-import androidx.compose.ui.tooling.preview.Preview
 import kotlin.uuid.Uuid
-
 
 @Composable
 fun JournalMetadataBlock(
@@ -37,9 +37,7 @@ fun JournalMetadataBlock(
 }
 
 @Composable
-private fun JournalMetadata(
-    audience: List<PersonUiState>,
-) {
+private fun JournalMetadata(audience: List<PersonUiState>) {
     Row {
         MiniProfileIcons(people = listOf())
         Text("", style = MaterialTheme.typography.labelMedium)
@@ -51,17 +49,18 @@ private fun JournalMetadata(
 private fun JournalMetadataBlockPreview() {
     JournalMetadataBlock(
         title = "Climbing Buddies",
-        audience = listOf(
-            PersonUiState(
-                uid = Uuid.random(),
-                name = "Margaret Belford",
-                photoUri = null,
+        audience =
+            listOf(
+                PersonUiState(
+                    uid = Uuid.random(),
+                    name = "Margaret Belford",
+                    photoUri = null,
+                ),
+                PersonUiState(
+                    uid = Uuid.random(),
+                    name = "Willie Chalmers III",
+                    photoUri = null,
+                ),
             ),
-            PersonUiState(
-                uid = Uuid.random(),
-                name = "Willie Chalmers III",
-                photoUri = null,
-            ),
-        ),
     )
 }

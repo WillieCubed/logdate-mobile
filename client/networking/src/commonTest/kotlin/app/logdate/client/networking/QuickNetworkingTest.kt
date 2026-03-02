@@ -8,7 +8,6 @@ import kotlin.time.Clock
  * Quick validation test to ensure networking test infrastructure is working.
  */
 class QuickNetworkingTest {
-
     @Test
     fun httpClient_exists() {
         assertNotNull(httpClient)

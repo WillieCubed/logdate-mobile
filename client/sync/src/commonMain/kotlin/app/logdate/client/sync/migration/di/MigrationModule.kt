@@ -14,30 +14,31 @@ import org.koin.dsl.module
 /**
  * Common migration dependencies shared across all platforms.
  */
-internal val migrationCoreModule = module {
-    // Provide JSON for serialization
-    single { Json { ignoreUnknownKeys = true } }
-    
-    // Provide a CoroutineScope for migrations
-    single { CoroutineScope(SupervisorJob()) }
-    
-    // Register the migration manager
-    single<MigrationManager> { 
-        DefaultMigrationManager(
-            migrationStorage = get(),
-            userIdentityProvider = get<IdentitySyncProvider>()
+internal val migrationCoreModule =
+    module {
+        // Provide JSON for serialization
+        single { Json { ignoreUnknownKeys = true } }
+
+        // Provide a CoroutineScope for migrations
+        single { CoroutineScope(SupervisorJob()) }
+
+        // Register the migration manager
+        single<MigrationManager> {
+            DefaultMigrationManager(
+                migrationStorage = get(),
+                userIdentityProvider = get<IdentitySyncProvider>(),
 //            coroutineScope = get(),
-        )
+            )
+        }
+
+        // Register in-memory storage for testing
+        factory { InMemoryMigrationStorage(get()) }
+
+        // Register identity sync provider that uses DeviceIdProvider
+        single<IdentitySyncProvider> {
+            DefaultIdentitySyncProvider(get())
+        }
     }
-    
-    // Register in-memory storage for testing
-    factory { InMemoryMigrationStorage(get()) }
-    
-    // Register identity sync provider that uses DeviceIdProvider
-    single<IdentitySyncProvider> {
-        DefaultIdentitySyncProvider(get())
-    }
-}
 
 /**
  * A module for platform-specific migration dependencies.

@@ -11,6 +11,6 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "se
 actual fun createDataStore(): DataStore<Preferences> {
     val applicationContext: Context by inject(Context::class.java)
     return createDataStore(
-        producePath = { applicationContext.filesDir.resolve(dataStoreFileName).absolutePath }
+        producePath = { applicationContext.filesDir.resolve(DATA_STORE_FILE_NAME).absolutePath },
     )
 }

@@ -29,5 +29,5 @@ data class PlatformInfo(
     val deviceName: String?,
     val deviceType: String,
     val osVersion: String,
-    val appVersion: String
+    val appVersion: String,
 )

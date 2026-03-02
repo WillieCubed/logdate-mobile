@@ -1,9 +1,9 @@
 package app.logdate.client.data.account.di
 
-import app.logdate.client.sync.cloud.account.DesktopPlatformInfoProvider
-import app.logdate.client.sync.cloud.account.PlatformInfoProvider
 import app.logdate.client.data.account.passkey.DesktopPasskeyManager
 import app.logdate.client.domain.account.passkey.PasskeyManager
+import app.logdate.client.sync.cloud.account.DesktopPlatformInfoProvider
+import app.logdate.client.sync.cloud.account.PlatformInfoProvider
 import org.koin.dsl.module
 
 /**
@@ -12,16 +12,17 @@ import org.koin.dsl.module
  * This module provides desktop implementations of platform-specific interfaces
  * needed for account functionality.
  */
-val desktopAccountDataModule = module {
-    // Platform info provider
-    single<PlatformInfoProvider> { 
-        DesktopPlatformInfoProvider(
-            appInfoProvider = get()
-        )
+val desktopAccountDataModule =
+    module {
+        // Platform info provider
+        single<PlatformInfoProvider> {
+            DesktopPlatformInfoProvider(
+                appInfoProvider = get(),
+            )
+        }
+
+        // Passkey manager
+        single<PasskeyManager> {
+            DesktopPasskeyManager()
+        }
     }
-    
-    // Passkey manager
-    single<PasskeyManager> { 
-        DesktopPasskeyManager()
-    }
-}

@@ -9,8 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * An implementation of [BiometricGatekeeper] that uses native iOS biometric authentication.
  */
-class IosBiometricGatekeeper(
-) : BiometricGatekeeper {
+class IosBiometricGatekeeper : BiometricGatekeeper {
     private val _authState = MutableStateFlow(AppAuthState.NO_PROMPT_NEEDED)
 
     override val authState: StateFlow<AppAuthState>
@@ -30,6 +29,4 @@ class IosBiometricGatekeeper(
     override fun requestEnrollment() {
         TODO("Not yet implemented")
     }
-
-
 }

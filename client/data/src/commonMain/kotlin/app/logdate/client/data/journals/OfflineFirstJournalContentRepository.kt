@@ -31,31 +31,36 @@ class OfflineFirstJournalContentRepository(
     private val journalNotesRepository: JournalNotesRepository,
     private val syncMetadataService: SyncMetadataService,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
-) : JournalContentRepository, SyncableJournalContentRepository {
-
+) : JournalContentRepository,
+    SyncableJournalContentRepository {
     override fun observeContentForJournal(journalId: Uuid): Flow<List<JournalNote>> {
         // Use the JournalContentDao to get content IDs associated with this journal
-        return journalContentDao.getContentForJournal(journalId)
+        return journalContentDao
+            .getContentForJournal(journalId)
             .combine(journalNotesRepository.allNotesObserved) { contentIds, allNotes ->
                 // Filter notes to only those associated with this journal
-                allNotes.filter { note -> 
-                    contentIds.contains(note.uid) 
+                allNotes.filter { note ->
+                    contentIds.contains(note.uid)
                 }
             }
     }
 
     override fun observeJournalsForContent(contentId: Uuid): Flow<List<Journal>> {
         // Use the dedicated JournalContentDao to get journal IDs
-        return journalContentDao.getJournalsForContent(contentId)
+        return journalContentDao
+            .getJournalsForContent(contentId)
             .combine(journalRepository.allJournalsObserved) { journalIds, allJournals ->
                 // Get all journals that match the journal IDs
-                allJournals.filter { journal -> 
-                    journalIds.contains(journal.id) 
+                allJournals.filter { journal ->
+                    journalIds.contains(journal.id)
                 }
             }
     }
 
-    override suspend fun addContentToJournal(contentId: Uuid, journalId: Uuid) = withContext(dispatcher) {
+    override suspend fun addContentToJournal(
+        contentId: Uuid,
+        journalId: Uuid,
+    ) = withContext(dispatcher) {
         // Create a link in the journal content table using string IDs
         val link = JournalContentEntityLink(journalId, contentId)
         journalContentDao.addContentToJournal(link)
@@ -63,52 +68,65 @@ class OfflineFirstJournalContentRepository(
         syncMetadataService.enqueuePending(
             entityId = AssociationPendingKey(journalId, contentId).toPendingId(),
             entityType = EntityType.ASSOCIATION,
-            operation = PendingOperation.CREATE
+            operation = PendingOperation.CREATE,
         )
 
         Unit
     }
 
-    override suspend fun removeContentFromJournal(contentId: Uuid, journalId: Uuid) = withContext(dispatcher) {
+    override suspend fun removeContentFromJournal(
+        contentId: Uuid,
+        journalId: Uuid,
+    ) = withContext(dispatcher) {
         // Remove from the journal content links table using string IDs
         journalContentDao.removeContentFromJournal(journalId, contentId)
 
         syncMetadataService.enqueuePending(
             entityId = AssociationPendingKey(journalId, contentId).toPendingId(),
             entityType = EntityType.ASSOCIATION,
-            operation = PendingOperation.DELETE
+            operation = PendingOperation.DELETE,
         )
 
         Unit
     }
 
-    override suspend fun addContentToJournals(contentId: Uuid, journalIds: List<Uuid>) = withContext(dispatcher) {
+    override suspend fun addContentToJournals(
+        contentId: Uuid,
+        journalIds: List<Uuid>,
+    ) = withContext(dispatcher) {
         journalIds.forEach { journalId ->
             addContentToJournal(contentId, journalId)
         }
     }
 
-    override suspend fun removeContentFromAllJournals(contentId: Uuid) = withContext(dispatcher) {
-        val journalIds = journalContentDao.getJournalsForContent(contentId).first()
+    override suspend fun removeContentFromAllJournals(contentId: Uuid) =
+        withContext(dispatcher) {
+            val journalIds = journalContentDao.getJournalsForContent(contentId).first()
 
-        journalIds.forEach { journalId ->
-            syncMetadataService.enqueuePending(
-                entityId = AssociationPendingKey(journalId, contentId).toPendingId(),
-                entityType = EntityType.ASSOCIATION,
-                operation = PendingOperation.DELETE
-            )
+            journalIds.forEach { journalId ->
+                syncMetadataService.enqueuePending(
+                    entityId = AssociationPendingKey(journalId, contentId).toPendingId(),
+                    entityType = EntityType.ASSOCIATION,
+                    operation = PendingOperation.DELETE,
+                )
+            }
+
+            // Remove from the journal content links table using Uuid
+            journalContentDao.removeContentFromAllJournals(contentId)
         }
 
-        // Remove from the journal content links table using Uuid
-        journalContentDao.removeContentFromAllJournals(contentId)
-    }
-
-    override suspend fun addContentToJournalFromSync(contentId: Uuid, journalId: Uuid) = withContext(dispatcher) {
+    override suspend fun addContentToJournalFromSync(
+        contentId: Uuid,
+        journalId: Uuid,
+    ) = withContext(dispatcher) {
         val link = JournalContentEntityLink(journalId, contentId)
         journalContentDao.addContentToJournal(link)
     }
 
-    override suspend fun removeContentFromJournalFromSync(contentId: Uuid, journalId: Uuid) = withContext(dispatcher) {
+    override suspend fun removeContentFromJournalFromSync(
+        contentId: Uuid,
+        journalId: Uuid,
+    ) = withContext(dispatcher) {
         journalContentDao.removeContentFromJournal(journalId, contentId)
     }
 }

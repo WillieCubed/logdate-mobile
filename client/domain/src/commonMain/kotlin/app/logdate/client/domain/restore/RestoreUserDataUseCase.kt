@@ -20,27 +20,28 @@ import app.logdate.shared.model.Journal
 import app.logdate.shared.model.SerializableCameraBlock
 import app.logdate.shared.model.SerializableEntryBlock
 import app.logdate.shared.model.SerializableTextBlock
-import kotlin.time.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class RestoreUserDataUseCase(
     private val journalRepository: JournalRepository,
     private val journalNotesRepository: JournalNotesRepository,
-    private val journalContentRepository: JournalContentRepository
+    private val journalContentRepository: JournalContentRepository,
 ) {
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-    }
+    private val json =
+        Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+        }
 
     suspend fun restore(
         bundle: RestoreBundle,
         options: RestoreOptions = RestoreOptions(),
-        mediaImporter: MediaImporter? = null
+        mediaImporter: MediaImporter? = null,
     ): RestoreResult {
         val metadata = json.decodeFromString<ExportMetadata>(bundle.metadataJson)
         val journalsPayload = json.decodeFromString<JournalsPayload>(bundle.journalsJson)
@@ -90,11 +91,12 @@ class RestoreUserDataUseCase(
             val restored = note.toJournalNote(parsedId, mediaResolution.uri)
             if (restored == null) {
                 val normalizedType = note.type.lowercase()
-                val message = if (normalizedType == "image" || normalizedType == "video" || normalizedType == "audio") {
-                    "Missing media reference for note ${note.id}"
-                } else {
-                    "Unsupported note type: ${note.type}"
-                }
+                val message =
+                    if (normalizedType == "image" || normalizedType == "video" || normalizedType == "audio") {
+                        "Missing media reference for note ${note.id}"
+                    } else {
+                        "Unsupported note type: ${note.type}"
+                    }
                 warnings.add(message)
                 continue
             }
@@ -134,11 +136,12 @@ class RestoreUserDataUseCase(
 
         if (options.includeDrafts) {
             for (draft in draftsPayload.drafts) {
-                val restored = restoreDraft(draft, manifestIndex, mediaImporter) { imported ->
-                    if (imported) {
-                        mediaImported++
+                val restored =
+                    restoreDraft(draft, manifestIndex, mediaImporter) { imported ->
+                        if (imported) {
+                            mediaImported++
+                        }
                     }
-                }
                 journalRepository.saveDraft(restored)
                 draftsImported++
             }
@@ -151,27 +154,32 @@ class RestoreUserDataUseCase(
             draftsImported = draftsImported,
             journalLinksImported = linksImported,
             mediaImported = mediaImported,
-            warnings = warnings
+            warnings = warnings,
         )
     }
 
-    private fun shouldOverwrite(existing: Instant?, incoming: Instant, strategy: RestoreStrategy): Boolean {
-        return when (strategy) {
+    private fun shouldOverwrite(
+        existing: Instant?,
+        incoming: Instant,
+        strategy: RestoreStrategy,
+    ): Boolean =
+        when (strategy) {
             RestoreStrategy.MERGE_KEEP_NEWEST -> existing == null || incoming > existing
             RestoreStrategy.REPLACE_EXISTING -> true
         }
-    }
 
-    private fun parseUuid(value: String, warnings: MutableList<String>): Uuid? {
-        return runCatching { Uuid.parse(value) }
+    private fun parseUuid(
+        value: String,
+        warnings: MutableList<String>,
+    ): Uuid? =
+        runCatching { Uuid.parse(value) }
             .onFailure { warnings.add("Invalid UUID in restore payload: $value") }
             .getOrNull()
-    }
 
     private suspend fun resolveMediaReference(
         sourceUri: String?,
         manifestIndex: Map<String, ExportMediaFile>,
-        mediaImporter: MediaImporter?
+        mediaImporter: MediaImporter?,
     ): MediaResolution {
         if (sourceUri.isNullOrBlank()) {
             return MediaResolution(null, false)
@@ -190,7 +198,7 @@ class RestoreUserDataUseCase(
         draft: ExportDraft,
         manifestIndex: Map<String, ExportMediaFile>,
         mediaImporter: MediaImporter?,
-        onMediaImported: (Boolean) -> Unit
+        onMediaImported: (Boolean) -> Unit,
     ): EditorDraft {
         val blocks = mutableListOf<SerializableEntryBlock>()
         if (draft.content.isNotBlank()) {
@@ -200,8 +208,8 @@ class RestoreUserDataUseCase(
                     timestamp = draft.createdAt,
                     locationLat = draft.location?.latitude,
                     locationLng = draft.location?.longitude,
-                    content = draft.content
-                )
+                    content = draft.content,
+                ),
             )
         }
 
@@ -213,65 +221,72 @@ class RestoreUserDataUseCase(
                 SerializableCameraBlock(
                     id = Uuid.random(),
                     timestamp = draft.updatedAt,
-                    uri = uri
-                )
+                    uri = uri,
+                ),
             )
         }
 
-        val selectedJournalIds = draft.journalId?.let { journalId ->
-            runCatching { listOf(Uuid.parse(journalId)) }.getOrNull() ?: emptyList()
-        } ?: emptyList()
+        val selectedJournalIds =
+            draft.journalId?.let { journalId ->
+                runCatching { listOf(Uuid.parse(journalId)) }.getOrNull() ?: emptyList()
+            } ?: emptyList()
 
         return EditorDraft(
             id = runCatching { Uuid.parse(draft.id) }.getOrDefault(Uuid.random()),
             blocks = blocks,
             selectedJournalIds = selectedJournalIds,
             createdAt = draft.createdAt,
-            lastModifiedAt = draft.updatedAt
+            lastModifiedAt = draft.updatedAt,
         )
     }
 
-    private fun ExportNote.toJournalNote(id: Uuid, mediaUri: String?): JournalNote? {
+    private fun ExportNote.toJournalNote(
+        id: Uuid,
+        mediaUri: String?,
+    ): JournalNote? {
         val location = location?.toNoteLocation()
         return when (type.lowercase()) {
-            "text" -> JournalNote.Text(
-                uid = id,
-                creationTimestamp = createdAt,
-                lastUpdated = updatedAt,
-                content = content.orEmpty(),
-                location = location
-            )
-            "image" -> JournalNote.Image(
-                uid = id,
-                creationTimestamp = createdAt,
-                lastUpdated = updatedAt,
-                mediaRef = (mediaUri ?: mediaPath)?.takeIf { it.isNotBlank() } ?: return null,
-                location = location
-            )
-            "video" -> JournalNote.Video(
-                uid = id,
-                creationTimestamp = createdAt,
-                lastUpdated = updatedAt,
-                mediaRef = (mediaUri ?: mediaPath)?.takeIf { it.isNotBlank() } ?: return null,
-                location = location
-            )
-            "audio" -> JournalNote.Audio(
-                uid = id,
-                creationTimestamp = createdAt,
-                lastUpdated = updatedAt,
-                mediaRef = (mediaUri ?: mediaPath)?.takeIf { it.isNotBlank() } ?: return null,
-                durationMs = 0,
-                location = location
-            )
+            "text" ->
+                JournalNote.Text(
+                    uid = id,
+                    creationTimestamp = createdAt,
+                    lastUpdated = updatedAt,
+                    content = content.orEmpty(),
+                    location = location,
+                )
+            "image" ->
+                JournalNote.Image(
+                    uid = id,
+                    creationTimestamp = createdAt,
+                    lastUpdated = updatedAt,
+                    mediaRef = (mediaUri ?: mediaPath)?.takeIf { it.isNotBlank() } ?: return null,
+                    location = location,
+                )
+            "video" ->
+                JournalNote.Video(
+                    uid = id,
+                    creationTimestamp = createdAt,
+                    lastUpdated = updatedAt,
+                    mediaRef = (mediaUri ?: mediaPath)?.takeIf { it.isNotBlank() } ?: return null,
+                    location = location,
+                )
+            "audio" ->
+                JournalNote.Audio(
+                    uid = id,
+                    creationTimestamp = createdAt,
+                    lastUpdated = updatedAt,
+                    mediaRef = (mediaUri ?: mediaPath)?.takeIf { it.isNotBlank() } ?: return null,
+                    durationMs = 0,
+                    location = location,
+                )
             else -> null
         }
     }
 
-    private fun app.logdate.client.domain.export.ExportLocation.toNoteLocation(): NoteLocation {
-        return NoteLocation(
-            coordinates = NoteCoordinates(latitude, longitude)
+    private fun app.logdate.client.domain.export.ExportLocation.toNoteLocation(): NoteLocation =
+        NoteLocation(
+            coordinates = NoteCoordinates(latitude, longitude),
         )
-    }
 }
 
 interface MediaImporter {
@@ -284,17 +299,17 @@ data class RestoreBundle(
     val notesJson: String,
     val journalNotesJson: String,
     val draftsJson: String,
-    val mediaManifestJson: String? = null
+    val mediaManifestJson: String? = null,
 )
 
 data class RestoreOptions(
     val strategy: RestoreStrategy = RestoreStrategy.MERGE_KEEP_NEWEST,
-    val includeDrafts: Boolean = true
+    val includeDrafts: Boolean = true,
 )
 
 enum class RestoreStrategy {
     MERGE_KEEP_NEWEST,
-    REPLACE_EXISTING
+    REPLACE_EXISTING,
 }
 
 data class RestoreResult(
@@ -304,31 +319,31 @@ data class RestoreResult(
     val draftsImported: Int,
     val journalLinksImported: Int,
     val mediaImported: Int,
-    val warnings: List<String>
+    val warnings: List<String>,
 )
 
 private data class MediaResolution(
     val uri: String?,
-    val imported: Boolean
+    val imported: Boolean,
 )
 
 @Serializable
 private data class JournalsPayload(
-    val journals: List<Journal>
+    val journals: List<Journal>,
 )
 
 @Serializable
 private data class NotesPayload(
-    val notes: List<ExportNote>
+    val notes: List<ExportNote>,
 )
 
 @Serializable
 private data class DraftsPayload(
-    val drafts: List<ExportDraft>
+    val drafts: List<ExportDraft>,
 )
 
 @Serializable
 private data class JournalNotesPayload(
     @SerialName("journal_notes")
-    val journalNotes: List<ExportJournalNoteRelation>
+    val journalNotes: List<ExportJournalNoteRelation>,
 )

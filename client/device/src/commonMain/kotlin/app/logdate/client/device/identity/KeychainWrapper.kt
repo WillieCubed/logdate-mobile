@@ -12,7 +12,7 @@ interface KeychainWrapper {
      * @return The stored string, or null if not found
      */
     fun getString(key: String): String?
-    
+
     /**
      * Stores a string value in the keychain.
      *
@@ -20,8 +20,11 @@ interface KeychainWrapper {
      * @param value The value to store
      * @return True if storage was successful
      */
-    suspend fun set(value: String, key: String): Boolean
-    
+    suspend fun set(
+        value: String,
+        key: String,
+    ): Boolean
+
     /**
      * Removes a value from the keychain.
      *

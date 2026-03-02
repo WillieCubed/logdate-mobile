@@ -8,18 +8,20 @@ import org.koin.core.module.Module
 import org.koin.dsl.module
 import java.net.InetAddress
 
-actual val locationModule: Module = module {
+actual val locationModule: Module =
+    module {
 
-    single<ClientLocationProvider> { DesktopLocationProvider() }
-    single<ExternalPlacesProvider> { StubExternalPlacesProvider() }
-    
-    // Device ID for location tracking
-    single { 
-        val hostname = try {
-            InetAddress.getLocalHost().hostName
-        } catch (e: Exception) {
-            "unknown"
+        single<ClientLocationProvider> { DesktopLocationProvider() }
+        single<ExternalPlacesProvider> { StubExternalPlacesProvider() }
+
+        // Device ID for location tracking
+        single {
+            val hostname =
+                try {
+                    InetAddress.getLocalHost().hostName
+                } catch (e: Exception) {
+                    "unknown"
+                }
+            "desktop_$hostname"
         }
-        "desktop_$hostname" 
     }
-}

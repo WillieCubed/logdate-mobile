@@ -12,9 +12,9 @@ import app.logdate.client.sync.cloud.di.cloudAccountModule
 import app.logdate.client.sync.conflict.KeyValueSyncConflictStore
 import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.metadata.KeyValueMediaSyncRefStore
-import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.KeyValueSyncDeadLetterStore
 import app.logdate.client.sync.metadata.KeyValueSyncRetryScheduleStore
+import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import org.koin.android.ext.koin.androidContext
@@ -25,37 +25,53 @@ import org.koin.dsl.module
 /**
  * A module for all sync-related dependencies.
  */
-actual val syncModule: Module = module {
-    single<SyncConflictStore> { KeyValueSyncConflictStore(get()) }
-    single<MediaSyncRefStore> { KeyValueMediaSyncRefStore(get()) }
-    single<SyncDeadLetterStore> { KeyValueSyncDeadLetterStore(get()) }
-    single<SyncRetryScheduleStore> { KeyValueSyncRetryScheduleStore(get()) }
-    single<SyncTransactionManager> {
-        val database = get<LogDateDatabase>()
-        RoomSyncTransactionManager(database)
-    }
-    single<DefaultSyncManager> {
-        DefaultSyncManager(
-            cloudContentDataSource = get(),
-            cloudJournalDataSource = get(),
-            cloudAssociationDataSource = get(),
-            cloudMediaDataSource = get(),
-            cloudAccountRepository = get(),
-            sessionStorage = get(),
-            mediaManager = get(),
-            mediaSyncRefStore = get(),
-            journalRepository = get(),
-            journalNotesRepository = get(),
-            journalContentRepository = get(),
-            journalConflictResolver = get(named(SyncQualifiers.JOURNAL_CONFLICT_RESOLVER)),
-            noteConflictResolver = get(named(SyncQualifiers.NOTE_CONFLICT_RESOLVER)),
-            conflictStore = get(),
-            deadLetterStore = get(),
-            retryScheduleStore = get(),
-            syncMetadataService = get(),
-            transactionManager = get()
+actual val syncModule: Module =
+    module {
+        single<SyncConflictStore> { KeyValueSyncConflictStore(get()) }
+        single<MediaSyncRefStore> { KeyValueMediaSyncRefStore(get()) }
+        single<SyncDeadLetterStore> { KeyValueSyncDeadLetterStore(get()) }
+        single<SyncRetryScheduleStore> { KeyValueSyncRetryScheduleStore(get()) }
+        single<SyncTransactionManager> {
+            val database = get<LogDateDatabase>()
+            RoomSyncTransactionManager(database)
+        }
+        single<DefaultSyncManager> {
+            DefaultSyncManager(
+                cloudContentDataSource = get(),
+                cloudJournalDataSource = get(),
+                cloudAssociationDataSource = get(),
+                cloudMediaDataSource = get(),
+                cloudAccountRepository = get(),
+                sessionStorage = get(),
+                mediaManager = get(),
+                mediaSyncRefStore = get(),
+                journalRepository = get(),
+                journalNotesRepository = get(),
+                journalContentRepository = get(),
+                journalConflictResolver = get(named(SyncQualifiers.JOURNAL_CONFLICT_RESOLVER)),
+                noteConflictResolver = get(named(SyncQualifiers.NOTE_CONFLICT_RESOLVER)),
+                conflictStore = get(),
+                deadLetterStore = get(),
+                retryScheduleStore = get(),
+                syncMetadataService = get(),
+                transactionManager = get(),
+            )
+        }
+        single<SyncManager> {
+            AndroidSyncManager(
+                androidContext(),
+                get<DefaultSyncManager>(),
+                get(),
+                get(),
+                get<NetworkAvailabilityMonitor>(),
+            )
+        }
+        includes(
+            quotaModule,
+            cloudAccountModule,
+            cloudModule,
+            deviceInstanceModule,
+            conflictResolverModule,
+            app.logdate.client.media.di.mediaModule,
         )
     }
-    single<SyncManager> { AndroidSyncManager(androidContext(), get<DefaultSyncManager>(), get(), get(), get<NetworkAvailabilityMonitor>()) }
-    includes(quotaModule, cloudAccountModule, cloudModule, deviceInstanceModule, conflictResolverModule, app.logdate.client.media.di.mediaModule)
-}

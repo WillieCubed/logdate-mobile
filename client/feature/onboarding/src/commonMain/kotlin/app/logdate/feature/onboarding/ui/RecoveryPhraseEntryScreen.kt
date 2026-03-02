@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.feature.onboarding.ui
 
 import androidx.compose.foundation.layout.*
@@ -12,73 +14,77 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.aakira.napier.Napier
-import org.jetbrains.compose.resources.StringResource
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
+
 private val RecoveryPhraseWordPattern = Regex("^[a-z]+$")
 
 @Composable
 fun RecoveryPhraseEntryScreen(
     onRecovered: () -> Unit,
-    onError: (String) -> Unit = {}
+    onError: (String) -> Unit = {},
 ) {
     var phraseWords by remember { mutableStateOf(List(12) { "" }) }
     var isRecovering by remember { mutableStateOf(false) }
     var errorMessageRes by remember { mutableStateOf<StringResource?>(null) }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
             text = stringResource(Res.string.enter_recovery_phrase),
-            style = MaterialTheme.typography.headlineMedium
+            style = MaterialTheme.typography.headlineMedium,
         )
 
         Text(
             text = stringResource(Res.string.enter_your_12_word_recovery_phrase_to_restore_your_encryption_keys_and_decrypt_your_data),
-            style = MaterialTheme.typography.bodyMedium
+            style = MaterialTheme.typography.bodyMedium,
         )
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         ) {
             itemsIndexed(phraseWords) { index, word ->
                 OutlinedTextField(
                     value = word,
                     onValueChange = { newValue ->
-                        phraseWords = phraseWords.toMutableList().apply {
-                            this[index] = newValue.lowercase().trim()
-                        }
+                        phraseWords =
+                            phraseWords.toMutableList().apply {
+                                this[index] = newValue.lowercase().trim()
+                            }
                         errorMessageRes = null
                     },
                     label = { Text((index + 1).toString()) },
                     singleLine = true,
                     enabled = !isRecovering,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
 
         errorMessageRes?.let { messageRes ->
             Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer
-                ),
-                modifier = Modifier.fillMaxWidth()
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                    ),
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(
                     text = stringResource(messageRes),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(12.dp)
+                    modifier = Modifier.padding(12.dp),
                 )
             }
         }
@@ -86,9 +92,10 @@ fun RecoveryPhraseEntryScreen(
         if (isRecovering) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
             ) {
                 CircularProgressIndicator()
                 Spacer(modifier = Modifier.height(12.dp))
@@ -115,8 +122,9 @@ fun RecoveryPhraseEntryScreen(
 
                 runCatching(onRecovered)
                     .onFailure { throwable ->
-                        val reason = throwable.message?.takeIf { it.isNotBlank() }
-                            ?: "Recovery flow failed"
+                        val reason =
+                            throwable.message?.takeIf { it.isNotBlank() }
+                                ?: "Recovery flow failed"
                         Napier.e("Recovery phrase flow failed: $reason", throwable)
                         errorMessageRes = Res.string.recovery_error_unexpected
                         onError(reason)
@@ -125,7 +133,7 @@ fun RecoveryPhraseEntryScreen(
                 isRecovering = false
             },
             enabled = !isRecovering,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(Res.string.recover_account))
         }

@@ -6,7 +6,6 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.DatePeriod
-import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
@@ -18,15 +17,19 @@ import kotlinx.datetime.plus
 class GetMediaUrisUseCase(
     private val mediaManager: MediaManager,
 ) {
-    operator fun invoke(day: LocalDate): Flow<List<String>> = flow {
-        val startOfDay = day.atStartOfDayIn(TimeZone.currentSystemDefault())
-        val endOfDay = day.plus(DatePeriod(days = 1))
-            .atStartOfDayIn(TimeZone.currentSystemDefault())
-        val startInstant = startOfDay
-        val endInstant = endOfDay
-        val mediaUris = mediaManager.queryMediaByDate(startInstant, endInstant).map { it ->
-            it.map { it.uri }
+    operator fun invoke(day: LocalDate): Flow<List<String>> =
+        flow {
+            val startOfDay = day.atStartOfDayIn(TimeZone.currentSystemDefault())
+            val endOfDay =
+                day
+                    .plus(DatePeriod(days = 1))
+                    .atStartOfDayIn(TimeZone.currentSystemDefault())
+            val startInstant = startOfDay
+            val endInstant = endOfDay
+            val mediaUris =
+                mediaManager.queryMediaByDate(startInstant, endInstant).map { it ->
+                    it.map { it.uri }
+                }
+            emitAll(mediaUris)
         }
-        emitAll(mediaUris)
-    }
 }

@@ -11,5 +11,5 @@ import androidx.room.PrimaryKey
 data class SyncCursorEntity(
     @PrimaryKey
     val entityType: String,
-    val lastSyncTimestamp: Long
+    val lastSyncTimestamp: Long,
 )

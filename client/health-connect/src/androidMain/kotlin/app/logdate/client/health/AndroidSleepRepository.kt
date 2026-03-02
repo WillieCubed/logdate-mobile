@@ -11,18 +11,17 @@ import app.logdate.client.health.model.SleepStage
 import app.logdate.client.health.model.SleepStageType
 import app.logdate.client.health.model.TimeOfDay
 import io.github.aakira.napier.Napier
-import kotlin.time.Clock
-import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import java.time.ZoneId
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 /**
  * Android implementation of SleepRepository using Health Connect API.
  */
 class AndroidSleepRepository(
-    private val context: Context
+    private val context: Context,
 ) : SleepRepository {
-
     private val healthConnectClient by lazy {
         try {
             HealthConnectClient.getOrCreate(context)
@@ -32,13 +31,14 @@ class AndroidSleepRepository(
         }
     }
 
-    private val sleepPermissions = setOf(
-        HealthPermission.getReadPermission(SleepSessionRecord::class)
-    )
+    private val sleepPermissions =
+        setOf(
+            HealthPermission.getReadPermission(SleepSessionRecord::class),
+        )
 
     override suspend fun hasSleepPermissions(): Boolean {
         val client = healthConnectClient ?: return false
-        
+
         return try {
             val grantedPermissions = client.permissionController.getGrantedPermissions()
             grantedPermissions.containsAll(sleepPermissions)
@@ -56,20 +56,25 @@ class AndroidSleepRepository(
         return false
     }
 
-    override suspend fun getSleepSessions(start: Instant, end: Instant): List<SleepSession> {
+    override suspend fun getSleepSessions(
+        start: Instant,
+        end: Instant,
+    ): List<SleepSession> {
         val client = healthConnectClient ?: return emptyList()
-        
+
         return try {
-            val timeRangeFilter = TimeRangeFilter.between(
-                start.toJavaTimeInstant(),
-                end.toJavaTimeInstant()
-            )
-            
-            val request = ReadRecordsRequest(
-                recordType = SleepSessionRecord::class,
-                timeRangeFilter = timeRangeFilter
-            )
-            
+            val timeRangeFilter =
+                TimeRangeFilter.between(
+                    start.toJavaTimeInstant(),
+                    end.toJavaTimeInstant(),
+                )
+
+            val request =
+                ReadRecordsRequest(
+                    recordType = SleepSessionRecord::class,
+                    timeRangeFilter = timeRangeFilter,
+                )
+
             val response = client.readRecords(request)
             response.records.map { it.toSleepSession() }
         } catch (e: Exception) {
@@ -78,17 +83,21 @@ class AndroidSleepRepository(
         }
     }
 
-    override suspend fun getAverageWakeUpTime(timeZone: TimeZone, days: Int): TimeOfDay? {
+    override suspend fun getAverageWakeUpTime(
+        timeZone: TimeZone,
+        days: Int,
+    ): TimeOfDay? {
         if (!hasSleepPermissions()) {
             Napier.d("Sleep permissions not granted")
             return null
         }
-        
+
         try {
             val end = Clock.System.now()
-            val start = Instant.fromEpochMilliseconds(
-                end.toEpochMilliseconds() - (days * 24 * 60 * 60 * 1000L)
-            )
+            val start =
+                Instant.fromEpochMilliseconds(
+                    end.toEpochMilliseconds() - (days * 24 * 60 * 60 * 1000L),
+                )
 
             val sessions = getSleepSessions(start, end)
 
@@ -110,16 +119,18 @@ class AndroidSleepRepository(
             return TimeOfDay(
                 hour = javaTime.hour,
                 minute = javaTime.minute,
-                second = javaTime.second
+                second = javaTime.second,
             )
-
         } catch (e: Exception) {
             Napier.e("Error calculating average wake-up time", e)
             return null
         }
     }
 
-    override suspend fun getAverageSleepTime(timeZone: TimeZone, days: Int): TimeOfDay? {
+    override suspend fun getAverageSleepTime(
+        timeZone: TimeZone,
+        days: Int,
+    ): TimeOfDay? {
         if (!hasSleepPermissions()) {
             Napier.d("Sleep permissions not granted")
             return null
@@ -127,9 +138,10 @@ class AndroidSleepRepository(
 
         try {
             val end = Clock.System.now()
-            val start = Instant.fromEpochMilliseconds(
-                end.toEpochMilliseconds() - (days * 24 * 60 * 60 * 1000L)
-            )
+            val start =
+                Instant.fromEpochMilliseconds(
+                    end.toEpochMilliseconds() - (days * 24 * 60 * 60 * 1000L),
+                )
 
             val sessions = getSleepSessions(start, end)
 
@@ -151,37 +163,37 @@ class AndroidSleepRepository(
             return TimeOfDay(
                 hour = javaTime.hour,
                 minute = javaTime.minute,
-                second = javaTime.second
+                second = javaTime.second,
             )
-
         } catch (e: Exception) {
             Napier.e("Error calculating average sleep time", e)
             return null
         }
     }
 
-    private fun SleepSessionRecord.toSleepSession(): SleepSession {
-        return SleepSession(
+    private fun SleepSessionRecord.toSleepSession(): SleepSession =
+        SleepSession(
             id = metadata.id,
             startTime = startTime.toKotlinxInstant(),
             endTime = endTime.toKotlinxInstant(),
             sourceAppName = metadata.dataOrigin.packageName,
-            stages = stages.map { stage ->
-                SleepStage(
-                    type = when (stage.stage) {
-                        SleepSessionRecord.STAGE_TYPE_AWAKE -> SleepStageType.AWAKE
-                        SleepSessionRecord.STAGE_TYPE_DEEP -> SleepStageType.DEEP
-                        SleepSessionRecord.STAGE_TYPE_LIGHT -> SleepStageType.LIGHT
-                        SleepSessionRecord.STAGE_TYPE_REM -> SleepStageType.REM
-                        SleepSessionRecord.STAGE_TYPE_UNKNOWN -> SleepStageType.UNKNOWN
-                        else -> SleepStageType.UNKNOWN
-                    },
-                    startTime = stage.startTime.toKotlinxInstant(),
-                    endTime = stage.endTime.toKotlinxInstant()
-                )
-            }
+            stages =
+                stages.map { stage ->
+                    SleepStage(
+                        type =
+                            when (stage.stage) {
+                                SleepSessionRecord.STAGE_TYPE_AWAKE -> SleepStageType.AWAKE
+                                SleepSessionRecord.STAGE_TYPE_DEEP -> SleepStageType.DEEP
+                                SleepSessionRecord.STAGE_TYPE_LIGHT -> SleepStageType.LIGHT
+                                SleepSessionRecord.STAGE_TYPE_REM -> SleepStageType.REM
+                                SleepSessionRecord.STAGE_TYPE_UNKNOWN -> SleepStageType.UNKNOWN
+                                else -> SleepStageType.UNKNOWN
+                            },
+                        startTime = stage.startTime.toKotlinxInstant(),
+                        endTime = stage.endTime.toKotlinxInstant(),
+                    )
+                },
         )
-    }
 
     private fun calculateAverageTime(times: List<java.time.LocalTime>): java.time.LocalTime? {
         if (times.isEmpty()) return null
@@ -196,8 +208,6 @@ class AndroidSleepRepository(
     }
 }
 
-private fun Instant.toJavaTimeInstant(): java.time.Instant =
-    java.time.Instant.ofEpochSecond(epochSeconds, nanosecondsOfSecond.toLong())
+private fun Instant.toJavaTimeInstant(): java.time.Instant = java.time.Instant.ofEpochSecond(epochSeconds, nanosecondsOfSecond.toLong())
 
-private fun java.time.Instant.toKotlinxInstant(): Instant =
-    Instant.fromEpochSeconds(epochSecond, nano.toLong())
+private fun java.time.Instant.toKotlinxInstant(): Instant = Instant.fromEpochSeconds(epochSecond, nano.toLong())

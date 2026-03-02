@@ -11,18 +11,17 @@ import app.logdate.client.health.model.SleepStage
 import app.logdate.client.health.model.SleepStageType
 import app.logdate.client.health.model.TimeOfDay
 import io.github.aakira.napier.Napier
-import kotlin.time.Clock
-import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import java.time.ZoneId
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 /**
  * Android implementation of RemoteHealthDataSource using Health Connect API.
  */
 class AndroidHealthConnectDataSource(
-    private val context: Context
+    private val context: Context,
 ) : RemoteHealthDataSource {
-
     private val healthConnectClient by lazy {
         try {
             HealthConnectClient.getOrCreate(context)
@@ -32,23 +31,23 @@ class AndroidHealthConnectDataSource(
         }
     }
 
-    private val sleepPermissions = setOf(
-        HealthPermission.getReadPermission(SleepSessionRecord::class)
-    )
+    private val sleepPermissions =
+        setOf(
+            HealthPermission.getReadPermission(SleepSessionRecord::class),
+        )
 
-    override suspend fun isHealthApiAvailable(): Boolean {
-        return try {
+    override suspend fun isHealthApiAvailable(): Boolean =
+        try {
             val availability = HealthConnectClient.getSdkStatus(context)
             availability == HealthConnectClient.SDK_AVAILABLE
         } catch (e: Exception) {
             Napier.e("Error checking Health Connect availability", e)
             false
         }
-    }
 
     override suspend fun hasSleepPermissions(): Boolean {
         val client = healthConnectClient ?: return false
-        
+
         return try {
             val grantedPermissions = client.permissionController.getGrantedPermissions()
             grantedPermissions.containsAll(sleepPermissions)
@@ -66,19 +65,24 @@ class AndroidHealthConnectDataSource(
         return false
     }
 
-    override suspend fun getSleepSessions(start: Instant, end: Instant): List<SleepSession> {
+    override suspend fun getSleepSessions(
+        start: Instant,
+        end: Instant,
+    ): List<SleepSession> {
         val client = healthConnectClient ?: return emptyList()
-        
-        return try {
-            val timeRangeFilter = TimeRangeFilter.between(
-                start.toJavaTimeInstant(),
-                end.toJavaTimeInstant()
-            )
 
-            val request = ReadRecordsRequest(
-                recordType = SleepSessionRecord::class,
-                timeRangeFilter = timeRangeFilter
-            )
+        return try {
+            val timeRangeFilter =
+                TimeRangeFilter.between(
+                    start.toJavaTimeInstant(),
+                    end.toJavaTimeInstant(),
+                )
+
+            val request =
+                ReadRecordsRequest(
+                    recordType = SleepSessionRecord::class,
+                    timeRangeFilter = timeRangeFilter,
+                )
 
             val response = client.readRecords(request)
             response.records.map { it.toSleepSession() }
@@ -88,7 +92,10 @@ class AndroidHealthConnectDataSource(
         }
     }
 
-    override suspend fun getAverageWakeUpTime(timeZone: TimeZone, days: Int): TimeOfDay? {
+    override suspend fun getAverageWakeUpTime(
+        timeZone: TimeZone,
+        days: Int,
+    ): TimeOfDay? {
         if (!hasSleepPermissions()) {
             Napier.d("Sleep permissions not granted")
             return null
@@ -96,9 +103,10 @@ class AndroidHealthConnectDataSource(
 
         try {
             val end = Clock.System.now()
-            val start = Instant.fromEpochMilliseconds(
-                end.toEpochMilliseconds() - (days * 24 * 60 * 60 * 1000L)
-            )
+            val start =
+                Instant.fromEpochMilliseconds(
+                    end.toEpochMilliseconds() - (days * 24 * 60 * 60 * 1000L),
+                )
 
             val sessions = getSleepSessions(start, end)
 
@@ -120,16 +128,18 @@ class AndroidHealthConnectDataSource(
             return TimeOfDay(
                 hour = javaTime.hour,
                 minute = javaTime.minute,
-                second = javaTime.second
+                second = javaTime.second,
             )
-
         } catch (e: Exception) {
             Napier.e("Error calculating average wake-up time", e)
             return null
         }
     }
 
-    override suspend fun getAverageSleepTime(timeZone: TimeZone, days: Int): TimeOfDay? {
+    override suspend fun getAverageSleepTime(
+        timeZone: TimeZone,
+        days: Int,
+    ): TimeOfDay? {
         if (!hasSleepPermissions()) {
             Napier.d("Sleep permissions not granted")
             return null
@@ -137,9 +147,10 @@ class AndroidHealthConnectDataSource(
 
         try {
             val end = Clock.System.now()
-            val start = Instant.fromEpochMilliseconds(
-                end.toEpochMilliseconds() - (days * 24 * 60 * 60 * 1000L)
-            )
+            val start =
+                Instant.fromEpochMilliseconds(
+                    end.toEpochMilliseconds() - (days * 24 * 60 * 60 * 1000L),
+                )
 
             val sessions = getSleepSessions(start, end)
 
@@ -161,9 +172,8 @@ class AndroidHealthConnectDataSource(
             return TimeOfDay(
                 hour = javaTime.hour,
                 minute = javaTime.minute,
-                second = javaTime.second
+                second = javaTime.second,
             )
-
         } catch (e: Exception) {
             Napier.e("Error calculating average sleep time", e)
             return null
@@ -172,7 +182,7 @@ class AndroidHealthConnectDataSource(
 
     override suspend fun getAvailableDataTypes(): List<String> {
         val client = healthConnectClient ?: return emptyList()
-        
+
         return try {
             val availableTypes = client.permissionController.getGrantedPermissions()
             availableTypes.toList()
@@ -182,28 +192,29 @@ class AndroidHealthConnectDataSource(
         }
     }
 
-    private fun SleepSessionRecord.toSleepSession(): SleepSession {
-        return SleepSession(
+    private fun SleepSessionRecord.toSleepSession(): SleepSession =
+        SleepSession(
             id = metadata.id,
             startTime = startTime.toKotlinxInstant(),
             endTime = endTime.toKotlinxInstant(),
             sourceAppName = metadata.dataOrigin.packageName,
-            stages = stages.map { stage ->
-                SleepStage(
-                    type = when (stage.stage) {
-                        SleepSessionRecord.STAGE_TYPE_AWAKE -> SleepStageType.AWAKE
-                        SleepSessionRecord.STAGE_TYPE_DEEP -> SleepStageType.DEEP
-                        SleepSessionRecord.STAGE_TYPE_LIGHT -> SleepStageType.LIGHT
-                        SleepSessionRecord.STAGE_TYPE_REM -> SleepStageType.REM
-                        SleepSessionRecord.STAGE_TYPE_UNKNOWN -> SleepStageType.UNKNOWN
-                        else -> SleepStageType.UNKNOWN
-                    },
-                    startTime = stage.startTime.toKotlinxInstant(),
-                    endTime = stage.endTime.toKotlinxInstant()
-                )
-            }
+            stages =
+                stages.map { stage ->
+                    SleepStage(
+                        type =
+                            when (stage.stage) {
+                                SleepSessionRecord.STAGE_TYPE_AWAKE -> SleepStageType.AWAKE
+                                SleepSessionRecord.STAGE_TYPE_DEEP -> SleepStageType.DEEP
+                                SleepSessionRecord.STAGE_TYPE_LIGHT -> SleepStageType.LIGHT
+                                SleepSessionRecord.STAGE_TYPE_REM -> SleepStageType.REM
+                                SleepSessionRecord.STAGE_TYPE_UNKNOWN -> SleepStageType.UNKNOWN
+                                else -> SleepStageType.UNKNOWN
+                            },
+                        startTime = stage.startTime.toKotlinxInstant(),
+                        endTime = stage.endTime.toKotlinxInstant(),
+                    )
+                },
         )
-    }
 
     private fun calculateAverageTime(times: List<java.time.LocalTime>): java.time.LocalTime? {
         if (times.isEmpty()) return null
@@ -218,8 +229,6 @@ class AndroidHealthConnectDataSource(
     }
 }
 
-private fun Instant.toJavaTimeInstant(): java.time.Instant =
-    java.time.Instant.ofEpochSecond(epochSeconds, nanosecondsOfSecond.toLong())
+private fun Instant.toJavaTimeInstant(): java.time.Instant = java.time.Instant.ofEpochSecond(epochSeconds, nanosecondsOfSecond.toLong())
 
-private fun java.time.Instant.toKotlinxInstant(): Instant =
-    Instant.fromEpochSeconds(epochSecond, nano.toLong())
+private fun java.time.Instant.toKotlinxInstant(): Instant = Instant.fromEpochSeconds(epochSecond, nano.toLong())

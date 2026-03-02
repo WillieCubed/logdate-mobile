@@ -9,12 +9,13 @@ import org.koin.dsl.module
 /**
  * iOS-specific Koin module for device location tracking.
  */
-actual val locationTrackerModule: Module = module {
-    
-    // Provide the iOS implementation of DeviceLocationTracker
-    single<DeviceLocationTracker> {
-        IosDeviceLocationTracker(
-            locationProvider = get<IosLocationProvider>()
-        )
+actual val locationTrackerModule: Module =
+    module {
+
+        // Provide the iOS implementation of DeviceLocationTracker
+        single<DeviceLocationTracker> {
+            IosDeviceLocationTracker(
+                locationProvider = get<IosLocationProvider>(),
+            )
+        }
     }
-}

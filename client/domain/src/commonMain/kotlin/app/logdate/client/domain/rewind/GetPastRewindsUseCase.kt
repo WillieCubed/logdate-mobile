@@ -10,7 +10,5 @@ import kotlinx.coroutines.flow.Flow
 class GetPastRewindsUseCase(
     private val rewindRepository: RewindRepository,
 ) {
-    operator fun invoke(): Flow<List<Rewind>> {
-        return rewindRepository.getAllRewinds()
-    }
+    operator fun invoke(): Flow<List<Rewind>> = rewindRepository.getAllRewinds()
 }

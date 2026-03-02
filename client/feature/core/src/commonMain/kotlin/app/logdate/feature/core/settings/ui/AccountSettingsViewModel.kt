@@ -18,28 +18,37 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.time.Instant
 
 data class AccountSettingsState(
     val userData: UserData,
     val currentAccount: LogDateAccount,
-    val isAuthenticated: Boolean
+    val isAuthenticated: Boolean,
 )
 
 sealed class ProfileUpdateState {
     data object Idle : ProfileUpdateState()
+
     data object Updating : ProfileUpdateState()
+
     data object Success : ProfileUpdateState()
-    data class Error(val message: String) : ProfileUpdateState()
+
+    data class Error(
+        val message: String,
+    ) : ProfileUpdateState()
 }
 
 sealed class BirthdayUpdateState {
     data object Idle : BirthdayUpdateState()
+
     data object Updating : BirthdayUpdateState()
+
     data object Success : BirthdayUpdateState()
-    data class Error(val message: String) : BirthdayUpdateState()
+
+    data class Error(
+        val message: String,
+    ) : BirthdayUpdateState()
 }
 
 class AccountSettingsViewModel(
@@ -50,44 +59,48 @@ class AccountSettingsViewModel(
     private val sessionStorage: SessionStorage,
     private val preferencesDataSource: LogdatePreferencesDataSource,
 ) : ViewModel() {
-
     private val _profileUpdateState = MutableStateFlow<ProfileUpdateState>(ProfileUpdateState.Idle)
     val profileUpdateState: StateFlow<ProfileUpdateState> = _profileUpdateState
 
     private val _birthdayUpdateState = MutableStateFlow<BirthdayUpdateState>(BirthdayUpdateState.Idle)
     val birthdayUpdateState: StateFlow<BirthdayUpdateState> = _birthdayUpdateState
 
-    private val currentAccountFlow: Flow<LogDateAccount?> = flow {
-        val result = getCurrentAccountUseCase(GetCurrentAccountUseCase.AccountRequest.GetCurrentAccount)
-        when (result) {
-            is GetCurrentAccountUseCase.AccountResult.CurrentAccount -> {
-                result.account.collect { emit(it) }
+    private val currentAccountFlow: Flow<LogDateAccount?> =
+        flow {
+            val result = getCurrentAccountUseCase(GetCurrentAccountUseCase.AccountRequest.GetCurrentAccount)
+            when (result) {
+                is GetCurrentAccountUseCase.AccountResult.CurrentAccount -> {
+                    result.account.collect { emit(it) }
+                }
+                else -> emit(null)
             }
-            else -> emit(null)
         }
-    }
 
-    val state: StateFlow<AccountSettingsState> = combine(
-        userStateRepository.userData,
-        currentAccountFlow,
-        sessionStorage.getSessionFlow()
-    ) { userData, currentAccount, session ->
-        AccountSettingsState(
-            userData = userData.orDefault(),
-            currentAccount = currentAccount.orDefault(),
-            isAuthenticated = session != null
+    val state: StateFlow<AccountSettingsState> =
+        combine(
+            userStateRepository.userData,
+            currentAccountFlow,
+            sessionStorage.getSessionFlow(),
+        ) { userData, currentAccount, session ->
+            AccountSettingsState(
+                userData = userData.orDefault(),
+                currentAccount = currentAccount.orDefault(),
+                isAuthenticated = session != null,
+            )
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            AccountSettingsState(
+                userData = (null as UserData?).orDefault(),
+                currentAccount = (null as LogDateAccount?).orDefault(),
+                isAuthenticated = false,
+            ),
         )
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        AccountSettingsState(
-            userData = (null as UserData?).orDefault(),
-            currentAccount = (null as LogDateAccount?).orDefault(),
-            isAuthenticated = false
-        )
-    )
 
-    fun updateProfile(displayName: String, username: String) {
+    fun updateProfile(
+        displayName: String,
+        username: String,
+    ) {
         val trimmedDisplayName = displayName.trim()
         val trimmedUsername = username.trim()
         val displayNameUpdate = trimmedDisplayName.takeIf { it.isNotEmpty() }
@@ -111,12 +124,13 @@ class AccountSettingsViewModel(
                 }
                 is UpdateProfileUseCase.Result.Error -> {
                     val error = result.error
-                    val message = when (error) {
-                        is UpdateProfileUseCase.ProfileUpdateError.InvalidDisplayName -> "Invalid display name"
-                        is UpdateProfileUseCase.ProfileUpdateError.InvalidUsername -> "Invalid username"
-                        is UpdateProfileUseCase.ProfileUpdateError.NetworkError -> "Network error updating profile"
-                        is UpdateProfileUseCase.ProfileUpdateError.Unknown -> error.message
-                    }
+                    val message =
+                        when (error) {
+                            is UpdateProfileUseCase.ProfileUpdateError.InvalidDisplayName -> "Invalid display name"
+                            is UpdateProfileUseCase.ProfileUpdateError.InvalidUsername -> "Invalid username"
+                            is UpdateProfileUseCase.ProfileUpdateError.NetworkError -> "Network error updating profile"
+                            is UpdateProfileUseCase.ProfileUpdateError.Unknown -> error.message
+                        }
                     _profileUpdateState.value = ProfileUpdateState.Error(message)
                 }
             }
@@ -132,9 +146,10 @@ class AccountSettingsViewModel(
                 _birthdayUpdateState.value = BirthdayUpdateState.Success
             } catch (e: Exception) {
                 Napier.e("AccountSettingsViewModel: failed to update birthday", e)
-                _birthdayUpdateState.value = BirthdayUpdateState.Error(
-                    e.message ?: "Failed to update birthday"
-                )
+                _birthdayUpdateState.value =
+                    BirthdayUpdateState.Error(
+                        e.message ?: "Failed to update birthday",
+                    )
             }
         }
     }

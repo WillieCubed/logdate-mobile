@@ -98,12 +98,19 @@ if [[ -n "$kt_files" ]]; then
         # Build ktlintCheck tasks for affected modules, skipping modules without ktlint
         ktlint_tasks=()
         ktlint_modules=()
+        missing_ktlint_modules=()
         for mod in "${modules[@]}"; do
             if ./gradlew "${mod}:tasks" --all --quiet 2>/dev/null | grep -q "ktlintCheck"; then
                 ktlint_tasks+=("${mod}:ktlintCheck")
                 ktlint_modules+=("$mod")
+            else
+                missing_ktlint_modules+=("$mod")
             fi
         done
+
+        if [[ ${#missing_ktlint_modules[@]} -gt 0 ]]; then
+            echo "Warning: skipping ktlint for modules without ktlintCheck: ${missing_ktlint_modules[*]}"
+        fi
 
         if [[ ${#ktlint_tasks[@]} -gt 0 ]]; then
             echo "Running ktlint on affected modules: ${ktlint_modules[*]}"

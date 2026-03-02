@@ -1,11 +1,11 @@
 package app.logdate.client.sync.metadata
 
+import app.logdate.client.datastore.KeyValueStorage
+import io.github.aakira.napier.Napier
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import io.github.aakira.napier.Napier
-import app.logdate.client.datastore.KeyValueStorage
 
 @Serializable
 data class SyncDeadLetterRecord(
@@ -15,21 +15,23 @@ data class SyncDeadLetterRecord(
     val operation: String,
     val retryCount: Int,
     val lastError: String,
-    val failedAt: Long
+    val failedAt: Long,
 )
 
 interface SyncDeadLetterStore {
     suspend fun list(): List<SyncDeadLetterRecord>
+
     suspend fun add(record: SyncDeadLetterRecord)
+
     suspend fun remove(id: String)
+
     suspend fun clear()
 }
 
 class KeyValueSyncDeadLetterStore(
     private val storage: KeyValueStorage,
-    private val json: Json = Json { ignoreUnknownKeys = true }
+    private val json: Json = Json { ignoreUnknownKeys = true },
 ) : SyncDeadLetterStore {
-
     override suspend fun list(): List<SyncDeadLetterRecord> = readAll()
 
     override suspend fun add(record: SyncDeadLetterRecord) {

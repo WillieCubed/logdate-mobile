@@ -753,4 +753,3 @@ sealed interface Question : IntransitiveActivity {
         val oneOf: List<Object>
     }
 }
-

@@ -14,19 +14,19 @@ object StubUserDeviceRepository : UserDeviceRepository {
     override val allDevices: Flow<List<UserDevice>>
         get() = flowOf(emptyList())
     override val currentDevice: Flow<UserDevice>
-        get() = flowOf(
-            UserDevice(
-                "stub",
-                "stub",
-                "stub",
-                "stub",
-                "",
-                "",
-                DeviceType.OTHER,
-                Clock.System.now(),
+        get() =
+            flowOf(
+                UserDevice(
+                    "stub",
+                    "stub",
+                    "stub",
+                    "stub",
+                    "",
+                    "",
+                    DeviceType.OTHER,
+                    Clock.System.now(),
+                ),
             )
-        )
-
 
     override suspend fun addDevice(
         label: String,

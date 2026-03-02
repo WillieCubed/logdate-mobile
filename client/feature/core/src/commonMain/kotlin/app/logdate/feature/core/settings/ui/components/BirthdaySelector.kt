@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.core.settings.ui.components
 
 import androidx.compose.foundation.clickable
@@ -17,14 +19,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import kotlin.time.Clock
-import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.core.generated.resources.*
 import logdate.client.feature.core.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Clock
+import kotlin.time.Instant
+
 /**
  * Format a LocalDate according to the current locale.
  * This is implemented differently on each platform.
@@ -43,19 +45,20 @@ expect fun formatDateLocalized(date: LocalDate): String
 fun BirthdaySelector(
     birthday: Instant,
     onBirthdaySelected: (Instant) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
-    
+
     // Format the birthday for display
-    val formattedBirthday = if (birthday == Instant.DISTANT_PAST) {
-        "Not set"
-    } else {
-        // Use kotlinx.datetime.format for properly localized date
-        val localDate = birthday.toLocalDateTime(TimeZone.currentSystemDefault()).date
-        formatDateLocalized(localDate)
-    }
-    
+    val formattedBirthday =
+        if (birthday == Instant.DISTANT_PAST) {
+            "Not set"
+        } else {
+            // Use kotlinx.datetime.format for properly localized date
+            val localDate = birthday.toLocalDateTime(TimeZone.currentSystemDefault()).date
+            formatDateLocalized(localDate)
+        }
+
     // The list item that shows the current birthday and opens the date picker
     ListItem(
         headlineContent = { Text(stringResource(Res.string.birthday)) },
@@ -63,22 +66,23 @@ fun BirthdaySelector(
         leadingContent = {
             Icon(
                 imageVector = Icons.Default.DateRange,
-                contentDescription = null
+                contentDescription = null,
             )
         },
-        modifier = modifier.clickable { showDatePicker = true }
+        modifier = modifier.clickable { showDatePicker = true },
     )
-    
+
     if (showDatePicker) {
         // Initialize date picker with current birthday or current date if not set
-        val initialMillis = if (birthday == Instant.DISTANT_PAST) {
-            Clock.System.now().toEpochMilliseconds()
-        } else {
-            birthday.toEpochMilliseconds()
-        }
-        
+        val initialMillis =
+            if (birthday == Instant.DISTANT_PAST) {
+                Clock.System.now().toEpochMilliseconds()
+            } else {
+                birthday.toEpochMilliseconds()
+            }
+
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
-        
+
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
@@ -88,7 +92,7 @@ fun BirthdaySelector(
                             onBirthdaySelected(Instant.fromEpochMilliseconds(millis))
                         }
                         showDatePicker = false
-                    }
+                    },
                 ) {
                     Text(stringResource(Res.string.confirm))
                 }
@@ -97,7 +101,7 @@ fun BirthdaySelector(
                 TextButton(onClick = { showDatePicker = false }) {
                     Text(stringResource(Res.string.cancel))
                 }
-            }
+            },
         ) {
             DatePicker(state = datePickerState)
         }

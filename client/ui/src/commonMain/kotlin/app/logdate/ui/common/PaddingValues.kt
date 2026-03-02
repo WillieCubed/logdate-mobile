@@ -10,11 +10,14 @@ import androidx.compose.ui.unit.LayoutDirection
  *
  * This assumes a left to right layout direction.
  */
-operator fun PaddingValues.plus(other: PaddingValues): PaddingValues = PaddingValues(
-    start = this.calculateStartPadding(LayoutDirection.Ltr) +
-            other.calculateStartPadding(LayoutDirection.Ltr),
-    top = this.calculateTopPadding() + other.calculateTopPadding(),
-    end = this.calculateEndPadding(LayoutDirection.Ltr) +
-            other.calculateEndPadding(LayoutDirection.Ltr),
-    bottom = this.calculateBottomPadding() + other.calculateBottomPadding(),
-)
+operator fun PaddingValues.plus(other: PaddingValues): PaddingValues =
+    PaddingValues(
+        start =
+            this.calculateStartPadding(LayoutDirection.Ltr) +
+                other.calculateStartPadding(LayoutDirection.Ltr),
+        top = this.calculateTopPadding() + other.calculateTopPadding(),
+        end =
+            this.calculateEndPadding(LayoutDirection.Ltr) +
+                other.calculateEndPadding(LayoutDirection.Ltr),
+        bottom = this.calculateBottomPadding() + other.calculateBottomPadding(),
+    )

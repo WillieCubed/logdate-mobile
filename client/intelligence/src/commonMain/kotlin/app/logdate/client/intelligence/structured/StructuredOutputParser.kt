@@ -4,8 +4,12 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 
 sealed interface StructuredOutputResult<out T> {
-    data class Success<T>(val value: T) : StructuredOutputResult<T>
+    data class Success<T>(
+        val value: T,
+    ) : StructuredOutputResult<T>
+
     data object Empty : StructuredOutputResult<Nothing>
+
     data object Invalid : StructuredOutputResult<Nothing>
 }
 
@@ -31,8 +35,7 @@ class JsonStructuredOutputParser<T>(
         return StructuredOutputResult.Invalid
     }
 
-    private fun decode(payload: String): T? =
-        runCatching { json.decodeFromString(serializer, payload) }.getOrNull()
+    private fun decode(payload: String): T? = runCatching { json.decodeFromString(serializer, payload) }.getOrNull()
 }
 
 private fun extractJsonObject(raw: String): String? {
@@ -51,12 +54,13 @@ private fun extractJsonObject(raw: String): String? {
             '\\' -> if (inString) escape = true
             '"' -> inString = !inString
             '{' -> if (!inString) depth += 1
-            '}' -> if (!inString) {
-                depth -= 1
-                if (depth == 0) {
-                    return raw.substring(start, index + 1)
+            '}' ->
+                if (!inString) {
+                    depth -= 1
+                    if (depth == 0) {
+                        return raw.substring(start, index + 1)
+                    }
                 }
-            }
         }
     }
     return null

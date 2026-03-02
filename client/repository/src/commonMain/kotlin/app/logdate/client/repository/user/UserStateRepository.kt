@@ -14,5 +14,4 @@ interface UserStateRepository {
     suspend fun setBiometricEnabled(isEnabled: Boolean)
 
     suspend fun addFavoriteNote(vararg noteId: String)
-
 }

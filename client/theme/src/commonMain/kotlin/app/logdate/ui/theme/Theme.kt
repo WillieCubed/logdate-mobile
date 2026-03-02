@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -11,11 +13,11 @@ import androidx.compose.runtime.Composable
  *
  * This should be used when dynamic color scheme is not available on Android 12+ devices.
  */
-val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
+val LightColorScheme =
+    lightColorScheme(
+        primary = Purple40,
+        secondary = PurpleGrey40,
+        tertiary = Pink40,
     /* Other default colors to override
     background = Color(0xFFFFFBFE),
     surface = Color(0xFFFFFBFE),
@@ -24,19 +26,20 @@ val LightColorScheme = lightColorScheme(
     onTertiary = Color.White,
     onBackground = Color(0xFF1C1B1F),
     onSurface = Color(0xFF1C1B1F),
-    */
-)
+     */
+    )
 
 /**
  * The default dark color scheme for the LogDate app.
  *
  * This should be used when dynamic color scheme is not available on Android 12+ devices.
  */
-val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
-)
+val DarkColorScheme =
+    darkColorScheme(
+        primary = Purple80,
+        secondary = PurpleGrey80,
+        tertiary = Pink80,
+    )
 
 /**
  * A theme for the LogDate app.
@@ -53,18 +56,19 @@ val DarkColorScheme = darkColorScheme(
 fun LogDateTheme(
     dynamicColor: Boolean = true,
     darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
-    val colorScheme = when {
-        // TODO: Re-enable dynamic color when able
+    val colorScheme =
+        when {
+            // TODO: Re-enable dynamic color when able
 //        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
 //            val context = LocalContext.current
 //            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
 //        }
 
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
+            darkTheme -> DarkColorScheme
+            else -> LightColorScheme
+        }
 //    val view = LocalView.current
 
 //    @Suppress("DEPRECATION")
@@ -81,6 +85,6 @@ fun LogDateTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
-        content = content
+        content = content,
     )
 }

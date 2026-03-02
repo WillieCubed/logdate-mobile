@@ -8,6 +8,7 @@ import org.koin.dsl.module
  * Module for quota-related domain use cases.
  * Separated to avoid circular dependencies with sync modules.
  */
-val quotaDomainModule: Module = module {
-    factory { ObserveCloudQuotaUseCase(get()) }
-}
+val quotaDomainModule: Module =
+    module {
+        factory { ObserveCloudQuotaUseCase(get()) }
+    }

@@ -16,9 +16,8 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 class DesktopSecureStorage(
-    baseDirectory: Path = Path.of(System.getProperty("user.home"), ".logdate")
+    baseDirectory: Path = Path.of(System.getProperty("user.home"), ".logdate"),
 ) : SecureStorage {
-
     private val keyPath = baseDirectory.resolve("secure-storage.key")
     private val preferences = Preferences.userRoot().node("app.logdate.secure")
     private val secretKey: SecretKey = loadOrCreateKey()
@@ -53,7 +52,10 @@ class DesktopSecureStorage(
         return decrypted
     }
 
-    override suspend fun putString(key: String, value: String) {
+    override suspend fun putString(
+        key: String,
+        value: String,
+    ) {
         val encrypted = encryptString(value) ?: return
         preferences.put(key, encrypted)
         valueCache[key] = value
@@ -72,27 +74,21 @@ class DesktopSecureStorage(
         valueCacheFlow.value = emptyMap()
     }
 
-    override fun observeString(key: String): Flow<String?> {
-        return valueCacheFlow.map { cache -> cache[key] }
-    }
+    override fun observeString(key: String): Flow<String?> = valueCacheFlow.map { cache -> cache[key] }
 
-    override fun observeAll(): Flow<Map<String, String>> {
-        return valueCacheFlow
-    }
+    override fun observeAll(): Flow<Map<String, String>> = valueCacheFlow
 
-    override suspend fun encrypt(data: ByteArray): ByteArray {
-        return runCatching { encryptBytes(data) }.getOrElse { error ->
+    override suspend fun encrypt(data: ByteArray): ByteArray =
+        runCatching { encryptBytes(data) }.getOrElse { error ->
             Napier.e("Failed to encrypt payload", error)
             null
         } ?: data
-    }
 
-    override suspend fun decrypt(data: ByteArray): ByteArray? {
-        return runCatching { decryptBytes(data) }.getOrElse { error ->
+    override suspend fun decrypt(data: ByteArray): ByteArray? =
+        runCatching { decryptBytes(data) }.getOrElse { error ->
             Napier.e("Failed to decrypt payload", error)
             null
         }
-    }
 
     private fun loadOrCreateKey(): SecretKey {
         return runCatching {

@@ -20,5 +20,5 @@ data class ImageNoteRewindPanelUiState(
     val timestamp: Instant,
     val imageUri: String,
     val caption: String? = null,
-    val dateFormatted: String
+    val dateFormatted: String,
 ) : RewindPanelUiState

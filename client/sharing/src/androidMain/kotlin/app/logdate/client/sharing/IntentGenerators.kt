@@ -37,11 +37,12 @@ internal fun createInstagramStoryIntent(
  *
  * @param imageUri The URI of the video to share.
  */
-internal fun createInstagramImageShareIntent(imageUri: Uri) = Intent(Intent.ACTION_SEND).apply {
-    type = "image/*"
-    putExtra(Intent.EXTRA_STREAM, imageUri)
-    setPackage(INSTAGRAM_PACKAGE_NAME)
-}
+internal fun createInstagramImageShareIntent(imageUri: Uri) =
+    Intent(Intent.ACTION_SEND).apply {
+        type = "image/*"
+        putExtra(Intent.EXTRA_STREAM, imageUri)
+        setPackage(INSTAGRAM_PACKAGE_NAME)
+    }
 
 /**
  * Creates an intent to share a video to Instagram.
@@ -55,8 +56,9 @@ internal fun createInstagramImageShareIntent(imageUri: Uri) = Intent(Intent.ACTI
  *
  * @param videoUri The URI of the video to share.
  */
-internal fun createInstagramVideoShareIntent(videoUri: Uri) = Intent(Intent.ACTION_SEND).apply {
-    type = "video/*"
-    putExtra(Intent.EXTRA_STREAM, videoUri)
-    setPackage(INSTAGRAM_PACKAGE_NAME)
-}
+internal fun createInstagramVideoShareIntent(videoUri: Uri) =
+    Intent(Intent.ACTION_SEND).apply {
+        type = "video/*"
+        putExtra(Intent.EXTRA_STREAM, videoUri)
+        setPackage(INSTAGRAM_PACKAGE_NAME)
+    }

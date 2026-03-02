@@ -4,14 +4,14 @@ import kotlinx.datetime.LocalDate
 
 sealed class TimelineDaySelection {
     data object NotSelected : TimelineDaySelection()
-    
+
     /**
      * Represents a selected day in the timeline.
      */
     data class DateSelected(
         val date: LocalDate,
     ) : TimelineDaySelection()
-    
+
     /**
      * @deprecated Use DateSelected instead
      */

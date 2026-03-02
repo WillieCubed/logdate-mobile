@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:filename")
+
 package app.logdate.client.sync.cloud
 
 // Re-export shared sync models to avoid duplicate domain definitions.

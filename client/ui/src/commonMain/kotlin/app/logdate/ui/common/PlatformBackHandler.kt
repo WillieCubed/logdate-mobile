@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.ui.common
 
 import androidx.compose.runtime.Composable
@@ -9,4 +11,7 @@ import androidx.compose.runtime.Composable
  * @param onBack The callback to run when the back event is intercepted.
  */
 @Composable
-expect fun PlatformBackHandler(enabled: Boolean, onBack: () -> Unit)
+expect fun PlatformBackHandler(
+    enabled: Boolean,
+    onBack: () -> Unit,
+)

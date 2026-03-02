@@ -1,65 +1,72 @@
 package app.logdate.client.intelligence.cache
 
 import kotlinx.coroutines.test.runTest
-import kotlin.time.Clock
-import kotlin.time.Instant
-import kotlin.time.Duration.Companion.seconds
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 class OfflineGenerativeAICacheTest {
+    @Test
+    fun getEntry_expiresAfterTtl() =
+        runTest {
+            val clock = TestClock(Instant.parse("2024-01-01T00:00:00Z"))
+            val dataSource = TestLocalDataSource()
+            val cache =
+                OfflineGenerativeAICache(
+                    dataSource = dataSource,
+                    clock = clock,
+                    config = AICacheConfig(memoryMaxEntries = 10, memoryMaxBytes = 10_000),
+                )
+            val request = requestFor("Hello world", ttlSeconds = 5)
+
+            cache.putEntry(request, "summary")
+            val fresh = cache.getEntry(request)
+            assertNotNull(fresh)
+
+            clock.advance(seconds = 6)
+            val expired = cache.getEntry(request)
+            assertNull(expired)
+        }
 
     @Test
-    fun getEntry_expiresAfterTtl() = runTest {
-        val clock = TestClock(Instant.parse("2024-01-01T00:00:00Z"))
-        val dataSource = TestLocalDataSource()
-        val cache = OfflineGenerativeAICache(
-            dataSource = dataSource,
-            clock = clock,
-            config = AICacheConfig(memoryMaxEntries = 10, memoryMaxBytes = 10_000)
-        )
-        val request = requestFor("Hello world", ttlSeconds = 5)
+    fun putEntry_enforcesPersistentMaxEntries() =
+        runTest {
+            val clock = TestClock(Instant.parse("2024-01-01T00:00:00Z"))
+            val dataSource = TestLocalDataSource()
+            val cache =
+                OfflineGenerativeAICache(
+                    dataSource = dataSource,
+                    clock = clock,
+                    config =
+                        AICacheConfig(
+                            memoryMaxEntries = 10,
+                            memoryMaxBytes = 10_000,
+                            persistentMaxEntries = 1,
+                            persistentMaxBytes = 10_000,
+                        ),
+                )
 
-        cache.putEntry(request, "summary")
-        val fresh = cache.getEntry(request)
-        assertNotNull(fresh)
+            val firstRequest = requestFor("First", ttlSeconds = 60)
+            val secondRequest = requestFor("Second", ttlSeconds = 60)
 
-        clock.advance(seconds = 6)
-        val expired = cache.getEntry(request)
-        assertNull(expired)
-    }
+            cache.putEntry(firstRequest, "first-content")
+            clock.advance(seconds = 1)
+            cache.putEntry(secondRequest, "second-content")
 
-    @Test
-    fun putEntry_enforcesPersistentMaxEntries() = runTest {
-        val clock = TestClock(Instant.parse("2024-01-01T00:00:00Z"))
-        val dataSource = TestLocalDataSource()
-        val cache = OfflineGenerativeAICache(
-            dataSource = dataSource,
-            clock = clock,
-            config = AICacheConfig(
-                memoryMaxEntries = 10,
-                memoryMaxBytes = 10_000,
-                persistentMaxEntries = 1,
-                persistentMaxBytes = 10_000
-            )
-        )
+            val remaining = dataSource.entries()
+            assertEquals(1, remaining.size)
+            assertEquals("second-content", remaining.first().content)
+        }
 
-        val firstRequest = requestFor("First", ttlSeconds = 60)
-        val secondRequest = requestFor("Second", ttlSeconds = 60)
-
-        cache.putEntry(firstRequest, "first-content")
-        clock.advance(seconds = 1)
-        cache.putEntry(secondRequest, "second-content")
-
-        val remaining = dataSource.entries()
-        assertEquals(1, remaining.size)
-        assertEquals("second-content", remaining.first().content)
-    }
-
-    private fun requestFor(inputText: String, ttlSeconds: Long): GenerativeAICacheRequest {
-        return GenerativeAICacheRequest(
+    private fun requestFor(
+        inputText: String,
+        ttlSeconds: Long,
+    ): GenerativeAICacheRequest =
+        GenerativeAICacheRequest(
             contentType = GenerativeAICacheContentType.Summary,
             inputText = inputText,
             providerId = "openai",
@@ -67,12 +74,11 @@ class OfflineGenerativeAICacheTest {
             promptVersion = "v1",
             schemaVersion = "schema-v1",
             templateId = "summary",
-            policy = AICachePolicy(ttlSeconds = ttlSeconds)
+            policy = AICachePolicy(ttlSeconds = ttlSeconds),
         )
-    }
 
     private class TestClock(
-        private var current: Instant
+        private var current: Instant,
     ) : Clock {
         override fun now(): Instant = current
 
@@ -86,7 +92,10 @@ class OfflineGenerativeAICacheTest {
 
         override fun get(key: String): GenerativeAICacheEntry? = store[key]
 
-        override fun set(key: String, entry: GenerativeAICacheEntry) {
+        override fun set(
+            key: String,
+            entry: GenerativeAICacheEntry,
+        ) {
             store[key] = entry
         }
 

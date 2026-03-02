@@ -1,5 +1,6 @@
 package app.logdate.client.networking
 
+import app.logdate.util.UuidSerializer
 import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
@@ -9,7 +10,6 @@ import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.serialization.kotlinx.json.json
-import app.logdate.util.UuidSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.uuid.Uuid
@@ -28,13 +28,16 @@ expect val httpClient: HttpClient
  */
 internal fun <T : HttpClientEngineConfig> HttpClientConfig<T>.configureClientDefaults() {
     install(ContentNegotiation) {
-        json(Json {
-            prettyPrint = true
-            ignoreUnknownKeys = true
-            serializersModule = SerializersModule {
-                contextual(Uuid::class, UuidSerializer)
-            }
-        })
+        json(
+            Json {
+                prettyPrint = true
+                ignoreUnknownKeys = true
+                serializersModule =
+                    SerializersModule {
+                        contextual(Uuid::class, UuidSerializer)
+                    }
+            },
+        )
     }
     install(Logging) {
         logger = NapierLogger

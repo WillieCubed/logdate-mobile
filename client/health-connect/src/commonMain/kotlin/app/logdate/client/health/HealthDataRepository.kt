@@ -8,11 +8,11 @@ package app.logdate.client.health
 interface HealthDataRepository {
     /**
      * Checks if health data services are available on the device.
-     * 
+     *
      * @return true if health data is available, false otherwise
      */
     suspend fun isHealthDataAvailable(): Boolean
-    
+
     /**
      * Gets a list of available data types from health data services.
      *

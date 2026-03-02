@@ -20,12 +20,13 @@ sealed interface GenerativeAICacheContentType {
     }
 
     companion object {
-        fun fromId(id: String): GenerativeAICacheContentType? = when (id) {
-            Summary.id -> Summary
-            People.id -> People
-            Narrative.id -> Narrative
-            Onboarding.id -> Onboarding
-            else -> null
-        }
+        fun fromId(id: String): GenerativeAICacheContentType? =
+            when (id) {
+                Summary.id -> Summary
+                People.id -> People
+                Narrative.id -> Narrative
+                Onboarding.id -> Onboarding
+                else -> null
+            }
     }
 }

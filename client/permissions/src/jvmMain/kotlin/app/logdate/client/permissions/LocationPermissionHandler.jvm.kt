@@ -1,6 +1,6 @@
 package app.logdate.client.permissions
 
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 
 @Composable
 actual fun rememberLocationPermissionState(): LocationPermissionState {
@@ -10,6 +10,6 @@ actual fun rememberLocationPermissionState(): LocationPermissionState {
         hasPermission = true, // No permissions needed for IP geolocation
         shouldShowRationale = false,
         permissionRequested = false,
-        requestPermission = { /* No-op on desktop */ }
+        requestPermission = { /* No-op on desktop */ },
     )
 }

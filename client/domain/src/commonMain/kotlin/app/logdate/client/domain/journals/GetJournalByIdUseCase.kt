@@ -7,19 +7,17 @@ import kotlin.uuid.Uuid
 
 /**
  * Use case to get a journal by its ID.
- * 
+ *
  * @param repository The repository for journal operations
  */
 class GetJournalByIdUseCase(
-    private val repository: JournalRepository
+    private val repository: JournalRepository,
 ) {
     /**
      * Gets a journal by its ID as a flow.
-     * 
+     *
      * @param journalId The ID of the journal to get
      * @return A flow emitting the journal
      */
-    operator fun invoke(journalId: Uuid): Flow<Journal> {
-        return repository.observeJournalById(journalId)
-    }
+    operator fun invoke(journalId: Uuid): Flow<Journal> = repository.observeJournalById(journalId)
 }

@@ -1,10 +1,10 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.rewind.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.unit.dp
-import java.awt.Dimension
 import java.awt.Toolkit
 
 /**
@@ -14,19 +14,20 @@ import java.awt.Toolkit
  */
 data class ScreenConfiguration(
     val screenWidthDp: Int,
-    val screenHeightDp: Int
+    val screenHeightDp: Int,
 )
 
 /**
  * CompositionLocal providing screen configuration for desktop platforms.
  */
-val LocalConfiguration = staticCompositionLocalOf {
-    val screenSize = Toolkit.getDefaultToolkit().screenSize
-    ScreenConfiguration(
-        screenWidthDp = (screenSize.width / 1.5).toInt(),  // Approximate conversion to dp
-        screenHeightDp = (screenSize.height / 1.5).toInt() // Approximate conversion to dp
-    )
-}
+val LocalConfiguration =
+    staticCompositionLocalOf {
+        val screenSize = Toolkit.getDefaultToolkit().screenSize
+        ScreenConfiguration(
+            screenWidthDp = (screenSize.width / 1.5).toInt(), // Approximate conversion to dp
+            screenHeightDp = (screenSize.height / 1.5).toInt(), // Approximate conversion to dp
+        )
+    }
 
 /**
  * Provides a screen configuration to desktop Compose UI.
@@ -35,11 +36,12 @@ val LocalConfiguration = staticCompositionLocalOf {
 @Composable
 fun ProvideScreenConfiguration(content: @Composable () -> Unit) {
     val screenSize = Toolkit.getDefaultToolkit().screenSize
-    val configuration = ScreenConfiguration(
-        screenWidthDp = (screenSize.width / 1.5).toInt(),  // Approximate conversion to dp
-        screenHeightDp = (screenSize.height / 1.5).toInt() // Approximate conversion to dp
-    )
-    
+    val configuration =
+        ScreenConfiguration(
+            screenWidthDp = (screenSize.width / 1.5).toInt(), // Approximate conversion to dp
+            screenHeightDp = (screenSize.height / 1.5).toInt(), // Approximate conversion to dp
+        )
+
     CompositionLocalProvider(LocalConfiguration provides configuration) {
         content()
     }

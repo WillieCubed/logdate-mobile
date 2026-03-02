@@ -11,41 +11,44 @@ import kotlin.test.assertNotNull
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AndroidNetworkSaverModeProviderTest {
-    
     private lateinit var context: Context
     private lateinit var networkSaverModeProvider: AndroidNetworkSaverModeProvider
-    
+
     @Before
     fun setup() {
         context = ApplicationProvider.getApplicationContext()
         networkSaverModeProvider = AndroidNetworkSaverModeProvider(context)
     }
-    
+
     @Test
-    fun testNetworkStateNotNull() = runTest {
-        val networkState = networkSaverModeProvider.getCurrentDataSaverState()
-        assertNotNull(networkState)
-        assertNotNull(networkState.connectionType)
-    }
-    
+    fun testNetworkStateNotNull() =
+        runTest {
+            val networkState = networkSaverModeProvider.getCurrentDataSaverState()
+            assertNotNull(networkState)
+            assertNotNull(networkState.connectionType)
+        }
+
     @Test
-    fun testNetworkStateFlow() = runTest {
-        val networkState = networkSaverModeProvider.dataSaverModeState.first()
-        assertNotNull(networkState)
-    }
-    
+    fun testNetworkStateFlow() =
+        runTest {
+            val networkState = networkSaverModeProvider.dataSaverModeState.first()
+            assertNotNull(networkState)
+        }
+
     @Test
-    fun testDataSaverModeIsBoolean() = runTest {
-        val isDataSaverMode = networkSaverModeProvider.isDataSaverModeActive()
-        // Just verify it returns a boolean value without error
-        assertNotNull(isDataSaverMode)
-    }
-    
+    fun testDataSaverModeIsBoolean() =
+        runTest {
+            val isDataSaverMode = networkSaverModeProvider.isDataSaverModeActive()
+            // Just verify it returns a boolean value without error
+            assertNotNull(isDataSaverMode)
+        }
+
     @Test
-    fun testConnectionTypeValid() = runTest {
-        val networkState = networkSaverModeProvider.getCurrentDataSaverState()
-        val validTypes = NetworkConnectionType.values().toList()
-        // Verify we get a valid connection type
-        assert(networkState.connectionType in validTypes)
-    }
+    fun testConnectionTypeValid() =
+        runTest {
+            val networkState = networkSaverModeProvider.getCurrentDataSaverState()
+            val validTypes = NetworkConnectionType.values().toList()
+            // Verify we get a valid connection type
+            assert(networkState.connectionType in validTypes)
+        }
 }

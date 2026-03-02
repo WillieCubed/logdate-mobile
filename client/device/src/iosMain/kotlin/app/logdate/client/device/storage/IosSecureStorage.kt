@@ -1,9 +1,6 @@
 package app.logdate.client.device.storage
 
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
@@ -13,6 +10,9 @@ import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import platform.CoreCrypto.CCCrypt
 import platform.CoreCrypto.kCCAlgorithmAES
 import platform.CoreCrypto.kCCBlockSizeAES128
@@ -22,19 +22,18 @@ import platform.CoreCrypto.kCCKeySizeAES256
 import platform.CoreCrypto.kCCOptionPKCS7Padding
 import platform.CoreCrypto.kCCSuccess
 import platform.CoreFoundation.CFDictionaryRef
-import platform.CoreFoundation.CFTypeRefVar
 import platform.CoreFoundation.CFRelease
+import platform.CoreFoundation.CFTypeRefVar
 import platform.CoreFoundation.kCFBooleanTrue
-import platform.Foundation.NSData
-import platform.Foundation.NSDictionary
-import platform.Foundation.NSMutableDictionary
-import platform.Foundation.NSCopyingProtocol
+import platform.Foundation.CFBridgingRelease
 import platform.Foundation.CFBridgingRetain
-import platform.Foundation.base64EncodedStringWithOptions
-import platform.Foundation.create
+import platform.Foundation.NSCopyingProtocol
+import platform.Foundation.NSData
+import platform.Foundation.NSMutableDictionary
 import platform.Foundation.NSString
 import platform.Foundation.NSUTF8StringEncoding
-import platform.Foundation.CFBridgingRelease
+import platform.Foundation.base64EncodedStringWithOptions
+import platform.Foundation.create
 import platform.Security.SecItemAdd
 import platform.Security.SecItemCopyMatching
 import platform.Security.SecItemDelete
@@ -49,20 +48,19 @@ import platform.Security.kSecClass
 import platform.Security.kSecClassGenericPassword
 import platform.Security.kSecMatchLimit
 import platform.Security.kSecMatchLimitOne
+import platform.Security.kSecRandomDefault
 import platform.Security.kSecReturnData
 import platform.Security.kSecValueData
-import platform.Security.kSecRandomDefault
-import platform.posix.size_tVar
 import platform.posix.memcpy
+import platform.posix.size_tVar
 
 /**
  * iOS implementation of SecureStorage using the Keychain.
  */
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 class IosSecureStorage(
-    private val serviceName: String = "app.logdate"
+    private val serviceName: String = "app.logdate",
 ) : SecureStorage {
-
     private val valueCache = mutableMapOf<String, String>()
     private val valueCacheFlow = MutableStateFlow(valueCache.toMap())
 
@@ -75,7 +73,10 @@ class IosSecureStorage(
         return value
     }
 
-    override suspend fun putString(key: String, value: String) {
+    override suspend fun putString(
+        key: String,
+        value: String,
+    ) {
         writeKeychain(key, value)
         valueCache[key] = value
         valueCacheFlow.value = valueCache.toMap()
@@ -97,13 +98,9 @@ class IosSecureStorage(
         valueCacheFlow.value = emptyMap()
     }
 
-    override fun observeString(key: String): Flow<String?> {
-        return valueCacheFlow.map { cache -> cache[key] }
-    }
+    override fun observeString(key: String): Flow<String?> = valueCacheFlow.map { cache -> cache[key] }
 
-    override fun observeAll(): Flow<Map<String, String>> {
-        return valueCacheFlow
-    }
+    override fun observeAll(): Flow<Map<String, String>> = valueCacheFlow
 
     override suspend fun encrypt(data: ByteArray): ByteArray {
         val key = getOrCreateEncryptionKey()
@@ -122,22 +119,26 @@ class IosSecureStorage(
         return crypt(kCCDecrypt, ciphertext, key, iv)
     }
 
-    private fun readKeychain(key: String): String? = memScoped {
-        val query = baseQuery(key).toMutableMap()
-        query[kSecReturnData] = kCFBooleanTrue
-        query[kSecMatchLimit] = kSecMatchLimitOne
+    private fun readKeychain(key: String): String? =
+        memScoped {
+            val query = baseQuery(key).toMutableMap()
+            query[kSecReturnData] = kCFBooleanTrue
+            query[kSecMatchLimit] = kSecMatchLimitOne
 
-        val result = alloc<CFTypeRefVar>()
-        val status = withKeychainDictionary(query) { cfQuery -> SecItemCopyMatching(cfQuery, result.ptr) }
-        if (status != errSecSuccess) {
-            return@memScoped null
+            val result = alloc<CFTypeRefVar>()
+            val status = withKeychainDictionary(query) { cfQuery -> SecItemCopyMatching(cfQuery, result.ptr) }
+            if (status != errSecSuccess) {
+                return@memScoped null
+            }
+            val data = CFBridgingRelease(result.value) as? NSData ?: return@memScoped null
+            val string = NSString.create(data, NSUTF8StringEncoding)?.toString()
+            return@memScoped string
         }
-        val data = CFBridgingRelease(result.value) as? NSData ?: return@memScoped null
-        val string = NSString.create(data, NSUTF8StringEncoding)?.toString()
-        return@memScoped string
-    }
 
-    private fun writeKeychain(key: String, value: String) {
+    private fun writeKeychain(
+        key: String,
+        value: String,
+    ) {
         val data = value.toNSData()
         val query = baseQuery(key).toMutableMap()
         query[kSecValueData] = data
@@ -145,11 +146,12 @@ class IosSecureStorage(
         if (status == errSecDuplicateItem) {
             val updateQuery = baseQuery(key)
             val attributes = mapOf<Any?, Any?>(kSecValueData to data)
-            val updateStatus = withKeychainDictionary(updateQuery) { cfUpdateQuery ->
-                withKeychainDictionary(attributes) { cfAttributes ->
-                    SecItemUpdate(cfUpdateQuery, cfAttributes)
+            val updateStatus =
+                withKeychainDictionary(updateQuery) { cfUpdateQuery ->
+                    withKeychainDictionary(attributes) { cfAttributes ->
+                        SecItemUpdate(cfUpdateQuery, cfAttributes)
+                    }
                 }
-            }
             if (updateStatus != errSecSuccess) {
                 Napier.w("Failed to update keychain item: status=$updateStatus")
             }
@@ -177,20 +179,22 @@ class IosSecureStorage(
 
     private inline fun <T> withKeychainDictionary(
         query: Map<Any?, Any?>,
-        block: (CFDictionaryRef) -> T
+        block: (CFDictionaryRef) -> T,
     ): T {
         // Security framework functions take CoreFoundation dictionaries. In Kotlin/Native these are C pointers,
         // so we create an Objective-C NSDictionary and bridge it to a CFDictionaryRef.
         val nsQuery = NSMutableDictionary()
         query.forEach { (key, value) ->
             if (key != null && value != null) {
-                val copyKey = key as? NSCopyingProtocol
-                    ?: error("Keychain query key does not conform to NSCopyingProtocol.")
+                val copyKey =
+                    key as? NSCopyingProtocol
+                        ?: error("Keychain query key does not conform to NSCopyingProtocol.")
                 nsQuery.setObject(value, forKey = copyKey)
             }
         }
-        val retained = CFBridgingRetain(nsQuery)
-            ?: error("CFBridgingRetain returned null for keychain query dictionary")
+        val retained =
+            CFBridgingRetain(nsQuery)
+                ?: error("CFBridgingRetain returned null for keychain query dictionary")
         try {
             val cfQuery: CFDictionaryRef = retained.reinterpret()
             return block(cfQuery)
@@ -210,62 +214,65 @@ class IosSecureStorage(
         return key
     }
 
-    private fun crypt(operation: UInt, data: ByteArray, key: ByteArray, iv: ByteArray): ByteArray? = memScoped {
-        val outputSize = data.size + BLOCK_SIZE_BYTES
-        val output = ByteArray(outputSize)
-        val outLength = alloc<size_tVar>()
-        val status = data.usePinned { dataPinned ->
-            key.usePinned { keyPinned ->
-                iv.usePinned { ivPinned ->
-                    output.usePinned { outputPinned ->
-                        CCCrypt(
-                            operation,
-                            kCCAlgorithmAES,
-                            kCCOptionPKCS7Padding,
-                            keyPinned.addressOf(0),
-                            key.size.toULong(),
-                            ivPinned.addressOf(0),
-                            dataPinned.addressOf(0),
-                            data.size.toULong(),
-                            outputPinned.addressOf(0),
-                            outputSize.toULong(),
-                            outLength.ptr
-                        )
+    private fun crypt(
+        operation: UInt,
+        data: ByteArray,
+        key: ByteArray,
+        iv: ByteArray,
+    ): ByteArray? =
+        memScoped {
+            val outputSize = data.size + BLOCK_SIZE_BYTES
+            val output = ByteArray(outputSize)
+            val outLength = alloc<size_tVar>()
+            val status =
+                data.usePinned { dataPinned ->
+                    key.usePinned { keyPinned ->
+                        iv.usePinned { ivPinned ->
+                            output.usePinned { outputPinned ->
+                                CCCrypt(
+                                    operation,
+                                    kCCAlgorithmAES,
+                                    kCCOptionPKCS7Padding,
+                                    keyPinned.addressOf(0),
+                                    key.size.toULong(),
+                                    ivPinned.addressOf(0),
+                                    dataPinned.addressOf(0),
+                                    data.size.toULong(),
+                                    outputPinned.addressOf(0),
+                                    outputSize.toULong(),
+                                    outLength.ptr,
+                                )
+                            }
+                        }
                     }
                 }
+            if (status != kCCSuccess) {
+                Napier.w("CommonCrypto operation failed: status=$status")
+                return@memScoped null
             }
+            return@memScoped output.copyOf(outLength.value.toInt())
         }
-        if (status != kCCSuccess) {
-            Napier.w("CommonCrypto operation failed: status=$status")
-            return@memScoped null
-        }
-        return@memScoped output.copyOf(outLength.value.toInt())
-    }
 
     private fun randomBytes(size: Int): ByteArray {
         val bytes = ByteArray(size)
-        val status = bytes.usePinned { pinned ->
-            SecRandomCopyBytes(kSecRandomDefault, size.toULong(), pinned.addressOf(0))
-        }
+        val status =
+            bytes.usePinned { pinned ->
+                SecRandomCopyBytes(kSecRandomDefault, size.toULong(), pinned.addressOf(0))
+            }
         if (status != errSecSuccess) {
             Napier.e("Failed to generate secure random bytes: status=$status")
         }
         return bytes
     }
 
-    private fun String.toNSData(): NSData {
-        return encodeToByteArray().toNSData()
-    }
+    private fun String.toNSData(): NSData = encodeToByteArray().toNSData()
 
-    private fun ByteArray.toNSData(): NSData {
-        return usePinned { pinned ->
+    private fun ByteArray.toNSData(): NSData =
+        usePinned { pinned ->
             NSData.create(bytes = pinned.addressOf(0), length = size.toULong())
         }
-    }
 
-    private fun ByteArray.toBase64(): String {
-        return toNSData().base64EncodedStringWithOptions(0u)
-    }
+    private fun ByteArray.toBase64(): String = toNSData().base64EncodedStringWithOptions(0u)
 
     private fun String.fromBase64(): ByteArray? {
         val data = NSData.create(base64EncodedString = this, options = 0u) ?: return null

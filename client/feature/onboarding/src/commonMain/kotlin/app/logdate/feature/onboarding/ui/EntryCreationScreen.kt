@@ -1,32 +1,34 @@
+@file:Suppress("ktlint:standard:no-empty-file")
+
 package app.logdate.feature.onboarding.ui
 
-//enum class EntryCompositionState {
+// enum class EntryCompositionState {
 //    INITIAL, TEXT_OPEN, AUDIO_OPEN, PHOTO_OPEN;
 //
 //    val isExpanded
 //        get() = this != INITIAL
-//}
+// }
 //
-//@ExperimentalPermissionsApi
-//data class PermissionStateHolder(
+// @ExperimentalPermissionsApi
+// data class PermissionStateHolder(
 //    val audioPermissionState: PermissionState,
 //    val photoPermissionState: PermissionState,
-//) {
+// ) {
 //    val audioPermissionGranted
 //        get() = audioPermissionState.status == PermissionStatus.Granted
 //
 //    val cameraPermissionGranted
 //        get() = photoPermissionState.status == PermissionStatus.Granted
-//}
+// }
 //
-//@OptIn(ExperimentalPermissionsApi::class)
-//@Composable
-//fun EntryCreationScreenWrapper(
+// @OptIn(ExperimentalPermissionsApi::class)
+// @Composable
+// fun EntryCreationScreenWrapper(
 //    useCompactLayout: Boolean,
 //    onBack: () -> Unit,
 //    onNext: () -> Unit,
 //    viewModel: OnboardingViewModel = hiltViewModel(),
-//) {
+// ) {
 //    val uiState by viewModel.uiState.collectAsState()
 //
 //    val permissionStateHolder = PermissionStateHolder(
@@ -47,16 +49,16 @@ package app.logdate.feature.onboarding.ui
 //        permissionStateHolder = permissionStateHolder,
 //        onStopRecordingAudio = viewModel::stopRecordingAudio,
 //        onStartRecordingAudio = {
-////            viewModel.startRecordingAudio()
+// //            viewModel.startRecordingAudio()
 //        },
 //        entryIsCreated = uiState.entrySubmitted,
 //        onCreateEntry = { viewModel.addEntry(it) },
 //    )
-//}
+// }
 //
-//@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
-//@Composable
-//fun EntryCreationScreen(
+// @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
+// @Composable
+// fun EntryCreationScreen(
 //    useCompactLayout: Boolean,
 //    onBack: () -> Unit,
 //    onNext: () -> Unit,
@@ -69,7 +71,7 @@ package app.logdate.feature.onboarding.ui
 //    onStopRecordingAudio: () -> Unit = {},
 //    onStartRecordingAudio: () -> Unit = {},
 //    initialState: EntryCompositionState = EntryCompositionState.INITIAL,
-//) {
+// ) {
 //    var state by remember { mutableStateOf(initialState) }
 //    val time by remember { mutableStateOf(Clock.System.now()) }
 //
@@ -233,11 +235,11 @@ package app.logdate.feature.onboarding.ui
 //            }
 //        },
 //    )
-//}
+// }
 //
-//@OptIn(ExperimentalPermissionsApi::class)
-//@Composable
-//internal fun EntryCreationContent(
+// @OptIn(ExperimentalPermissionsApi::class)
+// @Composable
+// internal fun EntryCreationContent(
 //    entryCompositionState: EntryCompositionState,
 //    audioPreviewData: AudioPreviewData,
 //    onUpdateEntryCompositionState: (EntryCompositionState) -> Unit,
@@ -251,7 +253,7 @@ package app.logdate.feature.onboarding.ui
 //    ) -> Unit,
 //    onBack: () -> Unit,
 //    modifier: Modifier = Modifier,
-//) {
+// ) {
 //    var textContent by rememberSaveable { mutableStateOf("") }
 //    val isInDefaultState by remember {
 //        derivedStateOf {
@@ -301,16 +303,16 @@ package app.logdate.feature.onboarding.ui
 //    val canContinue by remember {
 //        derivedStateOf {
 //            textContent.isNotBlank()
-////            when (entryCompositionState) {
-////                EntryCompositionState.TEXT_OPEN -> {
-////                    textContent.isNotBlank()
-////                }
-////
-////                EntryCompositionState.AUDIO_OPEN -> audioPreviewData.canUseAudio
-////                EntryCompositionState.PHOTO_OPEN -> permissionState.cameraPermissionGranted
-////                // TODO: Validate that photo was taken
-////                EntryCompositionState.INITIAL -> false
-////            }
+// //            when (entryCompositionState) {
+// //                EntryCompositionState.TEXT_OPEN -> {
+// //                    textContent.isNotBlank()
+// //                }
+// //
+// //                EntryCompositionState.AUDIO_OPEN -> audioPreviewData.canUseAudio
+// //                EntryCompositionState.PHOTO_OPEN -> permissionState.cameraPermissionGranted
+// //                // TODO: Validate that photo was taken
+// //                EntryCompositionState.INITIAL -> false
+// //            }
 //        }
 //    }
 //
@@ -440,11 +442,11 @@ package app.logdate.feature.onboarding.ui
 //            }
 //        }
 //    }
-//}
+// }
 //
-//@OptIn(ExperimentalFoundationApi::class, ExperimentalPermissionsApi::class)
-//@Composable
-//internal fun ColumnScope.UserContentWindow(
+// @OptIn(ExperimentalFoundationApi::class, ExperimentalPermissionsApi::class)
+// @Composable
+// internal fun ColumnScope.UserContentWindow(
 //    // TODO: Bundle all this crap into a state object
 //    entryCompositionState: EntryCompositionState,
 //    textContent: String = "",
@@ -455,7 +457,7 @@ package app.logdate.feature.onboarding.ui
 //    onRestartRecordingAudio: () -> Unit,
 //    onStopRecordingAudio: () -> Unit,
 //    onCapturePhoto: () -> Unit,
-//) {
+// ) {
 //    Column(
 //        Modifier
 //            .clip(MaterialTheme.shapes.medium)
@@ -508,10 +510,10 @@ package app.logdate.feature.onboarding.ui
 //            }
 //        }
 //    }
-//}
+// }
 //
-//@OptIn(ExperimentalPermissionsApi::class)
-//private val DUMMY_PERMISSION_STATE_HOLDER = PermissionStateHolder(
+// @OptIn(ExperimentalPermissionsApi::class)
+// private val DUMMY_PERMISSION_STATE_HOLDER = PermissionStateHolder(
 //    audioPermissionState = object : PermissionState {
 //        override val permission: String
 //            get() = Manifest.permission.RECORD_AUDIO
@@ -528,13 +530,13 @@ package app.logdate.feature.onboarding.ui
 //
 //        override fun launchPermissionRequest() {}
 //    },
-//)
+// )
 //
-//@OptIn(ExperimentalPermissionsApi::class)
-//@Suppress("VisualLintBounds")
-//@Preview
-//@Composable
-//private fun EntryCreationScreenPreview() {
+// @OptIn(ExperimentalPermissionsApi::class)
+// @Suppress("VisualLintBounds")
+// @Preview
+// @Composable
+// private fun EntryCreationScreenPreview() {
 //    LogDateTheme {
 //        EntryCreationScreen(
 //            useCompactLayout = true,
@@ -545,13 +547,13 @@ package app.logdate.feature.onboarding.ui
 //            audioPreviewData = AudioPreviewData.Empty,
 //        )
 //    }
-//}
+// }
 //
-//@OptIn(ExperimentalPermissionsApi::class)
-//@Suppress("VisualLintBounds")
-//@Preview
-//@Composable
-//private fun EntryCreationScreenTextExpandedPreview() {
+// @OptIn(ExperimentalPermissionsApi::class)
+// @Suppress("VisualLintBounds")
+// @Preview
+// @Composable
+// private fun EntryCreationScreenTextExpandedPreview() {
 //    LogDateTheme {
 //        EntryCreationScreen(
 //            useCompactLayout = true,
@@ -563,13 +565,13 @@ package app.logdate.feature.onboarding.ui
 //            audioPreviewData = AudioPreviewData.Empty,
 //        )
 //    }
-//}
+// }
 //
-//@OptIn(ExperimentalPermissionsApi::class)
-//@Suppress("VisualLintBounds")
-//@Preview
-//@Composable
-//private fun EntryCreationScreenVoiceNoteExpandedPreview() {
+// @OptIn(ExperimentalPermissionsApi::class)
+// @Suppress("VisualLintBounds")
+// @Preview
+// @Composable
+// private fun EntryCreationScreenVoiceNoteExpandedPreview() {
 //    LogDateTheme {
 //        EntryCreationScreen(
 //            useCompactLayout = true,
@@ -584,13 +586,13 @@ package app.logdate.feature.onboarding.ui
 //            initialState = EntryCompositionState.AUDIO_OPEN,
 //        )
 //    }
-//}
+// }
 //
-//@OptIn(ExperimentalPermissionsApi::class)
-//@Suppress("VisualLintBounds")
-//@Preview
-//@Composable
-//private fun EntryCreationScreenCameraExpandedPreview() {
+// @OptIn(ExperimentalPermissionsApi::class)
+// @Suppress("VisualLintBounds")
+// @Preview
+// @Composable
+// private fun EntryCreationScreenCameraExpandedPreview() {
 //    LogDateTheme {
 //        EntryCreationScreen(
 //            useCompactLayout = true,
@@ -602,12 +604,12 @@ package app.logdate.feature.onboarding.ui
 //            initialState = EntryCompositionState.PHOTO_OPEN,
 //        )
 //    }
-//}
+// }
 //
-//@OptIn(ExperimentalPermissionsApi::class)
-//@Preview(device = "spec:id=reference_tablet,shape=Normal,width=1280,height=800,unit=dp,dpi=240")
-//@Composable
-//private fun EntryCreationScreenPreview_Medium() {
+// @OptIn(ExperimentalPermissionsApi::class)
+// @Preview(device = "spec:id=reference_tablet,shape=Normal,width=1280,height=800,unit=dp,dpi=240")
+// @Composable
+// private fun EntryCreationScreenPreview_Medium() {
 //    LogDateTheme {
 //        EntryCreationScreen(
 //            useCompactLayout = false,
@@ -618,4 +620,4 @@ package app.logdate.feature.onboarding.ui
 //            audioPreviewData = AudioPreviewData.Empty,
 //        )
 //    }
-//}
+// }

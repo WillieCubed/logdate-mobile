@@ -11,7 +11,6 @@ import kotlin.uuid.Uuid
 class UpdateEntryDraftUseCase(
     private val entryDraftRepository: EntryDraftRepository,
 ) {
-
     /**
      * Updates an existing draft with new content.
      *
@@ -25,15 +24,11 @@ class UpdateEntryDraftUseCase(
         draftId: Uuid,
         content: List<JournalNote>,
         overwrite: Boolean = true,
-    ): Uuid {
-        return entryDraftRepository.updateDraft(draftId, content)
-    }
+    ): Uuid = entryDraftRepository.updateDraft(draftId, content)
 
     suspend operator fun invoke(
         draftId: Uuid,
         content: EntryDraft,
         overwrite: Boolean = true,
-    ): Uuid {
-        return invoke(draftId, content.notes, overwrite)
-    }
+    ): Uuid = invoke(draftId, content.notes, overwrite)
 }

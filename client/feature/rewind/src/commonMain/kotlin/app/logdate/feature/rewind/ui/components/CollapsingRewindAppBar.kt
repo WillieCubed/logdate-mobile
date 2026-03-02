@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.rewind.ui.components
 
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -16,11 +18,11 @@ import androidx.compose.ui.graphics.lerp
 
 /**
  * A top app bar for the rewind screen that changes background color on scroll.
- * 
+ *
  * This component implements the Material Design spec for app bars that transition from transparent
  * to a surface color as the user scrolls. The app bar maintains its full height but changes
  * background color according to the scroll position.
- * 
+ *
  * @param title The title text to display in the app bar
  * @param scrollBehavior The scroll behavior that controls the app bar's appearance
  * @param modifier Additional modifiers for the app bar
@@ -38,33 +40,35 @@ fun CollapsingRewindAppBar(
             // Get the offset fraction from the scroll behavior
             // When at the top: 0.0, when scrolled: approaches 1.0
             val fraction = scrollBehavior.state.overlappedFraction
-            fraction.coerceIn(0f, 1f)  // Ensure it's within bounds
+            fraction.coerceIn(0f, 1f) // Ensure it's within bounds
         }
     }
-    
+
     // Interpolate between transparent (at top) and surface color (when scrolled)
-    val backgroundColor = lerp(
-        Color.Transparent,
-        MaterialTheme.colorScheme.surface,
-        scrollFraction
-    )
-    
+    val backgroundColor =
+        lerp(
+            Color.Transparent,
+            MaterialTheme.colorScheme.surface,
+            scrollFraction,
+        )
+
     // Create color scheme that transitions based on scroll position
-    val colors = TopAppBarDefaults.topAppBarColors(
-        containerColor = backgroundColor,
-        scrolledContainerColor = MaterialTheme.colorScheme.surface
-    )
-    
+    val colors =
+        TopAppBarDefaults.topAppBarColors(
+            containerColor = backgroundColor,
+            scrolledContainerColor = MaterialTheme.colorScheme.surface,
+        )
+
     // Standard TopAppBar with our dynamic colors
     TopAppBar(
-        title = { 
+        title = {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleLarge
+                style = MaterialTheme.typography.titleLarge,
             )
         },
         colors = colors,
         scrollBehavior = scrollBehavior,
-        modifier = modifier
+        modifier = modifier,
     )
 }

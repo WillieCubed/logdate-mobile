@@ -1,7 +1,7 @@
 package app.logdate.shared.model
 
-import kotlin.time.Instant
 import kotlin.time.Duration
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -42,7 +42,7 @@ sealed class RewindContent {
         override val timestamp: Instant,
         override val sourceId: Uuid,
         val content: String,
-        override val significanceScore: Float? = null
+        override val significanceScore: Float? = null,
     ) : RewindContent()
 
     /**
@@ -53,7 +53,7 @@ sealed class RewindContent {
         override val sourceId: Uuid,
         val uri: String,
         val caption: String? = null,
-        override val significanceScore: Float? = null
+        override val significanceScore: Float? = null,
     ) : RewindContent()
 
     /**
@@ -65,7 +65,7 @@ sealed class RewindContent {
         val uri: String,
         val caption: String? = null,
         val duration: Duration,
-        override val significanceScore: Float? = null
+        override val significanceScore: Float? = null,
     ) : RewindContent()
 
     /**
@@ -81,7 +81,7 @@ sealed class RewindContent {
         override val sourceId: Uuid,
         val contextText: String,
         val backgroundImage: String? = null,
-        override val significanceScore: Float? = null
+        override val significanceScore: Float? = null,
     ) : RewindContent()
 
     /**
@@ -96,6 +96,6 @@ sealed class RewindContent {
         override val timestamp: Instant,
         override val sourceId: Uuid,
         val transitionText: String,
-        override val significanceScore: Float? = null
+        override val significanceScore: Float? = null,
     ) : RewindContent()
 }

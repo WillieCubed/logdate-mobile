@@ -12,12 +12,13 @@ import kotlin.uuid.Uuid
 
 /**
  * Manager class for creating and handling multiple editor windows.
- * 
+ *
  * This class provides a central point for launching editor windows and
  * managing multi-window capabilities.
  */
-class EditorManager(private val context: Context) {
-    
+class EditorManager(
+    private val context: Context,
+) {
     /**
      * Checks if multiple editor windows are supported on this device.
      *
@@ -26,10 +27,8 @@ class EditorManager(private val context: Context) {
      *
      * @return true if the device supports multiple windows (Android N+), false otherwise
      */
-    fun supportsMultiWindow(): Boolean {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
-    }
-    
+    fun supportsMultiWindow(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
+
     /**
      * Opens a new editor window for creating a new entry.
      *
@@ -42,19 +41,19 @@ class EditorManager(private val context: Context) {
      */
     fun openNewEditorWindow(
         initialText: String? = null,
-        attachments: List<String>? = null
+        attachments: List<String>? = null,
     ) {
         try {
-            val intent = EditorActivity.createIntent(
-                context = context,
-                initialText = initialText,
-                attachments = attachments
-            )
+            val intent =
+                EditorActivity.createIntent(
+                    context = context,
+                    initialText = initialText,
+                    attachments = attachments,
+                )
 
             // Launch the activity as a new document
             context.startActivity(intent)
             Napier.d("Launched new editor window")
-
         } catch (e: Exception) {
             Napier.e("Failed to open new editor window", e)
         }
@@ -72,18 +71,18 @@ class EditorManager(private val context: Context) {
      */
     fun openEntryInNewWindow(
         entryId: Uuid,
-        journalId: Uuid? = null
+        journalId: Uuid? = null,
     ) {
         try {
-            val intent = EditorActivity.createIntent(
-                context = context,
-                entryId = entryId,
-                journalId = journalId
-            )
+            val intent =
+                EditorActivity.createIntent(
+                    context = context,
+                    entryId = entryId,
+                    journalId = journalId,
+                )
 
             context.startActivity(intent)
             Napier.d("Opened entry $entryId in new window")
-
         } catch (e: Exception) {
             Napier.e("Failed to open entry in new window", e)
         }
@@ -100,8 +99,8 @@ class EditorManager(private val context: Context) {
      * @param activity The activity to monitor for window layout changes
      * @return A Flow that emits WindowLayoutInfo whenever the layout changes
      */
-    fun getWindowLayoutInfo(activity: Activity): Flow<WindowLayoutInfo> {
-        return WindowInfoTracker.getOrCreate(activity)
+    fun getWindowLayoutInfo(activity: Activity): Flow<WindowLayoutInfo> =
+        WindowInfoTracker
+            .getOrCreate(activity)
             .windowLayoutInfo(activity)
-    }
 }

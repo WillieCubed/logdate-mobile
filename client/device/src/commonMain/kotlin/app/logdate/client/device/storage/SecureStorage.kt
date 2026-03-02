@@ -14,27 +14,30 @@ interface SecureStorage {
      * @return The stored string, or null if not found
      */
     suspend fun getString(key: String): String?
-    
+
     /**
      * Stores a string value in secure storage.
      *
      * @param key The key to store under
      * @param value The value to store
      */
-    suspend fun putString(key: String, value: String)
-    
+    suspend fun putString(
+        key: String,
+        value: String,
+    )
+
     /**
      * Removes a value from secure storage.
      *
      * @param key The key to remove
      */
     suspend fun remove(key: String)
-    
+
     /**
      * Clears all values from secure storage.
      */
     suspend fun clear()
-    
+
     /**
      * Observes changes to a specific key in secure storage.
      *
@@ -42,14 +45,14 @@ interface SecureStorage {
      * @return Flow emitting the current value and updates
      */
     fun observeString(key: String): Flow<String?>
-    
+
     /**
      * Observes all values in secure storage.
      *
      * @return Flow emitting the current map of all values and updates
      */
     fun observeAll(): Flow<Map<String, String>>
-    
+
     /**
      * Encrypts data using a secure algorithm.
      *
@@ -57,7 +60,7 @@ interface SecureStorage {
      * @return The encrypted data
      */
     suspend fun encrypt(data: ByteArray): ByteArray
-    
+
     /**
      * Decrypts previously encrypted data.
      *

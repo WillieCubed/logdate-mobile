@@ -30,7 +30,10 @@ interface SyncMetadataDao {
     suspend fun getPendingByType(entityType: String): List<PendingUploadEntity>
 
     @Query("SELECT * FROM pending_uploads WHERE entityType = :entityType AND entityId = :entityId")
-    suspend fun getPending(entityType: String, entityId: String): PendingUploadEntity?
+    suspend fun getPending(
+        entityType: String,
+        entityId: String,
+    ): PendingUploadEntity?
 
     @Query("SELECT * FROM pending_uploads ORDER BY createdAt ASC")
     suspend fun getAllPending(): List<PendingUploadEntity>
@@ -39,7 +42,10 @@ interface SyncMetadataDao {
     suspend fun insertPending(pending: PendingUploadEntity)
 
     @Query("DELETE FROM pending_uploads WHERE entityType = :entityType AND entityId = :entityId")
-    suspend fun deletePending(entityType: String, entityId: String)
+    suspend fun deletePending(
+        entityType: String,
+        entityId: String,
+    )
 
     @Query("DELETE FROM pending_uploads")
     suspend fun deleteAllPending()
@@ -51,5 +57,8 @@ interface SyncMetadataDao {
     fun observePendingCount(): Flow<Int>
 
     @Query("UPDATE pending_uploads SET retryCount = retryCount + 1 WHERE entityType = :entityType AND entityId = :entityId")
-    suspend fun incrementRetryCount(entityType: String, entityId: String)
+    suspend fun incrementRetryCount(
+        entityType: String,
+        entityId: String,
+    )
 }

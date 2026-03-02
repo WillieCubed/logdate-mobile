@@ -9,7 +9,14 @@ import kotlin.uuid.Uuid
  */
 interface SyncableJournalRepository : JournalRepository {
     suspend fun createFromSync(journal: Journal)
+
     suspend fun updateFromSync(journal: Journal)
+
     suspend fun deleteFromSync(journalId: Uuid)
-    suspend fun updateSyncMetadata(journalId: Uuid, syncVersion: Long, syncedAt: Instant)
+
+    suspend fun updateSyncMetadata(
+        journalId: Uuid,
+        syncVersion: Long,
+        syncedAt: Instant,
+    )
 }

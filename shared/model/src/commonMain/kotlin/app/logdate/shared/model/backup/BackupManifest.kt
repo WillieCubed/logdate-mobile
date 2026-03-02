@@ -5,8 +5,8 @@ import kotlin.time.Instant
 
 /**
  * Metadata stored in the clear (or just inner-encrypted) header of the backup file.
- * 
- * This manifest allows the app (or a standalone CLI tool) to validate the backup file's 
+ *
+ * This manifest allows the app (or a standalone CLI tool) to validate the backup file's
  * integrity and compatibility before attempting decryption.
  *
  * @property version The schema version of the backup format.
@@ -21,7 +21,7 @@ data class BackupManifest(
     val timestamp: Instant,
     val deviceId: String,
     val userId: String,
-    val encryption: BackupEncryptionMetadata
+    val encryption: BackupEncryptionMetadata,
 )
 
 /**
@@ -37,7 +37,7 @@ data class BackupManifest(
 data class BackupEncryptionMetadata(
     val algorithm: String = "AES/GCM/NoPadding",
     val kdf: String = "PBKDF2",
-    val salt: String, 
-    val iv: String,   
-    val iterations: Int = 100_000
+    val salt: String,
+    val iv: String,
+    val iterations: Int = 100_000,
 )

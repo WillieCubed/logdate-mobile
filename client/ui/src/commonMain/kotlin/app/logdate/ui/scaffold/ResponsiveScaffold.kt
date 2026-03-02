@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.ui.scaffold
 
 import androidx.compose.animation.AnimatedVisibility
@@ -79,28 +81,31 @@ fun ResponsiveScaffold(
     val previousBottomNavigationVisible = rememberSaveable { mutableStateOf(showBottomNavigation) }
 
     // Calculate animation states
-    val navigationRailVisibilityState = remember(showNavigationRail) {
-        MutableTransitionState(previousNavigationRailVisible.value).apply {
-            targetState = showNavigationRail
-            previousNavigationRailVisible.value = showNavigationRail
+    val navigationRailVisibilityState =
+        remember(showNavigationRail) {
+            MutableTransitionState(previousNavigationRailVisible.value).apply {
+                targetState = showNavigationRail
+                previousNavigationRailVisible.value = showNavigationRail
+            }
         }
-    }
 
-    val bottomNavigationVisibilityState = remember(showBottomNavigation) {
-        MutableTransitionState(previousBottomNavigationVisible.value).apply {
-            targetState = showBottomNavigation
-            previousBottomNavigationVisible.value = showBottomNavigation
+    val bottomNavigationVisibilityState =
+        remember(showBottomNavigation) {
+            MutableTransitionState(previousBottomNavigationVisible.value).apply {
+                targetState = showBottomNavigation
+                previousBottomNavigationVisible.value = showBottomNavigation
+            }
         }
-    }
 
     // Animated width for navigation rail
     val navigationRailWidthDp by animateDpAsState(
         targetValue = if (showNavigationRail) navigationRailWidth.dp else 0.dp,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioLowBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "navigationRailWidth"
+        animationSpec =
+            spring(
+                dampingRatio = Spring.DampingRatioLowBouncy,
+                stiffness = Spring.StiffnessLow,
+            ),
+        label = "navigationRailWidth",
     )
 
     // Get the status bar insets to exclude from content
@@ -112,7 +117,7 @@ fun ResponsiveScaffold(
 
     Surface(
         modifier = modifier.fillMaxSize(),
-        color = containerColor
+        color = containerColor,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             // Main layout structure with navigation rail and content
@@ -128,11 +133,11 @@ fun ResponsiveScaffold(
                     // The width is constrained here, and NavigationRail itself shouldn't need
                     // to specify fillMaxWidth which was causing layout issues
                     Box(
-                        modifier = Modifier
+                        modifier =
+                            Modifier
 //                            .width(navigationRailWidthDp)
-                            .fillMaxHeight()
+                                .fillMaxHeight(),
                         // Apply padding to avoid display cutout for the navigation rail
-
                     ) {
                         navigationRail()
                     }
@@ -140,9 +145,10 @@ fun ResponsiveScaffold(
 
                 // Main content area and bottom navigation
                 Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
                 ) {
                     // Content takes up all available space
                     Box(modifier = Modifier.weight(1f)) {
@@ -155,7 +161,7 @@ fun ResponsiveScaffold(
                     AnimatedVisibility(
                         visibleState = bottomNavigationVisibilityState,
                         enter = ResponsiveScaffoldDefaults.bottomNavEnterTransition,
-                        exit = ResponsiveScaffoldDefaults.bottomNavExitTransition
+                        exit = ResponsiveScaffoldDefaults.bottomNavExitTransition,
                     ) {
                         Box(modifier = Modifier.fillMaxWidth()) {
                             bottomNavigation()
@@ -189,7 +195,7 @@ fun ResponsiveScaffoldDefaults.SnackbarHost(
 ) {
     androidx.compose.material3.SnackbarHost(
         hostState = hostState,
-        modifier = modifier
+        modifier = modifier,
     )
 }
 
@@ -201,9 +207,7 @@ object ResponsiveScaffoldDefaults {
      * Creates and remembers a [SnackbarHostState].
      */
     @Composable
-    fun rememberSnackbarHostState(): SnackbarHostState {
-        return remember { SnackbarHostState() }
-    }
+    fun rememberSnackbarHostState(): SnackbarHostState = remember { SnackbarHostState() }
 
     // Animation defaults
     val enterTransitionDuration = 300
@@ -212,32 +216,36 @@ object ResponsiveScaffoldDefaults {
     /**
      * Default rail enter transition - slides in from left with fade
      */
-    val railEnterTransition: EnterTransition = slideInHorizontally(
-        initialOffsetX = { -it },
-        animationSpec = tween(durationMillis = enterTransitionDuration)
-    ) + fadeIn(animationSpec = tween(durationMillis = enterTransitionDuration))
+    val railEnterTransition: EnterTransition =
+        slideInHorizontally(
+            initialOffsetX = { -it },
+            animationSpec = tween(durationMillis = enterTransitionDuration),
+        ) + fadeIn(animationSpec = tween(durationMillis = enterTransitionDuration))
 
     /**
      * Default rail exit transition - slides out to left with fade
      */
-    val railExitTransition: ExitTransition = slideOutHorizontally(
-        targetOffsetX = { -it },
-        animationSpec = tween(durationMillis = exitTransitionDuration)
-    ) + fadeOut(animationSpec = tween(durationMillis = exitTransitionDuration))
+    val railExitTransition: ExitTransition =
+        slideOutHorizontally(
+            targetOffsetX = { -it },
+            animationSpec = tween(durationMillis = exitTransitionDuration),
+        ) + fadeOut(animationSpec = tween(durationMillis = exitTransitionDuration))
 
     /**
      * Default bottom navigation enter transition - expands from bottom with fade
      */
-    val bottomNavEnterTransition: EnterTransition = slideInVertically(
-        initialOffsetY = { it },
-        animationSpec = tween(durationMillis = enterTransitionDuration)
-    ) + fadeIn(animationSpec = tween(durationMillis = enterTransitionDuration))
+    val bottomNavEnterTransition: EnterTransition =
+        slideInVertically(
+            initialOffsetY = { it },
+            animationSpec = tween(durationMillis = enterTransitionDuration),
+        ) + fadeIn(animationSpec = tween(durationMillis = enterTransitionDuration))
 
     /**
      * Default bottom navigation exit transition - shrinks to bottom with fade
      */
-    val bottomNavExitTransition: ExitTransition = slideOutVertically(
-        targetOffsetY = { it },
-        animationSpec = tween(durationMillis = exitTransitionDuration)
-    ) + fadeOut(animationSpec = tween(durationMillis = exitTransitionDuration))
+    val bottomNavExitTransition: ExitTransition =
+        slideOutVertically(
+            targetOffsetY = { it },
+            animationSpec = tween(durationMillis = exitTransitionDuration),
+        ) + fadeOut(animationSpec = tween(durationMillis = exitTransitionDuration))
 }

@@ -24,21 +24,19 @@ class DefaultDeviceManager(
     private val appVersion: String,
     private val notificationTokenProvider: suspend () -> String? = { null },
 ) {
+    private val notificationToken = MutableStateFlow<String?>(null)
+    private val deviceInfo = MutableStateFlow(createInitialDeviceInfo(initialDeviceName))
 
-    private val _notificationToken = MutableStateFlow<String?>(null)
-    private val _deviceInfo = MutableStateFlow(createInitialDeviceInfo(initialDeviceName))
-
-    private fun createInitialDeviceInfo(deviceName: String): DeviceInfo {
-        return DeviceInfo(
+    private fun createInitialDeviceInfo(deviceName: String): DeviceInfo =
+        DeviceInfo(
             id = deviceIdProvider.getDeviceId().value,
             name = deviceName,
             platform = platform,
             createdAt = Clock.System.now(),
             lastActive = Clock.System.now(),
             appVersion = appVersion,
-            isCurrentDevice = true
+            isCurrentDevice = true,
         )
-    }
 
     /**
      * Gets the current device ID.
@@ -54,9 +52,9 @@ class DefaultDeviceManager(
      */
     suspend fun getCurrentDeviceInfo(): DeviceInfo {
         // Update last active
-        val currentInfo = _deviceInfo.value
+        val currentInfo = deviceInfo.value
         val updatedInfo = currentInfo.copy(lastActive = Clock.System.now())
-        _deviceInfo.value = updatedInfo
+        deviceInfo.value = updatedInfo
         return updatedInfo
     }
 
@@ -64,8 +62,8 @@ class DefaultDeviceManager(
      * Updates the device's last active timestamp.
      */
     suspend fun updateLastActive() {
-        val currentInfo = _deviceInfo.value
-        _deviceInfo.value = currentInfo.copy(lastActive = Clock.System.now())
+        val currentInfo = deviceInfo.value
+        deviceInfo.value = currentInfo.copy(lastActive = Clock.System.now())
     }
 
     /**
@@ -73,28 +71,26 @@ class DefaultDeviceManager(
      *
      * @return Result indicating success or failure
      */
-    suspend fun registerWithCloud(): Result<Boolean> {
-        return try {
+    suspend fun registerWithCloud(): Result<Boolean> =
+        try {
             val deviceInfo = getCurrentDeviceInfo()
-            val success = deviceRepository.registerDevice(
-                deviceInfo = deviceInfo,
-                notificationToken = _notificationToken.value
-            )
+            val success =
+                deviceRepository.registerDevice(
+                    deviceInfo = deviceInfo,
+                    notificationToken = notificationToken.value,
+                )
             Result.success(success)
         } catch (e: Exception) {
             Napier.e("Failed to register device", e)
             Result.failure(e)
         }
-    }
 
     /**
      * Gets all devices associated with this user account.
      *
      * @return Flow of device information objects
      */
-    fun getAssociatedDevices(): Flow<List<DeviceInfo>> {
-        return deviceRepository.getAssociatedDevices()
-    }
+    fun getAssociatedDevices(): Flow<List<DeviceInfo>> = deviceRepository.getAssociatedDevices()
 
     /**
      * Renames the current device.
@@ -103,9 +99,9 @@ class DefaultDeviceManager(
      */
     suspend fun renameDevice(newName: String) {
         // Update local device info
-        val currentInfo = _deviceInfo.value
+        val currentInfo = deviceInfo.value
         val updatedInfo = currentInfo.copy(name = newName)
-        _deviceInfo.value = updatedInfo
+        deviceInfo.value = updatedInfo
 
         // Update in repository
         try {
@@ -121,15 +117,14 @@ class DefaultDeviceManager(
      * @param deviceId The ID of the device to remove
      * @return Result indicating success or failure
      */
-    suspend fun removeDevice(deviceId: Uuid): Result<Boolean> {
-        return try {
+    suspend fun removeDevice(deviceId: Uuid): Result<Boolean> =
+        try {
             val success = deviceRepository.removeDevice(deviceId)
             Result.success(success)
         } catch (e: Exception) {
             Napier.e("Failed to remove device", e)
             Result.failure(e)
         }
-    }
 
     /**
      * Generates a new device ID, replacing the current one.
@@ -143,12 +138,13 @@ class DefaultDeviceManager(
         val newId = deviceIdProvider.getDeviceId().value
 
         // Update device info
-        val currentInfo = _deviceInfo.value
-        val updatedInfo = currentInfo.copy(
-            id = newId,
-            lastActive = Clock.System.now()
-        )
-        _deviceInfo.value = updatedInfo
+        val currentInfo = deviceInfo.value
+        val updatedInfo =
+            currentInfo.copy(
+                id = newId,
+                lastActive = Clock.System.now(),
+            )
+        deviceInfo.value = updatedInfo
 
         // Re-register with cloud
         try {
@@ -167,14 +163,14 @@ class DefaultDeviceManager(
      * @return The notification token, or null if not available
      */
     suspend fun getNotificationToken(): String? {
-        val storedToken = _notificationToken.value
+        val storedToken = notificationToken.value
         if (!storedToken.isNullOrEmpty()) {
             return storedToken
         }
 
         // If not stored, try to get from provider
         return notificationTokenProvider()?.also {
-            _notificationToken.value = it
+            notificationToken.value = it
         }
     }
 
@@ -184,7 +180,7 @@ class DefaultDeviceManager(
      * @param token The new notification token
      */
     suspend fun updateNotificationToken(token: String) {
-        _notificationToken.value = token
+        notificationToken.value = token
 
         // TODO: Use different coroutine scope if possible
         try {

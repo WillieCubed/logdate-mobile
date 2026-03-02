@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.core.settings.ui
 
 import androidx.compose.foundation.clickable
@@ -9,8 +11,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,22 +35,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import app.logdate.feature.core.settings.ui.components.formatDateLocalized
+import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.feature.core.settings.ui.LocalSettingsLayoutInfo
+import app.logdate.feature.core.settings.ui.components.formatDateLocalized
 import app.logdate.shared.model.user.UserData
+import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
-import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.theme.Spacing
-import kotlin.time.Clock
-import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import androidx.compose.ui.tooling.preview.Preview
-import org.koin.compose.viewmodel.koinViewModel
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.core.generated.resources.*
 import logdate.client.feature.core.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
+import kotlin.time.Clock
+import kotlin.time.Instant
+
 /**
  * Account management settings screen.
  *
@@ -77,12 +79,13 @@ fun AccountSettingsScreen(
     val layoutInfo = LocalSettingsLayoutInfo.current
     val resolvedIsDetailPane = isPotentialDetailPane ?: layoutInfo.isDetailPane
     val isAuthenticated = accountState.isAuthenticated
-    val onCreatePasskey = if (isAuthenticated) {
-        privacyViewModel::createPasskey
-    } else {
-        onNavigateToCloudAccountCreation
-    }
-    
+    val onCreatePasskey =
+        if (isAuthenticated) {
+            privacyViewModel::createPasskey
+        } else {
+            onNavigateToCloudAccountCreation
+        }
+
     AccountSettingsContent(
         onBack = onBack,
         onCreatePasskey = onCreatePasskey,
@@ -96,7 +99,7 @@ fun AccountSettingsScreen(
         onSignOut = accountViewModel::signOut,
         birthdayUpdateState = birthdayUpdateState,
         profileUpdateState = profileUpdateState,
-        isPotentialDetailPane = resolvedIsDetailPane
+        isPotentialDetailPane = resolvedIsDetailPane,
     )
 }
 
@@ -115,16 +118,16 @@ private fun AccountSettingsContent(
     onSignOut: () -> Unit,
     birthdayUpdateState: BirthdayUpdateState,
     profileUpdateState: ProfileUpdateState,
-    isPotentialDetailPane: Boolean = false
+    isPotentialDetailPane: Boolean = false,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val snackbarHostState = remember { SnackbarHostState() }
     var showSignOutDialog by remember { mutableStateOf(false) }
-    
+
     // State for profile edit fields
     var displayName by remember { mutableStateOf(userProfile.name) }
     var username by remember { mutableStateOf(userProfile.username) }
-    
+
     // Handle birthday update state changes
     LaunchedEffect(birthdayUpdateState) {
         when (birthdayUpdateState) {
@@ -133,7 +136,7 @@ private fun AccountSettingsContent(
             }
             is BirthdayUpdateState.Error -> {
                 snackbarHostState.showSnackbar(
-                    "Failed to update birthday: ${birthdayUpdateState.message}"
+                    "Failed to update birthday: ${birthdayUpdateState.message}",
                 )
             }
             else -> { /* No action needed */ }
@@ -151,11 +154,12 @@ private fun AccountSettingsContent(
             else -> { /* No action needed */ }
         }
     }
-    
+
     Scaffold(
-        modifier = Modifier
-            .applyScreenStyles()
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier =
+            Modifier
+                .applyScreenStyles()
+                .nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             // Only show top bar with back button in single-pane mode
             if (!isPotentialDetailPane) {
@@ -170,13 +174,13 @@ private fun AccountSettingsContent(
                 )
             }
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { paddingValues ->
         DefaultSettingsContentContainer {
             LazyColumn(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = paddingValues,
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
                 // Section title for two-pane mode
                 if (isPotentialDetailPane) {
@@ -184,7 +188,7 @@ private fun AccountSettingsContent(
                         Text(
                             text = stringResource(Res.string.account_and_profile),
                             style = MaterialTheme.typography.headlineSmall,
-                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)
+                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
                         )
                     }
                 }
@@ -193,38 +197,38 @@ private fun AccountSettingsContent(
                 item {
                     Column(
                         modifier = Modifier.padding(horizontal = Spacing.lg),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.md)
+                        verticalArrangement = Arrangement.spacedBy(Spacing.md),
                     ) {
                         Text(
                             text = stringResource(Res.string.profile_information),
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.titleMedium,
                         )
 
                         TextField(
                             value = displayName,
                             onValueChange = { displayName = it },
                             label = { Text(stringResource(Res.string.display_name)) },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
                         )
 
                         TextField(
                             value = username,
                             onValueChange = { username = it },
                             label = { Text(stringResource(Res.string.username)) },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
                         )
 
                         Button(
                             onClick = { onUpdateProfile(displayName, username) },
                             enabled = profileUpdateState != ProfileUpdateState.Updating,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(
                                 if (profileUpdateState == ProfileUpdateState.Updating) {
                                     "Updating..."
                                 } else {
                                     "Update Profile"
-                                }
+                                },
                             )
                         }
                     }
@@ -237,7 +241,7 @@ private fun AccountSettingsContent(
                         onCreatePasskey = onCreatePasskey,
                         onRevokePasskey = onRevokePasskey,
                         showCreatePasskeyAction = !isAuthenticated,
-                        modifier = Modifier.padding(horizontal = Spacing.lg)
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }
 
@@ -245,11 +249,11 @@ private fun AccountSettingsContent(
                 item {
                     Column(
                         modifier = Modifier.padding(horizontal = Spacing.lg),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
                         Text(
                             text = stringResource(Res.string.personal_information),
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.titleMedium,
                         )
 
                         // Birthday selector in MaterialContainer - now navigates to full screen
@@ -258,23 +262,25 @@ private fun AccountSettingsContent(
                                 ListItem(
                                     headlineContent = { Text(stringResource(Res.string.birthday)) },
                                     supportingContent = {
-                                        val formattedBirthday = if (userData.birthday == Instant.DISTANT_PAST) {
-                                            "Set your birthday!"
-                                        } else {
-                                            val localDate = userData.birthday
-                                                .toLocalDateTime(TimeZone.currentSystemDefault())
-                                                .date
-                                            formatDateLocalized(localDate)
-                                        }
+                                        val formattedBirthday =
+                                            if (userData.birthday == Instant.DISTANT_PAST) {
+                                                "Set your birthday!"
+                                            } else {
+                                                val localDate =
+                                                    userData.birthday
+                                                        .toLocalDateTime(TimeZone.currentSystemDefault())
+                                                        .date
+                                                formatDateLocalized(localDate)
+                                            }
                                         Text(formattedBirthday)
                                     },
                                     leadingContent = {
                                         Icon(
                                             imageVector = Icons.Default.DateRange,
-                                            contentDescription = null
+                                            contentDescription = null,
                                         )
                                     },
-                                    modifier = Modifier.clickable { onNavigateToBirthdaySettings() }
+                                    modifier = Modifier.clickable { onNavigateToBirthdaySettings() },
                                 )
                             }
                         }
@@ -286,11 +292,11 @@ private fun AccountSettingsContent(
                     item {
                         Column(
                             modifier = Modifier.padding(horizontal = Spacing.lg),
-                            verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                         ) {
                             Text(
                                 text = stringResource(Res.string.account_actions),
-                                style = MaterialTheme.typography.titleMedium
+                                style = MaterialTheme.typography.titleMedium,
                             )
 
                             MaterialContainer {
@@ -306,7 +312,7 @@ private fun AccountSettingsContent(
                                             ) {
                                                 Text(stringResource(Res.string.sign_out))
                                             }
-                                        }
+                                        },
                                     )
                                 }
                             }
@@ -327,7 +333,7 @@ private fun AccountSettingsContent(
                     onClick = {
                         onSignOut()
                         showSignOutDialog = false
-                    }
+                    },
                 ) {
                     Text(stringResource(Res.string.sign_out))
                 }
@@ -336,7 +342,7 @@ private fun AccountSettingsContent(
                 TextButton(onClick = { showSignOutDialog = false }) {
                     Text(stringResource(Res.string.cancel))
                 }
-            }
+            },
         )
     }
 }
@@ -348,30 +354,33 @@ private fun AccountSettingsScreenPreview() {
         onBack = {},
         onCreatePasskey = {},
         onNavigateToBirthdaySettings = {},
-        userProfile = UserProfile(
-            name = "John Doe",
-            username = "johndoe",
-            isAuthenticated = true
-        ),
-        passkeys = listOf(
-            PasskeyInfo(
-                id = "passkey1",
-                name = "Preview Passkey",
-                device = "Demo Device",
-                createdAt = "Jan 1, 2023",
-                lastUsed = Clock.System.now()
-            )
-        ),
-        userData = UserData(
-            birthday = Clock.System.now(),
-            isOnboarded = true,
-            onboardedDate = Clock.System.now()
-        ),
+        userProfile =
+            UserProfile(
+                name = "John Doe",
+                username = "johndoe",
+                isAuthenticated = true,
+            ),
+        passkeys =
+            listOf(
+                PasskeyInfo(
+                    id = "passkey1",
+                    name = "Preview Passkey",
+                    device = "Demo Device",
+                    createdAt = "Jan 1, 2023",
+                    lastUsed = Clock.System.now(),
+                ),
+            ),
+        userData =
+            UserData(
+                birthday = Clock.System.now(),
+                isOnboarded = true,
+                onboardedDate = Clock.System.now(),
+            ),
         isAuthenticated = true,
         onUpdateProfile = { _, _ -> },
         onRevokePasskey = {},
         onSignOut = {},
         birthdayUpdateState = BirthdayUpdateState.Idle,
-        profileUpdateState = ProfileUpdateState.Idle
+        profileUpdateState = ProfileUpdateState.Idle,
     )
 }

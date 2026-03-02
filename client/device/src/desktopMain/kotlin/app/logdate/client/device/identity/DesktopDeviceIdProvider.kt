@@ -12,50 +12,49 @@ import kotlin.uuid.Uuid
  * a persistent device identifier using KeyValueStorage.
  */
 class DesktopDeviceIdProvider(
-    private val storage: KeyValueStorage
+    private val storage: KeyValueStorage,
 ) : DeviceIdProvider {
-    
-    private val DEVICE_ID_KEY = "device.id"
-    
+    private val deviceIdKey = "device.id"
+
     // Initialize device ID synchronously to ensure immediate availability
-    private val _deviceId: Uuid
-    private val _deviceIdFlow: MutableStateFlow<Uuid>
-    
+    private val initialDeviceId: Uuid
+    private val deviceIdFlow: MutableStateFlow<Uuid>
+
     init {
         // Synchronously load or generate the ID
-        _deviceId = initializeDeviceId()
-        
+        initialDeviceId = initializeDeviceId()
+
         // Initialize flow with the loaded/generated ID
-        _deviceIdFlow = MutableStateFlow(_deviceId)
+        deviceIdFlow = MutableStateFlow(initialDeviceId)
     }
-    
-    override fun getDeviceId(): StateFlow<Uuid> = _deviceIdFlow
-    
+
+    override fun getDeviceId(): StateFlow<Uuid> = deviceIdFlow
+
     override suspend fun refreshDeviceId() {
         val newId = Uuid.random()
         Napier.d("Refreshing device ID: ${newId.toString().take(8)}...")
-        storage.putString(DEVICE_ID_KEY, newId.toString())
-        _deviceIdFlow.value = newId
+        storage.putString(deviceIdKey, newId.toString())
+        deviceIdFlow.value = newId
     }
-    
-    private fun initializeDeviceId(): Uuid {
-        return runCatching {
+
+    private fun initializeDeviceId(): Uuid =
+        runCatching {
             runBlocking {
-                val storedId = storage.getString(DEVICE_ID_KEY)
-                
+                val storedId = storage.getString(deviceIdKey)
+
                 if (storedId != null) {
                     try {
                         Uuid.parse(storedId)
                     } catch (e: Exception) {
                         Napier.w("Invalid stored device ID, generating new one", e)
                         val newId = Uuid.random()
-                        storage.putString(DEVICE_ID_KEY, newId.toString())
+                        storage.putString(deviceIdKey, newId.toString())
                         newId
                     }
                 } else {
                     Napier.i("No device ID found, generating new one")
                     val newId = Uuid.random()
-                    storage.putString(DEVICE_ID_KEY, newId.toString())
+                    storage.putString(deviceIdKey, newId.toString())
                     newId
                 }
             }
@@ -63,5 +62,4 @@ class DesktopDeviceIdProvider(
             Napier.e("Failed to initialize device ID with KeyValueStorage", it)
             Uuid.random()
         }
-    }
 }

@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.ui.common
 
 import androidx.compose.foundation.layout.Arrangement
@@ -20,13 +22,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
-import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.ui.generated.resources.*
 import logdate.client.ui.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+
 /**
  * A Material You-themed container that automatically applies spacing between its children,
  * gives each child a surface background, and rounds the entire container.
@@ -58,14 +60,15 @@ fun MaterialContainer(
 ) {
     // Create a modified color scheme where the surface color is overridden to use surfaceContainerHigh
     val currentColorScheme = MaterialTheme.colorScheme
-    val modifiedColorScheme = currentColorScheme.copy(
-        surface = currentColorScheme.surfaceContainerHigh
-    )
-    
+    val modifiedColorScheme =
+        currentColorScheme.copy(
+            surface = currentColorScheme.surfaceContainerHigh,
+        )
+
     MaterialTheme(
         colorScheme = modifiedColorScheme,
         typography = MaterialTheme.typography,
-        shapes = MaterialTheme.shapes
+        shapes = MaterialTheme.shapes,
     ) {
         Surface(
             modifier = modifier.fillMaxWidth(),
@@ -76,11 +79,12 @@ fun MaterialContainer(
                 verticalArrangement = Arrangement.spacedBy(itemSpacing),
                 horizontalAlignment = horizontalAlignment,
             ) {
-                val scope = MaterialContainerScopeImpl(
-                    itemShape = itemShape,
-                    itemColor = containerColor,
-                    itemPadding = itemPadding
-                )
+                val scope =
+                    MaterialContainerScopeImpl(
+                        itemShape = itemShape,
+                        itemColor = containerColor,
+                        itemPadding = itemPadding,
+                    )
                 scope.content()
             }
         }
@@ -128,7 +132,6 @@ private class MaterialContainerScopeImpl(
     private val itemColor: Color,
     private val itemPadding: PaddingValues,
 ) : MaterialContainerScope {
-
     @Composable
     override fun SurfaceItem(
         modifier: Modifier,
@@ -152,7 +155,7 @@ private class MaterialContainerScopeImpl(
         content: @Composable () -> Unit,
     ) {
         Column(
-            modifier = modifier.fillMaxWidth()
+            modifier = modifier.fillMaxWidth(),
         ) {
             content()
         }
@@ -199,11 +202,11 @@ private fun MaterialContainerPreview() {
     LogDateTheme {
         Column(
             modifier = Modifier.padding(Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.xl)
+            verticalArrangement = Arrangement.spacedBy(Spacing.xl),
         ) {
             Text(
                 text = stringResource(Res.string.materialcontainer_examples),
-                style = MaterialTheme.typography.headlineMedium
+                style = MaterialTheme.typography.headlineMedium,
             )
 
             MaterialContainer {
@@ -211,18 +214,18 @@ private fun MaterialContainerPreview() {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(Icons.Default.Home, contentDescription = null)
                         Column {
                             Text(
                                 text = stringResource(Res.string.home),
-                                style = MaterialTheme.typography.titleMedium
+                                style = MaterialTheme.typography.titleMedium,
                             )
                             Text(
                                 text = stringResource(Res.string.navigate_to_home_screen),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -232,18 +235,18 @@ private fun MaterialContainerPreview() {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(Icons.Default.Person, contentDescription = null)
                         Column {
                             Text(
                                 text = stringResource(Res.string.profile),
-                                style = MaterialTheme.typography.titleMedium
+                                style = MaterialTheme.typography.titleMedium,
                             )
                             Text(
                                 text = stringResource(Res.string.manage_your_profile_settings),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -254,20 +257,20 @@ private fun MaterialContainerPreview() {
                 SurfaceItem {
                     Text(
                         text = stringResource(Res.string.section_1),
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.titleMedium,
                     )
                 }
 
                 UnsurfacedItem {
                     HorizontalDivider(
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
                     )
                 }
 
                 SurfaceItem {
                     Text(
                         text = stringResource(Res.string.section_2),
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.titleMedium,
                     )
                 }
             }
@@ -275,11 +278,11 @@ private fun MaterialContainerPreview() {
             SimpleMaterialContainer {
                 Text(
                     text = stringResource(Res.string.simple_container_item_1),
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.bodyLarge,
                 )
                 Text(
                     text = stringResource(Res.string.simple_container_item_2),
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.bodyLarge,
                 )
             }
         }

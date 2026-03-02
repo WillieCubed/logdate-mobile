@@ -1,13 +1,12 @@
 package app.logdate.client.intelligence.cache
 
-import kotlin.time.Instant
 import kotlinx.serialization.Serializable
+import kotlin.time.Instant
 
 /**
  * A cache for storing generative AI outputs.
  */
 interface GenerativeAICache {
-
     /**
      * Retrieves a generative AI response from the cache.
      */
@@ -16,7 +15,10 @@ interface GenerativeAICache {
     /**
      * Stores a generative AI response in the cache.
      */
-    suspend fun putEntry(request: GenerativeAICacheRequest, content: String)
+    suspend fun putEntry(
+        request: GenerativeAICacheRequest,
+        content: String,
+    )
 
     /**
      * Purges the cache of all generative AI entries.

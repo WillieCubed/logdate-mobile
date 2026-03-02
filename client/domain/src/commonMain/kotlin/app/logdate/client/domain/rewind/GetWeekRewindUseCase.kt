@@ -1,14 +1,14 @@
 package app.logdate.client.domain.rewind
 
 import kotlinx.coroutines.flow.Flow
-import kotlin.time.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.DayOfWeek
-import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.minus
 import kotlinx.datetime.todayIn
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 /**
  * A use case for fetching a user's weekly rewind.
@@ -19,7 +19,6 @@ import kotlinx.datetime.todayIn
 class GetWeekRewindUseCase(
     private val getRewindUseCase: GetRewindUseCase,
 ) {
-
     /**
      * Gets the rewind for the week prior to the current date.
      *
@@ -34,21 +33,22 @@ class GetWeekRewindUseCase(
     ): Flow<RewindQueryResult> {
         val timezone = TimeZone.currentSystemDefault()
         val now = Clock.System.todayIn(timezone)
-        val startOfWeek = now.minus(
-            (now.dayOfWeek.ordinal - weekStart.ordinal + 7) % 7,
-            DateTimeUnit.DAY,
-        )
+        val startOfWeek =
+            now.minus(
+                (now.dayOfWeek.ordinal - weekStart.ordinal + 7) % 7,
+                DateTimeUnit.DAY,
+            )
         val endOfWeek = now
 
         return getRewindUseCase(
             RewindParams(
                 Instant.fromEpochMilliseconds(
-                    startOfWeek.atStartOfDayIn(timezone).toEpochMilliseconds()
+                    startOfWeek.atStartOfDayIn(timezone).toEpochMilliseconds(),
                 ),
                 Instant.fromEpochMilliseconds(
-                    endOfWeek.atStartOfDayIn(timezone).toEpochMilliseconds()
-                )
-            )
+                    endOfWeek.atStartOfDayIn(timezone).toEpochMilliseconds(),
+                ),
+            ),
         )
     }
 }

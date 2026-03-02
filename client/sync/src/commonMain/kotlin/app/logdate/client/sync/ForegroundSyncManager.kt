@@ -27,20 +27,18 @@ class ForegroundSyncManager(
     private val sessionStorage: SessionStorage,
     private val preferencesDataSource: LogdatePreferencesDataSource,
     private val networkMonitor: NetworkAvailabilityMonitor,
-    private val syncScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val syncScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) : SyncManager {
-
     private var periodicJob: Job? = null
 
     init {
         syncScope.launch {
             combine(
                 sessionStorage.getSessionFlow().map { it != null },
-                preferencesDataSource.backgroundSyncEnabled
+                preferencesDataSource.backgroundSyncEnabled,
             ) { isAuthenticated, isEnabled ->
                 isAuthenticated && isEnabled
-            }
-                .distinctUntilChanged()
+            }.distinctUntilChanged()
                 .collect { shouldEnable ->
                     if (shouldEnable) {
                         startPeriodicSync()
@@ -52,7 +50,8 @@ class ForegroundSyncManager(
 
         syncScope.launch {
             var lastNetworkState: NetworkState? = null
-            networkMonitor.observeNetwork()
+            networkMonitor
+                .observeNetwork()
                 .debounce(2000)
                 .distinctUntilChanged()
                 .collect { currentState ->
@@ -90,12 +89,13 @@ class ForegroundSyncManager(
         if (periodicJob?.isActive == true) {
             return
         }
-        periodicJob = syncScope.launch {
-            while (isActive) {
-                defaultSyncManager.fullSync()
-                delay(PERIODIC_SYNC_INTERVAL_MS)
+        periodicJob =
+            syncScope.launch {
+                while (isActive) {
+                    defaultSyncManager.fullSync()
+                    delay(PERIODIC_SYNC_INTERVAL_MS)
+                }
             }
-        }
         Napier.d("Foreground sync scheduler enabled")
     }
 

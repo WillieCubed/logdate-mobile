@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.core.settings.ui
 
 import androidx.compose.foundation.background
@@ -30,21 +32,21 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import app.logdate.ui.theme.Spacing
+import androidx.compose.ui.tooling.preview.Preview
+import app.logdate.feature.core.settings.ui.LocalSettingsLayoutInfo
+import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
-import app.logdate.ui.common.DefaultSettingsContentContainer
-import app.logdate.feature.core.settings.ui.LocalSettingsLayoutInfo
+import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.screen_title_settings
 import org.jetbrains.compose.resources.stringResource
-import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
-import logdate.client.feature.core.generated.resources.*
+
 /**
  * Main settings overview screen that displays navigation options to different settings sections.
  * This is the entry point for the settings flow and provides access to all specific settings areas.
- * 
+ *
  * The screen displays:
  * - A profile information section at the top
  * - Navigation options to Account & Profile settings
@@ -104,7 +106,7 @@ fun SettingsOverviewScreen(
         userProfile = accountState.currentAccount.toUserProfile(),
         selectedDetail = resolvedSelectedDetail,
         isInTwoPaneMode = resolvedIsInTwoPaneMode,
-        modifier = modifier
+        modifier = modifier,
     )
 }
 
@@ -123,14 +125,15 @@ private fun SettingsOverviewContent(
     userProfile: UserProfile,
     selectedDetail: String? = null,
     isInTwoPaneMode: Boolean = false,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    
+
     Scaffold(
-        modifier = modifier
-            .applyScreenStyles()
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier =
+            modifier
+                .applyScreenStyles()
+                .nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             // Only show top bar with back button in single-pane mode
             if (!isInTwoPaneMode) {
@@ -150,7 +153,7 @@ private fun SettingsOverviewContent(
             LazyColumn(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = paddingValues,
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
                 // Section title for two-pane mode
                 if (isInTwoPaneMode) {
@@ -158,123 +161,124 @@ private fun SettingsOverviewContent(
                         Text(
                             text = stringResource(Res.string.settings),
                             style = MaterialTheme.typography.headlineSmall,
-                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)
+                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
                         )
                     }
                 }
-            // Profile preview (only show in single-pane mode or always show in two-pane)
-            item {
-                ProfileSection(
-                    profile = userProfile,
-                    onUpdateProfile = { _, _ -> /* Will be handled in profile screen */ },
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
-                    isPreview = true,
-                    onNavigateToProfile = onNavigateToProfile
-                )
-            }
-            
-            // Settings navigation options
-            item {
-                // Only show section title in single-pane mode
-                if (!isInTwoPaneMode) {
-                    Text(
-                        text = stringResource(Res.string.settings),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+                // Profile preview (only show in single-pane mode or always show in two-pane)
+                item {
+                    ProfileSection(
+                        profile = userProfile,
+                        // Will be handled in profile screen
+                        onUpdateProfile = { _, _ -> },
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                        isPreview = true,
+                        onNavigateToProfile = onNavigateToProfile,
                     )
                 }
-                
-                MaterialContainer(modifier = Modifier.padding(horizontal = Spacing.lg)) {
-                    // Profile
-                    SurfaceItem {
-                        SettingsNavigationItem(
-                            title = "Profile",
-                            description = "View and edit your profile information",
-                            icon = { Icon(Icons.Default.AccountCircle, contentDescription = null) },
-                            onClick = onNavigateToProfile,
-                            isSelected = selectedDetail == "profile"
-                        )
-                    }
-                    
-                    // Account Settings
-                    SurfaceItem {
-                        SettingsNavigationItem(
-                            title = "Account",
-                            description = "Manage your account settings and authentication",
-                            icon = { Icon(Icons.Default.AccountCircle, contentDescription = null) },
-                            onClick = onNavigateToAccount,
-                            isSelected = selectedDetail == "account"
-                        )
-                    }
-                    
-                    // Devices
-                    SurfaceItem {
-                        SettingsNavigationItem(
-                            title = "Devices",
-                            description = "Manage your connected devices",
-                            icon = { Icon(Icons.Default.Devices, contentDescription = null) },
-                            onClick = onNavigateToDevices,
-                            isSelected = selectedDetail == "devices"
-                        )
-                    }
-                    
-                    // Privacy Settings
-                    SurfaceItem {
-                        SettingsNavigationItem(
-                            title = "Privacy & Security",
-                            description = "Control your privacy settings and app security",
-                            icon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                            onClick = onNavigateToPrivacy,
-                            isSelected = selectedDetail == "privacy"
-                        )
-                    }
-                    
-                    // Location Settings
-                    SurfaceItem {
-                        SettingsNavigationItem(
-                            title = "Location",
-                            description = "Manage location tracking and history settings",
-                            icon = { Icon(Icons.Default.ScreenshotMonitor, contentDescription = null) },
-                            onClick = onNavigateToLocation,
-                            isSelected = selectedDetail == "location"
-                        )
-                    }
-                    
-                    // Data Settings
-                    SurfaceItem {
-                        SettingsNavigationItem(
-                            title = "Data & Storage",
-                            description = "Manage your data usage and storage preferences",
-                            icon = { Icon(Icons.Default.DataObject, contentDescription = null) },
-                            onClick = onNavigateToData,
-                            isSelected = selectedDetail == "data"
+
+                // Settings navigation options
+                item {
+                    // Only show section title in single-pane mode
+                    if (!isInTwoPaneMode) {
+                        Text(
+                            text = stringResource(Res.string.settings),
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
                         )
                     }
 
-                    // Advanced Settings
-                    SurfaceItem {
-                        SettingsNavigationItem(
-                            title = "Advanced",
-                            description = "Server configuration and developer options",
-                            icon = { Icon(Icons.Default.DeveloperMode, contentDescription = null) },
-                            onClick = onNavigateToAdvanced,
-                            isSelected = selectedDetail == "advanced"
-                        )
-                    }
+                    MaterialContainer(modifier = Modifier.padding(horizontal = Spacing.lg)) {
+                        // Profile
+                        SurfaceItem {
+                            SettingsNavigationItem(
+                                title = "Profile",
+                                description = "View and edit your profile information",
+                                icon = { Icon(Icons.Default.AccountCircle, contentDescription = null) },
+                                onClick = onNavigateToProfile,
+                                isSelected = selectedDetail == "profile",
+                            )
+                        }
 
-                    // Danger Zone
-                    SurfaceItem {
-                        SettingsNavigationItem(
-                            title = "Danger Zone",
-                            description = "Reset app, delete data, and other destructive actions",
-                            icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-                            onClick = onNavigateToDangerZone,
-                            isDangerous = true,
-                            isSelected = selectedDetail == "danger"
-                        )
+                        // Account Settings
+                        SurfaceItem {
+                            SettingsNavigationItem(
+                                title = "Account",
+                                description = "Manage your account settings and authentication",
+                                icon = { Icon(Icons.Default.AccountCircle, contentDescription = null) },
+                                onClick = onNavigateToAccount,
+                                isSelected = selectedDetail == "account",
+                            )
+                        }
+
+                        // Devices
+                        SurfaceItem {
+                            SettingsNavigationItem(
+                                title = "Devices",
+                                description = "Manage your connected devices",
+                                icon = { Icon(Icons.Default.Devices, contentDescription = null) },
+                                onClick = onNavigateToDevices,
+                                isSelected = selectedDetail == "devices",
+                            )
+                        }
+
+                        // Privacy Settings
+                        SurfaceItem {
+                            SettingsNavigationItem(
+                                title = "Privacy & Security",
+                                description = "Control your privacy settings and app security",
+                                icon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                                onClick = onNavigateToPrivacy,
+                                isSelected = selectedDetail == "privacy",
+                            )
+                        }
+
+                        // Location Settings
+                        SurfaceItem {
+                            SettingsNavigationItem(
+                                title = "Location",
+                                description = "Manage location tracking and history settings",
+                                icon = { Icon(Icons.Default.ScreenshotMonitor, contentDescription = null) },
+                                onClick = onNavigateToLocation,
+                                isSelected = selectedDetail == "location",
+                            )
+                        }
+
+                        // Data Settings
+                        SurfaceItem {
+                            SettingsNavigationItem(
+                                title = "Data & Storage",
+                                description = "Manage your data usage and storage preferences",
+                                icon = { Icon(Icons.Default.DataObject, contentDescription = null) },
+                                onClick = onNavigateToData,
+                                isSelected = selectedDetail == "data",
+                            )
+                        }
+
+                        // Advanced Settings
+                        SurfaceItem {
+                            SettingsNavigationItem(
+                                title = "Advanced",
+                                description = "Server configuration and developer options",
+                                icon = { Icon(Icons.Default.DeveloperMode, contentDescription = null) },
+                                onClick = onNavigateToAdvanced,
+                                isSelected = selectedDetail == "advanced",
+                            )
+                        }
+
+                        // Danger Zone
+                        SurfaceItem {
+                            SettingsNavigationItem(
+                                title = "Danger Zone",
+                                description = "Reset app, delete data, and other destructive actions",
+                                icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                                onClick = onNavigateToDangerZone,
+                                isDangerous = true,
+                                isSelected = selectedDetail == "danger",
+                            )
+                        }
                     }
                 }
-            }
             }
         }
     }
@@ -287,43 +291,45 @@ private fun SettingsNavigationItem(
     icon: @Composable () -> Unit,
     onClick: () -> Unit,
     isDangerous: Boolean = false,
-    isSelected: Boolean = false
+    isSelected: Boolean = false,
 ) {
     ListItem(
-        headlineContent = { 
+        headlineContent = {
             Text(
                 text = title,
-                color = if (isDangerous) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                color = if (isDangerous) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
             )
         },
-        supportingContent = { 
+        supportingContent = {
             Text(
                 text = description,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            ) 
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         },
         leadingContent = icon,
         trailingContent = {
             Icon(
                 imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                contentDescription = stringResource(
-                    Res.string.navigate_to_title,
-                    title
-                )
+                contentDescription =
+                    stringResource(
+                        Res.string.navigate_to_title,
+                        title,
+                    ),
             )
         },
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .let { modifier ->
-                if (isSelected) {
-                    modifier.background(
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        shape = MaterialTheme.shapes.medium
-                    )
-                } else {
-                    modifier
-                }
-            }
+        modifier =
+            Modifier
+                .clickable(onClick = onClick)
+                .let { modifier ->
+                    if (isSelected) {
+                        modifier.background(
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            shape = MaterialTheme.shapes.medium,
+                        )
+                    } else {
+                        modifier
+                    }
+                },
     )
 }
 
@@ -340,13 +346,14 @@ private fun SettingsOverviewScreenPreview() {
         onNavigateToDangerZone = {},
         onNavigateToLocation = {},
         onNavigateToAdvanced = {},
-        userProfile = UserProfile(
-            name = "John Doe",
-            username = "johndoe",
-            isAuthenticated = true
-        ),
+        userProfile =
+            UserProfile(
+                name = "John Doe",
+                username = "johndoe",
+                isAuthenticated = true,
+            ),
         selectedDetail = null,
-        isInTwoPaneMode = false
+        isInTwoPaneMode = false,
     )
 }
 
@@ -363,12 +370,13 @@ private fun SettingsOverviewScreenPreviewNotSignedIn() {
         onNavigateToDangerZone = {},
         onNavigateToLocation = {},
         onNavigateToAdvanced = {},
-        userProfile = UserProfile(
-            name = "",
-            username = "",
-            isAuthenticated = false
-        ),
+        userProfile =
+            UserProfile(
+                name = "",
+                username = "",
+                isAuthenticated = false,
+            ),
         selectedDetail = null,
-        isInTwoPaneMode = false
+        isInTwoPaneMode = false,
     )
 }

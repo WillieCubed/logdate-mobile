@@ -1,10 +1,14 @@
 package app.logdate.server.e2e.basic
 
 import app.logdate.server.module
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import io.ktor.server.testing.*
+import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
+import io.ktor.server.testing.testApplication
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -14,333 +18,365 @@ import kotlin.test.assertEquals
  * fundamental endpoint functionality across the entire API surface.
  */
 class BasicEndpointCoverageE2ETest {
-    
     @Test
-    fun `health endpoint returns OK`() = testApplication {
-        application {
-            module()
+    fun `health endpoint returns OK`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.get("/health")
+            assertEquals(HttpStatusCode.OK, response.status)
         }
-        
-        val response = client.get("/health")
-        assertEquals(HttpStatusCode.OK, response.status)
-    }
-    
-    @Test  
-    fun `root endpoint returns OK`() = testApplication {
-        application {
-            module()
+
+    @Test
+    fun `root endpoint returns OK`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.get("/")
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals("LogDate Server API v1.0", response.bodyAsText())
         }
-        
-        val response = client.get("/")
-        assertEquals(HttpStatusCode.OK, response.status)
-        assertEquals("LogDate Server API v1.0", response.bodyAsText())
-    }
-    
+
     // Auth routes tests
     @Test
-    fun `auth login returns not found`() = testApplication {
-        application {
-            module()
+    fun `auth login returns not found`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.post("/api/v1/auth/login")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
-        
-        val response = client.post("/api/v1/auth/login")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-    
+
     @Test
-    fun `auth logout returns not found`() = testApplication {
-        application {
-            module()
+    fun `auth logout returns not found`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.post("/api/v1/auth/logout")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
-        
-        val response = client.post("/api/v1/auth/logout")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-    
+
     @Test
-    fun `auth refresh returns not found`() = testApplication {
-        application {
-            module()
+    fun `auth refresh returns not found`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.post("/api/v1/auth/refresh")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
-        
-        val response = client.post("/api/v1/auth/refresh")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-    
+
     // Account routes tests
     @Test
-    fun `accounts username availability returns bad request for empty username`() = testApplication {
-        application {
-            module()
+    fun `accounts username availability returns bad request for empty username`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.get("/api/v1/accounts/username/%20/available")
+            assertEquals(HttpStatusCode.BadRequest, response.status)
         }
-        
-        val response = client.get("/api/v1/accounts/username/%20/available")
-        assertEquals(HttpStatusCode.BadRequest, response.status)
-    }
-    
+
     @Test
-    fun `accounts create begin returns bad request for missing body`() = testApplication {
-        application {
-            module()
+    fun `accounts create begin returns bad request for missing body`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.post("/api/v1/accounts/create/begin")
+            assertEquals(HttpStatusCode.BadRequest, response.status)
         }
-        
-        val response = client.post("/api/v1/accounts/create/begin")
-        assertEquals(HttpStatusCode.BadRequest, response.status)
-    }
-    
+
     @Test
-    fun `accounts create complete returns bad request for missing body`() = testApplication {
-        application {
-            module()
+    fun `accounts create complete returns bad request for missing body`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.post("/api/v1/accounts/create/complete")
+            assertEquals(HttpStatusCode.BadRequest, response.status)
         }
-        
-        val response = client.post("/api/v1/accounts/create/complete")
-        assertEquals(HttpStatusCode.BadRequest, response.status)
-    }
-    
+
     @Test
-    fun `accounts auth begin returns OK without body`() = testApplication {
-        application {
-            module()
+    fun `accounts auth begin returns OK without body`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response =
+                client.post("/api/v1/accounts/authenticate/begin") {
+                    contentType(ContentType.Application.Json)
+                    setBody("{}")
+                }
+            assertEquals(HttpStatusCode.OK, response.status)
         }
-        
-        val response = client.post("/api/v1/accounts/authenticate/begin") {
-            contentType(ContentType.Application.Json)
-            setBody("{}")
-        }
-        assertEquals(HttpStatusCode.OK, response.status)
-    }
-    
+
     @Test
-    fun `accounts me requires authorization header`() = testApplication {
-        application {
-            module()
+    fun `accounts me requires authorization header`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.get("/api/v1/accounts/me")
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
         }
-        
-        val response = client.get("/api/v1/accounts/me")
-        assertEquals(HttpStatusCode.Unauthorized, response.status)
-    }
-    
+
     @Test
-    fun `accounts token refresh requires refresh token`() = testApplication {
-        application {
-            module()
+    fun `accounts token refresh requires refresh token`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response =
+                client.post("/api/v1/accounts/refresh") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"refreshToken": ""}""")
+                }
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
         }
-        
-        val response = client.post("/api/v1/accounts/refresh") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"refreshToken": ""}""")
-        }
-        assertEquals(HttpStatusCode.Unauthorized, response.status)
-    }
-    
+
     // Passkey routes tests
     @Test
-    fun `passkeys list returns not found`() = testApplication {
-        application {
-            module()
+    fun `passkeys list returns not found`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.get("/api/v1/passkeys/")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
-        
-        val response = client.get("/api/v1/passkeys/")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-    
+
     @Test
-    fun `passkey register begin returns not found`() = testApplication {
-        application {
-            module()
+    fun `passkey register begin returns not found`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.post("/api/v1/passkeys/register/begin")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
-        
-        val response = client.post("/api/v1/passkeys/register/begin")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-    
+
     // Journal routes tests
     @Test
-    fun `journals list returns not found`() = testApplication {
-        application {
-            module()
+    fun `journals list returns not found`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.get("/api/v1/journals/")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
-        
-        val response = client.get("/api/v1/journals/")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-    
+
     @Test
-    fun `journals create returns not found`() = testApplication {
-        application {
-            module()
+    fun `journals create returns not found`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.post("/api/v1/journals/")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
-        
-        val response = client.post("/api/v1/journals/")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-    
+
     @Test
-    fun `journal details returns not found`() = testApplication {
-        application {
-            module()
+    fun `journal details returns not found`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.get("/api/v1/journals/123")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
-        
-        val response = client.get("/api/v1/journals/123")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-    
+
     // Notes routes tests
     @Test
-    fun `notes list returns not found`() = testApplication {
-        application {
-            module()
+    fun `notes list returns not found`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.get("/api/v1/notes/")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
-        
-        val response = client.get("/api/v1/notes/")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-    
+
     @Test
-    fun `notes create returns not found`() = testApplication {
-        application {
-            module()
+    fun `notes create returns not found`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.post("/api/v1/notes/")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
-        
-        val response = client.post("/api/v1/notes/")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-    
+
     // Drafts routes tests
     @Test
-    fun `drafts list returns not found`() = testApplication {
-        application {
-            module()
+    fun `drafts list returns not found`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.get("/api/v1/drafts/")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
-        
-        val response = client.get("/api/v1/drafts/")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-    
+
     @Test
-    fun `drafts create returns not found`() = testApplication {
-        application {
-            module()
+    fun `drafts create returns not found`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.post("/api/v1/drafts/")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
-        
-        val response = client.post("/api/v1/drafts/")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-    
+
     // Media routes tests
     @Test
-    fun `media list returns not found`() = testApplication {
-        application {
-            module()
+    fun `media list returns not found`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.get("/api/v1/media/")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
-        
-        val response = client.get("/api/v1/media/")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-    
+
     @Test
-    fun `media upload returns not found`() = testApplication {
-        application {
-            module()
+    fun `media upload returns not found`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.post("/api/v1/media/")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
-        
-        val response = client.post("/api/v1/media/")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-    
+
     // Sync routes tests - these now require authentication
     @Test
-    fun `sync status requires authentication`() = testApplication {
-        application {
-            module()
-        }
+    fun `sync status requires authentication`() =
+        testApplication {
+            application {
+                module()
+            }
 
-        val response = client.get("/api/v1/sync/status")
-        assertEquals(HttpStatusCode.Unauthorized, response.status)
-    }
+            val response = client.get("/api/v1/sync/status")
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }
 
     @Test
-    fun `sync trigger endpoint is not available`() = testApplication {
-        application {
-            module()
+    fun `sync trigger endpoint is not available`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.post("/api/v1/sync/")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
 
-        val response = client.post("/api/v1/sync/")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-    
     // AI routes tests
     @Test
-    fun `ai summarize returns not found`() = testApplication {
-        application {
-            module()
+    fun `ai summarize returns not found`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.post("/api/v1/ai/summarize")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
-        
-        val response = client.post("/api/v1/ai/summarize")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-    
+
     // Device routes tests
     @Test
-    fun `devices list returns not found`() = testApplication {
-        application {
-            module()
+    fun `devices list returns not found`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.get("/api/v1/devices/")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
-        
-        val response = client.get("/api/v1/devices/")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-    
+
     @Test
-    fun `device registration returns not found`() = testApplication {
-        application {
-            module()
+    fun `device registration returns not found`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.post("/api/v1/devices/")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
-        
-        val response = client.post("/api/v1/devices/")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-    
+
     // Rewind routes tests
     @Test
-    fun `rewind list returns not found`() = testApplication {
-        application {
-            module()
+    fun `rewind list returns not found`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.get("/api/v1/rewind/")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
-        
-        val response = client.get("/api/v1/rewind/")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-    
+
     @Test
-    fun `rewind create returns not found`() = testApplication {
-        application {
-            module()
+    fun `rewind create returns not found`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.post("/api/v1/rewind/")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
-        
-        val response = client.post("/api/v1/rewind/")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-    
+
     // Timeline routes tests
     @Test
-    fun `timeline list returns not found`() = testApplication {
-        application {
-            module()
+    fun `timeline list returns not found`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.get("/api/v1/timeline/")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
-        
-        val response = client.get("/api/v1/timeline/")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-    
+
     @Test
-    fun `timeline for date returns not found`() = testApplication {
-        application {
-            module()
+    fun `timeline for date returns not found`() =
+        testApplication {
+            application {
+                module()
+            }
+
+            val response = client.get("/api/v1/timeline/2024-01-01")
+            assertEquals(HttpStatusCode.NotFound, response.status)
         }
-        
-        val response = client.get("/api/v1/timeline/2024-01-01")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
 }

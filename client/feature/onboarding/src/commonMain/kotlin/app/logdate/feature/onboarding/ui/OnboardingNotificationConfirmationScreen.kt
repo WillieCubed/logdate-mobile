@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports", "ktlint:standard:max-line-length")
+
 package app.logdate.feature.onboarding.ui
 
 import androidx.compose.foundation.layout.Arrangement
@@ -22,16 +24,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.AdaptiveLayout
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
+import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import logdate.client.feature.onboarding.generated.resources.onboarding_notifications_confirmation_content
 import logdate.client.feature.onboarding.generated.resources.onboarding_notifications_confirmation_title
 import org.jetbrains.compose.resources.stringResource
-import androidx.compose.ui.tooling.preview.Preview
-import logdate.client.feature.onboarding.generated.resources.*
+
 @Composable
 fun OnboardingNotificationConfirmationScreen(
     onBack: () -> Unit,
@@ -66,13 +69,14 @@ private fun OnboardingNotificationConfirmationContent(
                             IconButton(onClick = onBack) {
                                 Icon(
                                     Icons.AutoMirrored.Rounded.ArrowBack,
-                                    contentDescription = stringResource(Res.string.back)
+                                    contentDescription = stringResource(Res.string.back),
                                 )
                             }
                         },
-                        colors = TopAppBarDefaults.topAppBarColors().copy(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        ),
+                        colors =
+                            TopAppBarDefaults.topAppBarColors().copy(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            ),
                         modifier = Modifier.then(if (useCompactLayout) Modifier.fillMaxHeight() else Modifier),
                         scrollBehavior = scrollBehavior,
                     )
@@ -80,10 +84,11 @@ private fun OnboardingNotificationConfirmationContent(
                 containerColor = MaterialTheme.colorScheme.surfaceContainer,
             ) { contentPadding ->
                 Column(
-                    modifier = Modifier
-                        .padding(contentPadding)
-                        .padding(Spacing.lg)
-                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    modifier =
+                        Modifier
+                            .padding(contentPadding)
+                            .padding(Spacing.lg)
+                            .nestedScroll(scrollBehavior.nestedScrollConnection),
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     LazyColumn(
@@ -93,11 +98,10 @@ private fun OnboardingNotificationConfirmationContent(
                         item {
                             Text(
                                 stringResource(Res.string.onboarding_notifications_confirmation_content),
-                                style = MaterialTheme.typography.bodyLarge
+                                style = MaterialTheme.typography.bodyLarge,
                             )
                         }
                     }
-
                 }
             }
         },
@@ -112,7 +116,7 @@ private fun OnboardingNotificationConfirmationContent(
                                 IconButton(onClick = onBack) {
                                     Icon(
                                         Icons.AutoMirrored.Rounded.ArrowBack,
-                                        contentDescription = stringResource(Res.string.back)
+                                        contentDescription = stringResource(Res.string.back),
                                     )
                                 }
                             },
@@ -121,12 +125,13 @@ private fun OnboardingNotificationConfirmationContent(
                     },
                 ) { contentPadding ->
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(contentPadding)
-                            .widthIn(max = 444.dp)
-                            .padding(Spacing.lg)
-                            .nestedScroll(scrollBehavior.nestedScrollConnection),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(contentPadding)
+                                .widthIn(max = 444.dp)
+                                .padding(Spacing.lg)
+                                .nestedScroll(scrollBehavior.nestedScrollConnection),
                         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
                         LazyColumn(
@@ -135,8 +140,10 @@ private fun OnboardingNotificationConfirmationContent(
                         ) {
                             item {
                                 Text(
-                                    stringResource(logdate.client.feature.onboarding.generated.resources.Res.string.onboarding_notifications_confirmation_content),
-                                    style = MaterialTheme.typography.bodyLarge
+                                    stringResource(
+                                        logdate.client.feature.onboarding.generated.resources.Res.string.onboarding_notifications_confirmation_content,
+                                    ),
+                                    style = MaterialTheme.typography.bodyLarge,
                                 )
                             }
                         }
@@ -147,11 +154,12 @@ private fun OnboardingNotificationConfirmationContent(
                 }
             } else {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(Spacing.lg)
-                        .padding(top = 96.dp)
-                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(Spacing.lg)
+                            .padding(top = 96.dp)
+                            .nestedScroll(scrollBehavior.nestedScrollConnection),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
@@ -164,7 +172,7 @@ private fun OnboardingNotificationConfirmationContent(
                         item {
                             Text(
                                 stringResource(Res.string.onboarding_notifications_confirmation_content),
-                                style = MaterialTheme.typography.bodyLarge
+                                style = MaterialTheme.typography.bodyLarge,
                             )
                         }
                     }
@@ -176,7 +184,6 @@ private fun OnboardingNotificationConfirmationContent(
             }
         },
     )
-
 }
 
 @Composable
@@ -211,7 +218,7 @@ private fun OnboardingNotificationScreenPreview() {
 }
 
 @Preview
-//@Preview(device = "spec:parent=pixel_5,orientation=landscape")
+// @Preview(device = "spec:parent=pixel_5,orientation=landscape")
 @Composable
 private fun OnboardingNotificationScreenPreview_Compact_Landscape() {
     LogDateTheme {
@@ -224,7 +231,7 @@ private fun OnboardingNotificationScreenPreview_Compact_Landscape() {
 }
 
 @Preview
-//@Preview(device = "spec:width=1280dp,height=800dp,dpi=240")
+// @Preview(device = "spec:width=1280dp,height=800dp,dpi=240")
 @Composable
 private fun OnboardingNotificationScreenPreview_Medium_Landscape() {
     LogDateTheme {

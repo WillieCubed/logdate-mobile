@@ -17,6 +17,7 @@ import org.koin.compose.viewmodel.koinViewModel
  * @param onNewEntry Callback to create a new entry
  * @param onOpenSettings Callback to open settings
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun TimelineDetailPaneScene(
     viewModel: HomeViewModel = koinViewModel(),
@@ -25,10 +26,10 @@ fun TimelineDetailPaneScene(
     onOpenSettings: () -> Unit = {},
 ) {
     // We'll use real data from the view model rather than mock data
-    // The uiState.selectedDay property will contain the day information 
+    // The uiState.selectedDay property will contain the day information
     // if a day has been selected
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    
+
     uiState.selectedDay?.let { selectedDay ->
         TimelineDayDetailPanel(
             uiState = selectedDay,

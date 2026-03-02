@@ -3,11 +3,10 @@ package app.logdate.client.networking
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.put
-import io.ktor.client.request.delete
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
@@ -16,7 +15,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
-import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -50,7 +48,6 @@ import kotlin.test.assertTrue
  * @see io.ktor.client.HttpClient
  */
 class HttpClientTest {
-
     /**
      * Creates a mock HTTP client configured with the same defaults as the production client.
      *
@@ -66,21 +63,20 @@ class HttpClientTest {
     private fun createMockClient(
         responseBody: String = """{"message": "success"}""",
         statusCode: HttpStatusCode = HttpStatusCode.OK,
-        headers: Map<String, String> = mapOf(HttpHeaders.ContentType to ContentType.Application.Json.toString())
-    ): HttpClient {
-        return HttpClient(MockEngine) {
+        headers: Map<String, String> = mapOf(HttpHeaders.ContentType to ContentType.Application.Json.toString()),
+    ): HttpClient =
+        HttpClient(MockEngine) {
             engine {
                 addHandler { request ->
                     respond(
                         content = ByteReadChannel(responseBody),
                         status = statusCode,
-                        headers = headersOf(*headers.map { it.key to listOf(it.value) }.toTypedArray())
+                        headers = headersOf(*headers.map { it.key to listOf(it.value) }.toTypedArray()),
                     )
                 }
             }
             configureClientDefaults()
         }
-    }
 
     /**
      * Validates that an HTTP client can be successfully created and configured.
@@ -93,11 +89,12 @@ class HttpClientTest {
      * **Expected Behavior**: Client creates successfully and can be closed without errors
      */
     @Test
-    fun httpClient_canBeCreated() = runTest {
-        val client = createMockClient()
-        assertNotNull(client)
-        client.close()
-    }
+    fun httpClient_canBeCreated() =
+        runTest {
+            val client = createMockClient()
+            assertNotNull(client)
+            client.close()
+        }
 
     /**
      * Verifies that ContentNegotiation plugin is properly installed and functional.
@@ -111,13 +108,14 @@ class HttpClientTest {
      * **Critical for**: All API communication in LogDate app
      */
     @Test
-    fun httpClient_hasContentNegotiationInstalled() = runTest {
-        val client = createMockClient()
-        // Test that JSON content negotiation works by making a request
-        val response = client.get("https://api.example.com/test")
-        assertEquals(HttpStatusCode.OK, response.status)
-        client.close()
-    }
+    fun httpClient_hasContentNegotiationInstalled() =
+        runTest {
+            val client = createMockClient()
+            // Test that JSON content negotiation works by making a request
+            val response = client.get("https://api.example.com/test")
+            assertEquals(HttpStatusCode.OK, response.status)
+            client.close()
+        }
 
     /**
      * Tests GET request functionality for journal retrieval operations.
@@ -131,17 +129,18 @@ class HttpClientTest {
      * **Real App Usage**: Loading user journal list, fetching journal details
      */
     @Test
-    fun httpClient_makesGetRequest() = runTest {
-        val client = createMockClient("""{"data": "test_value", "id": 123}""")
-        
-        val response: HttpResponse = client.get("https://api.logdate.com/journals")
-        val responseText = response.bodyAsText()
-        
-        assertEquals(HttpStatusCode.OK, response.status)
-        assertTrue(responseText.contains("test_value"))
-        assertTrue(responseText.contains("123"))
-        client.close()
-    }
+    fun httpClient_makesGetRequest() =
+        runTest {
+            val client = createMockClient("""{"data": "test_value", "id": 123}""")
+
+            val response: HttpResponse = client.get("https://api.logdate.com/journals")
+            val responseText = response.bodyAsText()
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertTrue(responseText.contains("test_value"))
+            assertTrue(responseText.contains("123"))
+            client.close()
+        }
 
     /**
      * Tests POST request functionality for journal creation operations.
@@ -155,19 +154,21 @@ class HttpClientTest {
      * **Real App Usage**: Creating new journals, adding journal entries
      */
     @Test
-    fun httpClient_makesPostRequest() = runTest {
-        val client = createMockClient("""{"id": "new_journal_123", "created": true}""")
-        
-        val response: HttpResponse = client.post("https://api.logdate.com/journals") {
-            setBody(TextContent("""{"title": "My Journal", "content": "Today was good"}""", ContentType.Application.Json))
+    fun httpClient_makesPostRequest() =
+        runTest {
+            val client = createMockClient("""{"id": "new_journal_123", "created": true}""")
+
+            val response: HttpResponse =
+                client.post("https://api.logdate.com/journals") {
+                    setBody(TextContent("""{"title": "My Journal", "content": "Today was good"}""", ContentType.Application.Json))
+                }
+            val responseText = response.bodyAsText()
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertTrue(responseText.contains("new_journal_123"))
+            assertTrue(responseText.contains("created"))
+            client.close()
         }
-        val responseText = response.bodyAsText()
-        
-        assertEquals(HttpStatusCode.OK, response.status)
-        assertTrue(responseText.contains("new_journal_123"))
-        assertTrue(responseText.contains("created"))
-        client.close()
-    }
 
     /**
      * Tests PUT request functionality for journal update operations.
@@ -181,18 +182,20 @@ class HttpClientTest {
      * **Real App Usage**: Editing journal titles, updating journal content
      */
     @Test
-    fun httpClient_makesPutRequest() = runTest {
-        val client = createMockClient("""{"id": "journal_123", "updated": true}""")
-        
-        val response: HttpResponse = client.put("https://api.logdate.com/journals/123") {
-            setBody(TextContent("""{"title": "Updated Journal", "content": "Updated content"}""", ContentType.Application.Json))
+    fun httpClient_makesPutRequest() =
+        runTest {
+            val client = createMockClient("""{"id": "journal_123", "updated": true}""")
+
+            val response: HttpResponse =
+                client.put("https://api.logdate.com/journals/123") {
+                    setBody(TextContent("""{"title": "Updated Journal", "content": "Updated content"}""", ContentType.Application.Json))
+                }
+            val responseText = response.bodyAsText()
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertTrue(responseText.contains("updated"))
+            client.close()
         }
-        val responseText = response.bodyAsText()
-        
-        assertEquals(HttpStatusCode.OK, response.status)
-        assertTrue(responseText.contains("updated"))
-        client.close()
-    }
 
     /**
      * Tests DELETE request functionality for journal removal operations.
@@ -206,16 +209,17 @@ class HttpClientTest {
      * **Real App Usage**: Deleting unwanted journals, cleaning up old entries
      */
     @Test
-    fun httpClient_makesDeleteRequest() = runTest {
-        val client = createMockClient("""{"deleted": true, "id": "journal_123"}""")
-        
-        val response: HttpResponse = client.delete("https://api.logdate.com/journals/123")
-        val responseText = response.bodyAsText()
-        
-        assertEquals(HttpStatusCode.OK, response.status)
-        assertTrue(responseText.contains("deleted"))
-        client.close()
-    }
+    fun httpClient_makesDeleteRequest() =
+        runTest {
+            val client = createMockClient("""{"deleted": true, "id": "journal_123"}""")
+
+            val response: HttpResponse = client.delete("https://api.logdate.com/journals/123")
+            val responseText = response.bodyAsText()
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertTrue(responseText.contains("deleted"))
+            client.close()
+        }
 
     /**
      * Tests handling of complex, nested JSON responses from the LogDate API.
@@ -230,31 +234,33 @@ class HttpClientTest {
      * **Real App Usage**: Journal list with entries, paginated responses, metadata
      */
     @Test
-    fun httpClient_handlesJsonResponseWithComplexData() = runTest {
-        val jsonResponse = """
-        {
-            "journals": [
-                {"id": "1", "title": "Today", "entries": ["Entry 1", "Entry 2"]},
-                {"id": "2", "title": "Yesterday", "entries": ["Entry 3"]}
-            ],
-            "metadata": {
-                "total": 2,
-                "hasMore": false
-            }
+    fun httpClient_handlesJsonResponseWithComplexData() =
+        runTest {
+            val jsonResponse =
+                """
+                {
+                    "journals": [
+                        {"id": "1", "title": "Today", "entries": ["Entry 1", "Entry 2"]},
+                        {"id": "2", "title": "Yesterday", "entries": ["Entry 3"]}
+                    ],
+                    "metadata": {
+                        "total": 2,
+                        "hasMore": false
+                    }
+                }
+                """.trimIndent()
+            val client = createMockClient(jsonResponse)
+
+            val response: HttpResponse = client.get("https://api.logdate.com/journals")
+            val responseText = response.bodyAsText()
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertTrue(responseText.contains("journals"))
+            assertTrue(responseText.contains("metadata"))
+            assertTrue(responseText.contains("Entry 1"))
+            assertTrue(responseText.contains("hasMore"))
+            client.close()
         }
-        """.trimIndent()
-        val client = createMockClient(jsonResponse)
-        
-        val response: HttpResponse = client.get("https://api.logdate.com/journals")
-        val responseText = response.bodyAsText()
-        
-        assertEquals(HttpStatusCode.OK, response.status)
-        assertTrue(responseText.contains("journals"))
-        assertTrue(responseText.contains("metadata"))
-        assertTrue(responseText.contains("Entry 1"))
-        assertTrue(responseText.contains("hasMore"))
-        client.close()
-    }
 
     /**
      * Tests handling of 404 Not Found errors for non-existent resources.
@@ -268,19 +274,21 @@ class HttpClientTest {
      * **Real App Usage**: Accessing deleted journals, invalid journal IDs
      */
     @Test
-    fun httpClient_handles404Error() = runTest {
-        val client = createMockClient(
-            responseBody = """{"error": "Journal not found", "code": 404}""",
-            statusCode = HttpStatusCode.NotFound
-        )
-        
-        val response: HttpResponse = client.get("https://api.logdate.com/journals/nonexistent")
-        val responseText = response.bodyAsText()
-        
-        assertEquals(HttpStatusCode.NotFound, response.status)
-        assertTrue(responseText.contains("Journal not found"))
-        client.close()
-    }
+    fun httpClient_handles404Error() =
+        runTest {
+            val client =
+                createMockClient(
+                    responseBody = """{"error": "Journal not found", "code": 404}""",
+                    statusCode = HttpStatusCode.NotFound,
+                )
+
+            val response: HttpResponse = client.get("https://api.logdate.com/journals/nonexistent")
+            val responseText = response.bodyAsText()
+
+            assertEquals(HttpStatusCode.NotFound, response.status)
+            assertTrue(responseText.contains("Journal not found"))
+            client.close()
+        }
 
     /**
      * Tests handling of 401 Unauthorized errors for authentication failures.
@@ -295,20 +303,22 @@ class HttpClientTest {
      * **Real App Usage**: Expired login sessions, invalid API tokens
      */
     @Test
-    fun httpClient_handles401UnauthorizedError() = runTest {
-        val client = createMockClient(
-            responseBody = """{"error": "Unauthorized", "message": "Invalid token"}""",
-            statusCode = HttpStatusCode.Unauthorized
-        )
-        
-        val response: HttpResponse = client.get("https://api.logdate.com/journals")
-        val responseText = response.bodyAsText()
-        
-        assertEquals(HttpStatusCode.Unauthorized, response.status)
-        assertTrue(responseText.contains("Unauthorized"))
-        assertTrue(responseText.contains("Invalid token"))
-        client.close()
-    }
+    fun httpClient_handles401UnauthorizedError() =
+        runTest {
+            val client =
+                createMockClient(
+                    responseBody = """{"error": "Unauthorized", "message": "Invalid token"}""",
+                    statusCode = HttpStatusCode.Unauthorized,
+                )
+
+            val response: HttpResponse = client.get("https://api.logdate.com/journals")
+            val responseText = response.bodyAsText()
+
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+            assertTrue(responseText.contains("Unauthorized"))
+            assertTrue(responseText.contains("Invalid token"))
+            client.close()
+        }
 
     /**
      * Tests handling of 500 Internal Server Error responses.
@@ -323,17 +333,19 @@ class HttpClientTest {
      * **Real App Usage**: Database failures, backend service outages
      */
     @Test
-    fun httpClient_handles500InternalServerError() = runTest {
-        val client = createMockClient(
-            responseBody = """{"error": "Internal server error", "timestamp": "2024-01-01T00:00:00Z"}""",
-            statusCode = HttpStatusCode.InternalServerError
-        )
-        
-        val response: HttpResponse = client.get("https://api.logdate.com/journals")
-        
-        assertEquals(HttpStatusCode.InternalServerError, response.status)
-        client.close()
-    }
+    fun httpClient_handles500InternalServerError() =
+        runTest {
+            val client =
+                createMockClient(
+                    responseBody = """{"error": "Internal server error", "timestamp": "2024-01-01T00:00:00Z"}""",
+                    statusCode = HttpStatusCode.InternalServerError,
+                )
+
+            val response: HttpResponse = client.get("https://api.logdate.com/journals")
+
+            assertEquals(HttpStatusCode.InternalServerError, response.status)
+            client.close()
+        }
 
     /**
      * Tests handling of custom HTTP headers required by the LogDate API.
@@ -347,20 +359,22 @@ class HttpClientTest {
      * **Real App Usage**: User authentication, API versioning, request tracing
      */
     @Test
-    fun httpClient_handlesCustomHeaders() = runTest {
-        val customHeaders = mapOf(
-            HttpHeaders.ContentType to ContentType.Application.Json.toString(),
-            HttpHeaders.Authorization to "Bearer test-token",
-            "X-API-Version" to "v1",
-            "X-Request-ID" to "req-123"
-        )
-        val client = createMockClient(headers = customHeaders)
-        
-        val response: HttpResponse = client.get("https://api.logdate.com/journals")
-        
-        assertEquals(HttpStatusCode.OK, response.status)
-        client.close()
-    }
+    fun httpClient_handlesCustomHeaders() =
+        runTest {
+            val customHeaders =
+                mapOf(
+                    HttpHeaders.ContentType to ContentType.Application.Json.toString(),
+                    HttpHeaders.Authorization to "Bearer test-token",
+                    "X-API-Version" to "v1",
+                    "X-Request-ID" to "req-123",
+                )
+            val client = createMockClient(headers = customHeaders)
+
+            val response: HttpResponse = client.get("https://api.logdate.com/journals")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            client.close()
+        }
 
     /**
      * Tests handling of empty responses from health check and ping endpoints.
@@ -374,16 +388,17 @@ class HttpClientTest {
      * **Real App Usage**: Health checks, connectivity tests, ping operations
      */
     @Test
-    fun httpClient_handlesEmptyResponse() = runTest {
-        val client = createMockClient(responseBody = "")
-        
-        val response: HttpResponse = client.get("https://api.logdate.com/ping")
-        val responseText = response.bodyAsText()
-        
-        assertEquals(HttpStatusCode.OK, response.status)
-        assertEquals("", responseText)
-        client.close()
-    }
+    fun httpClient_handlesEmptyResponse() =
+        runTest {
+            val client = createMockClient(responseBody = "")
+
+            val response: HttpResponse = client.get("https://api.logdate.com/ping")
+            val responseText = response.bodyAsText()
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals("", responseText)
+            client.close()
+        }
 
     /**
      * Tests handling of large JSON responses with many journal entries.
@@ -397,22 +412,26 @@ class HttpClientTest {
      * **Real App Usage**: Loading complete journal history, bulk operations
      */
     @Test
-    fun httpClient_handlesLargeJsonResponse() = runTest {
-        // Simulate a large response that might be returned by the LogDate API
-        val entries = (1..100).map { """{"id": "$it", "content": "Entry $it content", "timestamp": "2024-01-${it.toString().padStart(2, '0')}T00:00:00Z"}""" }
-        val largeResponse = """{"entries": [${entries.joinToString(",")}], "total": 100}"""
-        
-        val client = createMockClient(largeResponse)
-        
-        val response: HttpResponse = client.get("https://api.logdate.com/journals/123/entries")
-        val responseText = response.bodyAsText()
-        
-        assertEquals(HttpStatusCode.OK, response.status)
-        assertTrue(responseText.contains("Entry 1 content"))
-        assertTrue(responseText.contains("Entry 100 content"))
-        assertTrue(responseText.contains("\"total\": 100"))
-        client.close()
-    }
+    fun httpClient_handlesLargeJsonResponse() =
+        runTest {
+            // Simulate a large response that might be returned by the LogDate API
+            val entries =
+                (1..100).map {
+                    """{"id": "$it", "content": "Entry $it content", "timestamp": "2024-01-${it.toString().padStart(2, '0')}T00:00:00Z"}"""
+                }
+            val largeResponse = """{"entries": [${entries.joinToString(",")}], "total": 100}"""
+
+            val client = createMockClient(largeResponse)
+
+            val response: HttpResponse = client.get("https://api.logdate.com/journals/123/entries")
+            val responseText = response.bodyAsText()
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertTrue(responseText.contains("Entry 1 content"))
+            assertTrue(responseText.contains("Entry 100 content"))
+            assertTrue(responseText.contains("\"total\": 100"))
+            client.close()
+        }
 
     /**
      * Tests JSON configuration for API evolution compatibility.
@@ -427,29 +446,31 @@ class HttpClientTest {
      * **Real App Usage**: API version upgrades, gradual feature rollouts
      */
     @Test
-    fun httpClient_configurationIgnoresUnknownJsonKeys() = runTest {
-        // Test that the JSON configuration properly ignores unknown keys (important for API evolution)
-        val responseWithUnknownFields = """
-        {
-            "id": "journal_123",
-            "title": "My Journal",
-            "unknownNewField": "this should be ignored",
-            "deprecatedField": "this too",
-            "entries": ["Entry 1"],
-            "futureApiField": {"nested": "data"}
+    fun httpClient_configurationIgnoresUnknownJsonKeys() =
+        runTest {
+            // Test that the JSON configuration properly ignores unknown keys (important for API evolution)
+            val responseWithUnknownFields =
+                """
+                {
+                    "id": "journal_123",
+                    "title": "My Journal",
+                    "unknownNewField": "this should be ignored",
+                    "deprecatedField": "this too",
+                    "entries": ["Entry 1"],
+                    "futureApiField": {"nested": "data"}
+                }
+                """.trimIndent()
+
+            val client = createMockClient(responseWithUnknownFields)
+
+            val response: HttpResponse = client.get("https://api.logdate.com/journals/123")
+            val responseText = response.bodyAsText()
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertTrue(responseText.contains("journal_123"))
+            assertTrue(responseText.contains("My Journal"))
+            // The response should include unknown fields since we're just getting raw text
+            assertTrue(responseText.contains("unknownNewField"))
+            client.close()
         }
-        """.trimIndent()
-        
-        val client = createMockClient(responseWithUnknownFields)
-        
-        val response: HttpResponse = client.get("https://api.logdate.com/journals/123")
-        val responseText = response.bodyAsText()
-        
-        assertEquals(HttpStatusCode.OK, response.status)
-        assertTrue(responseText.contains("journal_123"))
-        assertTrue(responseText.contains("My Journal"))
-        // The response should include unknown fields since we're just getting raw text
-        assertTrue(responseText.contains("unknownNewField"))
-        client.close()
-    }
 }

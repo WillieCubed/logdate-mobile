@@ -8,6 +8,7 @@ import io.ktor.client.engine.js.Js
  *
  * Logging is enabled by default.
  */
-actual val httpClient: HttpClient = HttpClient(Js) {
-    configureClientDefaults()
-}
+actual val httpClient: HttpClient =
+    HttpClient(Js) {
+        configureClientDefaults()
+    }

@@ -13,19 +13,20 @@ import org.koin.dsl.module
  * - KeyDerivation (HKDF for per-content keys)
  * - ContentEncryptionService (high-level encryption API)
  */
-val cryptoModule: Module = module {
-    // Platform-specific CryptoManager (one of the following)
-    // These must be provided by platform-specific modules
-    
-    // Common crypto services
-    singleOf(::IdentityKeyManager)
-    singleOf(::KeyDerivation)
-    singleOf(::ContentEncryptionService)
-}
+val cryptoModule: Module =
+    module {
+        // Platform-specific CryptoManager (one of the following)
+        // These must be provided by platform-specific modules
+
+        // Common crypto services
+        singleOf(::IdentityKeyManager)
+        singleOf(::KeyDerivation)
+        singleOf(::ContentEncryptionService)
+    }
 
 /**
  * Platform-specific crypto module provider.
- * 
+ *
  * Each platform (Android, iOS, Desktop) must provide its own CryptoManager.
  * Use this interface to access the platform's crypto capabilities.
  */

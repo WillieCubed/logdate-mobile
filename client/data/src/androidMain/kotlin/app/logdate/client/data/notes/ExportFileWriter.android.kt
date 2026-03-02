@@ -5,7 +5,7 @@ import java.io.File
 internal actual fun writeExportFile(
     destination: String,
     content: String,
-    overwrite: Boolean
+    overwrite: Boolean,
 ) {
     val file = File(destination)
     if (file.exists() && !overwrite) {

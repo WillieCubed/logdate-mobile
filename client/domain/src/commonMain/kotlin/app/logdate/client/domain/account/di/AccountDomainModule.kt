@@ -7,6 +7,7 @@ import org.koin.dsl.module
  *
  * This module provides use cases and domain services for account functionality.
  */
-val accountDomainModule = module {
-    // Add use cases here when implemented
-}
+val accountDomainModule =
+    module {
+        // Add use cases here when implemented
+    }

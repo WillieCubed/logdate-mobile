@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.ui.profiles
 
 import androidx.compose.foundation.background
@@ -29,9 +31,9 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.ui.generated.resources.*
 import logdate.client.ui.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+
 /**
  * A chip that displays the person's initials in a circle.
  */
@@ -47,32 +49,36 @@ fun PersonIcon(name: String) {
     val tooltipScope = rememberCoroutineScope()
     val tooltipState = rememberTooltipState()
     TooltipBox(
-        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
-            positioning = TooltipAnchorPosition.Above
-        ),
+        positionProvider =
+            TooltipDefaults.rememberTooltipPositionProvider(
+                positioning = TooltipAnchorPosition.Above,
+            ),
         tooltip = { PlainTooltip { Text(name) } },
         state = tooltipState,
-        modifier = Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primary),
+        modifier =
+            Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary),
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clickable {
-                    tooltipScope.launch {
-                        tooltipState.show()
-                    }
-                },
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .clickable {
+                        tooltipScope.launch {
+                            tooltipState.show()
+                        }
+                    },
         ) {
             Text(
                 initials,
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier
-                    .align(Alignment.Center),
+                modifier =
+                    Modifier
+                        .align(Alignment.Center),
             )
         }
     }
@@ -82,19 +88,25 @@ fun PersonIcon(name: String) {
  * A chip that displays the person's profile photo in a circle.
  */
 @Composable
-fun PersonIcon(photoUri: String, name: String) {
-    val photoModel = ImageRequest.Builder(LocalPlatformContext.current)
-        .data(photoUri)
-        .apply {
-            // TODO: Add placeholder
-            crossfade(true)
+fun PersonIcon(
+    photoUri: String,
+    name: String,
+) {
+    val photoModel =
+        ImageRequest
+            .Builder(LocalPlatformContext.current)
+            .data(photoUri)
+            .apply {
+                // TODO: Add placeholder
+                crossfade(true)
 //                    placeholder(R.drawable.ic_image_placeholder)
 //                    error(R.drawable.ic_image_error)
-        }.build()
+            }.build()
     Box(
-        modifier = Modifier
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+        modifier =
+            Modifier
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
     ) {
         AsyncImage(
             model = photoModel,

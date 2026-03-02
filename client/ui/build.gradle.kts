@@ -13,12 +13,17 @@ plugins {
     alias(libs.plugins.dokka)
 }
 
-
 kotlin {
     android {
         namespace = "app.logdate.client.ui"
-        compileSdk = libs.versions.android.compileSdk.get().toInt()
-        minSdk = libs.versions.android.minSdk.get().toInt()
+        compileSdk =
+            libs.versions.android.compileSdk
+                .get()
+                .toInt()
+        minSdk =
+            libs.versions.android.minSdk
+                .get()
+                .toInt()
         androidResources {
             enable = true
         }
@@ -35,7 +40,7 @@ kotlin {
 
     listOf(
         iosArm64(),
-        iosSimulatorArm64()
+        iosSimulatorArm64(),
     )
 
     jvm("desktop")

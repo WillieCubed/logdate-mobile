@@ -7,8 +7,9 @@ import org.koin.dsl.module
 /**
  * Koin module for location tracking settings.
  */
-val locationSettingsModule = module {
-    single<LocationTrackingSettingsRepository> { 
-        DefaultLocationTrackingSettingsRepository(get()) 
+val locationSettingsModule =
+    module {
+        single<LocationTrackingSettingsRepository> {
+            DefaultLocationTrackingSettingsRepository(get())
+        }
     }
-}

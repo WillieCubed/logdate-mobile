@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.core.settings.ui
 
 import androidx.compose.animation.AnimatedVisibility
@@ -32,60 +34,63 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
-import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.core.generated.resources.*
 import logdate.client.feature.core.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+
 @Composable
 fun QuotaUsageBlock(
     quotaUsage: StorageQuotaUi,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    
+
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable { expanded = !expanded }
-            .animateContentSize(
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow
-                )
-            ),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .animateContentSize(
+                    animationSpec =
+                        spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessLow,
+                        ),
+                ),
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.tertiaryContainer
+        color = MaterialTheme.colorScheme.tertiaryContainer,
     ) {
         Column(
             modifier = Modifier.padding(Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md)
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             // Header (always visible)
             Column(
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 Text(
                     text = stringResource(Res.string.total_usage),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onTertiaryContainer,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
                 )
-                
+
                 Text(
                     text = "${quotaUsage.formattedUsed} / ${quotaUsage.formattedTotal}",
                     style = MaterialTheme.typography.headlineLarge,
                     color = MaterialTheme.colorScheme.onTertiaryContainer,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
-                
+
                 LinearProgressIndicator(
                     progress = { quotaUsage.usagePercentage },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp)),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp)),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.3f),
                 )
@@ -94,95 +99,102 @@ fun QuotaUsageBlock(
             // Expanded content
             AnimatedVisibility(
                 visible = expanded,
-                enter = expandVertically(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow
-                    )
-                ),
-                exit = shrinkVertically(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow
-                    )
-                )
+                enter =
+                    expandVertically(
+                        animationSpec =
+                            spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessLow,
+                            ),
+                    ),
+                exit =
+                    shrinkVertically(
+                        animationSpec =
+                            spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessLow,
+                            ),
+                    ),
             ) {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(Spacing.md)
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
                 ) {
                     // Detailed breakdown box
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.surface
+                        color = MaterialTheme.colorScheme.surface,
                     ) {
                         Column(
                             modifier = Modifier.padding(Spacing.md),
-                            verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                         ) {
                             // Progress bar with segments
                             Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(24.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .height(24.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant),
                             ) {
                                 var currentOffset = 0f
                                 quotaUsage.categories.forEach { category ->
                                     val categoryProgress = category.sizeInMB / (quotaUsage.totalGB * 1000)
                                     Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth(currentOffset + categoryProgress)
-                                            .height(24.dp)
-                                            .background(category.color)
+                                        modifier =
+                                            Modifier
+                                                .fillMaxWidth(currentOffset + categoryProgress)
+                                                .height(24.dp)
+                                                .background(category.color),
                                     )
                                     currentOffset += categoryProgress
                                 }
                             }
-                            
+
                             Text(
                                 text = "${quotaUsage.formattedUsed} / ${quotaUsage.formattedTotal}",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.Medium,
                             )
                         }
                     }
-                    
+
                     // Category breakdown
                     Column(
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
                         quotaUsage.categories.forEach { category ->
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Box(
-                                        modifier = Modifier
-                                            .size(12.dp)
-                                            .background(
-                                                color = category.color,
-                                                shape = CircleShape
-                                            )
+                                        modifier =
+                                            Modifier
+                                                .size(12.dp)
+                                                .background(
+                                                    color = category.color,
+                                                    shape = CircleShape,
+                                                ),
                                     )
                                     Text(
                                         text = category.name,
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer,
                                     )
                                 }
                                 Text(
                                     text = category.formattedUsed,
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Medium,
                                 )
                             }
                         }
@@ -196,45 +208,47 @@ fun QuotaUsageBlock(
 @Preview
 @Composable
 private fun QuotaUsageBlockPreview() {
-    val mockQuotaUsage = StorageQuotaUi(
-        totalBytes = 100L * 1024L * 1024L * 1024L, // 100GB
-        usedBytes = 12L * 1024L * 1024L * 1024L + 300L * 1024L * 1024L, // 12.3GB
-        usagePercentage = 0.123f,
-        categories = listOf(
-            StorageCategory(
-                name = "IMAGE_NOTES",
-                usedBytes = 255L * 1024L * 1024L, // 255MB
-                usagePercentage = 0.02f,
-                color = Color(0xFF2196F3), // Blue
-                formattedUsed = "255 MB"
-            ),
-            StorageCategory(
-                name = "VIDEO_NOTES", 
-                usedBytes = 12L * 1024L * 1024L * 1024L, // 12GB
-                usagePercentage = 0.92f,
-                color = Color(0xFFFF9800), // Orange
-                formattedUsed = "12 GB"
-            ),
-            StorageCategory(
-                name = "VOICE_NOTES",
-                usedBytes = 255L * 1024L * 1024L, // 255MB
-                usagePercentage = 0.02f,
-                color = Color(0xFFF44336), // Red
-                formattedUsed = "255 MB"
-            )
-        ),
-        formattedTotal = "100 GB",
-        formattedUsed = "12.3 GB",
-        isOverQuota = false
-    )
-    
+    val mockQuotaUsage =
+        StorageQuotaUi(
+            totalBytes = 100L * 1024L * 1024L * 1024L, // 100GB
+            usedBytes = 12L * 1024L * 1024L * 1024L + 300L * 1024L * 1024L, // 12.3GB
+            usagePercentage = 0.123f,
+            categories =
+                listOf(
+                    StorageCategory(
+                        name = "IMAGE_NOTES",
+                        usedBytes = 255L * 1024L * 1024L, // 255MB
+                        usagePercentage = 0.02f,
+                        color = Color(0xFF2196F3), // Blue
+                        formattedUsed = "255 MB",
+                    ),
+                    StorageCategory(
+                        name = "VIDEO_NOTES",
+                        usedBytes = 12L * 1024L * 1024L * 1024L, // 12GB
+                        usagePercentage = 0.92f,
+                        color = Color(0xFFFF9800), // Orange
+                        formattedUsed = "12 GB",
+                    ),
+                    StorageCategory(
+                        name = "VOICE_NOTES",
+                        usedBytes = 255L * 1024L * 1024L, // 255MB
+                        usagePercentage = 0.02f,
+                        color = Color(0xFFF44336), // Red
+                        formattedUsed = "255 MB",
+                    ),
+                ),
+            formattedTotal = "100 GB",
+            formattedUsed = "12.3 GB",
+            isOverQuota = false,
+        )
+
     Column(
         modifier = Modifier.padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
             text = stringResource(Res.string.quota_usage_block),
-            style = MaterialTheme.typography.headlineMedium
+            style = MaterialTheme.typography.headlineMedium,
         )
         QuotaUsageBlock(quotaUsage = mockQuotaUsage)
     }

@@ -22,10 +22,26 @@ interface ActivityStreamBase {
  * }
  * ```
  */
-interface Object : ActivityStreamBase, Actor<Object>, Attachment<Object>, AttributedTo<Object>,
-    Target<Object>, Result<Object>, Origin<Object>, Instrument<Object>, Items<Object>,
-    Subject<Object>, OneOf<Object>, AnyOf<Object>, Closed<Object>, Tag<Object>, To<Object>,
-    Bto<Object>, Cc<Object>, Bcc<Object>, Preview<Object> {
+interface Object :
+    ActivityStreamBase,
+    Actor<Object>,
+    Attachment<Object>,
+    AttributedTo<Object>,
+    Target<Object>,
+    Result<Object>,
+    Origin<Object>,
+    Instrument<Object>,
+    Items<Object>,
+    Subject<Object>,
+    OneOf<Object>,
+    AnyOf<Object>,
+    Closed<Object>,
+    Tag<Object>,
+    To<Object>,
+    Bto<Object>,
+    Cc<Object>,
+    Bcc<Object>,
+    Preview<Object> {
     val attachment: Attachment<*>
     val attributedTo: AttributedTo<*>
     val audience: Audience<*>
@@ -72,10 +88,32 @@ interface Object : ActivityStreamBase, Actor<Object>, Attachment<Object>, Attrib
  * }
  * ```
  */
-interface Link : ActivityStreamBase, Actor<Link>, Attachment<Object>, AttributedTo<Link>,
-    Target<Link>, Result<Link>, Origin<Link>, Instrument<Link>, First<Link>, Last<Link>,
-    Current<Link>, Items<Link>, Subject<Link>, OneOf<Link>, AnyOf<Link>, Closed<Link>, Tag<Link>,
-    Url<Link>, To<Link>, Bto<Link>, Cc<Link>, Bcc<Link>, Preview<Link>, PartOf<Link>, Next<Link>,
+interface Link :
+    ActivityStreamBase,
+    Actor<Link>,
+    Attachment<Object>,
+    AttributedTo<Link>,
+    Target<Link>,
+    Result<Link>,
+    Origin<Link>,
+    Instrument<Link>,
+    First<Link>,
+    Last<Link>,
+    Current<Link>,
+    Items<Link>,
+    Subject<Link>,
+    OneOf<Link>,
+    AnyOf<Link>,
+    Closed<Link>,
+    Tag<Link>,
+    Url<Link>,
+    To<Link>,
+    Bto<Link>,
+    Cc<Link>,
+    Bcc<Link>,
+    Preview<Link>,
+    PartOf<Link>,
+    Next<Link>,
     Prev<Link> {
     val href: String
     val rel: String
@@ -177,7 +215,9 @@ interface IntransitiveActivity : BaseActivity
  * }
  * ```
  */
-interface Collection : Object, PartOf<Collection> {
+interface Collection :
+    Object,
+    PartOf<Collection> {
     val totalItems: TotalItems
     val current: Current<*>
     val first: First<*>
@@ -242,8 +282,13 @@ interface OrderedCollection : Collection {
  * }
  * ```
  */
-interface CollectionPage : Collection, Current<CollectionPage>, First<CollectionPage>,
-    Last<CollectionPage>, Next<CollectionPage>, Prev<CollectionPage> {
+interface CollectionPage :
+    Collection,
+    Current<CollectionPage>,
+    First<CollectionPage>,
+    Last<CollectionPage>,
+    Next<CollectionPage>,
+    Prev<CollectionPage> {
     val partOf: PartOf<*>
     val next: Next<*>
     val prev: Prev<*>
@@ -254,6 +299,8 @@ interface CollectionPage : Collection, Current<CollectionPage>, First<Collection
  * Used to represent ordered subsets of items from an [OrderedCollection]. Refer to the Activity
  * Streams 2.0 Core for a complete description of the [OrderedCollectionPage] object.
  */
-interface OrderedCollectionPage : CollectionPage, OrderedCollection {
+interface OrderedCollectionPage :
+    CollectionPage,
+    OrderedCollection {
     val startIndex: Int
 }

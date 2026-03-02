@@ -16,24 +16,22 @@ import app.logdate.client.device.BuildConfigAppInfoProvider
  */
 class AndroidPlatformInfoProvider(
     private val context: Context,
-    private val appInfoProvider: BuildConfigAppInfoProvider
+    private val appInfoProvider: BuildConfigAppInfoProvider,
 ) : PlatformInfoProvider {
-    
     /**
      * Gets platform-specific information about the current Android device.
      *
      * @return PlatformInfo containing Android device details.
      */
-    override fun getPlatformInfo(): PlatformInfo {
-        return PlatformInfo(
+    override fun getPlatformInfo(): PlatformInfo =
+        PlatformInfo(
             platform = "Android",
             deviceName = getDeviceName(),
             deviceType = getDeviceType(),
             osVersion = Build.VERSION.RELEASE,
-            appVersion = getAppVersion()
+            appVersion = getAppVersion(),
         )
-    }
-    
+
     /**
      * Gets the device name, or a generic name if unavailable.
      *
@@ -42,14 +40,14 @@ class AndroidPlatformInfoProvider(
     private fun getDeviceName(): String {
         val manufacturer = Build.MANUFACTURER
         val model = Build.MODEL
-        
+
         return if (model.startsWith(manufacturer, ignoreCase = true)) {
             model.capitalize()
         } else {
             "${manufacturer.capitalize()} $model"
         }
     }
-    
+
     /**
      * Gets the device type based on screen size and other characteristics.
      *
@@ -61,14 +59,14 @@ class AndroidPlatformInfoProvider(
         val isTablet = context.resources.configuration.screenWidthDp >= 600
         return if (isTablet) "tablet" else "phone"
     }
-    
+
     /**
      * Gets the application version.
      *
      * @return The application version string.
      */
-    private fun getAppVersion(): String {
-        return try {
+    private fun getAppVersion(): String =
+        try {
             val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
             val versionCode = PackageInfoCompat.getLongVersionCode(packageInfo)
             "${packageInfo.versionName} ($versionCode)"
@@ -76,12 +74,9 @@ class AndroidPlatformInfoProvider(
             val appInfo = appInfoProvider.getAppInfo()
             "${appInfo.versionName} (${appInfo.versionCode})"
         }
-    }
-    
+
     /**
      * Helper function to capitalize the first letter of a string.
      */
-    private fun String.capitalize(): String {
-        return if (isNotEmpty()) this[0].uppercase() + substring(1) else this
-    }
+    private fun String.capitalize(): String = if (isNotEmpty()) this[0].uppercase() + substring(1) else this
 }

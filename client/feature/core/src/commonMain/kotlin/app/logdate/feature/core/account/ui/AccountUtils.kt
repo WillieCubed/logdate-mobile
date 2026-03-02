@@ -14,43 +14,42 @@ object AccountUtils {
         if (username.isBlank()) {
             return false
         }
-        
+
         return username.matches(Regex("^[a-zA-Z0-9_]+$"))
     }
 
     /**
      * Returns validation error message for a username or null if valid.
      */
-    fun getValidationErrorForUsername(username: String): String? {
-        return when {
+    fun getValidationErrorForUsername(username: String): String? =
+        when {
             username.isBlank() -> "Username cannot be empty"
             !isValidUsername(username) -> "Username can only contain letters, numbers, and underscores"
             else -> null
         }
-    }
-    
+
     /**
      * Validates display name format.
      * @return true if the display name is valid
      */
-    fun isValidDisplayName(displayName: String): Boolean {
-        return displayName.isNotBlank()
-    }
+    fun isValidDisplayName(displayName: String): Boolean = displayName.isNotBlank()
 
     /**
      * Returns validation error message for a display name or null if valid.
      */
-    fun getValidationErrorForDisplayName(displayName: String): String? {
-        return when {
+    fun getValidationErrorForDisplayName(displayName: String): String? =
+        when {
             displayName.isBlank() -> "Display name cannot be empty"
             else -> null
         }
-    }
-    
+
     /**
      * Helper for consistent error logging across ViewModels.
      */
-    fun logError(message: String, throwable: Throwable) {
+    fun logError(
+        message: String,
+        throwable: Throwable,
+    ) {
         Napier.e(message, throwable)
     }
 }
@@ -65,5 +64,5 @@ enum class UsernameAvailability {
     CHECKING,
     AVAILABLE,
     TAKEN,
-    ERROR
+    ERROR,
 }

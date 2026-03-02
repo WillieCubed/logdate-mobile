@@ -13,14 +13,13 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.HttpStatusCode
 import io.ktor.utils.io.ByteReadChannel
-import kotlinx.io.IOException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
-import kotlin.time.Clock
+import kotlinx.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -58,18 +57,17 @@ import kotlin.time.Duration.Companion.seconds
  * @see io.ktor.client.plugins.HttpRequestTimeoutException
  */
 class NetworkErrorHandlingTest {
-
     private fun createMockClientWithDelay(
         responseBody: String = "OK",
         statusCode: HttpStatusCode = HttpStatusCode.OK,
-        delayMs: Long = 0
-    ): HttpClient {
-        return HttpClient(MockEngine) {
+        delayMs: Long = 0,
+    ): HttpClient =
+        HttpClient(MockEngine) {
             configureClientDefaults()
             install(HttpTimeout) {
                 requestTimeoutMillis = 1000 // 1 second timeout
-                connectTimeoutMillis = 500   // 500ms connect timeout
-                socketTimeoutMillis = 1000   // 1 second socket timeout
+                connectTimeoutMillis = 500 // 500ms connect timeout
+                socketTimeoutMillis = 1000 // 1 second socket timeout
             }
             engine {
                 addHandler { request ->
@@ -82,15 +80,14 @@ class NetworkErrorHandlingTest {
                     }
                     respond(
                         content = responseBody,
-                        status = statusCode
+                        status = statusCode,
                     )
                 }
             }
         }
-    }
 
-    private fun createMockClientWithException(exception: Exception): HttpClient {
-        return HttpClient(MockEngine) {
+    private fun createMockClientWithException(exception: Exception): HttpClient =
+        HttpClient(MockEngine) {
             configureClientDefaults()
             engine {
                 addHandler {
@@ -98,243 +95,276 @@ class NetworkErrorHandlingTest {
                 }
             }
         }
-    }
 
     @Test
-    fun httpClient_withTimeout_throwsTimeoutException() = runTest {
-        val client = createMockClientWithDelay(delayMs = 2000) // 2 second delay
-        
-        assertFailsWith<HttpRequestTimeoutException> {
-            client.get("https://api.example.com/slow")
-        }
-        client.close()
-    }
+    fun httpClient_withTimeout_throwsTimeoutException() =
+        runTest {
+            val client = createMockClientWithDelay(delayMs = 2000) // 2 second delay
 
-    @Test
-    fun httpClient_withConnectTimeout_throwsConnectTimeoutException() = runTest {
-        val client = createMockClientWithException(ConnectTimeoutException("Connection timeout"))
-        
-        assertFailsWith<ConnectTimeoutException> {
-            client.get("https://api.example.com/unreachable")
-        }
-        client.close()
-    }
-
-    @Test
-    fun httpClient_withSocketTimeout_throwsSocketTimeoutException() = runTest {
-        val client = createMockClientWithException(SocketTimeoutException("Socket timeout"))
-        
-        assertFailsWith<SocketTimeoutException> {
-            client.get("https://api.example.com/socket-timeout")
-        }
-        client.close()
-    }
-
-    @Test
-    fun httpClient_withIOException_throwsIOException() = runTest {
-        val client = createMockClientWithException(IOException("Network IO error"))
-        
-        assertFailsWith<IOException> {
-            client.get("https://api.example.com/io-error")
-        }
-        client.close()
-    }
-
-    @Test
-    fun httpClient_with400BadRequest_throwsClientRequestException() = runTest {
-        val client = createMockClientWithDelay(
-            responseBody = """{"error": "Bad Request", "message": "Invalid parameters"}""",
-            statusCode = HttpStatusCode.BadRequest
-        )
-
-        val response = client.get("https://api.example.com/bad-request")
-        assertTrue(response.status == HttpStatusCode.BadRequest)
-        client.close()
-    }
-
-    @Test
-    fun httpClient_with401Unauthorized_throwsClientRequestException() = runTest {
-        val client = createMockClientWithDelay(
-            responseBody = """{"error": "Unauthorized", "message": "Invalid API key"}""",
-            statusCode = HttpStatusCode.Unauthorized
-        )
-
-        val response = client.get("https://api.example.com/unauthorized")
-        assertTrue(response.status == HttpStatusCode.Unauthorized)
-        client.close()
-    }
-
-    @Test
-    fun httpClient_with403Forbidden_throwsClientRequestException() = runTest {
-        val client = createMockClientWithDelay(
-            responseBody = """{"error": "Forbidden", "message": "Access denied"}""",
-            statusCode = HttpStatusCode.Forbidden
-        )
-
-        val response = client.get("https://api.example.com/forbidden")
-        assertTrue(response.status == HttpStatusCode.Forbidden)
-        client.close()
-    }
-
-    @Test
-    fun httpClient_with404NotFound_throwsClientRequestException() = runTest {
-        val client = createMockClientWithDelay(
-            responseBody = """{"error": "Not Found", "message": "Resource not found"}""",
-            statusCode = HttpStatusCode.NotFound
-        )
-
-        val response = client.get("https://api.example.com/not-found")
-        assertTrue(response.status == HttpStatusCode.NotFound)
-        client.close()
-    }
-
-    @Test
-    fun httpClient_with500InternalServerError_throwsServerResponseException() = runTest {
-        val client = createMockClientWithDelay(
-            responseBody = """{"error": "Internal Server Error", "message": "Server is down"}""",
-            statusCode = HttpStatusCode.InternalServerError
-        )
-
-        val response = client.get("https://api.example.com/server-error")
-        assertTrue(response.status == HttpStatusCode.InternalServerError)
-        client.close()
-    }
-
-    @Test
-    fun httpClient_with502BadGateway_throwsServerResponseException() = runTest {
-        val client = createMockClientWithDelay(
-            responseBody = """{"error": "Bad Gateway", "message": "Upstream server error"}""",
-            statusCode = HttpStatusCode.BadGateway
-        )
-
-        val response = client.get("https://api.example.com/bad-gateway")
-        assertTrue(response.status == HttpStatusCode.BadGateway)
-        client.close()
-    }
-
-    @Test
-    fun httpClient_with503ServiceUnavailable_throwsServerResponseException() = runTest {
-        val client = createMockClientWithDelay(
-            responseBody = """{"error": "Service Unavailable", "message": "Server temporarily unavailable"}""",
-            statusCode = HttpStatusCode.ServiceUnavailable
-        )
-
-        val response = client.get("https://api.example.com/service-unavailable")
-        assertTrue(response.status == HttpStatusCode.ServiceUnavailable)
-        client.close()
-    }
-
-    @Test
-    fun httpClient_withCustomTimeout_respectsTimeout() = runTest {
-        val client = HttpClient(MockEngine) {
-            configureClientDefaults()
-            install(HttpTimeout) {
-                requestTimeoutMillis = 500
+            assertFailsWith<HttpRequestTimeoutException> {
+                client.get("https://api.example.com/slow")
             }
-            engine {
-                addHandler {
-                    delay(2.seconds) // 2 second delay
-                    respond("Should not reach here")
-                }
-            }
-        }
-
-        assertFailsWith<HttpRequestTimeoutException> {
-            client.get("https://api.example.com/custom-timeout") {
-                timeout {
-                    requestTimeoutMillis = 500 // 500ms timeout
-                }
-            }
-        }
-        client.close()
-    }
-
-    @Test
-    fun httpClient_withPostRequestError_handlesCorrectly() = runTest {
-        val client = createMockClientWithDelay(
-            responseBody = """{"error": "Validation failed", "fields": ["email", "password"]}""",
-            statusCode = HttpStatusCode.UnprocessableEntity
-        )
-
-        val response = client.post("https://api.example.com/create") {
-            setBody("""{"email": "invalid", "password": ""}""")
-        }
-        assertTrue(response.status == HttpStatusCode.UnprocessableEntity)
-        client.close()
-    }
-
-    @Test
-    fun httpClient_withNetworkFluctuation_handlesMultipleErrors() = runTest {
-        val errors = listOf(
-            ConnectTimeoutException("Connection timeout"),
-            SocketTimeoutException("Socket timeout"),
-            IOException("Network IO error")
-        )
-        
-        errors.forEach { error ->
-            val client = createMockClientWithException(error)
-            
-            val exception = assertFailsWith<Exception> {
-                client.get("https://api.example.com/unstable")
-            }
-            assertTrue(exception::class == error::class)
             client.close()
         }
-    }
 
     @Test
-    fun httpClient_withMalformedResponse_handlesGracefully() = runTest {
-        val client = HttpClient(MockEngine) {
-            configureClientDefaults()
-            engine {
-                addHandler {
-                    respond(
-                        content = ByteReadChannel("malformed response that cannot be parsed"),
-                        status = HttpStatusCode.OK
-                    )
+    fun httpClient_withConnectTimeout_throwsConnectTimeoutException() =
+        runTest {
+            val client = createMockClientWithException(ConnectTimeoutException("Connection timeout"))
+
+            assertFailsWith<ConnectTimeoutException> {
+                client.get("https://api.example.com/unreachable")
+            }
+            client.close()
+        }
+
+    @Test
+    fun httpClient_withSocketTimeout_throwsSocketTimeoutException() =
+        runTest {
+            val client = createMockClientWithException(SocketTimeoutException("Socket timeout"))
+
+            assertFailsWith<SocketTimeoutException> {
+                client.get("https://api.example.com/socket-timeout")
+            }
+            client.close()
+        }
+
+    @Test
+    fun httpClient_withIOException_throwsIOException() =
+        runTest {
+            val client = createMockClientWithException(IOException("Network IO error"))
+
+            assertFailsWith<IOException> {
+                client.get("https://api.example.com/io-error")
+            }
+            client.close()
+        }
+
+    @Test
+    fun httpClient_with400BadRequest_throwsClientRequestException() =
+        runTest {
+            val client =
+                createMockClientWithDelay(
+                    responseBody = """{"error": "Bad Request", "message": "Invalid parameters"}""",
+                    statusCode = HttpStatusCode.BadRequest,
+                )
+
+            val response = client.get("https://api.example.com/bad-request")
+            assertTrue(response.status == HttpStatusCode.BadRequest)
+            client.close()
+        }
+
+    @Test
+    fun httpClient_with401Unauthorized_throwsClientRequestException() =
+        runTest {
+            val client =
+                createMockClientWithDelay(
+                    responseBody = """{"error": "Unauthorized", "message": "Invalid API key"}""",
+                    statusCode = HttpStatusCode.Unauthorized,
+                )
+
+            val response = client.get("https://api.example.com/unauthorized")
+            assertTrue(response.status == HttpStatusCode.Unauthorized)
+            client.close()
+        }
+
+    @Test
+    fun httpClient_with403Forbidden_throwsClientRequestException() =
+        runTest {
+            val client =
+                createMockClientWithDelay(
+                    responseBody = """{"error": "Forbidden", "message": "Access denied"}""",
+                    statusCode = HttpStatusCode.Forbidden,
+                )
+
+            val response = client.get("https://api.example.com/forbidden")
+            assertTrue(response.status == HttpStatusCode.Forbidden)
+            client.close()
+        }
+
+    @Test
+    fun httpClient_with404NotFound_throwsClientRequestException() =
+        runTest {
+            val client =
+                createMockClientWithDelay(
+                    responseBody = """{"error": "Not Found", "message": "Resource not found"}""",
+                    statusCode = HttpStatusCode.NotFound,
+                )
+
+            val response = client.get("https://api.example.com/not-found")
+            assertTrue(response.status == HttpStatusCode.NotFound)
+            client.close()
+        }
+
+    @Test
+    fun httpClient_with500InternalServerError_throwsServerResponseException() =
+        runTest {
+            val client =
+                createMockClientWithDelay(
+                    responseBody = """{"error": "Internal Server Error", "message": "Server is down"}""",
+                    statusCode = HttpStatusCode.InternalServerError,
+                )
+
+            val response = client.get("https://api.example.com/server-error")
+            assertTrue(response.status == HttpStatusCode.InternalServerError)
+            client.close()
+        }
+
+    @Test
+    fun httpClient_with502BadGateway_throwsServerResponseException() =
+        runTest {
+            val client =
+                createMockClientWithDelay(
+                    responseBody = """{"error": "Bad Gateway", "message": "Upstream server error"}""",
+                    statusCode = HttpStatusCode.BadGateway,
+                )
+
+            val response = client.get("https://api.example.com/bad-gateway")
+            assertTrue(response.status == HttpStatusCode.BadGateway)
+            client.close()
+        }
+
+    @Test
+    fun httpClient_with503ServiceUnavailable_throwsServerResponseException() =
+        runTest {
+            val client =
+                createMockClientWithDelay(
+                    responseBody = """{"error": "Service Unavailable", "message": "Server temporarily unavailable"}""",
+                    statusCode = HttpStatusCode.ServiceUnavailable,
+                )
+
+            val response = client.get("https://api.example.com/service-unavailable")
+            assertTrue(response.status == HttpStatusCode.ServiceUnavailable)
+            client.close()
+        }
+
+    @Test
+    fun httpClient_withCustomTimeout_respectsTimeout() =
+        runTest {
+            val client =
+                HttpClient(MockEngine) {
+                    configureClientDefaults()
+                    install(HttpTimeout) {
+                        requestTimeoutMillis = 500
+                    }
+                    engine {
+                        addHandler {
+                            delay(2.seconds) // 2 second delay
+                            respond("Should not reach here")
+                        }
+                    }
+                }
+
+            assertFailsWith<HttpRequestTimeoutException> {
+                client.get("https://api.example.com/custom-timeout") {
+                    timeout {
+                        requestTimeoutMillis = 500 // 500ms timeout
+                    }
                 }
             }
+            client.close()
         }
-        
-        // Should not throw an exception for malformed content
-        val response = client.get("https://api.example.com/malformed")
-        assertTrue(response.status == HttpStatusCode.OK)
-        client.close()
-    }
 
     @Test
-    fun httpClient_withSlowResponse_completesWithinReasonableTime() = runTest {
-        val client = createMockClientWithDelay(
-            responseBody = "Slow but successful response",
-            delayMs = 100 // Small delay that should not timeout
-        )
-        
-        val response = client.get("https://api.example.com/slow-but-ok")
-        assertTrue(response.status == HttpStatusCode.OK)
-        client.close()
-    }
+    fun httpClient_withPostRequestError_handlesCorrectly() =
+        runTest {
+            val client =
+                createMockClientWithDelay(
+                    responseBody = """{"error": "Validation failed", "fields": ["email", "password"]}""",
+                    statusCode = HttpStatusCode.UnprocessableEntity,
+                )
+
+            val response =
+                client.post("https://api.example.com/create") {
+                    setBody("""{"email": "invalid", "password": ""}""")
+                }
+            assertTrue(response.status == HttpStatusCode.UnprocessableEntity)
+            client.close()
+        }
 
     @Test
-    fun httpClient_withEmptyErrorResponse_handlesCorrectly() = runTest {
-        val client = createMockClientWithDelay(
-            responseBody = "",
-            statusCode = HttpStatusCode.InternalServerError
-        )
+    fun httpClient_withNetworkFluctuation_handlesMultipleErrors() =
+        runTest {
+            val errors =
+                listOf(
+                    ConnectTimeoutException("Connection timeout"),
+                    SocketTimeoutException("Socket timeout"),
+                    IOException("Network IO error"),
+                )
 
-        val response = client.get("https://api.example.com/empty-error")
-        assertTrue(response.status == HttpStatusCode.InternalServerError)
-        client.close()
-    }
+            errors.forEach { error ->
+                val client = createMockClientWithException(error)
+
+                val exception =
+                    assertFailsWith<Exception> {
+                        client.get("https://api.example.com/unstable")
+                    }
+                assertTrue(exception::class == error::class)
+                client.close()
+            }
+        }
 
     @Test
-    fun httpClient_withRateLimitError_throwsCorrectException() = runTest {
-        val client = createMockClientWithDelay(
-            responseBody = """{"error": "Rate limit exceeded", "retry_after": 60}""",
-            statusCode = HttpStatusCode.TooManyRequests
-        )
+    fun httpClient_withMalformedResponse_handlesGracefully() =
+        runTest {
+            val client =
+                HttpClient(MockEngine) {
+                    configureClientDefaults()
+                    engine {
+                        addHandler {
+                            respond(
+                                content = ByteReadChannel("malformed response that cannot be parsed"),
+                                status = HttpStatusCode.OK,
+                            )
+                        }
+                    }
+                }
 
-        val response = client.get("https://api.example.com/rate-limited")
-        assertTrue(response.status == HttpStatusCode.TooManyRequests)
-        client.close()
-    }
+            // Should not throw an exception for malformed content
+            val response = client.get("https://api.example.com/malformed")
+            assertTrue(response.status == HttpStatusCode.OK)
+            client.close()
+        }
+
+    @Test
+    fun httpClient_withSlowResponse_completesWithinReasonableTime() =
+        runTest {
+            val client =
+                createMockClientWithDelay(
+                    responseBody = "Slow but successful response",
+                    delayMs = 100, // Small delay that should not timeout
+                )
+
+            val response = client.get("https://api.example.com/slow-but-ok")
+            assertTrue(response.status == HttpStatusCode.OK)
+            client.close()
+        }
+
+    @Test
+    fun httpClient_withEmptyErrorResponse_handlesCorrectly() =
+        runTest {
+            val client =
+                createMockClientWithDelay(
+                    responseBody = "",
+                    statusCode = HttpStatusCode.InternalServerError,
+                )
+
+            val response = client.get("https://api.example.com/empty-error")
+            assertTrue(response.status == HttpStatusCode.InternalServerError)
+            client.close()
+        }
+
+    @Test
+    fun httpClient_withRateLimitError_throwsCorrectException() =
+        runTest {
+            val client =
+                createMockClientWithDelay(
+                    responseBody = """{"error": "Rate limit exceeded", "retry_after": 60}""",
+                    statusCode = HttpStatusCode.TooManyRequests,
+                )
+
+            val response = client.get("https://api.example.com/rate-limited")
+            assertTrue(response.status == HttpStatusCode.TooManyRequests)
+            client.close()
+        }
 }

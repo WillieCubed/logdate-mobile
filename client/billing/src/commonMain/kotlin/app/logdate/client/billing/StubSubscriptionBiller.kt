@@ -5,11 +5,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
 // TODO: Move to debug build variant, remove from release
+
 /**
  * A fake implementation of [SubscriptionBiller] for testing purposes.
  */
 class StubSubscriptionBiller : SubscriptionBiller {
-
     private var currentPlan: LogDateBackupPlanOption = LogDateBackupPlanOption.BASIC
 
     override suspend fun purchasePlan(plan: LogDateBackupPlanOption) {
@@ -23,12 +23,13 @@ class StubSubscriptionBiller : SubscriptionBiller {
     override val isSubscribed: Flow<Boolean>
         get() = flow { emit(currentPlan != LogDateBackupPlanOption.BASIC) }
 
-    override val availablePlans: Flow<List<LogDateBackupPlanOption>> = flow {
-        emit(
-            listOf(
-                LogDateBackupPlanOption.BASIC,
-                LogDateBackupPlanOption.STANDARD,
+    override val availablePlans: Flow<List<LogDateBackupPlanOption>> =
+        flow {
+            emit(
+                listOf(
+                    LogDateBackupPlanOption.BASIC,
+                    LogDateBackupPlanOption.STANDARD,
+                ),
             )
-        )
-    }
+        }
 }

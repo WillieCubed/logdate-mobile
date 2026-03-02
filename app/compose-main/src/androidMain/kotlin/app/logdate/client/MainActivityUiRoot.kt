@@ -2,6 +2,11 @@ package app.logdate.client
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -9,11 +14,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.navigation3.runtime.NavKey
 import app.logdate.client.database.DatabaseStartupState
 import app.logdate.feature.core.GlobalAppUiLoadedState
@@ -24,16 +24,23 @@ import app.logdate.navigation.rememberMainAppNavigator
 import app.logdate.navigation.routes.core.DataSettingsRoute
 import app.logdate.navigation.routes.core.NavigationStart
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
-import app.logdate.navigation.routes.openDataSettings
 import app.logdate.navigation.routes.core.navigateHomeFromLaunch
+import app.logdate.navigation.routes.openDataSettings
 import app.logdate.navigation.routes.openSettings
 import app.logdate.navigation.routes.startOnboarding
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.theme.LogDateTheme
-import org.jetbrains.compose.resources.stringResource
-import logdate.app.composemain.generated.resources.*
 import logdate.app.composemain.generated.resources.Res
+import logdate.app.composemain.generated.resources.cancel
+import logdate.app.composemain.generated.resources.encrypted_data_recovery_required
+import logdate.app.composemain.generated.resources.i_understand_reset
+import logdate.app.composemain.generated.resources.open_recovery_tools
+import logdate.app.composemain.generated.resources.reset_encrypted_storage
+import logdate.app.composemain.generated.resources.reset_encrypted_storage_2
+import org.jetbrains.compose.resources.stringResource
+
 @OptIn(ExperimentalSharedTransitionApi::class)
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun MainActivityUiRoot(
     appUiState: GlobalAppUiLoadedState,
@@ -101,7 +108,7 @@ fun MainActivityUiRoot(
                                 "LogDate could not open your encrypted local database.\n\n" +
                                     "Reason: ${recovery.reason}\n\n" +
                                     "No local data has been deleted automatically. " +
-                                    "Open recovery tools first to import/restore a backup."
+                                    "Open recovery tools first to import/restore a backup.",
                             )
                         },
                         confirmButton = {
@@ -135,7 +142,7 @@ fun MainActivityUiRoot(
                             Text(
                                 "This will clear the local encryption key and move the current " +
                                     "database file to a recovery backup. You should only do this " +
-                                    "if you have a verified backup to restore."
+                                    "if you have a verified backup to restore.",
                             )
                         },
                         confirmButton = {

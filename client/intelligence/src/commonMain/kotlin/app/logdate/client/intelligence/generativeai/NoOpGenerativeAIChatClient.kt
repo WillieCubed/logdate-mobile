@@ -13,7 +13,6 @@ internal class NoOpGenerativeAIChatClient : GenerativeAIChatClient {
     override val providerId: String = "noop"
     override val defaultModel: String? = null
 
-    override suspend fun submit(request: GenerativeAIRequest): AIResult<GenerativeAIResponse> {
-        return AIResult.Unavailable(AIUnavailableReason.MissingCredentials)
-    }
+    override suspend fun submit(request: GenerativeAIRequest): AIResult<GenerativeAIResponse> =
+        AIResult.Unavailable(AIUnavailableReason.MissingCredentials)
 }

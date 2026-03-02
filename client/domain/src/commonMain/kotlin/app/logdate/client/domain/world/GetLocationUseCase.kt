@@ -14,7 +14,5 @@ import app.logdate.shared.model.Location
 class GetLocationUseCase(
     private val locationProvider: ClientLocationProvider,
 ) {
-    suspend operator fun invoke(): Location {
-        return locationProvider.getCurrentLocation()
-    }
+    suspend operator fun invoke(): Location = locationProvider.getCurrentLocation()
 }

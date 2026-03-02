@@ -6,7 +6,7 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 @Entity(
-    tableName = "journals"
+    tableName = "journals",
 )
 data class JournalEntity(
     @PrimaryKey

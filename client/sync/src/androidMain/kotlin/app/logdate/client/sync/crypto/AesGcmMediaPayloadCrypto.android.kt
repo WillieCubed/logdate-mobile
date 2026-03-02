@@ -5,7 +5,9 @@ import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-actual class AesGcmMediaPayloadCrypto actual constructor(key: ByteArray) : MediaPayloadCrypto {
+actual class AesGcmMediaPayloadCrypto actual constructor(
+    key: ByteArray,
+) : MediaPayloadCrypto {
     private val keyBytes = key.copyOf()
     private val secureRandom = SecureRandom()
 
@@ -40,7 +42,10 @@ actual class AesGcmMediaPayloadCrypto actual constructor(key: ByteArray) : Media
         return cipher.doFinal(cipherText)
     }
 
-    private fun cipher(mode: Int, iv: ByteArray): Cipher {
+    private fun cipher(
+        mode: Int,
+        iv: ByteArray,
+    ): Cipher {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         val keySpec = SecretKeySpec(keyBytes, KEY_ALGORITHM)
         val gcmSpec = GCMParameterSpec(GCM_TAG_BITS, iv)

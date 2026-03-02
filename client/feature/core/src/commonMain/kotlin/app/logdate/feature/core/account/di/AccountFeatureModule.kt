@@ -11,21 +11,22 @@ import org.koin.dsl.module
  *
  * This module provides the ViewModels needed for the cloud account setup flow.
  */
-val accountFeatureModule = module {
-    // Consolidated ViewModel for all screens except passkey creation
-    viewModel { 
-        AccountOnboardingViewModel(
-            checkUsernameAvailabilityUseCase = get(),
-            getAccountSetupDataUseCase = get()
-        ) 
+val accountFeatureModule =
+    module {
+        // Consolidated ViewModel for all screens except passkey creation
+        viewModel {
+            AccountOnboardingViewModel(
+                checkUsernameAvailabilityUseCase = get(),
+                getAccountSetupDataUseCase = get(),
+            )
+        }
+
+        // PasskeyCreationViewModel kept separate due to unique functionality
+        viewModel {
+            PasskeyCreationViewModel(
+                createPasskeyAccountUseCase = get(),
+                createRemoteAccountUseCase = get<CreateRemoteAccountUseCase>(),
+                getAccountSetupDataUseCase = get(),
+            )
+        }
     }
-    
-    // PasskeyCreationViewModel kept separate due to unique functionality
-    viewModel { 
-        PasskeyCreationViewModel(
-            createPasskeyAccountUseCase = get(),
-            createRemoteAccountUseCase = get<CreateRemoteAccountUseCase>(),
-            getAccountSetupDataUseCase = get()
-        ) 
-    }
-}

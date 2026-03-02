@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.update
 class SearchViewModel(
     searchEntriesUseCase: SearchEntriesUseCase,
 ) : ViewModel() {
-
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
 
@@ -27,12 +26,13 @@ class SearchViewModel(
      * Search results from the use case, automatically updated when query changes.
      * The use case handles debouncing internally.
      */
-    val searchResults: StateFlow<List<SearchResult>> = searchEntriesUseCase(_query)
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+    val searchResults: StateFlow<List<SearchResult>> =
+        searchEntriesUseCase(_query)
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList(),
+            )
 
     /**
      * Updates the search query.

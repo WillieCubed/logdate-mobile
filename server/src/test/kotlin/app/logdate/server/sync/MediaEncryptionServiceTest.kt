@@ -3,11 +3,10 @@ package app.logdate.server.sync
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
 import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 
 class MediaEncryptionServiceTest {
-
     @Test
     fun `encryption disabled returns original bytes`() {
         val service = MediaEncryptionService(null)
@@ -37,8 +36,10 @@ class MediaEncryptionServiceTest {
     @Test
     fun `decrypting encrypted bytes without key fails`() {
         val key = ByteArray(32) { index -> (index + 1).toByte() }
-        val encrypted = MediaEncryptionService.fromKeyBytes(key)
-            .encryptIfConfigured("payload".encodeToByteArray())
+        val encrypted =
+            MediaEncryptionService
+                .fromKeyBytes(key)
+                .encryptIfConfigured("payload".encodeToByteArray())
 
         val service = MediaEncryptionService(null)
 

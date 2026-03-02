@@ -11,15 +11,11 @@ object TimestampConverter {
      * Converts a [Instant] to a [Long] that can be stored in a Room database.
      */
     @TypeConverter
-    fun fromInstant(value: Instant): Long {
-        return value.toEpochMilliseconds()
-    }
+    fun fromInstant(value: Instant): Long = value.toEpochMilliseconds()
 
     /**
      * Converts a [Long] timestamp to a [Instant] usable for domain layer operations.
      */
     @TypeConverter
-    fun toInstant(value: Long): Instant {
-        return Instant.fromEpochMilliseconds(value)
-    }
+    fun toInstant(value: Long): Instant = Instant.fromEpochMilliseconds(value)
 }

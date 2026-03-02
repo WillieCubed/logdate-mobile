@@ -1,10 +1,8 @@
 package app.logdate.server.database
 
-import kotlin.time.Instant
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import kotlin.uuid.ExperimentalUuidApi
-import java.util.UUID
 
 /**
  * Database table definitions using Jetbrains Exposed ORM.
@@ -22,7 +20,7 @@ object AccountsTable : Table("accounts") {
     val lastSignInAt = timestamp("last_sign_in_at").nullable()
     val isActive = bool("is_active").default(true)
     val preferences = text("preferences").default("{}")
-    
+
     override val primaryKey = PrimaryKey(id)
 }
 
@@ -39,7 +37,7 @@ object PasskeysTable : Table("passkeys") {
     val lastUsedAt = timestamp("last_used_at").nullable()
     val isActive = bool("is_active").default(true)
     val webauthnData = text("webauthn_data").default("{}")
-    
+
     override val primaryKey = PrimaryKey(id)
 }
 
@@ -55,7 +53,7 @@ object SessionsTable : Table("sessions") {
     val createdAt = timestamp("created_at")
     val expiresAt = timestamp("expires_at")
     val isUsed = bool("is_used").default(false)
-    
+
     override val primaryKey = PrimaryKey(id)
 }
 
@@ -66,7 +64,7 @@ object WebAuthnChallengesTable : Table("webauthn_challenges") {
     val expiresAt = timestamp("expires_at")
     val isUsed = bool("is_used").default(false)
     val createdAt = timestamp("created_at")
-    
+
     override val primaryKey = PrimaryKey(challenge)
 }
 
@@ -77,12 +75,12 @@ data class UserPreferences(
     val theme: String? = null,
     val language: String? = null,
     val notifications: Map<String, Boolean> = emptyMap(),
-    val privacy: Map<String, Any> = emptyMap()
+    val privacy: Map<String, Any> = emptyMap(),
 )
 
 data class WebAuthnData(
     val attestationType: String? = null,
     val transports: List<String> = emptyList(),
     val userVerification: String? = null,
-    val extensions: Map<String, Any> = emptyMap()
+    val extensions: Map<String, Any> = emptyMap(),
 )

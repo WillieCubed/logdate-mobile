@@ -15,10 +15,10 @@ import kotlinx.coroutines.launch
  */
 class LocationTrackingManager(
     private val scheduledLocationTrackingService: ScheduledLocationTrackingService,
-    private val locationTrackingSettingsRepository: LocationTrackingSettingsRepository
+    private val locationTrackingSettingsRepository: LocationTrackingSettingsRepository,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    
+
     init {
         // Listen for changes to tracking settings
         scope.launch {
@@ -26,30 +26,30 @@ class LocationTrackingManager(
                 applyTrackingSettings(settings)
             }
         }
-        
+
         // Apply initial settings
         scope.launch {
             val settings = locationTrackingSettingsRepository.getSettings()
             applyTrackingSettings(settings)
         }
     }
-    
+
     /**
      * Apply tracking settings by starting or stopping tracking services.
      */
     private fun applyTrackingSettings(settings: LocationTrackingSettings) {
         Napier.i("Applying location tracking settings: $settings")
-        
+
         if (settings.backgroundTrackingEnabled) {
             scheduledLocationTrackingService.startScheduledTracking(
                 intervalMinutes = settings.trackingIntervalMinutes,
-                replaceExisting = true
+                replaceExisting = true,
             )
         } else {
             scheduledLocationTrackingService.stopScheduledTracking()
         }
     }
-    
+
     /**
      * Explicitly start location tracking (usually called when the app starts).
      */
@@ -59,12 +59,12 @@ class LocationTrackingManager(
             if (settings.backgroundTrackingEnabled) {
                 scheduledLocationTrackingService.startScheduledTracking(
                     intervalMinutes = settings.trackingIntervalMinutes,
-                    replaceExisting = false
+                    replaceExisting = false,
                 )
             }
         }
     }
-    
+
     /**
      * Explicitly stop location tracking (usually called when the app is being destroyed).
      */

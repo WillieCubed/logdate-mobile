@@ -1,4 +1,5 @@
 @file:OptIn(ExperimentalLayoutApi::class)
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
 
 package app.logdate.ui.timeline.newstuff
 
@@ -46,26 +47,27 @@ import app.logdate.ui.timeline.TimelineSuggestionBlockUiState
 import app.logdate.util.now
 import coil3.compose.AsyncImage
 import kotlinx.datetime.LocalDate
-import kotlin.math.absoluteValue
-import kotlin.uuid.Uuid
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.*
 import logdate.client.ui.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+import kotlin.math.absoluteValue
+import kotlin.uuid.Uuid
+
 /**
  * UI state for the end of timeline section.
  */
 sealed class EndOfTimelineUiState {
     /**
      * State when the user has set their birthday.
-     * 
+     *
      * @param birthDate The user's birth date
      * @param daysSinceBirth Number of days since the user was born
      */
     data class BirthdayCelebration(
-        val birthDate: LocalDate, 
-        val daysSinceBirth: Int
+        val birthDate: LocalDate,
+        val daysSinceBirth: Int,
     ) : EndOfTimelineUiState()
-    
+
     /**
      * State when the user has not set their birthday.
      * Shows an easter egg message encouraging them to add their birthday.
@@ -97,25 +99,28 @@ fun TimelineList(
     onShare: (memoryId: String) -> Unit = {},
     listState: LazyListState = rememberLazyListState(),
 ) {
-    val suggestionBlockState: TimelineSuggestionBlockUiState? = when (timelineSuggestion) {
-        is TimelineSuggestionBlock.OngoingEvent -> TimelineSuggestionBlockUiState(
-            memoryId = timelineSuggestion.memoryId,
-            type = TimelineSuggestionBlockType.HAPPENING_NOW,
-            message = timelineSuggestion.message,
-            location = timelineSuggestion.location,
-            people = timelineSuggestion.people,
-            mediaUris = timelineSuggestion.mediaUris,
-        )
-        is TimelineSuggestionBlock.PastMoment -> TimelineSuggestionBlockUiState(
-            memoryId = timelineSuggestion.memoryId,
-            type = TimelineSuggestionBlockType.UPDATE,
-            message = timelineSuggestion.message,
-            location = timelineSuggestion.location,
-            people = timelineSuggestion.people,
-            mediaUris = timelineSuggestion.mediaUris,
-        )
-        null -> null
-    }
+    val suggestionBlockState: TimelineSuggestionBlockUiState? =
+        when (timelineSuggestion) {
+            is TimelineSuggestionBlock.OngoingEvent ->
+                TimelineSuggestionBlockUiState(
+                    memoryId = timelineSuggestion.memoryId,
+                    type = TimelineSuggestionBlockType.HAPPENING_NOW,
+                    message = timelineSuggestion.message,
+                    location = timelineSuggestion.location,
+                    people = timelineSuggestion.people,
+                    mediaUris = timelineSuggestion.mediaUris,
+                )
+            is TimelineSuggestionBlock.PastMoment ->
+                TimelineSuggestionBlockUiState(
+                    memoryId = timelineSuggestion.memoryId,
+                    type = TimelineSuggestionBlockType.UPDATE,
+                    message = timelineSuggestion.message,
+                    location = timelineSuggestion.location,
+                    people = timelineSuggestion.people,
+                    mediaUris = timelineSuggestion.mediaUris,
+                )
+            null -> null
+        }
 
     LazyColumn(
         modifier = modifier.safeDrawingPadding(),
@@ -129,7 +134,7 @@ fun TimelineList(
                         state = blockState,
                         onAddToMemory = onAddToMemory,
                         onShare = onShare,
-                        modifier = Modifier.padding(Spacing.lg)
+                        modifier = Modifier.padding(Spacing.lg),
                     )
                 }
             }
@@ -142,11 +147,12 @@ fun TimelineList(
             TimelineDayListItem(
                 item = item,
                 onOpenDay = onOpenDay,
-                modifier = Modifier
-                    .applyPaddingIfLast(
-                        currentIndex = index,
-                        totalItems = items.size,
-                    ),
+                modifier =
+                    Modifier
+                        .applyPaddingIfLast(
+                            currentIndex = index,
+                            totalItems = items.size,
+                        ),
             )
             // Check if we should show the time gap message
             val isNotLastItem = index < items.size - 1
@@ -172,17 +178,17 @@ fun TimelineList(
 }
 
 @Composable
-internal fun TimeGapMessageItem(
-    modifier: Modifier = Modifier,
-) {
+internal fun TimeGapMessageItem(modifier: Modifier = Modifier) {
     Column(
-        verticalArrangement = Arrangement.spacedBy(
-            Spacing.lg,
-            alignment = Alignment.CenterVertically,
-        ),
-        modifier = modifier
-            .defaultMinSize(minWidth = 320.dp)
-            .padding(Spacing.lg),
+        verticalArrangement =
+            Arrangement.spacedBy(
+                Spacing.lg,
+                alignment = Alignment.CenterVertically,
+            ),
+        modifier =
+            modifier
+                .defaultMinSize(minWidth = 320.dp)
+                .padding(Spacing.lg),
     ) {
         Text(
             text = stringResource(Res.string.a_long_time_passed),
@@ -195,7 +201,7 @@ internal fun TimeGapMessageItem(
 /**
  * A composable that displays content at the end of the timeline.
  * Shows either a birthday celebration or an easter egg based on the provided state.
- * 
+ *
  * @param state The UI state for the end of timeline section
  * @param modifier Modifier to be applied to the container
  */
@@ -206,10 +212,11 @@ internal fun EndOfTimelineItem(
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-        modifier = modifier
-            .defaultMinSize(minWidth = 320.dp)
-            .height(320.dp)
-            .padding(Spacing.lg),
+        modifier =
+            modifier
+                .defaultMinSize(minWidth = 320.dp)
+                .height(320.dp)
+                .padding(Spacing.lg),
     ) {
         when (state) {
             is EndOfTimelineUiState.BirthdayCelebration -> {
@@ -222,16 +229,17 @@ internal fun EndOfTimelineItem(
                         style = MaterialTheme.typography.headlineMedium,
                     )
                     Text(
-                        text = stringResource(
-                            Res.string.journey_days_count,
-                            state.daysSinceBirth
-                        ),
+                        text =
+                            stringResource(
+                                Res.string.journey_days_count,
+                                state.daysSinceBirth,
+                            ),
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-            
+
             EndOfTimelineUiState.DiscoveryEasterEgg -> {
                 Text(stringResource(Res.string.youve_reached_the_end), style = MaterialTheme.typography.titleLarge)
                 Column(
@@ -271,11 +279,12 @@ internal fun BirthdayListItem(
     }
 
     EndOfTimelineItem(
-        state = EndOfTimelineUiState.BirthdayCelebration(
-            birthDate = birthDate,
-            daysSinceBirth = daysSinceBirthday
-        ),
-        modifier = modifier
+        state =
+            EndOfTimelineUiState.BirthdayCelebration(
+                birthDate = birthDate,
+                daysSinceBirth = daysSinceBirthday,
+            ),
+        modifier = modifier,
     )
 }
 
@@ -287,14 +296,14 @@ internal fun TimelineDayListItem(
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-        modifier = modifier
-            .widthIn(min = 320.dp)
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .clickable {
-                onOpenDay(item.date)
-            }
-            .padding(Spacing.lg),
+        modifier =
+            modifier
+                .widthIn(min = 320.dp)
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.medium)
+                .clickable {
+                    onOpenDay(item.date)
+                }.padding(Spacing.lg),
     ) {
         TimelineDayHeader(
             date = item.date,
@@ -312,7 +321,7 @@ internal fun TimelineDayListItem(
             ) {
                 Text(
                     "In summary",
-                    style = MaterialTheme.typography.labelLarge.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    style = MaterialTheme.typography.labelLarge.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
                 )
                 if (item.isLoadingSummary) {
                     SummaryLoadingPlaceholder()
@@ -325,9 +334,7 @@ internal fun TimelineDayListItem(
 }
 
 @Composable
-private fun SummaryLoadingPlaceholder(
-    modifier: Modifier = Modifier,
-) {
+private fun SummaryLoadingPlaceholder(modifier: Modifier = Modifier) {
     Column(
         verticalArrangement = Arrangement.spacedBy(Spacing.xs),
         modifier = modifier,
@@ -382,8 +389,7 @@ internal fun ActivitySection(uiState: ActivitySectionUiState) {
         is MediaSectionUiState -> {
             ActivitySectionWrapper(title = uiState.title) {
                 // TODO: Implement logic to display images in a visually aesthetic way
-                FlowRow(
-                ) {
+                FlowRow {
                     uiState.media.forEach { media ->
                         AsyncImage(
                             model = media.mediaUri,
@@ -419,7 +425,6 @@ internal fun ActivitySectionWrapper(
         )
         content()
     }
-
 }
 
 @Composable
@@ -462,7 +467,7 @@ private fun DayMetadata(
                     imageVector = Icons.Default.LocationOn,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(end = Spacing.sm)
+                    modifier = Modifier.padding(end = Spacing.sm),
                 )
                 Text(
                     "${places.size} places",
@@ -477,7 +482,7 @@ private fun DayMetadata(
                     imageVector = Icons.Default.PeopleAlt,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(end = Spacing.sm)
+                    modifier = Modifier.padding(end = Spacing.sm),
                 )
                 Text(
                     "${people.size} people",

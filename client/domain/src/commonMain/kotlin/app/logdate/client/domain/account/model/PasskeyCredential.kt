@@ -1,8 +1,8 @@
 package app.logdate.client.domain.account.model
 
-import app.logdate.shared.model.PasskeyCredential as SharedPasskeyCredential
 import app.logdate.shared.model.DeviceInfo as SharedDeviceInfo
 import app.logdate.shared.model.DeviceType as SharedDeviceType
+import app.logdate.shared.model.PasskeyCredential as SharedPasskeyCredential
 
 /**
  * Represents a passkey credential for authentication.

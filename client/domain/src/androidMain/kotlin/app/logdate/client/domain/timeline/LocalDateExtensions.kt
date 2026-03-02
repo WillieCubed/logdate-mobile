@@ -1,15 +1,10 @@
 package app.logdate.client.domain.timeline
 
-import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.atStartOfDayIn
-import java.time.ZoneId
 import kotlinx.datetime.number
+import kotlin.time.Instant
 
-/**
- * Extension functions for LocalDate to work with java.time conversions
- */
+// Extension functions for LocalDate to work with java.time conversions
 
 /**
  * Add the specified number of days to this date.
@@ -30,33 +25,27 @@ fun LocalDate.minusDays(days: Long): LocalDate {
 /**
  * Convert this LocalDate to a java.time.LocalDate.
  */
-fun LocalDate.toJavaLocalDate(): java.time.LocalDate {
-    return java.time.LocalDate.of(year, month.number, day)
-}
+fun LocalDate.toJavaLocalDate(): java.time.LocalDate = java.time.LocalDate.of(year, month.number, day)
 
 /**
  * Convert a java.time.LocalDate to kotlinx.datetime.LocalDate.
  */
-fun java.time.LocalDate.toKotlinLocalDate(): LocalDate {
-    return LocalDate(year, monthValue, dayOfMonth)
-}
+fun java.time.LocalDate.toKotlinLocalDate(): LocalDate = LocalDate(year, monthValue, dayOfMonth)
 
 /**
  * Convert java.time.Instant to kotlin.time.Instant.
  */
-fun java.time.Instant.toKotlinInstant(): Instant {
-    return Instant.fromEpochSeconds(
+fun java.time.Instant.toKotlinInstant(): Instant =
+    Instant.fromEpochSeconds(
         epochSecond,
-        nano.toLong()
+        nano.toLong(),
     )
-}
 
 /**
  * Convert kotlin.time.Instant to java.time.Instant.
  */
-fun Instant.toJavaInstant(): java.time.Instant {
-    return java.time.Instant.ofEpochSecond(
+fun Instant.toJavaInstant(): java.time.Instant =
+    java.time.Instant.ofEpochSecond(
         epochSeconds,
-        nanosecondsOfSecond.toLong()
+        nanosecondsOfSecond.toLong(),
     )
-}

@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.ui
 
 import androidx.compose.foundation.layout.Box
@@ -11,7 +13,7 @@ import androidx.compose.ui.Modifier
 fun GenericLoadingScreen(modifier: Modifier = Modifier) {
     Box(
         contentAlignment = Alignment.Center,
-        modifier = modifier.fillMaxSize()
+        modifier = modifier.fillMaxSize(),
     ) {
         CircularProgressIndicator()
     }

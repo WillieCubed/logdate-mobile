@@ -10,7 +10,10 @@ class GetPeopleForNoteUseCase(
     private val extractPeopleUseCase: ExtractPeopleUseCase,
     private val peopleRepository: PeopleRepository,
 ) {
-    suspend operator fun invoke(noteId: String, text: String): List<Person> {
+    suspend operator fun invoke(
+        noteId: String,
+        text: String,
+    ): List<Person> {
         TODO("Not yet implemented")
     }
 }

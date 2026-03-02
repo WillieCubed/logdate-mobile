@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.core.account.ui
 
 import androidx.compose.foundation.layout.Arrangement
@@ -30,16 +32,16 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import org.koin.compose.viewmodel.koinViewModel
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.core.generated.resources.*
 import logdate.client.feature.core.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
+
 /**
  * Screen for selecting a display name during account creation.
- * 
+ *
  * This screen allows users to enter their display name for their LogDate Cloud account.
  * The display name is used for personalization throughout the app.
- * 
+ *
  * @param onContinue Callback when a valid display name is selected and the user continues.
  * @param onBack Callback when the user chooses to go back.
  * @param viewModel The ViewModel for this screen.
@@ -48,18 +50,18 @@ import logdate.client.feature.core.generated.resources.Res
 fun DisplayNameSelectionScreen(
     onContinue: () -> Unit,
     onBack: () -> Unit,
-    viewModel: AccountOnboardingViewModel = koinViewModel()
+    viewModel: AccountOnboardingViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val snackbarHostState = remember { SnackbarHostState() }
-    
+
     // Request focus on the display name field when the screen appears
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
     }
-    
+
     // Show error messages in a Snackbar
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let {
@@ -67,70 +69,74 @@ fun DisplayNameSelectionScreen(
             viewModel.clearErrorMessage()
         }
     }
-    
+
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(paddingValues)
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(paddingValues)
+                    .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
                 text = stringResource(Res.string.your_display_name),
-                style = MaterialTheme.typography.headlineMedium
+                style = MaterialTheme.typography.headlineMedium,
             )
-            
+
             Text(
                 text = stringResource(Res.string.this_is_how_youll_appear_to_others_you_can_change_this_anytime),
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyMedium,
             )
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             OutlinedTextField(
                 value = uiState.displayName,
                 onValueChange = { viewModel.onDisplayNameChanged(it) },
                 label = { Text(stringResource(Res.string.display_name)) },
                 isError = uiState.displayNameError != null,
                 supportingText = uiState.displayNameError?.let { { Text(it) } },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester),
-                keyboardOptions = KeyboardOptions(
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        focusManager.clearFocus()
-                        if (uiState.canContinueFromDisplayName) {
-                            viewModel.onDisplayNameContinue()
-                            onContinue()
-                        }
-                    }
-                ),
-                singleLine = true
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester),
+                keyboardOptions =
+                    KeyboardOptions(
+                        imeAction = ImeAction.Done,
+                    ),
+                keyboardActions =
+                    KeyboardActions(
+                        onDone = {
+                            focusManager.clearFocus()
+                            if (uiState.canContinueFromDisplayName) {
+                                viewModel.onDisplayNameContinue()
+                                onContinue()
+                            }
+                        },
+                    ),
+                singleLine = true,
             )
-            
+
             Spacer(modifier = Modifier.weight(1f))
-            
+
             Button(
-                onClick = { 
+                onClick = {
                     viewModel.onDisplayNameContinue()
                     onContinue()
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = uiState.canContinueFromDisplayName
+                enabled = uiState.canContinueFromDisplayName,
             ) {
                 Text(stringResource(Res.string.`continue`))
             }
-            
+
             TextButton(
                 onClick = onBack,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(Res.string.back))
             }

@@ -8,15 +8,11 @@ import kotlin.time.Clock
  * A [NetworkAvailabilityMonitor] that functions on desktop (JVM) platforms.
  */
 class DesktopNetworkAvailabilityMonitor : NetworkAvailabilityMonitor {
-    private val _networkState =
+    private val networkStateFlow =
         MutableStateFlow<NetworkState>(NetworkState.Connected(Clock.System.now()))
 
     // TODO: Implement this
-    override fun isNetworkAvailable(): Boolean {
-        return true
-    }
+    override fun isNetworkAvailable(): Boolean = true
 
-    override fun observeNetwork(): SharedFlow<NetworkState> {
-        return _networkState
-    }
+    override fun observeNetwork(): SharedFlow<NetworkState> = networkStateFlow
 }

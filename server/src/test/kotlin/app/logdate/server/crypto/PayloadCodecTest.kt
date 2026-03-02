@@ -1,18 +1,21 @@
 package app.logdate.server.crypto
 
-import kotlin.test.Test
-import kotlin.test.assertFailsWith
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import java.util.Base64
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class PayloadCodecTest {
     private val testKey = Base64.getDecoder().decode("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
-    private val keyring = object : EncryptionKeyring {
-        private val key = EncryptionKey("test-key-1", testKey)
-        override fun getActiveKey() = key
-        override fun getKey(keyId: String) = if (keyId == "test-key-1") key else null
-    }
+    private val keyring =
+        object : EncryptionKeyring {
+            private val key = EncryptionKey("test-key-1", testKey)
+
+            override fun getActiveKey() = key
+
+            override fun getKey(keyId: String) = if (keyId == "test-key-1") key else null
+        }
     private val codec = PayloadCodec(keyring)
 
     @Test
@@ -56,12 +59,15 @@ class PayloadCodecTest {
     @Test
     fun `decryption with wrong key fails`() {
         val encrypted = codec.encryptMedia("test".toByteArray(), "user1", "media1", "content1")
-        
-        val wrongKeyring = object : EncryptionKeyring {
-            private val wrongKey = EncryptionKey("test-key-1", ByteArray(32) { 0xFF.toByte() })
-            override fun getActiveKey() = wrongKey
-            override fun getKey(keyId: String) = wrongKey
-        }
+
+        val wrongKeyring =
+            object : EncryptionKeyring {
+                private val wrongKey = EncryptionKey("test-key-1", ByteArray(32) { 0xFF.toByte() })
+
+                override fun getActiveKey() = wrongKey
+
+                override fun getKey(keyId: String) = wrongKey
+            }
         val wrongCodec = PayloadCodec(wrongKeyring)
 
         assertFailsWith<Exception> {
@@ -72,16 +78,19 @@ class PayloadCodecTest {
     @Test
     fun `decryption with missing key throws exception`() {
         val encrypted = codec.encryptMedia("test".toByteArray(), "user1", "media1", "content1")
-        
-        val emptyKeyring = object : EncryptionKeyring {
-            override fun getActiveKey() = EncryptionKey("other-key", testKey)
-            override fun getKey(keyId: String) = null
-        }
+
+        val emptyKeyring =
+            object : EncryptionKeyring {
+                override fun getActiveKey() = EncryptionKey("other-key", testKey)
+
+                override fun getKey(keyId: String) = null
+            }
         val emptyCodec = PayloadCodec(emptyKeyring)
 
-        val exception = assertFailsWith<EncryptionException> {
-            emptyCodec.decryptMedia(encrypted)
-        }
+        val exception =
+            assertFailsWith<EncryptionException> {
+                emptyCodec.decryptMedia(encrypted)
+            }
         assertTrue(exception.message?.contains("Key not found") == true)
     }
 
@@ -91,7 +100,7 @@ class PayloadCodecTest {
         val encrypted = codec.encryptMedia(plaintext, "user1", "media1", "content1")
 
         assertEquals(0x01.toByte(), encrypted[5])
-        
+
         val keyIdLength = ((encrypted[6].toInt() and 0xFF) shl 8) or (encrypted[7].toInt() and 0xFF)
         assertTrue(keyIdLength > 0)
     }

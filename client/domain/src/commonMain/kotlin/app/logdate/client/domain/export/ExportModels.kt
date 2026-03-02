@@ -1,8 +1,8 @@
 package app.logdate.client.domain.export
 
 import app.logdate.shared.model.Journal
-import kotlin.time.Instant
 import kotlinx.serialization.Serializable
+import kotlin.time.Instant
 
 /**
  * Data structure for the complete user data export that follows the LogDate export specification.
@@ -12,7 +12,7 @@ data class LogDateExport(
     val metadata: ExportMetadata,
     val journals: List<Journal>,
     val notes: List<ExportNote>,
-    val drafts: List<ExportDraft>
+    val drafts: List<ExportDraft>,
 )
 
 /**
@@ -25,7 +25,7 @@ data class ExportMetadata(
     val userId: String,
     val deviceId: String,
     val appVersion: String,
-    val stats: ExportStats
+    val stats: ExportStats,
 )
 
 /**
@@ -36,12 +36,12 @@ data class ExportStats(
     val journalCount: Int,
     val noteCount: Int,
     val draftCount: Int,
-    val mediaCount: Int
+    val mediaCount: Int,
 )
 
 /**
  * Note data for export.
- * 
+ *
  * Notes are exported independently of journals. Journal-note relationships
  * are stored in a separate schema file to support a note appearing in multiple journals.
  */
@@ -56,7 +56,7 @@ data class ExportNote(
     val updatedAt: Instant,
     val location: ExportLocation? = null,
     val tags: List<String> = emptyList(),
-    val people: List<String> = emptyList()
+    val people: List<String> = emptyList(),
 )
 
 /**
@@ -70,7 +70,7 @@ data class ExportDraft(
     val createdAt: Instant,
     val updatedAt: Instant,
     val location: ExportLocation? = null,
-    val mediaReferences: List<String> = emptyList()
+    val mediaReferences: List<String> = emptyList(),
 )
 
 /**
@@ -80,19 +80,19 @@ data class ExportDraft(
 data class ExportLocation(
     val latitude: Double,
     val longitude: Double,
-    val placeName: String? = null
+    val placeName: String? = null,
 )
 
 /**
  * Journal-note relationship for export.
- * 
+ *
  * Since notes can belong to multiple journals, we store these relationships separately.
  */
 @Serializable
 data class ExportJournalNoteRelation(
     val journalId: String,
     val noteId: String,
-    val addedAt: Instant
+    val addedAt: Instant,
 )
 
 /**
@@ -105,10 +105,10 @@ data class ExportFileStructure(
     val journalNotesFile: String = "journal_notes.json",
     val draftsFile: String = "drafts.json",
     val mediaManifestFile: String = "media_manifest.json",
-    val mediaFolder: String = "media"
+    val mediaFolder: String = "media",
 )
 
 @Serializable
 data class ExportMediaManifest(
-    val files: List<ExportMediaFile>
+    val files: List<ExportMediaFile>,
 )

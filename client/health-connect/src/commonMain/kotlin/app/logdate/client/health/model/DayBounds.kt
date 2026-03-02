@@ -9,5 +9,5 @@ import kotlin.time.Instant
  */
 data class DayBounds(
     val start: Instant,
-    val end: Instant
+    val end: Instant,
 )

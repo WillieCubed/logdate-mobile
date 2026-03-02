@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:filename")
+
 package app.logdate.ui.foldable
 
 import androidx.compose.runtime.Composable

@@ -13,23 +13,24 @@ import org.koin.dsl.module
 /**
  * Android-specific implementation of the sensor module.
  */
-actual val sensorModule: Module = module {
-    single<GyroSensorProvider> {
-        AndroidGyroSensorProvider(
-            coroutineScope = get(),
-            context = androidContext()
-        ) 
+actual val sensorModule: Module =
+    module {
+        single<GyroSensorProvider> {
+            AndroidGyroSensorProvider(
+                coroutineScope = get(),
+                context = androidContext(),
+            )
+        }
+
+        single<BatteryInfoProvider> {
+            AndroidBatteryInfoProvider(
+                context = androidContext(),
+            )
+        }
+
+        single<NetworkSaverModeProvider> {
+            AndroidNetworkSaverModeProvider(
+                context = androidContext(),
+            )
+        }
     }
-    
-    single<BatteryInfoProvider> { 
-        AndroidBatteryInfoProvider(
-            context = androidContext()
-        ) 
-    }
-    
-    single<NetworkSaverModeProvider> { 
-        AndroidNetworkSaverModeProvider(
-            context = androidContext()
-        ) 
-    }
-}

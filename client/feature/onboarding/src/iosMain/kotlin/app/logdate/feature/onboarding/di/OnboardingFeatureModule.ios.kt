@@ -8,9 +8,10 @@ import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
-actual val onboardingFeatureModule: Module = module {
-    includes(billingModule)
-    viewModel { OnboardingViewModel(get(), get()) }
-    viewModel { MemorySelectionViewModel(get(), get()) }
-    viewModel { PersonalIntroViewModel(get()) }
-}
+actual val onboardingFeatureModule: Module =
+    module {
+        includes(billingModule)
+        viewModel { OnboardingViewModel(get(), get()) }
+        viewModel { MemorySelectionViewModel(get(), get()) }
+        viewModel { PersonalIntroViewModel(get()) }
+    }

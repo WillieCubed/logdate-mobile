@@ -14,11 +14,19 @@ internal actual fun formatByteSize(bytes: Long): String {
         unitIndex++
     }
 
-    val fractionDigits = if (unitIndex == 0) 0 else if (size < 10) 1 else 0
-    val formatter = NumberFormat.getNumberInstance(Locale.getDefault()).apply {
-        minimumFractionDigits = fractionDigits
-        maximumFractionDigits = fractionDigits
-    }
+    val fractionDigits =
+        if (unitIndex == 0) {
+            0
+        } else if (size < 10) {
+            1
+        } else {
+            0
+        }
+    val formatter =
+        NumberFormat.getNumberInstance(Locale.getDefault()).apply {
+            minimumFractionDigits = fractionDigits
+            maximumFractionDigits = fractionDigits
+        }
     val formatted = formatter.format(size)
     val sign = if (bytes < 0) "-" else ""
     return "$sign$formatted ${units[unitIndex]}"

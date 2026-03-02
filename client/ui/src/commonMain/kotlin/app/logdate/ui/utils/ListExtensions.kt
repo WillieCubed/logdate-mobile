@@ -1,8 +1,8 @@
 package app.logdate.ui.utils
 
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyRow
 
 /**
  * Scrolls the list to the last visible item with an animation.

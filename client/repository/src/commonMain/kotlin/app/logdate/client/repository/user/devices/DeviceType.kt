@@ -26,5 +26,5 @@ enum class DeviceType {
     /**
      * Unknown device type.
      */
-    OTHER
+    OTHER,
 }

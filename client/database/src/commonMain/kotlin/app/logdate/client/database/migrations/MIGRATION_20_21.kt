@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:filename")
+
 package app.logdate.client.database.migrations
 
 import androidx.room.migration.Migration
@@ -11,30 +13,31 @@ import androidx.sqlite.execSQL
  * - sync_cursors: Stores last sync timestamp per entity type
  * - pending_uploads: Outbox for entities waiting to be uploaded
  */
-val MIGRATION_20_21 = object : Migration(20, 21) {
-    override fun migrate(connection: SQLiteConnection) {
-        // Create sync_cursors table
-        connection.execSQL(
-            """
-            CREATE TABLE IF NOT EXISTS sync_cursors (
-                entityType TEXT NOT NULL PRIMARY KEY,
-                lastSyncTimestamp INTEGER NOT NULL
+val MIGRATION_20_21 =
+    object : Migration(20, 21) {
+        override fun migrate(connection: SQLiteConnection) {
+            // Create sync_cursors table
+            connection.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS sync_cursors (
+                    entityType TEXT NOT NULL PRIMARY KEY,
+                    lastSyncTimestamp INTEGER NOT NULL
+                )
+                """.trimIndent(),
             )
-            """.trimIndent()
-        )
 
-        // Create pending_uploads table
-        connection.execSQL(
-            """
-            CREATE TABLE IF NOT EXISTS pending_uploads (
-                entityType TEXT NOT NULL,
-                entityId TEXT NOT NULL,
-                operation TEXT NOT NULL,
-                createdAt INTEGER NOT NULL,
-                retryCount INTEGER NOT NULL,
-                PRIMARY KEY (entityType, entityId)
+            // Create pending_uploads table
+            connection.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS pending_uploads (
+                    entityType TEXT NOT NULL,
+                    entityId TEXT NOT NULL,
+                    operation TEXT NOT NULL,
+                    createdAt INTEGER NOT NULL,
+                    retryCount INTEGER NOT NULL,
+                    PRIMARY KEY (entityType, entityId)
+                )
+                """.trimIndent(),
             )
-            """.trimIndent()
-        )
+        }
     }
-}

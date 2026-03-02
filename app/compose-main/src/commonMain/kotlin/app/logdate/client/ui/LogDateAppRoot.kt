@@ -21,7 +21,7 @@ import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.audio.AudioPlaybackProvider
 import app.logdate.ui.theme.LogDateTheme
 
-
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun LogDateAppRoot(
     appUiState: GlobalAppUiLoadedState,

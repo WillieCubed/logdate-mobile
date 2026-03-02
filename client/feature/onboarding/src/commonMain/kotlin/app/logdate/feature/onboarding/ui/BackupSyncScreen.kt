@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports", "ktlint:standard:max-line-length")
+
 package app.logdate.feature.onboarding.ui
 
 import androidx.compose.foundation.layout.Arrangement
@@ -19,15 +21,16 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.client.billing.model.LogDateBackupPlanOption
 import app.logdate.ui.AdaptiveLayout
 import app.logdate.ui.theme.Spacing
+import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import logdate.client.feature.onboarding.generated.resources.section_title_backup_sync
 import org.jetbrains.compose.resources.stringResource
-import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
-import logdate.client.feature.onboarding.generated.resources.*
+
 @Composable
 fun BackupSyncScreen(
     onBack: () -> Unit,
@@ -61,13 +64,14 @@ private fun BackupSyncScreenContent(
                             IconButton(onClick = onBack) {
                                 Icon(
                                     Icons.AutoMirrored.Default.ArrowBack,
-                                    contentDescription = stringResource(Res.string.back)
+                                    contentDescription = stringResource(Res.string.back),
                                 )
                             }
                         },
-                        colors = TopAppBarDefaults.topAppBarColors().copy(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        ),
+                        colors =
+                            TopAppBarDefaults.topAppBarColors().copy(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            ),
                     )
                 },
                 containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -77,7 +81,11 @@ private fun BackupSyncScreenContent(
                         .padding(contentPadding)
                         .padding(Spacing.lg),
                 ) {
-                    Text(stringResource(Res.string.all_your_memories_are_stored_securely_on_your_device_by_default_sign_up_for_a_logdate_account_so_you_never_lose_your_memories))
+                    Text(
+                        stringResource(
+                            Res.string.all_your_memories_are_stored_securely_on_your_device_by_default_sign_up_for_a_logdate_account_so_you_never_lose_your_memories,
+                        ),
+                    )
                 }
             }
         },
@@ -92,22 +100,22 @@ private fun BackupSyncScreenContent(
                                 IconButton(onClick = onBack) {
                                     Icon(
                                         Icons.AutoMirrored.Default.ArrowBack,
-                                        contentDescription = stringResource(Res.string.back)
+                                        contentDescription = stringResource(Res.string.back),
                                     )
                                 }
                             },
                             scrollBehavior = scrollBehavior,
                         )
-
                     },
                 ) { contentPadding ->
                     MainContent(
                         onPlanSelected = onPlanSelected,
-                        modifier = Modifier
-                            .padding(contentPadding)
-                            .nestedScroll(
-                                scrollBehavior.nestedScrollConnection
-                            ),
+                        modifier =
+                            Modifier
+                                .padding(contentPadding)
+                                .nestedScroll(
+                                    scrollBehavior.nestedScrollConnection,
+                                ),
                     )
                 }
             } else {
@@ -143,7 +151,8 @@ private fun MainContent(
             PlanContentCard(
                 option = LogDateBackupPlanOption.STANDARD,
                 title = "Premium Plan",
-                description = "Includes up to 2 TB of storage for text, photo, video, and voice notes.\n" +
+                description =
+                    "Includes up to 2 TB of storage for text, photo, video, and voice notes.\n" +
                         "Photos and videos will be stored in original quality.",
                 price = "$12/month",
                 onPlanSelected = onPlanSelected,

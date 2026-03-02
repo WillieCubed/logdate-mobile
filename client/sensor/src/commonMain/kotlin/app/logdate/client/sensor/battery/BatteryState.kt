@@ -10,5 +10,5 @@ package app.logdate.client.sensor.battery
 data class BatteryState(
     val level: Int,
     val isCharging: Boolean,
-    val isPowerSaveMode: Boolean
+    val isPowerSaveMode: Boolean,
 )

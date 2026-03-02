@@ -14,6 +14,7 @@ internal fun ByteArray.hasClientMediaPrefix(): Boolean {
 
 interface MediaPayloadCrypto {
     suspend fun encrypt(data: ByteArray): ByteArray
+
     suspend fun decrypt(data: ByteArray): ByteArray
 }
 
@@ -23,7 +24,10 @@ object NoOpMediaPayloadCrypto : MediaPayloadCrypto {
     override suspend fun decrypt(data: ByteArray): ByteArray = data
 }
 
-expect class AesGcmMediaPayloadCrypto(key: ByteArray) : MediaPayloadCrypto {
+expect class AesGcmMediaPayloadCrypto(
+    key: ByteArray,
+) : MediaPayloadCrypto {
     override suspend fun encrypt(data: ByteArray): ByteArray
+
     override suspend fun decrypt(data: ByteArray): ByteArray
 }

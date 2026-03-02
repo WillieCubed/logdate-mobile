@@ -12,27 +12,29 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-
 class JournalCreationViewModel(
     private val journalRepository: JournalRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-
     val routeData = savedStateHandle.toRoute<JournalCreationRoute>()
 
-    private val backingUiSate = MutableStateFlow(JournalCreationUiState(
-        title = routeData.journalTitle
-    ))
+    private val backingUiSate =
+        MutableStateFlow(
+            JournalCreationUiState(
+                title = routeData.journalTitle,
+            ),
+        )
     val uiState: StateFlow<JournalCreationUiState> = backingUiSate
 
     fun createJournal(data: NewJournalRequest) {
         viewModelScope.launch {
-            val id = journalRepository.create(
-                Journal(
-                    title = data.title,
-                    description = data.contentDescription,
+            val id =
+                journalRepository.create(
+                    Journal(
+                        title = data.title,
+                        description = data.contentDescription,
+                    ),
                 )
-            )
             backingUiSate.update { currentState ->
                 currentState.copy(created = true, journalId = id)
             }

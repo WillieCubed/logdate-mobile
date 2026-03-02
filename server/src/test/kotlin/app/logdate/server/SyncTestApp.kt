@@ -22,7 +22,7 @@ import kotlin.uuid.Uuid
 data class SyncTestEnvironment(
     val tokenService: JwtTokenService,
     val repository: InMemorySyncRepository,
-    val metrics: SyncMetricsRegistry
+    val metrics: SyncMetricsRegistry,
 )
 
 @OptIn(ExperimentalUuidApi::class)
@@ -32,16 +32,18 @@ fun TestApplicationBuilder.configureSyncTestApp(
     metrics: SyncMetricsRegistry = SyncMetricsRegistry(),
     mediaStorage: GcsMediaStorage? = null,
     mediaAccessPolicy: MediaAccessPolicy = MediaAccessPolicy(useSignedUrls = false, signedUrlTtlHours = 1),
-    mediaEncryption: MediaEncryptionService = MediaEncryptionService.fromEnvironment()
+    mediaEncryption: MediaEncryptionService = MediaEncryptionService.fromEnvironment(),
 ): SyncTestEnvironment {
-    val json = Json {
-        prettyPrint = true
-        isLenient = true
-        ignoreUnknownKeys = true
-        serializersModule = SerializersModule {
-            contextual(Uuid::class, UuidSerializer)
+    val json =
+        Json {
+            prettyPrint = true
+            isLenient = true
+            ignoreUnknownKeys = true
+            serializersModule =
+                SerializersModule {
+                    contextual(Uuid::class, UuidSerializer)
+                }
         }
-    }
 
     application {
         install(ContentNegotiation) {
@@ -55,7 +57,7 @@ fun TestApplicationBuilder.configureSyncTestApp(
                     mediaStorage = mediaStorage,
                     metrics = metrics,
                     mediaAccessPolicy = mediaAccessPolicy,
-                    mediaEncryption = mediaEncryption
+                    mediaEncryption = mediaEncryption,
                 )
             }
         }

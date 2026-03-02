@@ -9,14 +9,19 @@ import kotlin.coroutines.CoroutineContext
 /**
  * iOS-specific health module that provides platform implementations
  */
-val iosHealthModule = module {
-    // iOS-specific remote data source
-    single<RemoteHealthDataSource> {
-        IosHealthKitDataSource()
+val iosHealthModule =
+    module {
+        // iOS-specific remote data source
+        single<RemoteHealthDataSource> {
+            IosHealthKitDataSource()
+        }
+
+        // iOS-specific IO dispatcher
+        single<CoroutineContext>(
+            qualifier =
+                org.koin.core.qualifier
+                    .named("io-dispatcher"),
+        ) {
+            Dispatchers.Default
+        }
     }
-    
-    // iOS-specific IO dispatcher
-    single<CoroutineContext>(qualifier = org.koin.core.qualifier.named("io-dispatcher")) {
-        Dispatchers.Default
-    }
-}

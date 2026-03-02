@@ -15,22 +15,24 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 class AndroidSecureStorage(
-    context: Context
+    context: Context,
 ) : SecureStorage {
-
     private val keyAlias = "logdate_secure_storage_master_key"
-    private val masterKey = MasterKey.Builder(context)
-        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-        .build()
+    private val masterKey =
+        MasterKey
+            .Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
 
     @Suppress("DEPRECATION")
-    private val prefs = EncryptedSharedPreferences.create(
-        context,
-        "logdate_secure_storage",
-        masterKey,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
+    private val prefs =
+        EncryptedSharedPreferences.create(
+            context,
+            "logdate_secure_storage",
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+        )
 
     private val valueCache = mutableMapOf<String, String>()
     private val valueCacheFlow = MutableStateFlow<Map<String, String>>(emptyMap())
@@ -53,7 +55,10 @@ class AndroidSecureStorage(
         return value
     }
 
-    override suspend fun putString(key: String, value: String) {
+    override suspend fun putString(
+        key: String,
+        value: String,
+    ) {
         prefs.edit().putString(key, value).apply()
         valueCache[key] = value
         valueCacheFlow.value = valueCache.toMap()
@@ -71,16 +76,12 @@ class AndroidSecureStorage(
         valueCacheFlow.value = emptyMap()
     }
 
-    override fun observeString(key: String): Flow<String?> {
-        return valueCacheFlow.map { cache -> cache[key] }
-    }
+    override fun observeString(key: String): Flow<String?> = valueCacheFlow.map { cache -> cache[key] }
 
-    override fun observeAll(): Flow<Map<String, String>> {
-        return valueCacheFlow
-    }
+    override fun observeAll(): Flow<Map<String, String>> = valueCacheFlow
 
-    override suspend fun encrypt(data: ByteArray): ByteArray {
-        return runCatching {
+    override suspend fun encrypt(data: ByteArray): ByteArray =
+        runCatching {
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.ENCRYPT_MODE, secretKey())
             val iv = cipher.iv
@@ -90,7 +91,6 @@ class AndroidSecureStorage(
             Napier.e("Failed to encrypt payload", error)
             data
         }
-    }
 
     override suspend fun decrypt(data: ByteArray): ByteArray? {
         return runCatching {

@@ -6,7 +6,8 @@ import org.koin.dsl.module
 /**
  * Android-specific datastore module implementation
  */
-actual val datastoreModule: Module = module {
-    // Include common datastore module components
-    includes(commonDatastoreModule)
-}
+actual val datastoreModule: Module =
+    module {
+        // Include common datastore module components
+        includes(commonDatastoreModule)
+    }

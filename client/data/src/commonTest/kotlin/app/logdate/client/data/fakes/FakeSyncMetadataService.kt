@@ -13,15 +13,14 @@ class FakeSyncMetadataService : SyncMetadataService {
     private val syncTimes = mutableMapOf<EntityType, Instant>()
     private val _pendingCount = MutableStateFlow(0)
 
-    override suspend fun getPendingUploads(entityType: EntityType): List<PendingUpload> {
-        return pendingUploads[entityType]?.values?.toList() ?: emptyList()
-    }
+    override suspend fun getPendingUploads(entityType: EntityType): List<PendingUpload> =
+        pendingUploads[entityType]?.values?.toList() ?: emptyList()
 
     override suspend fun markAsSynced(
         entityId: String,
         entityType: EntityType,
         syncedAt: Instant,
-        version: Long
+        version: Long,
     ) {
         pendingUploads[entityType]?.remove(entityId)
         updatePendingCount()
@@ -29,14 +28,17 @@ class FakeSyncMetadataService : SyncMetadataService {
 
     override suspend fun getLastSyncTime(entityType: EntityType): Instant? = syncTimes[entityType]
 
-    override suspend fun updateLastSyncTime(entityType: EntityType, syncedAt: Instant) {
+    override suspend fun updateLastSyncTime(
+        entityType: EntityType,
+        syncedAt: Instant,
+    ) {
         updateSyncTime(entityType, syncedAt)
     }
 
     override suspend fun enqueuePending(
         entityId: String,
         entityType: EntityType,
-        operation: PendingOperation
+        operation: PendingOperation,
     ) {
         val existing = pendingUploads[entityType]?.get(entityId)
         val resolved = resolveOperation(existing?.operation, operation)
@@ -50,7 +52,10 @@ class FakeSyncMetadataService : SyncMetadataService {
         updatePendingCount()
     }
 
-    override suspend fun resetSyncStatus(entityId: String, entityType: EntityType) {
+    override suspend fun resetSyncStatus(
+        entityId: String,
+        entityType: EntityType,
+    ) {
         pendingUploads.getOrPut(entityType) { mutableMapOf() }[entityId] =
             PendingUpload(entityId, PendingOperation.UPDATE, retryCount = 0)
         updatePendingCount()
@@ -60,7 +65,10 @@ class FakeSyncMetadataService : SyncMetadataService {
 
     override fun observePendingCount(): Flow<Int> = _pendingCount
 
-    override suspend fun incrementRetryCount(entityId: String, entityType: EntityType) {
+    override suspend fun incrementRetryCount(
+        entityId: String,
+        entityType: EntityType,
+    ) {
         val existing = pendingUploads[entityType]?.get(entityId) ?: return
         pendingUploads.getOrPut(entityType) { mutableMapOf() }[entityId] =
             existing.copy(retryCount = existing.retryCount + 1)
@@ -70,7 +78,10 @@ class FakeSyncMetadataService : SyncMetadataService {
         _pendingCount.value = pendingUploads.values.sumOf { it.size }
     }
 
-    private fun updateSyncTime(entityType: EntityType, syncedAt: Instant) {
+    private fun updateSyncTime(
+        entityType: EntityType,
+        syncedAt: Instant,
+    ) {
         val current = syncTimes[entityType]
         if (current == null || syncedAt >= current) {
             syncTimes[entityType] = syncedAt
@@ -79,25 +90,28 @@ class FakeSyncMetadataService : SyncMetadataService {
 
     private fun resolveOperation(
         existing: PendingOperation?,
-        incoming: PendingOperation
+        incoming: PendingOperation,
     ): PendingOperation? {
         if (existing == null) return incoming
         return when (existing) {
-            PendingOperation.CREATE -> when (incoming) {
-                PendingOperation.UPDATE -> PendingOperation.CREATE
-                PendingOperation.DELETE -> null
-                PendingOperation.CREATE -> PendingOperation.CREATE
-            }
-            PendingOperation.UPDATE -> when (incoming) {
-                PendingOperation.DELETE -> PendingOperation.DELETE
-                PendingOperation.CREATE -> PendingOperation.CREATE
-                PendingOperation.UPDATE -> PendingOperation.UPDATE
-            }
-            PendingOperation.DELETE -> when (incoming) {
-                PendingOperation.CREATE -> PendingOperation.CREATE
-                PendingOperation.UPDATE -> PendingOperation.CREATE
-                PendingOperation.DELETE -> PendingOperation.DELETE
-            }
+            PendingOperation.CREATE ->
+                when (incoming) {
+                    PendingOperation.UPDATE -> PendingOperation.CREATE
+                    PendingOperation.DELETE -> null
+                    PendingOperation.CREATE -> PendingOperation.CREATE
+                }
+            PendingOperation.UPDATE ->
+                when (incoming) {
+                    PendingOperation.DELETE -> PendingOperation.DELETE
+                    PendingOperation.CREATE -> PendingOperation.CREATE
+                    PendingOperation.UPDATE -> PendingOperation.UPDATE
+                }
+            PendingOperation.DELETE ->
+                when (incoming) {
+                    PendingOperation.CREATE -> PendingOperation.CREATE
+                    PendingOperation.UPDATE -> PendingOperation.CREATE
+                    PendingOperation.DELETE -> PendingOperation.DELETE
+                }
         }
     }
 }

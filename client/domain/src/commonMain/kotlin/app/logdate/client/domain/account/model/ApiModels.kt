@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class CheckUsernameAvailabilityRequest(
-    val username: String
+    val username: String,
 )
 
 /**
@@ -17,7 +17,7 @@ data class CheckUsernameAvailabilityRequest(
 @Serializable
 data class CheckUsernameAvailabilityResponse(
     val username: String,
-    val available: Boolean
+    val available: Boolean,
 )
 
 /**
@@ -28,7 +28,7 @@ data class BeginAccountCreationRequest(
     val username: String,
     val displayName: String,
     val bio: String? = null,
-    val deviceInfo: DeviceInfoDto? = null
+    val deviceInfo: DeviceInfoDto? = null,
 )
 
 /**
@@ -38,7 +38,7 @@ data class BeginAccountCreationRequest(
 data class DeviceInfoDto(
     val platform: String,
     val deviceName: String? = null,
-    val deviceType: String = "MOBILE"
+    val deviceType: String = "MOBILE",
 )
 
 /**
@@ -47,7 +47,7 @@ data class DeviceInfoDto(
 @Serializable
 data class BeginAccountCreationResponse(
     val sessionToken: String,
-    val registrationOptions: RegistrationOptionsDto
+    val registrationOptions: RegistrationOptionsDto,
 )
 
 /**
@@ -61,7 +61,7 @@ data class RegistrationOptionsDto(
     val pubKeyCredParams: List<PublicKeyCredentialParametersDto>,
     val timeout: Long,
     val authenticatorSelection: AuthenticatorSelectionDto,
-    val attestation: String
+    val attestation: String,
 )
 
 /**
@@ -70,7 +70,7 @@ data class RegistrationOptionsDto(
 @Serializable
 data class RelyingPartyDto(
     val id: String,
-    val name: String
+    val name: String,
 )
 
 /**
@@ -80,7 +80,7 @@ data class RelyingPartyDto(
 data class PasskeyUserDto(
     val id: String,
     val name: String,
-    val displayName: String
+    val displayName: String,
 )
 
 /**
@@ -89,7 +89,7 @@ data class PasskeyUserDto(
 @Serializable
 data class PublicKeyCredentialParametersDto(
     val type: String,
-    val alg: Int
+    val alg: Int,
 )
 
 /**
@@ -100,7 +100,7 @@ data class AuthenticatorSelectionDto(
     val authenticatorAttachment: String?,
     val requireResidentKey: Boolean,
     val residentKey: String,
-    val userVerification: String
+    val userVerification: String,
 )
 
 /**
@@ -109,7 +109,7 @@ data class AuthenticatorSelectionDto(
 @Serializable
 data class CompleteAccountCreationRequest(
     val sessionToken: String,
-    val credential: PublicKeyCredentialDto
+    val credential: PublicKeyCredentialDto,
 )
 
 /**
@@ -120,7 +120,7 @@ data class PublicKeyCredentialDto(
     val id: String,
     val rawId: String,
     val response: AuthenticatorResponseDto,
-    val type: String
+    val type: String,
 )
 
 /**
@@ -129,7 +129,7 @@ data class PublicKeyCredentialDto(
 @Serializable
 data class AuthenticatorResponseDto(
     val clientDataJSON: String,
-    val attestationObject: String
+    val attestationObject: String,
 )
 
 /**
@@ -138,7 +138,7 @@ data class AuthenticatorResponseDto(
 @Serializable
 data class CompleteAccountCreationResponse(
     val success: Boolean,
-    val data: AccountCreationDataDto
+    val data: AccountCreationDataDto,
 )
 
 /**
@@ -149,7 +149,7 @@ data class AccountCreationDataDto(
     val account: AccountDto,
     val tokens: TokensDto,
     val passkey: PasskeyDto,
-    val syncData: SyncDataDto
+    val syncData: SyncDataDto,
 )
 
 /**
@@ -163,7 +163,7 @@ data class AccountDto(
     val bio: String? = null,
     val passkeyCredentialIds: List<String>,
     val createdAt: String,
-    val updatedAt: String
+    val updatedAt: String,
 )
 
 /**
@@ -174,7 +174,7 @@ data class TokensDto(
     val accessToken: String,
     val refreshToken: String,
     @SerialName("expiresIn")
-    val expiresInSeconds: Long
+    val expiresInSeconds: Long,
 )
 
 /**
@@ -184,7 +184,7 @@ data class TokensDto(
 data class PasskeyDto(
     val credentialId: String,
     val nickname: String,
-    val createdAt: String
+    val createdAt: String,
 )
 
 /**
@@ -193,5 +193,5 @@ data class PasskeyDto(
 @Serializable
 data class SyncDataDto(
     val serverEndpoint: String,
-    val initialSyncRequired: Boolean
+    val initialSyncRequired: Boolean,
 )

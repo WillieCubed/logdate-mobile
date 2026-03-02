@@ -3,11 +3,10 @@ package app.logdate.client.domain.notes
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import kotlinx.coroutines.flow.Flow
-import kotlin.time.Clock
-import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 
@@ -21,10 +20,12 @@ class FetchTodayNotesUseCase(
     private val repository: JournalNotesRepository,
 ) {
     operator fun invoke(buffer: Duration = 4.hours): Flow<List<JournalNote>> {
-        val start = Clock.System.now()
-            .toLocalDateTime(TimeZone.currentSystemDefault())
-            .date
-            .atStartOfDayIn(TimeZone.currentSystemDefault())
+        val start =
+            Clock.System
+                .now()
+                .toLocalDateTime(TimeZone.currentSystemDefault())
+                .date
+                .atStartOfDayIn(TimeZone.currentSystemDefault())
         val end = start + 24.hours
         val startWithBuffer = start - buffer
         val startInstant = startWithBuffer

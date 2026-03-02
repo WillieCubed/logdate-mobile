@@ -3,14 +3,14 @@ package app.logdate.client.database
 import android.content.Context
 import android.util.Log
 import app.logdate.client.database.encryption.DatabasePassphraseProvider
-import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 sealed interface DatabaseStartupState {
     data object Ready : DatabaseStartupState
@@ -44,35 +44,37 @@ class DatabaseRecoveryController(
     private val passphraseProvider: DatabasePassphraseProvider,
     private val startupMonitor: DatabaseStartupMonitor,
 ) {
-    suspend fun quarantineAndResetEncryptedStorage(): Result<File> = withContext(Dispatchers.IO) {
-        runCatching {
-            val appContext = context.applicationContext
-            val dbFile = appContext.getDatabasePath(DATABASE_NAME)
-            val backupBase = File(
-                dbFile.parentFile,
-                "$DATABASE_NAME.recovery-backup-${System.currentTimeMillis()}",
-            )
+    suspend fun quarantineAndResetEncryptedStorage(): Result<File> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val appContext = context.applicationContext
+                val dbFile = appContext.getDatabasePath(DATABASE_NAME)
+                val backupBase =
+                    File(
+                        dbFile.parentFile,
+                        "$DATABASE_NAME.recovery-backup-${System.currentTimeMillis()}",
+                    )
 
-            Log.w(
-                DB_RECOVERY_TAG,
-                "Reset requested. Quarantining current encrypted DB before clearing key.",
-            )
-            moveIfExists(dbFile, backupBase)
-            moveIfExists(File("${dbFile.absolutePath}-wal"), File("${backupBase.absolutePath}-wal"))
-            moveIfExists(File("${dbFile.absolutePath}-shm"), File("${backupBase.absolutePath}-shm"))
-            moveIfExists(File("${dbFile.absolutePath}-journal"), File("${backupBase.absolutePath}-journal"))
+                Log.w(
+                    DB_RECOVERY_TAG,
+                    "Reset requested. Quarantining current encrypted DB before clearing key.",
+                )
+                moveIfExists(dbFile, backupBase)
+                moveIfExists(File("${dbFile.absolutePath}-wal"), File("${backupBase.absolutePath}-wal"))
+                moveIfExists(File("${dbFile.absolutePath}-shm"), File("${backupBase.absolutePath}-shm"))
+                moveIfExists(File("${dbFile.absolutePath}-journal"), File("${backupBase.absolutePath}-journal"))
 
-            passphraseProvider.clearPassphrase()
-            startupMonitor.markReady()
+                passphraseProvider.clearPassphrase()
+                startupMonitor.markReady()
 
-            Log.w(
-                DB_RECOVERY_TAG,
-                "Encrypted DB/key reset complete. Backup preserved at ${backupBase.absolutePath}",
-            )
+                Log.w(
+                    DB_RECOVERY_TAG,
+                    "Encrypted DB/key reset complete. Backup preserved at ${backupBase.absolutePath}",
+                )
 
-            backupBase
+                backupBase
+            }
         }
-    }
 }
 
 private fun classifyRecoveryReason(message: String): String {
@@ -94,14 +96,20 @@ private fun Throwable.rootCause(): Throwable {
     return current
 }
 
-private fun moveIfExists(source: File, target: File) {
+private fun moveIfExists(
+    source: File,
+    target: File,
+) {
     if (!source.exists()) {
         return
     }
     moveReplacing(source, target)
 }
 
-private fun moveReplacing(source: File, target: File) {
+private fun moveReplacing(
+    source: File,
+    target: File,
+) {
     target.parentFile?.mkdirs()
     Files.move(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
 }

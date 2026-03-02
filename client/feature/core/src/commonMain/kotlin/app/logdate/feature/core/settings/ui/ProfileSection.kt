@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.core.settings.ui
 
 import androidx.compose.foundation.clickable
@@ -32,18 +34,18 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.theme.Spacing
-import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.core.generated.resources.*
 import logdate.client.feature.core.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+
 data class UserProfile(
     val name: String,
     val username: String, // @handle without the @
     val isEditable: Boolean = true,
-    val isAuthenticated: Boolean = false
+    val isAuthenticated: Boolean = false,
 )
 
 @Composable
@@ -53,104 +55,107 @@ fun ProfileSection(
     modifier: Modifier = Modifier,
     isPreview: Boolean = false,
     onNavigateToAccount: (() -> Unit)? = null,
-    onNavigateToProfile: (() -> Unit)? = null
+    onNavigateToProfile: (() -> Unit)? = null,
 ) {
     var showEditDialog by remember { mutableStateOf(false) }
-    
+
     MaterialContainer(modifier = modifier) {
         // Header
         UnsurfacedItem(
-            modifier = Modifier.padding(Spacing.lg)
+            modifier = Modifier.padding(Spacing.lg),
         ) {
             Column(
-                verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
                 Text(
                     text = stringResource(Res.string.profile),
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
                     text = stringResource(Res.string.manage_your_display_name_and_username),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }
 
         // Profile Info Display
         val navigateAction = onNavigateToProfile ?: onNavigateToAccount
-        val itemModifier = if (isPreview && navigateAction != null) {
-            Modifier.clickable { navigateAction() }
-        } else {
-            Modifier
-        }
-        
+        val itemModifier =
+            if (isPreview && navigateAction != null) {
+                Modifier.clickable { navigateAction() }
+            } else {
+                Modifier
+            }
+
         SurfaceItem(
             color = MaterialTheme.colorScheme.surfaceVariant,
-            modifier = itemModifier
+            modifier = itemModifier,
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
                     modifier = Modifier.weight(1f),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
                         imageVector = Icons.Default.Person,
                         contentDescription = null,
                         modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Column(
-                        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+                        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
                     ) {
                         Text(
                             text = profile.name.ifEmpty { "No display name set" },
                             style = MaterialTheme.typography.titleMedium,
-                            color = if (profile.name.isNotEmpty()) {
-                                MaterialTheme.colorScheme.onSurface
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
+                            color =
+                                if (profile.name.isNotEmpty()) {
+                                    MaterialTheme.colorScheme.onSurface
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
                         )
                         Text(
                             text = if (profile.username.isNotEmpty()) "@${profile.username}" else "No username set",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = if (profile.username.isNotEmpty()) {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                            }
+                            color =
+                                if (profile.username.isNotEmpty()) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                },
                         )
                     }
                 }
-                
+
                 if (isPreview && navigateAction != null) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                         contentDescription = stringResource(Res.string.go_to_account_settings),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else if (profile.isEditable) {
                     IconButton(
-                        onClick = { showEditDialog = true }
+                        onClick = { showEditDialog = true },
                     ) {
                         Icon(
                             imageVector = Icons.Default.Edit,
                             contentDescription = stringResource(Res.string.edit_profile),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
             }
         }
     }
-    
+
     if (showEditDialog && !isPreview) {
         EditProfileDialog(
             currentDisplayName = profile.name,
@@ -159,7 +164,7 @@ fun ProfileSection(
             onSave = { displayName, username ->
                 onUpdateProfile(displayName, username)
                 showEditDialog = false
-            }
+            },
         )
     }
 }
@@ -169,26 +174,25 @@ private fun EditProfileDialog(
     currentDisplayName: String,
     currentUsername: String,
     onDismiss: () -> Unit,
-    onSave: (displayName: String, username: String) -> Unit
+    onSave: (displayName: String, username: String) -> Unit,
 ) {
     var displayName by remember { mutableStateOf(currentDisplayName) }
     var username by remember { mutableStateOf(currentUsername) }
     var displayNameError by remember { mutableStateOf<String?>(null) }
     var usernameError by remember { mutableStateOf<String?>(null) }
-    
+
     val keyboardController = LocalSoftwareKeyboardController.current
-    
+
     // Validation functions
-    fun validateDisplayName(name: String): String? {
-        return when {
+    fun validateDisplayName(name: String): String? =
+        when {
             name.isBlank() -> "Display name cannot be empty"
             name.length > 50 -> "Display name must be 50 characters or less"
             else -> null
         }
-    }
-    
-    fun validateUsername(handle: String): String? {
-        return when {
+
+    fun validateUsername(handle: String): String? =
+        when {
             handle.isBlank() -> "Username cannot be empty"
             handle.length < 3 -> "Username must be at least 3 characters"
             handle.length > 30 -> "Username must be 30 characters or less"
@@ -196,8 +200,7 @@ private fun EditProfileDialog(
             handle.startsWith("_") || handle.endsWith("_") -> "Username cannot start or end with underscore"
             else -> null
         }
-    }
-    
+
     fun isValid(): Boolean {
         val nameError = validateDisplayName(displayName)
         val handleError = validateUsername(username)
@@ -205,7 +208,7 @@ private fun EditProfileDialog(
         usernameError = handleError
         return nameError == null && handleError == null
     }
-    
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -213,11 +216,11 @@ private fun EditProfileDialog(
         },
         text = {
             Column(
-                verticalArrangement = Arrangement.spacedBy(Spacing.md)
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
                 OutlinedTextField(
                     value = displayName,
-                    onValueChange = { 
+                    onValueChange = {
                         displayName = it
                         displayNameError = null
                     },
@@ -225,17 +228,18 @@ private fun EditProfileDialog(
                     placeholder = { Text(stringResource(Res.string.your_full_name)) },
                     supportingText = displayNameError?.let { { Text(it) } },
                     isError = displayNameError != null,
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.Words,
-                        imeAction = ImeAction.Next
-                    ),
+                    keyboardOptions =
+                        KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Words,
+                            imeAction = ImeAction.Next,
+                        ),
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                
+
                 OutlinedTextField(
                     value = username,
-                    onValueChange = { 
+                    onValueChange = {
                         // Remove @ if user types it
                         val cleanUsername = it.removePrefix("@")
                         username = cleanUsername
@@ -243,29 +247,32 @@ private fun EditProfileDialog(
                     },
                     label = { Text(stringResource(Res.string.username)) },
                     placeholder = { Text(stringResource(Res.string.username_2)) },
-                    supportingText = usernameError?.let { { Text(it) } } ?: {
-                        Text(
-                            stringResource(
-                                Res.string.profile_username_hint,
-                                username.ifEmpty { "username" }
+                    supportingText =
+                        usernameError?.let { { Text(it) } } ?: {
+                            Text(
+                                stringResource(
+                                    Res.string.profile_username_hint,
+                                    username.ifEmpty { "username" },
+                                ),
                             )
-                        )
-                    },
+                        },
                     isError = usernameError != null,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Ascii,
-                        imeAction = ImeAction.Done
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = {
-                            keyboardController?.hide()
-                            if (isValid()) {
-                                onSave(displayName, username)
-                            }
-                        }
-                    ),
+                    keyboardOptions =
+                        KeyboardOptions(
+                            keyboardType = KeyboardType.Ascii,
+                            imeAction = ImeAction.Done,
+                        ),
+                    keyboardActions =
+                        KeyboardActions(
+                            onDone = {
+                                keyboardController?.hide()
+                                if (isValid()) {
+                                    onSave(displayName, username)
+                                }
+                            },
+                        ),
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         },
@@ -275,7 +282,7 @@ private fun EditProfileDialog(
                     if (isValid()) {
                         onSave(displayName, username)
                     }
-                }
+                },
             ) {
                 Text(stringResource(Res.string.save))
             }
@@ -284,7 +291,7 @@ private fun EditProfileDialog(
             TextButton(onClick = onDismiss) {
                 Text(stringResource(Res.string.cancel))
             }
-        }
+        },
     )
 }
 
@@ -292,12 +299,13 @@ private fun EditProfileDialog(
 @Composable
 private fun ProfileSectionPreview() {
     ProfileSection(
-        profile = UserProfile(
-            name = "John Doe",
-            username = "johndoe",
-            isAuthenticated = true
-        ),
-        onUpdateProfile = { _, _ -> }
+        profile =
+            UserProfile(
+                name = "John Doe",
+                username = "johndoe",
+                isAuthenticated = true,
+            ),
+        onUpdateProfile = { _, _ -> },
     )
 }
 
@@ -305,12 +313,13 @@ private fun ProfileSectionPreview() {
 @Composable
 private fun ProfileSectionEmptyPreview() {
     ProfileSection(
-        profile = UserProfile(
-            name = "",
-            username = "",
-            isAuthenticated = false
-        ),
-        onUpdateProfile = { _, _ -> }
+        profile =
+            UserProfile(
+                name = "",
+                username = "",
+                isAuthenticated = false,
+            ),
+        onUpdateProfile = { _, _ -> },
     )
 }
 
@@ -318,14 +327,15 @@ private fun ProfileSectionEmptyPreview() {
 @Composable
 private fun ProfileSectionPreviewWithNavigateOption() {
     ProfileSection(
-        profile = UserProfile(
-            name = "John Doe",
-            username = "johndoe",
-            isAuthenticated = true
-        ),
+        profile =
+            UserProfile(
+                name = "John Doe",
+                username = "johndoe",
+                isAuthenticated = true,
+            ),
         onUpdateProfile = { _, _ -> },
         isPreview = true,
-        onNavigateToAccount = {}
+        onNavigateToAccount = {},
     )
 }
 
@@ -336,6 +346,6 @@ private fun EditProfileDialogPreview() {
         currentDisplayName = "John Doe",
         currentUsername = "johndoe",
         onDismiss = {},
-        onSave = { _, _ -> }
+        onSave = { _, _ -> },
     )
 }

@@ -3,11 +3,10 @@ package app.logdate.client.domain.notes
 import app.logdate.client.repository.journals.JournalNotesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlin.time.Clock
-import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 
 /**
@@ -21,15 +20,18 @@ class HasNotesForTodayUseCase(
     private val repository: JournalNotesRepository,
 ) {
     operator fun invoke(): Flow<Boolean> {
-        val start = Clock.System.now()
-            .toLocalDateTime(TimeZone.currentSystemDefault())
-            .date
-            .atStartOfDayIn(TimeZone.currentSystemDefault())
+        val start =
+            Clock.System
+                .now()
+                .toLocalDateTime(TimeZone.currentSystemDefault())
+                .date
+                .atStartOfDayIn(TimeZone.currentSystemDefault())
         val end = start + 24.hours
 
         val startInstant = start
         val endInstant = end
-        return repository.observeNotesInRange(startInstant, endInstant)
+        return repository
+            .observeNotesInRange(startInstant, endInstant)
             .map { notes -> notes.isNotEmpty() }
     }
 }

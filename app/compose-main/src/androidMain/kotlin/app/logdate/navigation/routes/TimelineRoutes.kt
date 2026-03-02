@@ -1,7 +1,5 @@
 package app.logdate.navigation.routes
 
-import app.logdate.navigation.routes.routeEntry
-
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -23,19 +21,19 @@ import app.logdate.navigation.MainAppNavigator
 import app.logdate.navigation.TimelinePaneScreen
 import app.logdate.navigation.routes.core.TimelineDetail
 import app.logdate.navigation.routes.core.TimelineListRoute
+import app.logdate.navigation.routes.routeEntry
 import app.logdate.navigation.scenes.HomeScene
 import kotlinx.datetime.LocalDate
-import org.koin.compose.viewmodel.koinViewModel
-import org.jetbrains.compose.resources.stringResource
-import logdate.app.composemain.generated.resources.*
 import logdate.app.composemain.generated.resources.Res
+import logdate.app.composemain.generated.resources.select_an_entry_to_view_details
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
+
 fun MainAppNavigator.openTimeline() {
     backStack.add(TimelineListRoute)
 }
 
-fun MainAppNavigator.openTimelineDetail(
-    day: LocalDate,
-) {
+fun MainAppNavigator.openTimelineDetail(day: LocalDate) {
     backStack.add(TimelineDetail(day))
 }
 
@@ -49,7 +47,7 @@ fun EntryProviderScope<NavKey>.timelineRoutes(
 ) {
     // The home screen
     routeEntry<TimelineListRoute>(
-        metadata = HomeScene.homeScene()
+        metadata = HomeScene.homeScene(),
     ) { _ ->
         TimelinePaneScreen(
             onNewEntry = openEntryEditor,
@@ -59,7 +57,7 @@ fun EntryProviderScope<NavKey>.timelineRoutes(
             },
             onOpenSettings = onOpenSettings,
             onOpenSearch = onOpenSearch,
-            viewModel = homeViewModel
+            viewModel = homeViewModel,
         )
     }
     routeEntry<TimelineDetail> { route ->
@@ -68,7 +66,7 @@ fun EntryProviderScope<NavKey>.timelineRoutes(
             homeViewModel.selectDay(route.day)
             homeViewModel.fetchNotesForDate(route.day)
         }
-        
+
         TimelineDetailScreen(
             onClose = onCloseTimelineDetail,
             viewModel = homeViewModel,
@@ -76,16 +74,17 @@ fun EntryProviderScope<NavKey>.timelineRoutes(
     }
 }
 
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun TimelineDetailScreen(
     onClose: () -> Unit,
     viewModel: HomeViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    
+
     // Log the current UI state for debugging
     println("TimelineDetailScreen UI state: selectedDay=${uiState.selectedDay}, selectedItem=${uiState.selectedItem}")
-    
+
     // Use a safe fallback if selectedDay is null
     uiState.selectedDay?.let { selectedDay ->
         TimelineDayDetailPanel(
@@ -95,20 +94,23 @@ fun TimelineDetailScreen(
     } ?: TimelineDetailPlaceholder()
 }
 
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun TimelineDetailPlaceholder() {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             text = stringResource(Res.string.select_an_entry_to_view_details),
             style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier
-                .fillMaxSize(),
-            textAlign = TextAlign.Center
+            modifier =
+                Modifier
+                    .fillMaxSize(),
+            textAlign = TextAlign.Center,
         )
     }
 }

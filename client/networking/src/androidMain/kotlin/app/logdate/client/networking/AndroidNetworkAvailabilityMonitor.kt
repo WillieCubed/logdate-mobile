@@ -21,26 +21,27 @@ import kotlin.time.Clock
  */
 class AndroidNetworkAvailabilityMonitor(
     context: Context,
-    private val applicationScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
+    private val applicationScope: CoroutineScope = CoroutineScope(Dispatchers.IO),
 ) : NetworkAvailabilityMonitor {
     private val networkState = MutableSharedFlow<NetworkState>()
     private val connectivityManager = context.getSystemService() as ConnectivityManager?
-    private val connectivityCallback = object : ConnectivityManager.NetworkCallback() {
-        override fun onAvailable(network: Network) {
-            super.onAvailable(network)
-            applicationScope.launch {
-                val newState = NetworkState.Connected(Clock.System.now())
-                networkState.emit(newState)
+    private val connectivityCallback =
+        object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                super.onAvailable(network)
+                applicationScope.launch {
+                    val newState = NetworkState.Connected(Clock.System.now())
+                    networkState.emit(newState)
+                }
             }
-        }
 
-        override fun onUnavailable() {
-            applicationScope.launch {
-                val newState = NetworkState.NotConnected(Clock.System.now())
-                networkState.emit(newState)
+            override fun onUnavailable() {
+                applicationScope.launch {
+                    val newState = NetworkState.NotConnected(Clock.System.now())
+                    networkState.emit(newState)
+                }
             }
         }
-    }
 
     override fun isNetworkAvailable(): Boolean {
         // TODO: Figure out whether this is the right API to be using
@@ -53,11 +54,13 @@ class AndroidNetworkAvailabilityMonitor(
      * @return A [SharedFlow] that is updated whenever
      */
     override fun observeNetwork(): SharedFlow<NetworkState> {
-        val networkRequest = NetworkRequest.Builder()
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-            .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR)
-            .build()
+        val networkRequest =
+            NetworkRequest
+                .Builder()
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR)
+                .build()
         if (connectivityManager == null) {
             Napier.w(tag = "NetworkAvailabilityMonitor", message = "ConnectivityManager is null")
             return networkState
@@ -66,4 +69,3 @@ class AndroidNetworkAvailabilityMonitor(
         return networkState
     }
 }
-

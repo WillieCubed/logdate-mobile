@@ -10,17 +10,18 @@ import kotlin.time.Clock
  * Simple configurable network availability monitor for tests.
  */
 class FakeNetworkAvailabilityMonitor(
-    private var available: Boolean = true
+    private var available: Boolean = true,
 ) : NetworkAvailabilityMonitor {
-    private val networkStateFlow = MutableSharedFlow<NetworkState>(replay = 1).apply {
-        tryEmit(
-            if (available) {
-                NetworkState.Connected(Clock.System.now())
-            } else {
-                NetworkState.NotConnected(Clock.System.now())
-            }
-        )
-    }
+    private val networkStateFlow =
+        MutableSharedFlow<NetworkState>(replay = 1).apply {
+            tryEmit(
+                if (available) {
+                    NetworkState.Connected(Clock.System.now())
+                } else {
+                    NetworkState.NotConnected(Clock.System.now())
+                },
+            )
+        }
 
     override fun isNetworkAvailable(): Boolean = available
 
@@ -33,7 +34,7 @@ class FakeNetworkAvailabilityMonitor(
                 NetworkState.Connected(Clock.System.now())
             } else {
                 NetworkState.NotConnected(Clock.System.now())
-            }
+            },
         )
     }
 }

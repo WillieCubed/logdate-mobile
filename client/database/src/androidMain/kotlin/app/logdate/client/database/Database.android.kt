@@ -6,14 +6,14 @@ import android.util.Log
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import net.zetetic.database.sqlcipher.SQLiteConnection
+import net.zetetic.database.sqlcipher.SQLiteDatabaseHook
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import java.io.File
 import java.io.FileInputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
-import net.zetetic.database.sqlcipher.SQLiteDatabaseHook
-import net.zetetic.database.sqlcipher.SQLiteConnection
 import net.zetetic.database.sqlcipher.SQLiteDatabase as SQLCipherDatabase
-import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 /**
  * Creates a database builder for the LogDate database.
@@ -22,13 +22,17 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
  *
  * @param context The context to use for the database.
  */
-fun getDatabaseBuilder(context: Context, passphrase: ByteArray? = null): RoomDatabase.Builder<LogDateDatabase> {
+fun getDatabaseBuilder(
+    context: Context,
+    passphrase: ByteArray? = null,
+): RoomDatabase.Builder<LogDateDatabase> {
     val appContext = context.applicationContext
     val dbFile = appContext.getDatabasePath(DATABASE_NAME)
-    val builder = Room.databaseBuilder<LogDateDatabase>(
-        context = appContext,
-        name = dbFile.absolutePath,
-    )
+    val builder =
+        Room.databaseBuilder<LogDateDatabase>(
+            context = appContext,
+            name = dbFile.absolutePath,
+        )
     val hasExistingDb = passphrase != null && dbFile.exists()
     var needsLegacyHook = false
 
@@ -44,12 +48,13 @@ fun getDatabaseBuilder(context: Context, passphrase: ByteArray? = null): RoomDat
         }
 
         Log.i(DB_MIGRATION_TAG, "Configuring SQLCipher open helper (existingDb=$hasExistingDb)")
-        val migrationHook = if (needsLegacyHook) {
-            Log.i(DB_MIGRATION_TAG, "Applying legacy SQLCipher compatibility hook before keying")
-            createLegacySqlCipherHook()
-        } else {
-            null
-        }
+        val migrationHook =
+            if (needsLegacyHook) {
+                Log.i(DB_MIGRATION_TAG, "Applying legacy SQLCipher compatibility hook before keying")
+                createLegacySqlCipherHook()
+            } else {
+                null
+            }
         builder.openHelperFactory(
             if (migrationHook != null) {
                 SupportOpenHelperFactory(passphrase, migrationHook, false)
@@ -91,7 +96,10 @@ fun getDatabaseBuilder(context: Context, passphrase: ByteArray? = null): RoomDat
  * - original files are moved to timestamped backups before replacement
  * - the encrypted output is validated before replacement
  */
-fun migratePlaintextDatabaseIfNeeded(context: Context, passphrase: ByteArray) {
+fun migratePlaintextDatabaseIfNeeded(
+    context: Context,
+    passphrase: ByteArray,
+) {
     val dbFile = context.applicationContext.getDatabasePath(DATABASE_NAME)
     if (!dbFile.exists()) {
         Log.i(DB_MIGRATION_TAG, "No existing database file found; skipping plaintext migration")
@@ -178,14 +186,15 @@ private fun exportPlaintextDatabaseToEncrypted(
     encryptedFile: File,
     passphrase: ByteArray,
 ) {
-    val plaintextDb = SQLCipherDatabase.openDatabase(
-        plaintextFile.absolutePath,
-        ByteArray(0),
-        null,
-        SQLCipherDatabase.OPEN_READWRITE or SQLCipherDatabase.CREATE_IF_NECESSARY,
-        null,
-        null,
-    )
+    val plaintextDb =
+        SQLCipherDatabase.openDatabase(
+            plaintextFile.absolutePath,
+            ByteArray(0),
+            null,
+            SQLCipherDatabase.OPEN_READWRITE or SQLCipherDatabase.CREATE_IF_NECESSARY,
+            null,
+            null,
+        )
 
     try {
         plaintextDb.execSQL(
@@ -206,11 +215,17 @@ private fun exportPlaintextDatabaseToEncrypted(
     }
 }
 
-private fun verifyEncryptedDatabase(encryptedFile: File, passphrase: ByteArray) {
+private fun verifyEncryptedDatabase(
+    encryptedFile: File,
+    passphrase: ByteArray,
+) {
     openAndPingEncryptedDatabase(encryptedFile, passphrase, hook = null)
 }
 
-private fun canOpenEncryptedDatabaseWithCurrentSettings(encryptedFile: File, passphrase: ByteArray): Boolean {
+private fun canOpenEncryptedDatabaseWithCurrentSettings(
+    encryptedFile: File,
+    passphrase: ByteArray,
+): Boolean {
     if (!encryptedFile.exists()) {
         return false
     }
@@ -221,11 +236,13 @@ private fun canOpenEncryptedDatabaseWithCurrentSettings(encryptedFile: File, pas
                 DB_MIGRATION_TAG,
                 "Database did not open with current SQLCipher settings: ${error::class.java.simpleName}: ${error.message}",
             )
-        }
-        .isSuccess
+        }.isSuccess
 }
 
-private fun canOpenEncryptedDatabaseWithLegacySettings(encryptedFile: File, passphrase: ByteArray): Boolean {
+private fun canOpenEncryptedDatabaseWithLegacySettings(
+    encryptedFile: File,
+    passphrase: ByteArray,
+): Boolean {
     if (!encryptedFile.exists()) {
         return false
     }
@@ -240,7 +257,10 @@ private fun canOpenEncryptedDatabaseWithLegacySettings(encryptedFile: File, pass
     }.isSuccess
 }
 
-private fun canOpenEncryptedDatabase(encryptedFile: File, passphrase: ByteArray): Boolean {
+private fun canOpenEncryptedDatabase(
+    encryptedFile: File,
+    passphrase: ByteArray,
+): Boolean {
     if (canOpenEncryptedDatabaseWithCurrentSettings(encryptedFile, passphrase)) {
         return true
     }
@@ -252,14 +272,15 @@ private fun openAndPingEncryptedDatabase(
     passphrase: ByteArray,
     hook: SQLiteDatabaseHook?,
 ) {
-    val encryptedDb = SQLCipherDatabase.openDatabase(
-        encryptedFile.absolutePath,
-        passphrase,
-        null,
-        SQLCipherDatabase.OPEN_READONLY,
-        null,
-        hook,
-    )
+    val encryptedDb =
+        SQLCipherDatabase.openDatabase(
+            encryptedFile.absolutePath,
+            passphrase,
+            null,
+            SQLCipherDatabase.OPEN_READONLY,
+            null,
+            hook,
+        )
     try {
         encryptedDb.rawQuery("SELECT COUNT(*) FROM sqlite_schema", emptyArray<String>()).use { cursor ->
             cursor.moveToFirst()
@@ -272,24 +293,26 @@ private fun openAndPingEncryptedDatabase(
 private fun findLatestPlaintextBackup(dbFile: File): File? {
     val directory = dbFile.parentFile ?: return null
     val prefix = "$DATABASE_NAME.plaintext-backup-"
-    return directory.listFiles()
+    return directory
+        .listFiles()
         ?.asSequence()
         ?.filter { file -> file.isFile && file.name.startsWith(prefix) }
         ?.maxByOrNull { file -> file.lastModified() }
 }
 
-private fun createLegacySqlCipherHook(): SQLiteDatabaseHook = object : SQLiteDatabaseHook {
-    override fun preKey(database: SQLiteConnection) {
-        val cancellationSignal = CancellationSignal()
-        database.execute("PRAGMA cipher_default_page_size = 1024", emptyArray(), cancellationSignal)
-        database.execute("PRAGMA cipher_default_kdf_iter = 4000", emptyArray(), cancellationSignal)
-        database.execute("PRAGMA cipher_default_hmac_algorithm = HMAC_SHA1", emptyArray(), cancellationSignal)
-        database.execute("PRAGMA cipher_default_kdf_algorithm = PBKDF2_HMAC_SHA1", emptyArray(), cancellationSignal)
-    }
+private fun createLegacySqlCipherHook(): SQLiteDatabaseHook =
+    object : SQLiteDatabaseHook {
+        override fun preKey(database: SQLiteConnection) {
+            val cancellationSignal = CancellationSignal()
+            database.execute("PRAGMA cipher_default_page_size = 1024", emptyArray(), cancellationSignal)
+            database.execute("PRAGMA cipher_default_kdf_iter = 4000", emptyArray(), cancellationSignal)
+            database.execute("PRAGMA cipher_default_hmac_algorithm = HMAC_SHA1", emptyArray(), cancellationSignal)
+            database.execute("PRAGMA cipher_default_kdf_algorithm = PBKDF2_HMAC_SHA1", emptyArray(), cancellationSignal)
+        }
 
-    override fun postKey(database: SQLiteConnection) {
+        override fun postKey(database: SQLiteConnection) {
+        }
     }
-}
 
 private fun isPlaintextSqliteDatabase(dbFile: File): Boolean {
     if (!dbFile.isFile || dbFile.length() < SQLITE_FILE_HEADER.size) {
@@ -307,14 +330,20 @@ private fun isPlaintextSqliteDatabase(dbFile: File): Boolean {
     }.getOrDefault(false)
 }
 
-private fun moveIfExists(source: File, target: File) {
+private fun moveIfExists(
+    source: File,
+    target: File,
+) {
     if (!source.exists()) {
         return
     }
     moveReplacing(source, target)
 }
 
-private fun moveReplacing(source: File, target: File) {
+private fun moveReplacing(
+    source: File,
+    target: File,
+) {
     target.parentFile?.mkdirs()
     Files.move(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
 }
@@ -331,21 +360,22 @@ fun protectDatabaseFile(context: Context) {
 }
 
 private const val DB_MIGRATION_TAG = "LogDateDatabase"
-private val SQLITE_FILE_HEADER = byteArrayOf(
-    'S'.code.toByte(),
-    'Q'.code.toByte(),
-    'L'.code.toByte(),
-    'i'.code.toByte(),
-    't'.code.toByte(),
-    'e'.code.toByte(),
-    ' '.code.toByte(),
-    'f'.code.toByte(),
-    'o'.code.toByte(),
-    'r'.code.toByte(),
-    'm'.code.toByte(),
-    'a'.code.toByte(),
-    't'.code.toByte(),
-    ' '.code.toByte(),
-    '3'.code.toByte(),
-    0.toByte(),
-)
+private val SQLITE_FILE_HEADER =
+    byteArrayOf(
+        'S'.code.toByte(),
+        'Q'.code.toByte(),
+        'L'.code.toByte(),
+        'i'.code.toByte(),
+        't'.code.toByte(),
+        'e'.code.toByte(),
+        ' '.code.toByte(),
+        'f'.code.toByte(),
+        'o'.code.toByte(),
+        'r'.code.toByte(),
+        'm'.code.toByte(),
+        'a'.code.toByte(),
+        't'.code.toByte(),
+        ' '.code.toByte(),
+        '3'.code.toByte(),
+        0.toByte(),
+    )

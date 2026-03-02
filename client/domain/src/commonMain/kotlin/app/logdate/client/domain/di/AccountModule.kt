@@ -12,14 +12,15 @@ import org.koin.dsl.module
 /**
  * Dedicated module for account-related dependencies to avoid circular dependencies
  */
-val accountModule: Module = module {
-    // Account
-    factory { CreatePasskeyAccountUseCase(get()) }
-    factory { CreatePasskeyUseCase(get()) }
-    factory { GetCurrentAccountUseCase(get()) }
-    factory { HasLogDateCloudAccountUseCase(get()) }
-    factory { DeletePasskeyUseCase(get()) }
-    
-    // User identity 
-    factory { GetUserIdUseCase(get(), get()) }
-}
+val accountModule: Module =
+    module {
+        // Account
+        factory { CreatePasskeyAccountUseCase(get()) }
+        factory { CreatePasskeyUseCase(get()) }
+        factory { GetCurrentAccountUseCase(get()) }
+        factory { HasLogDateCloudAccountUseCase(get()) }
+        factory { DeletePasskeyUseCase(get()) }
+
+        // User identity
+        factory { GetUserIdUseCase(get(), get()) }
+    }

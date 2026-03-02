@@ -12,53 +12,54 @@ import kotlin.uuid.Uuid
  * a persistent device identifier.
  */
 class AndroidDeviceIdProvider(
-    private val context: Context
+    private val context: Context,
 ) : DeviceIdProvider {
-    
-    private val DEVICE_ID_KEY = "device_id"
-    private val prefs: SharedPreferences = context.getSharedPreferences(
-        "app.logdate.device_identifiers", 
-        Context.MODE_PRIVATE
-    )
-    
+    private val deviceIdKey = "device_id"
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences(
+            "app.logdate.device_identifiers",
+            Context.MODE_PRIVATE,
+        )
+
     // Initialize device ID synchronously to ensure immediate availability
-    private val _deviceId: Uuid
-    private val _deviceIdFlow: MutableStateFlow<Uuid>
-    
+    private val initialDeviceId: Uuid
+    private val deviceIdFlow: MutableStateFlow<Uuid>
+
     init {
         // Synchronously load or generate the ID
-        val storedId = prefs.getString(DEVICE_ID_KEY, null)
-        
-        _deviceId = if (!storedId.isNullOrEmpty()) {
-            try {
-                Uuid.parse(storedId)
-            } catch (e: Exception) {
-                Napier.e("Invalid stored device ID, generating new one", e)
+        val storedId = prefs.getString(deviceIdKey, null)
+
+        initialDeviceId =
+            if (!storedId.isNullOrEmpty()) {
+                try {
+                    Uuid.parse(storedId)
+                } catch (e: Exception) {
+                    Napier.e("Invalid stored device ID, generating new one", e)
+                    val newId = Uuid.random()
+                    storeDeviceId(newId)
+                    newId
+                }
+            } else {
+                Napier.i("No device ID found, generating new one")
                 val newId = Uuid.random()
                 storeDeviceId(newId)
                 newId
             }
-        } else {
-            Napier.i("No device ID found, generating new one")
-            val newId = Uuid.random()
-            storeDeviceId(newId)
-            newId
-        }
-        
+
         // Initialize flow with the loaded/generated ID
-        _deviceIdFlow = MutableStateFlow(_deviceId)
+        deviceIdFlow = MutableStateFlow(initialDeviceId)
     }
-    
-    override fun getDeviceId(): StateFlow<Uuid> = _deviceIdFlow
-    
+
+    override fun getDeviceId(): StateFlow<Uuid> = deviceIdFlow
+
     override suspend fun refreshDeviceId() {
         val newId = Uuid.random()
         Napier.d("Refreshing device ID: ${newId.toString().take(8)}...")
         storeDeviceId(newId)
-        _deviceIdFlow.value = newId
+        deviceIdFlow.value = newId
     }
-    
+
     private fun storeDeviceId(id: Uuid) {
-        prefs.edit().putString(DEVICE_ID_KEY, id.toString()).apply()
+        prefs.edit().putString(deviceIdKey, id.toString()).apply()
     }
 }

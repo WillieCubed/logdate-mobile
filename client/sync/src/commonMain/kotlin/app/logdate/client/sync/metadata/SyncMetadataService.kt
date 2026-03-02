@@ -18,7 +18,12 @@ interface SyncMetadataService {
     /**
      * Marks an entity as successfully synced by removing it from the pending queue.
      */
-    suspend fun markAsSynced(entityId: String, entityType: EntityType, syncedAt: Instant, version: Long)
+    suspend fun markAsSynced(
+        entityId: String,
+        entityType: EntityType,
+        syncedAt: Instant,
+        version: Long,
+    )
 
     /**
      * Gets the last sync time for a specific entity type.
@@ -28,17 +33,27 @@ interface SyncMetadataService {
     /**
      * Updates the last sync time for a specific entity type.
      */
-    suspend fun updateLastSyncTime(entityType: EntityType, syncedAt: Instant)
+    suspend fun updateLastSyncTime(
+        entityType: EntityType,
+        syncedAt: Instant,
+    )
 
     /**
      * Enqueues an entity change for sync (create, update, delete).
      */
-    suspend fun enqueuePending(entityId: String, entityType: EntityType, operation: PendingOperation)
+    suspend fun enqueuePending(
+        entityId: String,
+        entityType: EntityType,
+        operation: PendingOperation,
+    )
 
     /**
      * Resets sync metadata for an entity (forces re-sync).
      */
-    suspend fun resetSyncStatus(entityId: String, entityType: EntityType)
+    suspend fun resetSyncStatus(
+        entityId: String,
+        entityType: EntityType,
+    )
 
     /**
      * Gets count of pending uploads for UI display.
@@ -53,7 +68,10 @@ interface SyncMetadataService {
     /**
      * Increments the retry count for a pending upload.
      */
-    suspend fun incrementRetryCount(entityId: String, entityType: EntityType)
+    suspend fun incrementRetryCount(
+        entityId: String,
+        entityType: EntityType,
+    )
 }
 
 /**
@@ -71,5 +89,5 @@ enum class EntityType {
     JOURNAL,
     NOTE,
     ASSOCIATION,
-    MEDIA
+    MEDIA,
 }

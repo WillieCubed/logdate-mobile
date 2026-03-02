@@ -9,6 +9,7 @@ import org.koin.dsl.module
 /**
  * Dependency injection module for the devices management feature.
  */
-val devicesModule: Module = module {
-    viewModel { DevicesViewModel(get<DefaultDeviceManager>()) }
-}
+val devicesModule: Module =
+    module {
+        viewModel { DevicesViewModel(get<DefaultDeviceManager>()) }
+    }

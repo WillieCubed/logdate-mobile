@@ -10,10 +10,11 @@ actual fun formatDeviceLastActive(timestamp: Instant): String {
         return "Unknown"
     }
 
-    val formatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
-        .withZone(ZoneId.systemDefault())
+    val formatter =
+        DateTimeFormatter
+            .ofLocalizedDateTime(FormatStyle.MEDIUM)
+            .withZone(ZoneId.systemDefault())
     return formatter.format(timestamp.toJavaTimeInstant())
 }
 
-private fun Instant.toJavaTimeInstant(): java.time.Instant =
-    java.time.Instant.ofEpochSecond(epochSeconds, nanosecondsOfSecond.toLong())
+private fun Instant.toJavaTimeInstant(): java.time.Instant = java.time.Instant.ofEpochSecond(epochSeconds, nanosecondsOfSecond.toLong())

@@ -100,7 +100,7 @@ data class ShareJournal(
  */
 @Serializable
 data class EntryEditor(
-    val id: Uuid? = null
+    val id: Uuid? = null,
 ) : NavKey
 
 /**
@@ -129,10 +129,6 @@ data class RewindDetailRoute(
     @Serializable(with = UuidSerializer::class)
     val id: Uuid,
 ) : NavKey
-
-/**
- * Routes for the settings feature
- */
 
 /**
  * Navigation route for the main settings overview screen.

@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.ui.common
 
 import androidx.compose.foundation.layout.Box
@@ -17,11 +19,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.ui.generated.resources.*
+import androidx.compose.ui.unit.dp
 import logdate.client.ui.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+
 /**
  * A scaffold that wraps the main content of the app.
  *
@@ -45,19 +47,21 @@ fun MainWrapperScaffold(
     }
 
     Surface(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
     ) {
         Scaffold(
-            modifier = Modifier
-                .fillMaxSize()
+            modifier =
+                Modifier
+                    .fillMaxSize()
 //                .nestedScroll(scrollConnection)
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentWindowInsets = WindowInsets(0, 0, 0, 0)
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
         ) { paddingValues ->
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
             ) {
                 content()
             }
@@ -72,9 +76,10 @@ fun MainWrapperScaffold(
 fun MainWrapperScaffoldPreview() {
     MainWrapperScaffold {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
         ) {
             Text(stringResource(Res.string.sample_content))
         }

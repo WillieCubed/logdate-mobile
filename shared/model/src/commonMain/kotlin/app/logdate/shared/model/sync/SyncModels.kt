@@ -10,7 +10,9 @@ import kotlin.jvm.JvmInline
  */
 @JvmInline
 @Serializable
-value class DeviceId(val value: String) {
+value class DeviceId(
+    val value: String,
+) {
     companion object {
         val UNKNOWN = DeviceId("unknown")
     }
@@ -34,7 +36,9 @@ sealed class VersionConstraint {
      */
     @Serializable
     @SerialName("known")
-    data class Known(val serverVersion: Long) : VersionConstraint()
+    data class Known(
+        val serverVersion: Long,
+    ) : VersionConstraint()
 }
 
 /**
@@ -50,14 +54,14 @@ data class ContentUploadRequest(
     val createdAt: Long,
     val lastUpdated: Long,
     val syncVersion: Long = 0,
-    val deviceId: DeviceId = DeviceId.UNKNOWN
+    val deviceId: DeviceId = DeviceId.UNKNOWN,
 )
 
 @Serializable
 data class ContentUploadResponse(
     val id: String,
     val serverVersion: Long,
-    val uploadedAt: Long
+    val uploadedAt: Long,
 )
 
 @Serializable
@@ -68,14 +72,14 @@ data class ContentUpdateRequest(
     val lastUpdated: Long,
     val syncVersion: Long = 0,
     val deviceId: DeviceId = DeviceId.UNKNOWN,
-    val versionConstraint: VersionConstraint = VersionConstraint.None
+    val versionConstraint: VersionConstraint = VersionConstraint.None,
 )
 
 @Serializable
 data class ContentUpdateResponse(
     val id: String,
     val serverVersion: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
 )
 
 @Serializable
@@ -83,7 +87,7 @@ data class ContentChangesResponse(
     val changes: List<ContentChange>,
     val deletions: List<ContentDeletion>,
     val lastTimestamp: Long,
-    val hasMore: Boolean = false
+    val hasMore: Boolean = false,
 )
 
 @Serializable
@@ -96,13 +100,13 @@ data class ContentChange(
     val createdAt: Long,
     val lastUpdated: Long,
     val serverVersion: Long,
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
 )
 
 @Serializable
 data class ContentDeletion(
     val id: String,
-    val deletedAt: Long
+    val deletedAt: Long,
 )
 
 @Serializable
@@ -113,14 +117,14 @@ data class JournalUploadRequest(
     val createdAt: Long,
     val lastUpdated: Long,
     val syncVersion: Long = 0,
-    val deviceId: DeviceId = DeviceId.UNKNOWN
+    val deviceId: DeviceId = DeviceId.UNKNOWN,
 )
 
 @Serializable
 data class JournalUploadResponse(
     val id: String,
     val serverVersion: Long,
-    val uploadedAt: Long
+    val uploadedAt: Long,
 )
 
 @Serializable
@@ -130,14 +134,14 @@ data class JournalUpdateRequest(
     val lastUpdated: Long,
     val syncVersion: Long = 0,
     val deviceId: DeviceId = DeviceId.UNKNOWN,
-    val versionConstraint: VersionConstraint = VersionConstraint.None
+    val versionConstraint: VersionConstraint = VersionConstraint.None,
 )
 
 @Serializable
 data class JournalUpdateResponse(
     val id: String,
     val serverVersion: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
 )
 
 @Serializable
@@ -145,7 +149,7 @@ data class JournalChangesResponse(
     val changes: List<JournalChange>,
     val deletions: List<JournalDeletion>,
     val lastTimestamp: Long,
-    val hasMore: Boolean = false
+    val hasMore: Boolean = false,
 )
 
 @Serializable
@@ -156,18 +160,18 @@ data class JournalChange(
     val createdAt: Long,
     val lastUpdated: Long,
     val serverVersion: Long,
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
 )
 
 @Serializable
 data class JournalDeletion(
     val id: String,
-    val deletedAt: Long
+    val deletedAt: Long,
 )
 
 @Serializable
 data class AssociationUploadRequest(
-    val associations: List<Association>
+    val associations: List<Association>,
 )
 
 @Serializable
@@ -176,7 +180,7 @@ data class Association(
     val contentId: String,
     val createdAt: Long,
     val syncVersion: Long = 0,
-    val deviceId: DeviceId = DeviceId.UNKNOWN
+    val deviceId: DeviceId = DeviceId.UNKNOWN,
 ) {
     fun key(): Pair<String, String> = journalId to contentId
 }
@@ -184,7 +188,7 @@ data class Association(
 @Serializable
 data class AssociationUploadResponse(
     val uploadedCount: Int,
-    val uploadedAt: Long
+    val uploadedAt: Long,
 )
 
 @Serializable
@@ -192,7 +196,7 @@ data class AssociationChangesResponse(
     val changes: List<AssociationChange>,
     val deletions: List<AssociationDeletion>,
     val lastTimestamp: Long,
-    val hasMore: Boolean = false
+    val hasMore: Boolean = false,
 )
 
 @Serializable
@@ -201,25 +205,25 @@ data class AssociationChange(
     val contentId: String,
     val createdAt: Long,
     val serverVersion: Long,
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
 )
 
 @Serializable
 data class AssociationDeletion(
     val journalId: String,
     val contentId: String,
-    val deletedAt: Long
+    val deletedAt: Long,
 )
 
 @Serializable
 data class AssociationDeleteRequest(
-    val associations: List<AssociationDeleteItem>
+    val associations: List<AssociationDeleteItem>,
 )
 
 @Serializable
 data class AssociationDeleteItem(
     val journalId: String,
-    val contentId: String
+    val contentId: String,
 ) {
     fun key(): Pair<String, String> = journalId to contentId
 }
@@ -231,7 +235,7 @@ data class MediaUploadRequest(
     val mimeType: String,
     val sizeBytes: Long,
     val data: ByteArray,
-    val deviceId: DeviceId = DeviceId.UNKNOWN
+    val deviceId: DeviceId = DeviceId.UNKNOWN,
 )
 
 @Serializable
@@ -239,7 +243,7 @@ data class MediaUploadResponse(
     val contentId: String,
     val mediaId: String,
     val downloadUrl: String,
-    val uploadedAt: Long
+    val uploadedAt: Long,
 )
 
 @Serializable
@@ -249,21 +253,21 @@ data class MediaDownloadResponse(
     val mimeType: String,
     val sizeBytes: Long,
     val data: ByteArray,
-    val downloadUrl: String
+    val downloadUrl: String,
 )
 
 @Serializable
 data class BackupUploadRequest(
     val deviceId: String,
     val manifest: String,
-    val data: ByteArray
+    val data: ByteArray,
 )
 
 @Serializable
 data class BackupUploadResponse(
     val id: String,
     val createdAt: Long,
-    val sizeBytes: Long
+    val sizeBytes: Long,
 )
 
 @Serializable
@@ -273,10 +277,10 @@ data class BackupInfoResponse(
     val manifest: String,
     val createdAt: Long,
     val sizeBytes: Long,
-    val downloadUrl: String
+    val downloadUrl: String,
 )
 
 @Serializable
 data class BackupListResponse(
-    val backups: List<BackupInfoResponse>
+    val backups: List<BackupInfoResponse>,
 )

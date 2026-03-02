@@ -16,12 +16,14 @@ import java.util.concurrent.TimeUnit
 class GcsMediaStorage(
     private val bucketName: String,
     projectId: String? = null,
-    private val kmsKeyName: String? = null
+    private val kmsKeyName: String? = null,
 ) {
-    private val storage: Storage = StorageOptions.newBuilder()
-        .apply { projectId?.let { setProjectId(it) } }
-        .build()
-        .service
+    private val storage: Storage =
+        StorageOptions
+            .newBuilder()
+            .apply { projectId?.let { setProjectId(it) } }
+            .build()
+            .service
 
     /**
      * Upload media file to GCS.
@@ -37,20 +39,23 @@ class GcsMediaStorage(
         mediaId: UUID,
         fileName: String,
         mimeType: String,
-        data: ByteArray
+        data: ByteArray,
     ): String {
         val storagePath = buildStoragePath(userId, mediaId, fileName)
         val blobId = BlobId.of(bucketName, storagePath)
-        val blobInfo = BlobInfo.newBuilder(blobId)
-            .setContentType(mimeType)
-            .build()
+        val blobInfo =
+            BlobInfo
+                .newBuilder(blobId)
+                .setContentType(mimeType)
+                .build()
 
         try {
-            val options = if (kmsKeyName != null) {
-                arrayOf(Storage.BlobTargetOption.kmsKeyName(kmsKeyName))
-            } else {
-                emptyArray()
-            }
+            val options =
+                if (kmsKeyName != null) {
+                    arrayOf(Storage.BlobTargetOption.kmsKeyName(kmsKeyName))
+                } else {
+                    emptyArray()
+                }
             storage.create(blobInfo, data, *options)
             Napier.d("Uploaded media to GCS: $storagePath (${data.size} bytes)")
             return storagePath
@@ -66,20 +71,23 @@ class GcsMediaStorage(
     fun uploadBackup(
         userId: UUID,
         backupId: UUID,
-        data: ByteArray
+        data: ByteArray,
     ): String {
         val storagePath = "users/$userId/backups/$backupId.enc"
         val blobId = BlobId.of(bucketName, storagePath)
-        val blobInfo = BlobInfo.newBuilder(blobId)
-            .setContentType("application/octet-stream")
-            .build()
+        val blobInfo =
+            BlobInfo
+                .newBuilder(blobId)
+                .setContentType("application/octet-stream")
+                .build()
 
         try {
-            val options = if (kmsKeyName != null) {
-                arrayOf(Storage.BlobTargetOption.kmsKeyName(kmsKeyName))
-            } else {
-                emptyArray()
-            }
+            val options =
+                if (kmsKeyName != null) {
+                    arrayOf(Storage.BlobTargetOption.kmsKeyName(kmsKeyName))
+                } else {
+                    emptyArray()
+                }
             storage.create(blobInfo, data, *options)
             Napier.d("Uploaded backup to GCS: $storagePath (${data.size} bytes)")
             return storagePath
@@ -95,15 +103,19 @@ class GcsMediaStorage(
      * @param expirationHours How long the URL should be valid (default: 1 hour)
      * @return Signed URL for downloading the media file
      */
-    fun getSignedDownloadUrl(storagePath: String, expirationHours: Long = 1): String {
+    fun getSignedDownloadUrl(
+        storagePath: String,
+        expirationHours: Long = 1,
+    ): String {
         val blobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, storagePath)).build()
         return try {
-            val url: URL = storage.signUrl(
-                blobInfo,
-                expirationHours,
-                TimeUnit.HOURS,
-                Storage.SignUrlOption.withV4Signature()
-            )
+            val url: URL =
+                storage.signUrl(
+                    blobInfo,
+                    expirationHours,
+                    TimeUnit.HOURS,
+                    Storage.SignUrlOption.withV4Signature(),
+                )
             url.toString()
         } catch (e: Exception) {
             Napier.e("Failed to generate signed URL for: $storagePath", e)
@@ -161,12 +173,17 @@ class GcsMediaStorage(
         }
     }
 
-    private fun buildStoragePath(userId: UUID, mediaId: UUID, fileName: String): String {
+    private fun buildStoragePath(
+        userId: UUID,
+        mediaId: UUID,
+        fileName: String,
+    ): String {
         // Sanitize filename to prevent path traversal
-        val sanitizedFileName = fileName
-            .replace("..", "")
-            .replace("/", "_")
-            .replace("\\", "_")
+        val sanitizedFileName =
+            fileName
+                .replace("..", "")
+                .replace("/", "_")
+                .replace("\\", "_")
         return "users/$userId/media/$mediaId/$sanitizedFileName"
     }
 
@@ -187,4 +204,7 @@ class GcsMediaStorage(
 /**
  * Exception thrown when media storage operations fail.
  */
-class MediaStorageException(message: String, cause: Throwable? = null) : Exception(message, cause)
+class MediaStorageException(
+    message: String,
+    cause: Throwable? = null,
+) : Exception(message, cause)

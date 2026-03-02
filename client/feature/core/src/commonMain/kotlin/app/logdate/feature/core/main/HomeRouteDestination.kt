@@ -35,8 +35,10 @@ enum class HomeRouteDestination(
         label = "Locations",
         selectedIcon = Icons.Filled.LocationOn,
         unselectedIcon = Icons.Outlined.LocationOn,
-    );
-//    People(
+    ),
+    ;
+
+    //    People(
 //        label = "People",
 //        selectedIcon = "ic_people_selected",
 //        unselectedIcon = "ic_people_unselected",

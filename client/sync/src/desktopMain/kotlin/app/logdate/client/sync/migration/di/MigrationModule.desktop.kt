@@ -8,7 +8,8 @@ import org.koin.dsl.module
 /**
  * Desktop-specific migration dependencies.
  */
-actual val migrationModule: Module = module {
-    // Provide Desktop-specific migration storage
-    single<MigrationStorage> { FileMigrationStorage(get()) }
-}
+actual val migrationModule: Module =
+    module {
+        // Provide Desktop-specific migration storage
+        single<MigrationStorage> { FileMigrationStorage(get()) }
+    }

@@ -11,7 +11,7 @@ import kotlin.uuid.Uuid
 
 /**
  * A DAO that provides methods for interacting with note-journal relationships.
- * 
+ *
  * This interface has been updated to use string IDs for journals.
  */
 @Dao
@@ -54,13 +54,19 @@ interface JournalNotesDao {
      */
     @Transaction
     @Query("INSERT INTO journal_notes (id, uid) VALUES (:journalId, :noteId)")
-    suspend fun addNoteToJournal(journalId: Uuid, noteId: Uuid)
+    suspend fun addNoteToJournal(
+        journalId: Uuid,
+        noteId: Uuid,
+    )
 
     /**
      * Removes a note from the journal with the given ID.
      */
     @Query("DELETE FROM journal_notes WHERE id = :journalId AND uid = :noteId")
-    suspend fun removeNoteFromJournal(journalId: Uuid, noteId: Uuid)
+    suspend fun removeNoteFromJournal(
+        journalId: Uuid,
+        noteId: Uuid,
+    )
 
     /**
      * Removes a note from all journals.

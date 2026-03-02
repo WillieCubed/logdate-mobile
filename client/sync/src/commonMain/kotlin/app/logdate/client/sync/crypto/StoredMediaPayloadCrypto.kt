@@ -1,17 +1,13 @@
 package app.logdate.client.sync.crypto
 
 class StoredMediaPayloadCrypto(
-    private val keyProvider: MediaPayloadKeyProvider
+    private val keyProvider: MediaPayloadKeyProvider,
 ) : MediaPayloadCrypto {
     private var cachedCrypto: MediaPayloadCrypto? = null
 
-    override suspend fun encrypt(data: ByteArray): ByteArray {
-        return getCrypto().encrypt(data)
-    }
+    override suspend fun encrypt(data: ByteArray): ByteArray = getCrypto().encrypt(data)
 
-    override suspend fun decrypt(data: ByteArray): ByteArray {
-        return getCrypto().decrypt(data)
-    }
+    override suspend fun decrypt(data: ByteArray): ByteArray = getCrypto().decrypt(data)
 
     private suspend fun getCrypto(): MediaPayloadCrypto {
         cachedCrypto?.let { return it }

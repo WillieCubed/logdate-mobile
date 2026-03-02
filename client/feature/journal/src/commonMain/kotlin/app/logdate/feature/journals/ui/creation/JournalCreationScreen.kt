@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.feature.journals.ui.creation
 
 import androidx.compose.foundation.layout.Arrangement
@@ -38,15 +40,16 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
+import logdate.client.feature.journal.generated.resources.*
 import logdate.client.feature.journal.generated.resources.Res
 import logdate.client.feature.journal.generated.resources.note_stack_add
 import org.jetbrains.compose.resources.painterResource
-import androidx.compose.ui.tooling.preview.Preview
-import org.koin.compose.viewmodel.koinViewModel
 import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.journal.generated.resources.*
+import org.koin.compose.viewmodel.koinViewModel
+
 @Composable
 fun JournalCreationScreen(
     onGoBack: () -> Unit,
@@ -94,13 +97,11 @@ fun JournalCreationScreenContent(
     }
 
     fun handleSelectMedia() {
-
     }
 
     fun handleSelectTextNotes() {
-
     }
-    
+
     LaunchedEffect(Unit) {
         titleFocusRequester.requestFocus()
     }
@@ -119,47 +120,52 @@ fun JournalCreationScreenContent(
         },
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(Spacing.lg),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(Spacing.lg),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = Spacing.lg),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = Spacing.lg),
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-
                 OutlinedTextField(
                     textStyle = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(titleFocusRequester),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .focusRequester(titleFocusRequester),
                     value = title,
                     label = { Text(stringResource(Res.string.add_a_title)) },
                     onValueChange = {
                         title = it
                     },
                     singleLine = false,
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Next
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onNext = { 
-                            focusManager.moveFocus(FocusDirection.Down)
-                        }
-                    ),
+                    keyboardOptions =
+                        KeyboardOptions(
+                            imeAction = ImeAction.Next,
+                        ),
+                    keyboardActions =
+                        KeyboardActions(
+                            onNext = {
+                                focusManager.moveFocus(FocusDirection.Down)
+                            },
+                        ),
                 )
                 Column {
                     Text(stringResource(Res.string.what_is_this_for), style = MaterialTheme.typography.bodyMedium)
                     OutlinedTextField(
                         textStyle = MaterialTheme.typography.bodyLarge,
                         minLines = 3,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(descriptionFocusRequester),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .focusRequester(descriptionFocusRequester),
                         value = contentDescription,
                         placeholder = { Text(stringResource(Res.string.description)) },
                         label = { },
@@ -167,17 +173,19 @@ fun JournalCreationScreenContent(
                             contentDescription = it
                         },
                         singleLine = false,
-                        keyboardOptions = KeyboardOptions(
-                            imeAction = ImeAction.Done
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                focusManager.clearFocus()
-                                if (canFinish) {
-                                    handleNewJournal()
-                                }
-                            }
-                        ),
+                        keyboardOptions =
+                            KeyboardOptions(
+                                imeAction = ImeAction.Done,
+                            ),
+                        keyboardActions =
+                            KeyboardActions(
+                                onDone = {
+                                    focusManager.clearFocus()
+                                    if (canFinish) {
+                                        handleNewJournal()
+                                    }
+                                },
+                            ),
                     )
                 }
                 Column(
@@ -190,22 +198,22 @@ fun JournalCreationScreenContent(
                         icon = {
                             Icon(
                                 Icons.Default.AddPhotoAlternate,
-                                contentDescription = ""
+                                contentDescription = "",
                             )
                         },
                         label = "Add media",
-                        description = "Select photos and videos from your library"
+                        description = "Select photos and videos from your library",
                     )
                     ContainerButton(
                         onClick = ::handleSelectTextNotes,
                         icon = {
                             Icon(
                                 painterResource(Res.drawable.note_stack_add),
-                                contentDescription = ""
+                                contentDescription = "",
                             )
                         },
                         label = "Add text notes",
-                        description = "Add notes you've already written"
+                        description = "Add notes you've already written",
                     )
                 }
             }
@@ -249,10 +257,11 @@ internal fun ContainerButton(
     Button(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        ),
+        colors =
+            ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ),
         contentPadding = PaddingValues(Spacing.lg),
         shape = MaterialTheme.shapes.small,
     ) {

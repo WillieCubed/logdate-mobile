@@ -9,10 +9,11 @@ import org.koin.dsl.module
  * Common permissions module that provides platform-specific implementations
  * of permission-related functionality.
  */
-val commonPermissionsModule = module {
-    // Provide the platform-specific PermissionManager
-    single<PermissionManager> { createPermissionManager() }
-}
+val commonPermissionsModule =
+    module {
+        // Provide the platform-specific PermissionManager
+        single<PermissionManager> { createPermissionManager() }
+    }
 
 /**
  * Platform-specific permission module

@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -22,27 +21,27 @@ class DevicesViewModel(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DevicesUiState())
     val uiState: StateFlow<DevicesUiState> = _uiState.asStateFlow()
-    
+
     /**
      * Loads devices associated with the current account.
      */
     fun loadDevices() {
         _uiState.update { it.copy(isLoading = true) }
-        
+
         viewModelScope.launch {
             try {
                 // Get current device info
                 val currentDevice = deviceManager.getCurrentDeviceInfo()
-                
+
                 // Collect associated devices
                 deviceManager.getAssociatedDevices().collect { devices ->
                     val allDevices = (devices + currentDevice).distinctBy { it.id }
                     val deviceUiStates = allDevices.map { it.toUiState(it.id == currentDevice.id) }
-                    
+
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            devices = deviceUiStates
+                            devices = deviceUiStates,
                         )
                     }
                 }
@@ -51,13 +50,13 @@ class DevicesViewModel(
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        error = "Failed to load devices: ${e.message}"
+                        error = "Failed to load devices: ${e.message}",
                     )
                 }
             }
         }
     }
-    
+
     /**
      * Renames the current device.
      */
@@ -74,7 +73,7 @@ class DevicesViewModel(
             }
         }
     }
-    
+
     /**
      * Removes a device from the account.
      */
@@ -96,7 +95,7 @@ class DevicesViewModel(
             }
         }
     }
-    
+
     /**
      * Resets the current device ID.
      */
@@ -113,26 +112,25 @@ class DevicesViewModel(
             }
         }
     }
-    
+
     /**
      * Converts a DeviceInfo to a DeviceInfoUiState.
      */
-    private fun DeviceInfo.toUiState(isCurrentDevice: Boolean): DeviceInfoUiState {
-        return DeviceInfoUiState(
+    private fun DeviceInfo.toUiState(isCurrentDevice: Boolean): DeviceInfoUiState =
+        DeviceInfoUiState(
             id = id,
             name = name,
             platformName = getPlatformName(platform),
             lastActiveFormatted = formatDeviceLastActive(lastActive),
             appVersion = appVersion,
-            isCurrentDevice = isCurrentDevice
+            isCurrentDevice = isCurrentDevice,
         )
-    }
-    
+
     /**
      * Gets a user-friendly platform name.
      */
-    private fun getPlatformName(platform: DevicePlatform): String {
-        return when (platform) {
+    private fun getPlatformName(platform: DevicePlatform): String =
+        when (platform) {
             DevicePlatform.ANDROID -> "Android"
             DevicePlatform.IOS -> "iOS"
             DevicePlatform.MACOS -> "macOS"
@@ -141,8 +139,6 @@ class DevicesViewModel(
             DevicePlatform.WEB -> "Web"
             DevicePlatform.UNKNOWN -> "Unknown"
         }
-    }
-    
 }
 
 /**
@@ -151,7 +147,7 @@ class DevicesViewModel(
 data class DevicesUiState(
     val isLoading: Boolean = false,
     val devices: List<DeviceInfoUiState> = emptyList(),
-    val error: String? = null
+    val error: String? = null,
 )
 
 /**
@@ -163,5 +159,5 @@ data class DeviceInfoUiState(
     val platformName: String,
     val lastActiveFormatted: String,
     val appVersion: String,
-    val isCurrentDevice: Boolean
+    val isCurrentDevice: Boolean,
 )

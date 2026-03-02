@@ -10,9 +10,8 @@ import io.github.aakira.napier.Napier
  * This implementation uses the actual package info as the source of truth.
  */
 class AndroidAppInfoProvider(
-    private val context: Context
+    private val context: Context,
 ) : AppInfoProvider {
-
     override fun getAppInfo(): AppInfo {
         try {
             val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
@@ -20,7 +19,7 @@ class AndroidAppInfoProvider(
             return AppInfo(
                 versionName = packageInfo.versionName ?: "unknown",
                 versionCode = PackageInfoCompat.getLongVersionCode(packageInfo).toInt(),
-                packageName = context.packageName
+                packageName = context.packageName,
             )
         } catch (e: PackageManager.NameNotFoundException) {
             Napier.e("Failed to retrieve package info", e)

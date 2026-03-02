@@ -8,7 +8,6 @@ import app.logdate.client.device.IosAccountManager
 import app.logdate.client.device.IosAppInfoProvider
 import app.logdate.client.device.PlatformAccountManager
 import app.logdate.client.device.identity.DefaultDeviceIdProvider
-import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.device.identity.di.deviceIdentityModule
 import app.logdate.client.device.storage.IosSecureStorage
 import app.logdate.client.device.storage.SecureSessionStorage
@@ -24,44 +23,45 @@ import org.koin.dsl.module
 /**
  * iOS-specific device instance module that complements the deviceIdentityModule.
  */
-actual val deviceInstanceModule: Module = module {
-    // Include the device identity module (which already provides DeviceIdProvider)
-    includes(deviceIdentityModule)
-    
-    // Create a SupervisorJob that will be cancelled when the app is destroyed
-    single<Job> { SupervisorJob() }
+actual val deviceInstanceModule: Module =
+    module {
+        // Include the device identity module (which already provides DeviceIdProvider)
+        includes(deviceIdentityModule)
 
-    // Create a CoroutineScope that uses the application dispatcher and supervisor job
-    single {
-        CoroutineScope(get<Job>() + Dispatchers.Default)
-    }
+        // Create a SupervisorJob that will be cancelled when the app is destroyed
+        single<Job> { SupervisorJob() }
 
-    single<SecureStorage> { IosSecureStorage() }
+        // Create a CoroutineScope that uses the application dispatcher and supervisor job
+        single {
+            CoroutineScope(get<Job>() + Dispatchers.Default)
+        }
 
-    single<SessionStorage> {
-        SecureSessionStorage(
-            secureStorage = get(),
-            scope = get()
-        )
+        single<SecureStorage> { IosSecureStorage() }
+
+        single<SessionStorage> {
+            SecureSessionStorage(
+                secureStorage = get(),
+                scope = get(),
+            )
+        }
+
+        // New device ID provider using KeyValueStorage
+        single(named("modernDeviceIdProvider")) {
+            DefaultDeviceIdProvider(get<KeyValueStorage>(named("deviceKeyValueStorage")))
+        }
+
+        // Provide iOS-specific app info provider
+        single<AppInfoProvider> {
+            IosAppInfoProvider()
+        }
+
+        // Provide iOS-specific account manager
+        single<PlatformAccountManager> {
+            IosAccountManager()
+        }
+
+        // Provide the BuildConfig-based app info provider
+        single<BuildConfigAppInfoProvider> {
+            BuildConfigAppInfoProvider()
+        }
     }
-    
-    // New device ID provider using KeyValueStorage
-    single(named("modernDeviceIdProvider")) {
-        DefaultDeviceIdProvider(get<KeyValueStorage>(named("deviceKeyValueStorage")))
-    }
-    
-    // Provide iOS-specific app info provider
-    single<AppInfoProvider> {
-        IosAppInfoProvider()
-    }
-    
-    // Provide iOS-specific account manager
-    single<PlatformAccountManager> {
-        IosAccountManager()
-    }
-    
-    // Provide the BuildConfig-based app info provider
-    single<BuildConfigAppInfoProvider> {
-        BuildConfigAppInfoProvider()
-    }
-}

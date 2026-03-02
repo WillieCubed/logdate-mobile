@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.onboarding.ui
 
 import androidx.compose.foundation.background
@@ -15,9 +17,7 @@ import androidx.compose.ui.text.style.TextAlign
 import app.logdate.ui.theme.Spacing
 
 @Composable
-internal fun EntryPrompt(
-    promptText: String,
-) {
+internal fun EntryPrompt(promptText: String) {
     Row(
         horizontalArrangement = Arrangement.Center,
     ) {
@@ -36,5 +36,4 @@ internal fun EntryPrompt(
             }
         }
     }
-
 }

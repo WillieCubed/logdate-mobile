@@ -3,7 +3,9 @@ package app.logdate.client.sync.crypto
 import kotlinx.cinterop.ExperimentalForeignApi
 
 @OptIn(ExperimentalForeignApi::class)
-actual class AesGcmMediaPayloadCrypto actual constructor(key: ByteArray) : MediaPayloadCrypto {
+actual class AesGcmMediaPayloadCrypto actual constructor(
+    key: ByteArray,
+) : MediaPayloadCrypto {
     private val keyBytes = key.copyOf()
 
     init {
@@ -21,5 +23,4 @@ actual class AesGcmMediaPayloadCrypto actual constructor(key: ByteArray) : Media
         if (!data.hasClientMediaPrefix()) return data
         error("AES-GCM decryption is not available on iOS yet.")
     }
-
 }

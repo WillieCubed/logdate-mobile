@@ -5,18 +5,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlin.uuid.Uuid
 
 interface PeopleRepository {
-
     suspend fun getPerson(uid: Uuid): Person
 
     fun getAllPeople(): Flow<List<Person>>
 
-    suspend fun resolvePersonByName(
-        name: String,
-    ): Person?
+    suspend fun resolvePersonByName(name: String): Person?
 
-    suspend fun resolvePersonByDescription(
-        description: String,
-    ): Person?
+    suspend fun resolvePersonByDescription(description: String): Person?
 
     suspend fun addPerson(person: Person)
 

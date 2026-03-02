@@ -17,19 +17,20 @@ import org.koin.dsl.module
  * This module is used to provide the dependencies for the application. Each source set will provide
  * a different implementation of this module.
  */
-actual val appModule: Module = module {
-    // Base modules first
-    includes(defaultModules)
-    includes(appDataModule)
-    includes(networkingModule)
-    includes(deviceModule)
-    
-    // Domain modules in correct dependency order
-    includes(accountDomainModule)  // Account domain depends on data layers
-    includes(quotaDomainModule)    // Quota domain depends on sync layer
-    includes(locationDomainModule) // Location domain depends on data layers
-    includes(app.logdate.client.health.di.healthModule) // Common Health Connect implementation
-    includes(app.logdate.client.health.di.jvmHealthModule) // Desktop-specific Health Connect implementation
-    includes(domainModule)         // Main domain module with no circular deps
-    includes(audioModule)
-}
+actual val appModule: Module =
+    module {
+        // Base modules first
+        includes(defaultModules)
+        includes(appDataModule)
+        includes(networkingModule)
+        includes(deviceModule)
+
+        // Domain modules in correct dependency order
+        includes(accountDomainModule) // Account domain depends on data layers
+        includes(quotaDomainModule) // Quota domain depends on sync layer
+        includes(locationDomainModule) // Location domain depends on data layers
+        includes(app.logdate.client.health.di.healthModule) // Common Health Connect implementation
+        includes(app.logdate.client.health.di.jvmHealthModule) // Desktop-specific Health Connect implementation
+        includes(domainModule) // Main domain module with no circular deps
+        includes(audioModule)
+    }

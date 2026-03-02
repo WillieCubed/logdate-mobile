@@ -56,23 +56,28 @@ class OpenAiClient(
                             model = request.model ?: DEFAULT_MODEL,
                             messages = request.messages.map(GenerativeAIChatMessage::toOpenAiChatMessage),
                             temperature = request.temperature ?: DEFAULT_TEMPERATURE,
-                            responseFormat = responseFormat
-                        )
+                            responseFormat = responseFormat,
+                        ),
                     )
                 }
             if (response.status.value !in 200..299) {
                 return AIResult.Error(mapError(response))
             }
             val openAiResponse: OpenAiResponse = response.body()
-            val content = openAiResponse.choices.firstOrNull()?.message?.content?.trim()
+            val content =
+                openAiResponse.choices
+                    .firstOrNull()
+                    ?.message
+                    ?.content
+                    ?.trim()
             if (content.isNullOrBlank()) {
                 return AIResult.Error(AIError.InvalidResponse)
             }
             AIResult.Success(
                 GenerativeAIResponse(
                     content = content,
-                    model = openAiResponse.model
-                )
+                    model = openAiResponse.model,
+                ),
             )
         } catch (e: Exception) {
             AIResult.Error(AIError.Unknown, e)
@@ -83,28 +88,29 @@ class OpenAiClient(
         return when (format) {
             null, GenerativeAIResponseFormat.Text -> null
             is GenerativeAIResponseFormat.JsonSchema -> {
-                val schema = runCatching { Json.parseToJsonElement(format.schema) }.getOrNull()
-                    ?: return null
+                val schema =
+                    runCatching { Json.parseToJsonElement(format.schema) }.getOrNull()
+                        ?: return null
                 OpenAiResponseFormat(
                     type = "json_schema",
-                    jsonSchema = OpenAiJsonSchema(
-                        name = format.name,
-                        schema = schema,
-                        strict = format.strict
-                    )
+                    jsonSchema =
+                        OpenAiJsonSchema(
+                            name = format.name,
+                            schema = schema,
+                            strict = format.strict,
+                        ),
                 )
             }
         }
     }
 
-    private fun mapError(response: HttpResponse): AIError {
-        return when (response.status.value) {
+    private fun mapError(response: HttpResponse): AIError =
+        when (response.status.value) {
             401, 403 -> AIError.Unauthorized
             429 -> AIError.RateLimited
             in 500..599 -> AIError.ProviderUnavailable
             else -> AIError.Unknown
         }
-    }
 }
 
 @Serializable
@@ -152,5 +158,4 @@ data class OpenAiJsonSchema(
     val strict: Boolean = true,
 )
 
-internal fun GenerativeAIChatMessage.toOpenAiChatMessage() =
-    OpenAiChatMessage(role, content)
+internal fun GenerativeAIChatMessage.toOpenAiChatMessage() = OpenAiChatMessage(role, content)

@@ -1,22 +1,20 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.journals.ui
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.shared.model.Journal
 import app.logdate.ui.common.centeredGridPadding
 import app.logdate.ui.theme.Spacing
 import kotlin.time.Clock
-import androidx.compose.ui.tooling.preview.Preview
 import kotlin.uuid.Uuid
-
 
 @Composable
 fun JournalList(
@@ -29,7 +27,7 @@ fun JournalList(
         columns = GridCells.Adaptive(minSize = 172.dp),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
-        contentPadding = centeredGridPadding()
+        contentPadding = centeredGridPadding(),
     ) {
         items(journals) { item ->
             when (item) {
@@ -39,7 +37,7 @@ fun JournalList(
 
                 is JournalListItemUiState.CreateJournalPlaceholder -> {
                     CreateJournalPlaceholder(
-                        onClick = { /* TODO: Add onCreateJournal callback */ }
+                        onClick = { /* TODO: Add onCreateJournal callback */ },
                     )
                 }
             }
@@ -50,15 +48,16 @@ fun JournalList(
 @Preview
 @Composable
 private fun JournalListPreview() {
-    val journals = List(10) {
-        Journal(
-            id = Uuid.random(),
-            title = "Journal $it",
-            created = Clock.System.now(),
-            description = "Journal $it description",
-            isFavorited = false,
-            lastUpdated = Clock.System.now(),
-        )
-    }.map { JournalListItemUiState.ExistingJournal(it) }
+    val journals =
+        List(10) {
+            Journal(
+                id = Uuid.random(),
+                title = "Journal $it",
+                created = Clock.System.now(),
+                description = "Journal $it description",
+                isFavorited = false,
+                lastUpdated = Clock.System.now(),
+            )
+        }.map { JournalListItemUiState.ExistingJournal(it) }
     JournalList(journals, onOpenJournal = {})
 }

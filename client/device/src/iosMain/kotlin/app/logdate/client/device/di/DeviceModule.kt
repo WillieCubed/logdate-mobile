@@ -1,8 +1,9 @@
+@file:Suppress("ktlint:standard:filename")
+
 package app.logdate.client.device.di
 
 import app.logdate.client.device.AppInfo
 import app.logdate.client.device.AppInfoProvider
-import app.logdate.client.device.BuildConfigAppInfoProvider
 import app.logdate.client.device.identity.di.deviceIdentityModule
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -18,23 +19,24 @@ class IosAppInfoProvider : AppInfoProvider {
         val versionCodeString = bundle.infoDictionary?.get("CFBundleVersion") as? String ?: "1"
         val versionCode = versionCodeString.toIntOrNull() ?: 1
         val packageName = bundle.bundleIdentifier ?: "app.logdate"
-        
+
         return AppInfo(
             versionName = versionName,
             versionCode = versionCode,
-            packageName = packageName
+            packageName = packageName,
         )
     }
 }
 
 // We're not going to use this as we'll use the common deviceModule
-private val iosDeviceModule: Module = module {
-    // Include device identity components
-    includes(deviceIdentityModule)
-    
-    // Include device instance module
-    includes(deviceInstanceModule)
-    
-    // Provide the iOS-specific app info provider
-    single<AppInfoProvider> { IosAppInfoProvider() }
-}
+private val iosDeviceModule: Module =
+    module {
+        // Include device identity components
+        includes(deviceIdentityModule)
+
+        // Include device instance module
+        includes(deviceInstanceModule)
+
+        // Provide the iOS-specific app info provider
+        single<AppInfoProvider> { IosAppInfoProvider() }
+    }

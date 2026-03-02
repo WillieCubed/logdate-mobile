@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.core.settings.ui
 
 import androidx.compose.foundation.clickable
@@ -36,14 +38,14 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.feature.location.timeline.ui.LocationTimelineBottomSheet
+import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
-import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.theme.Spacing
-import org.koin.compose.viewmodel.koinViewModel
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.core.generated.resources.*
 import logdate.client.feature.core.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
+
 /**
  * Screen for managing location tracking settings.
  *
@@ -75,13 +77,13 @@ fun LocationSettingsScreen(
         onUpdateTrackingInterval = viewModel::updateTrackingInterval,
         onShowLocationTimeline = { showLocationTimeline = true },
         isPotentialDetailPane = resolvedIsDetailPane,
-        modifier = modifier.applyScreenStyles()
+        modifier = modifier.applyScreenStyles(),
     )
 
     // Location Timeline Bottom Sheet
     LocationTimelineBottomSheet(
         isVisible = showLocationTimeline,
-        onDismiss = { showLocationTimeline = false }
+        onDismiss = { showLocationTimeline = false },
     )
 }
 
@@ -101,9 +103,10 @@ private fun LocationSettingsContent(
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     Scaffold(
-        modifier = modifier
-            .applyScreenStyles()
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier =
+            modifier
+                .applyScreenStyles()
+                .nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             // Only show top bar with back button in single-pane mode
             if (!isPotentialDetailPane) {
@@ -117,13 +120,13 @@ private fun LocationSettingsContent(
                     scrollBehavior = scrollBehavior,
                 )
             }
-        }
+        },
     ) { paddingValues ->
         DefaultSettingsContentContainer {
             LazyColumn(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = paddingValues,
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
                 // Section title for two-pane mode
                 if (isPotentialDetailPane) {
@@ -131,172 +134,176 @@ private fun LocationSettingsContent(
                         Text(
                             text = stringResource(Res.string.location_settings),
                             style = MaterialTheme.typography.headlineSmall,
-                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)
+                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
                         )
                     }
                 }
-            // Location Services Section
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm)
-                ) {
-                    Text(
-                        text = stringResource(Res.string.location_services),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(vertical = Spacing.sm)
-                    )
-
-                    MaterialContainer {
-                        ToggleSettingsItem(
-                            title = "Enable Background Location Tracking",
-                            description = "Allow the app to track your location in the background for better context and features.",
-                            checked = settings.backgroundTrackingEnabled,
-                            onCheckedChange = onToggleBackgroundTracking,
-                        )
-                        ToggleSettingsItem(
-                            title = "Track Location for Journal Entries",
-                            description = "Automatically attach your location to new journal entries.",
-                            checked = settings.autoTrackForJournalEntries,
-                            onCheckedChange = onToggleJournalTracking,
-                        )
-                        ToggleSettingsItem(
-                            title = "Track Location for Timeline Review",
-                            description = "Record location when viewing your timeline to improve context.",
-                            checked = settings.autoTrackForTimelineReview,
-                            onCheckedChange = onToggleTimelineTracking,
-                        )
-                    }
-                }
-            }
-
-            // Tracking Interval Section (only visible if background tracking is enabled)
-            if (settings.backgroundTrackingEnabled) {
+                // Location Services Section
                 item {
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = Spacing.lg),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Spacing.lg),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
                         Text(
-                            text = stringResource(Res.string.tracking_interval),
+                            text = stringResource(Res.string.location_services),
                             style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(vertical = Spacing.sm)
+                            modifier = Modifier.padding(vertical = Spacing.sm),
                         )
 
                         MaterialContainer {
-                            SurfaceItem {
-                                Column(
-                                    modifier = Modifier.padding(Spacing.md),
-                                    verticalArrangement = Arrangement.spacedBy(Spacing.md)
-                                ) {
-                                    Text(
-                                        text = "Update Frequency: ${settings.trackingIntervalMinutes} minutes",
-                                        style = MaterialTheme.typography.bodyLarge
-                                    )
+                            ToggleSettingsItem(
+                                title = "Enable Background Location Tracking",
+                                description = "Allow the app to track your location in the background for better context and features.",
+                                checked = settings.backgroundTrackingEnabled,
+                                onCheckedChange = onToggleBackgroundTracking,
+                            )
+                            ToggleSettingsItem(
+                                title = "Track Location for Journal Entries",
+                                description = "Automatically attach your location to new journal entries.",
+                                checked = settings.autoTrackForJournalEntries,
+                                onCheckedChange = onToggleJournalTracking,
+                            )
+                            ToggleSettingsItem(
+                                title = "Track Location for Timeline Review",
+                                description = "Record location when viewing your timeline to improve context.",
+                                checked = settings.autoTrackForTimelineReview,
+                                onCheckedChange = onToggleTimelineTracking,
+                            )
+                        }
+                    }
+                }
 
-                                    // Calculate the step value for the current interval
-                                    // 15 minutes = step 0, 30 minutes = step 1, etc.
-                                    val stepValue =
-                                        ((settings.trackingIntervalMinutes - 15) / 15f).coerceIn(
-                                            0f,
-                                            7f
+                // Tracking Interval Section (only visible if background tracking is enabled)
+                if (settings.backgroundTrackingEnabled) {
+                    item {
+                        Column(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = Spacing.lg),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        ) {
+                            Text(
+                                text = stringResource(Res.string.tracking_interval),
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(vertical = Spacing.sm),
+                            )
+
+                            MaterialContainer {
+                                SurfaceItem {
+                                    Column(
+                                        modifier = Modifier.padding(Spacing.md),
+                                        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                                    ) {
+                                        Text(
+                                            text = "Update Frequency: ${settings.trackingIntervalMinutes} minutes",
+                                            style = MaterialTheme.typography.bodyLarge,
                                         )
 
-                                    // Use steps parameter for discrete slider with 15-minute intervals
-                                    // From 15 to 120 minutes in 15-minute steps = 8 steps (0 to 7)
-                                    Slider(
-                                        value = stepValue,
-                                        onValueChange = { newValue ->
-                                            // Convert from step value to minutes (15-120)
-                                            val step = newValue.toInt()
-                                            val minutes = 15 + (step * 15)
-                                            onUpdateTrackingInterval(minutes.toLong())
-                                        },
-                                        valueRange = 0f..7f,
-                                        steps = 6, // 8 positions (0-7) means 7 spaces, so 6 steps
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
+                                        // Calculate the step value for the current interval
+                                        // 15 minutes = step 0, 30 minutes = step 1, etc.
+                                        val stepValue =
+                                            ((settings.trackingIntervalMinutes - 15) / 15f).coerceIn(
+                                                0f,
+                                                7f,
+                                            )
 
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(stringResource(Res.string.text_15_min), style = MaterialTheme.typography.labelMedium)
-                                        Text(stringResource(Res.string.text_30_min), style = MaterialTheme.typography.labelMedium)
-                                        Text(stringResource(Res.string.text_60_min), style = MaterialTheme.typography.labelMedium)
+                                        // Use steps parameter for discrete slider with 15-minute intervals
+                                        // From 15 to 120 minutes in 15-minute steps = 8 steps (0 to 7)
+                                        Slider(
+                                            value = stepValue,
+                                            onValueChange = { newValue ->
+                                                // Convert from step value to minutes (15-120)
+                                                val step = newValue.toInt()
+                                                val minutes = 15 + (step * 15)
+                                                onUpdateTrackingInterval(minutes.toLong())
+                                            },
+                                            valueRange = 0f..7f,
+                                            steps = 6, // 8 positions (0-7) means 7 spaces, so 6 steps
+                                            modifier = Modifier.fillMaxWidth(),
+                                        )
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                        ) {
+                                            Text(stringResource(Res.string.text_15_min), style = MaterialTheme.typography.labelMedium)
+                                            Text(stringResource(Res.string.text_30_min), style = MaterialTheme.typography.labelMedium)
+                                            Text(stringResource(Res.string.text_60_min), style = MaterialTheme.typography.labelMedium)
+                                            Text(
+                                                "120 min",
+                                                style = MaterialTheme.typography.labelMedium,
+                                            )
+                                        }
+
                                         Text(
-                                            "120 min",
-                                            style = MaterialTheme.typography.labelMedium
+                                            "Note: More frequent updates use more battery. The minimum interval is 15 minutes due to system limitations.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Location Timeline Section
+                item {
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Spacing.lg),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.location_timeline),
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(vertical = Spacing.sm),
+                        )
+                        OutlinedCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = onShowLocationTimeline,
+                        ) {
+                            Row(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(Spacing.md),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                            ) {
+                                Icon(
+                                    Icons.Default.Timeline,
+                                    contentDescription = stringResource(Res.string.view_timeline),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "View Location Timeline",
+                                        style = MaterialTheme.typography.titleSmall,
+                                    )
 
                                     Text(
-                                        "Note: More frequent updates use more battery. The minimum interval is 15 minutes due to system limitations.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        "See your location history and current location",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            // Location Timeline Section
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm)
-                ) {
-                    Text(
-                        text = stringResource(Res.string.location_timeline),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(vertical = Spacing.sm)
-                    )
-                    OutlinedCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = onShowLocationTimeline
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(Spacing.md),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.md)
-                        ) {
-                            Icon(
-                                Icons.Default.Timeline,
-                                contentDescription = stringResource(Res.string.view_timeline),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "View Location Timeline",
-                                    style = MaterialTheme.typography.titleSmall
-                                )
-
-                                Text(
-                                    "See your location history and current location",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
+                // Location Privacy Notes
+                item {
+                    LocationSettingsNotes()
                 }
-            }
-
-            // Location Privacy Notes
-            item {
-                LocationSettingsNotes()
-            }
             }
         }
     }
@@ -307,27 +314,27 @@ private fun LocationSettingsNotes() {
     Surface {
         Column(
             modifier = Modifier.padding(Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md)
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 Icon(
                     Icons.Default.LocationOn,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = MaterialTheme.colorScheme.primary,
                 )
 
                 Text(
                     "Location data is stored on your device",
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                 )
             }
 
             Text(
                 "Your location data is only stored locally on your device. If you enable cloud sync, your location data will be encrypted before being sent to the cloud.",
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyMedium,
             )
         }
     }
@@ -344,12 +351,12 @@ fun SettingsSection(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg)
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(vertical = Spacing.sm)
+            modifier = Modifier.padding(vertical = Spacing.sm),
         )
 
         MaterialContainer {
@@ -357,7 +364,6 @@ fun SettingsSection(
         }
     }
 }
-
 
 /**
  * A simple settings item with a slot for title and description and optional actions.
@@ -404,8 +410,8 @@ fun ToggleSettingsItem(
         action = {
             Switch(
                 checked = checked,
-                onCheckedChange = onCheckedChange
+                onCheckedChange = onCheckedChange,
             )
-        }
+        },
     )
 }

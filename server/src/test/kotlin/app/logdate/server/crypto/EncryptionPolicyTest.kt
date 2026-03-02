@@ -7,11 +7,12 @@ import kotlin.test.assertTrue
 class EncryptionPolicyTest {
     @Test
     fun `AT_REST_ONLY accepts plaintext and encrypts`() {
-        val policy = EncryptionPolicy(
-            mode = EncryptionMode.AT_REST_ONLY,
-            serverEncryptionEnabled = true,
-            allowPassthroughClientCiphertext = true
-        )
+        val policy =
+            EncryptionPolicy(
+                mode = EncryptionMode.AT_REST_ONLY,
+                serverEncryptionEnabled = true,
+                allowPassthroughClientCiphertext = true,
+            )
 
         val plaintext = "plaintext data".toByteArray()
         val decision = policy.evaluate(plaintext)
@@ -21,11 +22,12 @@ class EncryptionPolicyTest {
 
     @Test
     fun `AT_REST_ONLY accepts client ciphertext with passthrough`() {
-        val policy = EncryptionPolicy(
-            mode = EncryptionMode.AT_REST_ONLY,
-            serverEncryptionEnabled = true,
-            allowPassthroughClientCiphertext = true
-        )
+        val policy =
+            EncryptionPolicy(
+                mode = EncryptionMode.AT_REST_ONLY,
+                serverEncryptionEnabled = true,
+                allowPassthroughClientCiphertext = true,
+            )
 
         val clientCiphertext = "LDCE1".toByteArray() + ByteArray(28)
         val decision = policy.evaluate(clientCiphertext)
@@ -35,11 +37,12 @@ class EncryptionPolicyTest {
 
     @Test
     fun `AT_REST_ONLY accepts server ciphertext`() {
-        val policy = EncryptionPolicy(
-            mode = EncryptionMode.AT_REST_ONLY,
-            serverEncryptionEnabled = true,
-            allowPassthroughClientCiphertext = true
-        )
+        val policy =
+            EncryptionPolicy(
+                mode = EncryptionMode.AT_REST_ONLY,
+                serverEncryptionEnabled = true,
+                allowPassthroughClientCiphertext = true,
+            )
 
         val serverCiphertext = "LDSM1".toByteArray() + ByteArray(28)
         val decision = policy.evaluate(serverCiphertext)
@@ -49,11 +52,12 @@ class EncryptionPolicyTest {
 
     @Test
     fun `E2EE_REQUIRED rejects plaintext`() {
-        val policy = EncryptionPolicy(
-            mode = EncryptionMode.E2EE_REQUIRED,
-            serverEncryptionEnabled = true,
-            allowPassthroughClientCiphertext = true
-        )
+        val policy =
+            EncryptionPolicy(
+                mode = EncryptionMode.E2EE_REQUIRED,
+                serverEncryptionEnabled = true,
+                allowPassthroughClientCiphertext = true,
+            )
 
         val plaintext = "plaintext data".toByteArray()
         val decision = policy.evaluate(plaintext)
@@ -64,11 +68,12 @@ class EncryptionPolicyTest {
 
     @Test
     fun `E2EE_REQUIRED accepts client ciphertext`() {
-        val policy = EncryptionPolicy(
-            mode = EncryptionMode.E2EE_REQUIRED,
-            serverEncryptionEnabled = true,
-            allowPassthroughClientCiphertext = true
-        )
+        val policy =
+            EncryptionPolicy(
+                mode = EncryptionMode.E2EE_REQUIRED,
+                serverEncryptionEnabled = true,
+                allowPassthroughClientCiphertext = true,
+            )
 
         val clientCiphertext = "LDCE1".toByteArray() + ByteArray(28)
         val decision = policy.evaluate(clientCiphertext)
@@ -78,11 +83,12 @@ class EncryptionPolicyTest {
 
     @Test
     fun `E2EE_REQUIRED accepts server ciphertext`() {
-        val policy = EncryptionPolicy(
-            mode = EncryptionMode.E2EE_REQUIRED,
-            serverEncryptionEnabled = true,
-            allowPassthroughClientCiphertext = true
-        )
+        val policy =
+            EncryptionPolicy(
+                mode = EncryptionMode.E2EE_REQUIRED,
+                serverEncryptionEnabled = true,
+                allowPassthroughClientCiphertext = true,
+            )
 
         val serverCiphertext = "LDSM1".toByteArray() + ByteArray(28)
         val decision = policy.evaluate(serverCiphertext)
@@ -92,11 +98,12 @@ class EncryptionPolicyTest {
 
     @Test
     fun `AT_REST_ONLY with encryption disabled accepts plaintext`() {
-        val policy = EncryptionPolicy(
-            mode = EncryptionMode.AT_REST_ONLY,
-            serverEncryptionEnabled = false,
-            allowPassthroughClientCiphertext = true
-        )
+        val policy =
+            EncryptionPolicy(
+                mode = EncryptionMode.AT_REST_ONLY,
+                serverEncryptionEnabled = false,
+                allowPassthroughClientCiphertext = true,
+            )
 
         val plaintext = "plaintext data".toByteArray()
         val decision = policy.evaluate(plaintext)

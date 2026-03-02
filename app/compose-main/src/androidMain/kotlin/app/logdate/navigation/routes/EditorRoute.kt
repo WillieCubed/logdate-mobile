@@ -6,13 +6,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
-import app.logdate.feature.editor.ui.LocalAnimatedVisibilityScope as EditorLocalAnimatedVisibilityScope
 import app.logdate.feature.editor.ui.LocalSharedTransitionScope
 import app.logdate.feature.editor.ui.NoteEditorScreen
-import app.logdate.navigation.LocalSharedTransitionScope as NavigationLocalSharedTransitionScope
 import app.logdate.navigation.routes.core.EntryEditor
-import app.logdate.navigation.scenes.LocalAnimatedVisibilityScope
-
+import app.logdate.feature.editor.ui.LocalAnimatedVisibilityScope as EditorLocalAnimatedVisibilityScope
+import app.logdate.navigation.LocalSharedTransitionScope as NavigationLocalSharedTransitionScope
 
 /**
  * Provides the navigation routes for the note editor screen.
@@ -29,12 +27,12 @@ fun EntryProviderScope<NavKey>.editorRoutes(
     routeEntry<EntryEditor> {
         // Bridge the SharedTransitionScope from navigation to editor module
         val navigationScope = NavigationLocalSharedTransitionScope.current
-        
+
         // Use AnimatedVisibility to provide the AnimatedVisibilityScope
         AnimatedVisibility(visible = true) {
             CompositionLocalProvider(
                 LocalSharedTransitionScope provides navigationScope,
-                EditorLocalAnimatedVisibilityScope provides this@AnimatedVisibility
+                EditorLocalAnimatedVisibilityScope provides this@AnimatedVisibility,
             ) {
                 NoteEditorScreen(
                     onNavigateBack = onBack,

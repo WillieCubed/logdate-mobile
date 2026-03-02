@@ -1,3 +1,5 @@
+import org.jlleitschuh.gradle.ktlint.KtlintExtension
+
 plugins {
     // this is necessary to avoid the plugins to be loaded multiple times
     // in each subproject's classloader
@@ -9,6 +11,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform) apply false
     alias(libs.plugins.compose.compiler) apply false
     alias(libs.plugins.dokka) apply false
+    alias(libs.plugins.ktlint) apply false
     alias(libs.plugins.kover)
     alias(libs.plugins.benManesVersions)
 }
@@ -17,6 +20,13 @@ subprojects {
     apply {
         // TODO: Migrate to version catalog
         plugin("org.jetbrains.dokka")
+        plugin("org.jlleitschuh.gradle.ktlint")
+    }
+
+    configure<KtlintExtension> {
+        filter {
+            exclude { it.file.path.contains("/build/") }
+        }
     }
 
     val dokkaPlugin by configurations

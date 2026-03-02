@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.journals.ui
 
 import androidx.compose.animation.AnimatedVisibility
@@ -10,16 +12,16 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
-import androidx.compose.ui.tooling.preview.Preview
 
 @Composable
 fun JournalListPlaceholder(
     modifier: Modifier = Modifier,
     isVisible: Boolean = true,
-    journals: Int = 4
+    journals: Int = 4,
 ) {
     LazyVerticalGrid(
         modifier = modifier,

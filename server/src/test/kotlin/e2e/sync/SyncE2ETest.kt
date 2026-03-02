@@ -1,20 +1,25 @@
 package app.logdate.server.e2e.sync
 
-import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.configureSyncTestApp
 import app.logdate.shared.model.sync.ContentChangesResponse
 import app.logdate.shared.model.sync.DeviceId
 import app.logdate.shared.model.sync.MediaDownloadResponse
 import app.logdate.shared.model.sync.MediaUploadRequest
 import app.logdate.shared.model.sync.MediaUploadResponse
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import io.ktor.server.testing.*
-import kotlinx.serialization.json.Json
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
+import io.ktor.server.testing.testApplication
 import kotlinx.serialization.encodeToString
-import kotlin.test.Test
+import kotlinx.serialization.json.Json
 import java.util.UUID
+import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -22,99 +27,104 @@ import kotlin.test.assertTrue
  * End-to-end sync tests that cover multi-device behavior, conflict handling, and media flow.
  */
 class SyncE2ETest {
-
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
-    fun `multi-device sync flow detects conflicts and downloads media`() = testApplication {
-        val env = configureSyncTestApp()
-        val accountId = UUID.randomUUID().toString()
-        val authHeader = "Bearer ${env.tokenService.generateAccessToken(accountId)}"
+    fun `multi-device sync flow detects conflicts and downloads media`() =
+        testApplication {
+            val env = configureSyncTestApp()
+            val accountId = UUID.randomUUID().toString()
+            val authHeader = "Bearer ${env.tokenService.generateAccessToken(accountId)}"
 
-        client.post("/api/v1/sync/journals") {
-            header(HttpHeaders.Authorization, authHeader)
-            contentType(ContentType.Application.Json)
-            setBody(
-                """
-                {
-                  "id": "journal-e2e",
-                  "title": "E2E Journal",
-                  "description": "Sync test",
-                  "createdAt": 1000,
-                  "lastUpdated": 1000,
-                  "deviceId": "device-a"
+            client.post("/api/v1/sync/journals") {
+                header(HttpHeaders.Authorization, authHeader)
+                contentType(ContentType.Application.Json)
+                setBody(
+                    """
+                    {
+                      "id": "journal-e2e",
+                      "title": "E2E Journal",
+                      "description": "Sync test",
+                      "createdAt": 1000,
+                      "lastUpdated": 1000,
+                      "deviceId": "device-a"
+                    }
+                    """.trimIndent(),
+                )
+            }
+
+            client.post("/api/v1/sync/content") {
+                header(HttpHeaders.Authorization, authHeader)
+                contentType(ContentType.Application.Json)
+                setBody(
+                    """
+                    {
+                      "id": "note-e2e",
+                      "type": "TEXT",
+                      "content": "hello from device A",
+                      "mediaUri": null,
+                      "createdAt": 1000,
+                      "lastUpdated": 1000,
+                      "deviceId": "device-a"
+                    }
+                    """.trimIndent(),
+                )
+            }
+
+            val mediaBytes = byteArrayOf(9, 8, 7, 6)
+            val mediaRequest =
+                MediaUploadRequest(
+                    contentId = "note-e2e",
+                    fileName = "media.png",
+                    mimeType = "image/png",
+                    sizeBytes = mediaBytes.size.toLong(),
+                    data = mediaBytes,
+                    deviceId = DeviceId("device-a"),
+                )
+            val mediaUpload =
+                client.post("/api/v1/sync/media") {
+                    header(HttpHeaders.Authorization, authHeader)
+                    contentType(ContentType.Application.Json)
+                    setBody(json.encodeToString(mediaRequest))
                 }
-                """.trimIndent()
-            )
-        }
+            assertEquals(HttpStatusCode.OK, mediaUpload.status)
+            val mediaUploadPayload = json.decodeFromString<MediaUploadResponse>(mediaUpload.bodyAsText())
 
-        client.post("/api/v1/sync/content") {
-            header(HttpHeaders.Authorization, authHeader)
-            contentType(ContentType.Application.Json)
-            setBody(
-                """
-                {
-                  "id": "note-e2e",
-                  "type": "TEXT",
-                  "content": "hello from device A",
-                  "mediaUri": null,
-                  "createdAt": 1000,
-                  "lastUpdated": 1000,
-                  "deviceId": "device-a"
+            val changes =
+                client.get("/api/v1/sync/content/changes?since=0") {
+                    header(HttpHeaders.Authorization, authHeader)
                 }
-                """.trimIndent()
-            )
-        }
+            assertEquals(HttpStatusCode.OK, changes.status)
+            val changesPayload = json.decodeFromString<ContentChangesResponse>(changes.bodyAsText())
+            assertTrue(changesPayload.changes.any { it.id == "note-e2e" })
 
-        val mediaBytes = byteArrayOf(9, 8, 7, 6)
-        val mediaRequest = MediaUploadRequest(
-            contentId = "note-e2e",
-            fileName = "media.png",
-            mimeType = "image/png",
-            sizeBytes = mediaBytes.size.toLong(),
-            data = mediaBytes,
-            deviceId = DeviceId("device-a")
-        )
-        val mediaUpload = client.post("/api/v1/sync/media") {
-            header(HttpHeaders.Authorization, authHeader)
-            contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(mediaRequest))
-        }
-        assertEquals(HttpStatusCode.OK, mediaUpload.status)
-        val mediaUploadPayload = json.decodeFromString<MediaUploadResponse>(mediaUpload.bodyAsText())
-
-        val changes = client.get("/api/v1/sync/content/changes?since=0") {
-            header(HttpHeaders.Authorization, authHeader)
-        }
-        assertEquals(HttpStatusCode.OK, changes.status)
-        val changesPayload = json.decodeFromString<ContentChangesResponse>(changes.bodyAsText())
-        assertTrue(changesPayload.changes.any { it.id == "note-e2e" })
-
-        val conflict = client.post("/api/v1/sync/content/note-e2e") {
-            header(HttpHeaders.Authorization, authHeader)
-            contentType(ContentType.Application.Json)
-            setBody(
-                """
-                {
-                  "content": "device b update",
-                  "mediaUri": null,
-                  "lastUpdated": 2000,
-                  "deviceId": "device-b",
-                  "versionConstraint": {
-                    "type": "known",
-                    "serverVersion": 0
-                  }
+            val conflict =
+                client.post("/api/v1/sync/content/note-e2e") {
+                    header(HttpHeaders.Authorization, authHeader)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """
+                        {
+                          "content": "device b update",
+                          "mediaUri": null,
+                          "lastUpdated": 2000,
+                          "deviceId": "device-b",
+                          "versionConstraint": {
+                            "type": "known",
+                            "serverVersion": 0
+                          }
+                        }
+                        """.trimIndent(),
+                    )
                 }
-                """.trimIndent()
-            )
-        }
-        assertEquals(HttpStatusCode.Conflict, conflict.status)
+            assertEquals(HttpStatusCode.Conflict, conflict.status)
 
-        val download = client.get("/api/v1/sync/media/${mediaUploadPayload.mediaId}") {
-            header(HttpHeaders.Authorization, authHeader)
+            val download =
+                client.get("/api/v1/sync/media/${mediaUploadPayload.mediaId}") {
+                    header(HttpHeaders.Authorization, authHeader)
+                }
+            assertEquals(HttpStatusCode.OK, download.status)
+            val downloadPayload = json.decodeFromString<MediaDownloadResponse>(download.bodyAsText())
+            assertTrue(downloadPayload.data.contentEquals(mediaBytes))
         }
-        assertEquals(HttpStatusCode.OK, download.status)
-        val downloadPayload = json.decodeFromString<MediaDownloadResponse>(download.bodyAsText())
-        assertTrue(downloadPayload.data.contentEquals(mediaBytes))
-    }
 }

@@ -1,17 +1,13 @@
 package app.logdate.navigation.routes
 
-import app.logdate.navigation.routes.routeEntry
-
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.core.account.ui.AccountCreationCompletionScreen
-import app.logdate.feature.core.account.ui.AccountOnboardingViewModel
-import app.logdate.feature.core.account.ui.AccountScreen
 import app.logdate.feature.core.account.ui.CloudAccountIntroScreen
 import app.logdate.feature.core.account.ui.DisplayNameSelectionScreen
 import app.logdate.feature.core.account.ui.PasskeyCreationScreen
 import app.logdate.feature.core.account.ui.UsernameSelectionScreen
-import org.koin.compose.koinInject
+import app.logdate.navigation.routes.routeEntry
 
 /**
  * Extension function to add cloud account setup routes to an EntryProviderScope.
@@ -32,54 +28,54 @@ fun EntryProviderScope<NavKey>.cloudAccountSetup(
     onDisplayNameSelected: () -> Unit,
     onPasskeyCreated: () -> Unit,
     onSetupCompleted: () -> Unit,
-    onSkip: () -> Unit
+    onSkip: () -> Unit,
 ) {
     // Cloud Account Intro Screen
-    routeEntry<CloudAccountIntroRoute>() { route ->
+    routeEntry<CloudAccountIntroRoute> { route ->
         // Display the intro screen with ViewModel
         CloudAccountIntroScreen(
             isFromOnboarding = route.isFromOnboarding,
             onContinue = onUsernameSelected,
             onSkip = onSkip,
-            onBack = onBack
+            onBack = onBack,
         )
     }
-    
+
     // The following routes are kept for backward compatibility
     // but will be unused with the new consolidated approach
-    
+
     // Username Selection Screen
-    routeEntry<UsernameSelectionRoute>() {
+    routeEntry<UsernameSelectionRoute> {
         // Display the username selection screen
         UsernameSelectionScreen(
             onContinue = onDisplayNameSelected,
-            onBack = onBack
+            onBack = onBack,
         )
     }
-    
+
     // Display Name Selection Screen
-    routeEntry<DisplayNameSelectionRoute>() {
+    routeEntry<DisplayNameSelectionRoute> {
         // Display the display name selection screen
         DisplayNameSelectionScreen(
             onContinue = onPasskeyCreated,
-            onBack = onBack
+            onBack = onBack,
         )
     }
-    
+
     // Passkey Creation Screen
-    routeEntry<PasskeyCreationRoute>() {
+    routeEntry<PasskeyCreationRoute> {
         // Display the passkey creation screen
         PasskeyCreationScreen(
             onComplete = onSetupCompleted,
-            onBack = onBack
+            onBack = onBack,
         )
     }
-    
+
     // Account Creation Completion Screen
-    routeEntry<AccountCreationCompletionRoute>() {
+    routeEntry<AccountCreationCompletionRoute> {
         // Display the account creation completion screen
         AccountCreationCompletionScreen(
-            onFinish = onSetupCompleted
+            onFinish = onSetupCompleted,
         )
     }
 }

@@ -8,12 +8,10 @@ import kotlinx.coroutines.flow.map
  * Use case for observing place resolution from a stream of locations.
  */
 class ObservePlaceResolutionUseCase(
-    private val resolveLocationToPlaceUseCase: ResolveLocationToPlaceUseCase
+    private val resolveLocationToPlaceUseCase: ResolveLocationToPlaceUseCase,
 ) {
-    
-    operator fun invoke(locations: Flow<Location>): Flow<PlaceResolutionResult> {
-        return locations.map { location ->
+    operator fun invoke(locations: Flow<Location>): Flow<PlaceResolutionResult> =
+        locations.map { location ->
             resolveLocationToPlaceUseCase(location)
         }
-    }
 }

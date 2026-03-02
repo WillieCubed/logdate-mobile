@@ -21,7 +21,9 @@ data class SettingsRoute(
 )
 
 @Serializable
-data class DevicesRoute(val id: String = "devices")
+data class DevicesRoute(
+    val id: String = "devices",
+)
 
 @Serializable
 data object AccountSettingsRoute
@@ -50,7 +52,10 @@ data object AdvancedSettingsRoute
  * @param settingId The ID of the setting to navigate to.
  * @param selectedDetail The detail setting to show (for list-detail layouts).
  */
-fun NavController.navigateToSettings(settingId: String? = null, selectedDetail: String? = null) {
+fun NavController.navigateToSettings(
+    settingId: String? = null,
+    selectedDetail: String? = null,
+) {
     navigate(SettingsRoute(settingId, selectedDetail))
 }
 
@@ -136,15 +141,15 @@ fun NavGraphBuilder.settingsDestination(
             },
             onNavigateToAdvanced = {
                 navController.navigateToAdvancedSettings()
-            }
+            },
         )
     }
-    
+
     composable<DevicesRoute> {
         DevicesScreen(
             onBackClick = {
                 navController.popBackStack()
-            }
+            },
         )
     }
 

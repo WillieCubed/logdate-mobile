@@ -21,19 +21,23 @@ class GetHomeRecommendationUseCase(
     private val hasNotesForToday: HasNotesForTodayUseCase,
     private val fetchMostRecentDraft: FetchMostRecentDraftUseCase,
 ) {
-    operator fun invoke(): Flow<HomeRecommendation> = combine(
-        hasNotesForToday(),
-        fetchMostRecentDraft(),
-    ) { hasNotes, recentDraft ->
-        when {
-            recentDraft != null -> HomeRecommendation.CompleteYourDraft(
-                draftId = recentDraft.id,
-                notePreview = recentDraft.notes
-                    .filterIsInstance<JournalNote.Text>()
-                    .firstOrNull()?.content,
-            )
-            !hasNotes -> HomeRecommendation.CaptureToday()
-            else -> HomeRecommendation.None
+    operator fun invoke(): Flow<HomeRecommendation> =
+        combine(
+            hasNotesForToday(),
+            fetchMostRecentDraft(),
+        ) { hasNotes, recentDraft ->
+            when {
+                recentDraft != null ->
+                    HomeRecommendation.CompleteYourDraft(
+                        draftId = recentDraft.id,
+                        notePreview =
+                            recentDraft.notes
+                                .filterIsInstance<JournalNote.Text>()
+                                .firstOrNull()
+                                ?.content,
+                    )
+                !hasNotes -> HomeRecommendation.CaptureToday()
+                else -> HomeRecommendation.None
+            }
         }
-    }
 }

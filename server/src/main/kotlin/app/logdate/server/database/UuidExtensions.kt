@@ -1,8 +1,8 @@
 package app.logdate.server.database
 
+import java.util.UUID
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
-import java.util.UUID
 
 /**
  * Extension functions to handle UUID conversions between kotlin.uuid.Uuid and java.util.UUID

@@ -7,9 +7,9 @@ import kotlin.uuid.Uuid
  */
 data class AssociationPendingKey(
     val journalId: Uuid,
-    val contentId: Uuid
+    val contentId: Uuid,
 ) {
-    fun toPendingId(): String = "${journalId}::${contentId}"
+    fun toPendingId(): String = "$journalId::$contentId"
 
     companion object {
         fun fromPendingId(value: String): AssociationPendingKey? {

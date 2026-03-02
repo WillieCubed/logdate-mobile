@@ -1,12 +1,12 @@
 package app.logdate.client.sync.metadata
 
-import kotlin.uuid.Uuid
+import app.logdate.client.datastore.KeyValueStorage
+import io.github.aakira.napier.Napier
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import io.github.aakira.napier.Napier
-import app.logdate.client.datastore.KeyValueStorage
+import kotlin.uuid.Uuid
 
 @Serializable
 data class MediaSyncRef(
@@ -14,20 +14,21 @@ data class MediaSyncRef(
     val localUri: String,
     val remoteUrl: String,
     val mediaId: String,
-    val updatedAt: Long
+    val updatedAt: Long,
 )
 
 interface MediaSyncRefStore {
     suspend fun get(noteId: Uuid): MediaSyncRef?
+
     suspend fun upsert(ref: MediaSyncRef)
+
     suspend fun delete(noteId: Uuid)
 }
 
 class KeyValueMediaSyncRefStore(
     private val storage: KeyValueStorage,
-    private val json: Json = Json { ignoreUnknownKeys = true }
+    private val json: Json = Json { ignoreUnknownKeys = true },
 ) : MediaSyncRefStore {
-
     override suspend fun get(noteId: Uuid): MediaSyncRef? {
         val value = storage.getString(key(noteId)) ?: return null
         return runCatching { json.decodeFromString<MediaSyncRef>(value) }
@@ -45,5 +46,5 @@ class KeyValueMediaSyncRefStore(
 
     private fun key(noteId: Uuid): String = key(noteId.toString())
 
-    private fun key(noteId: String): String = "sync_media_ref_${noteId}"
+    private fun key(noteId: String): String = "sync_media_ref_$noteId"
 }

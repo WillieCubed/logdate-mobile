@@ -9,7 +9,7 @@ import io.github.aakira.napier.Napier
  * This is used to pass data between screens in the account creation flow.
  */
 class SaveAccountSetupDataUseCase(
-    private val getAccountSetupDataUseCase: GetAccountSetupDataUseCase
+    private val getAccountSetupDataUseCase: GetAccountSetupDataUseCase,
 ) {
     /**
      * Saves the account setup data.
@@ -17,16 +17,21 @@ class SaveAccountSetupDataUseCase(
      * @param displayName The display name to save
      * @param email Optional email to save
      */
-    suspend operator fun invoke(username: String, displayName: String, email: String? = null) {
+    suspend operator fun invoke(
+        username: String,
+        displayName: String,
+        email: String? = null,
+    ) {
         try {
-            val accountSetupData = AccountSetupData(
-                username = username,
-                displayName = displayName,
-                email = email
-            )
+            val accountSetupData =
+                AccountSetupData(
+                    username = username,
+                    displayName = displayName,
+                    email = email,
+                )
             getAccountSetupDataUseCase(
                 action = GetAccountSetupDataUseCase.Action.Save,
-                data = accountSetupData
+                data = accountSetupData,
             )
             Napier.d("Account setup data saved successfully")
         } catch (e: Exception) {

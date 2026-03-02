@@ -1,14 +1,21 @@
 package app.logdate.server.passkeys
 
-import app.logdate.shared.model.*
+import app.logdate.shared.model.AuthenticatorAssertionResponse
+import app.logdate.shared.model.AuthenticatorAttestationResponse
+import app.logdate.shared.model.PasskeyAuthenticationResponse
+import app.logdate.shared.model.PasskeyRegistrationResponse
 import kotlinx.coroutines.test.runTest
-import kotlin.test.*
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class)
 class WebAuthnVerificationTest {
-
     private lateinit var passkeyService: SimplePasskeyService
 
     @BeforeTest
@@ -19,7 +26,7 @@ class WebAuthnVerificationTest {
     @Test
     fun `challenge must be valid base64url without padding`() {
         val challenge = passkeyService.generateChallenge()
-        
+
         // Should be a hex string in our implementation
         assertTrue(challenge.isNotEmpty())
         assertTrue(challenge.length >= 32) // At least 32 characters for 32 bytes in hex
@@ -29,125 +36,140 @@ class WebAuthnVerificationTest {
     @Test
     fun `challenge generation creates unique values`() {
         val challenges = (1..10).map { passkeyService.generateChallenge() }
-        
+
         // All challenges should be unique
         assertEquals(10, challenges.toSet().size)
-        
+
         // All challenges should be non-empty
         assertTrue(challenges.all { it.isNotEmpty() })
     }
 
     @Test
-    fun `passkey registration requires valid challenge`() = runTest {
-        val userId = Uuid.random()
-        val validChallenge = passkeyService.generateRegistrationOptions(userId, "testuser", "Test User").challenge
-        
-        val registrationResponse = PasskeyRegistrationResponse(
-            id = "test-credential",
-            rawId = "dGVzdC1jcmVkZW50aWFs",
-            response = AuthenticatorAttestationResponse(
-                clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0=",
-                attestationObject = "YXR0ZXN0YXRpb25PYmplY3Q="
-            )
-        )
+    fun `passkey registration requires valid challenge`() =
+        runTest {
+            val userId = Uuid.random()
+            val validChallenge = passkeyService.generateRegistrationOptions(userId, "testuser", "Test User").challenge
 
-        // Valid challenge should succeed
-        val validResult = passkeyService.verifyRegistration(userId, validChallenge, registrationResponse)
-        assertTrue(validResult.success)
+            val registrationResponse =
+                PasskeyRegistrationResponse(
+                    id = "test-credential",
+                    rawId = "dGVzdC1jcmVkZW50aWFs",
+                    response =
+                        AuthenticatorAttestationResponse(
+                            clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0=",
+                            attestationObject = "YXR0ZXN0YXRpb25PYmplY3Q=",
+                        ),
+                )
 
-        // Invalid challenge should fail
-        val invalidResult = passkeyService.verifyRegistration(userId, "invalid-challenge", registrationResponse)
-        assertFalse(invalidResult.success)
-        assertEquals("Invalid challenge", invalidResult.error)
-    }
+            // Valid challenge should succeed
+            val validResult = passkeyService.verifyRegistration(userId, validChallenge, registrationResponse)
+            assertTrue(validResult.success)
 
-    @Test
-    fun `passkey authentication requires existing credential`() = runTest {
-        val userId = Uuid.random()
-        
-        // First register a passkey
-        val regOptions = passkeyService.generateRegistrationOptions(userId, "testuser", "Test User")
-        val regResponse = PasskeyRegistrationResponse(
-            id = "test-credential",
-            rawId = "dGVzdC1jcmVkZW50aWFs",
-            response = AuthenticatorAttestationResponse(
-                clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0=",
-                attestationObject = "YXR0ZXN0YXRpb25PYmplY3Q="
-            )
-        )
-        passkeyService.verifyRegistration(userId, regOptions.challenge, regResponse)
-
-        // Now test authentication
-        val authOptions = passkeyService.generateAuthenticationOptions(userId)
-        
-        // Authentication with registered credential should succeed
-        val validAuthResponse = PasskeyAuthenticationResponse(
-            id = "test-credential",
-            rawId = "dGVzdC1jcmVkZW50aWFs",
-            response = AuthenticatorAssertionResponse(
-                clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0In0=",
-                authenticatorData = "YXV0aGVudGljYXRvckRhdGE=",
-                signature = "c2lnbmF0dXJl",
-                userHandle = userId.toString()
-            )
-        )
-        
-        val validResult = passkeyService.verifyAuthentication(authOptions.challenge, validAuthResponse)
-        assertTrue(validResult.success)
-
-        // Authentication with unknown credential should fail - need new challenge since previous one is used
-        val authOptions2 = passkeyService.generateAuthenticationOptions(userId)
-        val invalidAuthResponse = PasskeyAuthenticationResponse(
-            id = "unknown-credential",
-            rawId = "dW5rbm93bi1jcmVkZW50aWFs",
-            response = AuthenticatorAssertionResponse(
-                clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0In0=",
-                authenticatorData = "YXV0aGVudGljYXRvckRhdGE=",
-                signature = "c2lnbmF0dXJl",
-                userHandle = userId.toString()
-            )
-        )
-        
-        val invalidResult = passkeyService.verifyAuthentication(authOptions2.challenge, invalidAuthResponse)
-        assertFalse(invalidResult.success)
-        assertEquals("Credential not found", invalidResult.error)
-    }
+            // Invalid challenge should fail
+            val invalidResult = passkeyService.verifyRegistration(userId, "invalid-challenge", registrationResponse)
+            assertFalse(invalidResult.success)
+            assertEquals("Invalid challenge", invalidResult.error)
+        }
 
     @Test
-    fun `challenge can only be used once`() = runTest {
-        val userId = Uuid.random()
-        val options = passkeyService.generateRegistrationOptions(userId, "testuser", "Test User")
-        
-        val registrationResponse = PasskeyRegistrationResponse(
-            id = "test-credential",
-            rawId = "dGVzdC1jcmVkZW50aWFs",
-            response = AuthenticatorAttestationResponse(
-                clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0=",
-                attestationObject = "YXR0ZXN0YXRpb25PYmplY3Q="
-            )
-        )
+    fun `passkey authentication requires existing credential`() =
+        runTest {
+            val userId = Uuid.random()
 
-        // First use should succeed
-        val firstResult = passkeyService.verifyRegistration(userId, options.challenge, registrationResponse)
-        assertTrue(firstResult.success)
+            // First register a passkey
+            val regOptions = passkeyService.generateRegistrationOptions(userId, "testuser", "Test User")
+            val regResponse =
+                PasskeyRegistrationResponse(
+                    id = "test-credential",
+                    rawId = "dGVzdC1jcmVkZW50aWFs",
+                    response =
+                        AuthenticatorAttestationResponse(
+                            clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0=",
+                            attestationObject = "YXR0ZXN0YXRpb25PYmplY3Q=",
+                        ),
+                )
+            passkeyService.verifyRegistration(userId, regOptions.challenge, regResponse)
 
-        // Second use of same challenge should fail
-        val secondResult = passkeyService.verifyRegistration(userId, options.challenge, registrationResponse)
-        assertFalse(secondResult.success)
-        assertEquals("Challenge already used", secondResult.error)
-    }
+            // Now test authentication
+            val authOptions = passkeyService.generateAuthenticationOptions(userId)
+
+            // Authentication with registered credential should succeed
+            val validAuthResponse =
+                PasskeyAuthenticationResponse(
+                    id = "test-credential",
+                    rawId = "dGVzdC1jcmVkZW50aWFs",
+                    response =
+                        AuthenticatorAssertionResponse(
+                            clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0In0=",
+                            authenticatorData = "YXV0aGVudGljYXRvckRhdGE=",
+                            signature = "c2lnbmF0dXJl",
+                            userHandle = userId.toString(),
+                        ),
+                )
+
+            val validResult = passkeyService.verifyAuthentication(authOptions.challenge, validAuthResponse)
+            assertTrue(validResult.success)
+
+            // Authentication with unknown credential should fail - need new challenge since previous one is used
+            val authOptions2 = passkeyService.generateAuthenticationOptions(userId)
+            val invalidAuthResponse =
+                PasskeyAuthenticationResponse(
+                    id = "unknown-credential",
+                    rawId = "dW5rbm93bi1jcmVkZW50aWFs",
+                    response =
+                        AuthenticatorAssertionResponse(
+                            clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0In0=",
+                            authenticatorData = "YXV0aGVudGljYXRvckRhdGE=",
+                            signature = "c2lnbmF0dXJl",
+                            userHandle = userId.toString(),
+                        ),
+                )
+
+            val invalidResult = passkeyService.verifyAuthentication(authOptions2.challenge, invalidAuthResponse)
+            assertFalse(invalidResult.success)
+            assertEquals("Credential not found", invalidResult.error)
+        }
+
+    @Test
+    fun `challenge can only be used once`() =
+        runTest {
+            val userId = Uuid.random()
+            val options = passkeyService.generateRegistrationOptions(userId, "testuser", "Test User")
+
+            val registrationResponse =
+                PasskeyRegistrationResponse(
+                    id = "test-credential",
+                    rawId = "dGVzdC1jcmVkZW50aWFs",
+                    response =
+                        AuthenticatorAttestationResponse(
+                            clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0=",
+                            attestationObject = "YXR0ZXN0YXRpb25PYmplY3Q=",
+                        ),
+                )
+
+            // First use should succeed
+            val firstResult = passkeyService.verifyRegistration(userId, options.challenge, registrationResponse)
+            assertTrue(firstResult.success)
+
+            // Second use of same challenge should fail
+            val secondResult = passkeyService.verifyRegistration(userId, options.challenge, registrationResponse)
+            assertFalse(secondResult.success)
+            assertEquals("Challenge already used", secondResult.error)
+        }
 
     @Test
     fun `registration response must contain required fields`() {
         // Test that our PasskeyRegistrationResponse model has the required fields
-        val response = PasskeyRegistrationResponse(
-            id = "credential-id",
-            rawId = "Y3JlZGVudGlhbC1pZA==",
-            response = AuthenticatorAttestationResponse(
-                clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0=",
-                attestationObject = "YXR0ZXN0YXRpb25PYmplY3Q="
+        val response =
+            PasskeyRegistrationResponse(
+                id = "credential-id",
+                rawId = "Y3JlZGVudGlhbC1pZA==",
+                response =
+                    AuthenticatorAttestationResponse(
+                        clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0=",
+                        attestationObject = "YXR0ZXN0YXRpb25PYmplY3Q=",
+                    ),
             )
-        )
 
         assertEquals("credential-id", response.id)
         assertEquals("Y3JlZGVudGlhbC1pZA==", response.rawId)
@@ -160,16 +182,18 @@ class WebAuthnVerificationTest {
     @Test
     fun `authentication response must contain required fields`() {
         // Test that our PasskeyAuthenticationResponse model has the required fields
-        val response = PasskeyAuthenticationResponse(
-            id = "credential-id",
-            rawId = "Y3JlZGVudGlhbC1pZA==",
-            response = AuthenticatorAssertionResponse(
-                clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0In0=",
-                authenticatorData = "YXV0aGVudGljYXRvckRhdGE=",
-                signature = "c2lnbmF0dXJl",
-                userHandle = "user-handle"
+        val response =
+            PasskeyAuthenticationResponse(
+                id = "credential-id",
+                rawId = "Y3JlZGVudGlhbC1pZA==",
+                response =
+                    AuthenticatorAssertionResponse(
+                        clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0In0=",
+                        authenticatorData = "YXV0aGVudGljYXRvckRhdGE=",
+                        signature = "c2lnbmF0dXJl",
+                        userHandle = "user-handle",
+                    ),
             )
-        )
 
         assertEquals("credential-id", response.id)
         assertEquals("Y3JlZGVudGlhbC1pZA==", response.rawId)
@@ -182,56 +206,61 @@ class WebAuthnVerificationTest {
     }
 
     @Test
-    fun `passkey registration options contain required fields`() = runTest {
-        val userId = Uuid.random()
-        val username = "testuser"
-        val displayName = "Test User"
-        
-        val options = passkeyService.generateRegistrationOptions(userId, username, displayName)
+    fun `passkey registration options contain required fields`() =
+        runTest {
+            val userId = Uuid.random()
+            val username = "testuser"
+            val displayName = "Test User"
 
-        assertNotNull(options.challenge)
-        assertTrue(options.challenge.isNotEmpty())
-        
-        assertEquals(username, options.user.name)
-        assertEquals(displayName, options.user.displayName)
-        assertEquals(userId.toString(), options.user.id)
-        
-        assertNotNull(options.excludeCredentials)
-        assertTrue(options.timeout > 0)
-    }
+            val options = passkeyService.generateRegistrationOptions(userId, username, displayName)
 
-    @Test
-    fun `passkey authentication options contain required fields`() = runTest {
-        val userId = Uuid.random()
-        
-        val options = passkeyService.generateAuthenticationOptions(userId)
+            assertNotNull(options.challenge)
+            assertTrue(options.challenge.isNotEmpty())
 
-        assertNotNull(options.challenge)
-        assertTrue(options.challenge.isNotEmpty())
-        
-        assertNotNull(options.allowCredentials)
-        assertTrue(options.timeout > 0)
-    }
+            assertEquals(username, options.user.name)
+            assertEquals(displayName, options.user.displayName)
+            assertEquals(userId.toString(), options.user.id)
+
+            assertNotNull(options.excludeCredentials)
+            assertTrue(options.timeout > 0)
+        }
 
     @Test
-    fun `user verification result contains expected information`() = runTest {
-        val userId = Uuid.random()
-        val regOptions = passkeyService.generateRegistrationOptions(userId, "testuser", "Test User")
-        
-        val registrationResponse = PasskeyRegistrationResponse(
-            id = "test-credential",
-            rawId = "dGVzdC1jcmVkZW50aWFs",
-            response = AuthenticatorAttestationResponse(
-                clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0=",
-                attestationObject = "YXR0ZXN0YXRpb25PYmplY3Q="
-            )
-        )
+    fun `passkey authentication options contain required fields`() =
+        runTest {
+            val userId = Uuid.random()
 
-        val result = passkeyService.verifyRegistration(userId, regOptions.challenge, registrationResponse)
-        
-        assertTrue(result.success)
-        assertEquals("test-credential", result.credentialId)
-        assertNull(result.error)
-        assertNull(result.userId) // userId is only returned for authentication
-    }
+            val options = passkeyService.generateAuthenticationOptions(userId)
+
+            assertNotNull(options.challenge)
+            assertTrue(options.challenge.isNotEmpty())
+
+            assertNotNull(options.allowCredentials)
+            assertTrue(options.timeout > 0)
+        }
+
+    @Test
+    fun `user verification result contains expected information`() =
+        runTest {
+            val userId = Uuid.random()
+            val regOptions = passkeyService.generateRegistrationOptions(userId, "testuser", "Test User")
+
+            val registrationResponse =
+                PasskeyRegistrationResponse(
+                    id = "test-credential",
+                    rawId = "dGVzdC1jcmVkZW50aWFs",
+                    response =
+                        AuthenticatorAttestationResponse(
+                            clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0=",
+                            attestationObject = "YXR0ZXN0YXRpb25PYmplY3Q=",
+                        ),
+                )
+
+            val result = passkeyService.verifyRegistration(userId, regOptions.challenge, registrationResponse)
+
+            assertTrue(result.success)
+            assertEquals("test-credential", result.credentialId)
+            assertNull(result.error)
+            assertNull(result.userId) // userId is only returned for authentication
+        }
 }

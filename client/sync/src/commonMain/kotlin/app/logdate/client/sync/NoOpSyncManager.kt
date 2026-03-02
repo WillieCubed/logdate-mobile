@@ -5,14 +5,15 @@ package app.logdate.client.sync
  */
 object NoOpSyncManager : SyncManager {
     private val noOpResult = SyncResult(success = true)
-    private val noOpStatus = SyncStatus(
-        isEnabled = false,
-        lastSyncTime = null,
-        pendingUploads = 0,
-        isSyncing = false,
-        hasErrors = false,
-        lastError = null
-    )
+    private val noOpStatus =
+        SyncStatus(
+            isEnabled = false,
+            lastSyncTime = null,
+            pendingUploads = 0,
+            isSyncing = false,
+            hasErrors = false,
+            lastError = null,
+        )
 
     override fun sync(startNow: Boolean) {
         // No-op.

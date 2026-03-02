@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports", "ktlint:standard:max-line-length")
+
 @file:OptIn(ExperimentalSharedTransitionApi::class)
 
 package app.logdate.feature.onboarding.ui
@@ -59,18 +61,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.client.media.MediaObject
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
-import kotlin.time.Duration
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.time.Clock
-import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Clock
+import kotlin.time.Duration
+
 /**
  * UI state for the memory selection screen.
  */
@@ -105,7 +108,7 @@ fun MemorySelectionScreen(
         AnimatedVisibility(
             visible = true,
             enter = fadeIn(),
-            exit = fadeOut()
+            exit = fadeOut(),
         ) {
             val animatedVisibilityScope = this
 
@@ -118,7 +121,7 @@ fun MemorySelectionScreen(
                             IconButton(onClick = onBack) {
                                 Icon(
                                     Icons.AutoMirrored.Default.ArrowBack,
-                                    contentDescription = stringResource(Res.string.back)
+                                    contentDescription = stringResource(Res.string.back),
                                 )
                             }
                         },
@@ -136,9 +139,10 @@ fun MemorySelectionScreen(
                             onMemoryLongPressEnd = { expandedMemory = null },
                             expandedMemory = expandedMemory,
                             animatedVisibilityScope = animatedVisibilityScope,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(contentPadding),
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .padding(contentPadding),
                         )
                     }
 
@@ -146,7 +150,7 @@ fun MemorySelectionScreen(
                     AnimatedVisibility(
                         visible = expandedMemory != null,
                         enter = fadeIn(),
-                        exit = fadeOut()
+                        exit = fadeOut(),
                     ) {
                         val visibilityScope = this
                         expandedMemory?.let { memory ->
@@ -198,7 +202,10 @@ private fun SharedTransitionScope.MemorySelectionContent(
                 )
 
                 Text(
-                    text = stringResource(Res.string.weve_found_some_photos_and_videos_that_might_have_special_meaning_to_you_select_the_ones_youd_like_to_import),
+                    text =
+                        stringResource(
+                            Res.string.weve_found_some_photos_and_videos_that_might_have_special_meaning_to_you_select_the_ones_youd_like_to_import,
+                        ),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -251,15 +258,16 @@ private fun SharedTransitionScope.MemorySelectionContent(
             Button(
                 onClick = onContinue,
                 enabled = uiState.selectedMemoryIds.isNotEmpty(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = Spacing.lg),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = Spacing.lg),
             ) {
                 Text(
                     stringResource(
                         Res.string.continue_with_memories_count,
-                        uiState.selectedMemoryIds.size
-                    )
+                        uiState.selectedMemoryIds.size,
+                    ),
                 )
             }
         }
@@ -289,12 +297,13 @@ private fun SharedTransitionScope.AICuratedMemoriesSection(
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(
-                        MaterialTheme.colorScheme.primary,
-                        CircleShape
-                    )
+                modifier =
+                    Modifier
+                        .size(8.dp)
+                        .background(
+                            MaterialTheme.colorScheme.primary,
+                            CircleShape,
+                        ),
             )
             Text(
                 text = stringResource(Res.string.moments_that_might_matter_most),
@@ -304,16 +313,20 @@ private fun SharedTransitionScope.AICuratedMemoriesSection(
         }
 
         Text(
-            text = stringResource(Res.string.our_ai_identified_these_as_potentially_meaningful_memories_based_on_visual_content_timing_and_context),
+            text =
+                stringResource(
+                    Res.string.our_ai_identified_these_as_potentially_meaningful_memories_based_on_visual_content_timing_and_context,
+                ),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         // Fixed height staggered grid for AI curated content
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(200.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
         ) {
             LazyVerticalStaggeredGrid(
                 columns = StaggeredGridCells.Fixed(3),
@@ -356,16 +369,19 @@ private fun SharedTransitionScope.AllMemoriesStaggeredGrid(
     modifier: Modifier = Modifier,
 ) {
     // Calculate height based on content to avoid infinite dimensions
-    val gridHeight = remember(memories.size) {
-        // Estimate height based on number of items and average item height
-        val estimatedRows = (memories.size + 2) / 3 // 3 columns
-        (estimatedRows * 120).dp // Average item height
-    }
+    val gridHeight =
+        remember(memories.size) {
+            // Estimate height based on number of items and average item height
+            val estimatedRows = (memories.size + 2) / 3 // 3 columns
+            (estimatedRows * 120).dp // Average item height
+        }
 
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(gridHeight.coerceAtMost(600.dp)), // Max height to prevent infinite dimensions
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .height(gridHeight.coerceAtMost(600.dp)),
+        // Max height to prevent infinite dimensions
     ) {
         LazyVerticalStaggeredGrid(
             columns = StaggeredGridCells.Fixed(3),
@@ -390,9 +406,10 @@ private fun SharedTransitionScope.AllMemoriesStaggeredGrid(
             if (isLoadingMore) {
                 item {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(Spacing.lg),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(Spacing.lg),
                         contentAlignment = Alignment.Center,
                     ) {
                         CircularProgressIndicator()
@@ -450,7 +467,7 @@ private fun SharedTransitionScope.MemoryThumbnail(
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 1.05f else 1f,
         animationSpec = tween(durationMillis = 100),
-        label = "thumbnail_scale"
+        label = "thumbnail_scale",
     )
 
     // Use native aspect ratio of the content, constrained to max 3:2
@@ -459,63 +476,68 @@ private fun SharedTransitionScope.MemoryThumbnail(
     val thumbnailScope = rememberCoroutineScope()
 
     Card(
-        modifier = modifier
-            .aspectRatio(aspectRatio)
-            .scale(scale)
-            .then(
-                if (!isExpanded) {
-                    Modifier.sharedElement(
-                        rememberSharedContentState("memory-${memory.uri}"),
-                        animatedVisibilityScope
-                    )
-                } else {
-                    Modifier
-                }
-            )
-            .pointerInput(memory.uri) {
-                detectTapGestures(
-                    onTap = { onToggleSelection() },
-                    onPress = {
-                        isPressed = true
-                        val longPressJob = thumbnailScope.launch {
-                            delay(500) // 500ms for long press
-                            onLongPress()
-                        }
-                        tryAwaitRelease()
-                        longPressJob.cancel()
-                        isPressed = false
-                        onLongPressEnd()
-                    }
-                )
-            },
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = if (isSelected) 4.dp else 1.dp,
-        ),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
+        modifier =
+            modifier
+                .aspectRatio(aspectRatio)
+                .scale(scale)
                 .then(
-                    if (isSelected) {
-                        Modifier.border(
-                            2.dp,
-                            MaterialTheme.colorScheme.primary,
-                            MaterialTheme.shapes.medium
+                    if (!isExpanded) {
+                        Modifier.sharedElement(
+                            rememberSharedContentState("memory-${memory.uri}"),
+                            animatedVisibilityScope,
                         )
                     } else {
                         Modifier
-                    }
-                )
+                    },
+                ).pointerInput(memory.uri) {
+                    detectTapGestures(
+                        onTap = { onToggleSelection() },
+                        onPress = {
+                            isPressed = true
+                            val longPressJob =
+                                thumbnailScope.launch {
+                                    delay(500) // 500ms for long press
+                                    onLongPress()
+                                }
+                            tryAwaitRelease()
+                            longPressJob.cancel()
+                            isPressed = false
+                            onLongPressEnd()
+                        },
+                    )
+                },
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            ),
+        elevation =
+            CardDefaults.cardElevation(
+                defaultElevation = if (isSelected) 4.dp else 1.dp,
+            ),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (isSelected) {
+                            Modifier.border(
+                                2.dp,
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.shapes.medium,
+                            )
+                        } else {
+                            Modifier
+                        },
+                    ),
         ) {
             // Placeholder for image/video content - in real implementation would load from filesystem
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clip(MaterialTheme.shapes.medium),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clip(MaterialTheme.shapes.medium),
                 contentAlignment = Alignment.Center,
             ) {
                 when (memory) {
@@ -541,14 +563,15 @@ private fun SharedTransitionScope.MemoryThumbnail(
             // Selection indicator
             if (isSelected) {
                 Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(Spacing.sm)
-                        .size(24.dp)
-                        .background(
-                            MaterialTheme.colorScheme.primary,
-                            CircleShape
-                        ),
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(Spacing.sm)
+                            .size(24.dp)
+                            .background(
+                                MaterialTheme.colorScheme.primary,
+                                CircleShape,
+                            ),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -574,32 +597,37 @@ private fun SharedTransitionScope.ExpandedMemoryOverlay(
     modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.7f))
-            .clickable { onDismiss() },
+        modifier =
+            modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.7f))
+                .clickable { onDismiss() },
         contentAlignment = Alignment.Center,
     ) {
         Card(
-            modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .aspectRatio(1f)
-                .sharedElement(
-                    rememberSharedContentState("memory-${memory.uri}"),
-                    animatedVisibilityScope
-                )
-                .clickable { }, // Prevent dismissing when clicking on the card itself
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface,
-            ),
-            elevation = CardDefaults.cardElevation(
-                defaultElevation = 8.dp,
-            ),
+            modifier =
+                Modifier
+                    .fillMaxWidth(0.9f)
+                    .aspectRatio(1f)
+                    .sharedElement(
+                        rememberSharedContentState("memory-${memory.uri}"),
+                        animatedVisibilityScope,
+                    ).clickable { },
+            // Prevent dismissing when clicking on the card itself
+            colors =
+                CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
+            elevation =
+                CardDefaults.cardElevation(
+                    defaultElevation = 8.dp,
+                ),
         ) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center,
             ) {
                 when (memory) {
@@ -649,34 +677,36 @@ private fun SharedTransitionScope.ExpandedMemoryOverlay(
 @Composable
 private fun MemorySelectionScreenPreview() {
     LogDateTheme {
-        val sampleMemories = (1..20).map { index ->
-            if (index % 3 == 0) {
-                MediaObject.Video(
-                    uri = "sample$index",
-                    size = 2048,
-                    name = "VID_$index.mp4",
-                    timestamp = Clock.System.now(),
-                    duration = kotlin.time.Duration.parse("30s"),
-                )
-            } else {
-                MediaObject.Image(
-                    uri = "sample$index",
-                    size = 1024,
-                    name = "IMG_$index.jpg",
-                    timestamp = Clock.System.now(),
-                )
+        val sampleMemories =
+            (1..20).map { index ->
+                if (index % 3 == 0) {
+                    MediaObject.Video(
+                        uri = "sample$index",
+                        size = 2048,
+                        name = "VID_$index.mp4",
+                        timestamp = Clock.System.now(),
+                        duration = kotlin.time.Duration.parse("30s"),
+                    )
+                } else {
+                    MediaObject.Image(
+                        uri = "sample$index",
+                        size = 1024,
+                        name = "IMG_$index.jpg",
+                        timestamp = Clock.System.now(),
+                    )
+                }
             }
-        }
 
         MemorySelectionScreen(
-            uiState = MemorySelectionUiState(
-                allMemories = sampleMemories,
-                aiCuratedMemories = sampleMemories.take(6),
-                selectedMemoryIds = setOf("sample1", "sample5"),
-                isLoading = false,
-                hasMoreMemories = true,
-                isLoadingMore = false,
-            ),
+            uiState =
+                MemorySelectionUiState(
+                    allMemories = sampleMemories,
+                    aiCuratedMemories = sampleMemories.take(6),
+                    selectedMemoryIds = setOf("sample1", "sample5"),
+                    isLoading = false,
+                    hasMoreMemories = true,
+                    isLoadingMore = false,
+                ),
             onBack = {},
             onContinue = {},
             onToggleMemorySelection = {},

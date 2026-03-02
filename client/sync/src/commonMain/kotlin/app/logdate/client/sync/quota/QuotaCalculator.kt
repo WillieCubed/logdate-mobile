@@ -9,12 +9,11 @@ import app.logdate.shared.model.CloudStorageQuota
  * Used for full recalculation and validation of cached data.
  */
 interface QuotaCalculator {
-    
     /**
      * Calculates total quota usage across all object types.
      */
     suspend fun calculateTotalUsage(): CloudStorageQuota
-    
+
     /**
      * Calculates usage for a specific object type.
      */

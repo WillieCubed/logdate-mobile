@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
 
-
 /**
  * A utility that handles sharing content to external apps.
  */
@@ -31,19 +30,25 @@ class AndroidSharingLauncher(
      * will be thrown.
      * @param theme The theme to use for the shared content
      */
-    override fun shareJournalToInstagram(journalId: Uuid, theme: ShareTheme) {
+    override fun shareJournalToInstagram(
+        journalId: Uuid,
+        theme: ShareTheme,
+    ) {
         coroutineScope.launch {
-            val journal = journalRepository.observeJournalById(journalId).firstOrNull()
-                ?: throw IllegalArgumentException("Journal with ID $journalId does not exist")
+            val journal =
+                journalRepository.observeJournalById(journalId).firstOrNull()
+                    ?: throw IllegalArgumentException("Journal with ID $journalId does not exist")
             val cover = shareAssetGenerator.generateStickerLayer(journal, theme)
             val background = shareAssetGenerator.generateBackgroundLayer(journal, theme)
             context.grantUriPermission(
-                INSTAGRAM_PACKAGE_NAME, cover.toUri(), Intent.FLAG_GRANT_READ_URI_PERMISSION
+                INSTAGRAM_PACKAGE_NAME,
+                cover.toUri(),
+                Intent.FLAG_GRANT_READ_URI_PERMISSION,
             )
             context.startActivity(createInstagramStoryIntent(cover.toUri(), background.toUri()))
         }
     }
-    
+
     /**
      * Shares a journal using the system share sheet.
      *
@@ -52,9 +57,10 @@ class AndroidSharingLauncher(
      */
     override fun shareJournalLink(journalId: Uuid) {
         coroutineScope.launch {
-            val journal = journalRepository.observeJournalById(journalId).firstOrNull()
-                ?: throw IllegalArgumentException("Journal with ID $journalId does not exist")
-            
+            val journal =
+                journalRepository.observeJournalById(journalId).firstOrNull()
+                    ?: throw IllegalArgumentException("Journal with ID $journalId does not exist")
+
             // Use the shareJournalLink extension function from ShareSheet.kt
             context.shareJournalLink(journal)
         }

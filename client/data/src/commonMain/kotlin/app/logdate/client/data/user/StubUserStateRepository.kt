@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlin.time.Instant
 
 object StubUserStateRepository : UserStateRepository {
-
     override val userData: Flow<UserData>
         get() = flowOf(UserData())
 

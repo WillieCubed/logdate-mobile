@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.ui.common
 
 import androidx.compose.foundation.layout.Column
@@ -47,23 +49,26 @@ fun MaterialCard(
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     elevation: Dp = 2.dp,
     contentPadding: Dp = 16.dp,
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = shape,
-        colors = CardDefaults.cardColors(
-            containerColor = containerColor,
-            contentColor = contentColor
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = elevation
-        )
+        colors =
+            CardDefaults.cardColors(
+                containerColor = containerColor,
+                contentColor = contentColor,
+            ),
+        elevation =
+            CardDefaults.cardElevation(
+                defaultElevation = elevation,
+            ),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(contentPadding)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(contentPadding),
         ) {
             // Title section if provided
             title?.let {
@@ -71,10 +76,10 @@ fun MaterialCard(
                     text = it,
                     style = titleStyle,
                     color = contentColor,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier.padding(bottom = 8.dp),
                 )
             }
-            
+
             // Card content
             content()
         }

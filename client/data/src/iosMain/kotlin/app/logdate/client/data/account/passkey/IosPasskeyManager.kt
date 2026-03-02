@@ -15,27 +15,21 @@ import app.logdate.client.domain.account.passkey.RegistrationOptions
  * operations return a not-supported error until the native implementation lands.
  */
 class IosPasskeyManager : PasskeyManager {
-    override suspend fun createPasskey(
-        options: RegistrationOptions
-    ): Result<PasskeyRegistrationResult> {
-        return Result.failure(
+    override suspend fun createPasskey(options: RegistrationOptions): Result<PasskeyRegistrationResult> =
+        Result.failure(
             PasskeyException(
                 PasskeyErrorCode.NOT_SUPPORTED,
-                "Passkey registration is not supported on iOS yet."
-            )
+                "Passkey registration is not supported on iOS yet.",
+            ),
         )
-    }
 
-    override suspend fun getPasskey(
-        options: AuthenticationOptions
-    ): Result<PasskeyAuthenticationResult> {
-        return Result.failure(
+    override suspend fun getPasskey(options: AuthenticationOptions): Result<PasskeyAuthenticationResult> =
+        Result.failure(
             PasskeyException(
                 PasskeyErrorCode.NOT_SUPPORTED,
-                "Passkey authentication is not supported on iOS yet."
-            )
+                "Passkey authentication is not supported on iOS yet.",
+            ),
         )
-    }
 
     override fun isPasskeySupported(): Boolean = false
 }

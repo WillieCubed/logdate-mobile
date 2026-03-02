@@ -13,24 +13,17 @@ import kotlin.uuid.Uuid
 class FakeJournalDao : JournalDao {
     private val journals = mutableMapOf<Uuid, JournalEntity>()
     private val journalsFlow = MutableStateFlow<List<JournalEntity>>(emptyList())
-    
-    override fun observeJournalById(id: Uuid): Flow<JournalEntity> {
-        return journalsFlow.map { journals ->
+
+    override fun observeJournalById(id: Uuid): Flow<JournalEntity> =
+        journalsFlow.map { journals ->
             journals.find { it.id == id } ?: throw NoSuchElementException("Journal with ID $id not found")
         }
-    }
-    
-    override suspend fun getJournalById(id: Uuid): JournalEntity? {
-        return journals[id]
-    }
 
-    override fun observeAll(): Flow<List<JournalEntity>> {
-        return journalsFlow
-    }
+    override suspend fun getJournalById(id: Uuid): JournalEntity? = journals[id]
 
-    override suspend fun getAll(): List<JournalEntity> {
-        return journals.values.toList()
-    }
+    override fun observeAll(): Flow<List<JournalEntity>> = journalsFlow
+
+    override suspend fun getAll(): List<JournalEntity> = journals.values.toList()
 
     override suspend fun create(journal: JournalEntity) {
         journals[journal.id] = journal
@@ -42,7 +35,11 @@ class FakeJournalDao : JournalDao {
         updateFlow()
     }
 
-    override suspend fun updateSyncMetadata(journalId: Uuid, syncVersion: Long, lastSynced: kotlin.time.Instant) {
+    override suspend fun updateSyncMetadata(
+        journalId: Uuid,
+        syncVersion: Long,
+        lastSynced: kotlin.time.Instant,
+    ) {
         val existing = journals[journalId] ?: return
         journals[journalId] = existing.copy(syncVersion = syncVersion, lastSynced = lastSynced)
         updateFlow()
@@ -52,7 +49,7 @@ class FakeJournalDao : JournalDao {
         journals.remove(journalId)
         updateFlow()
     }
-    
+
     /**
      * Clears all journals in the fake database.
      * This method is specific to the fake implementation for testing.
@@ -61,7 +58,7 @@ class FakeJournalDao : JournalDao {
         journals.clear()
         updateFlow()
     }
-    
+
     private fun updateFlow() {
         journalsFlow.value = journals.values.toList()
     }

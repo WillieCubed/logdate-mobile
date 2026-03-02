@@ -17,8 +17,8 @@ import kotlin.uuid.Uuid
 class FetchEntryUseCase(
     private val journalNotesRepository: JournalNotesRepository,
 ) {
-    suspend operator fun invoke(entryId: Uuid): JournalNote? {
-        return try {
+    suspend operator fun invoke(entryId: Uuid): JournalNote? =
+        try {
             val entry = journalNotesRepository.getNoteById(entryId)
             if (entry != null) {
                 Napier.d("FetchEntryUseCase: Found entry $entryId")
@@ -30,5 +30,4 @@ class FetchEntryUseCase(
             Napier.e("FetchEntryUseCase: Failed to fetch entry: $entryId", e)
             null
         }
-    }
 }

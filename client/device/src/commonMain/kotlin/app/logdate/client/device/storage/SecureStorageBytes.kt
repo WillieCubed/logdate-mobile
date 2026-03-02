@@ -11,6 +11,9 @@ suspend fun SecureStorage.getBytes(key: String): ByteArray? {
 }
 
 @OptIn(ExperimentalEncodingApi::class)
-suspend fun SecureStorage.putBytes(key: String, value: ByteArray) {
+suspend fun SecureStorage.putBytes(
+    key: String,
+    value: ByteArray,
+) {
     putString(key, Base64.encode(value))
 }

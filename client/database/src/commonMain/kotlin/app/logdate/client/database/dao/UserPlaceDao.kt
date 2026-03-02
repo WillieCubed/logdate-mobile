@@ -11,17 +11,17 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface UserPlaceDao {
-    
     @Query("SELECT * FROM user_places ORDER BY name ASC")
     suspend fun getAllPlaces(): List<UserPlaceEntity>
-    
+
     @Query("SELECT * FROM user_places ORDER BY name ASC")
     fun observeAllPlaces(): Flow<List<UserPlaceEntity>>
-    
+
     @Query("SELECT * FROM user_places WHERE id = :placeId")
     suspend fun getPlaceById(placeId: String): UserPlaceEntity?
-    
-    @Query("""
+
+    @Query(
+        """
         SELECT * FROM user_places 
         WHERE (
             6371000 * acos(
@@ -37,25 +37,26 @@ interface UserPlaceDao {
                 sin(radians(:latitude)) * sin(radians(latitude))
             )
         ) ASC
-    """)
+    """,
+    )
     suspend fun getPlacesNear(
         latitude: Double,
         longitude: Double,
-        radiusMeters: Double
+        radiusMeters: Double,
     ): List<UserPlaceEntity>
-    
+
     @Query("SELECT * FROM user_places WHERE name LIKE '%' || :query || '%' ORDER BY name ASC")
     suspend fun searchPlaces(query: String): List<UserPlaceEntity>
-    
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPlace(place: UserPlaceEntity)
-    
+
     @Update
     suspend fun updatePlace(place: UserPlaceEntity)
-    
+
     @Delete
     suspend fun deletePlace(place: UserPlaceEntity)
-    
+
     @Query("DELETE FROM user_places WHERE id = :placeId")
     suspend fun deletePlaceById(placeId: String)
 }

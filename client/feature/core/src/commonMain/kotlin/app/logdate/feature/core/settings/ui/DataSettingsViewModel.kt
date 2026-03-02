@@ -39,7 +39,7 @@ data class DataSettingsState(
     val conflictsState: ConflictsState,
     val syncStatus: app.logdate.client.sync.SyncStatus?,
     val isAuthenticated: Boolean,
-    val isBackgroundSyncEnabled: Boolean
+    val isBackgroundSyncEnabled: Boolean,
 )
 
 private data class DataSettingsSourceState(
@@ -52,24 +52,30 @@ private data class DataSettingsSourceState(
 
 sealed class ExportState {
     data object Idle : ExportState()
+
     data object Selecting : ExportState()
+
     data class Selected(
         val path: String,
-        val showSnackbar: Boolean = true
+        val showSnackbar: Boolean = true,
     ) : ExportState()
 }
 
 sealed class RestoreState {
     data object Idle : RestoreState()
+
     data object Selecting : RestoreState()
+
     data object Restoring : RestoreState()
+
     data class Completed(
         val summary: RestoreSummary,
-        val showSnackbar: Boolean = true
+        val showSnackbar: Boolean = true,
     ) : RestoreState()
+
     data class Failed(
         val message: String,
-        val showSnackbar: Boolean = true
+        val showSnackbar: Boolean = true,
     ) : RestoreState()
 }
 
@@ -78,14 +84,14 @@ data class IntegrityState(
     val isRepairing: Boolean = false,
     val lastReport: IntegrityReport? = null,
     val lastRepair: IntegrityRepairResult? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
 )
 
 data class ConflictsState(
     val conflicts: List<SyncConflictRecord> = emptyList(),
     val isLoading: Boolean = false,
     val lastUpdated: Instant? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
 )
 
 class DataSettingsViewModel(
@@ -98,7 +104,6 @@ class DataSettingsViewModel(
     private val dataIntegrityService: DataIntegrityService,
     private val conflictStore: SyncConflictStore,
 ) : ViewModel() {
-
     private val _exportState = MutableStateFlow<ExportState>(ExportState.Idle)
     val exportState: StateFlow<ExportState> = _exportState.asStateFlow()
 
@@ -115,61 +120,64 @@ class DataSettingsViewModel(
     private val sessionFlow = sessionStorage.getSessionFlow()
     private val backgroundSyncEnabledFlow = preferencesDataSource.backgroundSyncEnabled
 
-    private val syncStatusFlow = flow {
-        while (true) {
-            val status = syncManager.getSyncStatus()
-            emit(status)
-            delay(5000)
+    private val syncStatusFlow =
+        flow {
+            while (true) {
+                val status = syncManager.getSyncStatus()
+                emit(status)
+                delay(5000)
+            }
         }
-    }
 
-    private val sourceStateFlow = combine(
-        quotaFlow,
-        _exportState,
-        _restoreState,
-        _integrityState
-    ) { quotaState, exportState, restoreState, integrityState ->
-        DataSettingsSourceState(
-            quotaState = quotaState,
-            exportState = exportState,
-            restoreState = restoreState,
-            integrityState = integrityState,
-            conflictsState = ConflictsState()
-        )
-    }.combine(_conflictsState) { sourceState, conflictsState ->
-        sourceState.copy(conflictsState = conflictsState)
-    }
+    private val sourceStateFlow =
+        combine(
+            quotaFlow,
+            _exportState,
+            _restoreState,
+            _integrityState,
+        ) { quotaState, exportState, restoreState, integrityState ->
+            DataSettingsSourceState(
+                quotaState = quotaState,
+                exportState = exportState,
+                restoreState = restoreState,
+                integrityState = integrityState,
+                conflictsState = ConflictsState(),
+            )
+        }.combine(_conflictsState) { sourceState, conflictsState ->
+            sourceState.copy(conflictsState = conflictsState)
+        }
 
-    val uiState: StateFlow<DataSettingsState> = combine(
-        sourceStateFlow,
-        syncStatusFlow,
-        sessionFlow,
-        backgroundSyncEnabledFlow
-    ) { sourceState, syncStatus, session, backgroundSyncEnabled ->
-        DataSettingsState(
-            quotaState = sourceState.quotaState.orDefault(),
-            exportState = sourceState.exportState,
-            restoreState = sourceState.restoreState,
-            integrityState = sourceState.integrityState,
-            conflictsState = sourceState.conflictsState,
-            syncStatus = syncStatus,
-            isAuthenticated = session != null,
-            isBackgroundSyncEnabled = backgroundSyncEnabled
+    val uiState: StateFlow<DataSettingsState> =
+        combine(
+            sourceStateFlow,
+            syncStatusFlow,
+            sessionFlow,
+            backgroundSyncEnabledFlow,
+        ) { sourceState, syncStatus, session, backgroundSyncEnabled ->
+            DataSettingsState(
+                quotaState = sourceState.quotaState.orDefault(),
+                exportState = sourceState.exportState,
+                restoreState = sourceState.restoreState,
+                integrityState = sourceState.integrityState,
+                conflictsState = sourceState.conflictsState,
+                syncStatus = syncStatus,
+                isAuthenticated = session != null,
+                isBackgroundSyncEnabled = backgroundSyncEnabled,
+            )
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            DataSettingsState(
+                quotaState = (null as CloudStorageQuota?).orDefault(),
+                exportState = ExportState.Idle,
+                restoreState = RestoreState.Idle,
+                integrityState = IntegrityState(),
+                conflictsState = ConflictsState(),
+                syncStatus = null,
+                isAuthenticated = false,
+                isBackgroundSyncEnabled = true,
+            ),
         )
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        DataSettingsState(
-            quotaState = (null as CloudStorageQuota?).orDefault(),
-            exportState = ExportState.Idle,
-            restoreState = RestoreState.Idle,
-            integrityState = IntegrityState(),
-            conflictsState = ConflictsState(),
-            syncStatus = null,
-            isAuthenticated = false,
-            isBackgroundSyncEnabled = true
-        )
-    )
 
     init {
         exportLauncher.setExportCompletionCallback { path ->
@@ -188,9 +196,10 @@ class DataSettingsViewModel(
                     _restoreState.update { RestoreState.Completed(outcome.summary, true) }
                     runIntegrityCheck()
                 }
-                is RestoreOutcome.Failure -> _restoreState.update {
-                    RestoreState.Failed(outcome.message, true)
-                }
+                is RestoreOutcome.Failure ->
+                    _restoreState.update {
+                        RestoreState.Failed(outcome.message, true)
+                    }
             }
         }
 
@@ -245,8 +254,7 @@ class DataSettingsViewModel(
                     _integrityState.update {
                         it.copy(isChecking = false, lastReport = report, errorMessage = null)
                     }
-                }
-                .onFailure { error ->
+                }.onFailure { error ->
                     Napier.e("Integrity audit failed", error)
                     _integrityState.update {
                         it.copy(isChecking = false, errorMessage = error.message ?: "Integrity audit failed")
@@ -266,11 +274,10 @@ class DataSettingsViewModel(
                             isRepairing = false,
                             lastRepair = result,
                             lastReport = refreshed ?: it.lastReport,
-                            errorMessage = null
+                            errorMessage = null,
                         )
                     }
-                }
-                .onFailure { error ->
+                }.onFailure { error ->
                     Napier.e("Integrity repair failed", error)
                     _integrityState.update {
                         it.copy(isRepairing = false, errorMessage = error.message ?: "Integrity repair failed")
@@ -294,16 +301,15 @@ class DataSettingsViewModel(
                             conflicts = conflicts.sortedByDescending { record -> record.detectedAt },
                             isLoading = false,
                             lastUpdated = Clock.System.now(),
-                            errorMessage = null
+                            errorMessage = null,
                         )
                     }
-                }
-                .onFailure { error ->
+                }.onFailure { error ->
                     Napier.e("Failed to load sync conflicts", error)
                     _conflictsState.update {
                         it.copy(
                             isLoading = false,
-                            errorMessage = error.message ?: "Failed to load conflicts"
+                            errorMessage = error.message ?: "Failed to load conflicts",
                         )
                     }
                 }

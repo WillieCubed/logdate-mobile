@@ -4,8 +4,8 @@ import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import kotlin.time.Instant
 import kotlin.time.Duration
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -17,8 +17,8 @@ import kotlin.uuid.Uuid
 @Entity(
     tableName = "indexed_media_videos",
     indices = [
-        Index(value = ["uri"], unique = true)
-    ]
+        Index(value = ["uri"], unique = true),
+    ],
 )
 data class IndexedVideoEntity(
     @PrimaryKey
@@ -32,11 +32,10 @@ data class IndexedVideoEntity(
     override val dimensions: MediaDimensions,
     @Embedded(prefix = "location_")
     override val location: LocationData?,
-    
     /**
      * Duration of the video.
      */
-    val duration: Duration
+    val duration: Duration,
 ) : BaseIndexedMediaEntity()
 
 /**

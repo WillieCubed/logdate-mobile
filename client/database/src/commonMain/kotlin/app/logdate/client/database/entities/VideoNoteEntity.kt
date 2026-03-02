@@ -15,13 +15,13 @@ import kotlin.uuid.Uuid
             entity = PlaceEntity::class,
             parentColumns = ["id"],
             childColumns = ["place_id"],
-            onDelete = ForeignKey.SET_NULL
-        )
+            onDelete = ForeignKey.SET_NULL,
+        ),
     ],
     indices = [
         Index("place_id"),
-        Index("latitude", "longitude")
-    ]
+        Index("latitude", "longitude"),
+    ],
 )
 data class VideoNoteEntity(
     val contentUri: String,

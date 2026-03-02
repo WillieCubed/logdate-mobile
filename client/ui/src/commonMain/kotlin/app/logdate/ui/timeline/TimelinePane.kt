@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.ui.timeline
 
 import androidx.compose.animation.AnimatedVisibility
@@ -27,19 +29,20 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.newstuff.EndOfTimelineUiState
 import app.logdate.ui.timeline.newstuff.TimelineList
 import app.logdate.util.now
 import kotlinx.coroutines.launch
-import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.*
 import logdate.client.ui.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Instant
+
 data class TimelineUiState(
     val items: List<TimelineDayUiState> = emptyList(),
 )
@@ -83,16 +86,17 @@ fun TimelinePane(
                 scrollBehavior = scrollBehavior,
                 onSearchClick = onSearchClick,
                 onSettingsClick = onProfileClick,
-                onHistoryClick = onHistoryClick
+                onHistoryClick = onHistoryClick,
             )
-        }
+        },
     ) { paddingValues ->
         // Only apply horizontal padding to avoid compounding top padding with parent scaffolds
         Box(
-            modifier = Modifier.fillMaxWidth()
-                .padding(paddingValues)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(paddingValues),
         ) {
-
             TimelineList(
                 items = uiState.items,
                 onOpenDay = onOpenDay,
@@ -106,9 +110,10 @@ fun TimelinePane(
 
             ScrollToTopButton(
                 listState = listState,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = Spacing.lg),
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = Spacing.lg),
             )
         }
     }
@@ -151,12 +156,11 @@ internal fun ScrollToTopButton(
     }
 }
 
-//@Composable
-//private fun LazyListScope.constructTimeline(
-//) {
+// @Composable
+// private fun LazyListScope.constructTimeline(
+// ) {
 
-//}
-
+// }
 
 @Preview
 @Composable
@@ -166,10 +170,11 @@ private fun TimelinePanePreview() {
         onOpenDay = {},
         onNewEntry = {},
         onShareMemory = {},
-        timelineSuggestion = TimelineSuggestionBlock.OngoingEvent(
-            memoryId = "",
-            message = "You haven't added any memories today.",
-        ),
+        timelineSuggestion =
+            TimelineSuggestionBlock.OngoingEvent(
+                memoryId = "",
+                message = "You haven't added any memories today.",
+            ),
         // Use a sample birthday for preview
         birthday = Instant.fromEpochMilliseconds(1655342400000), // June 16, 2022
     )

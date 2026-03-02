@@ -14,15 +14,11 @@ class CreateEntryDraftUseCase(
      * Creates a new draft with content from a list of journal notes.
      * Returns the ID of the new draft.
      */
-    suspend operator fun invoke(notes: List<JournalNote>): Uuid {
-        return entryDraftRepository.createDraft(notes)
-    }
+    suspend operator fun invoke(notes: List<JournalNote>): Uuid = entryDraftRepository.createDraft(notes)
 
     /**
      * Creates a new draft with content from a single journal note.
      * Returns the ID of the new draft.
      */
-    suspend operator fun invoke(note: JournalNote): Uuid {
-        return entryDraftRepository.createDraft(listOf(note))
-    }
+    suspend operator fun invoke(note: JournalNote): Uuid = entryDraftRepository.createDraft(listOf(note))
 }

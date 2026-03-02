@@ -9,13 +9,10 @@ import kotlin.uuid.Uuid
  * Default implementation of IdentitySyncProvider that uses DeviceIdProvider.
  */
 class DefaultIdentitySyncProvider(
-    private val deviceIdProvider: DeviceIdProvider
+    private val deviceIdProvider: DeviceIdProvider,
 ) : IdentitySyncProvider {
-    
-    override fun getUserId(): Flow<Uuid> {
-        return deviceIdProvider.getDeviceId()
-    }
-    
+    override fun getUserId(): Flow<Uuid> = deviceIdProvider.getDeviceId()
+
     override suspend fun syncIdentity(userId: Uuid): Flow<MigrationProgress> {
         // Create a dummy migration progress
         return deviceIdProvider.getDeviceId().map { currentId ->
@@ -24,7 +21,7 @@ class DefaultIdentitySyncProvider(
                 oldId = currentId,
                 newId = userId,
                 itemsProcessed = 1,
-                totalItems = 1
+                totalItems = 1,
             )
         }
     }

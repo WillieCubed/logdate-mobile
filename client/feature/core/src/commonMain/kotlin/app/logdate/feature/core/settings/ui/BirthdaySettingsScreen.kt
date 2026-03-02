@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.core.settings.ui
 
 import androidx.compose.animation.AnimatedVisibility
@@ -55,17 +57,17 @@ import app.logdate.feature.core.settings.ui.BirthdayUpdateState
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
 import io.github.aakira.napier.Napier
-import kotlin.time.Clock
-import kotlin.time.Instant
+import logdate.client.feature.core.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.floor
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.core.generated.resources.*
-import logdate.client.feature.core.generated.resources.Res
+import kotlin.time.Instant
+
 /**
  * A full-screen birthday selection screen with Material You styling.
- * 
+ *
  * @param onBack Callback for when the user navigates back
  * @param viewModel The settings view model
  */
@@ -95,31 +97,34 @@ fun BirthdaySettingsScreen(
     }
 
     // Get initial birthday from userData just once
-    val initialBirthday = remember {
-        val currentBirthday = viewModel.state.value.userData.birthday
-        if (currentBirthday == Instant.DISTANT_PAST) {
-            // Approximately 20 years in days (365.25 days/year * 20 years)
-            Clock.System.now().minus(7305.days)
-        } else {
-            currentBirthday
+    val initialBirthday =
+        remember {
+            val currentBirthday = viewModel.state.value.userData.birthday
+            if (currentBirthday == Instant.DISTANT_PAST) {
+                // Approximately 20 years in days (365.25 days/year * 20 years)
+                Clock.System.now().minus(7305.days)
+            } else {
+                currentBirthday
+            }
         }
-    }
-    
+
     // Setup date picker with the initial date
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = initialBirthday.toEpochMilliseconds()
-    )
-    
+    val datePickerState =
+        rememberDatePickerState(
+            initialSelectedDateMillis = initialBirthday.toEpochMilliseconds(),
+        )
+
     // Track if the birthday has been changed from its initial value
     val hasChanges by remember(datePickerState.selectedDateMillis) {
         derivedStateOf {
-            val selectedInstant = datePickerState.selectedDateMillis?.let { 
-                Instant.fromEpochMilliseconds(it) 
-            }
+            val selectedInstant =
+                datePickerState.selectedDateMillis?.let {
+                    Instant.fromEpochMilliseconds(it)
+                }
             selectedInstant != initialBirthday && selectedInstant != null
         }
     }
-    
+
     // Calculate and format the user's age
     val selectedBirthday by remember(datePickerState.selectedDateMillis) {
         derivedStateOf {
@@ -128,19 +133,19 @@ fun BirthdaySettingsScreen(
             }
         }
     }
-    
+
     val age by remember(selectedBirthday) {
         derivedStateOf {
             selectedBirthday?.let { calculateAge(it) } ?: 0
         }
     }
-    
+
     val ageMessage by remember(age) {
         derivedStateOf {
             formatAgeMessage(age)
         }
     }
-    
+
     // Handle save action when changes are made
     val onSave = {
         // Always save the selected birthday when saving, regardless of changes
@@ -155,13 +160,14 @@ fun BirthdaySettingsScreen(
             onBack()
         }
     }
-    
+
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    
+
     Scaffold(
-        modifier = Modifier
-            .applyScreenStyles()
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier =
+            Modifier
+                .applyScreenStyles()
+                .nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(Res.string.birthday)) },
@@ -180,154 +186,166 @@ fun BirthdaySettingsScreen(
                 },
                 scrollBehavior = scrollBehavior,
             )
-        }
+        },
     ) { paddingValues ->
         Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            color = MaterialTheme.colorScheme.background
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+            color = MaterialTheme.colorScheme.background,
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = Spacing.md),
-                verticalArrangement = Arrangement.spacedBy(Spacing.md)
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
                 // Title with fun icon
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = Spacing.lg),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = Spacing.lg),
                     horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
                         imageVector = Icons.Default.Cake,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(32.dp),
                     )
                     Spacer(modifier = Modifier.size(Spacing.sm))
                     Text(
                         text = stringResource(Res.string.when_were_you_born),
                         style = MaterialTheme.typography.headlineMedium,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
                 }
-                
+
                 Text(
                     text = stringResource(Res.string.this_helps_us_personalize_your_experience),
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                
+
                 // Date picker with Material You styling - using weight(1f) to fill available space
                 Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f) // This makes the card take up all available space
-                        .padding(vertical = Spacing.md),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .weight(1f) // This makes the card take up all available space
+                            .padding(vertical = Spacing.md),
+                    colors =
+                        CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                        ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                 ) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) {
                         DatePicker(
                             state = datePickerState,
-                            modifier = Modifier
-                                .fillMaxSize() // Fill the entire Card
-                                .padding(Spacing.md),
-                            title = null // Remove title as we have our own
+                            modifier =
+                                Modifier
+                                    .fillMaxSize() // Fill the entire Card
+                                    .padding(Spacing.md),
+                            title = null, // Remove title as we have our own
                         )
                     }
                 }
-                
+
                 // Age message with animation and celebration icon
                 AnimatedVisibility(
                     visible = ageMessage.isNotEmpty(),
                     enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
+                    exit = fadeOut() + shrinkVertically(),
                 ) {
                     Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = Spacing.md),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        )
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = Spacing.md),
+                        colors =
+                            CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            ),
                     ) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(Spacing.md),
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(Spacing.md),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        Brush.linearGradient(
-                                            listOf(
-                                                MaterialTheme.colorScheme.primary,
-                                                MaterialTheme.colorScheme.tertiary
-                                            )
-                                        )
-                                    ),
-                                contentAlignment = Alignment.Center
+                                modifier =
+                                    Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            Brush.linearGradient(
+                                                listOf(
+                                                    MaterialTheme.colorScheme.primary,
+                                                    MaterialTheme.colorScheme.tertiary,
+                                                ),
+                                            ),
+                                        ),
+                                contentAlignment = Alignment.Center,
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Celebration,
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(24.dp),
                                 )
                             }
-                            
+
                             Spacer(modifier = Modifier.size(Spacing.md))
-                            
+
                             Text(
                                 text = ageMessage,
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                style =
+                                    MaterialTheme.typography.titleLarge.copy(
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
                             )
                         }
                     }
                 }
-                
+
                 // Small spacing before save button
                 Spacer(modifier = Modifier.height(Spacing.lg))
-                
+
                 // Save button
                 FilledTonalButton(
                     onClick = onSave,
                     enabled = hasChanges,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = Spacing.xl)
-                        .height(56.dp)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = Spacing.xl)
+                            .height(56.dp),
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                        horizontalArrangement = Arrangement.Center,
                     ) {
                         Icon(
                             imageVector = Icons.Default.Check,
-                            contentDescription = null
+                            contentDescription = null,
                         )
                         Spacer(modifier = Modifier.size(8.dp))
                         Text(
                             "Save Birthday",
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.titleMedium,
                         )
                     }
                 }
@@ -348,8 +366,8 @@ private fun calculateAge(birthday: Instant): Int {
 /**
  * Format an age message based on the age
  */
-private fun formatAgeMessage(age: Int): String {
-    return when {
+private fun formatAgeMessage(age: Int): String =
+    when {
         age < 0 -> "" // Future date, don't show message
         age == 0 -> "You're less than a year old!"
         age < 3 -> "You're $age ${if (age == 1) "year" else "years"} old! Just getting started!"
@@ -360,4 +378,3 @@ private fun formatAgeMessage(age: Int): String {
         age < 60 -> "You're $age years old! Wisdom and experience!"
         else -> "You're $age years old! Very wise indeed!"
     }
-}

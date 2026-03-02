@@ -16,13 +16,13 @@ class OfflineGenerativeAICache(
     private val keyStrategy: AICacheKeyStrategy = DefaultAICacheKeyStrategy(),
     private val config: AICacheConfig = AICacheConfig(),
     private val clock: Clock = Clock.System,
-    private val memoryStore: AICacheMemoryStore = LruAICacheMemoryStore(
-        maxEntries = config.memoryMaxEntries,
-        maxBytes = config.memoryMaxBytes
-    ),
+    private val memoryStore: AICacheMemoryStore =
+        LruAICacheMemoryStore(
+            maxEntries = config.memoryMaxEntries,
+            maxBytes = config.memoryMaxBytes,
+        ),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : GenerativeAICache {
-
     override suspend fun getEntry(request: GenerativeAICacheRequest): GenerativeAICacheEntry? {
         return withContext(ioDispatcher) {
             val cacheKey = keyStrategy.createKey(request.toKeyInput())
@@ -33,11 +33,11 @@ class OfflineGenerativeAICache(
             if (memoryHit != null) {
                 memoryStore.remove(cacheKey.value)
             }
-            val entry = runCatching { dataSource.get(cacheKey.value) }
-                .onFailure { error ->
-                    Napier.w(message = "Failed to read AI cache entry ${cacheKey.value}", throwable = error)
-                }
-                .getOrNull()
+            val entry =
+                runCatching { dataSource.get(cacheKey.value) }
+                    .onFailure { error ->
+                        Napier.w(message = "Failed to read AI cache entry ${cacheKey.value}", throwable = error)
+                    }.getOrNull()
             if (entry == null) {
                 return@withContext null
             }
@@ -50,29 +50,34 @@ class OfflineGenerativeAICache(
         }
     }
 
-    override suspend fun putEntry(request: GenerativeAICacheRequest, content: String) = withContext(ioDispatcher) {
+    override suspend fun putEntry(
+        request: GenerativeAICacheRequest,
+        content: String,
+    ) = withContext(ioDispatcher) {
         val cacheKey = keyStrategy.createKey(request.toKeyInput())
         val now = clock.now()
         val expiresAt = now + request.policy.ttlSeconds.seconds
-        val metadata = GenerativeAICacheEntryMetadata(
-            contentTypeId = request.contentType.id,
-            providerId = request.providerId,
-            model = request.model,
-            promptVersion = request.promptVersion,
-            schemaVersion = request.schemaVersion,
-            templateId = request.templateId,
-            ttlSeconds = request.policy.ttlSeconds,
-            expiresAt = expiresAt,
-            sourceHash = cacheKey.sourceHash,
-            debugPrefix = cacheKey.debugPrefix,
-            contentBytes = content.encodeToByteArray().size.toLong(),
-        )
-        val entry = GenerativeAICacheEntry(
-            key = cacheKey.value,
-            content = content,
-            lastUpdated = now,
-            metadata = metadata
-        )
+        val metadata =
+            GenerativeAICacheEntryMetadata(
+                contentTypeId = request.contentType.id,
+                providerId = request.providerId,
+                model = request.model,
+                promptVersion = request.promptVersion,
+                schemaVersion = request.schemaVersion,
+                templateId = request.templateId,
+                ttlSeconds = request.policy.ttlSeconds,
+                expiresAt = expiresAt,
+                sourceHash = cacheKey.sourceHash,
+                debugPrefix = cacheKey.debugPrefix,
+                contentBytes = content.encodeToByteArray().size.toLong(),
+            )
+        val entry =
+            GenerativeAICacheEntry(
+                key = cacheKey.value,
+                content = content,
+                lastUpdated = now,
+                metadata = metadata,
+            )
         memoryStore.put(cacheKey.value, entry)
         runCatching { dataSource.set(cacheKey.value, entry) }
             .onFailure { error ->
@@ -81,19 +86,20 @@ class OfflineGenerativeAICache(
         enforcePersistentLimits()
     }
 
-    override suspend fun purge() = withContext(ioDispatcher) {
-        memoryStore.clear()
-        runCatching { dataSource.clear() }
-            .onFailure { error ->
-                Napier.w(message = "Failed to purge AI cache", throwable = error)
-            }
-        Unit
-    }
+    override suspend fun purge() =
+        withContext(ioDispatcher) {
+            memoryStore.clear()
+            runCatching { dataSource.clear() }
+                .onFailure { error ->
+                    Napier.w(message = "Failed to purge AI cache", throwable = error)
+                }
+            Unit
+        }
 
     private fun isEntryValid(
         entry: GenerativeAICacheEntry,
         key: AICacheKey,
-        request: GenerativeAICacheRequest
+        request: GenerativeAICacheRequest,
     ): Boolean {
         if (entry.metadata.expiresAt <= clock.now()) {
             return false
@@ -131,11 +137,11 @@ class OfflineGenerativeAICache(
     }
 
     private fun enforcePersistentLimits() {
-        val entries = runCatching { dataSource.entries() }
-            .onFailure { error ->
-                Napier.w(message = "Failed to list AI cache entries", throwable = error)
-            }
-            .getOrDefault(emptyList())
+        val entries =
+            runCatching { dataSource.entries() }
+                .onFailure { error ->
+                    Napier.w(message = "Failed to list AI cache entries", throwable = error)
+                }.getOrDefault(emptyList())
         if (entries.isEmpty()) {
             return
         }
@@ -164,14 +170,15 @@ class OfflineGenerativeAICache(
         }
     }
 
-    private fun GenerativeAICacheRequest.toKeyInput(): AICacheKeyInput = AICacheKeyInput(
-        contentType = contentType,
-        inputText = inputText,
-        providerId = providerId,
-        model = model,
-        promptVersion = promptVersion,
-        schemaVersion = schemaVersion,
-        templateId = templateId,
-        policy = policy
-    )
+    private fun GenerativeAICacheRequest.toKeyInput(): AICacheKeyInput =
+        AICacheKeyInput(
+            contentType = contentType,
+            inputText = inputText,
+            providerId = providerId,
+            model = model,
+            promptVersion = promptVersion,
+            schemaVersion = schemaVersion,
+            templateId = templateId,
+            policy = policy,
+        )
 }

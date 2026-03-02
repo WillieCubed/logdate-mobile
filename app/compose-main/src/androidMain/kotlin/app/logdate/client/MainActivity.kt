@@ -12,16 +12,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.navigation3.runtime.NavKey
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation3.runtime.NavKey
 import app.logdate.client.database.DatabaseRecoveryController
 import app.logdate.client.database.DatabaseStartupMonitor
 import app.logdate.client.database.DatabaseStartupState
+import app.logdate.client.media.audio.EXTRA_NAV_SOURCE
+import app.logdate.client.media.audio.EXTRA_NOTE_ID
+import app.logdate.client.media.audio.NAV_SOURCE_AUDIO_PLAYBACK
 import app.logdate.feature.core.AndroidBiometricGatekeeper
 import app.logdate.feature.core.AppViewModel
 import app.logdate.feature.core.BiometricGatekeeper
@@ -31,9 +34,6 @@ import app.logdate.feature.core.GlobalAppUiState
 import app.logdate.feature.core.di.ActivityProvider
 import app.logdate.feature.core.export.AndroidExportLauncher
 import app.logdate.feature.core.restore.AndroidRestoreLauncher
-import app.logdate.client.media.audio.EXTRA_NOTE_ID
-import app.logdate.client.media.audio.EXTRA_NAV_SOURCE
-import app.logdate.client.media.audio.NAV_SOURCE_AUDIO_PLAYBACK
 import app.logdate.navigation.routes.core.NoteViewerRoute
 import io.github.vinceglb.filekit.core.FileKit
 import kotlinx.coroutines.flow.onEach
@@ -55,7 +55,6 @@ import kotlin.uuid.Uuid
  * This activity is also responsible for providing the app's assist content and direct actions.
  */
 class MainActivity : FragmentActivity() {
-
     private val biometricGatekeeper: BiometricGatekeeper by inject()
     private val activityProvider: ActivityProvider by inject()
     private val androidExportLauncher: AndroidExportLauncher by inject()
@@ -67,29 +66,33 @@ class MainActivity : FragmentActivity() {
 
     private var pendingNavKey by mutableStateOf<NavKey?>(null)
     private var databaseStartupState by mutableStateOf<DatabaseStartupState>(DatabaseStartupState.Ready)
-    
-    // Register the document picker for export functionality
-    private val createDocumentLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val uri = if (result.resultCode == RESULT_OK) {
-            result.data?.data
-        } else {
-            null
-        }
-        androidExportLauncher.onExportDestinationSelected(uri)
-    }
 
-    private val openDocumentLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val uri = if (result.resultCode == RESULT_OK) {
-            result.data?.data
-        } else {
-            null
+    // Register the document picker for export functionality
+    private val createDocumentLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult(),
+        ) { result ->
+            val uri =
+                if (result.resultCode == RESULT_OK) {
+                    result.data?.data
+                } else {
+                    null
+                }
+            androidExportLauncher.onExportDestinationSelected(uri)
         }
-        androidRestoreLauncher.onRestoreSourceSelected(uri)
-    }
+
+    private val openDocumentLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult(),
+        ) { result ->
+            val uri =
+                if (result.resultCode == RESULT_OK) {
+                    result.data?.data
+                } else {
+                    null
+                }
+            androidRestoreLauncher.onRestoreSourceSelected(uri)
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         Log.i(APP_LAUNCH_TAG, "MainActivity onCreate: starting launch")
@@ -99,11 +102,11 @@ class MainActivity : FragmentActivity() {
         // Set up FileKit for file operations
         FileKit.init(this)
         Log.i(APP_LAUNCH_TAG, "MainActivity onCreate: FileKit initialized")
-        
+
         // Set up biometric gatekeeper
         (biometricGatekeeper as? AndroidBiometricGatekeeper)?.setActivity(this)
         Log.i(APP_LAUNCH_TAG, "MainActivity onCreate: biometric gatekeeper configured")
-        
+
         // Register this activity for use by the export launcher
         activityProvider.currentActivity = this
         androidExportLauncher.setupActivityResultLauncher(createDocumentLauncher)
@@ -111,7 +114,7 @@ class MainActivity : FragmentActivity() {
         androidRestoreLauncher.setupActivityResultLauncher(openDocumentLauncher)
         androidRestoreLauncher.setupWorkObserver(this)
         Log.i(APP_LAUNCH_TAG, "MainActivity onCreate: export/restore launchers configured")
-        
+
         // Set up multi-window support
         setupMultiWindowSupport()
         Log.i(APP_LAUNCH_TAG, "MainActivity onCreate: multi-window support configured")
@@ -139,8 +142,7 @@ class MainActivity : FragmentActivity() {
                             } else {
                                 Log.i(APP_LAUNCH_TAG, "MainActivity launch gate: database state ready")
                             }
-                        }
-                        .collect {}
+                        }.collect {}
                 }
             }
         }
@@ -166,37 +168,37 @@ class MainActivity : FragmentActivity() {
             }
         }
         Log.i(APP_LAUNCH_TAG, "MainActivity onCreate: Compose content attached")
-        
+
         // Handle the intent if this activity was launched with one
         intent?.let { handleMultiWindowIntent(it) }
     }
-    
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleMultiWindowIntent(intent)
         resolveNavKey(intent)?.let { pendingNavKey = it }
     }
-    
+
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         // Add multi-window options to the menu
         createMultiWindowMenuOptions(menu)
         return true
     }
-    
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         // Handle multi-window menu selections
         if (handleMultiWindowMenuSelection(item)) {
             return true
         }
-        
+
         return super.onOptionsItemSelected(item)
     }
-    
+
     override fun onResume() {
         super.onResume()
         activityProvider.currentActivity = this
     }
-    
+
     override fun onPause() {
         super.onPause()
         viewModel.onAppBackgrounded()
@@ -209,24 +211,25 @@ class MainActivity : FragmentActivity() {
     private fun resetEncryptedStorageAndRestart() {
         lifecycleScope.launch {
             Log.w(APP_LAUNCH_TAG, "Recovery action: user requested encrypted storage reset")
-            databaseRecoveryController.quarantineAndResetEncryptedStorage()
+            databaseRecoveryController
+                .quarantineAndResetEncryptedStorage()
                 .onSuccess { backup ->
                     Log.w(
                         APP_LAUNCH_TAG,
                         "Recovery action: reset complete, backup preserved at ${backup.absolutePath}",
                     )
                     restartApplicationProcess()
-                }
-                .onFailure { error ->
+                }.onFailure { error ->
                     Log.e(APP_LAUNCH_TAG, "Recovery action: failed to reset encrypted storage", error)
                 }
         }
     }
 
     private fun restartApplicationProcess() {
-        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-        }
+        val launchIntent =
+            packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            }
         if (launchIntent != null) {
             startActivity(launchIntent)
         }
@@ -264,11 +267,12 @@ private fun resolveNavKey(intent: Intent?): NavKey? {
 }
 
 @Preview
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun AppAndroidPreview() {
     MainActivityUiRoot(
         appUiState = GlobalAppUiLoadedState(),
-        onShowUnlockPrompt = { /* No-op for preview */ }
+        onShowUnlockPrompt = { /* No-op for preview */ },
     )
 }
 

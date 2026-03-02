@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.ui.common
 
 import androidx.compose.animation.core.animateDpAsState
@@ -22,7 +24,7 @@ import androidx.compose.ui.unit.dp
 /**
  * A reusable surface component that provides consistent styling and behavior
  * for card-like elements throughout the application.
- * 
+ *
  * Features:
  * - Animated elevation based on focused/expanded state
  * - Optional highlight border for selected state
@@ -50,45 +52,46 @@ fun CardSurface(
     elevationFocused: Float = 4f,
     elevationUnfocused: Float = 1f,
     borderWidth: Float = 2f,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     // Animate elevation changes based on focused state
     val elevation by animateDpAsState(
         targetValue = if (isFocused) elevationFocused.dp else elevationUnfocused.dp,
-        label = "elevation"
+        label = "elevation",
     )
-    
+
     // Border width animation based on selected state
     val border by animateDpAsState(
         targetValue = if (isSelected) borderWidth.dp else 0.dp,
-        label = "borderWidth"
+        label = "borderWidth",
     )
-    
+
     val shape = RoundedCornerShape(cornerRadius.dp)
-    
+
     // Apply styling and behavior to the container
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .shadow(elevation, shape)
-            .clip(shape)
-            .background(
-                if (isFocused) MaterialTheme.colorScheme.surfaceVariant
-                else MaterialTheme.colorScheme.surface
-            )
-            .border(
-                width = border,
-                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                shape = shape
-            )
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) {
-                onClick()
-            }
-            .padding(12.dp)
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+                .shadow(elevation, shape)
+                .clip(shape)
+                .background(
+                    if (isFocused) {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.surface
+                    },
+                ).border(
+                    width = border,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    shape = shape,
+                ).clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) {
+                    onClick()
+                }.padding(12.dp),
     ) {
         // Render the provided content
         content()

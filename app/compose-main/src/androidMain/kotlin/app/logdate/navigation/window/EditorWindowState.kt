@@ -22,5 +22,8 @@ sealed interface EditorWindowState {
     /**
      * Window is being resized.
      */
-    data class Resizing(val width: Float, val height: Float) : EditorWindowState
+    data class Resizing(
+        val width: Float,
+        val height: Float,
+    ) : EditorWindowState
 }

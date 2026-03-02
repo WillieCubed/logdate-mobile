@@ -15,17 +15,17 @@ class LogLocationUseCase(
     private val locationProvider: ClientLocationProvider,
     private val activityTimelineRepository: ActivityTimelineRepository,
 ) {
-
     /**
      * Logs the user's current location to the user's records.
      */
     suspend operator fun invoke() {
         val location = locationProvider.getCurrentLocation()
-        val activity = ActivityTimelineItem(
-            timestamp = Clock.System.now(),
-            uid = Uuid.random(),
-            location = location,
-        )
+        val activity =
+            ActivityTimelineItem(
+                timestamp = Clock.System.now(),
+                uid = Uuid.random(),
+                location = location,
+            )
         activityTimelineRepository.addActivity(activity)
     }
 }

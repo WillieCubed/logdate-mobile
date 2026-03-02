@@ -10,15 +10,14 @@ import kotlin.uuid.Uuid
 
 /**
  * Data access object for journals.
- * 
+ *
  * All journal IDs are now represented as UUID strings.
  */
 @Dao
 interface JournalDao {
-
     @Query("SELECT * FROM journals WHERE id = :id")
     fun observeJournalById(id: Uuid): Flow<JournalEntity>
-    
+
     @Query("SELECT * FROM journals WHERE id = :id")
     suspend fun getJournalById(id: Uuid): JournalEntity?
 
@@ -38,7 +37,11 @@ interface JournalDao {
     suspend fun update(journal: JournalEntity)
 
     @Query("UPDATE journals SET syncVersion = :syncVersion, lastSynced = :lastSynced WHERE id = :journalId")
-    suspend fun updateSyncMetadata(journalId: Uuid, syncVersion: Long, lastSynced: kotlin.time.Instant)
+    suspend fun updateSyncMetadata(
+        journalId: Uuid,
+        syncVersion: Long,
+        lastSynced: kotlin.time.Instant,
+    )
 
     @Query("DELETE FROM journals WHERE id = :journalId")
     suspend fun delete(journalId: Uuid)

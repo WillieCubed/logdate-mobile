@@ -15,8 +15,14 @@ plugins {
 kotlin {
     android {
         namespace = "app.logdate.feature.location.timeline"
-        compileSdk = libs.versions.android.compileSdk.get().toInt()
-        minSdk = libs.versions.android.minSdk.get().toInt()
+        compileSdk =
+            libs.versions.android.compileSdk
+                .get()
+                .toInt()
+        minSdk =
+            libs.versions.android.minSdk
+                .get()
+                .toInt()
         androidResources {
             enable = true
         }
@@ -44,7 +50,7 @@ kotlin {
             implementation(projects.client.repository)
             implementation(projects.client.location)
             implementation(projects.client.permissions)
-            
+
             // Compose
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
@@ -52,21 +58,21 @@ kotlin {
             implementation(libs.compose.material.icons.extended)
             implementation(libs.compose.ui)
             implementation(libs.compose.components.resources)
-            
+
             // External dependencies
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.kotlinx.coroutines.core)
-            
+
             // Koin
             implementation(project.dependencies.platform(libs.koin.bom))
             implementation(libs.koin.core)
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)
-            
+
             // Navigation
             implementation(libs.androidx.navigation.compose)
-            
+
             // Architecture
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.lifecycle.runtime.compose)

@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports", "ktlint:standard:max-line-length")
+
 package app.logdate.feature.onboarding.ui
 
 import androidx.compose.foundation.layout.*
@@ -10,27 +12,26 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+
 @Composable
-fun RecoveryPhraseSetupScreen(
-    onPhraseContinue: (List<String>) -> Unit
-) {
+fun RecoveryPhraseSetupScreen(onPhraseContinue: (List<String>) -> Unit) {
     var phase by remember { mutableStateOf<SetupPhase>(SetupPhase.Display(emptyList())) }
 
     when (val currentPhase = phase) {
         is SetupPhase.Display -> {
             RecoveryPhraseDisplayContent(
                 words = currentPhase.words,
-                onContinue = { phase = SetupPhase.Verify(currentPhase.words) }
+                onContinue = { phase = SetupPhase.Verify(currentPhase.words) },
             )
         }
 
         is SetupPhase.Verify -> {
             RecoveryPhraseVerificationContent(
                 expectedWords = currentPhase.words,
-                onVerified = { onPhraseContinue(currentPhase.words) }
+                onVerified = { onPhraseContinue(currentPhase.words) },
             )
         }
     }
@@ -39,57 +40,63 @@ fun RecoveryPhraseSetupScreen(
 @Composable
 private fun RecoveryPhraseDisplayContent(
     words: List<String>,
-    onContinue: () -> Unit
+    onContinue: () -> Unit,
 ) {
     var userConfirmed by remember { mutableStateOf(false) }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
             text = stringResource(Res.string.your_recovery_phrase),
-            style = MaterialTheme.typography.headlineMedium
+            style = MaterialTheme.typography.headlineMedium,
         )
 
         Text(
-            text = stringResource(Res.string.write_these_12_words_on_paper_and_store_them_safely_youll_need_them_to_recover_your_data_if_you_lose_your_device),
+            text =
+                stringResource(
+                    Res.string.write_these_12_words_on_paper_and_store_them_safely_youll_need_them_to_recover_your_data_if_you_lose_your_device,
+                ),
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            ),
-            modifier = Modifier.fillMaxWidth()
+            colors =
+                CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                ),
+            modifier = Modifier.fillMaxWidth(),
         ) {
             LazyColumn(
                 modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 itemsIndexed(words) { index, word ->
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(
-                            text = stringResource(
-                                Res.string.recovery_phrase_index,
-                                index + 1
-                            ),
+                            text =
+                                stringResource(
+                                    Res.string.recovery_phrase_index,
+                                    index + 1,
+                                ),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.width(24.dp)
+                            modifier = Modifier.width(24.dp),
                         )
                         Text(
                             text = word,
                             style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
@@ -98,37 +105,37 @@ private fun RecoveryPhraseDisplayContent(
 
         WarningCard(
             icon = "⚠️",
-            text = stringResource(Res.string.warning_recovery_phrase_never_share)
+            text = stringResource(Res.string.warning_recovery_phrase_never_share),
         )
         WarningCard(
             icon = "📝",
-            text = stringResource(Res.string.warning_recovery_phrase_write_on_paper)
+            text = stringResource(Res.string.warning_recovery_phrase_write_on_paper),
         )
         WarningCard(
             icon = "🔒",
-            text = stringResource(Res.string.warning_recovery_phrase_store_safe)
+            text = stringResource(Res.string.warning_recovery_phrase_store_safe),
         )
 
         Spacer(modifier = Modifier.weight(1f))
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Checkbox(
                 checked = userConfirmed,
-                onCheckedChange = { userConfirmed = it }
+                onCheckedChange = { userConfirmed = it },
             )
             Text(
                 text = stringResource(Res.string.i_have_written_down_my_recovery_phrase),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
         }
 
         Button(
             onClick = onContinue,
             enabled = userConfirmed,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(Res.string.`continue`))
         }
@@ -138,35 +145,44 @@ private fun RecoveryPhraseDisplayContent(
 @Composable
 private fun RecoveryPhraseVerificationContent(
     expectedWords: List<String>,
-    onVerified: () -> Unit
+    onVerified: () -> Unit,
 ) {
-    val wordsToVerify = remember {
-        expectedWords.indices.shuffled().take(3).sorted()
-    }
+    val wordsToVerify =
+        remember {
+            expectedWords.indices
+                .shuffled()
+                .take(3)
+                .sorted()
+        }
 
     var userInputs by remember {
         mutableStateOf(wordsToVerify.associateWith { "" })
     }
 
-    val allCorrect = wordsToVerify.all { index ->
-        userInputs[index]?.lowercase() == expectedWords[index].lowercase()
-    }
+    val allCorrect =
+        wordsToVerify.all { index ->
+            userInputs[index]?.lowercase() == expectedWords[index].lowercase()
+        }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
             text = stringResource(Res.string.verify_your_recovery_phrase),
-            style = MaterialTheme.typography.headlineMedium
+            style = MaterialTheme.typography.headlineMedium,
         )
 
         Text(
-            text = stringResource(Res.string.enter_the_following_words_from_your_recovery_phrase_to_confirm_youve_written_it_down_correctly),
-            style = MaterialTheme.typography.bodyMedium
+            text =
+                stringResource(
+                    Res.string.enter_the_following_words_from_your_recovery_phrase_to_confirm_youve_written_it_down_correctly,
+                ),
+            style = MaterialTheme.typography.bodyMedium,
         )
 
         wordsToVerify.forEach { index ->
@@ -177,12 +193,12 @@ private fun RecoveryPhraseVerificationContent(
                     Text(
                         stringResource(
                             Res.string.word_number,
-                            index + 1
-                        )
+                            index + 1,
+                        ),
                     )
                 },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
         }
 
@@ -191,7 +207,7 @@ private fun RecoveryPhraseVerificationContent(
         Button(
             onClick = onVerified,
             enabled = allCorrect,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(Res.string.verify_and_continue))
         }
@@ -199,17 +215,21 @@ private fun RecoveryPhraseVerificationContent(
 }
 
 @Composable
-private fun WarningCard(icon: String, text: String) {
+private fun WarningCard(
+    icon: String,
+    text: String,
+) {
     Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer
-        ),
-        modifier = Modifier.fillMaxWidth()
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+            ),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(icon, style = MaterialTheme.typography.bodyLarge)
             Text(text, style = MaterialTheme.typography.bodySmall)
@@ -218,6 +238,11 @@ private fun WarningCard(icon: String, text: String) {
 }
 
 sealed class SetupPhase {
-    data class Display(val words: List<String>) : SetupPhase()
-    data class Verify(val words: List<String>) : SetupPhase()
+    data class Display(
+        val words: List<String>,
+    ) : SetupPhase()
+
+    data class Verify(
+        val words: List<String>,
+    ) : SetupPhase()
 }

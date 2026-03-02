@@ -42,22 +42,19 @@ fun NavGraphBuilder.rewindRoutes(
     onGoBack: () -> Unit,
 ) {
     rewindOverviewRoute(
-        onOpenRewind = onOpenRewind
+        onOpenRewind = onOpenRewind,
     )
     rewindDetailRoute(
-        onExitRewind = onGoBack
+        onExitRewind = onGoBack,
     )
 }
-
 
 /**
  * Exposes a route for the Rewind overview screen.
  *
  * @param onOpenRewind A callback to be invoked when the user opens a Rewind.
  */
-fun NavGraphBuilder.rewindOverviewRoute(
-    onOpenRewind: RewindOpenCallback,
-) {
+fun NavGraphBuilder.rewindOverviewRoute(onOpenRewind: RewindOpenCallback) {
     composable<RewindOverviewRoute> {
         RewindOverviewScreen(
             onOpenRewind = onOpenRewind,
@@ -72,14 +69,12 @@ fun NavGraphBuilder.rewindOverviewRoute(
  *
  * @param onExitRewind A callback to be invoked when the user exits the Rewind.
  */
-fun NavGraphBuilder.rewindDetailRoute(
-    onExitRewind: () -> Unit,
-) {
+fun NavGraphBuilder.rewindDetailRoute(onExitRewind: () -> Unit) {
     composable<RewindDetailRoute> {
         val routeData: RewindDetailRoute = it.toRoute()
         RewindDetailScreen(
             rewindId = routeData.id,
-            onExitRewind = onExitRewind
+            onExitRewind = onExitRewind,
         )
     }
 }

@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.core.account.ui
 
 import androidx.compose.foundation.layout.Arrangement
@@ -32,16 +34,16 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import org.koin.compose.viewmodel.koinViewModel
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.core.generated.resources.*
 import logdate.client.feature.core.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
+
 /**
  * Screen for selecting a username during account creation.
- * 
+ *
  * This screen allows users to choose a unique username for their LogDate Cloud account.
  * It performs real-time validation and availability checks as the user types.
- * 
+ *
  * @param onContinue Callback when a valid username is selected and the user continues.
  * @param onBack Callback when the user chooses to go back.
  * @param viewModel The ViewModel for this screen.
@@ -50,18 +52,18 @@ import logdate.client.feature.core.generated.resources.Res
 fun UsernameSelectionScreen(
     onContinue: () -> Unit,
     onBack: () -> Unit,
-    viewModel: AccountOnboardingViewModel = koinViewModel()
+    viewModel: AccountOnboardingViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val snackbarHostState = remember { SnackbarHostState() }
-    
+
     // Request focus on the username field when the screen appears
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
     }
-    
+
     // Show error messages in a Snackbar
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let {
@@ -69,104 +71,108 @@ fun UsernameSelectionScreen(
             viewModel.clearErrorMessage()
         }
     }
-    
+
     // No longer needed - handle navigation directly in button clicks
-    
+
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(paddingValues)
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(paddingValues)
+                    .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
                 text = stringResource(Res.string.choose_a_username),
-                style = MaterialTheme.typography.headlineMedium
+                style = MaterialTheme.typography.headlineMedium,
             )
-            
+
             Text(
                 text = stringResource(Res.string.this_username_will_identify_you_on_logdate_cloud_you_can_change_it_later),
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyMedium,
             )
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             OutlinedTextField(
                 value = uiState.username,
                 onValueChange = { viewModel.onUsernameChanged(it) },
                 label = { Text(stringResource(Res.string.username)) },
                 isError = uiState.usernameError != null,
                 supportingText = uiState.usernameError?.let { { Text(it) } },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester),
-                keyboardOptions = KeyboardOptions(
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        focusManager.clearFocus()
-                        if (uiState.canContinueFromUsername) {
-                            viewModel.onUsernameContinue()
-                            onContinue()
-                        } else {
-                            viewModel.checkUsernameAvailability()
-                        }
-                    }
-                ),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester),
+                keyboardOptions =
+                    KeyboardOptions(
+                        imeAction = ImeAction.Done,
+                    ),
+                keyboardActions =
+                    KeyboardActions(
+                        onDone = {
+                            focusManager.clearFocus()
+                            if (uiState.canContinueFromUsername) {
+                                viewModel.onUsernameContinue()
+                                onContinue()
+                            } else {
+                                viewModel.checkUsernameAvailability()
+                            }
+                        },
+                    ),
                 trailingIcon = {
                     if (uiState.usernameAvailability == UsernameAvailability.CHECKING) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp
+                            strokeWidth = 2.dp,
                         )
                     }
                 },
-                singleLine = true
+                singleLine = true,
             )
-            
+
             Button(
                 onClick = { viewModel.checkUsernameAvailability() },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = uiState.canCheckUsernameAvailability
+                enabled = uiState.canCheckUsernameAvailability,
             ) {
                 Text(stringResource(Res.string.check_availability))
             }
-            
+
             if (uiState.usernameAvailability == UsernameAvailability.AVAILABLE) {
                 Text(
                     text = stringResource(Res.string.username_is_available_3),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
                 )
             } else if (uiState.usernameAvailability == UsernameAvailability.TAKEN) {
                 Text(
                     text = stringResource(Res.string.username_is_already_taken),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
+                    color = MaterialTheme.colorScheme.error,
                 )
             }
-            
+
             Spacer(modifier = Modifier.weight(1f))
-            
+
             Button(
-                onClick = { 
+                onClick = {
                     viewModel.onUsernameContinue()
                     onContinue()
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = uiState.canContinueFromUsername
+                enabled = uiState.canContinueFromUsername,
             ) {
                 Text(stringResource(Res.string.`continue`))
             }
-            
+
             TextButton(
                 onClick = onBack,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(Res.string.back))
             }

@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.feature.timeline.ui.details
 
 import androidx.compose.animation.AnimatedVisibility
@@ -15,9 +17,10 @@ import androidx.compose.ui.Modifier
 import app.logdate.ui.profiles.PersonIcon
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.theme.Spacing
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.timeline.generated.resources.*
 import logdate.client.feature.timeline.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+
 /**
  * A list of all people the user encountered on a given day.
  */

@@ -10,5 +10,5 @@ enum class DevicePlatform {
     WINDOWS,
     LINUX,
     WEB,
-    UNKNOWN
+    UNKNOWN,
 }

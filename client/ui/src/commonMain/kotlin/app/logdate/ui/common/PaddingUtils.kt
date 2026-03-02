@@ -17,15 +17,14 @@ import app.logdate.ui.theme.Spacing
 fun centeredListPadding(
     horizontal: Dp = Spacing.lg,
     vertical: Dp = Spacing.lg,
-    extraVertical: Dp = Spacing.xxxl * 2
-): PaddingValues {
-    return PaddingValues(
+    extraVertical: Dp = Spacing.xxxl * 2,
+): PaddingValues =
+    PaddingValues(
         start = horizontal,
         end = horizontal,
         top = vertical + extraVertical,
-        bottom = vertical + extraVertical
+        bottom = vertical + extraVertical,
     )
-}
 
 /**
  * Creates PaddingValues for grids that ensures content doesn't run against screen edges
@@ -34,13 +33,10 @@ fun centeredListPadding(
  * @param minHorizontal Minimum horizontal padding
  */
 @Composable
-fun centeredGridPadding(
-    minHorizontal: Dp = Spacing.xl
-): PaddingValues {
-    return PaddingValues(
+fun centeredGridPadding(minHorizontal: Dp = Spacing.xl): PaddingValues =
+    PaddingValues(
         start = minHorizontal,
         end = minHorizontal,
         top = Spacing.lg + Spacing.xl,
-        bottom = Spacing.lg + Spacing.xl
+        bottom = Spacing.lg + Spacing.xl,
     )
-}

@@ -8,10 +8,7 @@ import kotlinx.coroutines.flow.Flow
  * Use case to observe location history changes.
  */
 class ObserveLocationHistoryUseCase(
-    private val locationHistoryRepository: LocationHistoryRepository
+    private val locationHistoryRepository: LocationHistoryRepository,
 ) {
-    
-    operator fun invoke(): Flow<List<LocationHistoryItem>> {
-        return locationHistoryRepository.observeLocationHistory()
-    }
+    operator fun invoke(): Flow<List<LocationHistoryItem>> = locationHistoryRepository.observeLocationHistory()
 }

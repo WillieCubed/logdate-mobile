@@ -1,7 +1,7 @@
 package app.logdate.shared.model
 
-import kotlinx.serialization.Serializable
 import app.logdate.util.UuidSerializer
+import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
 /**
@@ -12,5 +12,5 @@ import kotlin.uuid.Uuid
 @Serializable
 data class EditorInstanceId(
     @Serializable(with = UuidSerializer::class)
-    val id: Uuid
+    val id: Uuid,
 )

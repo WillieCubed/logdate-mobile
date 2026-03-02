@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.core.settings.ui
 
 import androidx.compose.foundation.BorderStroke
@@ -6,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.DeleteForever
@@ -33,20 +34,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.core.settings.ui.dialogs.ResetAppConfirmationDialog
+import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
-import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.action_reset_app
 import logdate.client.feature.core.generated.resources.settings_reset_app_description
 import logdate.client.feature.core.generated.resources.settings_reset_app_title
 import org.jetbrains.compose.resources.stringResource
-import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
-import logdate.client.feature.core.generated.resources.*
+
 /**
  * Danger zone settings screen with destructive actions.
  *
@@ -71,7 +72,7 @@ fun DangerZoneSettingsScreen(
         onBack = onBack,
         onAppReset = { viewModel.resetApp { onAppReset() } },
         onClearData = { viewModel.clearLocalData() },
-        isPotentialDetailPane = resolvedIsDetailPane
+        isPotentialDetailPane = resolvedIsDetailPane,
     )
 }
 
@@ -81,16 +82,17 @@ private fun DangerZoneSettingsContent(
     onBack: () -> Unit,
     onAppReset: () -> Unit,
     onClearData: () -> Unit,
-    isPotentialDetailPane: Boolean = false
+    isPotentialDetailPane: Boolean = false,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     var showResetDialog by remember { mutableStateOf(false) }
     var showClearDataDialog by remember { mutableStateOf(false) }
 
     Scaffold(
-        modifier = Modifier
-            .applyScreenStyles()
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier =
+            Modifier
+                .applyScreenStyles()
+                .nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             // Only show top bar with back button in single-pane mode
             if (!isPotentialDetailPane) {
@@ -102,11 +104,12 @@ private fun DangerZoneSettingsContent(
                         }
                     },
                     scrollBehavior = scrollBehavior,
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.15f),
-                        titleContentColor = MaterialTheme.colorScheme.error,
-                        navigationIconContentColor = MaterialTheme.colorScheme.error
-                    )
+                    colors =
+                        TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.15f),
+                            titleContentColor = MaterialTheme.colorScheme.error,
+                            navigationIconContentColor = MaterialTheme.colorScheme.error,
+                        ),
                 )
             }
         },
@@ -115,7 +118,7 @@ private fun DangerZoneSettingsContent(
             LazyColumn(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = paddingValues,
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
                 // Section title for two-pane mode
                 if (isPotentialDetailPane) {
@@ -124,124 +127,127 @@ private fun DangerZoneSettingsContent(
                             text = stringResource(Res.string.danger_zone),
                             style = MaterialTheme.typography.headlineSmall,
                             color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)
+                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
                         )
                     }
                 }
-            item {
-                Column(
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm)
-                ) {
-                    Text(
-                        text = stringResource(Res.string.reset_actions),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                item {
+                    Column(
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.reset_actions),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
 
-                    MaterialContainer {
-                        SurfaceItem {
-                            ListItem(
-                                headlineContent = {
-                                    Text(stringResource(Res.string.before_you_reset))
-                                },
-                                supportingContent = {
-                                    Text(
-                                        "Export and verify a backup from Data & Storage. " +
-                                            "Without a backup, encrypted local data may be unrecoverable."
-                                    )
-                                },
-                                leadingContent = {
-                                    Icon(
-                                        Icons.Default.WarningAmber,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
-                                }
-                            )
-                        }
-
-                        // Reset App Item
-                        SurfaceItem {
-                            ListItem(
-                                headlineContent = {
-                                    Text(
-                                        text = stringResource(Res.string.settings_reset_app_title),
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                },
-                                supportingContent = {
-                                    Text(
-                                        text = stringResource(Res.string.settings_reset_app_description),
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                    )
-                                },
-                                leadingContent = {
-                                    Icon(
-                                        Icons.Default.RestartAlt,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
-                                },
-                                trailingContent = {
-                                    OutlinedButton(
-                                        onClick = { showResetDialog = true },
-                                        border = BorderStroke(
-                                            width = 1.dp,
-                                            color = MaterialTheme.colorScheme.error
-                                        ),
-                                        colors = ButtonDefaults.outlinedButtonColors(
-                                            contentColor = MaterialTheme.colorScheme.error
+                        MaterialContainer {
+                            SurfaceItem {
+                                ListItem(
+                                    headlineContent = {
+                                        Text(stringResource(Res.string.before_you_reset))
+                                    },
+                                    supportingContent = {
+                                        Text(
+                                            "Export and verify a backup from Data & Storage. " +
+                                                "Without a backup, encrypted local data may be unrecoverable.",
                                         )
-                                    ) {
-                                        Text(stringResource(Res.string.action_reset_app))
-                                    }
-                                }
-                            )
-                        }
-
-                        // Clear All Data
-                        SurfaceItem {
-                            ListItem(
-                                headlineContent = {
-                                    Text(
-                                        text = stringResource(Res.string.clear_all_data),
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                },
-                                supportingContent = {
-                                    Text(
-                                        text = stringResource(Res.string.clear_all_your_data_while_keeping_your_account),
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                    )
-                                },
-                                leadingContent = {
-                                    Icon(
-                                        Icons.Default.DeleteForever,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
-                                },
-                                trailingContent = {
-                                    OutlinedButton(
-                                        onClick = { showClearDataDialog = true },
-                                        border = BorderStroke(
-                                            width = 1.dp,
-                                            color = MaterialTheme.colorScheme.error
-                                        ),
-                                        colors = ButtonDefaults.outlinedButtonColors(
-                                            contentColor = MaterialTheme.colorScheme.error
+                                    },
+                                    leadingContent = {
+                                        Icon(
+                                            Icons.Default.WarningAmber,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error,
                                         )
-                                    ) {
-                                        Text(stringResource(Res.string.clear_data))
-                                    }
-                                }
-                            )
+                                    },
+                                )
+                            }
+
+                            // Reset App Item
+                            SurfaceItem {
+                                ListItem(
+                                    headlineContent = {
+                                        Text(
+                                            text = stringResource(Res.string.settings_reset_app_title),
+                                            color = MaterialTheme.colorScheme.error,
+                                        )
+                                    },
+                                    supportingContent = {
+                                        Text(
+                                            text = stringResource(Res.string.settings_reset_app_description),
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                        )
+                                    },
+                                    leadingContent = {
+                                        Icon(
+                                            Icons.Default.RestartAlt,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error,
+                                        )
+                                    },
+                                    trailingContent = {
+                                        OutlinedButton(
+                                            onClick = { showResetDialog = true },
+                                            border =
+                                                BorderStroke(
+                                                    width = 1.dp,
+                                                    color = MaterialTheme.colorScheme.error,
+                                                ),
+                                            colors =
+                                                ButtonDefaults.outlinedButtonColors(
+                                                    contentColor = MaterialTheme.colorScheme.error,
+                                                ),
+                                        ) {
+                                            Text(stringResource(Res.string.action_reset_app))
+                                        }
+                                    },
+                                )
+                            }
+
+                            // Clear All Data
+                            SurfaceItem {
+                                ListItem(
+                                    headlineContent = {
+                                        Text(
+                                            text = stringResource(Res.string.clear_all_data),
+                                            color = MaterialTheme.colorScheme.error,
+                                        )
+                                    },
+                                    supportingContent = {
+                                        Text(
+                                            text = stringResource(Res.string.clear_all_your_data_while_keeping_your_account),
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                        )
+                                    },
+                                    leadingContent = {
+                                        Icon(
+                                            Icons.Default.DeleteForever,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error,
+                                        )
+                                    },
+                                    trailingContent = {
+                                        OutlinedButton(
+                                            onClick = { showClearDataDialog = true },
+                                            border =
+                                                BorderStroke(
+                                                    width = 1.dp,
+                                                    color = MaterialTheme.colorScheme.error,
+                                                ),
+                                            colors =
+                                                ButtonDefaults.outlinedButtonColors(
+                                                    contentColor = MaterialTheme.colorScheme.error,
+                                                ),
+                                        ) {
+                                            Text(stringResource(Res.string.clear_data))
+                                        }
+                                    },
+                                )
+                            }
                         }
                     }
                 }
-            }
-
             }
         }
 
@@ -252,7 +258,7 @@ private fun DangerZoneSettingsContent(
                 onConfirmation = {
                     onAppReset()
                     showResetDialog = false
-                }
+                },
             )
         }
 
@@ -264,22 +270,23 @@ private fun DangerZoneSettingsContent(
                     Icon(
                         Icons.Default.WarningAmber,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error
+                        tint = MaterialTheme.colorScheme.error,
                     )
                 },
                 title = {
                     Text(
                         text = stringResource(Res.string.clear_all_data_2),
-                        color = MaterialTheme.colorScheme.error
+                        color = MaterialTheme.colorScheme.error,
                     )
                 },
                 text = {
                     Text(
-                        text = "⚠️ This action cannot be undone.\n\n" +
+                        text =
+                            "⚠️ This action cannot be undone.\n\n" +
                                 "This will permanently delete all your journals, entries, photos, " +
                                 "and settings.\n\n" +
                                 "Your account will remain active.\n\n" +
-                                "Are you absolutely sure you want to continue?"
+                                "Are you absolutely sure you want to continue?",
                     )
                 },
                 confirmButton = {
@@ -288,9 +295,10 @@ private fun DangerZoneSettingsContent(
                             onClearData()
                             showClearDataDialog = false
                         },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error
-                        )
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                            ),
                     ) {
                         Text(stringResource(Res.string.yes_clear_all_data))
                     }
@@ -299,7 +307,7 @@ private fun DangerZoneSettingsContent(
                     TextButton(onClick = { showClearDataDialog = false }) {
                         Text(stringResource(Res.string.cancel))
                     }
-                }
+                },
             )
         }
     }
@@ -311,6 +319,6 @@ private fun DangerZoneSettingsScreenPreview() {
     DangerZoneSettingsContent(
         onBack = {},
         onAppReset = {},
-        onClearData = {}
+        onClearData = {},
     )
 }

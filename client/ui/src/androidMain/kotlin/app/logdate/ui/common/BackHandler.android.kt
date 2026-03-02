@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.ui.common
 
 import androidx.compose.runtime.Composable
@@ -8,7 +10,10 @@ import androidx.compose.runtime.Composable
  * This exists solely to wrap Android specific back navigation handling.
  */
 @Composable
-actual fun PlatformBackHandler(enabled: Boolean, onBack: () -> Unit) {
+actual fun PlatformBackHandler(
+    enabled: Boolean,
+    onBack: () -> Unit,
+) {
     androidx.activity.compose.BackHandler(
         enabled = enabled,
         onBack = onBack,

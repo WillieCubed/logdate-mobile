@@ -15,14 +15,14 @@ data class ProfileUiState(
     val isLoading: Boolean = false,
     val editState: ProfileEditState = ProfileEditState.None,
     val updateState: ProfileUpdateState = ProfileUpdateState.Idle,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
 ) {
     val isEditing: Boolean
         get() = editState != ProfileEditState.None
-    
+
     val canSave: Boolean
         get() = isEditing && updateState != ProfileUpdateState.Updating
-    
+
     val hasCloudAccount: Boolean
         get() = account != null
 }
@@ -32,7 +32,10 @@ data class ProfileUiState(
  */
 sealed class ProfileEditState {
     data object None : ProfileEditState()
-    data class DisplayName(val currentValue: String) : ProfileEditState()
+
+    data class DisplayName(
+        val currentValue: String,
+    ) : ProfileEditState()
 }
 
 /**
@@ -40,14 +43,19 @@ sealed class ProfileEditState {
  */
 sealed class ProfileUpdateState {
     data object Idle : ProfileUpdateState()
+
     data object Updating : ProfileUpdateState()
+
     data object Success : ProfileUpdateState()
-    data class Error(val message: String) : ProfileUpdateState()
+
+    data class Error(
+        val message: String,
+    ) : ProfileUpdateState()
 }
 
 /**
  * Profile display model for UI rendering with local-first approach.
- * 
+ *
  * This model combines local profile data (always available) with cloud account data
  * (when available) to provide progressive enhancement.
  */
@@ -57,11 +65,10 @@ data class ProfileDisplayModel(
     val birthday: Instant?,
     val hasProfilePhoto: Boolean = false,
     val profileCreatedAt: Instant,
-    
     // Cloud account data (progressive enhancement when connected)
     val username: String? = null,
     val joinDate: Instant? = null,
-    val isAuthenticated: Boolean = false
+    val isAuthenticated: Boolean = false,
 ) {
     val hasCloudAccount: Boolean
         get() = isAuthenticated
@@ -69,25 +76,23 @@ data class ProfileDisplayModel(
 
 /**
  * Create ProfileDisplayModel from local profile and optional cloud account data.
- * 
+ *
  * This function implements the local-first approach where local profile data is always
  * available, and cloud account data provides progressive enhancement when connected.
  */
 fun createProfileDisplayModel(
     localProfile: LogDateProfile,
     account: LogDateAccount? = null,
-    userData: UserData? = null
-): ProfileDisplayModel {
-    return ProfileDisplayModel(
+    userData: UserData? = null,
+): ProfileDisplayModel =
+    ProfileDisplayModel(
         // Local profile data (always available)
         displayName = localProfile.displayName.ifEmpty { "Your name" },
         birthday = localProfile.birthday ?: userData?.birthday?.takeIf { it != Instant.DISTANT_PAST },
         hasProfilePhoto = !localProfile.profilePhotoUri.isNullOrEmpty(),
         profileCreatedAt = localProfile.createdAt,
-        
         // Cloud account data (progressive enhancement)
         username = account?.username?.takeIf { it.isNotEmpty() },
         joinDate = account?.createdAt,
-        isAuthenticated = account?.passkeyCredentialIds?.isNotEmpty() == true
+        isAuthenticated = account?.passkeyCredentialIds?.isNotEmpty() == true,
     )
-}

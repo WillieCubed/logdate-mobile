@@ -13,7 +13,6 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.window.layout.WindowMetricsCalculator
 import app.logdate.feature.editor.ui.NoteEditorScreen
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
-// Remove EditorInstanceId import until we properly implement it
 import app.logdate.ui.theme.LogDateTheme
 import io.github.aakira.napier.Napier
 import io.github.vinceglb.filekit.core.FileKit
@@ -36,11 +35,11 @@ import kotlin.uuid.Uuid
  * when the activity is resumed to handle device rotations and foldable/split-screen layout changes.
  */
 class EditorActivity : FragmentActivity() {
-    
     private val viewModel by viewModel<EntryEditorViewModel>()
+
     // We'll implement EditorInstanceId handling later
     private var instanceId: String? = null
-    
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -77,12 +76,12 @@ class EditorActivity : FragmentActivity() {
                     journalId = journalId,
                     initialTextContent = initialText,
                     attachments = attachmentUris,
-                    viewModel = viewModel
+                    viewModel = viewModel,
                 )
             }
         }
     }
-    
+
     /**
      * Sets up handling of lifecycle events to ensure editor content is saved
      * when appropriate and window size changes are handled.
@@ -94,7 +93,7 @@ class EditorActivity : FragmentActivity() {
                 updateWindowMetrics()
             }
         }
-        
+
         // Trigger auto-save when pausing the activity (going to background)
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -102,7 +101,7 @@ class EditorActivity : FragmentActivity() {
             }
         }
     }
-    
+
     override fun onPause() {
         super.onPause()
         // Auto-save content when going to background
@@ -112,7 +111,7 @@ class EditorActivity : FragmentActivity() {
             viewModel.autoSaveEntry(editorState)
         }
     }
-    
+
     /**
      * Calculates and updates window metrics for the editor.
      */
@@ -120,14 +119,14 @@ class EditorActivity : FragmentActivity() {
         val metrics = WindowMetricsCalculator.getOrCreate().computeCurrentWindowMetrics(this)
         val widthDp = metrics.bounds.width() / resources.displayMetrics.density
         val heightDp = metrics.bounds.height() / resources.displayMetrics.density
-        
+
         Napier.d("Window metrics updated: ${widthDp}dp x ${heightDp}dp")
-        
+
         // Adapt UI based on window size if needed
         // For example, we could enable/disable certain features based on window size
         // This is handled internally in the ViewModel to keep UI concerns separate
     }
-    
+
     companion object {
         private const val EXTRA_INSTANCE_ID = "editor_instance_id"
         private const val EXTRA_ENTRY_ID = "entry_id"
@@ -150,9 +149,9 @@ class EditorActivity : FragmentActivity() {
             entryId: Uuid? = null,
             journalId: Uuid? = null,
             initialText: String? = null,
-            attachments: List<String>? = null
-        ): Intent {
-            return Intent(context, EditorActivity::class.java).apply {
+            attachments: List<String>? = null,
+        ): Intent =
+            Intent(context, EditorActivity::class.java).apply {
                 entryId?.let {
                     putExtra(EXTRA_ENTRY_ID, it.toString())
                 }
@@ -170,6 +169,5 @@ class EditorActivity : FragmentActivity() {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT)
                 addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
             }
-        }
     }
 }

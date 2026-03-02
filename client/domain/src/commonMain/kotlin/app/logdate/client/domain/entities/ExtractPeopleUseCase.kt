@@ -18,7 +18,8 @@ class ExtractPeopleUseCase(
      * @param documentId An ID used to identify and cache the response.
      * @param text The text to extract people's names from.
      */
-    suspend operator fun invoke(documentId: String, text: String): AIResult<List<Person>> {
-        return peopleExtractor.extractPeople(documentId, text)
-    }
+    suspend operator fun invoke(
+        documentId: String,
+        text: String,
+    ): AIResult<List<Person>> = peopleExtractor.extractPeople(documentId, text)
 }

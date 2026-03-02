@@ -7,7 +7,6 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.user.UserStateRepository
-import app.logdate.shared.model.Journal
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.SerializableAudioBlock
 import app.logdate.shared.model.SerializableCameraBlock
@@ -17,10 +16,10 @@ import app.logdate.shared.model.SerializableVideoBlock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
-import kotlin.time.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlin.time.Clock
 
 /**
  * Use case for exporting all user data to JSON format according to the LogDate export specification.
@@ -31,162 +30,175 @@ class ExportUserDataUseCase(
     private val userStateRepository: UserStateRepository,
     private val deviceIdProvider: DeviceIdProvider,
     private val appInfoProvider: AppInfoProvider,
-    private val getAllAudioNotesUseCase: GetAllAudioNotesUseCase
+    private val getAllAudioNotesUseCase: GetAllAudioNotesUseCase,
 ) {
-    private val json = Json {
-        prettyPrint = true
-        encodeDefaults = true
-    }
-    
+    private val json =
+        Json {
+            prettyPrint = true
+            encodeDefaults = true
+        }
+
     /**
      * Exports all user data as a Flow that emits progress updates.
-     * 
+     *
      * @return Flow of ExportProgress containing current status and completion percentage
      */
-    fun exportUserData(): Flow<ExportProgress> = flow {
-        emit(ExportProgress.Starting)
-        
-        try {
-            // Gather all journals
-            emit(ExportProgress.InProgress(0.1f, "Collecting journals..."))
-            val journals = journalRepository.allJournalsObserved.first()
-            
-            // Gather all notes
-            emit(ExportProgress.InProgress(0.3f, "Collecting notes..."))
-            val notes = journalNotesRepository.allNotesObserved.first()
-            
-            // Specifically gather all audio notes for media export
-            val audioNotes = getAllAudioNotesUseCase().first()
-            
-            // Gather all drafts
-            emit(ExportProgress.InProgress(0.5f, "Collecting drafts..."))
-            val drafts = journalRepository.getAllDrafts()
-            
-            // Get app info and user ID
-            val appInfo = appInfoProvider.getAppInfo()
-            // Device ID will be our user ID if not signed in
-            val userId = deviceIdProvider.getDeviceId().value.toString()
-            
-            // Get device ID
-            val deviceId = deviceIdProvider.getDeviceId().value.toString()
-            
-            // Create export data structure
-            emit(ExportProgress.InProgress(0.7f, "Preparing export data..."))
-            
-            // Map repository data to export models
-            val exportNotes = notes.map { note ->
-                when (note) {
-                    is JournalNote.Text -> ExportNote(
-                        id = note.uid.toString(),
-                        type = "text",
-                        content = note.content,
-                        createdAt = note.creationTimestamp,
-                        updatedAt = note.lastUpdated
-                    )
-                    is JournalNote.Image -> ExportNote(
-                        id = note.uid.toString(),
-                        type = "image",
-                        mediaPath = note.mediaRef,
-                        createdAt = note.creationTimestamp,
-                        updatedAt = note.lastUpdated
-                    )
-                    is JournalNote.Audio -> ExportNote(
-                        id = note.uid.toString(),
-                        type = "audio",
-                        mediaPath = note.mediaRef,
-                        createdAt = note.creationTimestamp,
-                        updatedAt = note.lastUpdated
-                    )
-                    is JournalNote.Video -> ExportNote(
-                        id = note.uid.toString(),
-                        type = "video",
-                        mediaPath = note.mediaRef,
-                        createdAt = note.creationTimestamp,
-                        updatedAt = note.lastUpdated
-                    )
-                }
-            }
-            
-            val exportDrafts = drafts.map { it.toExportDraft() }
-            val exportRelations = journals.flatMap { journal ->
-                journalNotesRepository.observeNotesInJournal(journal.id).first().map { note ->
-                    ExportJournalNoteRelation(
-                        journalId = journal.id.toString(),
-                        noteId = note.uid.toString(),
-                        addedAt = note.creationTimestamp
-                    )
-                }
-            }
-            
-            // Calculate actual stats
-            val mediaFiles = getMediaFilesToExport(exportNotes, exportDrafts, audioNotes)
-            val mediaCount = mediaFiles.size
-                            
-            val stats = ExportStats(
-                journalCount = journals.size,
-                noteCount = notes.size,
-                draftCount = exportDrafts.size,
-                mediaCount = mediaCount
-            )
-            
-            val exportMetadata = ExportMetadata(
-                exportDate = Clock.System.now(),
-                userId = userId,
-                deviceId = deviceId,
-                appVersion = appInfo.versionName,
-                stats = stats
-            )
-            
-            // Create the separate export files
-            val metadataJson = json.encodeToString(exportMetadata)
-            val journalsJson = json.encodeToString(mapOf("journals" to journals))
-            val notesJson = json.encodeToString(mapOf("notes" to exportNotes))
-            val draftsJson = json.encodeToString(mapOf("drafts" to exportDrafts))
-            val journalNotesJson = json.encodeToString(mapOf("journal_notes" to exportRelations))
-            
-            val mediaManifestJson = json.encodeToString(ExportMediaManifest(mediaFiles))
+    fun exportUserData(): Flow<ExportProgress> =
+        flow {
+            emit(ExportProgress.Starting)
 
-            // Create the final export data
-            val exportData = ExportResult(
-                metadata = metadataJson,
-                journals = journalsJson,
-                notes = notesJson,
-                journalNotes = journalNotesJson,
-                drafts = draftsJson,
-                mediaFiles = mediaFiles,
-                mediaManifest = mediaManifestJson
-            )
-            
-            emit(ExportProgress.Completed(exportData))
-            
-        } catch (exception: Exception) {
-            emit(ExportProgress.Failed(exception.message ?: "Unknown error occurred"))
+            try {
+                // Gather all journals
+                emit(ExportProgress.InProgress(0.1f, "Collecting journals..."))
+                val journals = journalRepository.allJournalsObserved.first()
+
+                // Gather all notes
+                emit(ExportProgress.InProgress(0.3f, "Collecting notes..."))
+                val notes = journalNotesRepository.allNotesObserved.first()
+
+                // Specifically gather all audio notes for media export
+                val audioNotes = getAllAudioNotesUseCase().first()
+
+                // Gather all drafts
+                emit(ExportProgress.InProgress(0.5f, "Collecting drafts..."))
+                val drafts = journalRepository.getAllDrafts()
+
+                // Get app info and user ID
+                val appInfo = appInfoProvider.getAppInfo()
+                // Device ID will be our user ID if not signed in
+                val userId = deviceIdProvider.getDeviceId().value.toString()
+
+                // Get device ID
+                val deviceId = deviceIdProvider.getDeviceId().value.toString()
+
+                // Create export data structure
+                emit(ExportProgress.InProgress(0.7f, "Preparing export data..."))
+
+                // Map repository data to export models
+                val exportNotes =
+                    notes.map { note ->
+                        when (note) {
+                            is JournalNote.Text ->
+                                ExportNote(
+                                    id = note.uid.toString(),
+                                    type = "text",
+                                    content = note.content,
+                                    createdAt = note.creationTimestamp,
+                                    updatedAt = note.lastUpdated,
+                                )
+                            is JournalNote.Image ->
+                                ExportNote(
+                                    id = note.uid.toString(),
+                                    type = "image",
+                                    mediaPath = note.mediaRef,
+                                    createdAt = note.creationTimestamp,
+                                    updatedAt = note.lastUpdated,
+                                )
+                            is JournalNote.Audio ->
+                                ExportNote(
+                                    id = note.uid.toString(),
+                                    type = "audio",
+                                    mediaPath = note.mediaRef,
+                                    createdAt = note.creationTimestamp,
+                                    updatedAt = note.lastUpdated,
+                                )
+                            is JournalNote.Video ->
+                                ExportNote(
+                                    id = note.uid.toString(),
+                                    type = "video",
+                                    mediaPath = note.mediaRef,
+                                    createdAt = note.creationTimestamp,
+                                    updatedAt = note.lastUpdated,
+                                )
+                        }
+                    }
+
+                val exportDrafts = drafts.map { it.toExportDraft() }
+                val exportRelations =
+                    journals.flatMap { journal ->
+                        journalNotesRepository.observeNotesInJournal(journal.id).first().map { note ->
+                            ExportJournalNoteRelation(
+                                journalId = journal.id.toString(),
+                                noteId = note.uid.toString(),
+                                addedAt = note.creationTimestamp,
+                            )
+                        }
+                    }
+
+                // Calculate actual stats
+                val mediaFiles = getMediaFilesToExport(exportNotes, exportDrafts, audioNotes)
+                val mediaCount = mediaFiles.size
+
+                val stats =
+                    ExportStats(
+                        journalCount = journals.size,
+                        noteCount = notes.size,
+                        draftCount = exportDrafts.size,
+                        mediaCount = mediaCount,
+                    )
+
+                val exportMetadata =
+                    ExportMetadata(
+                        exportDate = Clock.System.now(),
+                        userId = userId,
+                        deviceId = deviceId,
+                        appVersion = appInfo.versionName,
+                        stats = stats,
+                    )
+
+                // Create the separate export files
+                val metadataJson = json.encodeToString(exportMetadata)
+                val journalsJson = json.encodeToString(mapOf("journals" to journals))
+                val notesJson = json.encodeToString(mapOf("notes" to exportNotes))
+                val draftsJson = json.encodeToString(mapOf("drafts" to exportDrafts))
+                val journalNotesJson = json.encodeToString(mapOf("journal_notes" to exportRelations))
+
+                val mediaManifestJson = json.encodeToString(ExportMediaManifest(mediaFiles))
+
+                // Create the final export data
+                val exportData =
+                    ExportResult(
+                        metadata = metadataJson,
+                        journals = journalsJson,
+                        notes = notesJson,
+                        journalNotes = journalNotesJson,
+                        drafts = draftsJson,
+                        mediaFiles = mediaFiles,
+                        mediaManifest = mediaManifestJson,
+                    )
+
+                emit(ExportProgress.Completed(exportData))
+            } catch (exception: Exception) {
+                emit(ExportProgress.Failed(exception.message ?: "Unknown error occurred"))
+            }
         }
-    }
-    
+
     /**
      * Creates a standardized media path for export according to the specification.
      */
-    private fun createMediaPath(uri: String, timestamp: kotlin.time.Instant): String {
+    private fun createMediaPath(
+        uri: String,
+        timestamp: kotlin.time.Instant,
+    ): String {
         val year = timestamp.toString().substring(0, 4)
         val formattedTimestamp = timestamp.toString().replace(":", "-")
         val id = uri.substringAfterLast("/")
         val extension = uri.substringAfterLast(".", "")
-        
+
         return if (extension.isNotEmpty()) {
             "$year/${formattedTimestamp}_$id.$extension"
         } else {
             "$year/${formattedTimestamp}_$id"
         }
     }
-    
+
     private fun getMediaFilesToExport(
-        notes: List<ExportNote>, 
+        notes: List<ExportNote>,
         drafts: List<ExportDraft>,
-        audioNotes: List<JournalNote.Audio> = emptyList()
+        audioNotes: List<JournalNote.Audio> = emptyList(),
     ): List<ExportMediaFile> {
         val mediaFilesByPath = linkedMapOf<String, String>()
-        
+
         // Process regular notes with media
         notes.forEach { note ->
             if (note.mediaPath != null) {
@@ -194,7 +206,7 @@ class ExportUserDataUseCase(
                 mediaFilesByPath[exportPath] = note.mediaPath
             }
         }
-        
+
         // Process draft media references
         drafts.forEach { draft ->
             draft.mediaReferences.forEach { mediaRef ->
@@ -202,46 +214,55 @@ class ExportUserDataUseCase(
                 mediaFilesByPath[exportPath] = mediaRef
             }
         }
-        
+
         // Process audio notes
         audioNotes.forEach { audioNote ->
             val exportPath = createMediaPath(audioNote.mediaRef, audioNote.creationTimestamp)
             mediaFilesByPath[exportPath] = audioNote.mediaRef
         }
-        
+
         return mediaFilesByPath.map { (exportPath, sourceUri) ->
             ExportMediaFile(exportPath, sourceUri)
         }
     }
 
     private fun EditorDraft.toExportDraft(): ExportDraft {
-        val location = blocks.firstNotNullOfOrNull { block ->
-            val latitude = block.locationLat
-            val longitude = block.locationLng
-            if (latitude != null && longitude != null) {
-                ExportLocation(
-                    latitude = latitude,
-                    longitude = longitude
-                )
-            } else null
-        }
-
-        val content = blocks.filterIsInstance<SerializableTextBlock>()
-            .joinToString("\n") { it.content }
-
-        val mediaReferences = buildList {
-            blocks.filterIsInstance<SerializableImageBlock>()
-                .mapNotNullTo(this) { it.uri }
-            blocks.filterIsInstance<SerializableVideoBlock>().forEach { block ->
-                listOfNotNull(block.uri, block.thumbnailUri).forEach { uri ->
-                    add(uri)
+        val location =
+            blocks.firstNotNullOfOrNull { block ->
+                val latitude = block.locationLat
+                val longitude = block.locationLng
+                if (latitude != null && longitude != null) {
+                    ExportLocation(
+                        latitude = latitude,
+                        longitude = longitude,
+                    )
+                } else {
+                    null
                 }
             }
-            blocks.filterIsInstance<SerializableAudioBlock>()
-                .mapNotNullTo(this) { it.uri }
-            blocks.filterIsInstance<SerializableCameraBlock>()
-                .mapNotNullTo(this) { it.uri }
-        }.distinct()
+
+        val content =
+            blocks
+                .filterIsInstance<SerializableTextBlock>()
+                .joinToString("\n") { it.content }
+
+        val mediaReferences =
+            buildList {
+                blocks
+                    .filterIsInstance<SerializableImageBlock>()
+                    .mapNotNullTo(this) { it.uri }
+                blocks.filterIsInstance<SerializableVideoBlock>().forEach { block ->
+                    listOfNotNull(block.uri, block.thumbnailUri).forEach { uri ->
+                        add(uri)
+                    }
+                }
+                blocks
+                    .filterIsInstance<SerializableAudioBlock>()
+                    .mapNotNullTo(this) { it.uri }
+                blocks
+                    .filterIsInstance<SerializableCameraBlock>()
+                    .mapNotNullTo(this) { it.uri }
+            }.distinct()
 
         val journalId = selectedJournalIds.firstOrNull()?.toString()
 
@@ -252,7 +273,7 @@ class ExportUserDataUseCase(
             createdAt = createdAt,
             updatedAt = lastModifiedAt,
             location = location,
-            mediaReferences = mediaReferences
+            mediaReferences = mediaReferences,
         )
     }
 }
@@ -265,27 +286,27 @@ sealed class ExportProgress {
      * Export operation is starting.
      */
     data object Starting : ExportProgress()
-    
+
     /**
      * Export operation is in progress.
      */
     data class InProgress(
         val percentage: Float,
-        val message: String
+        val message: String,
     ) : ExportProgress()
-    
+
     /**
      * Export operation completed successfully.
      */
     data class Completed(
-        val result: ExportResult
+        val result: ExportResult,
     ) : ExportProgress()
-    
+
     /**
      * Export operation failed.
      */
     data class Failed(
-        val reason: String
+        val reason: String,
     ) : ExportProgress()
 }
 
@@ -299,7 +320,7 @@ data class ExportResult(
     val journalNotes: String,
     val drafts: String,
     val mediaFiles: List<ExportMediaFile>,
-    val mediaManifest: String? = null
+    val mediaManifest: String? = null,
 )
 
 /**
@@ -308,5 +329,5 @@ data class ExportResult(
 @Serializable
 data class ExportMediaFile(
     val exportPath: String,
-    val sourceUri: String
+    val sourceUri: String,
 )

@@ -35,11 +35,10 @@ class DefaultCloudAccountRepository(
     private val apiClient: CloudApiClient,
     private val secureStorage: KeyValueStorage,
     private val platformInfoProvider: PlatformInfoProvider,
-    private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
+    private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.IO),
 ) : CloudAccountRepository {
-
     private val accountFlow = MutableStateFlow<CloudAccount?>(null)
-    
+
     /**
      * Key constants for secure storage.
      */
@@ -54,14 +53,14 @@ class DefaultCloudAccountRepository(
         const val UPDATED_AT = "cloud_updated_at"
         const val PASSKEY_IDS = "cloud_passkey_ids"
     }
-    
+
     init {
         // Initialize with a coroutine to avoid blocking the main thread
         coroutineScope.launch {
             loadStoredAccount()
         }
     }
-    
+
     /**
      * Loads account information from secure storage if available.
      */
@@ -76,25 +75,31 @@ class DefaultCloudAccountRepository(
             val createdAtString = secureStorage.getString(StorageKeys.CREATED_AT)
             val updatedAtString = secureStorage.getString(StorageKeys.UPDATED_AT)
             val passkeyIdsString = secureStorage.getString(StorageKeys.PASSKEY_IDS)
-            
-            if (accountId != null && username != null && displayName != null && 
-                userIdString != null && createdAtString != null && updatedAtString != null) {
+
+            if (accountId != null &&
+                username != null &&
+                displayName != null &&
+                userIdString != null &&
+                createdAtString != null &&
+                updatedAtString != null
+            ) {
                 val userId = Uuid.parse(userIdString)
                 val createdAt = Instant.parse(createdAtString)
                 val updatedAt = Instant.parse(updatedAtString)
                 val passkeyIds = passkeyIdsString?.split(",") ?: emptyList()
-                
+
                 // Convert String IDs to UUIDs
-                val account = CloudAccount(
-                    id = Uuid.parse(accountId),
-                    username = username,
-                    displayName = displayName,
-                    userId = userId,
-                    createdAt = createdAt,
-                    updatedAt = updatedAt,
-                    passkeyCredentialIds = passkeyIds.map { Uuid.parse(it) }
-                )
-                
+                val account =
+                    CloudAccount(
+                        id = Uuid.parse(accountId),
+                        username = username,
+                        displayName = displayName,
+                        userId = userId,
+                        createdAt = createdAt,
+                        updatedAt = updatedAt,
+                        passkeyCredentialIds = passkeyIds.map { Uuid.parse(it) },
+                    )
+
                 accountFlow.value = account
                 Napier.d("Loaded stored account: $username")
             }
@@ -103,18 +108,18 @@ class DefaultCloudAccountRepository(
             // If loading fails, we just keep the account as null
         }
     }
-    
+
     /**
      * Checks if a username is available for registration.
      *
      * @param username The username to check.
      * @return True if the username is available, false otherwise.
      */
-    override suspend fun isUsernameAvailable(username: String): Result<Boolean> {
-        return try {
+    override suspend fun isUsernameAvailable(username: String): Result<Boolean> =
+        try {
             // Using the RESTful approach
             val result = apiClient.checkUsernameAvailability(username)
-            
+
             result.map { response ->
                 response.available
             }
@@ -122,8 +127,7 @@ class DefaultCloudAccountRepository(
             Napier.e("Error checking username availability", e)
             Result.failure(e)
         }
-    }
-    
+
     /**
      * Begins the account creation process.
      *
@@ -135,25 +139,27 @@ class DefaultCloudAccountRepository(
     override suspend fun beginAccountCreation(
         username: String,
         displayName: String,
-        deviceInfo: DeviceInfo?
-    ): Result<BeginAccountCreationResult> {
-        return try {
-            val deviceInfoDto = deviceInfo?.let {
-                app.logdate.shared.model.DeviceInfoDto(
-                    platform = it.platform,
-                    deviceName = it.deviceName,
-                    deviceType = it.deviceType.name
+        deviceInfo: DeviceInfo?,
+    ): Result<BeginAccountCreationResult> =
+        try {
+            val deviceInfoDto =
+                deviceInfo?.let {
+                    app.logdate.shared.model.DeviceInfoDto(
+                        platform = it.platform,
+                        deviceName = it.deviceName,
+                        deviceType = it.deviceType.name,
+                    )
+                } ?: createDefaultDeviceInfo()
+
+            val request =
+                app.logdate.shared.model.BeginAccountCreationRequest(
+                    username = username,
+                    displayName = displayName,
+                    bio = null, // Optional bio not supported in domain model yet
                 )
-            } ?: createDefaultDeviceInfo()
-            
-            val request = app.logdate.shared.model.BeginAccountCreationRequest(
-                username = username,
-                displayName = displayName,
-                bio = null // Optional bio not supported in domain model yet
-            )
-            
+
             val result = apiClient.beginAccountCreation(request)
-            
+
             result.map { response ->
                 BeginAccountCreationResult(
                     sessionToken = response.data.sessionToken,
@@ -163,15 +169,14 @@ class DefaultCloudAccountRepository(
                     userId = Uuid.parse(response.data.registrationOptions.user.id),
                     username = response.data.registrationOptions.user.name,
                     displayName = response.data.registrationOptions.user.displayName,
-                    timeout = response.data.registrationOptions.timeout
+                    timeout = response.data.registrationOptions.timeout,
                 )
             }
         } catch (e: Exception) {
             Napier.e("Error beginning account creation", e)
             Result.failure(e)
         }
-    }
-    
+
     /**
      * Completes the account creation process with a passkey.
      *
@@ -185,57 +190,62 @@ class DefaultCloudAccountRepository(
         sessionToken: String,
         credentialId: String,
         clientDataJSON: String,
-        attestationObject: String
-    ): Result<AuthenticationResult> {
-        return try {
-            val request = app.logdate.shared.model.CompleteAccountCreationRequest(
-                sessionToken = sessionToken,
-                credential = app.logdate.shared.model.PasskeyCredentialResponse(
-                    id = credentialId,
-                    rawId = credentialId, // In a real implementation, these would be different
-                    response = app.logdate.shared.model.PasskeyAuthenticatorResponse(
-                        clientDataJSON = clientDataJSON,
-                        attestationObject = attestationObject
-                    ),
-                    type = "public-key"
+        attestationObject: String,
+    ): Result<AuthenticationResult> =
+        try {
+            val request =
+                app.logdate.shared.model.CompleteAccountCreationRequest(
+                    sessionToken = sessionToken,
+                    credential =
+                        app.logdate.shared.model.PasskeyCredentialResponse(
+                            id = credentialId,
+                            rawId = credentialId, // In a real implementation, these would be different
+                            response =
+                                app.logdate.shared.model.PasskeyAuthenticatorResponse(
+                                    clientDataJSON = clientDataJSON,
+                                    attestationObject = attestationObject,
+                                ),
+                            type = "public-key",
+                        ),
                 )
-            )
-            
+
             val result = apiClient.completeAccountCreation(request)
-            
+
             result.map { response ->
                 if (response.success) {
                     val accountDto = response.data.account
                     val tokensDto = response.data.tokens
-                    
+
                     // Create the account and credentials
-                    val account = CloudAccount(
-                        id = Uuid.parse(accountDto.username), // Generate a UUID from the username
-                        username = accountDto.username,
-                        displayName = accountDto.displayName,
-                        userId = Uuid.parse(accountDto.username), // Using username as user ID for simplicity
-                        createdAt = accountDto.createdAt,
-                        updatedAt = accountDto.updatedAt,
-                        passkeyCredentialIds = accountDto.passkeyCredentialIds.map { Uuid.parse(it) }
-                    )
-                    
-                    val credentials = AccountCredentials(
-                        accessToken = tokensDto.accessToken,
-                        refreshToken = tokensDto.refreshToken,
-                        expiresIn = 3600 // Default to 1 hour if not specified
-                    )
-                    
+                    val account =
+                        CloudAccount(
+                            id = Uuid.parse(accountDto.username), // Generate a UUID from the username
+                            username = accountDto.username,
+                            displayName = accountDto.displayName,
+                            userId = Uuid.parse(accountDto.username), // Using username as user ID for simplicity
+                            createdAt = accountDto.createdAt,
+                            updatedAt = accountDto.updatedAt,
+                            passkeyCredentialIds = accountDto.passkeyCredentialIds.map { Uuid.parse(it) },
+                        )
+
+                    val credentials =
+                        AccountCredentials(
+                            accessToken = tokensDto.accessToken,
+                            refreshToken = tokensDto.refreshToken,
+                            expiresIn = 3600, // Default to 1 hour if not specified
+                        )
+
                     // Store the account and credentials
                     storeAccountAndCredentials(account, credentials)
-                    
+
                     // Update the current account flow
                     accountFlow.value = account
-                    
+
                     AuthenticationResult.Success(account, credentials)
                 } else {
                     AuthenticationResult.Error(
                         errorCode = "ACCOUNT_CREATION_FAILED",
-                        message = "Failed to create account"
+                        message = "Failed to create account",
                     )
                 }
             }
@@ -243,55 +253,49 @@ class DefaultCloudAccountRepository(
             Napier.e("Error completing account creation", e)
             Result.failure(e)
         }
-    }
-    
+
     /**
      * Gets the currently authenticated account.
      *
      * @return The current account, or null if not authenticated.
      */
-    override suspend fun getCurrentAccount(): CloudAccount? {
-        return accountFlow.value
-    }
-    
+    override suspend fun getCurrentAccount(): CloudAccount? = accountFlow.value
+
     /**
      * Observes the current authentication state.
      *
      * @return A flow emitting the current account whenever it changes.
      */
-    override fun observeCurrentAccount(): Flow<CloudAccount?> {
-        return accountFlow.asStateFlow()
-    }
-    
+    override fun observeCurrentAccount(): Flow<CloudAccount?> = accountFlow.asStateFlow()
+
     /**
      * Refreshes the access token using a refresh token.
      *
      * @param refreshToken The refresh token.
      * @return The new access token if successful.
      */
-    override suspend fun refreshAccessToken(refreshToken: String): Result<String> {
-        return try {
+    override suspend fun refreshAccessToken(refreshToken: String): Result<String> =
+        try {
             val result = apiClient.refreshAccessToken(refreshToken)
-            
+
             result.onSuccess { newToken ->
                 // Update the stored token
                 secureStorage.putString(StorageKeys.ACCESS_TOKEN, newToken)
             }
-            
+
             result
         } catch (e: Exception) {
             Napier.e("Error refreshing access token", e)
             Result.failure(e)
         }
-    }
-    
+
     /**
      * Signs out the current user.
      *
      * @return True if the sign-out was successful.
      */
-    override suspend fun signOut(): Result<Boolean> {
-        return try {
+    override suspend fun signOut(): Result<Boolean> =
+        try {
             // Clear all stored account information
             secureStorage.remove(StorageKeys.ACCESS_TOKEN)
             secureStorage.remove(StorageKeys.REFRESH_TOKEN)
@@ -302,17 +306,16 @@ class DefaultCloudAccountRepository(
             secureStorage.remove(StorageKeys.CREATED_AT)
             secureStorage.remove(StorageKeys.UPDATED_AT)
             secureStorage.remove(StorageKeys.PASSKEY_IDS)
-            
+
             // Clear the current account
             accountFlow.value = null
-            
+
             Result.success(true)
         } catch (e: Exception) {
             Napier.e("Error signing out", e)
             Result.failure(e)
         }
-    }
-    
+
     /**
      * Gets all passkeys associated with the current account.
      *
@@ -324,14 +327,15 @@ class DefaultCloudAccountRepository(
         return try {
             val account = getCurrentAccount()
             if (account != null) {
-                val passkeyCredentials = account.passkeyCredentialIds.map { credentialId ->
-                    PasskeyCredential(
-                        credentialId = credentialId,
-                        nickname = "Passkey", // In a real implementation, we'd get this from the API
-                        deviceInfo = null,
-                        createdAt = account.createdAt // Simplification
-                    )
-                }
+                val passkeyCredentials =
+                    account.passkeyCredentialIds.map { credentialId ->
+                        PasskeyCredential(
+                            credentialId = credentialId,
+                            nickname = "Passkey", // In a real implementation, we'd get this from the API
+                            deviceInfo = null,
+                            createdAt = account.createdAt, // Simplification
+                        )
+                    }
                 Result.success(passkeyCredentials)
             } else {
                 Result.failure(IllegalStateException("Not authenticated"))
@@ -341,7 +345,7 @@ class DefaultCloudAccountRepository(
             Result.failure(e)
         }
     }
-    
+
     /**
      * Associates the user's local identity with their cloud account.
      *
@@ -349,7 +353,10 @@ class DefaultCloudAccountRepository(
      * @param accountId The cloud account ID.
      * @return True if the association was successful.
      */
-    override suspend fun associateUserIdentity(userId: Uuid, accountId: String): Result<Boolean> {
+    override suspend fun associateUserIdentity(
+        userId: Uuid,
+        accountId: String,
+    ): Result<Boolean> {
         // This would typically involve API calls to associate the user ID with the account
         // For now, we'll just store the association locally
         return try {
@@ -360,24 +367,28 @@ class DefaultCloudAccountRepository(
             Result.failure(e)
         }
     }
-    
+
     /**
      * Stores account and credentials information securely.
      */
-    private suspend fun storeAccountAndCredentials(account: CloudAccount, credentials: AccountCredentials) {
-        coroutineScope.launch {
-            secureStorage.putString(StorageKeys.ACCESS_TOKEN, credentials.accessToken)
-            secureStorage.putString(StorageKeys.REFRESH_TOKEN, credentials.refreshToken)
-            secureStorage.putString(StorageKeys.ACCOUNT_ID, account.id.toString())
-            secureStorage.putString(StorageKeys.ACCOUNT_USERNAME, account.username)
-            secureStorage.putString(StorageKeys.ACCOUNT_DISPLAY_NAME, account.displayName)
-            secureStorage.putString(StorageKeys.USER_ID, account.userId.toString())
-            secureStorage.putString(StorageKeys.CREATED_AT, account.createdAt.toString())
-            secureStorage.putString(StorageKeys.UPDATED_AT, account.updatedAt.toString())
-            secureStorage.putString(StorageKeys.PASSKEY_IDS, account.passkeyCredentialIds.joinToString(",") { it.toString() })
-        }.join() // Wait for the storage operations to complete
+    private suspend fun storeAccountAndCredentials(
+        account: CloudAccount,
+        credentials: AccountCredentials,
+    ) {
+        coroutineScope
+            .launch {
+                secureStorage.putString(StorageKeys.ACCESS_TOKEN, credentials.accessToken)
+                secureStorage.putString(StorageKeys.REFRESH_TOKEN, credentials.refreshToken)
+                secureStorage.putString(StorageKeys.ACCOUNT_ID, account.id.toString())
+                secureStorage.putString(StorageKeys.ACCOUNT_USERNAME, account.username)
+                secureStorage.putString(StorageKeys.ACCOUNT_DISPLAY_NAME, account.displayName)
+                secureStorage.putString(StorageKeys.USER_ID, account.userId.toString())
+                secureStorage.putString(StorageKeys.CREATED_AT, account.createdAt.toString())
+                secureStorage.putString(StorageKeys.UPDATED_AT, account.updatedAt.toString())
+                secureStorage.putString(StorageKeys.PASSKEY_IDS, account.passkeyCredentialIds.joinToString(",") { it.toString() })
+            }.join() // Wait for the storage operations to complete
     }
-    
+
     /**
      * Creates default device information from platform info.
      */
@@ -386,19 +397,18 @@ class DefaultCloudAccountRepository(
         return app.logdate.shared.model.DeviceInfoDto(
             platform = platformInfo.platform,
             deviceName = platformInfo.deviceName,
-            deviceType = mapDeviceType(platformInfo.deviceType).name
+            deviceType = mapDeviceType(platformInfo.deviceType).name,
         )
     }
-    
+
     /**
      * Maps platform-specific device type to domain model device type.
      */
-    private fun mapDeviceType(platformType: String): DeviceType {
-        return when (platformType.lowercase()) {
+    private fun mapDeviceType(platformType: String): DeviceType =
+        when (platformType.lowercase()) {
             "phone" -> DeviceType.MOBILE
             "tablet" -> DeviceType.TABLET
             "desktop" -> DeviceType.DESKTOP
             else -> DeviceType.UNKNOWN
         }
-    }
 }

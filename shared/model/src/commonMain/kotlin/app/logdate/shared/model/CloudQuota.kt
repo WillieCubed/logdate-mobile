@@ -10,14 +10,14 @@ import kotlinx.serialization.Serializable
 data class CloudStorageQuota(
     val totalBytes: Long,
     val usedBytes: Long,
-    val categories: List<CloudStorageCategoryUsage>
+    val categories: List<CloudStorageCategoryUsage>,
 ) {
     /**
      * The percentage of quota used (0.0 to 1.0).
      */
     val usagePercentage: Float
         get() = if (totalBytes > 0) usedBytes.toFloat() / totalBytes.toFloat() else 0f
-    
+
     /**
      * Remaining bytes available.
      */
@@ -32,7 +32,7 @@ data class CloudStorageQuota(
 data class CloudStorageCategoryUsage(
     val category: CloudObjectType,
     val sizeBytes: Long,
-    val objectCount: Int = 0
+    val objectCount: Int = 0,
 )
 
 /**
@@ -41,12 +41,12 @@ data class CloudStorageCategoryUsage(
 @Serializable
 enum class CloudObjectType {
     TEXT_NOTES,
-    IMAGE_NOTES, 
+    IMAGE_NOTES,
     VOICE_NOTES,
     VIDEO_NOTES,
     JOURNAL_DATA,
     USER_PROFILE,
-    ATTACHMENTS
+    ATTACHMENTS,
 }
 
 /**
@@ -57,47 +57,57 @@ interface CloudQuotaManager {
      * Gets the current quota usage. Returns cached data if available, otherwise calculates.
      */
     suspend fun getCurrentQuota(): CloudStorageQuota
-    
+
     /**
      * Observes quota changes in real-time.
      */
     fun observeQuota(): kotlinx.coroutines.flow.Flow<CloudStorageQuota>
-    
+
     /**
      * Records that a new cloud object was created.
      * Updates the cached quota incrementally.
      */
-    suspend fun recordObjectCreation(objectType: CloudObjectType, bytes: Long)
-    
+    suspend fun recordObjectCreation(
+        objectType: CloudObjectType,
+        bytes: Long,
+    )
+
     /**
      * Records that a cloud object was deleted.
      * Updates the cached quota incrementally.
      */
-    suspend fun recordObjectDeletion(objectType: CloudObjectType, bytes: Long)
-    
+    suspend fun recordObjectDeletion(
+        objectType: CloudObjectType,
+        bytes: Long,
+    )
+
     /**
      * Records that a cloud object was updated (size changed).
      * Updates the cached quota incrementally.
      */
-    suspend fun recordObjectUpdate(objectType: CloudObjectType, oldBytes: Long, newBytes: Long)
-    
+    suspend fun recordObjectUpdate(
+        objectType: CloudObjectType,
+        oldBytes: Long,
+        newBytes: Long,
+    )
+
     /**
      * Forces a complete recalculation of quota usage.
      * Used for validation and initial sync.
      */
     suspend fun recalculateQuota(): CloudStorageQuota
-    
+
     /**
      * Sets the total quota limit (typically set by billing/subscription).
      */
     suspend fun setQuotaLimit(totalBytes: Long)
-    
+
     /**
      * Synchronizes quota data with the server.
      * Server data is considered the source of truth.
      */
     suspend fun syncWithServer(): CloudStorageQuota
-    
+
     /**
      * Gets the last sync timestamp with the server.
      * Returns null if never synced.

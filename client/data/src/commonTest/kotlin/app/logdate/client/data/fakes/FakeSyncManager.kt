@@ -19,15 +19,16 @@ class FakeSyncManager : SyncManager {
     var fullSyncCalls = 0
     var getSyncStatusCalls = 0
     var syncResult: SyncResult = SyncResult(success = true)
-    var syncStatus: SyncStatus = SyncStatus(
-        isEnabled = true,
-        lastSyncTime = null,
-        pendingUploads = 0,
-        isSyncing = false,
-        hasErrors = false,
-        lastError = null
-    )
-    
+    var syncStatus: SyncStatus =
+        SyncStatus(
+            isEnabled = true,
+            lastSyncTime = null,
+            pendingUploads = 0,
+            isSyncing = false,
+            hasErrors = false,
+            lastError = null,
+        )
+
     override fun sync(startNow: Boolean) {
         syncRequested = true
         immediateSync = startNow
@@ -68,28 +69,22 @@ class FakeSyncManager : SyncManager {
         getSyncStatusCalls++
         return syncStatus
     }
-    
+
     /**
      * Returns whether sync was requested.
      */
-    fun wasSyncRequested(): Boolean {
-        return syncRequested
-    }
-    
+    fun wasSyncRequested(): Boolean = syncRequested
+
     /**
      * Returns whether immediate sync was requested.
      */
-    fun wasImmediateSyncRequested(): Boolean {
-        return immediateSync
-    }
-    
+    fun wasImmediateSyncRequested(): Boolean = immediateSync
+
     /**
      * Returns the number of times sync was called.
      */
-    fun getSyncCount(): Int {
-        return syncCount
-    }
-    
+    fun getSyncCount(): Int = syncCount
+
     /**
      * Resets the sync state for testing.
      */
@@ -105,13 +100,14 @@ class FakeSyncManager : SyncManager {
         fullSyncCalls = 0
         getSyncStatusCalls = 0
         syncResult = SyncResult(success = true)
-        syncStatus = SyncStatus(
-            isEnabled = true,
-            lastSyncTime = null,
-            pendingUploads = 0,
-            isSyncing = false,
-            hasErrors = false,
-            lastError = null
-        )
+        syncStatus =
+            SyncStatus(
+                isEnabled = true,
+                lastSyncTime = null,
+                pendingUploads = 0,
+                isSyncing = false,
+                hasErrors = false,
+                lastError = null,
+            )
     }
 }

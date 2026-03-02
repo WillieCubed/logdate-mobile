@@ -22,24 +22,24 @@ class JournalDetailViewModel(
     private val journalRepository: JournalRepository,
     private val journalContentRepository: JournalContentRepository,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow<JournalDetailUiState>(JournalDetailUiState.Loading)
-    
+
     // Combine journal details with notes
-    val uiState: StateFlow<JournalDetailUiState> = 
-        journalRepository.observeJournalById(Uuid.parse(journalId))
+    val uiState: StateFlow<JournalDetailUiState> =
+        journalRepository
+            .observeJournalById(Uuid.parse(journalId))
             .combine(journalContentRepository.observeContentForJournal(Uuid.parse(journalId))) { journal, notes ->
                 JournalDetailUiState.Success(journal, notes)
             }.stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(5000),
-                JournalDetailUiState.Loading
+                JournalDetailUiState.Loading,
             )
-            
+
     init {
         loadJournalDetails()
     }
-    
+
     private fun loadJournalDetails() {
         viewModelScope.launch {
             try {
@@ -56,11 +56,13 @@ class JournalDetailViewModel(
  */
 sealed interface JournalDetailUiState {
     data object Loading : JournalDetailUiState
-    
+
     data class Success(
         val journal: Journal,
-        val notes: List<JournalNote>
+        val notes: List<JournalNote>,
     ) : JournalDetailUiState
-    
-    data class Error(val message: String) : JournalDetailUiState
+
+    data class Error(
+        val message: String,
+    ) : JournalDetailUiState
 }

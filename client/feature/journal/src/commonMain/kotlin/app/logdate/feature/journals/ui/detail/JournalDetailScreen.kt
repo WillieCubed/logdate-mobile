@@ -1,3 +1,4 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
 @file:OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 
 package app.logdate.feature.journals.ui.detail
@@ -56,6 +57,7 @@ import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
+import logdate.client.feature.journal.generated.resources.*
 import logdate.client.feature.journal.generated.resources.Res
 import logdate.client.feature.journal.generated.resources.action_delete
 import logdate.client.feature.journal.generated.resources.delete_journal_description
@@ -63,7 +65,7 @@ import logdate.client.feature.journal.generated.resources.delete_journal_title
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
-import logdate.client.feature.journal.generated.resources.*
+
 /**
  * The main screen to view a journal's contents.
  */
@@ -81,7 +83,7 @@ fun JournalDetailScreen(
     LaunchedEffect(journalId) {
         viewModel.setSelectedJournalId(journalId)
     }
-    
+
     val state by viewModel.uiState.collectAsState()
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
@@ -102,30 +104,32 @@ fun JournalDetailScreen(
 
         is JournalDetailUiState.Success -> {
             Scaffold(
-                modifier = modifier
-                    .nestedScroll(scrollBehavior.nestedScrollConnection)
-                    .let { baseModifier ->
-                        if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-                            with(sharedTransitionScope) {
-                                baseModifier.sharedElement(
-                                    rememberSharedContentState("journal-container-${(state as JournalDetailUiState.Success).journalId}"),
-                                    animatedVisibilityScope,
-                                )
+                modifier =
+                    modifier
+                        .nestedScroll(scrollBehavior.nestedScrollConnection)
+                        .let { baseModifier ->
+                            if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                                with(sharedTransitionScope) {
+                                    baseModifier.sharedElement(
+                                        rememberSharedContentState(
+                                            "journal-container-${(state as JournalDetailUiState.Success).journalId}",
+                                        ),
+                                        animatedVisibilityScope,
+                                    )
+                                }
+                            } else {
+                                baseModifier
                             }
-                        } else {
-                            baseModifier
-                        }
-                    },
+                        },
                 contentWindowInsets = WindowInsets.navigationBars,
                 topBar = {
                     LargeTopAppBar(
                         title = { Text((state as JournalDetailUiState.Success).title) },
                         navigationIcon = {
-
                             IconButton(onClick = { onGoBack() }) {
                                 Icon(
                                     Icons.AutoMirrored.Default.ArrowBack,
-                                    contentDescription = stringResource(Res.string.back)
+                                    contentDescription = stringResource(Res.string.back),
                                 )
                             }
                         },
@@ -133,47 +137,49 @@ fun JournalDetailScreen(
                         actions = {
                             // Sort order toggle button
                             IconButton(onClick = { viewModel.toggleSortOrder() }) {
-                                val sortIcon = if ((state as JournalDetailUiState.Success).sortOrder == SortOrder.NEWEST_FIRST) {
-                                    // Arrow pointing down for newest first
-                                    Icons.Default.ArrowDownward
-                                } else {
-                                    // Arrow pointing up for oldest first
-                                    Icons.Default.ArrowUpward
-                                }
-                                
-                                val description = if ((state as JournalDetailUiState.Success).sortOrder == SortOrder.NEWEST_FIRST) {
-                                    "Sorted: Newest first (click to show oldest first)"
-                                } else {
-                                    "Sorted: Oldest first (click to show newest first)"
-                                }
-                                
+                                val sortIcon =
+                                    if ((state as JournalDetailUiState.Success).sortOrder == SortOrder.NEWEST_FIRST) {
+                                        // Arrow pointing down for newest first
+                                        Icons.Default.ArrowDownward
+                                    } else {
+                                        // Arrow pointing up for oldest first
+                                        Icons.Default.ArrowUpward
+                                    }
+
+                                val description =
+                                    if ((state as JournalDetailUiState.Success).sortOrder == SortOrder.NEWEST_FIRST) {
+                                        "Sorted: Newest first (click to show oldest first)"
+                                    } else {
+                                        "Sorted: Oldest first (click to show newest first)"
+                                    }
+
                                 Icon(
                                     sortIcon,
-                                    contentDescription = description
+                                    contentDescription = description,
                                 )
                             }
-                            
+
                             // Share button
                             IconButton(onClick = { onNavigateToShare((state as JournalDetailUiState.Success).journalId) }) {
                                 Icon(
                                     Icons.Default.Share,
-                                    contentDescription = stringResource(Res.string.share_journal_2)
+                                    contentDescription = stringResource(Res.string.share_journal_2),
                                 )
                             }
-                            
+
                             // Settings button
                             IconButton(onClick = { onNavigateToSettings((state as JournalDetailUiState.Success).journalId) }) {
                                 Icon(
                                     Icons.Default.Settings,
-                                    contentDescription = stringResource(Res.string.journal_settings_2)
+                                    contentDescription = stringResource(Res.string.journal_settings_2),
                                 )
                             }
-                            
+
                             // Delete button
                             IconButton(onClick = { openDeleteConfirmation = true }) {
                                 Icon(
                                     Icons.Default.DeleteOutline,
-                                    contentDescription = stringResource(Res.string.delete_journal_2)
+                                    contentDescription = stringResource(Res.string.delete_journal_2),
                                 )
                             }
                         },
@@ -182,61 +188,66 @@ fun JournalDetailScreen(
             ) {
                 val successState = state as JournalDetailUiState.Success
                 val listState = rememberLazyListState()
-                
+
                 if (successState.entries.isEmpty()) {
                     // Empty state
                     Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(it)
-                            .padding(Spacing.lg),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .padding(it)
+                                .padding(Spacing.lg),
+                        contentAlignment = Alignment.Center,
                     ) {
                         Text(stringResource(Res.string.no_entries_in_this_journal_yet))
                     }
                 } else {
                     Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(it)
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .padding(it),
                     ) {
                         // Sort order indicator at the top
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
                             horizontalArrangement = Arrangement.End,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                text = if (successState.sortOrder == SortOrder.NEWEST_FIRST) {
-                                    "Newest first"
-                                } else {
-                                    "Oldest first"
-                                },
+                                text =
+                                    if (successState.sortOrder == SortOrder.NEWEST_FIRST) {
+                                        "Newest first"
+                                    } else {
+                                        "Oldest first"
+                                    },
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        
+
                         // Journal entries list
                         LazyColumn(
                             state = listState,
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(
-                                start = Spacing.lg,
-                                end = Spacing.lg,
-                                bottom = Spacing.xl
-                            ),
-                            verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                            contentPadding =
+                                PaddingValues(
+                                    start = Spacing.lg,
+                                    end = Spacing.lg,
+                                    bottom = Spacing.xl,
+                                ),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                         ) {
                             items(successState.entries) { entry ->
                                 JournalEntryItem(
                                     content = entry.content,
                                     timestamp = entry.timestamp,
-                                    onClick = { 
+                                    onClick = {
                                         onNavigateToNoteDetail(entry.id)
-                                    }
+                                    },
                                 )
                             }
                         }
@@ -249,7 +260,7 @@ fun JournalDetailScreen(
                     onConfirmation = {
                         viewModel.deleteJournal(onJournalDeleted)
                         openDeleteConfirmation = false
-                    }
+                    },
                 )
             }
         }
@@ -286,20 +297,21 @@ fun DeleteConfirmationDialog(
             ) {
                 Text(stringResource(Res.string.cancel))
             }
-        }
+        },
     )
 }
 
 @Composable
 internal fun JournalDetailPlaceholder() {
     Row(
-        modifier = Modifier
-            .padding(Spacing.lg)
-            .fillMaxSize(),
+        modifier =
+            Modifier
+                .padding(Spacing.lg)
+                .fillMaxSize(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            "Loading..."
+            "Loading...",
         )
     }
 }
@@ -309,41 +321,42 @@ private fun JournalEntryItem(
     content: String,
     timestamp: kotlin.time.Instant,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    
+
     Column(modifier = modifier) {
         // Display date and time above the card
         Text(
             text = timestamp.toReadableDateTimeShort(),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 4.dp)
+            modifier = Modifier.padding(bottom = 4.dp),
         )
-        
+
         Card(
-            onClick = { 
+            onClick = {
                 if (expanded) {
                     onClick()
                 } else {
                     expanded = !expanded
                 }
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Column(
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(16.dp),
             ) {
                 Text(
                     text = content,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = if (expanded) Int.MAX_VALUE else 4,
                     overflow = if (expanded) TextOverflow.Visible else TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .animateContentSize()
-                        .heightIn(min = 40.dp)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .animateContentSize()
+                            .heightIn(min = 40.dp),
                 )
             }
         }

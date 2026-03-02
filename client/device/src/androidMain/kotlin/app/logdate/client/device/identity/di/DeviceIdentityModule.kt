@@ -18,33 +18,35 @@ import org.koin.dsl.module
 /**
  * Android implementation of device identity module.
  */
-actual val deviceIdentityModule: Module = module {
-    single<DeviceIdProvider> {
-        DefaultDeviceIdProvider(get<KeyValueStorage>(named("deviceKeyValueStorage")))
-    }
-
-    // Repository for device information
-    single<DeviceRepository> {
-        InMemoryDeviceRepository()
-    }
-
-    single<DefaultDeviceManager> {
-        val context = androidContext()
-        val appInfoProvider = get<AppInfoProvider>()
-
-        val deviceName = try {
-            Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME)
-                ?: "${Build.MANUFACTURER} ${Build.MODEL}"
-        } catch (e: Exception) {
-            "${Build.MANUFACTURER} ${Build.MODEL}"
+actual val deviceIdentityModule: Module =
+    module {
+        single<DeviceIdProvider> {
+            DefaultDeviceIdProvider(get<KeyValueStorage>(named("deviceKeyValueStorage")))
         }
 
-        DefaultDeviceManager(
-            deviceIdProvider = get(),
-            deviceRepository = get(),
-            initialDeviceName = deviceName,
-            platform = DevicePlatform.ANDROID,
-            appVersion = appInfoProvider.getAppInfo().versionName,
-        )
+        // Repository for device information
+        single<DeviceRepository> {
+            InMemoryDeviceRepository()
+        }
+
+        single<DefaultDeviceManager> {
+            val context = androidContext()
+            val appInfoProvider = get<AppInfoProvider>()
+
+            val deviceName =
+                try {
+                    Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME)
+                        ?: "${Build.MANUFACTURER} ${Build.MODEL}"
+                } catch (e: Exception) {
+                    "${Build.MANUFACTURER} ${Build.MODEL}"
+                }
+
+            DefaultDeviceManager(
+                deviceIdProvider = get(),
+                deviceRepository = get(),
+                initialDeviceName = deviceName,
+                platform = DevicePlatform.ANDROID,
+                appVersion = appInfoProvider.getAppInfo().versionName,
+            )
+        }
     }
-}

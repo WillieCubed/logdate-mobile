@@ -12,7 +12,6 @@ import kotlin.uuid.Uuid
 
 @Dao
 interface StorageMetadataDao {
-
     /**
      * Gets storage metadata for a specific content object.
      */
@@ -46,14 +45,16 @@ interface StorageMetadataDao {
     /**
      * Gets all storage metadata grouped by content type for quota calculation, excluding items marked to exclude from quota.
      */
-    @Query("""
+    @Query(
+        """
         SELECT contentType, 
                COALESCE(SUM(sizeBytes), 0) as totalSize, 
                COUNT(*) as objectCount
         FROM storage_metadata 
         WHERE excludeFromQuota = 0
         GROUP BY contentType
-    """)
+    """,
+    )
     suspend fun getStorageSummaryByType(): List<StorageSummary>
 
     /**
@@ -90,14 +91,22 @@ interface StorageMetadataDao {
      * Updates the size for a specific content object.
      */
     @Query("UPDATE storage_metadata SET sizeBytes = :newSizeBytes, lastUpdated = :timestamp WHERE contentId = :contentId")
-    suspend fun updateStorageSize(contentId: Uuid, newSizeBytes: Long, timestamp: Long)
-    
+    suspend fun updateStorageSize(
+        contentId: Uuid,
+        newSizeBytes: Long,
+        timestamp: Long,
+    )
+
     /**
      * Updates the quota exclusion status for a specific content object.
      */
     @Query("UPDATE storage_metadata SET excludeFromQuota = :exclude, lastUpdated = :timestamp WHERE contentId = :contentId")
-    suspend fun updateQuotaExclusion(contentId: Uuid, exclude: Boolean, timestamp: Long)
-    
+    suspend fun updateQuotaExclusion(
+        contentId: Uuid,
+        exclude: Boolean,
+        timestamp: Long,
+    )
+
     /**
      * Gets all storage metadata items that are excluded from quota tracking.
      */
@@ -111,5 +120,5 @@ interface StorageMetadataDao {
 data class StorageSummary(
     val contentType: StorageContentType,
     val totalSize: Long,
-    val objectCount: Int
+    val objectCount: Int,
 )

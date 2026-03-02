@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.feature.timeline.ui.details
 
 import androidx.compose.foundation.layout.Arrangement
@@ -13,11 +15,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.timeline.generated.resources.*
 import logdate.client.feature.timeline.generated.resources.Res
-//import com.google.maps.android.compose.GoogleMap
-//import com.google.maps.android.compose.rememberCameraPositionState
+import org.jetbrains.compose.resources.stringResource
+// import com.google.maps.android.compose.GoogleMap
+// import com.google.maps.android.compose.rememberCameraPositionState
 
 /**
  * A map that displays all the visited locations on a given day.
@@ -46,9 +48,10 @@ internal fun LocationsSection(
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             shape = RoundedCornerShape(8.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(4 / 3f)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(4 / 3f),
         ) {
             // TODO: Re-enable map once we find multiplatform solution
 //            GoogleMap(
@@ -65,11 +68,12 @@ data class DayLocation(
     val longitude: Double,
 ) {
     companion object {
-        val Origin = DayLocation(
-            locationId = "origin",
-            name = "Origin",
-            latitude = 0.0,
-            longitude = 0.0,
-        )
+        val Origin =
+            DayLocation(
+                locationId = "origin",
+                name = "Origin",
+                latitude = 0.0,
+                longitude = 0.0,
+            )
     }
 }

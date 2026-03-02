@@ -25,6 +25,7 @@ import app.logdate.navigation.scenes.HomeTab
  * @param headerContent Optional composable for header content
  * @param tabs The list of tabs to display, defaults to HomeTab entries
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun LogDateNavigationRail(
     selectedTab: HomeTab,
@@ -47,14 +48,14 @@ fun LogDateNavigationRail(
                     Icon(
                         imageVector = if (tab == selectedTab) tab.selectedIcon else tab.unselectedIcon,
                         contentDescription = tab.title,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(24.dp),
                     )
                 },
                 label = {
                     Text(
                         text = tab.title,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
                     )
                 },
             )

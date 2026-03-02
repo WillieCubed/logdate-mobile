@@ -12,13 +12,14 @@ import org.koin.dsl.module
 /**
  * iOS implementation of device identity module.
  */
-actual val deviceIdentityModule: Module = module {
-    single<DeviceIdProvider>(named("modernDeviceIdProvider")) {
-        DefaultDeviceIdProvider(get<KeyValueStorage>(named("deviceKeyValueStorage")))
-    }
+actual val deviceIdentityModule: Module =
+    module {
+        single<DeviceIdProvider>(named("modernDeviceIdProvider")) {
+            DefaultDeviceIdProvider(get<KeyValueStorage>(named("deviceKeyValueStorage")))
+        }
 
-    // Repository for device information
-    single<DeviceRepository> {
-        InMemoryDeviceRepository()
+        // Repository for device information
+        single<DeviceRepository> {
+            InMemoryDeviceRepository()
+        }
     }
-}

@@ -18,7 +18,9 @@ import kotlin.uuid.Uuid
  * Route for viewing a note by ID.
  */
 @Serializable
-data class NoteDetailRoute(val noteId: String) {
+data class NoteDetailRoute(
+    val noteId: String,
+) {
     constructor(noteId: Uuid) : this(noteId.toString())
 }
 
@@ -34,9 +36,7 @@ fun NavController.navigateToNoteDetail(noteId: Uuid) {
 /**
  * Navigation entry for note viewing.
  */
-fun NavGraphBuilder.noteDetailRoute(
-    onGoBack: () -> Unit,
-) {
+fun NavGraphBuilder.noteDetailRoute(onGoBack: () -> Unit) {
     composable<NoteDetailRoute>(
         enterTransition = {
             slideIntoContainer(
@@ -47,7 +47,7 @@ fun NavGraphBuilder.noteDetailRoute(
             slideOutOfContainer(
                 towards = AnimatedContentTransitionScope.SlideDirection.Right,
             )
-        }
+        },
     ) { backStackEntry ->
         val route = backStackEntry.toRoute<NoteDetailRoute>()
         val noteId = Uuid.parse(route.noteId)

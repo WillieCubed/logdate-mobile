@@ -1,11 +1,13 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.core.settings.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
@@ -35,17 +37,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.tooling.preview.Preview
+import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
-import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.settings_biometric_description
 import logdate.client.feature.core.generated.resources.settings_biometric_label
 import org.jetbrains.compose.resources.stringResource
-import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
-import logdate.client.feature.core.generated.resources.*
+
 /**
  * Privacy and security settings screen.
  *
@@ -68,9 +70,9 @@ fun PrivacySettingsScreen(
     val revocationState by viewModel.passkeyRevocationState.collectAsState()
     val layoutInfo = LocalSettingsLayoutInfo.current
     val resolvedIsDetailPane = isPotentialDetailPane ?: layoutInfo.isDetailPane
-    
+
     val creationState by viewModel.passkeyCreationState.collectAsState()
-    
+
     PrivacySettingsContent(
         onBack = onBack,
         onSetBiometricsEnabled = viewModel::setBiometricEnabled,
@@ -82,7 +84,7 @@ fun PrivacySettingsScreen(
         onNavigateToLocationSettings = onNavigateToLocationSettings,
         revocationState = revocationState,
         creationState = creationState,
-        isPotentialDetailPane = resolvedIsDetailPane
+        isPotentialDetailPane = resolvedIsDetailPane,
     )
 }
 
@@ -97,7 +99,7 @@ fun PrivacySettingsScreen(
 private fun PasskeyDeletionConfirmationDialog(
     passkey: PasskeyInfo?,
     onConfirm: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     if (passkey != null) {
         AlertDialog(
@@ -107,8 +109,8 @@ private fun PasskeyDeletionConfirmationDialog(
                 Text(
                     stringResource(
                         Res.string.remove_passkey_from_device,
-                        passkey.device
-                    )
+                        passkey.device,
+                    ),
                 )
             },
             confirmButton = {
@@ -120,7 +122,7 @@ private fun PasskeyDeletionConfirmationDialog(
                 TextButton(onClick = onDismiss) {
                     Text(stringResource(Res.string.cancel))
                 }
-            }
+            },
         )
     }
 }
@@ -136,7 +138,7 @@ private fun PasskeyDeletionConfirmationDialog(
 private fun PasskeyOperationLoadingDialog(
     operation: String = "Removing",
     message: String = "Please wait while we remove your passkey",
-    isLoading: Boolean
+    isLoading: Boolean,
 ) {
     if (isLoading) {
         AlertDialog(
@@ -145,24 +147,24 @@ private fun PasskeyOperationLoadingDialog(
                 Text(
                     stringResource(
                         Res.string.operation_passkey,
-                        operation
-                    )
+                        operation,
+                    ),
                 )
             },
             text = {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     CircularProgressIndicator()
                     Text(
                         text = message,
-                        modifier = Modifier.padding(top = Spacing.md)
+                        modifier = Modifier.padding(top = Spacing.md),
                     )
                 }
             },
-            confirmButton = { }
+            confirmButton = { },
         )
     }
 }
@@ -180,12 +182,12 @@ private fun PrivacySettingsContent(
     onNavigateToLocationSettings: () -> Unit = {},
     revocationState: PasskeyRevocationState = PasskeyRevocationState.Idle,
     creationState: PasskeyCreationState = PasskeyCreationState.Idle,
-    isPotentialDetailPane: Boolean = false
+    isPotentialDetailPane: Boolean = false,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val snackbarHostState = remember { SnackbarHostState() }
     var passkeyToDelete by remember { mutableStateOf<PasskeyInfo?>(null) }
-    
+
     // Show feedback for passkey operations
     LaunchedEffect(revocationState) {
         when (revocationState) {
@@ -198,7 +200,7 @@ private fun PrivacySettingsContent(
             else -> { /* No action needed */ }
         }
     }
-    
+
     LaunchedEffect(creationState) {
         when (creationState) {
             is PasskeyCreationState.Success -> {
@@ -210,7 +212,7 @@ private fun PrivacySettingsContent(
             else -> { /* No action needed */ }
         }
     }
-    
+
     // Confirmation dialog for passkey deletion
     PasskeyDeletionConfirmationDialog(
         passkey = passkeyToDelete,
@@ -218,26 +220,27 @@ private fun PrivacySettingsContent(
             passkeyToDelete?.let { onRevokePasskey(it) }
             passkeyToDelete = null
         },
-        onDismiss = { passkeyToDelete = null }
+        onDismiss = { passkeyToDelete = null },
     )
-    
+
     // Loading dialogs for passkey operations
     PasskeyOperationLoadingDialog(
         operation = "Removing",
         message = "Please wait while we remove your passkey",
-        isLoading = revocationState == PasskeyRevocationState.Revoking
+        isLoading = revocationState == PasskeyRevocationState.Revoking,
     )
-    
+
     PasskeyOperationLoadingDialog(
         operation = "Creating",
         message = "Please wait while we create your passkey",
-        isLoading = creationState == PasskeyCreationState.Creating
+        isLoading = creationState == PasskeyCreationState.Creating,
     )
-    
+
     Scaffold(
-        modifier = Modifier
-            .applyScreenStyles()
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier =
+            Modifier
+                .applyScreenStyles()
+                .nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             // Only show top bar with back button in single-pane mode
             if (!isPotentialDetailPane) {
@@ -252,13 +255,13 @@ private fun PrivacySettingsContent(
                 )
             }
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { paddingValues ->
         DefaultSettingsContentContainer {
             LazyColumn(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = paddingValues,
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
                 // Section title for two-pane mode
                 if (isPotentialDetailPane) {
@@ -266,87 +269,91 @@ private fun PrivacySettingsContent(
                         Text(
                             text = stringResource(Res.string.privacy_and_security),
                             style = MaterialTheme.typography.headlineSmall,
-                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)
+                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
                         )
                     }
                 }
-                
+
                 // App Security section
-            item {
-                Column(
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm)
-                ) {
-                    Text(
-                        text = stringResource(Res.string.app_security),
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    
-                    MaterialContainer {
-                        SurfaceItem {
-                            ListItem(
-                                headlineContent = { Text(stringResource(Res.string.settings_biometric_label)) },
-                                supportingContent = { Text(stringResource(Res.string.settings_biometric_description)) },
-                                trailingContent = {
-                                    Switch(
-                                        checked = isBiometricsEnabled,
-                                        onCheckedChange = onSetBiometricsEnabled
-                                    )
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-            
-            // Location Settings Section
-            item {
-                Column(
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm)
-                ) {
-                    Text(
-                        text = stringResource(Res.string.location_privacy),
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    
-                    MaterialContainer {
-                        SurfaceItem {
-                            ListItem(
-                                headlineContent = { Text(stringResource(Res.string.location_settings)) },
-                                supportingContent = { Text(stringResource(Res.string.manage_location_tracking_and_privacy_preferences)) },
-                                leadingContent = { 
-                                    Icon(
-                                        imageVector = Icons.Default.LocationOn,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                },
-                                trailingContent = {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                                        contentDescription = stringResource(Res.string.navigate_to_location_settings)
-                                    )
-                                },
-                                modifier = Modifier.clickable(onClick = onNavigateToLocationSettings)
-                            )
-                        }
-                    }
-                }
-            }
-            
-            // Passkeys management section
-            if (isAuthenticated) {
                 item {
-                    PasskeysInfoSection(
-                        passkeys = passkeys,
-                        onCreatePasskey = onCreatePasskey,
-                        onRevokePasskey = { passkey -> passkeyToDelete = passkey },
-                        showCreatePasskeyAction = false,
-                        modifier = Modifier.padding(horizontal = Spacing.lg)
-                    )
+                    Column(
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.app_security),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+
+                        MaterialContainer {
+                            SurfaceItem {
+                                ListItem(
+                                    headlineContent = { Text(stringResource(Res.string.settings_biometric_label)) },
+                                    supportingContent = { Text(stringResource(Res.string.settings_biometric_description)) },
+                                    trailingContent = {
+                                        Switch(
+                                            checked = isBiometricsEnabled,
+                                            onCheckedChange = onSetBiometricsEnabled,
+                                        )
+                                    },
+                                )
+                            }
+                        }
+                    }
                 }
-            }
+
+                // Location Settings Section
+                item {
+                    Column(
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.location_privacy),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+
+                        MaterialContainer {
+                            SurfaceItem {
+                                ListItem(
+                                    headlineContent = { Text(stringResource(Res.string.location_settings)) },
+                                    supportingContent = {
+                                        Text(
+                                            stringResource(Res.string.manage_location_tracking_and_privacy_preferences),
+                                        )
+                                    },
+                                    leadingContent = {
+                                        Icon(
+                                            imageVector = Icons.Default.LocationOn,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                        )
+                                    },
+                                    trailingContent = {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                                            contentDescription = stringResource(Res.string.navigate_to_location_settings),
+                                        )
+                                    },
+                                    modifier = Modifier.clickable(onClick = onNavigateToLocationSettings),
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Passkeys management section
+                if (isAuthenticated) {
+                    item {
+                        PasskeysInfoSection(
+                            passkeys = passkeys,
+                            onCreatePasskey = onCreatePasskey,
+                            onRevokePasskey = { passkey -> passkeyToDelete = passkey },
+                            showCreatePasskeyAction = false,
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        )
+                    }
+                }
             }
         }
     }
@@ -360,16 +367,17 @@ private fun PrivacySettingsScreenPreview() {
         onSetBiometricsEnabled = {},
         isBiometricsEnabled = true,
         isAuthenticated = true,
-        passkeys = listOf(
-            PasskeyInfo(
-                id = "1",
-                name = "Passkey #1",
-                device = "Pixel 7",
-                createdAt = "2024-03-13"
-            )
-        ),
+        passkeys =
+            listOf(
+                PasskeyInfo(
+                    id = "1",
+                    name = "Passkey #1",
+                    device = "Pixel 7",
+                    createdAt = "2024-03-13",
+                ),
+            ),
         revocationState = PasskeyRevocationState.Idle,
-        creationState = PasskeyCreationState.Idle
+        creationState = PasskeyCreationState.Idle,
     )
 }
 
@@ -381,7 +389,7 @@ private fun PrivacySettingsScreenEmptyPasskeysPreview() {
         onSetBiometricsEnabled = {},
         isBiometricsEnabled = false,
         isAuthenticated = false,
-        passkeys = emptyList()
+        passkeys = emptyList(),
     )
 }
 
@@ -393,15 +401,16 @@ private fun PrivacySettingsScreenLoadingRevocationPreview() {
         onSetBiometricsEnabled = {},
         isBiometricsEnabled = true,
         isAuthenticated = true,
-        passkeys = listOf(
-            PasskeyInfo(
-                id = "1",
-                name = "Passkey #1",
-                device = "Pixel 7",
-                createdAt = "2024-03-13"
-            )
-        ),
-        revocationState = PasskeyRevocationState.Revoking
+        passkeys =
+            listOf(
+                PasskeyInfo(
+                    id = "1",
+                    name = "Passkey #1",
+                    device = "Pixel 7",
+                    createdAt = "2024-03-13",
+                ),
+            ),
+        revocationState = PasskeyRevocationState.Revoking,
     )
 }
 
@@ -413,14 +422,15 @@ private fun PrivacySettingsScreenLoadingCreationPreview() {
         onSetBiometricsEnabled = {},
         isBiometricsEnabled = true,
         isAuthenticated = true,
-        passkeys = listOf(
-            PasskeyInfo(
-                id = "1",
-                name = "Passkey #1",
-                device = "Pixel 7",
-                createdAt = "2024-03-13"
-            )
-        ),
-        creationState = PasskeyCreationState.Creating
+        passkeys =
+            listOf(
+                PasskeyInfo(
+                    id = "1",
+                    name = "Passkey #1",
+                    device = "Pixel 7",
+                    createdAt = "2024-03-13",
+                ),
+            ),
+        creationState = PasskeyCreationState.Creating,
     )
 }

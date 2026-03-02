@@ -15,9 +15,8 @@ import kotlinx.coroutines.launch
  */
 class SecureSessionStorage(
     private val secureStorage: SecureStorage,
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) : SessionStorage {
-
     private object StorageKeys {
         const val ACCESS_TOKEN = "session_access_token"
         const val REFRESH_TOKEN = "session_refresh_token"
@@ -69,8 +68,8 @@ class SecureSessionStorage(
         }
     }
 
-    private suspend fun loadSession(): UserSession? {
-        return runCatching {
+    private suspend fun loadSession(): UserSession? =
+        runCatching {
             val accessToken = secureStorage.getString(StorageKeys.ACCESS_TOKEN)
             val refreshToken = secureStorage.getString(StorageKeys.REFRESH_TOKEN)
             val accountId = secureStorage.getString(StorageKeys.ACCOUNT_ID)
@@ -79,7 +78,7 @@ class SecureSessionStorage(
                 UserSession(
                     accessToken = accessToken,
                     refreshToken = refreshToken,
-                    accountId = accountId
+                    accountId = accountId,
                 )
             } else {
                 null
@@ -88,5 +87,4 @@ class SecureSessionStorage(
             Napier.e("Failed to load secure session", error)
             null
         }
-    }
 }

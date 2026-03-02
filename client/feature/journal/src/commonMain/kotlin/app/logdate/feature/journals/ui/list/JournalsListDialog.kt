@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.feature.journals.ui.list
 
 import androidx.compose.foundation.layout.Column
@@ -11,15 +13,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import app.logdate.shared.model.Journal
 import app.logdate.ui.theme.Spacing
-import kotlin.time.Clock
-import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.journal.generated.resources.*
 import logdate.client.feature.journal.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Clock
+
 /**
  * A dialog that displays a scrollable list of all available journals.
  *
@@ -33,7 +36,7 @@ fun JournalsListDialog(
     journals: List<Journal>,
     onJournalClick: (Journal) -> Unit,
     onDismiss: () -> Unit,
-    properties: DialogProperties = DialogProperties()
+    properties: DialogProperties = DialogProperties(),
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -41,32 +44,33 @@ fun JournalsListDialog(
         title = {
             Text(
                 text = stringResource(Res.string.all_journals),
-                style = MaterialTheme.typography.headlineSmall
+                style = MaterialTheme.typography.headlineSmall,
             )
         },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 if (journals.isEmpty()) {
                     Text(
                         text = stringResource(Res.string.you_dont_have_any_journals_yet),
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 } else {
                     // Create a custom list with a scrollstate
                     Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 400.dp)
-                            .padding(top = Spacing.sm)
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 400.dp)
+                                .padding(top = Spacing.sm),
                     ) {
                         JournalsList(
                             journals = journals,
                             onJournalClick = { journal ->
                                 onJournalClick(journal)
                                 onDismiss() // Close dialog after selection
-                            }
+                            },
                         )
                     }
                 }
@@ -76,47 +80,48 @@ fun JournalsListDialog(
             TextButton(onClick = onDismiss) {
                 Text(stringResource(Res.string.close))
             }
-        }
+        },
     )
 }
 
 @Preview
 @Composable
 private fun JournalsListDialogPreview() {
-    val sampleJournals = listOf(
-        Journal(
-            title = "Travel Journal",
-            created = Clock.System.now()
-        ),
-        Journal(
-            title = "Daily Notes",
-            created = Clock.System.now()
-        ),
-        Journal(
-            title = "Work Log",
-            created = Clock.System.now()
-        ),
-        Journal(
-            title = "Personal Journal",
-            created = Clock.System.now()
-        ),
-        Journal(
-            title = "Book Notes",
-            created = Clock.System.now()
-        ),
-        Journal(
-            title = "Ideas & Concepts",
-            created = Clock.System.now()
-        ),
-        Journal(
-            title = "", // Will show as "Untitled Journal"
-            created = Clock.System.now()
+    val sampleJournals =
+        listOf(
+            Journal(
+                title = "Travel Journal",
+                created = Clock.System.now(),
+            ),
+            Journal(
+                title = "Daily Notes",
+                created = Clock.System.now(),
+            ),
+            Journal(
+                title = "Work Log",
+                created = Clock.System.now(),
+            ),
+            Journal(
+                title = "Personal Journal",
+                created = Clock.System.now(),
+            ),
+            Journal(
+                title = "Book Notes",
+                created = Clock.System.now(),
+            ),
+            Journal(
+                title = "Ideas & Concepts",
+                created = Clock.System.now(),
+            ),
+            Journal(
+                title = "", // Will show as "Untitled Journal"
+                created = Clock.System.now(),
+            ),
         )
-    )
-    
+
     JournalsListDialog(
         journals = sampleJournals,
         onJournalClick = {},
-        onDismiss = {}
+        onDismiss = {},
     )
 }

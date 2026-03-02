@@ -1,6 +1,10 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.core.account
 
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
@@ -9,10 +13,10 @@ fun CloudAccountOnboardingScreen(
     viewModel: CloudAccountOnboardingViewModel,
     onAccountCreated: () -> Unit,
     onSkipOnboarding: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    
+
     // Handle completion
     LaunchedEffect(uiState.isAccountCreated, uiState.isSignedIn, uiState.isSkipped) {
         if (uiState.isAccountCreated || uiState.isSignedIn) {
@@ -21,17 +25,17 @@ fun CloudAccountOnboardingScreen(
             onSkipOnboarding()
         }
     }
-    
+
     when (uiState.currentStep) {
         OnboardingStep.Welcome -> {
             CloudAccountWelcomeScreen(
                 onContinue = viewModel::goToNextStep,
                 onSignIn = viewModel::goToSignIn,
                 onSkip = viewModel::skipOnboarding,
-                modifier = modifier
+                modifier = modifier,
             )
         }
-        
+
         OnboardingStep.SignIn -> {
             CloudAccountSignInScreen(
                 onSignIn = viewModel::signInWithPasskey,
@@ -40,10 +44,10 @@ fun CloudAccountOnboardingScreen(
                 onTermsOfService = { /* TODO: Implement terms */ },
                 onBack = viewModel::goToPreviousStep,
                 isSigningIn = uiState.isSigningIn,
-                modifier = modifier
+                modifier = modifier,
             )
         }
-        
+
         OnboardingStep.DisplayName -> {
             DisplayNameSetupScreen(
                 displayName = uiState.displayName,
@@ -51,10 +55,10 @@ fun CloudAccountOnboardingScreen(
                 onContinue = viewModel::goToNextStep,
                 onBack = viewModel::goToPreviousStep,
                 isValid = uiState.canContinueFromDisplayName,
-                modifier = modifier
+                modifier = modifier,
             )
         }
-        
+
         OnboardingStep.Username -> {
             UsernameSetupScreen(
                 username = uiState.username,
@@ -63,10 +67,10 @@ fun CloudAccountOnboardingScreen(
                 onBack = viewModel::goToPreviousStep,
                 usernameAvailability = uiState.usernameAvailability,
                 isValid = uiState.canContinueFromUsername,
-                modifier = modifier
+                modifier = modifier,
             )
         }
-        
+
         OnboardingStep.PasskeyCreation -> {
             PasskeyAccountCreationFinalScreen(
                 displayName = uiState.displayName,
@@ -79,10 +83,10 @@ fun CloudAccountOnboardingScreen(
                 errorMessage = uiState.errorMessage,
                 onClearError = viewModel::clearError,
                 isPasskeySupported = uiState.isPasskeySupported,
-                modifier = modifier
+                modifier = modifier,
             )
         }
-        
+
         OnboardingStep.Complete -> {
             // This should be handled by LaunchedEffect above
         }
@@ -101,7 +105,7 @@ private fun PasskeyAccountCreationFinalScreen(
     errorMessage: String?,
     onClearError: () -> Unit,
     isPasskeySupported: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     // Reuse the existing final creation screen but adapt it for the flow
     PasskeyAccountCreationFinalContent(
@@ -115,6 +119,6 @@ private fun PasskeyAccountCreationFinalScreen(
         errorMessage = errorMessage,
         onClearError = onClearError,
         isPasskeySupported = isPasskeySupported,
-        modifier = modifier
+        modifier = modifier,
     )
 }

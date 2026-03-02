@@ -12,8 +12,9 @@ import org.koin.dsl.module
 /**
  * Module that exposes handles for sharing content outside of the app.
  */
-actual val sharingModule: Module = module {
-    includes(mediaModule)
-    factory<ShareAssetInterface> { AndroidShareAssetGenerator(androidContext()) }
-    factory<SharingLauncher> { AndroidSharingLauncher(get(), get(), get(), get()) }
-}
+actual val sharingModule: Module =
+    module {
+        includes(mediaModule)
+        factory<ShareAssetInterface> { AndroidShareAssetGenerator(androidContext()) }
+        factory<SharingLauncher> { AndroidSharingLauncher(get(), get(), get(), get()) }
+    }

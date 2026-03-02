@@ -6,21 +6,27 @@ import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.di.initializeDatabase
 import app.logdate.server.di.serverModule
+import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.server.routes.accountRoutes
-import app.logdate.server.routes.*
-import app.logdate.server.sync.SyncRepository
+import app.logdate.server.routes.syncRoutes
 import app.logdate.server.sync.GcsMediaStorage
 import app.logdate.server.sync.SyncMetricsRegistry
-import app.logdate.server.passkeys.WebAuthnPasskeyService
+import app.logdate.server.sync.SyncRepository
 import app.logdate.util.UuidSerializer
-import io.ktor.serialization.kotlinx.json.*
-import io.ktor.server.application.*
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
-import io.ktor.server.engine.*
-import io.ktor.server.netty.*
-import io.ktor.server.plugins.contentnegotiation.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
+import io.ktor.server.application.install
+import io.ktor.server.application.log
+import io.ktor.server.application.monitor
+import io.ktor.server.engine.embeddedServer
+import io.ktor.server.netty.Netty
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.response.respond
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.get
+import io.ktor.server.routing.route
+import io.ktor.server.routing.routing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -28,11 +34,11 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
-import kotlin.uuid.Uuid
-import kotlin.uuid.ExperimentalUuidApi
-import org.koin.ktor.plugin.Koin
 import org.koin.ktor.ext.inject
+import org.koin.ktor.plugin.Koin
 import org.koin.logger.slf4jLogger
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 fun main() {
     val isDatabaseAvailable = initializeDatabase()
@@ -49,7 +55,8 @@ fun main() {
 fun Application.module(isDatabaseAvailable: Boolean = false) {
     // Stop any existing Koin instance to ensure clean state for tests
     try {
-        org.koin.core.context.stopKoin()
+        org.koin.core.context
+            .stopKoin()
     } catch (_: Exception) {
         // Ignore if Koin wasn't started
     }
@@ -63,7 +70,8 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     monitor.subscribe(ApplicationStopped) {
         maintenanceJob?.cancel()
         try {
-            org.koin.core.context.stopKoin()
+            org.koin.core.context
+                .stopKoin()
         } catch (_: Exception) {
             // Ignore if already stopped
         }
@@ -81,14 +89,17 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     }
 
     install(ContentNegotiation) {
-        json(Json {
-            prettyPrint = true
-            isLenient = true
-            ignoreUnknownKeys = true
-            serializersModule = SerializersModule {
-                contextual(Uuid::class, UuidSerializer)
-            }
-        })
+        json(
+            Json {
+                prettyPrint = true
+                isLenient = true
+                ignoreUnknownKeys = true
+                serializersModule =
+                    SerializersModule {
+                        contextual(Uuid::class, UuidSerializer)
+                    }
+            },
+        )
     }
 
     routing {
@@ -98,18 +109,26 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
 
         get("/health") {
             try {
-                val status = mapOf(
-                    "status" to "healthy",
-                    "timestamp" to kotlin.time.Clock.System.now().toString(),
-                    "version" to "1.0.0"
-                )
+                val status =
+                    mapOf(
+                        "status" to "healthy",
+                        "timestamp" to
+                            kotlin.time.Clock.System
+                                .now()
+                                .toString(),
+                        "version" to "1.0.0",
+                    )
                 call.respond(status)
             } catch (e: Exception) {
-                val status = mapOf(
-                    "status" to "unhealthy",
-                    "error" to e.message,
-                    "timestamp" to kotlin.time.Clock.System.now().toString()
-                )
+                val status =
+                    mapOf(
+                        "status" to "unhealthy",
+                        "error" to e.message,
+                        "timestamp" to
+                            kotlin.time.Clock.System
+                                .now()
+                                .toString(),
+                    )
                 call.respond(io.ktor.http.HttpStatusCode.ServiceUnavailable, status)
             }
         }
@@ -120,7 +139,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
                 accountRepository = accountRepository,
                 sessionManager = sessionManager,
                 webAuthnService = webAuthnService,
-                tokenService = tokenService
+                tokenService = tokenService,
             )
             syncRoutes(syncRepository, tokenService, mediaStorage, syncMetrics)
         }
@@ -133,7 +152,7 @@ private const val MILLIS_PER_DAY = 24 * MILLIS_PER_HOUR
 
 private fun Application.startSyncMaintenance(
     repository: SyncRepository,
-    metrics: SyncMetricsRegistry
+    metrics: SyncMetricsRegistry,
 ): Job? {
     val enabled = readBooleanEnv("SYNC_TOMBSTONE_PURGE_ENABLED", defaultValue = true)
     if (!enabled) {
@@ -150,7 +169,7 @@ private fun Application.startSyncMaintenance(
     log.info(
         "Starting sync tombstone purge: retentionDays={}, intervalHours={}",
         safeRetentionDays,
-        safeIntervalHours
+        safeIntervalHours,
     )
 
     return launch(Dispatchers.IO) {
@@ -166,7 +185,7 @@ private fun Application.startSyncMaintenance(
                     result.contentPurged,
                     result.journalPurged,
                     result.associationPurged,
-                    result.mediaPurged
+                    result.mediaPurged,
                 )
             } catch (e: Exception) {
                 metrics.recordOperation(SYNC_PURGE_METRIC_NAME, System.currentTimeMillis() - start, false)
@@ -177,7 +196,10 @@ private fun Application.startSyncMaintenance(
     }
 }
 
-private fun readBooleanEnv(name: String, defaultValue: Boolean): Boolean {
+private fun readBooleanEnv(
+    name: String,
+    defaultValue: Boolean,
+): Boolean {
     val raw = System.getenv(name) ?: return defaultValue
     return raw.equals("true", ignoreCase = true) ||
         raw.equals("yes", ignoreCase = true) ||

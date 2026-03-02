@@ -22,44 +22,45 @@ import org.koin.dsl.module
 /**
  * Desktop-specific device instance module that complements the deviceIdentityModule.
  */
-actual val deviceInstanceModule: Module = module {
-    // Include the device identity module (which already provides DeviceIdProvider)
-    includes(deviceIdentityModule)
-    
-    // Create a SupervisorJob that will be cancelled when the app is destroyed
-    single<Job> { SupervisorJob() }
+actual val deviceInstanceModule: Module =
+    module {
+        // Include the device identity module (which already provides DeviceIdProvider)
+        includes(deviceIdentityModule)
 
-    // Create a CoroutineScope that uses the application dispatcher and supervisor job
-    single {
-        CoroutineScope(get<Job>() + Dispatchers.Default)
-    }
+        // Create a SupervisorJob that will be cancelled when the app is destroyed
+        single<Job> { SupervisorJob() }
 
-    single<SecureStorage> { DesktopSecureStorage() }
+        // Create a CoroutineScope that uses the application dispatcher and supervisor job
+        single {
+            CoroutineScope(get<Job>() + Dispatchers.Default)
+        }
 
-    single<SessionStorage> {
-        SecureSessionStorage(
-            secureStorage = get(),
-            scope = get()
-        )
+        single<SecureStorage> { DesktopSecureStorage() }
+
+        single<SessionStorage> {
+            SecureSessionStorage(
+                secureStorage = get(),
+                scope = get(),
+            )
+        }
+
+        // New device ID provider using KeyValueStorage
+        single(named("modernDeviceIdProvider")) {
+            DefaultDeviceIdProvider(get<KeyValueStorage>(named("deviceKeyValueStorage")))
+        }
+
+        // Provide desktop-specific app info provider
+        single<AppInfoProvider> {
+            BuildConfigAppInfoProvider()
+        }
+
+        // Provide desktop-specific account manager
+        single<PlatformAccountManager> {
+            DesktopAccountManager()
+        }
+
+        // Provide the BuildConfig-based app info provider
+        single<BuildConfigAppInfoProvider> {
+            BuildConfigAppInfoProvider()
+        }
     }
-    
-    // New device ID provider using KeyValueStorage
-    single(named("modernDeviceIdProvider")) {
-        DefaultDeviceIdProvider(get<KeyValueStorage>(named("deviceKeyValueStorage")))
-    }
-    
-    // Provide desktop-specific app info provider
-    single<AppInfoProvider> {
-        BuildConfigAppInfoProvider() 
-    }
-    
-    // Provide desktop-specific account manager
-    single<PlatformAccountManager> {
-        DesktopAccountManager()
-    }
-    
-    // Provide the BuildConfig-based app info provider
-    single<BuildConfigAppInfoProvider> {
-        BuildConfigAppInfoProvider()
-    }
-}

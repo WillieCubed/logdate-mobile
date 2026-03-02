@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.Flow
  * Interface for handling LogDate subscriptions and in-app billing.
  */
 interface SubscriptionBiller {
-
     /**
      * True if the user is subscribed to a backup plan.
      */

@@ -1,18 +1,18 @@
 package app.logdate.client.domain.rewind
 
-import app.logdate.client.repository.rewind.RewindRepository
 import app.logdate.client.repository.rewind.RewindGenerationManager
+import app.logdate.client.repository.rewind.RewindRepository
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.time.Instant
-import io.github.aakira.napier.Napier
 
 /**
  * A use case that retrieves or constructs a Rewind for a given time period or by ID.
- * 
+ *
  * This use case implements temporal logic to automatically generate rewinds on-demand
  * for current and past time periods, while preventing anticipation of future rewinds.
  */
@@ -23,7 +23,7 @@ class GetRewindUseCase(
 ) {
     /**
      * Retrieves a Rewind for a given time period with temporal logic and instant UX.
-     * 
+     *
      * This method implements the following behavior:
      * - Future dates: Return NotReady (prevents anticipation)
      * - Current/Past dates with existing rewind: Return Success immediately
@@ -36,13 +36,13 @@ class GetRewindUseCase(
      */
     operator fun invoke(params: RewindParams): Flow<RewindQueryResult> {
         val now = Clock.System.now()
-        
+
         // Check if this is a future rewind (prevent anticipation)
         if (params.end > now) {
             Napier.d("Rewind requested for future period, returning NotReady")
             return flow { emit(RewindQueryResult.NotReady) }
         }
-        
+
         // Check if generation is already in progress and get rewind
         return channelFlow {
             if (generationManager.isGenerationInProgress(params.start, params.end)) {
@@ -91,15 +91,13 @@ class GetRewindUseCase(
             }
         }
     }
-    
+
     /**
      * Retrieves a Rewind by its unique identifier.
      *
      * @param rewindId The unique identifier of the rewind to retrieve.
      */
-    operator fun invoke(rewindId: kotlin.uuid.Uuid): Flow<app.logdate.shared.model.Rewind> {
-        return rewindRepository.getRewind(rewindId)
-    }
+    operator fun invoke(rewindId: kotlin.uuid.Uuid): Flow<app.logdate.shared.model.Rewind> = rewindRepository.getRewind(rewindId)
 }
 
 /**

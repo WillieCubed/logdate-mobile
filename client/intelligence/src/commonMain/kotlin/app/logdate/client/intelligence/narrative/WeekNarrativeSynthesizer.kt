@@ -44,7 +44,7 @@ class WeekNarrativeSynthesizer(
     private val generativeAICache: GenerativeAICache,
     private val genAIClient: GenerativeAIChatClient,
     private val networkAvailabilityMonitor: NetworkAvailabilityMonitor,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private companion object {
         private const val SYSTEM_PROMPT = """
@@ -173,40 +173,43 @@ Respond ONLY with valid JSON in this format. No additional text."""
         textEntries: List<JournalNote.Text>,
         media: List<IndexedMedia>,
         people: List<Person> = emptyList(),
-        useCached: Boolean = true
-    ): AIResult<WeekNarrative> = withContext(ioDispatcher) {
-        val cacheRequest = GenerativeAICacheRequest(
-            contentType = GenerativeAICacheContentType.Narrative,
-            inputText = buildContentSummary(textEntries, media, people),
-            providerId = genAIClient.providerId,
-            model = genAIClient.defaultModel,
-            promptVersion = PROMPT_VERSION,
-            schemaVersion = SCHEMA_VERSION,
-            templateId = TEMPLATE_ID,
-            policy = AICachePolicy(ttlSeconds = CACHE_TTL_SECONDS)
-        )
-        if (useCached) {
-            val cached = generativeAICache.getEntry(cacheRequest)
-            if (cached != null) {
-                Napier.d("Using cached narrative for $weekId")
-                val parsed = parseNarrativeResponse(cached.content)
-                if (parsed != null) {
-                    return@withContext AIResult.Success(parsed, fromCache = true)
+        useCached: Boolean = true,
+    ): AIResult<WeekNarrative> =
+        withContext(ioDispatcher) {
+            val cacheRequest =
+                GenerativeAICacheRequest(
+                    contentType = GenerativeAICacheContentType.Narrative,
+                    inputText = buildContentSummary(textEntries, media, people),
+                    providerId = genAIClient.providerId,
+                    model = genAIClient.defaultModel,
+                    promptVersion = PROMPT_VERSION,
+                    schemaVersion = SCHEMA_VERSION,
+                    templateId = TEMPLATE_ID,
+                    policy = AICachePolicy(ttlSeconds = CACHE_TTL_SECONDS),
+                )
+            if (useCached) {
+                val cached = generativeAICache.getEntry(cacheRequest)
+                if (cached != null) {
+                    Napier.d("Using cached narrative for $weekId")
+                    val parsed = parseNarrativeResponse(cached.content)
+                    if (parsed != null) {
+                        return@withContext AIResult.Success(parsed, fromCache = true)
+                    }
+                    Napier.w("Cached narrative response was invalid for $weekId")
                 }
-                Napier.w("Cached narrative response was invalid for $weekId")
             }
-        }
 
-        Napier.d("Generating narrative for $weekId with ${textEntries.size} entries, ${media.size} media items")
-        val unavailableReason = networkAvailabilityMonitor.unavailableReason()
-        if (unavailableReason != null) {
-            return@withContext AIResult.Unavailable(unavailableReason)
-        }
+            Napier.d("Generating narrative for $weekId with ${textEntries.size} entries, ${media.size} media items")
+            val unavailableReason = networkAvailabilityMonitor.unavailableReason()
+            if (unavailableReason != null) {
+                return@withContext AIResult.Unavailable(unavailableReason)
+            }
 
-        // Build content summary for AI
-        val contentSummary = cacheRequest.inputText
+            // Build content summary for AI
+            val contentSummary = cacheRequest.inputText
 
-        val prompt = """
+            val prompt =
+                """
 Week's content for analysis:
 
 $contentSummary
@@ -214,39 +217,42 @@ $contentSummary
 Analyze this content and provide the narrative structure in JSON format as specified.
 """.trim()
 
-        val response = genAIClient.submit(
-            GenerativeAIRequest(
-                messages = listOf(
-                    GenerativeAIChatMessage("system", SYSTEM_PROMPT),
-                    GenerativeAIChatMessage("user", prompt)
-                ),
-                model = cacheRequest.model,
-                responseFormat = GenerativeAIResponseFormat.JsonSchema(
-                    name = "week_narrative",
-                    schema = RESPONSE_SCHEMA
+            val response =
+                genAIClient.submit(
+                    GenerativeAIRequest(
+                        messages =
+                            listOf(
+                                GenerativeAIChatMessage("system", SYSTEM_PROMPT),
+                                GenerativeAIChatMessage("user", prompt),
+                            ),
+                        model = cacheRequest.model,
+                        responseFormat =
+                            GenerativeAIResponseFormat.JsonSchema(
+                                name = "week_narrative",
+                                schema = RESPONSE_SCHEMA,
+                            ),
+                    ),
                 )
-            )
-        )
 
-        return@withContext when (response) {
-            is AIResult.Success -> {
-                val content = response.value.content
-                Napier.d("Caching narrative for $weekId")
-                generativeAICache.putEntry(cacheRequest, content)
-                val parsed = parseNarrativeResponse(content)
-                if (parsed != null) {
-                    AIResult.Success(parsed, fromCache = false)
-                } else {
-                    AIResult.Error(AIError.InvalidResponse)
+            return@withContext when (response) {
+                is AIResult.Success -> {
+                    val content = response.value.content
+                    Napier.d("Caching narrative for $weekId")
+                    generativeAICache.putEntry(cacheRequest, content)
+                    val parsed = parseNarrativeResponse(content)
+                    if (parsed != null) {
+                        AIResult.Success(parsed, fromCache = false)
+                    } else {
+                        AIResult.Error(AIError.InvalidResponse)
+                    }
+                }
+                is AIResult.Unavailable -> response
+                is AIResult.Error -> {
+                    Napier.e("Failed to synthesize narrative", throwable = response.throwable)
+                    response
                 }
             }
-            is AIResult.Unavailable -> response
-            is AIResult.Error -> {
-                Napier.e("Failed to synthesize narrative", throwable = response.throwable)
-                response
-            }
         }
-    }
 
     /**
      * Builds a textual summary of the week's content for AI analysis.
@@ -254,40 +260,41 @@ Analyze this content and provide the narrative structure in JSON format as speci
     private fun buildContentSummary(
         textEntries: List<JournalNote.Text>,
         media: List<IndexedMedia>,
-        people: List<Person>
+        people: List<Person>,
     ): String {
-        val summary = buildString {
-            appendLine("=== TEXT ENTRIES ===")
-            textEntries.forEach { entry ->
-                appendLine("\n[${entry.creationTimestamp}] (ID: ${entry.uid})")
-                appendLine(entry.content.take(500)) // Limit to avoid token overflow
-                if (entry.content.length > 500) appendLine("... [truncated]")
-            }
+        val summary =
+            buildString {
+                appendLine("=== TEXT ENTRIES ===")
+                textEntries.forEach { entry ->
+                    appendLine("\n[${entry.creationTimestamp}] (ID: ${entry.uid})")
+                    appendLine(entry.content.take(500)) // Limit to avoid token overflow
+                    if (entry.content.length > 500) appendLine("... [truncated]")
+                }
 
-            appendLine("\n=== MEDIA ===")
-            media.forEach { item ->
-                when (item) {
-                    is IndexedMedia.Image -> {
-                        appendLine("\n[${item.timestamp}] Photo (ID: ${item.uid})")
-                        item.caption?.let { appendLine("Caption: $it") }
-                    }
-                    is IndexedMedia.Video -> {
-                        appendLine("\n[${item.timestamp}] Video (ID: ${item.uid}) - Duration: ${item.duration}")
-                        item.caption?.let { appendLine("Caption: $it") }
+                appendLine("\n=== MEDIA ===")
+                media.forEach { item ->
+                    when (item) {
+                        is IndexedMedia.Image -> {
+                            appendLine("\n[${item.timestamp}] Photo (ID: ${item.uid})")
+                            item.caption?.let { appendLine("Caption: $it") }
+                        }
+                        is IndexedMedia.Video -> {
+                            appendLine("\n[${item.timestamp}] Video (ID: ${item.uid}) - Duration: ${item.duration}")
+                            item.caption?.let { appendLine("Caption: $it") }
+                        }
                     }
                 }
-            }
 
-            if (people.isNotEmpty()) {
-                appendLine("\n=== PEOPLE MENTIONED ===")
-                appendLine(people.joinToString(", ") { it.name })
-            }
+                if (people.isNotEmpty()) {
+                    appendLine("\n=== PEOPLE MENTIONED ===")
+                    appendLine(people.joinToString(", ") { it.name })
+                }
 
-            appendLine("\n=== SUMMARY STATS ===")
-            appendLine("Total entries: ${textEntries.size}")
-            appendLine("Total media: ${media.size}")
-            appendLine("People mentioned: ${people.size}")
-        }
+                appendLine("\n=== SUMMARY STATS ===")
+                appendLine("Total entries: ${textEntries.size}")
+                appendLine("Total media: ${media.size}")
+                appendLine("People mentioned: ${people.size}")
+            }
 
         return summary
     }
@@ -296,26 +303,28 @@ Analyze this content and provide the narrative structure in JSON format as speci
      * Parses AI response into WeekNarrative structure.
      */
     private fun parseNarrativeResponse(response: String): WeekNarrative? {
-        val parser = JsonStructuredOutputParser(
-            json = json,
-            serializer = NarrativeResponse.serializer(),
-            allowEmbeddedJson = true
-        )
+        val parser =
+            JsonStructuredOutputParser(
+                json = json,
+                serializer = NarrativeResponse.serializer(),
+                allowEmbeddedJson = true,
+            )
         return when (val result = parser.parse(response)) {
             is StructuredOutputResult.Success -> {
                 val parsed = result.value
                 WeekNarrative(
                     themes = parsed.themes,
                     emotionalTone = parsed.emotionalTone,
-                    storyBeats = parsed.storyBeats.map {
-                        StoryBeat(
-                            moment = it.moment,
-                            context = it.context,
-                            emotionalWeight = it.emotionalWeight,
-                            evidenceIds = it.evidenceIds
-                        )
-                    },
-                    overallNarrative = parsed.overallNarrative
+                    storyBeats =
+                        parsed.storyBeats.map {
+                            StoryBeat(
+                                moment = it.moment,
+                                context = it.context,
+                                emotionalWeight = it.emotionalWeight,
+                                evidenceIds = it.evidenceIds,
+                            )
+                        },
+                    overallNarrative = parsed.overallNarrative,
                 )
             }
             StructuredOutputResult.Empty -> {
@@ -337,7 +346,7 @@ Analyze this content and provide the narrative structure in JSON format as speci
         val themes: List<String>,
         val emotionalTone: String,
         val storyBeats: List<StoryBeatResponse>,
-        val overallNarrative: String
+        val overallNarrative: String,
     )
 
     @Serializable
@@ -345,6 +354,6 @@ Analyze this content and provide the narrative structure in JSON format as speci
         val moment: String,
         val context: String,
         val emotionalWeight: String,
-        val evidenceIds: List<String>
+        val evidenceIds: List<String>,
     )
 }

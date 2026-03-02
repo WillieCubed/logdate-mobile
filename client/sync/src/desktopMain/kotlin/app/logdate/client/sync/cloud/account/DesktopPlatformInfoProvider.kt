@@ -11,24 +11,22 @@ import java.net.InetAddress
  * @param appInfoProvider Provider for application information.
  */
 class DesktopPlatformInfoProvider(
-    private val appInfoProvider: BuildConfigAppInfoProvider
+    private val appInfoProvider: BuildConfigAppInfoProvider,
 ) : PlatformInfoProvider {
-    
     /**
      * Gets platform-specific information about the current desktop device.
      *
      * @return PlatformInfo containing desktop device details.
      */
-    override fun getPlatformInfo(): PlatformInfo {
-        return PlatformInfo(
+    override fun getPlatformInfo(): PlatformInfo =
+        PlatformInfo(
             platform = getOsPlatformName(),
             deviceName = getComputerName(),
             deviceType = "desktop",
             osVersion = getOsVersion(),
-            appVersion = getAppVersion()
+            appVersion = getAppVersion(),
         )
-    }
-    
+
     /**
      * Gets the operating system platform name.
      *
@@ -43,7 +41,7 @@ class DesktopPlatformInfoProvider(
             else -> osName
         }
     }
-    
+
     /**
      * Gets the computer hostname.
      *
@@ -52,8 +50,8 @@ class DesktopPlatformInfoProvider(
      *
      * @return The computer hostname or a generic name.
      */
-    private fun getComputerName(): String {
-        return try {
+    private fun getComputerName(): String =
+        try {
             val hostname = InetAddress.getLocalHost().hostName
             // Sanitize hostname to remove potentially sensitive information
             // In a real implementation, you might want to implement more sophisticated sanitization
@@ -65,17 +63,14 @@ class DesktopPlatformInfoProvider(
         } catch (e: Exception) {
             "Computer"
         }
-    }
-    
+
     /**
      * Gets the operating system version.
      *
      * @return The operating system version string.
      */
-    private fun getOsVersion(): String {
-        return System.getProperty("os.version", "Unknown")
-    }
-    
+    private fun getOsVersion(): String = System.getProperty("os.version", "Unknown")
+
     /**
      * Gets the application version.
      *

@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports", "ktlint:standard:max-line-length")
+
 package app.logdate.feature.core.account
 
 import androidx.compose.foundation.layout.*
@@ -19,12 +21,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
-import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.core.generated.resources.*
 import logdate.client.feature.core.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+
 @Composable
 fun UsernameSetupScreen(
     username: String,
@@ -33,7 +35,7 @@ fun UsernameSetupScreen(
     onBack: () -> Unit,
     usernameAvailability: UsernameAvailability = UsernameAvailability.Unknown,
     isValid: Boolean = true,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     UsernameSetupContent(
         username = username,
@@ -42,7 +44,7 @@ fun UsernameSetupScreen(
         onBack = onBack,
         usernameAvailability = usernameAvailability,
         isValid = isValid,
-        modifier = modifier
+        modifier = modifier,
     )
 }
 
@@ -55,77 +57,82 @@ private fun UsernameSetupContent(
     onBack: () -> Unit,
     usernameAvailability: UsernameAvailability,
     isValid: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val focusManager = LocalFocusManager.current
     val focusRequester = remember { FocusRequester() }
-    
+
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
     }
-    
+
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(Spacing.lg)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.SpaceBetween
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(Spacing.lg)
+                .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Column(
-            verticalArrangement = Arrangement.spacedBy(Spacing.xl)
+            verticalArrangement = Arrangement.spacedBy(Spacing.xl),
         ) {
             // Header with back button
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(Res.string.go_back)
+                        contentDescription = stringResource(Res.string.go_back),
                     )
                 }
-                
+
                 LinearProgressIndicator(
                     progress = { 0.66f }, // Step 2 of 3
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = Spacing.md),
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .padding(horizontal = Spacing.md),
                 )
-                
+
                 Text(
                     text = stringResource(Res.string.text_2_of_3),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            
+
             Spacer(modifier = Modifier.height(Spacing.lg))
-            
+
             // Title and description
             Column(
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
                     text = stringResource(Res.string.choose_your_username),
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
-                
+
                 Text(
-                    text = stringResource(Res.string.your_unique_address_on_the_logdate_network_this_is_how_others_will_find_and_mention_you),
+                    text =
+                        stringResource(
+                            Res.string.your_unique_address_on_the_logdate_network_this_is_how_others_will_find_and_mention_you,
+                        ),
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Spacing.md)
+                    modifier = Modifier.padding(horizontal = Spacing.md),
                 )
             }
-            
+
             // Username input
             Column(
-                verticalArrangement = Arrangement.spacedBy(Spacing.md)
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
                 OutlinedTextField(
                     value = username,
@@ -137,7 +144,7 @@ private fun UsernameSetupContent(
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.AlternateEmail,
-                            contentDescription = null
+                            contentDescription = null,
                         )
                     },
                     trailingIcon = {
@@ -145,28 +152,28 @@ private fun UsernameSetupContent(
                             UsernameAvailability.Checking -> {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp
+                                    strokeWidth = 2.dp,
                                 )
                             }
                             UsernameAvailability.Available -> {
                                 Icon(
                                     imageVector = Icons.Default.CheckCircle,
                                     contentDescription = stringResource(Res.string.username_available),
-                                    tint = MaterialTheme.colorScheme.primary
+                                    tint = MaterialTheme.colorScheme.primary,
                                 )
                             }
                             UsernameAvailability.Taken -> {
                                 Icon(
                                     imageVector = Icons.Default.Cancel,
                                     contentDescription = stringResource(Res.string.username_taken),
-                                    tint = MaterialTheme.colorScheme.error
+                                    tint = MaterialTheme.colorScheme.error,
                                 )
                             }
                             UsernameAvailability.Error -> {
                                 Icon(
                                     imageVector = Icons.Default.Warning,
                                     contentDescription = stringResource(Res.string.error_checking_username),
-                                    tint = MaterialTheme.colorScheme.error
+                                    tint = MaterialTheme.colorScheme.error,
                                 )
                             }
                             UsernameAvailability.Unknown -> null
@@ -174,120 +181,137 @@ private fun UsernameSetupContent(
                     },
                     supportingText = {
                         when (usernameAvailability) {
-                            UsernameAvailability.Available -> Text(
-                                text = stringResource(Res.string.username_is_available_2),
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            UsernameAvailability.Taken -> Text(
-                                text = stringResource(Res.string.username_is_already_taken),
-                                color = MaterialTheme.colorScheme.error
-                            )
-                            else -> Text(
-                                stringResource(
-                                    Res.string.unique_address_username,
-                                    username
+                            UsernameAvailability.Available ->
+                                Text(
+                                    text = stringResource(Res.string.username_is_available_2),
+                                    color = MaterialTheme.colorScheme.primary,
                                 )
-                            )
+                            UsernameAvailability.Taken ->
+                                Text(
+                                    text = stringResource(Res.string.username_is_already_taken),
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            else ->
+                                Text(
+                                    stringResource(
+                                        Res.string.unique_address_username,
+                                        username,
+                                    ),
+                                )
                         }
                     },
                     isError = usernameAvailability == UsernameAvailability.Taken,
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Done,
-                        capitalization = KeyboardCapitalization.None
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = { 
-                            focusManager.clearFocus()
-                            if (isValid && username.isNotBlank() && usernameAvailability == UsernameAvailability.Available) {
-                                onContinue()
-                            }
-                        }
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(focusRequester)
+                    keyboardOptions =
+                        KeyboardOptions(
+                            imeAction = ImeAction.Done,
+                            capitalization = KeyboardCapitalization.None,
+                        ),
+                    keyboardActions =
+                        KeyboardActions(
+                            onDone = {
+                                focusManager.clearFocus()
+                                if (isValid && username.isNotBlank() && usernameAvailability == UsernameAvailability.Available) {
+                                    onContinue()
+                                }
+                            },
+                        ),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester),
                 )
-                
+
                 // ActivityPub/Fediverse explanation
                 Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
-                    )
+                    colors =
+                        CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                        ),
                 ) {
                     Column(
                         modifier = Modifier.padding(Spacing.md),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Public,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(20.dp),
                             )
                             Text(
                                 text = stringResource(Res.string.connected_to_the_fediverse),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
                             )
                         }
-                        
+
+                        val activityPubText =
+                            stringResource(
+                                Res.string
+                                    .logdate_uses_activitypub_the_same_technology_that_powers_mastodon_pixelfed_and_other_social_networks_this_means_you_can_interact_with_a_global_community_while_keeping_control_of_your_data,
+                            )
                         Text(
-                            text = stringResource(Res.string.logdate_uses_activitypub_the_same_technology_that_powers_mastodon_pixelfed_and_other_social_networks_this_means_you_can_interact_with_a_global_community_while_keeping_control_of_your_data),
+                            text = activityPubText,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
                         )
-                        
+
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                            modifier = Modifier.padding(top = Spacing.xs)
+                            modifier = Modifier.padding(top = Spacing.xs),
                         ) {
                             Chip(
                                 text = "Decentralized",
-                                icon = Icons.Default.Hub
+                                icon = Icons.Default.Hub,
                             )
                             Chip(
                                 text = "Open Source",
-                                icon = Icons.Default.Code
+                                icon = Icons.Default.Code,
                             )
                         }
                     }
                 }
-                
+
                 // Username guidelines
                 Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
+                    colors =
+                        CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        ),
                 ) {
                     Column(
                         modifier = Modifier.padding(Spacing.md),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+                        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
                     ) {
                         Text(
                             text = stringResource(Res.string.username_tips),
                             style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            text = "• Use only letters, numbers, and underscores\n• Keep it memorable and easy to share\n• 3-30 characters long\n• Can't be changed later",
+                            text =
+                                "• Use only letters, numbers, and underscores\n" +
+                                    "• Keep it memorable and easy to share\n" +
+                                    "• 3-30 characters long\n" +
+                                    "• Can't be changed later",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
             }
         }
-        
+
         // Continue button
         Button(
             onClick = onContinue,
             enabled = isValid && username.isNotBlank() && usernameAvailability == UsernameAvailability.Available,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(Res.string.`continue`))
         }
@@ -298,29 +322,30 @@ private fun UsernameSetupContent(
 private fun Chip(
     text: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-        ),
-        modifier = modifier
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+            ),
+        modifier = modifier,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
             horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.primary
+                tint = MaterialTheme.colorScheme.primary,
             )
             Text(
                 text = text,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
             )
         }
     }
@@ -337,7 +362,7 @@ private fun UsernameSetupScreenPreview() {
                 onContinue = {},
                 onBack = {},
                 usernameAvailability = UsernameAvailability.Available,
-                isValid = true
+                isValid = true,
             )
         }
     }
@@ -354,7 +379,7 @@ private fun UsernameSetupScreenTakenPreview() {
                 onContinue = {},
                 onBack = {},
                 usernameAvailability = UsernameAvailability.Taken,
-                isValid = false
+                isValid = false,
             )
         }
     }

@@ -10,7 +10,6 @@ import kotlin.uuid.Uuid
 
 @Dao
 interface TextNoteDao {
-
     /**
      * Retrieves an observable [TextNoteEntity] by the given ID.
      */
@@ -45,13 +44,19 @@ interface TextNoteDao {
      * Returns a paginated flow of [TextNoteEntity]s ordered by creation date.
      */
     @Query("SELECT * FROM text_notes ORDER BY created DESC LIMIT :limit OFFSET :offset")
-    fun getNotesPage(limit: Int, offset: Int): Flow<List<TextNoteEntity>>
+    fun getNotesPage(
+        limit: Int,
+        offset: Int,
+    ): Flow<List<TextNoteEntity>>
 
     /**
      * Returns notes within a specific date range.
      */
     @Query("SELECT * FROM text_notes WHERE created BETWEEN :startTimestamp AND :endTimestamp ORDER BY created DESC")
-    fun getNotesInRange(startTimestamp: Long, endTimestamp: Long): Flow<List<TextNoteEntity>>
+    fun getNotesInRange(
+        startTimestamp: Long,
+        endTimestamp: Long,
+    ): Flow<List<TextNoteEntity>>
 
     /**
      * Inserts the [note] into the DB if it doesn't already exist and ignores it if it does.
@@ -72,8 +77,12 @@ interface TextNoteDao {
     suspend fun removeNote(noteIds: List<Uuid>)
 
     @Query("UPDATE text_notes SET syncVersion = :syncVersion, lastSynced = :lastSynced WHERE uid = :noteId")
-    suspend fun updateSyncMetadata(noteId: Uuid, syncVersion: Long, lastSynced: kotlin.time.Instant)
-    
+    suspend fun updateSyncMetadata(
+        noteId: Uuid,
+        syncVersion: Long,
+        lastSynced: kotlin.time.Instant,
+    )
+
     /**
      * Fetches notes by their content, useful for finding newly created notes.
      */

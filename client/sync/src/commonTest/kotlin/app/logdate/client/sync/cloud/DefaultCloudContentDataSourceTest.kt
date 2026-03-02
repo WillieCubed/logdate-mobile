@@ -4,386 +4,459 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.sync.VersionConstraint
 import kotlinx.coroutines.test.runTest
-import kotlin.time.Clock
-import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
  * Tests for DefaultCloudContentDataSource.
  */
 class DefaultCloudContentDataSourceTest {
-    
     private val mockApiClient = MockCloudApiClientForContent()
     private val dataSource = DefaultCloudContentDataSource(mockApiClient)
-    
-    @Test
-    fun testUploadTextNote() = runTest {
-        // Given
-        val accessToken = "test-token"
-        val textNote = JournalNote.Text(
-            uid = Uuid.random(),
-            content = "Test content",
-            creationTimestamp = Clock.System.now(),
-            lastUpdated = Clock.System.now()
-        )
-        
-        val uploadTime = Clock.System.now()
-        mockApiClient.uploadContentResponse = Result.success(
-            ContentUploadResponse(
-                id = textNote.uid.toString(),
-                serverVersion = 1,
-                uploadedAt = uploadTime.toEpochMilliseconds()
-            )
-        )
-        
-        // When
-        val result = dataSource.uploadNote(accessToken, textNote)
-        
-        // Then
-        assertTrue(result.isSuccess, "Upload should succeed")
-        // Compare with millisecond precision since that's what the API returns
-        val expectedTime = Instant.fromEpochMilliseconds(uploadTime.toEpochMilliseconds())
-        val uploadResult = result.getOrNull()
-        assertEquals(expectedTime, uploadResult?.syncedAt, "Should return upload timestamp")
-        assertEquals(1, uploadResult?.serverVersion, "Should return server version")
-        assertEquals(1, mockApiClient.uploadCalls.size, "Should make one API call")
-        
-        val (token, request) = mockApiClient.uploadCalls.first()
-        assertEquals(accessToken, token, "Should use correct access token")
-        assertEquals(textNote.uid.toString(), request.id, "Should preserve note ID")
-        assertEquals("TEXT", request.type, "Should set correct note type")
-        assertEquals(textNote.content, request.content, "Should preserve note content")
-    }
-    
-    @Test
-    fun testUploadImageNote() = runTest {
-        // Given
-        val accessToken = "test-token"
-        val imageNote = JournalNote.Image(
-            uid = Uuid.random(),
-            creationTimestamp = Clock.System.now(),
-            lastUpdated = Clock.System.now(),
-            mediaRef = "file:///test/image.jpg"
-        )
-        
-        val uploadTime = Clock.System.now()
-        mockApiClient.uploadContentResponse = Result.success(
-            ContentUploadResponse(
-                id = imageNote.uid.toString(),
-                serverVersion = 1,
-                uploadedAt = uploadTime.toEpochMilliseconds()
-            )
-        )
-        
-        // When
-        val result = dataSource.uploadNote(accessToken, imageNote)
-        
-        // Then
-        assertTrue(result.isSuccess, "Upload should succeed")
-        assertEquals(1, mockApiClient.uploadCalls.size, "Should make one API call")
-        
-        val (_, request) = mockApiClient.uploadCalls.first()
-        assertEquals("IMAGE", request.type, "Should set correct note type")
-        assertEquals(null, request.content, "Image note should have no text content")
-        assertEquals(imageNote.mediaRef, request.mediaUri, "Should preserve media URI")
-    }
 
     @Test
-    fun testUploadAudioNoteIncludesDuration() = runTest {
-        // Given
-        val accessToken = "test-token"
-        val audioNote = JournalNote.Audio(
-            uid = Uuid.random(),
-            mediaRef = "file:///test/audio.m4a",
-            durationMs = 5300,
-            creationTimestamp = Clock.System.now(),
-            lastUpdated = Clock.System.now()
-        )
+    fun testUploadTextNote() =
+        runTest {
+            // Given
+            val accessToken = "test-token"
+            val textNote =
+                JournalNote.Text(
+                    uid = Uuid.random(),
+                    content = "Test content",
+                    creationTimestamp = Clock.System.now(),
+                    lastUpdated = Clock.System.now(),
+                )
 
-        mockApiClient.uploadContentResponse = Result.success(
-            ContentUploadResponse(
-                id = audioNote.uid.toString(),
-                serverVersion = 1,
-                uploadedAt = Clock.System.now().toEpochMilliseconds()
-            )
-        )
+            val uploadTime = Clock.System.now()
+            mockApiClient.uploadContentResponse =
+                Result.success(
+                    ContentUploadResponse(
+                        id = textNote.uid.toString(),
+                        serverVersion = 1,
+                        uploadedAt = uploadTime.toEpochMilliseconds(),
+                    ),
+                )
 
-        // When
-        val result = dataSource.uploadNote(accessToken, audioNote)
+            // When
+            val result = dataSource.uploadNote(accessToken, textNote)
 
-        // Then
-        assertTrue(result.isSuccess, "Upload should succeed")
-        val (_, request) = mockApiClient.uploadCalls.first()
-        assertEquals("AUDIO", request.type, "Should set correct note type")
-        assertEquals(audioNote.mediaRef, request.mediaUri, "Should preserve media URI")
-        assertEquals(audioNote.durationMs, request.durationMs, "Should include duration")
-    }
-    
-    @Test
-    fun testUpdateNote() = runTest {
-        // Given
-        val accessToken = "test-token"
-        val textNote = JournalNote.Text(
-            uid = Uuid.random(),
-            content = "Updated content",
-            creationTimestamp = Clock.System.now(),
-            lastUpdated = Clock.System.now(),
-            syncVersion = 1
-        )
-        
-        val updateTime = Clock.System.now()
-        mockApiClient.updateContentResponse = Result.success(
-            ContentUpdateResponse(
-                id = textNote.uid.toString(),
-                serverVersion = 2,
-                updatedAt = updateTime.toEpochMilliseconds()
-            )
-        )
-        
-        // When
-        val result = dataSource.updateNote(accessToken, textNote)
-        
-        // Then
-        assertTrue(result.isSuccess, "Update should succeed")
-        // Compare with millisecond precision since that's what the API returns
-        val expectedTime = Instant.fromEpochMilliseconds(updateTime.toEpochMilliseconds())
-        val updateResult = result.getOrNull()
-        assertEquals(expectedTime, updateResult?.syncedAt, "Should return update timestamp")
-        assertEquals(2, updateResult?.serverVersion, "Should return server version")
-        assertEquals(1, mockApiClient.updateCalls.size, "Should make one API call")
-        
-        val (token, noteId, request) = mockApiClient.updateCalls.first()
-        assertEquals(accessToken, token, "Should use correct access token")
-        assertEquals(textNote.uid.toString(), noteId, "Should use correct note ID")
-        assertEquals(textNote.content, request.content, "Should preserve updated content")
-        val constraint = request.versionConstraint
-        assertTrue(constraint is VersionConstraint.Known, "Should include version constraint")
-        assertEquals(1, constraint.serverVersion, "Should pass current sync version")
-    }
-    
-    @Test
-    fun testDeleteNote() = runTest {
-        // Given
-        val accessToken = "test-token"
-        val noteId = Uuid.random()
-        
-        mockApiClient.deleteContentResponse = Result.success(Unit)
-        
-        // When
-        val result = dataSource.deleteNote(accessToken, noteId)
-        
-        // Then
-        assertTrue(result.isSuccess, "Delete should succeed")
-        assertEquals(1, mockApiClient.deleteCalls.size, "Should make one API call")
-        
-        val (token, deletedNoteId) = mockApiClient.deleteCalls.first()
-        assertEquals(accessToken, token, "Should use correct access token")
-        assertEquals(noteId.toString(), deletedNoteId, "Should delete correct note")
-    }
-    
-    @Test
-    fun testGetContentChanges() = runTest {
-        // Given
-        val accessToken = "test-token"
-        val since = Clock.System.now()
-        val lastTimestamp = Clock.System.now().toEpochMilliseconds()
-        
-        val noteChange = ContentChange(
-            id = Uuid.random().toString(),
-            type = "TEXT",
-            content = "Remote content",
-            mediaUri = null,
-            createdAt = Clock.System.now().toEpochMilliseconds(),
-            lastUpdated = Clock.System.now().toEpochMilliseconds(),
-            serverVersion = 1,
-            isDeleted = false
-        )
-        
-        val noteDeletion = ContentDeletion(
-            id = Uuid.random().toString(),
-            deletedAt = Clock.System.now().toEpochMilliseconds()
-        )
-        
-        mockApiClient.contentChangesResponse = Result.success(
-            ContentChangesResponse(
-                changes = listOf(noteChange),
-                deletions = listOf(noteDeletion),
-                lastTimestamp = lastTimestamp
-            )
-        )
-        
-        // When
-        val result = dataSource.getContentChanges(accessToken, since)
-        
-        // Then
-        assertTrue(result.isSuccess, "Get changes should succeed")
-        assertEquals(1, mockApiClient.getChangesCalls.size, "Should make one API call")
-        
-        val (token, timestamp, limit) = mockApiClient.getChangesCalls.first()
-        assertEquals(accessToken, token, "Should use correct access token")
-        assertEquals(since.toEpochMilliseconds(), timestamp, "Should pass correct timestamp")
-        assertEquals(null, limit, "Should not set a limit by default")
-        
-        val syncResult = result.getOrNull()!!
-        assertEquals(1, syncResult.changes.size, "Should have one change")
-        assertEquals(1, syncResult.deletions.size, "Should have one deletion")
-        assertEquals(Instant.fromEpochMilliseconds(lastTimestamp), syncResult.lastSyncTimestamp, "Should preserve last sync timestamp")
-        
-        val convertedNote = syncResult.changes.first()
-        assertTrue(convertedNote is JournalNote.Text, "Should convert to correct note type")
-        assertEquals(noteChange.content, convertedNote.content, "Should preserve content")
-    }
+            // Then
+            assertTrue(result.isSuccess, "Upload should succeed")
+            // Compare with millisecond precision since that's what the API returns
+            val expectedTime = Instant.fromEpochMilliseconds(uploadTime.toEpochMilliseconds())
+            val uploadResult = result.getOrNull()
+            assertEquals(expectedTime, uploadResult?.syncedAt, "Should return upload timestamp")
+            assertEquals(1, uploadResult?.serverVersion, "Should return server version")
+            assertEquals(1, mockApiClient.uploadCalls.size, "Should make one API call")
+
+            val (token, request) = mockApiClient.uploadCalls.first()
+            assertEquals(accessToken, token, "Should use correct access token")
+            assertEquals(textNote.uid.toString(), request.id, "Should preserve note ID")
+            assertEquals("TEXT", request.type, "Should set correct note type")
+            assertEquals(textNote.content, request.content, "Should preserve note content")
+        }
 
     @Test
-    fun testGetContentChangesAudioIncludesDuration() = runTest {
-        // Given
-        val accessToken = "test-token"
-        val since = Clock.System.now()
-        val lastTimestamp = Clock.System.now().toEpochMilliseconds()
-        val durationMs = 4200L
+    fun testUploadImageNote() =
+        runTest {
+            // Given
+            val accessToken = "test-token"
+            val imageNote =
+                JournalNote.Image(
+                    uid = Uuid.random(),
+                    creationTimestamp = Clock.System.now(),
+                    lastUpdated = Clock.System.now(),
+                    mediaRef = "file:///test/image.jpg",
+                )
 
-        val audioChange = ContentChange(
-            id = Uuid.random().toString(),
-            type = "AUDIO",
-            content = null,
-            mediaUri = "file:///test/audio.m4a",
-            durationMs = durationMs,
-            createdAt = Clock.System.now().toEpochMilliseconds(),
-            lastUpdated = Clock.System.now().toEpochMilliseconds(),
-            serverVersion = 2,
-            isDeleted = false
-        )
+            val uploadTime = Clock.System.now()
+            mockApiClient.uploadContentResponse =
+                Result.success(
+                    ContentUploadResponse(
+                        id = imageNote.uid.toString(),
+                        serverVersion = 1,
+                        uploadedAt = uploadTime.toEpochMilliseconds(),
+                    ),
+                )
 
-        mockApiClient.contentChangesResponse = Result.success(
-            ContentChangesResponse(
-                changes = listOf(audioChange),
-                deletions = emptyList(),
-                lastTimestamp = lastTimestamp
-            )
-        )
+            // When
+            val result = dataSource.uploadNote(accessToken, imageNote)
 
-        // When
-        val result = dataSource.getContentChanges(accessToken, since)
+            // Then
+            assertTrue(result.isSuccess, "Upload should succeed")
+            assertEquals(1, mockApiClient.uploadCalls.size, "Should make one API call")
 
-        // Then
-        assertTrue(result.isSuccess, "Get changes should succeed")
-        val syncResult = result.getOrNull()!!
-        val convertedNote = syncResult.changes.first() as JournalNote.Audio
-        assertEquals(durationMs, convertedNote.durationMs, "Should preserve duration")
-    }
-    
+            val (_, request) = mockApiClient.uploadCalls.first()
+            assertEquals("IMAGE", request.type, "Should set correct note type")
+            assertEquals(null, request.content, "Image note should have no text content")
+            assertEquals(imageNote.mediaRef, request.mediaUri, "Should preserve media URI")
+        }
+
     @Test
-    fun testUploadFailure() = runTest {
-        // Given
-        val accessToken = "test-token"
-        val note = JournalNote.Text(
-            uid = Uuid.random(),
-            content = "Test",
-            creationTimestamp = Clock.System.now(),
-            lastUpdated = Clock.System.now()
-        )
-        
-        val exception = CloudApiException("UPLOAD_ERROR", "Upload failed", 500)
-        mockApiClient.uploadContentResponse = Result.failure(exception)
-        
-        // When
-        val result = dataSource.uploadNote(accessToken, note)
-        
-        // Then
-        assertFalse(result.isSuccess, "Upload should fail")
-        assertEquals(exception, result.exceptionOrNull(), "Should preserve exception")
-    }
-    
+    fun testUploadAudioNoteIncludesDuration() =
+        runTest {
+            // Given
+            val accessToken = "test-token"
+            val audioNote =
+                JournalNote.Audio(
+                    uid = Uuid.random(),
+                    mediaRef = "file:///test/audio.m4a",
+                    durationMs = 5300,
+                    creationTimestamp = Clock.System.now(),
+                    lastUpdated = Clock.System.now(),
+                )
+
+            mockApiClient.uploadContentResponse =
+                Result.success(
+                    ContentUploadResponse(
+                        id = audioNote.uid.toString(),
+                        serverVersion = 1,
+                        uploadedAt = Clock.System.now().toEpochMilliseconds(),
+                    ),
+                )
+
+            // When
+            val result = dataSource.uploadNote(accessToken, audioNote)
+
+            // Then
+            assertTrue(result.isSuccess, "Upload should succeed")
+            val (_, request) = mockApiClient.uploadCalls.first()
+            assertEquals("AUDIO", request.type, "Should set correct note type")
+            assertEquals(audioNote.mediaRef, request.mediaUri, "Should preserve media URI")
+            assertEquals(audioNote.durationMs, request.durationMs, "Should include duration")
+        }
+
     @Test
-    fun testGetContentChangesFailure() = runTest {
-        // Given
-        val accessToken = "test-token"
-        val exception = CloudApiException("SERVER_ERROR", "Server error", 500)
-        mockApiClient.contentChangesResponse = Result.failure(exception)
-        
-        // When
-        val result = dataSource.getContentChanges(accessToken, Clock.System.now())
-        
-        // Then
-        assertFalse(result.isSuccess, "Get changes should fail")
-        assertEquals(exception, result.exceptionOrNull(), "Should preserve exception")
-    }
+    fun testUpdateNote() =
+        runTest {
+            // Given
+            val accessToken = "test-token"
+            val textNote =
+                JournalNote.Text(
+                    uid = Uuid.random(),
+                    content = "Updated content",
+                    creationTimestamp = Clock.System.now(),
+                    lastUpdated = Clock.System.now(),
+                    syncVersion = 1,
+                )
+
+            val updateTime = Clock.System.now()
+            mockApiClient.updateContentResponse =
+                Result.success(
+                    ContentUpdateResponse(
+                        id = textNote.uid.toString(),
+                        serverVersion = 2,
+                        updatedAt = updateTime.toEpochMilliseconds(),
+                    ),
+                )
+
+            // When
+            val result = dataSource.updateNote(accessToken, textNote)
+
+            // Then
+            assertTrue(result.isSuccess, "Update should succeed")
+            // Compare with millisecond precision since that's what the API returns
+            val expectedTime = Instant.fromEpochMilliseconds(updateTime.toEpochMilliseconds())
+            val updateResult = result.getOrNull()
+            assertEquals(expectedTime, updateResult?.syncedAt, "Should return update timestamp")
+            assertEquals(2, updateResult?.serverVersion, "Should return server version")
+            assertEquals(1, mockApiClient.updateCalls.size, "Should make one API call")
+
+            val (token, noteId, request) = mockApiClient.updateCalls.first()
+            assertEquals(accessToken, token, "Should use correct access token")
+            assertEquals(textNote.uid.toString(), noteId, "Should use correct note ID")
+            assertEquals(textNote.content, request.content, "Should preserve updated content")
+            val constraint = request.versionConstraint
+            assertTrue(constraint is VersionConstraint.Known, "Should include version constraint")
+            assertEquals(1, constraint.serverVersion, "Should pass current sync version")
+        }
+
+    @Test
+    fun testDeleteNote() =
+        runTest {
+            // Given
+            val accessToken = "test-token"
+            val noteId = Uuid.random()
+
+            mockApiClient.deleteContentResponse = Result.success(Unit)
+
+            // When
+            val result = dataSource.deleteNote(accessToken, noteId)
+
+            // Then
+            assertTrue(result.isSuccess, "Delete should succeed")
+            assertEquals(1, mockApiClient.deleteCalls.size, "Should make one API call")
+
+            val (token, deletedNoteId) = mockApiClient.deleteCalls.first()
+            assertEquals(accessToken, token, "Should use correct access token")
+            assertEquals(noteId.toString(), deletedNoteId, "Should delete correct note")
+        }
+
+    @Test
+    fun testGetContentChanges() =
+        runTest {
+            // Given
+            val accessToken = "test-token"
+            val since = Clock.System.now()
+            val lastTimestamp = Clock.System.now().toEpochMilliseconds()
+
+            val noteChange =
+                ContentChange(
+                    id = Uuid.random().toString(),
+                    type = "TEXT",
+                    content = "Remote content",
+                    mediaUri = null,
+                    createdAt = Clock.System.now().toEpochMilliseconds(),
+                    lastUpdated = Clock.System.now().toEpochMilliseconds(),
+                    serverVersion = 1,
+                    isDeleted = false,
+                )
+
+            val noteDeletion =
+                ContentDeletion(
+                    id = Uuid.random().toString(),
+                    deletedAt = Clock.System.now().toEpochMilliseconds(),
+                )
+
+            mockApiClient.contentChangesResponse =
+                Result.success(
+                    ContentChangesResponse(
+                        changes = listOf(noteChange),
+                        deletions = listOf(noteDeletion),
+                        lastTimestamp = lastTimestamp,
+                    ),
+                )
+
+            // When
+            val result = dataSource.getContentChanges(accessToken, since)
+
+            // Then
+            assertTrue(result.isSuccess, "Get changes should succeed")
+            assertEquals(1, mockApiClient.getChangesCalls.size, "Should make one API call")
+
+            val (token, timestamp, limit) = mockApiClient.getChangesCalls.first()
+            assertEquals(accessToken, token, "Should use correct access token")
+            assertEquals(since.toEpochMilliseconds(), timestamp, "Should pass correct timestamp")
+            assertEquals(null, limit, "Should not set a limit by default")
+
+            val syncResult = result.getOrNull()!!
+            assertEquals(1, syncResult.changes.size, "Should have one change")
+            assertEquals(1, syncResult.deletions.size, "Should have one deletion")
+            assertEquals(Instant.fromEpochMilliseconds(lastTimestamp), syncResult.lastSyncTimestamp, "Should preserve last sync timestamp")
+
+            val convertedNote = syncResult.changes.first()
+            assertTrue(convertedNote is JournalNote.Text, "Should convert to correct note type")
+            assertEquals(noteChange.content, convertedNote.content, "Should preserve content")
+        }
+
+    @Test
+    fun testGetContentChangesAudioIncludesDuration() =
+        runTest {
+            // Given
+            val accessToken = "test-token"
+            val since = Clock.System.now()
+            val lastTimestamp = Clock.System.now().toEpochMilliseconds()
+            val durationMs = 4200L
+
+            val audioChange =
+                ContentChange(
+                    id = Uuid.random().toString(),
+                    type = "AUDIO",
+                    content = null,
+                    mediaUri = "file:///test/audio.m4a",
+                    durationMs = durationMs,
+                    createdAt = Clock.System.now().toEpochMilliseconds(),
+                    lastUpdated = Clock.System.now().toEpochMilliseconds(),
+                    serverVersion = 2,
+                    isDeleted = false,
+                )
+
+            mockApiClient.contentChangesResponse =
+                Result.success(
+                    ContentChangesResponse(
+                        changes = listOf(audioChange),
+                        deletions = emptyList(),
+                        lastTimestamp = lastTimestamp,
+                    ),
+                )
+
+            // When
+            val result = dataSource.getContentChanges(accessToken, since)
+
+            // Then
+            assertTrue(result.isSuccess, "Get changes should succeed")
+            val syncResult = result.getOrNull()!!
+            val convertedNote = syncResult.changes.first() as JournalNote.Audio
+            assertEquals(durationMs, convertedNote.durationMs, "Should preserve duration")
+        }
+
+    @Test
+    fun testUploadFailure() =
+        runTest {
+            // Given
+            val accessToken = "test-token"
+            val note =
+                JournalNote.Text(
+                    uid = Uuid.random(),
+                    content = "Test",
+                    creationTimestamp = Clock.System.now(),
+                    lastUpdated = Clock.System.now(),
+                )
+
+            val exception = CloudApiException("UPLOAD_ERROR", "Upload failed", 500)
+            mockApiClient.uploadContentResponse = Result.failure(exception)
+
+            // When
+            val result = dataSource.uploadNote(accessToken, note)
+
+            // Then
+            assertFalse(result.isSuccess, "Upload should fail")
+            assertEquals(exception, result.exceptionOrNull(), "Should preserve exception")
+        }
+
+    @Test
+    fun testGetContentChangesFailure() =
+        runTest {
+            // Given
+            val accessToken = "test-token"
+            val exception = CloudApiException("SERVER_ERROR", "Server error", 500)
+            mockApiClient.contentChangesResponse = Result.failure(exception)
+
+            // When
+            val result = dataSource.getContentChanges(accessToken, Clock.System.now())
+
+            // Then
+            assertFalse(result.isSuccess, "Get changes should fail")
+            assertEquals(exception, result.exceptionOrNull(), "Should preserve exception")
+        }
 }
 
 /**
  * Mock CloudApiClient for testing content operations.
  */
 private class MockCloudApiClientForContent : CloudApiClient {
-    var uploadContentResponse: Result<ContentUploadResponse> = Result.success(
-        ContentUploadResponse("test-id", 1, Clock.System.now().toEpochMilliseconds())
-    )
-    
-    var updateContentResponse: Result<ContentUpdateResponse> = Result.success(
-        ContentUpdateResponse("test-id", 1, Clock.System.now().toEpochMilliseconds())
-    )
-    
+    var uploadContentResponse: Result<ContentUploadResponse> =
+        Result.success(
+            ContentUploadResponse("test-id", 1, Clock.System.now().toEpochMilliseconds()),
+        )
+
+    var updateContentResponse: Result<ContentUpdateResponse> =
+        Result.success(
+            ContentUpdateResponse("test-id", 1, Clock.System.now().toEpochMilliseconds()),
+        )
+
     var deleteContentResponse: Result<Unit> = Result.success(Unit)
-    
-    var contentChangesResponse: Result<ContentChangesResponse> = Result.success(
-        ContentChangesResponse(emptyList(), emptyList(), Clock.System.now().toEpochMilliseconds())
-    )
-    
+
+    var contentChangesResponse: Result<ContentChangesResponse> =
+        Result.success(
+            ContentChangesResponse(emptyList(), emptyList(), Clock.System.now().toEpochMilliseconds()),
+        )
+
     val uploadCalls = mutableListOf<Pair<String, ContentUploadRequest>>()
     val updateCalls = mutableListOf<Triple<String, String, ContentUpdateRequest>>()
     val deleteCalls = mutableListOf<Pair<String, String>>()
     val getChangesCalls = mutableListOf<Triple<String, Long, Int?>>()
-    
-    override suspend fun uploadContent(accessToken: String, content: ContentUploadRequest): Result<ContentUploadResponse> {
+
+    override suspend fun uploadContent(
+        accessToken: String,
+        content: ContentUploadRequest,
+    ): Result<ContentUploadResponse> {
         uploadCalls.add(accessToken to content)
         return uploadContentResponse
     }
-    
-    override suspend fun updateContent(accessToken: String, contentId: String, content: ContentUpdateRequest): Result<ContentUpdateResponse> {
+
+    override suspend fun updateContent(
+        accessToken: String,
+        contentId: String,
+        content: ContentUpdateRequest,
+    ): Result<ContentUpdateResponse> {
         updateCalls.add(Triple(accessToken, contentId, content))
         return updateContentResponse
     }
-    
-    override suspend fun deleteContent(accessToken: String, contentId: String): Result<Unit> {
+
+    override suspend fun deleteContent(
+        accessToken: String,
+        contentId: String,
+    ): Result<Unit> {
         deleteCalls.add(accessToken to contentId)
         return deleteContentResponse
     }
-    
-    override suspend fun getContentChanges(accessToken: String, since: Long, limit: Int?): Result<ContentChangesResponse> {
+
+    override suspend fun getContentChanges(
+        accessToken: String,
+        since: Long,
+        limit: Int?,
+    ): Result<ContentChangesResponse> {
         getChangesCalls.add(Triple(accessToken, since, limit))
         return contentChangesResponse
     }
-    
+
     // Not needed for content tests - throwing NotImplementedError
-    override suspend fun checkUsernameAvailability(username: String): Result<CheckUsernameAvailabilityResponse> = 
+    override suspend fun checkUsernameAvailability(username: String): Result<CheckUsernameAvailabilityResponse> =
         Result.failure(NotImplementedError())
-    override suspend fun beginAccountCreation(request: app.logdate.shared.model.BeginAccountCreationRequest): Result<app.logdate.shared.model.BeginAccountCreationResponse> = 
-        Result.failure(NotImplementedError())
-    override suspend fun completeAccountCreation(request: app.logdate.shared.model.CompleteAccountCreationRequest): Result<app.logdate.shared.model.CompleteAccountCreationResponse> = 
-        Result.failure(NotImplementedError())
-    override suspend fun refreshAccessToken(refreshToken: String): Result<String> = 
-        Result.failure(NotImplementedError())
-    override suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount> = 
-        Result.failure(NotImplementedError())
-    override suspend fun uploadJournal(accessToken: String, journal: JournalUploadRequest): Result<JournalUploadResponse> = 
-        Result.failure(NotImplementedError())
-    override suspend fun getJournalChanges(accessToken: String, since: Long, limit: Int?): Result<JournalChangesResponse> = 
-        Result.failure(NotImplementedError())
-    override suspend fun updateJournal(accessToken: String, journalId: String, journal: JournalUpdateRequest): Result<JournalUpdateResponse> = 
-        Result.failure(NotImplementedError())
-    override suspend fun deleteJournal(accessToken: String, journalId: String): Result<Unit> = 
-        Result.failure(NotImplementedError())
-    override suspend fun uploadAssociations(accessToken: String, associations: AssociationUploadRequest): Result<AssociationUploadResponse> = 
-        Result.failure(NotImplementedError())
-    override suspend fun getAssociationChanges(accessToken: String, since: Long, limit: Int?): Result<AssociationChangesResponse> = 
-        Result.failure(NotImplementedError())
-    override suspend fun deleteAssociations(accessToken: String, associations: AssociationDeleteRequest): Result<Unit> = 
-        Result.failure(NotImplementedError())
-    override suspend fun uploadMedia(accessToken: String, media: MediaUploadRequest): Result<MediaUploadResponse> = 
-        Result.failure(NotImplementedError())
-    override suspend fun downloadMedia(accessToken: String, mediaId: String): Result<MediaDownloadResponse> = 
-        Result.failure(NotImplementedError())
+
+    override suspend fun beginAccountCreation(
+        request: app.logdate.shared.model.BeginAccountCreationRequest,
+    ): Result<app.logdate.shared.model.BeginAccountCreationResponse> = Result.failure(NotImplementedError())
+
+    override suspend fun completeAccountCreation(
+        request: app.logdate.shared.model.CompleteAccountCreationRequest,
+    ): Result<app.logdate.shared.model.CompleteAccountCreationResponse> = Result.failure(NotImplementedError())
+
+    override suspend fun refreshAccessToken(refreshToken: String): Result<String> = Result.failure(NotImplementedError())
+
+    override suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount> = Result.failure(NotImplementedError())
+
+    override suspend fun uploadJournal(
+        accessToken: String,
+        journal: JournalUploadRequest,
+    ): Result<JournalUploadResponse> = Result.failure(NotImplementedError())
+
+    override suspend fun getJournalChanges(
+        accessToken: String,
+        since: Long,
+        limit: Int?,
+    ): Result<JournalChangesResponse> = Result.failure(NotImplementedError())
+
+    override suspend fun updateJournal(
+        accessToken: String,
+        journalId: String,
+        journal: JournalUpdateRequest,
+    ): Result<JournalUpdateResponse> = Result.failure(NotImplementedError())
+
+    override suspend fun deleteJournal(
+        accessToken: String,
+        journalId: String,
+    ): Result<Unit> = Result.failure(NotImplementedError())
+
+    override suspend fun uploadAssociations(
+        accessToken: String,
+        associations: AssociationUploadRequest,
+    ): Result<AssociationUploadResponse> = Result.failure(NotImplementedError())
+
+    override suspend fun getAssociationChanges(
+        accessToken: String,
+        since: Long,
+        limit: Int?,
+    ): Result<AssociationChangesResponse> = Result.failure(NotImplementedError())
+
+    override suspend fun deleteAssociations(
+        accessToken: String,
+        associations: AssociationDeleteRequest,
+    ): Result<Unit> = Result.failure(NotImplementedError())
+
+    override suspend fun uploadMedia(
+        accessToken: String,
+        media: MediaUploadRequest,
+    ): Result<MediaUploadResponse> = Result.failure(NotImplementedError())
+
+    override suspend fun downloadMedia(
+        accessToken: String,
+        mediaId: String,
+    ): Result<MediaDownloadResponse> = Result.failure(NotImplementedError())
 }

@@ -43,6 +43,6 @@ class JsonStructuredOutputParserTest {
     @Serializable
     private data class SamplePayload(
         val name: String,
-        val count: Int
+        val count: Int,
     )
 }

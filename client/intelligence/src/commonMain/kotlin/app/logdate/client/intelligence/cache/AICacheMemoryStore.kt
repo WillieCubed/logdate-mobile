@@ -2,9 +2,16 @@ package app.logdate.client.intelligence.cache
 
 interface AICacheMemoryStore {
     fun get(key: String): GenerativeAICacheEntry?
-    fun put(key: String, entry: GenerativeAICacheEntry)
+
+    fun put(
+        key: String,
+        entry: GenerativeAICacheEntry,
+    )
+
     fun remove(key: String)
+
     fun clear()
+
     fun snapshot(): List<GenerativeAICacheEntry>
 }
 
@@ -23,7 +30,10 @@ class LruAICacheMemoryStore(
         return value
     }
 
-    override fun put(key: String, entry: GenerativeAICacheEntry) {
+    override fun put(
+        key: String,
+        entry: GenerativeAICacheEntry,
+    ) {
         val existing = entries.remove(key)
         if (existing != null) {
             currentBytes -= existing.metadata.contentBytes

@@ -35,7 +35,7 @@ class RewindSequencer {
         narrative: WeekNarrative,
         textEntries: List<JournalNote.Text>,
         media: List<IndexedMedia>,
-        people: List<Person> = emptyList()
+        people: List<Person> = emptyList(),
     ): List<RewindContent> {
         Napier.d("Sequencing narrative with ${narrative.storyBeats.size} beats")
 
@@ -72,17 +72,18 @@ class RewindSequencer {
     private fun createOpeningContext(narrative: WeekNarrative): RewindContent.NarrativeContext {
         // Extract first sentence from overall narrative as opening
         val sentences = narrative.overallNarrative.split(". ")
-        val openingText = if (sentences.size > 1) {
-            sentences.first() + "."
-        } else {
-            narrative.overallNarrative
-        }
+        val openingText =
+            if (sentences.size > 1) {
+                sentences.first() + "."
+            } else {
+                narrative.overallNarrative
+            }
 
         return RewindContent.NarrativeContext(
             timestamp = Instant.DISTANT_PAST, // Placeholder - will be set by generator
             sourceId = Uuid.random(),
             contextText = openingText,
-            backgroundImage = null // Could enhance: Use first photo from week
+            backgroundImage = null, // Could enhance: Use first photo from week
         )
     }
 
@@ -93,36 +94,38 @@ class RewindSequencer {
      */
     private fun createTransition(
         currentBeat: app.logdate.shared.model.StoryBeat,
-        previousBeat: app.logdate.shared.model.StoryBeat
+        previousBeat: app.logdate.shared.model.StoryBeat,
     ): RewindContent.Transition? {
         // Generate transition based on emotional weight shift
-        val transitionText = when {
-            // Positive to negative shift
-            previousBeat.emotionalWeight.contains("joyful", ignoreCase = true) &&
+        val transitionText =
+            when {
+                // Positive to negative shift
+                previousBeat.emotionalWeight.contains("joyful", ignoreCase = true) &&
                     currentBeat.emotionalWeight.contains("melancholy", ignoreCase = true) ->
-                "But then things shifted"
+                    "But then things shifted"
 
-            // Negative to positive shift
-            previousBeat.emotionalWeight.contains("exhausted", ignoreCase = true) &&
+                // Negative to positive shift
+                previousBeat.emotionalWeight.contains("exhausted", ignoreCase = true) &&
                     currentBeat.emotionalWeight.contains("triumphant", ignoreCase = true) ->
-                "Then came a breakthrough"
+                    "Then came a breakthrough"
 
-            // Continuing theme
-            else -> {
-                // Use context to create transition
-                val connector = when {
-                    currentBeat.context.contains("meanwhile", ignoreCase = true) -> "Meanwhile"
-                    currentBeat.context.contains("evening", ignoreCase = true) -> "When evenings came"
-                    else -> "And then"
+                // Continuing theme
+                else -> {
+                    // Use context to create transition
+                    val connector =
+                        when {
+                            currentBeat.context.contains("meanwhile", ignoreCase = true) -> "Meanwhile"
+                            currentBeat.context.contains("evening", ignoreCase = true) -> "When evenings came"
+                            else -> "And then"
+                        }
+                    connector
                 }
-                connector
             }
-        }
 
         return RewindContent.Transition(
             timestamp = Instant.DISTANT_PAST, // Placeholder
             sourceId = Uuid.random(),
-            transitionText = transitionText
+            transitionText = transitionText,
         )
     }
 
@@ -134,7 +137,7 @@ class RewindSequencer {
     private fun createBeatPanels(
         beat: app.logdate.shared.model.StoryBeat,
         textEntries: List<JournalNote.Text>,
-        media: List<IndexedMedia>
+        media: List<IndexedMedia>,
     ): List<RewindContent> {
         val panels = mutableListOf<RewindContent>()
 
@@ -149,13 +152,14 @@ class RewindSequencer {
                     RewindContent.TextNote(
                         timestamp = entry.creationTimestamp,
                         sourceId = entry.uid,
-                        content = entry.content
-                    )
+                        content = entry.content,
+                    ),
                 )
             }
 
         // Add media evidence
-        media.filter { it.uid.toString() in evidenceIds }
+        media
+            .filter { it.uid.toString() in evidenceIds }
             .forEach { mediaItem ->
                 when (mediaItem) {
                     is IndexedMedia.Image -> {
@@ -164,8 +168,8 @@ class RewindSequencer {
                                 timestamp = mediaItem.timestamp,
                                 sourceId = mediaItem.uid,
                                 uri = mediaItem.uri,
-                                caption = mediaItem.caption
-                            )
+                                caption = mediaItem.caption,
+                            ),
                         )
                     }
                     is IndexedMedia.Video -> {
@@ -175,8 +179,8 @@ class RewindSequencer {
                                 sourceId = mediaItem.uid,
                                 uri = mediaItem.uri,
                                 caption = mediaItem.caption,
-                                duration = mediaItem.duration
-                            )
+                                duration = mediaItem.duration,
+                            ),
                         )
                     }
                 }
@@ -190,8 +194,8 @@ class RewindSequencer {
                     timestamp = Instant.DISTANT_PAST,
                     sourceId = Uuid.random(),
                     contextText = beat.moment,
-                    backgroundImage = null
-                )
+                    backgroundImage = null,
+                ),
             )
         }
 
@@ -205,18 +209,19 @@ class RewindSequencer {
     private fun createResolution(narrative: WeekNarrative): RewindContent.NarrativeContext {
         // Use last sentence(s) from overall narrative as resolution
         val sentences = narrative.overallNarrative.split(". ")
-        val resolutionText = if (sentences.size > 1) {
-            sentences.drop(1).joinToString(". ")
-        } else {
-            // If only one sentence, use emotional tone as resolution
-            "A ${narrative.emotionalTone} week."
-        }
+        val resolutionText =
+            if (sentences.size > 1) {
+                sentences.drop(1).joinToString(". ")
+            } else {
+                // If only one sentence, use emotional tone as resolution
+                "A ${narrative.emotionalTone} week."
+            }
 
         return RewindContent.NarrativeContext(
             timestamp = Instant.DISTANT_FUTURE, // Placeholder - signals end
             sourceId = Uuid.random(),
             contextText = resolutionText,
-            backgroundImage = null
+            backgroundImage = null,
         )
     }
 }

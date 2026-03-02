@@ -3,7 +3,7 @@ package app.logdate.server.crypto
 class EncryptionPolicy(
     private val mode: EncryptionMode,
     private val serverEncryptionEnabled: Boolean,
-    private val allowPassthroughClientCiphertext: Boolean
+    private val allowPassthroughClientCiphertext: Boolean,
 ) {
     fun evaluate(payload: ByteArray): PolicyDecision {
         val payloadType = detectPayloadType(payload)
@@ -14,41 +14,44 @@ class EncryptionPolicy(
         }
     }
 
-    private fun evaluateE2EEMode(type: PayloadType): PolicyDecision {
-        return when (type) {
+    private fun evaluateE2EEMode(type: PayloadType): PolicyDecision =
+        when (type) {
             PayloadType.PLAINTEXT -> PolicyDecision.Reject("E2EE required: plaintext not allowed")
             PayloadType.CLIENT_CIPHERTEXT -> PolicyDecision.AcceptClientCiphertext
             PayloadType.SERVER_CIPHERTEXT -> PolicyDecision.AcceptServerCiphertext
         }
-    }
 
-    private fun evaluateAtRestMode(type: PayloadType): PolicyDecision {
-        return when (type) {
+    private fun evaluateAtRestMode(type: PayloadType): PolicyDecision =
+        when (type) {
             PayloadType.PLAINTEXT -> {
-                if (serverEncryptionEnabled) PolicyDecision.EncryptAtRest
-                else PolicyDecision.AcceptPlaintext
+                if (serverEncryptionEnabled) {
+                    PolicyDecision.EncryptAtRest
+                } else {
+                    PolicyDecision.AcceptPlaintext
+                }
             }
             PayloadType.CLIENT_CIPHERTEXT -> {
-                if (allowPassthroughClientCiphertext) PolicyDecision.AcceptClientCiphertext
-                else PolicyDecision.EncryptAtRest
+                if (allowPassthroughClientCiphertext) {
+                    PolicyDecision.AcceptClientCiphertext
+                } else {
+                    PolicyDecision.EncryptAtRest
+                }
             }
             PayloadType.SERVER_CIPHERTEXT -> PolicyDecision.AcceptServerCiphertext
         }
-    }
 
-    private fun detectPayloadType(payload: ByteArray): PayloadType {
-        return when {
+    private fun detectPayloadType(payload: ByteArray): PayloadType =
+        when {
             payload.hasPrefix(PayloadPrefixes.CLIENT_MEDIA) -> PayloadType.CLIENT_CIPHERTEXT
             payload.hasPrefix(PayloadPrefixes.SERVER_MEDIA) -> PayloadType.SERVER_CIPHERTEXT
             payload.hasPrefix(PayloadPrefixes.SERVER_BACKUP) -> PayloadType.SERVER_CIPHERTEXT
             else -> PayloadType.PLAINTEXT
         }
-    }
 
     private enum class PayloadType {
         PLAINTEXT,
         CLIENT_CIPHERTEXT,
-        SERVER_CIPHERTEXT
+        SERVER_CIPHERTEXT,
     }
 
     companion object {
@@ -63,9 +66,15 @@ class EncryptionPolicy(
 }
 
 sealed class PolicyDecision {
-    data class Reject(val reason: String) : PolicyDecision()
+    data class Reject(
+        val reason: String,
+    ) : PolicyDecision()
+
     object AcceptPlaintext : PolicyDecision()
+
     object AcceptClientCiphertext : PolicyDecision()
+
     object AcceptServerCiphertext : PolicyDecision()
+
     object EncryptAtRest : PolicyDecision()
 }

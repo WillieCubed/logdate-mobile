@@ -10,14 +10,15 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 class FakePasskeyAccountRepository : PasskeyAccountRepository {
-    private val defaultAccount = LogDateAccount(
-        id = Uuid.random(),
-        username = "testuser",
-        displayName = "Test User",
-        passkeyCredentialIds = emptyList(),
-        createdAt = Clock.System.now(),
-        updatedAt = Clock.System.now()
-    )
+    private val defaultAccount =
+        LogDateAccount(
+            id = Uuid.random(),
+            username = "testuser",
+            displayName = "Test User",
+            passkeyCredentialIds = emptyList(),
+            createdAt = Clock.System.now(),
+            updatedAt = Clock.System.now(),
+        )
 
     override val currentAccount: StateFlow<LogDateAccount?> = MutableStateFlow(null).asStateFlow()
     override val isAuthenticated: StateFlow<Boolean> = MutableStateFlow(false).asStateFlow()
@@ -25,17 +26,11 @@ class FakePasskeyAccountRepository : PasskeyAccountRepository {
     var usernameAvailability: Result<Boolean> = Result.success(true)
     var accountCreation: Result<LogDateAccount> = Result.success(defaultAccount)
 
-    override suspend fun createAccountWithPasskey(request: AccountCreationRequest): Result<LogDateAccount> {
-        return accountCreation
-    }
+    override suspend fun createAccountWithPasskey(request: AccountCreationRequest): Result<LogDateAccount> = accountCreation
 
-    override suspend fun authenticateWithPasskey(username: String?): Result<LogDateAccount> {
-        return Result.success(defaultAccount)
-    }
+    override suspend fun authenticateWithPasskey(username: String?): Result<LogDateAccount> = Result.success(defaultAccount)
 
-    override suspend fun checkUsernameAvailability(username: String): Result<Boolean> {
-        return usernameAvailability
-    }
+    override suspend fun checkUsernameAvailability(username: String): Result<Boolean> = usernameAvailability
 
     override suspend fun signOut(): Result<Unit> = Result.success(Unit)
 

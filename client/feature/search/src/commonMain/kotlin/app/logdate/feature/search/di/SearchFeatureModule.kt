@@ -9,9 +9,10 @@ import org.koin.dsl.module
 /**
  * Module for search functionality.
  */
-val searchFeatureModule: Module = module {
-    includes(domainModule)
+val searchFeatureModule: Module =
+    module {
+        includes(domainModule)
 
-    // ViewModels
-    viewModelOf(::SearchViewModel)
-}
+        // ViewModels
+        viewModelOf(::SearchViewModel)
+    }

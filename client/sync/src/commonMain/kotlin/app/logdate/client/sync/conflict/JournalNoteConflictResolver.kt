@@ -13,7 +13,7 @@ class JournalNoteConflictResolver : ConflictResolver<JournalNote> {
         local: JournalNote,
         remote: JournalNote,
         localTimestamp: Instant,
-        remoteTimestamp: Instant
+        remoteTimestamp: Instant,
     ): ConflictResolution<JournalNote> {
         if (local == remote) {
             return ConflictResolution.KeepRemote(remote)
@@ -23,7 +23,7 @@ class JournalNoteConflictResolver : ConflictResolver<JournalNote> {
             return ConflictResolution.RequiresManualResolution(
                 local,
                 remote,
-                "Note type changed between local and remote versions."
+                "Note type changed between local and remote versions.",
             )
         }
 
@@ -39,7 +39,7 @@ class JournalNoteConflictResolver : ConflictResolver<JournalNote> {
         local: JournalNote.Text,
         remote: JournalNote.Text,
         localTimestamp: Instant,
-        remoteTimestamp: Instant
+        remoteTimestamp: Instant,
     ): ConflictResolution<JournalNote> {
         if (local.content == remote.content && local.location == remote.location) {
             return ConflictResolution.KeepRemote(remote)
@@ -53,24 +53,26 @@ class JournalNoteConflictResolver : ConflictResolver<JournalNote> {
             return ConflictResolution.KeepRemote(remote)
         }
 
-        val mergedContent = buildString {
-            append(local.content.trimEnd())
-            append("\n\n")
-            append("---\n")
-            append("Merged conflict\n")
-            append("Local: ").append(localTimestamp).append('\n')
-            append("Remote: ").append(remoteTimestamp).append('\n')
-            append("---\n\n")
-            append(remote.content.trimStart())
-        }
+        val mergedContent =
+            buildString {
+                append(local.content.trimEnd())
+                append("\n\n")
+                append("---\n")
+                append("Merged conflict\n")
+                append("Local: ").append(localTimestamp).append('\n')
+                append("Remote: ").append(remoteTimestamp).append('\n')
+                append("---\n\n")
+                append(remote.content.trimStart())
+            }
 
-        val merged = local.copy(
-            content = mergedContent,
-            lastUpdated = maxOf(local.lastUpdated, remote.lastUpdated, Clock.System.now()),
-            syncVersion = maxOf(local.syncVersion, remote.syncVersion),
-            location = mergeLocation(local.location, remote.location),
-            creationTimestamp = minOf(local.creationTimestamp, remote.creationTimestamp)
-        )
+        val merged =
+            local.copy(
+                content = mergedContent,
+                lastUpdated = maxOf(local.lastUpdated, remote.lastUpdated, Clock.System.now()),
+                syncVersion = maxOf(local.syncVersion, remote.syncVersion),
+                location = mergeLocation(local.location, remote.location),
+                creationTimestamp = minOf(local.creationTimestamp, remote.creationTimestamp),
+            )
 
         return ConflictResolution.Merge(merged)
     }
@@ -78,7 +80,7 @@ class JournalNoteConflictResolver : ConflictResolver<JournalNote> {
     private fun resolveMedia(
         local: JournalNote.Image,
         remote: JournalNote.Image,
-        label: String
+        label: String,
     ): ConflictResolution<JournalNote> {
         if (local.mediaRef == remote.mediaRef && local.location == remote.location) {
             return ConflictResolution.KeepRemote(remote)
@@ -87,14 +89,14 @@ class JournalNoteConflictResolver : ConflictResolver<JournalNote> {
         return ConflictResolution.RequiresManualResolution(
             local,
             remote,
-            "$label note media reference differs between local and remote versions."
+            "$label note media reference differs between local and remote versions.",
         )
     }
 
     private fun resolveMedia(
         local: JournalNote.Video,
         remote: JournalNote.Video,
-        label: String
+        label: String,
     ): ConflictResolution<JournalNote> {
         if (local.mediaRef == remote.mediaRef && local.location == remote.location) {
             return ConflictResolution.KeepRemote(remote)
@@ -103,29 +105,33 @@ class JournalNoteConflictResolver : ConflictResolver<JournalNote> {
         return ConflictResolution.RequiresManualResolution(
             local,
             remote,
-            "$label note media reference differs between local and remote versions."
+            "$label note media reference differs between local and remote versions.",
         )
     }
 
     private fun resolveMedia(
         local: JournalNote.Audio,
         remote: JournalNote.Audio,
-        label: String
+        label: String,
     ): ConflictResolution<JournalNote> {
         if (local.mediaRef == remote.mediaRef &&
             local.durationMs == remote.durationMs &&
-            local.location == remote.location) {
+            local.location == remote.location
+        ) {
             return ConflictResolution.KeepRemote(remote)
         }
 
         return ConflictResolution.RequiresManualResolution(
             local,
             remote,
-            "$label note media reference differs between local and remote versions."
+            "$label note media reference differs between local and remote versions.",
         )
     }
 
-    private fun mergeLocation(local: NoteLocation?, remote: NoteLocation?): NoteLocation? {
+    private fun mergeLocation(
+        local: NoteLocation?,
+        remote: NoteLocation?,
+    ): NoteLocation? {
         if (local == null) return remote
         if (remote == null) return local
         if (local == remote) return local

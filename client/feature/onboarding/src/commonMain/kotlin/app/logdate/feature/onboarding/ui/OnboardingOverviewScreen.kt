@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports", "ktlint:standard:max-line-length")
+
 package app.logdate.feature.onboarding.ui
 
 import androidx.compose.foundation.background
@@ -32,17 +34,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
-import logdate.client.ui.generated.resources.book_open
-import org.jetbrains.compose.resources.painterResource
-import androidx.compose.ui.tooling.preview.Preview
-import logdate.client.ui.generated.resources.Res as coreRes
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
+import logdate.client.ui.generated.resources.book_open
+import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as coreRes
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingOverviewScreen(
@@ -77,16 +80,18 @@ fun OnboardingOverviewScreen(
     ) { contentPadding ->
         if (!useSplitScreen) {
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .widthIn(max = 444.dp)
-                    .nestedScroll(scrollBehavior.nestedScrollConnection),
-                contentPadding = PaddingValues(
-                    top = contentPadding.calculateTopPadding() + Spacing.lg,
-                    bottom = contentPadding.calculateBottomPadding() + Spacing.lg,
-                    start = contentPadding.calculateStartPadding(LayoutDirection.Ltr) + Spacing.lg,
-                    end = contentPadding.calculateEndPadding(LayoutDirection.Ltr) + Spacing.lg,
-                ),
+                modifier =
+                    Modifier
+                        .fillMaxHeight()
+                        .widthIn(max = 444.dp)
+                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                contentPadding =
+                    PaddingValues(
+                        top = contentPadding.calculateTopPadding() + Spacing.lg,
+                        bottom = contentPadding.calculateBottomPadding() + Spacing.lg,
+                        start = contentPadding.calculateStartPadding(LayoutDirection.Ltr) + Spacing.lg,
+                        end = contentPadding.calculateEndPadding(LayoutDirection.Ltr) + Spacing.lg,
+                    ),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -105,7 +110,8 @@ fun OnboardingOverviewScreen(
                         description = "Create a journal for the people you care about - whether your climbing buddies, your crochet club, or your family. Even if they don’t use LogDate, they can still join in and add stuff.",
                         icon = {
                             Icon(
-                                painterResource(coreRes.drawable.book_open), contentDescription = null
+                                painterResource(coreRes.drawable.book_open),
+                                contentDescription = null,
                             )
                         },
                     )
@@ -140,13 +146,16 @@ fun OnboardingOverviewScreen(
 
 @Composable
 internal fun OverviewItem(
-    title: String, description: String, icon: @Composable () -> Unit = {},
+    title: String,
+    description: String,
+    icon: @Composable () -> Unit = {},
 ) {
     Row(
-        modifier = Modifier
-            .clip(MaterialTheme.shapes.medium)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .padding(Spacing.lg),
+        modifier =
+            Modifier
+                .clip(MaterialTheme.shapes.medium)
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .padding(Spacing.lg),
         horizontalArrangement = Arrangement.spacedBy(Spacing.lg, Alignment.Start),
     ) {
         InfoIcon {
@@ -167,10 +176,11 @@ fun InfoIcon(icon: @Composable () -> Unit) {
     Row(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .size(40.dp)
-            .clip(MaterialTheme.shapes.extraLarge)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+        modifier =
+            Modifier
+                .size(40.dp)
+                .clip(MaterialTheme.shapes.extraLarge)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
     ) {
         icon()
     }
@@ -185,7 +195,7 @@ private fun OnboardingOverviewScreenPreview() {
 }
 
 @Preview
-//@Preview(device = "spec:parent=pixel_5,orientation=landscape")
+// @Preview(device = "spec:parent=pixel_5,orientation=landscape")
 @Composable
 private fun OnboardingOverviewScreenPreview_Compact_Landscape() {
     LogDateTheme {
@@ -194,7 +204,7 @@ private fun OnboardingOverviewScreenPreview_Compact_Landscape() {
 }
 
 @Preview
-//@Preview(device = "spec:width=1280dp,height=800dp,dpi=240")
+// @Preview(device = "spec:width=1280dp,height=800dp,dpi=240")
 @Composable
 private fun OnboardingOverviewScreenPreview_Medium_Landscape() {
     LogDateTheme {

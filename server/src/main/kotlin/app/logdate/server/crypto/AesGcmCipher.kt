@@ -5,24 +5,38 @@ import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-class AesGcmCipher(private val secureRandom: SecureRandom = SecureRandom()) {
-    fun encrypt(plaintext: ByteArray, key: ByteArray, iv: ByteArray, aad: ByteArray?): ByteArray {
+class AesGcmCipher(
+    private val secureRandom: SecureRandom = SecureRandom(),
+) {
+    fun encrypt(
+        plaintext: ByteArray,
+        key: ByteArray,
+        iv: ByteArray,
+        aad: ByteArray?,
+    ): ByteArray {
         val cipher = createCipher(Cipher.ENCRYPT_MODE, key, iv)
         aad?.let { cipher.updateAAD(it) }
         return cipher.doFinal(plaintext)
     }
 
-    fun decrypt(ciphertext: ByteArray, key: ByteArray, iv: ByteArray, aad: ByteArray?): ByteArray {
+    fun decrypt(
+        ciphertext: ByteArray,
+        key: ByteArray,
+        iv: ByteArray,
+        aad: ByteArray?,
+    ): ByteArray {
         val cipher = createCipher(Cipher.DECRYPT_MODE, key, iv)
         aad?.let { cipher.updateAAD(it) }
         return cipher.doFinal(ciphertext)
     }
 
-    fun generateIV(): ByteArray {
-        return ByteArray(IV_SIZE_BYTES).also { secureRandom.nextBytes(it) }
-    }
+    fun generateIV(): ByteArray = ByteArray(IV_SIZE_BYTES).also { secureRandom.nextBytes(it) }
 
-    private fun createCipher(mode: Int, key: ByteArray, iv: ByteArray): Cipher {
+    private fun createCipher(
+        mode: Int,
+        key: ByteArray,
+        iv: ByteArray,
+    ): Cipher {
         val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
         val keySpec = SecretKeySpec(key, KEY_ALGORITHM)
         val gcmSpec = GCMParameterSpec(GCM_TAG_BITS, iv)

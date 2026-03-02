@@ -3,8 +3,8 @@ package app.logdate.ui.timeline
 import app.logdate.ui.location.PlaceUiState
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.util.now
-import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 data class HomeTimelineUiState(
@@ -33,24 +33,29 @@ data class TimelineDayUiState(
 enum class TimelineLoadingState {
     /** Initial state - show skeleton UI immediately */
     InitialLoading,
+
     /** Loading content - show placeholders with shimmer */
     LoadingContent,
+
     /** Fully loaded */
     Loaded,
+
     /** Error state */
-    Error
+    Error,
 }
 
-val DEMO_PLACES_VISITED = listOf(
-    PlaceUiState(Uuid.random(), "Home"),
-    PlaceUiState(Uuid.random(), "Work"),
-    PlaceUiState(Uuid.random(), "Jamie's House"),
-)
+val DEMO_PLACES_VISITED =
+    listOf(
+        PlaceUiState(Uuid.random(), "Home"),
+        PlaceUiState(Uuid.random(), "Work"),
+        PlaceUiState(Uuid.random(), "Jamie's House"),
+    )
 
-val DEMO_PEOPLE = listOf(
-    PersonUiState(Uuid.random(), "Jamie"),
-    PersonUiState(Uuid.random(), "Alice"),
-)
+val DEMO_PEOPLE =
+    listOf(
+        PersonUiState(Uuid.random(), "Jamie"),
+        PersonUiState(Uuid.random(), "Alice"),
+    )
 
 sealed interface NoteUiState
 
@@ -70,7 +75,7 @@ data class AudioNoteUiState(
     val noteId: Uuid,
     val uri: String,
     val timestamp: Instant,
-    val duration: Long = 0 // Duration in milliseconds
+    val duration: Long = 0, // Duration in milliseconds
 ) : NoteUiState
 
 data class VideoNoteUiState(
@@ -78,5 +83,5 @@ data class VideoNoteUiState(
     val uri: String,
     val timestamp: Instant,
     val thumbnailUri: String? = null,
-    val duration: Long = 0 // Duration in milliseconds
+    val duration: Long = 0, // Duration in milliseconds
 ) : NoteUiState

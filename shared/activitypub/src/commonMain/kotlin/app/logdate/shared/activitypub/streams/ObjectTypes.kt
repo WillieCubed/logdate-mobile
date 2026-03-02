@@ -113,7 +113,6 @@ interface Image : Document
  */
 interface Video : Document
 
-
 /**
  * Represents a short written work typically less than a single paragraph in length.
  *
@@ -315,8 +314,15 @@ typealias Radius = Float
  * ```
  */
 @Suppress("EnumEntryName")
-enum class Units(val value: String) {
-    cm("cm"), feet("feet"), inches("inches"), km("km"), m("m"), miles("miles"),
+enum class Units(
+    val value: String,
+) {
+    cm("cm"),
+    feet("feet"),
+    inches("inches"),
+    km("km"),
+    m("m"),
+    miles("miles"),
 }
 
 /**

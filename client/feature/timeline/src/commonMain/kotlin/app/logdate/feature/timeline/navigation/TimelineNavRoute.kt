@@ -7,9 +7,9 @@ import kotlin.uuid.Uuid
 
 const val TIMELINE_ROUTE = "timeline"
 
-//fun NavController.navigateToTimeline(navOptions: NavOptions) = navigate(TIMELINE_ROUTE, navOptions)
+// fun NavController.navigateToTimeline(navOptions: NavOptions) = navigate(TIMELINE_ROUTE, navOptions)
 //
-//fun NavController.navigateToTimelineItem(itemId: String) = navigate(TIMELINE_ROUTE)
+// fun NavController.navigateToTimelineItem(itemId: String) = navigate(TIMELINE_ROUTE)
 
 // TODO: Remove this once we have a proper navigation system
 fun NavGraphBuilder.timelineRoute(onOpenTimelineItem: (id: Uuid) -> Unit) {

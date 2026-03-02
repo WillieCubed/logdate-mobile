@@ -16,8 +16,14 @@ plugins {
 kotlin {
     android {
         namespace = "app.logdate.client.sharing"
-        compileSdk = libs.versions.android.compileSdk.get().toInt()
-        minSdk = libs.versions.android.minSdk.get().toInt()
+        compileSdk =
+            libs.versions.android.compileSdk
+                .get()
+                .toInt()
+        minSdk =
+            libs.versions.android.minSdk
+                .get()
+                .toInt()
         androidResources {
             enable = true
         }
@@ -72,6 +78,4 @@ object PropertiesLoader {
     }
 }
 
-fun getConfigValue(key: String): String {
-    return "\"${configProperties.getProperty(key)}\""
-}
+fun getConfigValue(key: String): String = "\"${configProperties.getProperty(key)}\""

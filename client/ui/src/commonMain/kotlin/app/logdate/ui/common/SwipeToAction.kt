@@ -1,14 +1,13 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.ui.common
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -76,51 +75,52 @@ fun SwipeToAction(
     swipeThreshold: Dp = 80.dp,
     maxSwipe: Dp = 120.dp,
     spacing: Dp = 8.dp,
-    animationSpec: androidx.compose.animation.core.AnimationSpec<Float> = tween(300)
+    animationSpec: androidx.compose.animation.core.AnimationSpec<Float> = tween(300),
 ) {
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
-    
+
     // Convert dp values to pixels
     val thresholdPx = with(density) { swipeThreshold.toPx() }
     val maxSwipePx = with(density) { maxSwipe.toPx() }
-    
+
     // Keep track of container height for equal sizing
     var containerHeightPx by remember { mutableStateOf(0) }
     val containerHeight = with(density) { containerHeightPx.toDp() }
-    
+
     // Swipe state
     var offsetX by remember { mutableFloatStateOf(0f) }
     val animatedOffsetX = remember { Animatable(0f) }
-    
+
     // Animation state
     var isBeingRemoved by remember { mutableStateOf(false) }
     val removeAnimation = remember { Animatable(1f) }
-    
+
     // Calculate action button width based on swipe progress
     val actionButtonWidth by remember {
         derivedStateOf {
             val minWidth = 64.dp
             val maxWidth = 100.dp
-            
+
             // Calculate progress for action button width
-            val progress = if (abs(offsetX) > thresholdPx) {
-                1f // Full width once threshold is passed
-            } else {
-                (abs(offsetX) / thresholdPx).coerceIn(0f, 1f) // Proportional to swipe
-            }
-            
+            val progress =
+                if (abs(offsetX) > thresholdPx) {
+                    1f // Full width once threshold is passed
+                } else {
+                    (abs(offsetX) / thresholdPx).coerceIn(0f, 1f) // Proportional to swipe
+                }
+
             minWidth + (maxWidth - minWidth) * progress
         }
     }
-    
+
     // Sync animated offset with current offset
     LaunchedEffect(offsetX) {
         if (!isBeingRemoved) {
             animatedOffsetX.animateTo(offsetX)
         }
     }
-    
+
     // Handle item removal animation
     LaunchedEffect(isBeingRemoved) {
         if (isBeingRemoved) {
@@ -132,13 +132,14 @@ fun SwipeToAction(
             onAction()
         }
     }
-    
+
     // Use a Box with clipToBounds to contain all elements and prevent them from being visible outside container
     Box(
-        modifier = modifier
-            .onSizeChanged { containerHeightPx = it.height }
-            // Apply height animation when removing
-            .height(containerHeight * removeAnimation.value)
+        modifier =
+            modifier
+                .onSizeChanged { containerHeightPx = it.height }
+                // Apply height animation when removing
+                .height(containerHeight * removeAnimation.value),
     ) {
         // Action button positioned absolutely in the box, becomes visible as content slides away
         if (offsetX < 0) {
@@ -151,53 +152,56 @@ fun SwipeToAction(
                         }
                     }
                 },
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .width(actionButtonWidth)
-                    .fillMaxHeight()
-                    .padding(end = spacing),
+                modifier =
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .width(actionButtonWidth)
+                        .fillMaxHeight()
+                        .padding(end = spacing),
                 shape = actionShape,
-                color = actionBackgroundColor
+                color = actionBackgroundColor,
             ) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     actionLabel()
                 }
             }
         }
-        
+
         // Main content surface - positioned absolutely and slides over
         Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .offset { IntOffset(animatedOffsetX.value.roundToInt(), 0) }
-                .pointerInput(enabled) {
-                    if (enabled) {
-                        detectHorizontalDragGestures(
-                            onDragEnd = {
-                                scope.launch {
-                                    // Snap behavior
-                                    offsetX = if (abs(offsetX) < thresholdPx) {
-                                        // Snap back to original position
-                                        0f
-                                    } else {
-                                        // Stay at threshold position to show delete button
-                                        -thresholdPx
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .offset { IntOffset(animatedOffsetX.value.roundToInt(), 0) }
+                    .pointerInput(enabled) {
+                        if (enabled) {
+                            detectHorizontalDragGestures(
+                                onDragEnd = {
+                                    scope.launch {
+                                        // Snap behavior
+                                        offsetX =
+                                            if (abs(offsetX) < thresholdPx) {
+                                                // Snap back to original position
+                                                0f
+                                            } else {
+                                                // Stay at threshold position to show delete button
+                                                -thresholdPx
+                                            }
                                     }
-                                }
+                                },
+                            ) { _, dragAmount ->
+                                // Only allow left swipe and limit the distance
+                                val newOffset = (offsetX + dragAmount).coerceIn(-maxSwipePx, 0f)
+                                offsetX = newOffset
                             }
-                        ) { _, dragAmount ->
-                            // Only allow left swipe and limit the distance
-                            val newOffset = (offsetX + dragAmount).coerceIn(-maxSwipePx, 0f)
-                            offsetX = newOffset
                         }
-                    }
-                },
+                    },
             shape = contentShape,
             color = MaterialTheme.colorScheme.surface,
-            shadowElevation = if (offsetX < 0) 4.dp else 0.dp
+            shadowElevation = if (offsetX < 0) 4.dp else 0.dp,
         ) {
             // Content
             content()

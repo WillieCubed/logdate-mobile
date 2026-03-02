@@ -1,13 +1,13 @@
 package app.logdate.client.networking
 
-import kotlin.time.Clock
-import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 /**
  * Comprehensive test suite for NetworkState sealed interface and implementations.
@@ -36,7 +36,6 @@ import kotlin.time.Duration.Companion.seconds
  * @see app.logdate.client.networking.NetworkState.NotConnected
  */
 class NetworkStateTest {
-
     /**
      * Tests creation of Connected network state with timestamp preservation.
      *
@@ -52,7 +51,7 @@ class NetworkStateTest {
     fun networkStateConnected_createsWithTimestamp() {
         val timestamp = Clock.System.now()
         val state = NetworkState.Connected(timestamp)
-        
+
         assertEquals(timestamp, state.lastConnected)
     }
 
@@ -71,7 +70,7 @@ class NetworkStateTest {
     fun networkStateNotConnected_createsWithTimestamp() {
         val timestamp = Clock.System.now()
         val state = NetworkState.NotConnected(timestamp)
-        
+
         assertEquals(timestamp, state.lastConnected)
     }
 
@@ -80,7 +79,7 @@ class NetworkStateTest {
         val timestamp = Clock.System.now()
         val state1 = NetworkState.Connected(timestamp)
         val state2 = NetworkState.Connected(timestamp)
-        
+
         assertEquals(state1, state2)
         assertEquals(state1.hashCode(), state2.hashCode())
     }
@@ -90,7 +89,7 @@ class NetworkStateTest {
         val timestamp = Clock.System.now()
         val state1 = NetworkState.NotConnected(timestamp)
         val state2 = NetworkState.NotConnected(timestamp)
-        
+
         assertEquals(state1, state2)
         assertEquals(state1.hashCode(), state2.hashCode())
     }
@@ -99,15 +98,15 @@ class NetworkStateTest {
     fun networkStates_withDifferentTimestamps_areNotEqual() {
         val timestamp1 = Clock.System.now()
         val timestamp2 = timestamp1 + 1.seconds
-        
+
         val connected1 = NetworkState.Connected(timestamp1)
         val connected2 = NetworkState.Connected(timestamp2)
-        
+
         assertNotEquals(connected1, connected2)
-        
+
         val notConnected1 = NetworkState.NotConnected(timestamp1)
         val notConnected2 = NetworkState.NotConnected(timestamp2)
-        
+
         assertNotEquals(notConnected1, notConnected2)
     }
 
@@ -116,7 +115,7 @@ class NetworkStateTest {
         val timestamp = Clock.System.now()
         val connected = NetworkState.Connected(timestamp)
         val notConnected = NetworkState.NotConnected(timestamp)
-        
+
         assertNotEquals<NetworkState>(connected, notConnected)
     }
 
@@ -124,9 +123,9 @@ class NetworkStateTest {
     fun networkStateConnected_toStringContainsUsefulInfo() {
         val timestamp = Clock.System.now()
         val state = NetworkState.Connected(timestamp)
-        
+
         val stringRepresentation = state.toString()
-        
+
         assertTrue(stringRepresentation.contains("Connected"))
         assertTrue(stringRepresentation.contains(timestamp.toString()))
     }
@@ -135,9 +134,9 @@ class NetworkStateTest {
     fun networkStateNotConnected_toStringContainsUsefulInfo() {
         val timestamp = Clock.System.now()
         val state = NetworkState.NotConnected(timestamp)
-        
+
         val stringRepresentation = state.toString()
-        
+
         assertTrue(stringRepresentation.contains("NotConnected"))
         assertTrue(stringRepresentation.contains(timestamp.toString()))
     }
@@ -147,7 +146,7 @@ class NetworkStateTest {
         val beforeCreation = Clock.System.now()
         val state = NetworkState.Connected(Clock.System.now())
         val afterCreation = Clock.System.now()
-        
+
         assertTrue(state.lastConnected >= beforeCreation)
         assertTrue(state.lastConnected <= afterCreation)
     }
@@ -155,21 +154,23 @@ class NetworkStateTest {
     @Test
     fun networkState_sealedInterfacePolymorphism() {
         val timestamp = Clock.System.now()
-        val states: List<NetworkState> = listOf(
-            NetworkState.Connected(timestamp),
-            NetworkState.NotConnected(timestamp + 1.minutes)
-        )
-        
+        val states: List<NetworkState> =
+            listOf(
+                NetworkState.Connected(timestamp),
+                NetworkState.NotConnected(timestamp + 1.minutes),
+            )
+
         assertEquals(2, states.size)
         assertTrue(states[0] is NetworkState.Connected)
         assertTrue(states[1] is NetworkState.NotConnected)
-        
+
         // Test when expression coverage
         states.forEach { state ->
-            val description = when (state) {
-                is NetworkState.Connected -> "Device is connected at ${state.lastConnected}"
-                is NetworkState.NotConnected -> "Device is not connected, last seen at ${state.lastConnected}"
-            }
+            val description =
+                when (state) {
+                    is NetworkState.Connected -> "Device is connected at ${state.lastConnected}"
+                    is NetworkState.NotConnected -> "Device is not connected, last seen at ${state.lastConnected}"
+                }
             assertTrue(description.isNotEmpty())
         }
     }
@@ -178,10 +179,10 @@ class NetworkStateTest {
     fun networkState_copyFunctionality() {
         val originalTimestamp = Clock.System.now()
         val newTimestamp = originalTimestamp + 5.minutes
-        
+
         val originalState = NetworkState.Connected(originalTimestamp)
         val copiedState = originalState.copy(lastConnected = newTimestamp)
-        
+
         assertEquals(newTimestamp, copiedState.lastConnected)
         assertNotEquals(originalState, copiedState)
     }
@@ -191,12 +192,12 @@ class NetworkStateTest {
         val timestamp = Clock.System.now()
         val connected = NetworkState.Connected(timestamp)
         val (lastConnected) = connected
-        
+
         assertEquals(timestamp, lastConnected)
-        
+
         val notConnected = NetworkState.NotConnected(timestamp)
         val (lastConnectedFromNotConnected) = notConnected
-        
+
         assertEquals(timestamp, lastConnectedFromNotConnected)
     }
 
@@ -204,11 +205,11 @@ class NetworkStateTest {
     fun networkState_immutability() {
         val timestamp = Clock.System.now()
         val state = NetworkState.Connected(timestamp)
-        
+
         // Verify that lastConnected is a val (immutable)
         val extractedTimestamp = state.lastConnected
         assertEquals(timestamp, extractedTimestamp)
-        
+
         // Since it's a data class, the timestamp should be immutable
         // We can't modify it directly, which is the expected behavior
         assertTrue(state.lastConnected == timestamp)
@@ -220,7 +221,7 @@ class NetworkStateTest {
         val veryOldTimestamp = Instant.fromEpochMilliseconds(0)
         val oldState = NetworkState.Connected(veryOldTimestamp)
         assertEquals(veryOldTimestamp, oldState.lastConnected)
-        
+
         // Test with future timestamp (theoretical)
         val futureTimestamp = Clock.System.now() + 365.minutes * 24 * 365 // 1 year from now
         val futureState = NetworkState.NotConnected(futureTimestamp)
@@ -230,16 +231,20 @@ class NetworkStateTest {
     @Test
     fun networkState_multipleInstancesWithSameTimestamp() {
         val timestamp = Clock.System.now()
-        
-        val states = (1..100).map { 
-            if (it % 2 == 0) NetworkState.Connected(timestamp) 
-            else NetworkState.NotConnected(timestamp)
-        }
-        
+
+        val states =
+            (1..100).map {
+                if (it % 2 == 0) {
+                    NetworkState.Connected(timestamp)
+                } else {
+                    NetworkState.NotConnected(timestamp)
+                }
+            }
+
         // Verify all connected states are equal
         val connectedStates = states.filterIsInstance<NetworkState.Connected>()
         assertTrue(connectedStates.all { it == connectedStates.first() })
-        
+
         // Verify all not connected states are equal
         val notConnectedStates = states.filterIsInstance<NetworkState.NotConnected>()
         assertTrue(notConnectedStates.all { it == notConnectedStates.first() })

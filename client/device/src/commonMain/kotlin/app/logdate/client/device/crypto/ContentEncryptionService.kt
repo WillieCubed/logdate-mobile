@@ -20,9 +20,8 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 class ContentEncryptionService(
     private val identityKeyManager: IdentityKeyManager,
     private val keyDerivation: KeyDerivation,
-    private val cryptoManager: CryptoManager
+    private val cryptoManager: CryptoManager,
 ) {
-    
     /**
      * Encrypts a string of plaintext content.
      *
@@ -31,27 +30,30 @@ class ContentEncryptionService(
      * @return Encrypted envelope containing ciphertext + metadata
      * @throws IdentityKeyNotFoundException if identity not set up
      */
-    suspend fun encryptContent(contentId: String, plaintext: String): EncryptedEnvelope {
+    suspend fun encryptContent(
+        contentId: String,
+        plaintext: String,
+    ): EncryptedEnvelope {
         val identityKey = identityKeyManager.getIdentityKey()
         val contentKey = keyDerivation.deriveKey(identityKey, CONTEXT_CONTENT, contentId)
-        
+
         val iv = cryptoManager.generateRandomBytes(12)
         val aad = buildAAD(contentId)
         val plaintextBytes = plaintext.encodeToByteArray()
-        
+
         val ciphertext = cryptoManager.aesGcmEncrypt(contentKey, iv, aad, plaintextBytes)
-        
+
         return EncryptedEnvelope(
             version = ENVELOPE_VERSION,
             algorithm = ALGORITHM_AES_GCM,
             iv = iv.encodeBase64(),
             ciphertext = ciphertext.encodeBase64(),
-            aad = aad.encodeBase64()
+            aad = aad.encodeBase64(),
         ).also {
             Napier.d("Content encrypted: $contentId (${plaintext.length} bytes → ${it.ciphertext.length} bytes)")
         }
     }
-    
+
     /**
      * Decrypts an encrypted envelope back to plaintext.
      *
@@ -62,38 +64,39 @@ class ContentEncryptionService(
      * @throws Exception if decryption fails (wrong key, tampered data, etc)
      * @throws IdentityKeyNotFoundException if identity not set up
      */
-    suspend fun decryptContent(contentId: String, envelope: EncryptedEnvelope): String {
-        require(envelope.version == ENVELOPE_VERSION) { 
-            "Unsupported envelope version: ${envelope.version}" 
+    suspend fun decryptContent(
+        contentId: String,
+        envelope: EncryptedEnvelope,
+    ): String {
+        require(envelope.version == ENVELOPE_VERSION) {
+            "Unsupported envelope version: ${envelope.version}"
         }
-        require(envelope.algorithm == ALGORITHM_AES_GCM) { 
-            "Unsupported algorithm: ${envelope.algorithm}" 
+        require(envelope.algorithm == ALGORITHM_AES_GCM) {
+            "Unsupported algorithm: ${envelope.algorithm}"
         }
-        
+
         val identityKey = identityKeyManager.getIdentityKey()
         val contentKey = keyDerivation.deriveKey(identityKey, CONTEXT_CONTENT, contentId)
-        
+
         val iv = envelope.iv.decodeBase64()
         val ciphertext = envelope.ciphertext.decodeBase64()
         val aad = envelope.aad.decodeBase64()
-        
+
         val plaintext = cryptoManager.aesGcmDecrypt(contentKey, iv, aad, ciphertext)
-        
+
         return plaintext.decodeToString().also {
             Napier.d("Content decrypted: $contentId (${envelope.ciphertext.length} bytes → ${it.length} bytes)")
         }
     }
-    
+
     /**
      * Builds the additional authenticated data (AAD) for encryption.
      *
      * AAD is not encrypted but is authenticated, preventing attackers from
      * swapping encrypted values between different content IDs.
      */
-    private fun buildAAD(contentId: String): ByteArray {
-        return "type=CONTENT|v=$ENVELOPE_VERSION|id=$contentId".encodeToByteArray()
-    }
-    
+    private fun buildAAD(contentId: String): ByteArray = "type=CONTENT|v=$ENVELOPE_VERSION|id=$contentId".encodeToByteArray()
+
     companion object {
         private const val ENVELOPE_VERSION = 1
         private const val ALGORITHM_AES_GCM = "AES-GCM"
@@ -111,24 +114,16 @@ class ContentEncryptionService(
 data class EncryptedEnvelope(
     @SerialName("v")
     val version: Int,
-    
     @SerialName("alg")
     val algorithm: String,
-    
     @SerialName("iv")
     val iv: String,
-    
     @SerialName("ct")
     val ciphertext: String,
-    
     @SerialName("aad")
-    val aad: String
+    val aad: String,
 )
 
-private fun String.decodeBase64(): ByteArray {
-    return Base64.decode(this)
-}
+private fun String.decodeBase64(): ByteArray = Base64.decode(this)
 
-private fun ByteArray.encodeBase64(): String {
-    return Base64.encode(this)
-}
+private fun ByteArray.encodeBase64(): String = Base64.encode(this)

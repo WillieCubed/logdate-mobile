@@ -9,11 +9,12 @@ import org.koin.dsl.module
 /**
  * Android-specific Koin module for device location tracking.
  */
-actual val locationTrackerModule: Module = module {
-    single<DeviceLocationTracker> {
-        AndroidDeviceLocationTracker(
-            context = androidContext(),
-            locationProvider = get()
-        )
+actual val locationTrackerModule: Module =
+    module {
+        single<DeviceLocationTracker> {
+            AndroidDeviceLocationTracker(
+                context = androidContext(),
+                locationProvider = get(),
+            )
+        }
     }
-}

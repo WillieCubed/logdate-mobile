@@ -10,14 +10,19 @@ import kotlin.coroutines.CoroutineContext
 /**
  * Android-specific health module that provides platform implementations
  */
-val androidHealthModule = module {
-    // Android-specific remote data source
-    single<RemoteHealthDataSource> {
-        AndroidHealthConnectDataSource(androidContext())
+val androidHealthModule =
+    module {
+        // Android-specific remote data source
+        single<RemoteHealthDataSource> {
+            AndroidHealthConnectDataSource(androidContext())
+        }
+
+        // Android-specific IO dispatcher
+        single<CoroutineContext>(
+            qualifier =
+                org.koin.core.qualifier
+                    .named("io-dispatcher"),
+        ) {
+            Dispatchers.IO
+        }
     }
-    
-    // Android-specific IO dispatcher
-    single<CoroutineContext>(qualifier = org.koin.core.qualifier.named("io-dispatcher")) {
-        Dispatchers.IO
-    }
-}

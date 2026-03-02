@@ -18,43 +18,43 @@ interface SyncManager {
      *                 by some implementations. False by default.
      */
     fun sync(startNow: Boolean = false)
-    
+
     /**
      * Uploads all pending local changes to the cloud.
      * This includes journals, notes, associations, and media.
      */
     suspend fun uploadPendingChanges(): SyncResult
-    
+
     /**
      * Downloads and applies all remote changes since the last sync.
      * This includes journals, notes, associations, and media.
      */
     suspend fun downloadRemoteChanges(): SyncResult
-    
+
     /**
      * Syncs content (notes) specifically.
      * Uploads local changes and downloads remote changes.
      */
     suspend fun syncContent(): SyncResult
-    
+
     /**
      * Syncs journal metadata specifically.
      * Uploads local changes and downloads remote changes.
      */
     suspend fun syncJournals(): SyncResult
-    
+
     /**
      * Syncs journal-content associations specifically.
      * Uploads local changes and downloads remote changes.
      */
     suspend fun syncAssociations(): SyncResult
-    
+
     /**
      * Performs a full bidirectional sync of all data.
      * This is the most comprehensive sync operation.
      */
     suspend fun fullSync(): SyncResult
-    
+
     /**
      * Gets the current sync status including last sync time and pending changes count.
      */
@@ -70,7 +70,7 @@ data class SyncResult(
     val downloadedItems: Int = 0,
     val conflictsResolved: Int = 0,
     val errors: List<SyncError> = emptyList(),
-    val lastSyncTime: Instant? = null
+    val lastSyncTime: Instant? = null,
 )
 
 /**
@@ -82,7 +82,7 @@ data class SyncStatus(
     val pendingUploads: Int,
     val isSyncing: Boolean,
     val hasErrors: Boolean,
-    val lastError: SyncError? = null
+    val lastError: SyncError? = null,
 )
 
 /**
@@ -92,7 +92,7 @@ data class SyncError(
     val type: SyncErrorType,
     val message: String,
     val cause: Throwable? = null,
-    val retryable: Boolean = true
+    val retryable: Boolean = true,
 )
 
 /**
@@ -104,5 +104,5 @@ enum class SyncErrorType {
     SERVER_ERROR,
     CONFLICT_ERROR,
     STORAGE_ERROR,
-    UNKNOWN_ERROR
+    UNKNOWN_ERROR,
 }

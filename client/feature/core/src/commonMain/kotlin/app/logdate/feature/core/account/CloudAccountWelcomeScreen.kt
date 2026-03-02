@@ -1,6 +1,7 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.feature.core.account
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -16,24 +17,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
-import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.core.generated.resources.*
 import logdate.client.feature.core.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+
 @Composable
 fun CloudAccountWelcomeScreen(
     onContinue: () -> Unit,
     onSignIn: () -> Unit,
     onSkip: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     CloudAccountWelcomeContent(
         onContinue = onContinue,
         onSignIn = onSignIn,
         onSkip = onSkip,
-        modifier = modifier
+        modifier = modifier,
     )
 }
 
@@ -42,112 +43,119 @@ private fun CloudAccountWelcomeContent(
     onContinue: () -> Unit,
     onSignIn: () -> Unit,
     onSkip: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(Spacing.lg)
-            .verticalScroll(rememberScrollState()),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(Spacing.lg)
+                .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
+        verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(Spacing.xl)
+            verticalArrangement = Arrangement.spacedBy(Spacing.xl),
         ) {
             Spacer(modifier = Modifier.height(Spacing.xxl))
-            
+
             // LogDate Logo/Branding
             Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                    ),
             ) {
                 Box(
                     modifier = Modifier.padding(Spacing.lg),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Default.Cloud,
                         contentDescription = stringResource(Res.string.logdate_cloud),
                         modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.onPrimary
+                        tint = MaterialTheme.colorScheme.onPrimary,
                     )
                 }
             }
-            
+
             // Title and description
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(Spacing.md)
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
                 Text(
                     text = stringResource(Res.string.welcome_to_logdate_cloud),
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
-                
+
+                val connectText =
+                    stringResource(
+                        Res.string
+                            .connect_your_account_to_sync_your_journals_access_them_from_anywhere_and_unlock_powerful_cloud_features,
+                    )
                 Text(
-                    text = stringResource(Res.string.connect_your_account_to_sync_your_journals_access_them_from_anywhere_and_unlock_powerful_cloud_features),
+                    text = connectText,
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            
+
             // Features list
             Column(
-                verticalArrangement = Arrangement.spacedBy(Spacing.md)
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
                 FeatureItem(
                     icon = Icons.Default.Sync,
                     title = "Sync Across Devices",
-                    description = "Access your journals from any device, anywhere"
+                    description = "Access your journals from any device, anywhere",
                 )
-                
+
                 FeatureItem(
                     icon = Icons.Default.Key,
                     title = "Secure with Passkeys",
-                    description = "No passwords needed – use your fingerprint or face"
+                    description = "No passwords needed – use your fingerprint or face",
                 )
-                
+
                 FeatureItem(
                     icon = Icons.Default.Cloud,
                     title = "Cloud Backup",
-                    description = "Never lose your memories with automatic backup"
+                    description = "Never lose your memories with automatic backup",
                 )
-                
+
                 FeatureItem(
                     icon = Icons.Default.Lock,
                     title = "Privacy First",
-                    description = "Your data is encrypted and belongs to you"
+                    description = "Your data is encrypted and belongs to you",
                 )
             }
         }
-        
+
         // Action buttons
         Column(
-            verticalArrangement = Arrangement.spacedBy(Spacing.md)
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             Button(
                 onClick = onContinue,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(Res.string.create_new_account))
             }
-            
+
             OutlinedButton(
                 onClick = onSignIn,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(Res.string.sign_in_to_logdate_cloud))
             }
-            
+
             TextButton(
                 onClick = onSkip,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(Res.string.skip_for_now))
             }
@@ -160,33 +168,33 @@ private fun FeatureItem(
     icon: ImageVector,
     title: String,
     description: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(24.dp),
         )
-        
+
         Column(
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
             )
-            
+
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -200,7 +208,7 @@ private fun CloudAccountWelcomeScreenPreview() {
             CloudAccountWelcomeContent(
                 onContinue = {},
                 onSignIn = {},
-                onSkip = {}
+                onSkip = {},
             )
         }
     }

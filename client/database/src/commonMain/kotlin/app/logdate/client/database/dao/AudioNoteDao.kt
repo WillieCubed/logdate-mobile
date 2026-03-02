@@ -11,7 +11,6 @@ import kotlin.uuid.Uuid
 
 @Dao
 interface AudioNoteDao {
-
     /**
      * Retrieves an observable [AudioNoteEntity] by the given ID.
      */
@@ -36,7 +35,6 @@ interface AudioNoteDao {
     @Query("SELECT * FROM audio_notes")
     suspend fun getAll(): List<AudioNoteEntity>
 
-
     /**
      * Fast query for recent notes to enable immediate timeline display.
      */
@@ -47,7 +45,10 @@ interface AudioNoteDao {
      * Returns notes within a specific date range.
      */
     @Query("SELECT * FROM audio_notes WHERE created BETWEEN :startTimestamp AND :endTimestamp ORDER BY created DESC")
-    fun getNotesInRange(startTimestamp: Long, endTimestamp: Long): Flow<List<AudioNoteEntity>>
+    fun getNotesInRange(
+        startTimestamp: Long,
+        endTimestamp: Long,
+    ): Flow<List<AudioNoteEntity>>
 
     /**
      * Inserts a [note] into the DB if it doesn't exist, and ignores it if it does.
@@ -68,8 +69,15 @@ interface AudioNoteDao {
     suspend fun removeNote(noteIds: List<Uuid>)
 
     @Query("UPDATE audio_notes SET syncVersion = :syncVersion, lastSynced = :lastSynced WHERE uid = :noteId")
-    suspend fun updateSyncMetadata(noteId: Uuid, syncVersion: Long, lastSynced: Instant)
+    suspend fun updateSyncMetadata(
+        noteId: Uuid,
+        syncVersion: Long,
+        lastSynced: Instant,
+    )
 
     @Query("UPDATE audio_notes SET contentUri = :contentUri WHERE uid = :noteId")
-    suspend fun updateContentUri(noteId: Uuid, contentUri: String)
+    suspend fun updateContentUri(
+        noteId: Uuid,
+        contentUri: String,
+    )
 }

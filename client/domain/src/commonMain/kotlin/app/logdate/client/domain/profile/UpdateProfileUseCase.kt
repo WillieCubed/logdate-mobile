@@ -8,24 +8,33 @@ import io.github.aakira.napier.Napier
  * Use case for updating user profile information.
  */
 class UpdateProfileUseCase(
-    private val accountRepository: AccountRepository
+    private val accountRepository: AccountRepository,
 ) {
-    
     sealed class Result {
-        data class Success(val account: LogDateAccount) : Result()
-        data class Error(val error: ProfileUpdateError) : Result()
+        data class Success(
+            val account: LogDateAccount,
+        ) : Result()
+
+        data class Error(
+            val error: ProfileUpdateError,
+        ) : Result()
     }
-    
+
     sealed class ProfileUpdateError {
         data object InvalidDisplayName : ProfileUpdateError()
+
         data object InvalidUsername : ProfileUpdateError()
+
         data object NetworkError : ProfileUpdateError()
-        data class Unknown(val message: String) : ProfileUpdateError()
+
+        data class Unknown(
+            val message: String,
+        ) : ProfileUpdateError()
     }
-    
+
     suspend operator fun invoke(
         displayName: String? = null,
-        username: String? = null
+        username: String? = null,
     ): Result {
         return try {
             // Validate inputs
@@ -35,20 +44,21 @@ class UpdateProfileUseCase(
                     return Result.Error(validationError)
                 }
             }
-            
+
             username?.let { handle ->
                 val validationError = validateUsername(handle)
                 if (validationError != null) {
                     return Result.Error(validationError)
                 }
             }
-            
+
             // Attempt to update the profile
-            val updateResult = accountRepository.updateProfile(
-                displayName = displayName,
-                username = username
-            )
-            
+            val updateResult =
+                accountRepository.updateProfile(
+                    displayName = displayName,
+                    username = username,
+                )
+
             if (updateResult.isSuccess) {
                 val updatedAccount = updateResult.getOrThrow()
                 Napier.d("Profile updated successfully for user: ${updatedAccount.username}")
@@ -58,23 +68,21 @@ class UpdateProfileUseCase(
                 Napier.e("Failed to update profile", exception)
                 Result.Error(ProfileUpdateError.NetworkError)
             }
-            
         } catch (e: Exception) {
             Napier.e("Unexpected error during profile update", e)
             Result.Error(ProfileUpdateError.Unknown(e.message ?: "Unknown error"))
         }
     }
-    
-    private fun validateDisplayName(displayName: String): ProfileUpdateError? {
-        return when {
+
+    private fun validateDisplayName(displayName: String): ProfileUpdateError? =
+        when {
             displayName.isBlank() -> ProfileUpdateError.InvalidDisplayName
             displayName.length > 100 -> ProfileUpdateError.InvalidDisplayName
             else -> null
         }
-    }
-    
-    private fun validateUsername(username: String): ProfileUpdateError? {
-        return when {
+
+    private fun validateUsername(username: String): ProfileUpdateError? =
+        when {
             username.isBlank() -> ProfileUpdateError.InvalidUsername
             username.length < 3 -> ProfileUpdateError.InvalidUsername
             username.length > 30 -> ProfileUpdateError.InvalidUsername
@@ -82,6 +90,4 @@ class UpdateProfileUseCase(
             username.startsWith("_") || username.endsWith("_") -> ProfileUpdateError.InvalidUsername
             else -> null
         }
-    }
-    
 }

@@ -28,23 +28,23 @@ interface ServerHealthChecker {
  */
 data class ServerHealthInfo(
     val status: String,
-    val version: String?
+    val version: String?,
 )
 
 /**
  * Default implementation of [ServerHealthChecker] using Ktor HTTP client.
  */
 class DefaultServerHealthChecker(
-    private val httpClient: HttpClient
+    private val httpClient: HttpClient,
 ) : ServerHealthChecker {
+    private val json =
+        Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+        }
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-    }
-
-    override suspend fun checkServerHealth(baseUrl: String): Result<ServerHealthInfo> {
-        return try {
+    override suspend fun checkServerHealth(baseUrl: String): Result<ServerHealthInfo> =
+        try {
             val cleanUrl = baseUrl.trimEnd('/')
             val healthUrl = "$cleanUrl/health"
 
@@ -61,8 +61,8 @@ class DefaultServerHealthChecker(
                 Result.success(
                     ServerHealthInfo(
                         status = healthResponse.status,
-                        version = healthResponse.version
-                    )
+                        version = healthResponse.version,
+                    ),
                 )
             } else {
                 Result.failure(ServerHealthCheckException("Server reported unhealthy status: ${healthResponse.status}"))
@@ -71,13 +71,12 @@ class DefaultServerHealthChecker(
             Napier.e("Health check failed", e)
             Result.failure(ServerHealthCheckException("Failed to connect to server: ${e.message}", e))
         }
-    }
 }
 
 @Serializable
 private data class HealthCheckResponse(
     val status: String,
-    val version: String? = null
+    val version: String? = null,
 )
 
 /**
@@ -85,5 +84,5 @@ private data class HealthCheckResponse(
  */
 class ServerHealthCheckException(
     message: String,
-    cause: Throwable? = null
+    cause: Throwable? = null,
 ) : Exception(message, cause)

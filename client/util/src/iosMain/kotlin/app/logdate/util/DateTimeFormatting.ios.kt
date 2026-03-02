@@ -1,6 +1,5 @@
 package app.logdate.util
 
-import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.number
@@ -14,6 +13,7 @@ import platform.Foundation.NSTimeZone
 import platform.Foundation.currentLocale
 import platform.Foundation.dateWithTimeIntervalSince1970
 import platform.Foundation.timeZoneWithName
+import kotlin.time.Instant
 
 /**
  * Returns a formatted time string for this [Instant] based on the current system time zone and locale.
@@ -23,13 +23,14 @@ import platform.Foundation.timeZoneWithName
 actual val Instant.asTime: String
     get() {
         val date = NSDate.dateWithTimeIntervalSince1970(epochSeconds.toDouble())
-        val formatter = NSDateFormatter().apply {
-            dateStyle = NSDateFormatterNoStyle
-            timeStyle = NSDateFormatterShortStyle
-            // TODO: Verify this won't actually return a null value
-            this.timeZone = NSTimeZone.timeZoneWithName(timeZone.name)!!
-            locale = NSLocale.currentLocale
-        }
+        val formatter =
+            NSDateFormatter().apply {
+                dateStyle = NSDateFormatterNoStyle
+                timeStyle = NSDateFormatterShortStyle
+                // TODO: Verify this won't actually return a null value
+                this.timeZone = NSTimeZone.timeZoneWithName(timeZone.name)!!
+                locale = NSLocale.currentLocale
+            }
         return formatter.stringFromDate(date)
     }
 
@@ -42,18 +43,23 @@ actual fun formatDateLocalized(date: LocalDate): String {
     // Note: NSDate uses time interval since 1970-01-01 00:00:00 UTC
     // To create a correct NSDate from a LocalDate, we need to account for the date only
     // Create a timestamp for the start of the day (midnight)
-    val startOfDay = kotlinx.datetime.LocalDate(
-        date.year, date.month.number, date.day
-    ).atStartOfDayIn(kotlinx.datetime.TimeZone.currentSystemDefault())
+    val startOfDay =
+        kotlinx.datetime
+            .LocalDate(
+                date.year,
+                date.month.number,
+                date.day,
+            ).atStartOfDayIn(kotlinx.datetime.TimeZone.currentSystemDefault())
     val timestamp = startOfDay.epochSeconds
-    
+
     val nsDate = NSDate.dateWithTimeIntervalSince1970(timestamp.toDouble())
-    
-    val formatter = NSDateFormatter().apply {
-        dateStyle = NSDateFormatterLongStyle
-        timeStyle = NSDateFormatterNoStyle
-        locale = NSLocale.currentLocale
-    }
-    
+
+    val formatter =
+        NSDateFormatter().apply {
+            dateStyle = NSDateFormatterLongStyle
+            timeStyle = NSDateFormatterNoStyle
+            locale = NSLocale.currentLocale
+        }
+
     return formatter.stringFromDate(nsDate)
 }

@@ -19,10 +19,8 @@ import androidx.compose.ui.unit.Dp
  */
 fun Modifier.constrainHeightRatioIn(
     width: Dp,
-    maxRatio: Float
-): Modifier {
-    return this.heightIn(max = width / maxRatio)
-}
+    maxRatio: Float,
+): Modifier = this.heightIn(max = width / maxRatio)
 
 /**
  * Constrains the width of a composable based on its height and a minimum aspect ratio.
@@ -37,10 +35,8 @@ fun Modifier.constrainHeightRatioIn(
  */
 fun Modifier.constrainWidthRatioIn(
     height: Dp,
-    minRatio: Float
-): Modifier {
-    return this.widthIn(min = height * minRatio)
-}
+    minRatio: Float,
+): Modifier = this.widthIn(min = height * minRatio)
 
 /**
  * Applies an aspect ratio constraint with additional max height constraint.
@@ -55,14 +51,13 @@ fun Modifier.constrainWidthRatioIn(
 fun Modifier.aspectRatioIn(
     width: Dp,
     maxRatio: Float,
-    matchHeightConstraintsFirst: Boolean = false
-): Modifier {
-    return this
+    matchHeightConstraintsFirst: Boolean = false,
+): Modifier =
+    this
         // First ensure a max height based on width and aspect ratio
         .heightIn(max = width / maxRatio)
         // Then apply the aspect ratio constraint
         .aspectRatio(
             ratio = 1f / maxRatio,
-            matchHeightConstraintsFirst = matchHeightConstraintsFirst
+            matchHeightConstraintsFirst = matchHeightConstraintsFirst,
         )
-}

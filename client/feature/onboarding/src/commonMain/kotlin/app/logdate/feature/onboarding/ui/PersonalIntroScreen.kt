@@ -1,10 +1,11 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.feature.onboarding.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -30,13 +31,10 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -63,10 +61,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
-import org.koin.compose.viewmodel.koinViewModel
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
+
 /**
  * Personal introduction screen that asks users to share their name and bio
  * in a playful, two-step flow with LLM-powered friendly responses.
@@ -76,11 +75,11 @@ fun PersonalIntroScreen(
     onNext: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: PersonalIntroViewModel = koinViewModel()
+    viewModel: PersonalIntroViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    
+
     // Handle error messages
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { message ->
@@ -88,7 +87,7 @@ fun PersonalIntroScreen(
             viewModel.clearError()
         }
     }
-    
+
     // Auto-advance when LLM processing and saving is complete
     LaunchedEffect(uiState.canFinish) {
         if (uiState.canFinish && !uiState.isLoading) {
@@ -100,9 +99,9 @@ fun PersonalIntroScreen(
             }
         }
     }
-    
+
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { paddingValues ->
         PersonalIntroContent(
             uiState = uiState,
@@ -112,9 +111,10 @@ fun PersonalIntroScreen(
             onGoBackToName = viewModel::goBackToName,
             onProcessWithLlm = viewModel::processWithLlm,
             onBack = onBack,
-            modifier = modifier
-                .fillMaxSize()
-                .padding(paddingValues)
+            modifier =
+                modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
         )
     }
 }
@@ -128,97 +128,105 @@ private fun PersonalIntroContent(
     onGoBackToName: () -> Unit,
     onProcessWithLlm: () -> Unit,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = Spacing.lg)
-            .widthIn(max = 500.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier =
+            modifier
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.lg)
+                .widthIn(max = 500.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(modifier = Modifier.height(Spacing.xl))
-        
+
         // Progress indicator
         AnimatedVisibility(
             visible = uiState.isProcessingLlm || uiState.isLoading,
             enter = fadeIn(),
-            exit = fadeOut()
+            exit = fadeOut(),
         ) {
             LinearProgressIndicator(
                 modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
             )
         }
-        
+
         Spacer(modifier = Modifier.height(Spacing.xl))
-        
+
         // Cookie-shaped profile placeholder
         Box(
-            modifier = Modifier
-                .size(120.dp)
-                .clip(CircleShape)
-                .background(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = CircleShape
-                ),
-            contentAlignment = Alignment.Center
+            modifier =
+                Modifier
+                    .size(120.dp)
+                    .clip(CircleShape)
+                    .background(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = CircleShape,
+                    ),
+            contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Default.AccountCircle,
                 contentDescription = stringResource(Res.string.profile_photo),
                 modifier = Modifier.size(80.dp),
-                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
             )
         }
-        
+
         Spacer(modifier = Modifier.height(Spacing.xl))
-        
+
         // Animated step content
         AnimatedContent(
             targetState = uiState.currentStep,
             transitionSpec = {
                 slideInHorizontally(
                     initialOffsetX = { it },
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow
+                    animationSpec =
+                        spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessLow,
+                        ),
+                ) togetherWith
+                    slideOutHorizontally(
+                        targetOffsetX = { -it },
+                        animationSpec =
+                            spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessLow,
+                            ),
                     )
-                ) togetherWith slideOutHorizontally(
-                    targetOffsetX = { -it },
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow
-                    )
-                )
             },
-            label = "Step Content"
+            label = "Step Content",
         ) { step ->
             when (step) {
-                PersonalIntroStep.Name -> NameStep(
-                    name = uiState.name,
-                    nameError = uiState.nameError,
-                    canContinue = uiState.canContinueFromName,
-                    onNameChanged = onNameChanged,
-                    onContinue = onProceedToBio,
-                    onBack = onBack
-                )
-                
-                PersonalIntroStep.Bio -> BioStep(
-                    bio = uiState.bio,
-                    bioError = uiState.bioError,
-                    canContinue = uiState.canContinueFromBio,
-                    onBioChanged = onBioChanged,
-                    onContinue = onProcessWithLlm,
-                    onBack = onGoBackToName
-                )
-                
-                PersonalIntroStep.LlmResponse -> LlmResponseStep(
-                    userName = uiState.name,
-                    llmResponse = uiState.llmResponse,
-                    llmError = uiState.llmError,
-                    isLoading = uiState.isLoading
-                )
+                PersonalIntroStep.Name ->
+                    NameStep(
+                        name = uiState.name,
+                        nameError = uiState.nameError,
+                        canContinue = uiState.canContinueFromName,
+                        onNameChanged = onNameChanged,
+                        onContinue = onProceedToBio,
+                        onBack = onBack,
+                    )
+
+                PersonalIntroStep.Bio ->
+                    BioStep(
+                        bio = uiState.bio,
+                        bioError = uiState.bioError,
+                        canContinue = uiState.canContinueFromBio,
+                        onBioChanged = onBioChanged,
+                        onContinue = onProcessWithLlm,
+                        onBack = onGoBackToName,
+                    )
+
+                PersonalIntroStep.LlmResponse ->
+                    LlmResponseStep(
+                        userName = uiState.name,
+                        llmResponse = uiState.llmResponse,
+                        llmError = uiState.llmError,
+                        isLoading = uiState.isLoading,
+                    )
             }
         }
     }
@@ -231,63 +239,66 @@ private fun NameStep(
     canContinue: Boolean,
     onNameChanged: (String) -> Unit,
     onContinue: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
-    
+
     LaunchedEffect(Unit) {
         delay(300) // Small delay for smooth animation
         focusRequester.requestFocus()
     }
-    
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg)
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         // Step indicator
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(
-                        MaterialTheme.colorScheme.primary,
-                        CircleShape
-                    )
+                modifier =
+                    Modifier
+                        .size(8.dp)
+                        .background(
+                            MaterialTheme.colorScheme.primary,
+                            CircleShape,
+                        ),
             )
             Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(
-                        MaterialTheme.colorScheme.outlineVariant,
-                        CircleShape
-                    )
+                modifier =
+                    Modifier
+                        .size(8.dp)
+                        .background(
+                            MaterialTheme.colorScheme.outlineVariant,
+                            CircleShape,
+                        ),
             )
         }
-        
+
         Spacer(modifier = Modifier.height(Spacing.md))
-        
+
         Text(
             text = stringResource(Res.string.who_are_you),
-            style = MaterialTheme.typography.headlineLarge.copy(
-                fontWeight = FontWeight.Bold
-            ),
+            style =
+                MaterialTheme.typography.headlineLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                ),
             color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
         )
-        
+
         Text(
             text = stringResource(Res.string.lets_start_with_what_we_should_call_you),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
         )
-        
+
         Spacer(modifier = Modifier.height(Spacing.lg))
-        
+
         OutlinedTextField(
             value = name,
             onValueChange = onNameChanged,
@@ -295,35 +306,38 @@ private fun NameStep(
             placeholder = { Text(stringResource(Res.string.what_should_we_call_you)) },
             isError = nameError != null,
             supportingText = nameError?.let { { Text(it) } },
-            modifier = Modifier
-                .fillMaxWidth()
-                .focusRequester(focusRequester),
-            keyboardOptions = KeyboardOptions(
-                imeAction = ImeAction.Next,
-                capitalization = KeyboardCapitalization.Words
-            ),
-            keyboardActions = KeyboardActions(
-                onNext = {
-                    focusManager.clearFocus()
-                    if (canContinue) onContinue()
-                }
-            ),
-            singleLine = true
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester),
+            keyboardOptions =
+                KeyboardOptions(
+                    imeAction = ImeAction.Next,
+                    capitalization = KeyboardCapitalization.Words,
+                ),
+            keyboardActions =
+                KeyboardActions(
+                    onNext = {
+                        focusManager.clearFocus()
+                        if (canContinue) onContinue()
+                    },
+                ),
+            singleLine = true,
         )
-        
+
         Spacer(modifier = Modifier.height(Spacing.xl))
-        
+
         Button(
             onClick = onContinue,
             enabled = canContinue,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(Res.string.`continue`))
         }
-        
+
         TextButton(
             onClick = onBack,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(Res.string.back))
         }
@@ -337,62 +351,65 @@ private fun BioStep(
     canContinue: Boolean,
     onBioChanged: (String) -> Unit,
     onContinue: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
     val focusRequester = remember { FocusRequester() }
-    
+
     LaunchedEffect(Unit) {
         delay(300) // Small delay for smooth animation
         focusRequester.requestFocus()
     }
-    
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg)
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         // Step indicator
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(
-                        MaterialTheme.colorScheme.primary,
-                        CircleShape
-                    )
+                modifier =
+                    Modifier
+                        .size(8.dp)
+                        .background(
+                            MaterialTheme.colorScheme.primary,
+                            CircleShape,
+                        ),
             )
             Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(
-                        MaterialTheme.colorScheme.primary,
-                        CircleShape
-                    )
+                modifier =
+                    Modifier
+                        .size(8.dp)
+                        .background(
+                            MaterialTheme.colorScheme.primary,
+                            CircleShape,
+                        ),
             )
         }
-        
+
         Spacer(modifier = Modifier.height(Spacing.md))
-        
+
         Text(
             text = stringResource(Res.string.tell_us_a_bit_about_yourself),
-            style = MaterialTheme.typography.headlineLarge.copy(
-                fontWeight = FontWeight.Bold
-            ),
+            style =
+                MaterialTheme.typography.headlineLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                ),
             color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
         )
-        
+
         Text(
             text = stringResource(Res.string.what_makes_you_you_share_whatever_feels_right),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
         )
-        
+
         Spacer(modifier = Modifier.height(Spacing.lg))
-        
+
         OutlinedTextField(
             value = bio,
             onValueChange = onBioChanged,
@@ -400,35 +417,38 @@ private fun BioStep(
             placeholder = { Text(stringResource(Res.string.i_love_coffee_hiking_and_terrible_movies)) },
             isError = bioError != null,
             supportingText = bioError?.let { { Text(it) } },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(120.dp)
-                .focusRequester(focusRequester),
-            keyboardOptions = KeyboardOptions(
-                imeAction = ImeAction.Done,
-                capitalization = KeyboardCapitalization.Sentences
-            ),
-            keyboardActions = KeyboardActions(
-                onDone = {
-                    if (canContinue) onContinue()
-                }
-            ),
-            maxLines = 4
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+                    .focusRequester(focusRequester),
+            keyboardOptions =
+                KeyboardOptions(
+                    imeAction = ImeAction.Done,
+                    capitalization = KeyboardCapitalization.Sentences,
+                ),
+            keyboardActions =
+                KeyboardActions(
+                    onDone = {
+                        if (canContinue) onContinue()
+                    },
+                ),
+            maxLines = 4,
         )
-        
+
         Spacer(modifier = Modifier.height(Spacing.xl))
-        
+
         Button(
             onClick = onContinue,
             enabled = canContinue,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(Res.string.lets_see_what_i_think))
         }
-        
+
         TextButton(
             onClick = onBack,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(Res.string.back))
         }
@@ -440,89 +460,94 @@ private fun LlmResponseStep(
     userName: String,
     llmResponse: String?,
     llmError: String?,
-    isLoading: Boolean
+    isLoading: Boolean,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg)
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         // Step indicator (complete)
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(
-                        MaterialTheme.colorScheme.primary,
-                        CircleShape
-                    )
+                modifier =
+                    Modifier
+                        .size(8.dp)
+                        .background(
+                            MaterialTheme.colorScheme.primary,
+                            CircleShape,
+                        ),
             )
             Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(
-                        MaterialTheme.colorScheme.primary,
-                        CircleShape
-                    )
+                modifier =
+                    Modifier
+                        .size(8.dp)
+                        .background(
+                            MaterialTheme.colorScheme.primary,
+                            CircleShape,
+                        ),
             )
         }
-        
+
         Spacer(modifier = Modifier.height(Spacing.md))
-        
+
         AnimatedContent(
             targetState = llmResponse != null || llmError != null,
             transitionSpec = {
-                (fadeIn() + scaleIn(initialScale = 0.8f)) togetherWith 
-                (fadeOut() + scaleOut(targetScale = 0.8f))
+                (fadeIn() + scaleIn(initialScale = 0.8f)) togetherWith
+                    (fadeOut() + scaleOut(targetScale = 0.8f))
             },
-            label = "Response Content"
+            label = "Response Content",
         ) { hasResponse ->
             if (hasResponse) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(Spacing.lg)
+                    verticalArrangement = Arrangement.spacedBy(Spacing.lg),
                 ) {
                     Text(
-                        text = stringResource(
-                            Res.string.nice_to_meet_you_name,
-                            userName
-                        ),
-                        style = MaterialTheme.typography.headlineLarge.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
+                        text =
+                            stringResource(
+                                Res.string.nice_to_meet_you_name,
+                                userName,
+                            ),
+                        style =
+                            MaterialTheme.typography.headlineLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                            ),
                         color = MaterialTheme.colorScheme.onSurface,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
-                    
+
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                MaterialTheme.colorScheme.surfaceContainerLow,
-                                MaterialTheme.shapes.large
-                            )
-                            .padding(Spacing.lg)
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceContainerLow,
+                                    MaterialTheme.shapes.large,
+                                ).padding(Spacing.lg),
                     ) {
                         Text(
                             text = llmResponse ?: llmError ?: "",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = if (llmError != null) {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                            textAlign = TextAlign.Center
+                            color =
+                                if (llmError != null) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                            textAlign = TextAlign.Center,
                         )
                     }
-                    
+
                     if (isLoading) {
                         Text(
                             text = stringResource(Res.string.setting_up_your_profile),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
                         )
                     } else {
                         Text(
@@ -530,22 +555,22 @@ private fun LlmResponseStep(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.primary,
                             textAlign = TextAlign.Center,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
                         )
                     }
                 }
             } else {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(Spacing.lg)
+                    verticalArrangement = Arrangement.spacedBy(Spacing.lg),
                 ) {
                     CircularProgressIndicator()
-                    
+
                     Text(
                         text = stringResource(Res.string.let_me_think_about_that),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
                 }
             }

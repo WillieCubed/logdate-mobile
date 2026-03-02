@@ -16,8 +16,8 @@ import kotlin.uuid.Uuid
 @Entity(
     tableName = "indexed_media_images",
     indices = [
-        Index(value = ["uri"], unique = true)
-    ]
+        Index(value = ["uri"], unique = true),
+    ],
 )
 data class IndexedImageEntity(
     @PrimaryKey
@@ -30,7 +30,7 @@ data class IndexedImageEntity(
     @Embedded(prefix = "dimensions_")
     override val dimensions: MediaDimensions,
     @Embedded(prefix = "location_")
-    override val location: LocationData?
+    override val location: LocationData?,
 ) : BaseIndexedMediaEntity()
 
 /**

@@ -5,13 +5,14 @@ import androidx.compose.runtime.staticCompositionLocalOf
 data class SettingsLayoutInfo(
     val isInTwoPaneMode: Boolean,
     val selectedDetail: String?,
-    val isDetailPane: Boolean
+    val isDetailPane: Boolean,
 )
 
-val LocalSettingsLayoutInfo = staticCompositionLocalOf {
-    SettingsLayoutInfo(
-        isInTwoPaneMode = false,
-        selectedDetail = null,
-        isDetailPane = false
-    )
-}
+val LocalSettingsLayoutInfo =
+    staticCompositionLocalOf {
+        SettingsLayoutInfo(
+            isInTwoPaneMode = false,
+            selectedDetail = null,
+            isDetailPane = false,
+        )
+    }

@@ -18,7 +18,7 @@ internal inline fun <reified T : NavKey> EntryProviderScope<NavKey>.routeEntry(
     noinline content: @Composable (T) -> Unit,
 ) {
     entry<T>(
-        metadata = metadata + mapOf(ROUTE_CLASS_METADATA_KEY to T::class)
+        metadata = metadata + mapOf(ROUTE_CLASS_METADATA_KEY to T::class),
     ) { route ->
         content(route)
     }

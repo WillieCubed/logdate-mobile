@@ -34,7 +34,7 @@ object ContentSyncTable : Table("sync_content") {
 object JournalSyncTable : Table("sync_journals") {
     val id = varchar("id", 128)
     val userId = uuid("user_id")
-    val title = text("title") 
+    val title = text("title")
     val description = text("description")
     val createdAt = long("created_at")
     val lastUpdated = long("last_updated")

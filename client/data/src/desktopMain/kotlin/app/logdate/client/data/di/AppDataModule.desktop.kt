@@ -8,7 +8,8 @@ import org.koin.dsl.module
  * Aggregates data-related modules including sync.
  * This separate module breaks the circular dependency between dataModule and syncModule.
  */
-val appDataModule: Module = module {
-    includes(dataModule)
-    includes(syncModule)
-}
+val appDataModule: Module =
+    module {
+        includes(dataModule)
+        includes(syncModule)
+    }

@@ -7,7 +7,10 @@ interface JournalUserDataRepository {
      * @param journalId The ID of the journal to change the favorited status of.
      * @param isFavorite Whether the journal should be favorited or not.
      */
-    suspend fun changeFavoritedStatus(journalId: String, isFavorite: Boolean = true)
+    suspend fun changeFavoritedStatus(
+        journalId: String,
+        isFavorite: Boolean = true,
+    )
 
     /**
      * Marks a journal as archived.
@@ -15,5 +18,8 @@ interface JournalUserDataRepository {
      * @param journalId The ID of the journal to archive.
      * @param isArchived Whether the journal should be archived or not, defaults to true.
      */
-    suspend fun changeArchiveStatus(journalId: String, isArchived: Boolean = true)
+    suspend fun changeArchiveStatus(
+        journalId: String,
+        isArchived: Boolean = true,
+    )
 }

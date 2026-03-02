@@ -1,10 +1,8 @@
 package app.logdate.server.util
 
-import kotlinx.datetime.Instant as KxInstant
 import kotlin.time.Instant as KtInstant
+import kotlinx.datetime.Instant as KxInstant
 
-internal fun KtInstant.toKotlinxInstant(): KxInstant =
-    KxInstant.fromEpochMilliseconds(toEpochMilliseconds())
+internal fun KtInstant.toKotlinxInstant(): KxInstant = KxInstant.fromEpochMilliseconds(toEpochMilliseconds())
 
-internal fun KxInstant.toKotlinInstant(): KtInstant =
-    KtInstant.fromEpochMilliseconds(toEpochMilliseconds())
+internal fun KxInstant.toKotlinInstant(): KtInstant = KtInstant.fromEpochMilliseconds(toEpochMilliseconds())

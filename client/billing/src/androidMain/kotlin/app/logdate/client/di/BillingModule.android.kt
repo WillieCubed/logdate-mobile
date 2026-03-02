@@ -5,6 +5,7 @@ import app.logdate.client.billing.SubscriptionBiller
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
-actual val billingModule: Module = module {
-    single<SubscriptionBiller> { PlayStoreSubscriptionBiller(get()) }
-}
+actual val billingModule: Module =
+    module {
+        single<SubscriptionBiller> { PlayStoreSubscriptionBiller(get()) }
+    }

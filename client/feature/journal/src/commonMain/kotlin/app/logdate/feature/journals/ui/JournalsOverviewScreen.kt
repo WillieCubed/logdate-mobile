@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.journals.ui
 
 import androidx.compose.animation.AnimatedVisibility
@@ -20,16 +22,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.journal.generated.resources.Res
 import logdate.client.feature.journal.generated.resources.action_browse_journals
 import org.jetbrains.compose.resources.stringResource
-import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
-
 
 @Composable
 fun JournalsOverviewScreen(
@@ -47,9 +48,9 @@ fun JournalsOverviewScreen(
         topBar = {
             JournalSearchToolbar(
                 onNavigationClick = onNavigationClick,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
-        }
+        },
     ) { paddingValues ->
         // Apply the padding from the scaffold to the content
         JournalListPanel(
@@ -58,7 +59,7 @@ fun JournalsOverviewScreen(
             onBrowseJournals = onBrowseJournals,
             onCreateJournal = onCreateJournal,
             showLoading = false,
-            modifier = Modifier.padding(paddingValues)
+            modifier = Modifier.padding(paddingValues),
         )
     }
 }
@@ -116,7 +117,7 @@ private fun JournalsScreenPreview() {
             onBrowseJournals = {},
             onCreateJournal = {},
             onNavigationClick = {},
-            modifier = Modifier
+            modifier = Modifier,
         )
     }
 }
@@ -137,9 +138,10 @@ private fun JournalsScreenPreview_Empty() {
 /**
  * A [CornerBasedShape] that represents the shape of a journal item.
  */
-internal val JournalShape = RoundedCornerShape(
-    topEnd = 16.dp,
-    bottomEnd = 16.dp,
-)
+internal val JournalShape =
+    RoundedCornerShape(
+        topEnd = 16.dp,
+        bottomEnd = 16.dp,
+    )
 
 typealias JournalClickCallback = (journalId: Uuid) -> Unit

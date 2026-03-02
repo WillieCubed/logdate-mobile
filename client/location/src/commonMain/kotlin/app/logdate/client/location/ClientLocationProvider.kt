@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.SharedFlow
  * It is expected that clients regularly update the location of the client whenever it changes.
  */
 interface ClientLocationProvider {
-
     /**
      * The current location of the client.
      */

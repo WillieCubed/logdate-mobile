@@ -8,14 +8,14 @@ import androidx.room.Entity
  */
 @Entity(
     tableName = "pending_uploads",
-    primaryKeys = ["entityType", "entityId"]
+    primaryKeys = ["entityType", "entityId"],
 )
 data class PendingUploadEntity(
     val entityType: String,
     val entityId: String,
     val operation: String,
     val createdAt: Long,
-    val retryCount: Int = 0
+    val retryCount: Int = 0,
 )
 
 /**

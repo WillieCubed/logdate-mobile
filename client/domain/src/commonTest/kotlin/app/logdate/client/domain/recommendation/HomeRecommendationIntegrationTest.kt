@@ -27,78 +27,83 @@ import kotlin.uuid.Uuid
  * underlying data states.
  */
 class HomeRecommendationIntegrationTest {
-
     // Reactive state flows that allow tests to push data changes mid-test
     private val notesFlow = MutableStateFlow(emptyList<JournalNote>())
     private val draftsFlow = MutableStateFlow(emptyList<EntryDraft>())
 
-    private val useCase = GetHomeRecommendationUseCase(
-        hasNotesForToday = HasNotesForTodayUseCase(ReactiveNotesRepository(notesFlow)),
-        fetchMostRecentDraft = FetchMostRecentDraftUseCase(ReactiveDraftRepository(draftsFlow)),
-    )
+    private val useCase =
+        GetHomeRecommendationUseCase(
+            hasNotesForToday = HasNotesForTodayUseCase(ReactiveNotesRepository(notesFlow)),
+            fetchMostRecentDraft = FetchMostRecentDraftUseCase(ReactiveDraftRepository(draftsFlow)),
+        )
 
     @Test
-    fun `fresh user sees CaptureToday recommendation`() = runTest {
-        val result = useCase().first()
-        assertIs<HomeRecommendation.CaptureToday>(result)
-    }
+    fun `fresh user sees CaptureToday recommendation`() =
+        runTest {
+            val result = useCase().first()
+            assertIs<HomeRecommendation.CaptureToday>(result)
+        }
 
     @Test
-    fun `recommendation becomes None after user adds first note`() = runTest {
-        notesFlow.value = listOf(textNote())
+    fun `recommendation becomes None after user adds first note`() =
+        runTest {
+            notesFlow.value = listOf(textNote())
 
-        val result = useCase().first()
-        assertIs<HomeRecommendation.None>(result)
-    }
-
-    @Test
-    fun `recommendation shows CompleteYourDraft when draft exists`() = runTest {
-        draftsFlow.value = listOf(draftWithText("Hello world"))
-
-        val result = useCase().first()
-        assertIs<HomeRecommendation.CompleteYourDraft>(result)
-    }
+            val result = useCase().first()
+            assertIs<HomeRecommendation.None>(result)
+        }
 
     @Test
-    fun `draft recommendation appears even after user has added notes today`() = runTest {
-        notesFlow.value = listOf(textNote())
-        draftsFlow.value = listOf(draftWithText("Unfinished"))
+    fun `recommendation shows CompleteYourDraft when draft exists`() =
+        runTest {
+            draftsFlow.value = listOf(draftWithText("Hello world"))
 
-        val result = useCase().first()
-        assertIs<HomeRecommendation.CompleteYourDraft>(result)
-    }
+            val result = useCase().first()
+            assertIs<HomeRecommendation.CompleteYourDraft>(result)
+        }
 
     @Test
-    fun `recommendation transitions correctly across lifecycle states`() = runTest {
-        val emissions = mutableListOf<HomeRecommendation>()
-        val job = launch { useCase().collect { emissions.add(it) } }
+    fun `draft recommendation appears even after user has added notes today`() =
+        runTest {
+            notesFlow.value = listOf(textNote())
+            draftsFlow.value = listOf(draftWithText("Unfinished"))
 
-        // State 1: no notes, no draft → CaptureToday
-        delay(50)
-        assertIs<HomeRecommendation.CaptureToday>(emissions.last())
+            val result = useCase().first()
+            assertIs<HomeRecommendation.CompleteYourDraft>(result)
+        }
 
-        // State 2: draft created → CompleteYourDraft
-        draftsFlow.value = listOf(draftWithText("Started"))
-        delay(50)
-        assertIs<HomeRecommendation.CompleteYourDraft>(emissions.last())
+    @Test
+    fun `recommendation transitions correctly across lifecycle states`() =
+        runTest {
+            val emissions = mutableListOf<HomeRecommendation>()
+            val job = launch { useCase().collect { emissions.add(it) } }
 
-        // State 3: draft removed, still no notes → CaptureToday
-        draftsFlow.value = emptyList()
-        delay(50)
-        assertIs<HomeRecommendation.CaptureToday>(emissions.last())
+            // State 1: no notes, no draft → CaptureToday
+            delay(50)
+            assertIs<HomeRecommendation.CaptureToday>(emissions.last())
 
-        // State 4: note added → None
-        notesFlow.value = listOf(textNote())
-        delay(50)
-        assertIs<HomeRecommendation.None>(emissions.last())
+            // State 2: draft created → CompleteYourDraft
+            draftsFlow.value = listOf(draftWithText("Started"))
+            delay(50)
+            assertIs<HomeRecommendation.CompleteYourDraft>(emissions.last())
 
-        // State 5: new draft created on same day → CompleteYourDraft again
-        draftsFlow.value = listOf(draftWithText("New draft"))
-        delay(50)
-        assertIs<HomeRecommendation.CompleteYourDraft>(emissions.last())
+            // State 3: draft removed, still no notes → CaptureToday
+            draftsFlow.value = emptyList()
+            delay(50)
+            assertIs<HomeRecommendation.CaptureToday>(emissions.last())
 
-        job.cancel()
-    }
+            // State 4: note added → None
+            notesFlow.value = listOf(textNote())
+            delay(50)
+            assertIs<HomeRecommendation.None>(emissions.last())
+
+            // State 5: new draft created on same day → CompleteYourDraft again
+            draftsFlow.value = listOf(draftWithText("New draft"))
+            delay(50)
+            assertIs<HomeRecommendation.CompleteYourDraft>(emissions.last())
+
+            job.cancel()
+        }
 
     // --- Helpers ---
 
@@ -116,14 +121,15 @@ class HomeRecommendationIntegrationTest {
         val now = Clock.System.now()
         return EntryDraft(
             id = Uuid.random(),
-            notes = listOf(
-                JournalNote.Text(
-                    uid = Uuid.random(),
-                    content = content,
-                    creationTimestamp = now,
-                    lastUpdated = now,
-                )
-            ),
+            notes =
+                listOf(
+                    JournalNote.Text(
+                        uid = Uuid.random(),
+                        content = content,
+                        creationTimestamp = now,
+                        lastUpdated = now,
+                    ),
+                ),
             createdAt = now,
             updatedAt = now,
         )
@@ -134,29 +140,57 @@ class HomeRecommendationIntegrationTest {
     private class ReactiveNotesRepository(
         private val notesFlow: MutableStateFlow<List<JournalNote>>,
     ) : JournalNotesRepository {
-        override fun observeNotesInRange(start: Instant, end: Instant): Flow<List<JournalNote>> =
-            notesFlow
+        override fun observeNotesInRange(
+            start: Instant,
+            end: Instant,
+        ): Flow<List<JournalNote>> = notesFlow
 
         override val allNotesObserved: Flow<List<JournalNote>> = notesFlow
+
         override fun observeNotesInJournal(journalId: Uuid) = notesFlow
-        override fun observeNotesPage(pageSize: Int, offset: Int) = notesFlow
+
+        override fun observeNotesPage(
+            pageSize: Int,
+            offset: Int,
+        ) = notesFlow
+
         override fun observeNotesStream(pageSize: Int) = notesFlow
+
         override fun observeRecentNotes(limit: Int) = notesFlow
+
         override suspend fun getNoteById(noteId: Uuid): JournalNote? = null
+
         override suspend fun create(note: JournalNote): Uuid = note.uid
-        override suspend fun create(note: JournalNote, journalId: Uuid) = Unit
+
+        override suspend fun create(
+            note: JournalNote,
+            journalId: Uuid,
+        ) = Unit
+
         override suspend fun remove(note: JournalNote) = Unit
+
         override suspend fun removeById(noteId: Uuid) = Unit
-        override suspend fun removeFromJournal(noteId: Uuid, journalId: Uuid) = Unit
+
+        override suspend fun removeFromJournal(
+            noteId: Uuid,
+            journalId: Uuid,
+        ) = Unit
     }
 
     private class ReactiveDraftRepository(
         private val draftsFlow: MutableStateFlow<List<EntryDraft>>,
     ) : EntryDraftRepository {
         override fun getDrafts(): Flow<List<EntryDraft>> = draftsFlow
+
         override fun getDraft(uid: Uuid): Flow<Result<EntryDraft>> = throw UnsupportedOperationException()
+
         override suspend fun createDraft(notes: List<JournalNote>): Uuid = Uuid.random()
-        override suspend fun updateDraft(uid: Uuid, notes: List<JournalNote>): Uuid = uid
+
+        override suspend fun updateDraft(
+            uid: Uuid,
+            notes: List<JournalNote>,
+        ): Uuid = uid
+
         override suspend fun deleteDraft(uid: Uuid) = Unit
     }
 }

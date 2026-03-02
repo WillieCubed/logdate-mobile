@@ -17,8 +17,9 @@ class BackgroundSyncRunner : KoinComponent {
 
     fun run(completion: (Boolean) -> Unit) {
         scope.launch {
-            val success = runCatching { syncManager.fullSync().success }
-                .getOrElse { false }
+            val success =
+                runCatching { syncManager.fullSync().success }
+                    .getOrElse { false }
             completion(success)
         }
     }

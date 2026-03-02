@@ -37,13 +37,13 @@ data class JournalWithNotes(
     @Relation(
         parentColumn = "id",
         entityColumn = "uid",
-        associateBy = Junction(JournalNoteCrossRef::class)
+        associateBy = Junction(JournalNoteCrossRef::class),
     )
     val textNotes: List<TextNoteEntity>,
     @Relation(
         parentColumn = "id",
         entityColumn = "uid",
-        associateBy = Junction(JournalNoteCrossRef::class)
+        associateBy = Junction(JournalNoteCrossRef::class),
     )
     val imageNotes: List<ImageNoteEntity>,
 //    val audioNotes: List<AudioNoteEntity>,

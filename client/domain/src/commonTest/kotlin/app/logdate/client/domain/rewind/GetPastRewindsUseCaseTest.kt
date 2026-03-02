@@ -6,17 +6,16 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
-import kotlin.time.Clock
-import kotlin.time.Instant
-import kotlin.time.Duration.Companion.seconds
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class GetPastRewindsUseCaseTest {
-
     private lateinit var mockRepository: MockRewindRepository
     private lateinit var useCase: GetPastRewindsUseCase
 
@@ -27,151 +26,164 @@ class GetPastRewindsUseCaseTest {
     }
 
     @Test
-    fun `invoke should return all rewinds from repository`() = runTest {
-        // Given
-        val rewind1 = createTestRewind("First rewind")
-        val rewind2 = createTestRewind("Second rewind")
-        val rewind3 = createTestRewind("Third rewind")
-        val allRewinds = listOf(rewind1, rewind2, rewind3)
-        
-        mockRepository.allRewinds = allRewinds
-        
-        // When
-        val result = useCase().first()
-        
-        // Then
-        assertEquals(allRewinds, result)
-        assertEquals(3, result.size)
-        assertEquals(1, mockRepository.getAllRewindsCalls)
-    }
+    fun `invoke should return all rewinds from repository`() =
+        runTest {
+            // Given
+            val rewind1 = createTestRewind("First rewind")
+            val rewind2 = createTestRewind("Second rewind")
+            val rewind3 = createTestRewind("Third rewind")
+            val allRewinds = listOf(rewind1, rewind2, rewind3)
 
-    @Test
-    fun `invoke should return empty list when no rewinds exist`() = runTest {
-        // Given
-        mockRepository.allRewinds = emptyList()
-        
-        // When
-        val result = useCase().first()
-        
-        // Then
-        assertTrue(result.isEmpty())
-        assertEquals(1, mockRepository.getAllRewindsCalls)
-    }
+            mockRepository.allRewinds = allRewinds
 
-    @Test
-    fun `invoke should return single rewind when only one exists`() = runTest {
-        // Given
-        val singleRewind = createTestRewind("Single rewind")
-        mockRepository.allRewinds = listOf(singleRewind)
-        
-        // When
-        val result = useCase().first()
-        
-        // Then
-        assertEquals(1, result.size)
-        assertEquals(singleRewind, result.first())
-        assertEquals(1, mockRepository.getAllRewindsCalls)
-    }
+            // When
+            val result = useCase().first()
 
-    @Test
-    fun `invoke should handle multiple calls correctly`() = runTest {
-        // Given
-        val testRewinds = listOf(
-            createTestRewind("Rewind A"),
-            createTestRewind("Rewind B")
-        )
-        mockRepository.allRewinds = testRewinds
-        
-        // When
-        val result1 = useCase().first()
-        val result2 = useCase().first()
-        
-        // Then
-        assertEquals(testRewinds, result1)
-        assertEquals(testRewinds, result2)
-        assertEquals(2, mockRepository.getAllRewindsCalls)
-    }
-
-    @Test
-    fun `invoke should handle large number of rewinds`() = runTest {
-        // Given
-        val manyRewinds = (1..100).map { i ->
-            createTestRewind("Rewind $i")
+            // Then
+            assertEquals(allRewinds, result)
+            assertEquals(3, result.size)
+            assertEquals(1, mockRepository.getAllRewindsCalls)
         }
-        mockRepository.allRewinds = manyRewinds
-        
-        // When
-        val result = useCase().first()
-        
-        // Then
-        assertEquals(100, result.size)
-        assertEquals(manyRewinds, result)
-        assertEquals(1, mockRepository.getAllRewindsCalls)
-    }
 
     @Test
-    fun `invoke should preserve rewind order from repository`() = runTest {
-        // Given
-        val orderedRewinds = listOf(
-            createTestRewind("First chronologically"),
-            createTestRewind("Second chronologically"),
-            createTestRewind("Third chronologically")
-        )
-        mockRepository.allRewinds = orderedRewinds
-        
-        // When
-        val result = useCase().first()
-        
-        // Then
-        assertEquals(orderedRewinds.size, result.size)
-        orderedRewinds.forEachIndexed { index, expectedRewind ->
-            assertEquals(expectedRewind, result[index])
+    fun `invoke should return empty list when no rewinds exist`() =
+        runTest {
+            // Given
+            mockRepository.allRewinds = emptyList()
+
+            // When
+            val result = useCase().first()
+
+            // Then
+            assertTrue(result.isEmpty())
+            assertEquals(1, mockRepository.getAllRewindsCalls)
         }
-    }
 
     @Test
-    fun `invoke should handle rewinds with different time periods`() = runTest {
-        // Given
-        val now = Clock.System.now()
-        val rewind1 = Rewind(
+    fun `invoke should return single rewind when only one exists`() =
+        runTest {
+            // Given
+            val singleRewind = createTestRewind("Single rewind")
+            mockRepository.allRewinds = listOf(singleRewind)
+
+            // When
+            val result = useCase().first()
+
+            // Then
+            assertEquals(1, result.size)
+            assertEquals(singleRewind, result.first())
+            assertEquals(1, mockRepository.getAllRewindsCalls)
+        }
+
+    @Test
+    fun `invoke should handle multiple calls correctly`() =
+        runTest {
+            // Given
+            val testRewinds =
+                listOf(
+                    createTestRewind("Rewind A"),
+                    createTestRewind("Rewind B"),
+                )
+            mockRepository.allRewinds = testRewinds
+
+            // When
+            val result1 = useCase().first()
+            val result2 = useCase().first()
+
+            // Then
+            assertEquals(testRewinds, result1)
+            assertEquals(testRewinds, result2)
+            assertEquals(2, mockRepository.getAllRewindsCalls)
+        }
+
+    @Test
+    fun `invoke should handle large number of rewinds`() =
+        runTest {
+            // Given
+            val manyRewinds =
+                (1..100).map { i ->
+                    createTestRewind("Rewind $i")
+                }
+            mockRepository.allRewinds = manyRewinds
+
+            // When
+            val result = useCase().first()
+
+            // Then
+            assertEquals(100, result.size)
+            assertEquals(manyRewinds, result)
+            assertEquals(1, mockRepository.getAllRewindsCalls)
+        }
+
+    @Test
+    fun `invoke should preserve rewind order from repository`() =
+        runTest {
+            // Given
+            val orderedRewinds =
+                listOf(
+                    createTestRewind("First chronologically"),
+                    createTestRewind("Second chronologically"),
+                    createTestRewind("Third chronologically"),
+                )
+            mockRepository.allRewinds = orderedRewinds
+
+            // When
+            val result = useCase().first()
+
+            // Then
+            assertEquals(orderedRewinds.size, result.size)
+            orderedRewinds.forEachIndexed { index, expectedRewind ->
+                assertEquals(expectedRewind, result[index])
+            }
+        }
+
+    @Test
+    fun `invoke should handle rewinds with different time periods`() =
+        runTest {
+            // Given
+            val now = Clock.System.now()
+            val rewind1 =
+                Rewind(
+                    uid = Uuid.random(),
+                    startDate = now - 7.seconds,
+                    endDate = now - 6.seconds,
+                    generationDate = now,
+                    label = "2024#01",
+                    title = "Short rewind",
+                    content = emptyList(),
+                )
+            val rewind2 =
+                Rewind(
+                    uid = Uuid.random(),
+                    startDate = now - 10.seconds,
+                    endDate = now - 1.seconds,
+                    generationDate = now,
+                    label = "2024#02",
+                    title = "Long rewind",
+                    content = emptyList(),
+                )
+
+            mockRepository.allRewinds = listOf(rewind1, rewind2)
+
+            // When
+            val result = useCase().first()
+
+            // Then
+            assertEquals(2, result.size)
+            assertEquals(rewind1, result[0])
+            assertEquals(rewind2, result[1])
+        }
+
+    private fun createTestRewind(title: String) =
+        Rewind(
             uid = Uuid.random(),
-            startDate = now - 7.seconds,
-            endDate = now - 6.seconds,
-            generationDate = now,
+            startDate = Clock.System.now(),
+            endDate = Clock.System.now(),
+            generationDate = Clock.System.now(),
             label = "2024#01",
-            title = "Short rewind",
-            content = emptyList()
+            title = title,
+            content = emptyList(),
         )
-        val rewind2 = Rewind(
-            uid = Uuid.random(),
-            startDate = now - 10.seconds,
-            endDate = now - 1.seconds,
-            generationDate = now,
-            label = "2024#02",
-            title = "Long rewind",
-            content = emptyList()
-        )
-        
-        mockRepository.allRewinds = listOf(rewind1, rewind2)
-        
-        // When
-        val result = useCase().first()
-        
-        // Then
-        assertEquals(2, result.size)
-        assertEquals(rewind1, result[0])
-        assertEquals(rewind2, result[1])
-    }
-
-    private fun createTestRewind(title: String) = Rewind(
-        uid = Uuid.random(),
-        startDate = Clock.System.now(),
-        endDate = Clock.System.now(),
-        generationDate = Clock.System.now(),
-        label = "2024#01",
-        title = title,
-        content = emptyList()
-    )
 
     private class MockRewindRepository : RewindRepository {
         var allRewinds = emptyList<Rewind>()
@@ -183,20 +195,34 @@ class GetPastRewindsUseCaseTest {
         }
 
         override fun getRewind(uid: Uuid): Flow<Rewind> = flowOf(createTestRewind("Single rewind"))
-        override fun getRewindBetween(start: Instant, end: Instant): Flow<Rewind?> = flowOf(null)
-        override suspend fun isRewindAvailable(start: Instant, end: Instant): Boolean = false
+
+        override fun getRewindBetween(
+            start: Instant,
+            end: Instant,
+        ): Flow<Rewind?> = flowOf(null)
+
+        override suspend fun isRewindAvailable(
+            start: Instant,
+            end: Instant,
+        ): Boolean = false
+
         @Deprecated("Use GenerateBasicRewindUseCase instead")
-        override suspend fun createRewind(start: Instant, end: Instant): Rewind = createTestRewind("Created rewind")
+        override suspend fun createRewind(
+            start: Instant,
+            end: Instant,
+        ): Rewind = createTestRewind("Created rewind")
+
         override suspend fun saveRewind(rewind: Rewind) {}
 
-        private fun createTestRewind(title: String) = Rewind(
-            uid = Uuid.random(),
-            startDate = Clock.System.now(),
-            endDate = Clock.System.now(),
-            generationDate = Clock.System.now(),
-            label = "2024#01",
-            title = title,
-            content = emptyList()
-        )
+        private fun createTestRewind(title: String) =
+            Rewind(
+                uid = Uuid.random(),
+                startDate = Clock.System.now(),
+                endDate = Clock.System.now(),
+                generationDate = Clock.System.now(),
+                label = "2024#01",
+                title = title,
+                content = emptyList(),
+            )
     }
 }

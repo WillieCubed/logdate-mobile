@@ -47,7 +47,7 @@ data class Rewind(
      * Contains contextual information like detected activities, location insights,
      * milestones, and highlighted people from the time period.
      */
-    val metadata: RewindMetadata? = null
+    val metadata: RewindMetadata? = null,
 )
 
 /**
@@ -72,7 +72,7 @@ data class RewindMetadata(
     /**
      * Names of people highlighted in this rewind.
      */
-    val peopleHighlighted: List<String>
+    val peopleHighlighted: List<String>,
 )
 
 /**
@@ -83,26 +83,31 @@ enum class ActivityType {
      * Significant travel or movement to new locations.
      */
     TRAVEL,
+
     /**
      * Social week with many people interactions.
      */
     SOCIAL,
+
     /**
      * Focused work period with consistent location and project keywords.
      */
     FOCUSED_WORK,
+
     /**
      * Quiet week with minimal entries or activity.
      */
     QUIET,
+
     /**
      * Week with significant milestones or achievements.
      */
     MILESTONE,
+
     /**
      * Mixed activities without clear dominant pattern.
      */
-    MIXED
+    MIXED,
 }
 
 /**
@@ -120,5 +125,5 @@ data class LocationSummary(
     /**
      * Name or description of the primary/most-visited location.
      */
-    val primaryLocation: String?
+    val primaryLocation: String?,
 )

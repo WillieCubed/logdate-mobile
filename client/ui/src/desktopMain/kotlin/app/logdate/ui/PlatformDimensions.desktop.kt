@@ -13,7 +13,7 @@ actual object PlatformDimensions {
         val density = LocalDensity.current.density
         return (screenSize.width / density).dp
     }
-    
+
     @Composable
     actual fun getScreenHeight(): Dp {
         val screenSize = Toolkit.getDefaultToolkit().screenSize

@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:filename")
+
 package app.logdate.server.types
 
 import kotlinx.serialization.Serializable
@@ -5,5 +7,5 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class DateRange(
     val start: String,
-    val end: String
+    val end: String,
 )

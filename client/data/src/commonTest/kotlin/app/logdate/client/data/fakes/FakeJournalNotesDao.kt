@@ -15,61 +15,67 @@ import kotlin.uuid.Uuid
 class FakeJournalNotesDao : JournalNotesDao {
     private val journalNotes = mutableListOf<JournalNoteCrossRef>()
     private val journals = mutableMapOf<Uuid, JournalEntity>()
-    
+
     private val journalsFlow = MutableStateFlow<List<JournalEntity>>(emptyList())
     private val journalNotesFlow = MutableStateFlow<List<JournalNoteCrossRef>>(emptyList())
-    
+
     override suspend fun getAll(): List<JournalWithNotes> {
         // Since this is just a fake for testing, we'll return an empty list
         // Implementing a proper JournalWithNotes with text and image notes would be complex
         return emptyList()
     }
-    
+
     override fun observeAll(): Flow<List<JournalWithNotes>> {
         // Since this is just a fake for testing, we'll return an empty flow
         return journalsFlow.map { emptyList() }
     }
-    
-    override fun getNotesForJournal(journalId: Uuid): Flow<List<JournalNoteCrossRef>> {
-        return journalNotesFlow.map { refs ->
+
+    override fun getNotesForJournal(journalId: Uuid): Flow<List<JournalNoteCrossRef>> =
+        journalNotesFlow.map { refs ->
             refs.filter { it.journalId == journalId }
         }
-    }
-    
+
     override suspend fun journalsForNoteSync(noteId: Uuid): List<JournalEntity> {
-        val journalIds = journalNotes
-            .filter { it.noteId == noteId }
-            .map { it.journalId }
-        
-        return journals.values.filter { it.id in journalIds }
-    }
-    
-    override fun observeJournalsForNote(noteId: Uuid): Flow<List<JournalEntity>> {
-        return journalNotesFlow.map { refs ->
-            val journalIds = refs
+        val journalIds =
+            journalNotes
                 .filter { it.noteId == noteId }
                 .map { it.journalId }
-            
+
+        return journals.values.filter { it.id in journalIds }
+    }
+
+    override fun observeJournalsForNote(noteId: Uuid): Flow<List<JournalEntity>> =
+        journalNotesFlow.map { refs ->
+            val journalIds =
+                refs
+                    .filter { it.noteId == noteId }
+                    .map { it.journalId }
+
             journals.values.filter { it.id in journalIds }
         }
-    }
-    
-    override suspend fun addNoteToJournal(journalId: Uuid, noteId: Uuid) {
+
+    override suspend fun addNoteToJournal(
+        journalId: Uuid,
+        noteId: Uuid,
+    ) {
         val crossRef = JournalNoteCrossRef(journalId, noteId)
         journalNotes.add(crossRef)
         updateJournalNotesFlow()
     }
-    
-    override suspend fun removeNoteFromJournal(journalId: Uuid, noteId: Uuid) {
+
+    override suspend fun removeNoteFromJournal(
+        journalId: Uuid,
+        noteId: Uuid,
+    ) {
         journalNotes.removeIf { it.journalId == journalId && it.noteId == noteId }
         updateJournalNotesFlow()
     }
-    
+
     override suspend fun deleteNoteFromAllJournals(noteId: Uuid) {
         journalNotes.removeIf { it.noteId == noteId }
         updateJournalNotesFlow()
     }
-    
+
     /**
      * Adds a journal to the fake database for testing purposes.
      */
@@ -77,7 +83,7 @@ class FakeJournalNotesDao : JournalNotesDao {
         journals[journal.id] = journal
         updateJournalsFlow()
     }
-    
+
     /**
      * Clears all journal-note relationships and journals from the fake database.
      */
@@ -87,11 +93,11 @@ class FakeJournalNotesDao : JournalNotesDao {
         updateJournalNotesFlow()
         updateJournalsFlow()
     }
-    
+
     private fun updateJournalNotesFlow() {
         journalNotesFlow.value = journalNotes.toList()
     }
-    
+
     private fun updateJournalsFlow() {
         journalsFlow.value = journals.values.toList()
     }

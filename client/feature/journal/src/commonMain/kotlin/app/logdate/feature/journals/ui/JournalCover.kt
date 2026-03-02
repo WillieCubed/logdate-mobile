@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 @file:OptIn(ExperimentalSharedTransitionApi::class)
 
 package app.logdate.feature.journals.ui
@@ -21,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.shared.model.Journal
@@ -31,7 +34,6 @@ import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateShort
 import kotlin.time.Clock
-import androidx.compose.ui.tooling.preview.Preview
 import kotlin.uuid.Uuid
 
 /**
@@ -56,36 +58,35 @@ fun JournalCover(
     // Get scopes for shared transitions, gracefully handling when they're not available
     val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
     val sharedTransitionScope = LocalSharedTransitionScope.current
-    
+
     // Use a standard Box without shared transitions when scopes aren't available
-    val baseModifier = modifier
-        .aspectRatio(AspectRatios.JOURNAL_COVER)
-        .shadow(
-            elevation = elevation,
-            shape = JournalShape
-        )
-        .background(
-            color = backgroundColor,
-            shape = JournalShape,
-        )
-        .let { mod ->
-            if (onClick != null) {
-                mod.clickable(enabled) { onClick(journal.id) }
-            } else {
-                mod
-            }
-        }
-        .widthIn(max = 256.dp)
-    
+    val baseModifier =
+        modifier
+            .aspectRatio(AspectRatios.JOURNAL_COVER)
+            .shadow(
+                elevation = elevation,
+                shape = JournalShape,
+            ).background(
+                color = backgroundColor,
+                shape = JournalShape,
+            ).let { mod ->
+                if (onClick != null) {
+                    mod.clickable(enabled) { onClick(journal.id) }
+                } else {
+                    mod
+                }
+            }.widthIn(max = 256.dp)
+
     // Apply shared element transition only when both scopes are available
     if (animatedVisibilityScope != null && sharedTransitionScope != null) {
         with(sharedTransitionScope) {
             Box(
-                modifier = baseModifier
-                    .sharedElement(
-                        sharedTransitionScope.rememberSharedContentState("journal-container-${journal.id}"),
-                        animatedVisibilityScope,
-                    )
+                modifier =
+                    baseModifier
+                        .sharedElement(
+                            sharedTransitionScope.rememberSharedContentState("journal-container-${journal.id}"),
+                            animatedVisibilityScope,
+                        ),
             ) {
                 JournalCoverContent(journal)
             }
@@ -101,13 +102,15 @@ fun JournalCover(
 @Composable
 private fun BoxScope.JournalCoverContent(journal: Journal) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .align(Alignment.BottomStart)
-            .padding(Spacing.lg),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomStart)
+                .padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.Bottom),
         horizontalAlignment = Alignment.Start,
-    ) { // Actual content
+    ) {
+        // Actual content
         Text(
             text = journal.title,
             modifier = Modifier.fillMaxWidth(),
@@ -127,14 +130,15 @@ private fun BoxScope.JournalCoverContent(journal: Journal) {
 fun JournalCoverPreview() {
     LogDateTheme {
         JournalCover(
-            journal = Journal(
-                id = Uuid.random(),
-                title = "Diary",
-                description = "Description",
-                created = Clock.System.now(),
-                isFavorited = false,
-                lastUpdated = Clock.System.now(),
-            ),
+            journal =
+                Journal(
+                    id = Uuid.random(),
+                    title = "Diary",
+                    description = "Description",
+                    created = Clock.System.now(),
+                    isFavorited = false,
+                    lastUpdated = Clock.System.now(),
+                ),
             modifier = Modifier.width(180.dp),
             elevation = 2.dp,
             onClick = {},

@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.feature.onboarding.ui
 
 import androidx.compose.animation.AnimatedContent
@@ -22,15 +24,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
+import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import logdate.client.feature.onboarding.generated.resources.onboarding_action_sign_in
 import org.jetbrains.compose.resources.stringResource
-import androidx.compose.ui.tooling.preview.Preview
-import logdate.client.feature.onboarding.generated.resources.*
+
 private const val DELAY_TIME = 1_000L
 
 /**
@@ -51,10 +54,11 @@ fun OnboardingStartScreen(
     }
 
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.primary)
-            .padding(Spacing.lg)
+        modifier =
+            modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.primary)
+                .padding(Spacing.lg),
     ) {
         AnimatedContent(
             shouldShowMain,
@@ -70,7 +74,6 @@ fun OnboardingStartScreen(
             } else {
                 OnboardingSplashContent()
             }
-
         }
     }
 }
@@ -118,9 +121,10 @@ private fun OnboardingLandingContent(
     useLargerTextSizes: Boolean = false,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.primary),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.primary),
         verticalArrangement = Arrangement.Center,
     ) {
         Column(
@@ -136,21 +140,23 @@ private fun OnboardingLandingContent(
             ) {
                 Text(
                     "Welcome to LogDate.",
-                    style = if (useLargerTextSizes) {
-                        MaterialTheme.typography.displaySmall
-                    } else {
-                        MaterialTheme.typography.headlineLarge
-                    },
+                    style =
+                        if (useLargerTextSizes) {
+                            MaterialTheme.typography.displaySmall
+                        } else {
+                            MaterialTheme.typography.headlineLarge
+                        },
                     color = MaterialTheme.colorScheme.onPrimary,
                     textAlign = TextAlign.Center,
                 )
                 Text(
                     "A new home for your memories.",
-                    style = if (useLargerTextSizes) {
-                        MaterialTheme.typography.headlineSmall
-                    } else {
-                        MaterialTheme.typography.headlineMedium
-                    },
+                    style =
+                        if (useLargerTextSizes) {
+                            MaterialTheme.typography.headlineSmall
+                        } else {
+                            MaterialTheme.typography.headlineMedium
+                        },
                     color = MaterialTheme.colorScheme.onPrimary,
                     textAlign = TextAlign.Center,
                 )
@@ -171,13 +177,12 @@ private fun OnboardingLandingContent(
                 ) {
                     Text(
                         stringResource(Res.string.onboarding_action_sign_in),
-                        color = MaterialTheme.colorScheme.onPrimary
+                        color = MaterialTheme.colorScheme.onPrimary,
                     )
                 }
             }
         }
     }
-
 }
 
 @Preview(

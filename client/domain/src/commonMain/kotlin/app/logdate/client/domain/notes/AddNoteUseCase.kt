@@ -1,11 +1,11 @@
 package app.logdate.client.domain.notes
 
+import app.logdate.client.domain.location.LogCurrentLocationUseCase
+import app.logdate.client.domain.world.LogLocationUseCase
 import app.logdate.client.media.MediaManager
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
-import app.logdate.client.domain.location.LogCurrentLocationUseCase
-import app.logdate.client.domain.world.LogLocationUseCase
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -17,7 +17,7 @@ import kotlin.uuid.Uuid
  *
  * This also adds a location to the repository if the note has a location and
  * begins uploading any media attachments.
- * 
+ *
  * Notes can be associated with multiple journals at creation time.
  */
 class AddNoteUseCase(
@@ -34,8 +34,8 @@ class AddNoteUseCase(
     ) {
         invoke(
             notes = notes.toTypedArray(),
-            journalIds = journalIds.toTypedArray(), 
-            attachments = attachments
+            journalIds = journalIds.toTypedArray(),
+            attachments = attachments,
         )
     }
 
@@ -44,43 +44,45 @@ class AddNoteUseCase(
         journalIds: Array<out Uuid>,
         attachments: List<String> = emptyList(),
     ) = coroutineScope {
-        val noteJobs = notes.map { note ->
-            async {
-                try {
-                    // Create the note
-                    repository.create(note)
-                    
-                    // Associate with journals if any are specified
-                    if (journalIds.isNotEmpty()) {
-                        // Link note to all specified journals
-                        journalIds.forEach { journalId ->
-                            try {
-                                journalContentRepository.addContentToJournal(note.uid, journalId)
-                            } catch (e: Exception) {
-                                // Continue with other journals even if one fails
+        val noteJobs =
+            notes.map { note ->
+                async {
+                    try {
+                        // Create the note
+                        repository.create(note)
+
+                        // Associate with journals if any are specified
+                        if (journalIds.isNotEmpty()) {
+                            // Link note to all specified journals
+                            journalIds.forEach { journalId ->
+                                try {
+                                    journalContentRepository.addContentToJournal(note.uid, journalId)
+                                } catch (e: Exception) {
+                                    // Continue with other journals even if one fails
+                                }
                             }
                         }
-                    }
-                    
-                    // Log current location when note is created
-                    try {
-                        logLocationUseCase() // For activity timeline
-                        logCurrentLocationUseCase(LogCurrentLocationUseCase.LocationLogRequest.LogLocation()) // For location history with automatic retry
+
+                        // Log current location when note is created
+                        try {
+                            logLocationUseCase() // For activity timeline
+                            // For location history with automatic retry
+                            logCurrentLocationUseCase(LogCurrentLocationUseCase.LocationLogRequest.LogLocation())
+                        } catch (e: Exception) {
+                            // Location logging shouldn't fail note creation
+                            // LogCurrentLocationUseCase handles retries automatically
+                            Napier.w("Failed to log location when creating note", e)
+                        }
                     } catch (e: Exception) {
-                        // Location logging shouldn't fail note creation
-                        // LogCurrentLocationUseCase handles retries automatically
-                        Napier.w("Failed to log location when creating note", e)
+                        Napier.e("Failed to create note ${note.uid}", e)
+                        throw e // Rethrow to properly handle failure
                     }
-                } catch (e: Exception) {
-                    Napier.e("Failed to create note ${note.uid}", e)
-                    throw e // Rethrow to properly handle failure
                 }
             }
-        }
-        
+
         try {
             noteJobs.awaitAll()
-            
+
             // Process attachments after notes are created
             attachments.forEach { uri ->
                 try {

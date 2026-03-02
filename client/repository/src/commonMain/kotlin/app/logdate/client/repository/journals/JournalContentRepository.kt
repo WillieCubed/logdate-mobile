@@ -14,27 +14,36 @@ interface JournalContentRepository {
      * Observes all content associated with a journal.
      */
     fun observeContentForJournal(journalId: Uuid): Flow<List<JournalNote>>
-    
+
     /**
      * Observes all journals associated with a piece of content.
      */
     fun observeJournalsForContent(contentId: Uuid): Flow<List<Journal>>
-    
+
     /**
      * Associates content with a journal.
      */
-    suspend fun addContentToJournal(contentId: Uuid, journalId: Uuid)
-    
+    suspend fun addContentToJournal(
+        contentId: Uuid,
+        journalId: Uuid,
+    )
+
     /**
      * Removes content from a journal.
      */
-    suspend fun removeContentFromJournal(contentId: Uuid, journalId: Uuid)
-    
+    suspend fun removeContentFromJournal(
+        contentId: Uuid,
+        journalId: Uuid,
+    )
+
     /**
      * Associates content with multiple journals.
      */
-    suspend fun addContentToJournals(contentId: Uuid, journalIds: List<Uuid>)
-    
+    suspend fun addContentToJournals(
+        contentId: Uuid,
+        journalIds: List<Uuid>,
+    )
+
     /**
      * Removes content from all journals.
      */

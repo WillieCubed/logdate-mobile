@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.feature.timeline.ui.details
 
 import androidx.compose.foundation.layout.Arrangement
@@ -20,20 +22,21 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.ui.common.plus
 import app.logdate.ui.common.scrollToTop
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.util.toReadableDateShort
-import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import androidx.compose.ui.tooling.preview.Preview
-import kotlin.uuid.Uuid
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.timeline.generated.resources.*
 import logdate.client.feature.timeline.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Clock
+import kotlin.uuid.Uuid
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimelineDayDetailPanel(
@@ -47,7 +50,7 @@ fun TimelineDayDetailPanel(
     modifier: Modifier = Modifier,
 ) {
     val (summary, timestamp, people) = uiState
-    
+
     LaunchedEffect(uiState) {
         scrollState.scrollToTop()
     }
@@ -62,9 +65,10 @@ fun TimelineDayDetailPanel(
                         Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(Res.string.close))
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors().copy(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                ),
+                colors =
+                    TopAppBarDefaults.topAppBarColors().copy(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    ),
                 actions = {
                     IconButton(onClick = {
                         onOpenRewind()
@@ -83,22 +87,22 @@ fun TimelineDayDetailPanel(
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
             item(
-                contentType = "tldr"
+                contentType = "tldr",
             ) {
                 TldrSection(summary)
             }
             item(
-                contentType = "people"
+                contentType = "people",
             ) {
                 PeopleEncounteredSection(
                     people = people,
                 )
             }
             item(
-                contentType = "notes"
-            ){
+                contentType = "notes",
+            ) {
                 // We already logged this info earlier, don't need redundant logging
-                
+
                 NotesListSection(
                     notes = uiState.notes,
                 )
@@ -110,40 +114,45 @@ fun TimelineDayDetailPanel(
 //                )
 //            }
             item(
-                contentType = "locations"
-            ){
+                contentType = "locations",
+            ) {
                 LocationsSection(locations = visitedLocations, DayLocation.Origin)
             }
         }
     }
 }
 
-
 @Preview
 @Composable
 private fun TimelineDayDetailPanelPreview() {
-    val uiState = TimelineDayUiState(
-        summary = "I ate some cake downtown, went to a concert, and had a lot of fun with friends.",
-        date = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date,
-        people = listOf(
-            PersonUiState(
-                uid = Uuid.random(),
-                name = "Margaret Belford",
-            ),
-            PersonUiState(
-                uid = Uuid.random(),
-                name = "Charles Averill",
-            ),
-            PersonUiState(
-                uid = Uuid.random(),
-                name = "Lane Hughes",
-            ),
-            PersonUiState(
-                uid = Uuid.random(),
-                name = "Haley Wheatley",
-            ),
-        ),
-    )
+    val uiState =
+        TimelineDayUiState(
+            summary = "I ate some cake downtown, went to a concert, and had a lot of fun with friends.",
+            date =
+                Clock.System
+                    .now()
+                    .toLocalDateTime(TimeZone.currentSystemDefault())
+                    .date,
+            people =
+                listOf(
+                    PersonUiState(
+                        uid = Uuid.random(),
+                        name = "Margaret Belford",
+                    ),
+                    PersonUiState(
+                        uid = Uuid.random(),
+                        name = "Charles Averill",
+                    ),
+                    PersonUiState(
+                        uid = Uuid.random(),
+                        name = "Lane Hughes",
+                    ),
+                    PersonUiState(
+                        uid = Uuid.random(),
+                        name = "Haley Wheatley",
+                    ),
+                ),
+        )
     TimelineDayDetailPanel(
         uiState = uiState,
         onExit = {},
@@ -154,10 +163,15 @@ private fun TimelineDayDetailPanelPreview() {
 @Preview
 @Composable
 private fun TimelineDayDetailPanelPreview_NoPeople() {
-    val uiState = TimelineDayUiState(
-        summary = "I ate some cake downtown, went to a concert, and had a lot of fun with friends.",
-        date = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date,
-    )
+    val uiState =
+        TimelineDayUiState(
+            summary = "I ate some cake downtown, went to a concert, and had a lot of fun with friends.",
+            date =
+                Clock.System
+                    .now()
+                    .toLocalDateTime(TimeZone.currentSystemDefault())
+                    .date,
+        )
     TimelineDayDetailPanel(
         uiState = uiState,
         onExit = {},

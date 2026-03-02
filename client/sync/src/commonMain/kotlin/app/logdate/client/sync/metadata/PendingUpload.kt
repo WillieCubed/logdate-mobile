@@ -6,7 +6,7 @@ package app.logdate.client.sync.metadata
 data class PendingUpload(
     val entityId: String,
     val operation: PendingOperation,
-    val retryCount: Int = 0
+    val retryCount: Int = 0,
 )
 
 /**
@@ -15,11 +15,10 @@ data class PendingUpload(
 enum class PendingOperation {
     CREATE,
     UPDATE,
-    DELETE;
+    DELETE,
+    ;
 
     companion object {
-        fun fromStorage(value: String): PendingOperation {
-            return values().firstOrNull { it.name == value } ?: UPDATE
-        }
+        fun fromStorage(value: String): PendingOperation = values().firstOrNull { it.name == value } ?: UPDATE
     }
 }

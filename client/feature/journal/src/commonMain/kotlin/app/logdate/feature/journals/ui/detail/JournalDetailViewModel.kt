@@ -36,19 +36,18 @@ class JournalDetailViewModel(
     journalContentRepository: JournalContentRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-
     // Simple MutableStateFlow to store the journal ID
-    private val _journalId = MutableStateFlow<Uuid?>(null)
-    
+    private val journalIdState = MutableStateFlow<Uuid?>(null)
+
     // Current sort order preference
-    private val _sortOrder = MutableStateFlow(SortOrder.NEWEST_FIRST)
+    private val sortOrderState = MutableStateFlow(SortOrder.NEWEST_FIRST)
 
     // Try to initialize from route if possible
     init {
         try {
             val routeData = savedStateHandle.toRoute<JournalDetailsRoute>()
             try {
-                _journalId.value = Uuid.parse(routeData.journalId)
+                journalIdState.value = Uuid.parse(routeData.journalId)
             } catch (e: Exception) {
                 // Invalid UUID in route, leave as null
             }
@@ -58,78 +57,80 @@ class JournalDetailViewModel(
     }
 
     // Journal contents based on the current journal ID
-    private val _journalContents = _journalId
-        .filterNotNull()
-        .flatMapLatest { journalId ->
-            journalContentRepository.observeContentForJournal(journalId)
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val journalContentsState =
+        journalIdState
+            .filterNotNull()
+            .flatMapLatest { journalId ->
+                journalContentRepository.observeContentForJournal(journalId)
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // UI state combines journal data with contents and sort order
-    val uiState: StateFlow<JournalDetailUiState> = _journalId
-        .flatMapLatest { journalId ->
-            if (journalId == null) {
-                return@flatMapLatest flowOf(JournalDetailUiState.Loading)
-            }
-            
-            repository.observeJournalById(journalId)
-                .combine(_journalContents) { journal, notes ->
-                    journal to notes
+    val uiState: StateFlow<JournalDetailUiState> =
+        journalIdState
+            .flatMapLatest { journalId ->
+                if (journalId == null) {
+                    return@flatMapLatest flowOf(JournalDetailUiState.Loading)
                 }
-                .combine(_sortOrder) { journalToNotes, sortOrder ->
-                    Triple(journalToNotes.first, journalToNotes.second, sortOrder)
-                }
-                .map { (journal, notes, sortOrder) ->
-                    val displayData = notes.map { it.toDisplayData() }
-                    
-                    // Sort based on the current sort order
-                    val sortedEntries = when (sortOrder) {
-                        SortOrder.NEWEST_FIRST -> displayData.sortedByDescending { it.timestamp }
-                        SortOrder.OLDEST_FIRST -> displayData.sortedBy { it.timestamp }
+
+                repository
+                    .observeJournalById(journalId)
+                    .combine(journalContentsState) { journal, notes ->
+                        journal to notes
+                    }.combine(sortOrderState) { journalToNotes, sortOrder ->
+                        Triple(journalToNotes.first, journalToNotes.second, sortOrder)
+                    }.map { (journal, notes, sortOrder) ->
+                        val displayData = notes.map { it.toDisplayData() }
+
+                        // Sort based on the current sort order
+                        val sortedEntries =
+                            when (sortOrder) {
+                                SortOrder.NEWEST_FIRST -> displayData.sortedByDescending { it.timestamp }
+                                SortOrder.OLDEST_FIRST -> displayData.sortedBy { it.timestamp }
+                            }
+
+                        JournalDetailUiState.Success(
+                            journal.id,
+                            journal.title,
+                            sortedEntries,
+                            sortOrder,
+                        )
                     }
-                    
-                    JournalDetailUiState.Success(
-                        journal.id,
-                        journal.title,
-                        sortedEntries,
-                        sortOrder
-                    )
-                }
-        }
-        .catch { e ->
-            emit(JournalDetailUiState.Error(
-                "error",
-                "Could not load this journal: ${e.message}"
-            ))
-        }
-        .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5000),
-            JournalDetailUiState.Loading
-        )
-        
+            }.catch { e ->
+                emit(
+                    JournalDetailUiState.Error(
+                        "error",
+                        "Could not load this journal: ${e.message}",
+                    ),
+                )
+            }.stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                JournalDetailUiState.Loading,
+            )
+
     /**
      * Toggles the sort order between newest first and oldest first
      */
     fun toggleSortOrder() {
-        _sortOrder.update { currentOrder ->
+        sortOrderState.update { currentOrder ->
             when (currentOrder) {
                 SortOrder.NEWEST_FIRST -> SortOrder.OLDEST_FIRST
                 SortOrder.OLDEST_FIRST -> SortOrder.NEWEST_FIRST
             }
         }
     }
-        
+
     /**
      * Converts a JournalNote to an EntryDisplayData
      */
     private fun JournalNote.toDisplayData(): EntryDisplayData {
-        val content = when (this) {
-            is JournalNote.Text -> content
-            is JournalNote.Image -> "Image"
-            is JournalNote.Video -> "Video"
-            is JournalNote.Audio -> "Audio"
-        }
+        val content =
+            when (this) {
+                is JournalNote.Text -> content
+                is JournalNote.Image -> "Image"
+                is JournalNote.Video -> "Video"
+                is JournalNote.Audio -> "Audio"
+            }
         return EntryDisplayData(uid, content, creationTimestamp)
     }
 
@@ -138,7 +139,7 @@ class JournalDetailViewModel(
      * This is the primary way to set which journal to display.
      */
     fun setSelectedJournalId(id: Uuid) {
-        _journalId.value = id
+        journalIdState.value = id
     }
 
     /**
@@ -146,7 +147,7 @@ class JournalDetailViewModel(
      */
     fun shareCurrentJournal() {
         viewModelScope.launch {
-            _journalId.value?.let { journalId ->
+            journalIdState.value?.let { journalId ->
                 sharingLauncher.shareJournalToInstagram(journalId)
             }
         }
@@ -157,7 +158,7 @@ class JournalDetailViewModel(
      */
     fun deleteJournal(onDelete: () -> Unit) {
         viewModelScope.launch {
-            _journalId.value?.let { journalId ->
+            journalIdState.value?.let { journalId ->
                 repository.delete(journalId)
                 onDelete()
             }

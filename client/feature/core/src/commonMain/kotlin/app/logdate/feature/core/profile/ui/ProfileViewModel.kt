@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 
 /**
  * ViewModel for the profile screen with local-first approach.
- * 
+ *
  * Manages local profile data (always available) with optional cloud account integration
  * for progressive enhancement. Uses Material 3 Expressive patterns.
  */
@@ -29,17 +29,17 @@ class ProfileViewModel(
     private val profileRepository: ProfileRepository,
     private val accountRepository: AccountRepository,
     private val userStateRepository: UserStateRepository,
-    private val updateProfileUseCase: UpdateProfileUseCase
+    private val updateProfileUseCase: UpdateProfileUseCase,
 ) : ViewModel() {
-
-    private val _uiState = MutableStateFlow(
-        ProfileUiState(
-            localProfile = LogDateProfile(),
-            account = null,
-            userData = null,
-            isLoading = true
+    private val _uiState =
+        MutableStateFlow(
+            ProfileUiState(
+                localProfile = LogDateProfile(),
+                account = null,
+                userData = null,
+                isLoading = true,
+            ),
         )
-    )
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
 
     init {
@@ -54,27 +54,29 @@ class ProfileViewModel(
         viewModelScope.launch {
             try {
                 _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
-                
+
                 combine(
                     profileRepository.currentProfile,
                     accountRepository.currentAccount,
-                    userStateRepository.userData
+                    userStateRepository.userData,
                 ) { localProfile, account, userData ->
                     Triple(localProfile, account, userData)
                 }.collect { (localProfile, account, userData) ->
-                    _uiState.value = _uiState.value.copy(
-                        localProfile = localProfile,
-                        account = account,
-                        userData = userData,
-                        isLoading = false
-                    )
+                    _uiState.value =
+                        _uiState.value.copy(
+                            localProfile = localProfile,
+                            account = account,
+                            userData = userData,
+                            isLoading = false,
+                        )
                 }
             } catch (e: Exception) {
                 Napier.e("Failed to load profile data", e)
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    errorMessage = "Failed to load profile: ${e.message}"
-                )
+                _uiState.value =
+                    _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = "Failed to load profile: ${e.message}",
+                    )
             }
         }
     }
@@ -84,21 +86,22 @@ class ProfileViewModel(
      */
     fun startEditingDisplayName() {
         val currentDisplayName = _uiState.value.localProfile.displayName
-        _uiState.value = _uiState.value.copy(
-            editState = ProfileEditState.DisplayName(currentDisplayName),
-            updateState = ProfileUpdateState.Idle
-        )
+        _uiState.value =
+            _uiState.value.copy(
+                editState = ProfileEditState.DisplayName(currentDisplayName),
+                updateState = ProfileUpdateState.Idle,
+            )
     }
-
 
     /**
      * Cancel current editing operation.
      */
     fun cancelEditing() {
-        _uiState.value = _uiState.value.copy(
-            editState = ProfileEditState.None,
-            updateState = ProfileUpdateState.Idle
-        )
+        _uiState.value =
+            _uiState.value.copy(
+                editState = ProfileEditState.None,
+                updateState = ProfileUpdateState.Idle,
+            )
     }
 
     /**
@@ -106,32 +109,34 @@ class ProfileViewModel(
      */
     fun saveDisplayName(newDisplayName: String) {
         if (newDisplayName.isBlank()) {
-            _uiState.value = _uiState.value.copy(
-                updateState = ProfileUpdateState.Error("Display name cannot be empty")
-            )
+            _uiState.value =
+                _uiState.value.copy(
+                    updateState = ProfileUpdateState.Error("Display name cannot be empty"),
+                )
             return
         }
 
         viewModelScope.launch {
             try {
                 _uiState.value = _uiState.value.copy(updateState = ProfileUpdateState.Updating)
-                
+
                 // First, update the local profile (always available)
                 val localResult = profileRepository.updateDisplayName(newDisplayName)
-                
+
                 if (localResult.isFailure) {
                     val exception = localResult.exceptionOrNull()
                     Napier.e("Failed to update local profile", exception)
-                    _uiState.value = _uiState.value.copy(
-                        updateState = ProfileUpdateState.Error("Failed to save locally: ${exception?.message}")
-                    )
+                    _uiState.value =
+                        _uiState.value.copy(
+                            updateState = ProfileUpdateState.Error("Failed to save locally: ${exception?.message}"),
+                        )
                     return@launch
                 }
-                
+
                 // If we have a cloud account, try to sync there too
                 if (_uiState.value.hasCloudAccount) {
                     val cloudResult = updateProfileUseCase(displayName = newDisplayName)
-                    
+
                     when (cloudResult) {
                         is UpdateProfileUseCase.Result.Error -> {
                             // Local save succeeded, but cloud sync failed - still show success but log the sync error
@@ -142,28 +147,28 @@ class ProfileViewModel(
                         }
                     }
                 }
-                
+
                 // Success - local update worked (cloud sync is best-effort)
-                _uiState.value = _uiState.value.copy(
-                    editState = ProfileEditState.None,
-                    updateState = ProfileUpdateState.Success
-                )
-                
+                _uiState.value =
+                    _uiState.value.copy(
+                        editState = ProfileEditState.None,
+                        updateState = ProfileUpdateState.Success,
+                    )
+
                 // Clear success state after a brief moment
                 kotlinx.coroutines.delay(2000)
                 if (_uiState.value.updateState is ProfileUpdateState.Success) {
                     _uiState.value = _uiState.value.copy(updateState = ProfileUpdateState.Idle)
                 }
-                
             } catch (e: Exception) {
                 Napier.e("Unexpected error saving display name", e)
-                _uiState.value = _uiState.value.copy(
-                    updateState = ProfileUpdateState.Error("Unexpected error: ${e.message}")
-                )
+                _uiState.value =
+                    _uiState.value.copy(
+                        updateState = ProfileUpdateState.Error("Unexpected error: ${e.message}"),
+                    )
             }
         }
     }
-
 
     /**
      * Refresh profile data from the server.
@@ -172,25 +177,27 @@ class ProfileViewModel(
         viewModelScope.launch {
             try {
                 _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
-                
+
                 val result = accountRepository.refreshAccount()
                 if (result.isFailure) {
                     val exception = result.exceptionOrNull()
                     Napier.e("Failed to refresh profile", exception)
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = "Failed to refresh profile: ${exception?.message}"
-                    )
+                    _uiState.value =
+                        _uiState.value.copy(
+                            isLoading = false,
+                            errorMessage = "Failed to refresh profile: ${exception?.message}",
+                        )
                 } else {
                     // Data will be updated through the flow collection
                     _uiState.value = _uiState.value.copy(isLoading = false)
                 }
             } catch (e: Exception) {
                 Napier.e("Unexpected error refreshing profile", e)
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    errorMessage = "Unexpected error: ${e.message}"
-                )
+                _uiState.value =
+                    _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = "Unexpected error: ${e.message}",
+                    )
             }
         }
     }
@@ -213,9 +220,10 @@ class ProfileViewModel(
      * Get the current profile display model for UI rendering using local-first approach.
      */
     val profileDisplayModel: ProfileDisplayModel
-        get() = createProfileDisplayModel(
-            localProfile = _uiState.value.localProfile,
-            account = _uiState.value.account,
-            userData = _uiState.value.userData
-        )
+        get() =
+            createProfileDisplayModel(
+                localProfile = _uiState.value.localProfile,
+                account = _uiState.value.account,
+                userData = _uiState.value.userData,
+            )
 }

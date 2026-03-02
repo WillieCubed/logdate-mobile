@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.feature.timeline.ui
 
 import androidx.compose.foundation.layout.Arrangement
@@ -15,12 +17,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
-import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.timeline.generated.resources.*
 import logdate.client.feature.timeline.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+
 @Composable
 internal fun DefaultNewEntryBlock(
     onNewEntry: () -> Unit,
@@ -30,24 +33,24 @@ internal fun DefaultNewEntryBlock(
     Surface(
         onClick = onNewEntry,
         shape = RoundedCornerShape(8.dp),
-        modifier = Modifier
-            .fillMaxWidth(),
+        modifier =
+            Modifier
+                .fillMaxWidth(),
         color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .padding(
-                    start = Spacing.xl,
-                    end = Spacing.xl,
-                    bottom = Spacing.sm,
-                    top = Spacing.sm
-                )
-                .fillMaxWidth(),
+            modifier =
+                Modifier
+                    .padding(
+                        start = Spacing.xl,
+                        end = Spacing.xl,
+                        bottom = Spacing.sm,
+                        top = Spacing.sm,
+                    ).fillMaxWidth(),
         ) {
-
             Text(
                 message,
                 style = MaterialTheme.typography.labelLarge,

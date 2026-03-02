@@ -1,6 +1,5 @@
 package app.logdate.ui.common.formatting
 
-import kotlin.time.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
@@ -8,6 +7,7 @@ import kotlinx.datetime.Month
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.todayIn
+import kotlin.time.Clock
 
 /**
  * Returns a relative date string for this [LocalDate].
@@ -44,28 +44,30 @@ fun LocalDate.asRelativeDate(): String {
 }
 
 // TODO: Localize months
-private fun Month.asText(): String = when (this) {
-    Month.JANUARY -> "January"
-    Month.FEBRUARY -> "February"
-    Month.MARCH -> "March"
-    Month.APRIL -> "April"
-    Month.MAY -> "May"
-    Month.JUNE -> "June"
-    Month.JULY -> "July"
-    Month.AUGUST -> "August"
-    Month.SEPTEMBER -> "September"
-    Month.OCTOBER -> "October"
-    Month.NOVEMBER -> "November"
-    Month.DECEMBER -> "December"
-}
+private fun Month.asText(): String =
+    when (this) {
+        Month.JANUARY -> "January"
+        Month.FEBRUARY -> "February"
+        Month.MARCH -> "March"
+        Month.APRIL -> "April"
+        Month.MAY -> "May"
+        Month.JUNE -> "June"
+        Month.JULY -> "July"
+        Month.AUGUST -> "August"
+        Month.SEPTEMBER -> "September"
+        Month.OCTOBER -> "October"
+        Month.NOVEMBER -> "November"
+        Month.DECEMBER -> "December"
+    }
 
 // TODO: Localize days of the week
-private fun DayOfWeek.asText(): String = when (this) {
-    DayOfWeek.MONDAY -> "Monday"
-    DayOfWeek.TUESDAY -> "Tuesday"
-    DayOfWeek.WEDNESDAY -> "Wednesday"
-    DayOfWeek.THURSDAY -> "Thursday"
-    DayOfWeek.FRIDAY -> "Friday"
-    DayOfWeek.SATURDAY -> "Saturday"
-    DayOfWeek.SUNDAY -> "Sunday"
-}
+private fun DayOfWeek.asText(): String =
+    when (this) {
+        DayOfWeek.MONDAY -> "Monday"
+        DayOfWeek.TUESDAY -> "Tuesday"
+        DayOfWeek.WEDNESDAY -> "Wednesday"
+        DayOfWeek.THURSDAY -> "Thursday"
+        DayOfWeek.FRIDAY -> "Friday"
+        DayOfWeek.SATURDAY -> "Saturday"
+        DayOfWeek.SUNDAY -> "Sunday"
+    }

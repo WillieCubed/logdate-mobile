@@ -37,7 +37,11 @@ interface CryptoManager {
      * @param key The AES-256 secret key.
      * @param iv The 12-byte initialization vector.
      */
-    fun encryptSink(sink: Sink, key: ByteArray, iv: ByteArray): Sink
+    fun encryptSink(
+        sink: Sink,
+        key: ByteArray,
+        iv: ByteArray,
+    ): Sink
 
     /**
      * Creates a decrypting [Source] that wraps an underlying source.
@@ -49,7 +53,11 @@ interface CryptoManager {
      * @param iv The 12-byte initialization vector used during encryption.
      * @throws IOException If the data is tampered with or the key is incorrect (GCM tag mismatch).
      */
-    fun decryptSource(source: Source, key: ByteArray, iv: ByteArray): Source
+    fun decryptSource(
+        source: Source,
+        key: ByteArray,
+        iv: ByteArray,
+    ): Source
 
     /**
      * Generates a cryptographically secure random sequence of bytes for salts or IVs.
@@ -60,7 +68,10 @@ interface CryptoManager {
      * Computes HMAC-SHA256 of data using the provided key.
      * Used for HKDF and other operations.
      */
-    fun hmacSha256(key: ByteArray, data: ByteArray): ByteArray
+    fun hmacSha256(
+        key: ByteArray,
+        data: ByteArray,
+    ): ByteArray
 
     /**
      * Performs AES-GCM encryption for in-memory content.
@@ -69,7 +80,7 @@ interface CryptoManager {
         key: ByteArray,
         iv: ByteArray,
         aad: ByteArray,
-        plaintext: ByteArray
+        plaintext: ByteArray,
     ): ByteArray
 
     /**
@@ -79,6 +90,6 @@ interface CryptoManager {
         key: ByteArray,
         iv: ByteArray,
         aad: ByteArray,
-        ciphertext: ByteArray
+        ciphertext: ByteArray,
     ): ByteArray
 }

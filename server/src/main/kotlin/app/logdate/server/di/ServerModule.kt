@@ -13,16 +13,15 @@ import app.logdate.server.database.PostgreSQLSessionManager
 import app.logdate.server.passkeys.InMemoryPasskeyRepository
 import app.logdate.server.passkeys.PasskeyRepository
 import app.logdate.server.passkeys.WebAuthnPasskeyService
-import app.logdate.server.sync.ContentSyncTable
-import app.logdate.server.sync.JournalSyncTable
 import app.logdate.server.sync.AssociationSyncTable
-import app.logdate.server.sync.MediaSyncTable
+import app.logdate.server.sync.ContentSyncTable
 import app.logdate.server.sync.DbSyncRepository
 import app.logdate.server.sync.InMemorySyncRepository
+import app.logdate.server.sync.JournalSyncTable
+import app.logdate.server.sync.MediaSyncTable
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.sync.SyncRepository
 import io.github.aakira.napier.Napier
-import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.koin.dsl.module
@@ -31,8 +30,8 @@ import org.koin.dsl.module
  * Initializes the database connection and tables.
  * @return true if database is available, false otherwise
  */
-fun initializeDatabase(): Boolean {
-    return try {
+fun initializeDatabase(): Boolean =
+    try {
         val dataSource = DatabaseConfig.createDataSource()
         DatabaseConfig.initializeDatabase(dataSource)
         transaction {
@@ -40,7 +39,7 @@ fun initializeDatabase(): Boolean {
                 ContentSyncTable,
                 JournalSyncTable,
                 AssociationSyncTable,
-                MediaSyncTable
+                MediaSyncTable,
             )
         }
         Napier.i("Database repositories initialized successfully")
@@ -49,43 +48,43 @@ fun initializeDatabase(): Boolean {
         Napier.w("Database not available, using in-memory repositories", e)
         false
     }
-}
 
 /**
  * Creates server Koin module based on database availability.
  */
-fun serverModule(isDatabaseAvailable: Boolean) = module {
-    single<AccountRepository> {
-        if (isDatabaseAvailable) PostgreSQLAccountRepository() else InMemoryAccountRepository()
-    }
+fun serverModule(isDatabaseAvailable: Boolean) =
+    module {
+        single<AccountRepository> {
+            if (isDatabaseAvailable) PostgreSQLAccountRepository() else InMemoryAccountRepository()
+        }
 
-    single<PasskeyRepository> {
-        if (isDatabaseAvailable) PostgreSQLPasskeyRepository() else InMemoryPasskeyRepository()
-    }
+        single<PasskeyRepository> {
+            if (isDatabaseAvailable) PostgreSQLPasskeyRepository() else InMemoryPasskeyRepository()
+        }
 
-    single<SessionManager> {
-        if (isDatabaseAvailable) PostgreSQLSessionManager() else InMemorySessionManager()
-    }
+        single<SessionManager> {
+            if (isDatabaseAvailable) PostgreSQLSessionManager() else InMemorySessionManager()
+        }
 
-    single { WebAuthnPasskeyService() }
+        single { WebAuthnPasskeyService() }
 
-    single<SyncRepository> {
-        if (isDatabaseAvailable) DbSyncRepository() else InMemorySyncRepository()
-    }
+        single<SyncRepository> {
+            if (isDatabaseAvailable) DbSyncRepository() else InMemorySyncRepository()
+        }
 
-    single { SyncMetricsRegistry() }
+        single { SyncMetricsRegistry() }
 
-    single {
-        JwtTokenService(
-            secret = System.getenv("JWT_SECRET") ?: JwtTokenService.generateSecret()
-        )
-    }
+        single {
+            JwtTokenService(
+                secret = System.getenv("JWT_SECRET") ?: JwtTokenService.generateSecret(),
+            )
+        }
 
-    single {
-        if (isDatabaseAvailable) {
-            DatabaseWebAuthnPasskeyService(get())
-        } else {
-            null
+        single {
+            if (isDatabaseAvailable) {
+                DatabaseWebAuthnPasskeyService(get())
+            } else {
+                null
+            }
         }
     }
-}

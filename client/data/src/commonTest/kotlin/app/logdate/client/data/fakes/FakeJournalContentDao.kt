@@ -22,17 +22,17 @@ class FakeJournalContentDao : JournalContentDao {
         emitState()
     }
 
-    override fun getContentForJournal(journalId: Uuid): Flow<List<Uuid>> {
-        return state.map { it[journalId]?.toList() ?: emptyList() }
-    }
+    override fun getContentForJournal(journalId: Uuid): Flow<List<Uuid>> = state.map { it[journalId]?.toList() ?: emptyList() }
 
-    override fun getJournalsForContent(contentId: Uuid): Flow<List<Uuid>> {
-        return state.map {
+    override fun getJournalsForContent(contentId: Uuid): Flow<List<Uuid>> =
+        state.map {
             contentJournals[contentId]?.toList() ?: emptyList()
         }
-    }
 
-    override suspend fun removeContentFromJournal(journalId: Uuid, contentId: Uuid) {
+    override suspend fun removeContentFromJournal(
+        journalId: Uuid,
+        contentId: Uuid,
+    ) {
         journalContent[journalId]?.remove(contentId)
         if (journalContent[journalId].isNullOrEmpty()) {
             journalContent.remove(journalId)
@@ -57,9 +57,10 @@ class FakeJournalContentDao : JournalContentDao {
         emitState()
     }
 
-    override suspend fun isContentInJournal(journalId: Uuid, contentId: Uuid): Boolean {
-        return journalContent[journalId]?.contains(contentId) ?: false
-    }
+    override suspend fun isContentInJournal(
+        journalId: Uuid,
+        contentId: Uuid,
+    ): Boolean = journalContent[journalId]?.contains(contentId) ?: false
 
     fun clear() {
         journalContent.clear()

@@ -12,6 +12,7 @@ buildConfigPlugin = "6.0.7"
 kover = "0.9.7"
 screenshot = "0.0.1-alpha13"
 benManesVersions = "0.53.0"
+ktlint = "13.1.0"
 
 # Android Build Versions
 android-compileSdk = "36"
@@ -353,3 +354,4 @@ buildConfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildConfig
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 screenshot = { id = "com.android.compose.screenshot", version.ref = "screenshot" }
 benManesVersions = { id = "com.github.ben-manes.versions", version.ref = "benManesVersions" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }

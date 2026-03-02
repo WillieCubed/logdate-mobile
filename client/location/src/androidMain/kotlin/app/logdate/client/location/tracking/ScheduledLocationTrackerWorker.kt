@@ -17,25 +17,26 @@ import kotlin.time.Duration.Companion.seconds
  */
 class ScheduledLocationTrackerWorker(
     context: Context,
-    workerParams: WorkerParameters
-) : CoroutineWorker(context, workerParams), KoinComponent {
-
+    workerParams: WorkerParameters,
+) : CoroutineWorker(context, workerParams),
+    KoinComponent {
     private val locationProvider: ClientLocationProvider by inject()
     private val locationTracker: LocationTracker by inject()
 
     override suspend fun doWork(): Result {
         Napier.i("ScheduledLocationTrackerWorker: Starting scheduled location tracking")
-        
+
         try {
             // Request a fresh location update
             locationProvider.refreshLocation()
-            
+
             // Try to get current location with timeout
             try {
-                val location = withTimeout(30.seconds) {
-                    locationProvider.getCurrentLocation()
-                }
-                
+                val location =
+                    withTimeout(30.seconds) {
+                        locationProvider.getCurrentLocation()
+                    }
+
                 Napier.i("ScheduledLocationTrackerWorker: Got location: $location")
                 locationTracker.logLocation(location)
                 return Result.success()

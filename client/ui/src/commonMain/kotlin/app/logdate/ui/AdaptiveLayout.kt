@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.ui
 
 import androidx.compose.foundation.background
@@ -23,20 +25,21 @@ fun AdaptiveLayout(
     ) {
         if (!useCompactLayout) {
             Box(
-                modifier = Modifier
-                    .widthIn(max = 372.dp)
-                    .background(MaterialTheme.colorScheme.surface),
+                modifier =
+                    Modifier
+                        .widthIn(max = 372.dp)
+                        .background(MaterialTheme.colorScheme.surface),
             ) {
                 supplementalContent()
             }
         }
         Row(
-            modifier = Modifier
-                .weight(1f)
-                .conditional(!useCompactLayout) {
-                    clip(MaterialTheme.shapes.large)
-                }
-                .background(MaterialTheme.colorScheme.surface),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .conditional(!useCompactLayout) {
+                        clip(MaterialTheme.shapes.large)
+                    }.background(MaterialTheme.colorScheme.surface),
         ) {
             mainContent()
         }

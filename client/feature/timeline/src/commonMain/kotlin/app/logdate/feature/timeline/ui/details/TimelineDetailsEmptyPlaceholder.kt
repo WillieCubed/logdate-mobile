@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.timeline.ui.details
 
 import androidx.compose.foundation.background
@@ -16,12 +18,11 @@ import androidx.compose.ui.tooling.preview.Preview
  * A placeholder that is displayed when no timeline item is selected.
  */
 @Composable
-fun TimelineDetailsEmptyPlaceholder(
-    modifier: Modifier = Modifier,
-) {
+fun TimelineDetailsEmptyPlaceholder(modifier: Modifier = Modifier) {
     Box(
-        modifier = modifier
-            .background(MaterialTheme.colorScheme.surface),
+        modifier =
+            modifier
+                .background(MaterialTheme.colorScheme.surface),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -36,8 +37,9 @@ fun TimelineDetailsEmptyPlaceholder(
 @Composable
 private fun TimelineDayEmptyPlaceholderPanelPreview() {
     TimelineDetailsEmptyPlaceholder(
-        modifier = Modifier
-            .clip(MaterialTheme.shapes.large)
-            .fillMaxSize(),
+        modifier =
+            Modifier
+                .clip(MaterialTheme.shapes.large)
+                .fillMaxSize(),
     )
 }

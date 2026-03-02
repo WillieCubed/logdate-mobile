@@ -24,29 +24,30 @@ class DefaultUserDeviceRepository(
     private val deviceIdProvider: DeviceIdProvider,
     private val remoteUserAccountRepository: RemoteUserAccountRepository,
 ) : UserDeviceRepository {
-
     override val allDevices: Flow<List<UserDevice>>
-        get() = userDeviceDao.getAllDevices().map {
-            it.map(UserDeviceEntity::toUserDevice)
-        }
+        get() =
+            userDeviceDao.getAllDevices().map {
+                it.map(UserDeviceEntity::toUserDevice)
+            }
 
     // TODO: Move this functionality into domain layer
     override val currentDevice: Flow<UserDevice>
-        get() = combine(
-            deviceIdProvider.getDeviceId(),
-            remoteUserAccountRepository.currentUser,
-        ) { instanceId, userAccount ->
-            UserDevice(
-                uid = instanceId.toString(),
-                userId = userAccount?.uid ?: error("No user signed in"),
-                label = Build.DEVICE,
-                operatingSystem = "Android",
-                version = Build.VERSION.RELEASE,
-                model = Build.MODEL,
-                type = DeviceType.MOBILE, // TODO: Find reliable way to determine device type
-                added = Clock.System.now(),
-            )
-        }
+        get() =
+            combine(
+                deviceIdProvider.getDeviceId(),
+                remoteUserAccountRepository.currentUser,
+            ) { instanceId, userAccount ->
+                UserDevice(
+                    uid = instanceId.toString(),
+                    userId = userAccount?.uid ?: error("No user signed in"),
+                    label = Build.DEVICE,
+                    operatingSystem = "Android",
+                    version = Build.VERSION.RELEASE,
+                    model = Build.MODEL,
+                    type = DeviceType.MOBILE, // TODO: Find reliable way to determine device type
+                    added = Clock.System.now(),
+                )
+            }
 
     override suspend fun addDevice(
         label: String,
@@ -74,11 +75,10 @@ class DefaultUserDeviceRepository(
      *
      * @return A [UserDevice] object pre-filled with the current device's data.
      */
-    private suspend fun generateDeviceData(
-        deviceId: String? = null,
-    ): UserDevice {
-        val currentUser = remoteUserAccountRepository.currentUser.first()
-            ?: throw IllegalStateException("No user signed in")
+    private suspend fun generateDeviceData(deviceId: String? = null): UserDevice {
+        val currentUser =
+            remoteUserAccountRepository.currentUser.first()
+                ?: throw IllegalStateException("No user signed in")
         return UserDevice(
             uid = deviceId ?: deviceIdProvider.getDeviceId().first().toString(),
             userId = currentUser.uid,
@@ -92,25 +92,26 @@ class DefaultUserDeviceRepository(
     }
 }
 
+fun UserDeviceEntity.toUserDevice() =
+    UserDevice(
+        uid = uid,
+        userId = userId,
+        label = label,
+        operatingSystem = operatingSystem,
+        version = version,
+        model = model,
+        type = DeviceType.valueOf(type),
+        added = added,
+    )
 
-fun UserDeviceEntity.toUserDevice() = UserDevice(
-    uid = uid,
-    userId = userId,
-    label = label,
-    operatingSystem = operatingSystem,
-    version = version,
-    model = model,
-    type = DeviceType.valueOf(type),
-    added = added,
-)
-
-fun UserDevice.toUserDeviceEntity() = UserDeviceEntity(
-    uid = uid,
-    userId = userId,
-    label = label,
-    operatingSystem = operatingSystem,
-    version = version,
-    model = model,
-    type = type.name,
-    added = added,
-)
+fun UserDevice.toUserDeviceEntity() =
+    UserDeviceEntity(
+        uid = uid,
+        userId = userId,
+        label = label,
+        operatingSystem = operatingSystem,
+        version = version,
+        model = model,
+        type = type.name,
+        added = added,
+    )

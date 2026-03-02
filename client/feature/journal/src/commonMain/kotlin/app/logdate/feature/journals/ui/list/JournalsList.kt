@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.journals.ui.list
 
 import androidx.compose.foundation.clickable
@@ -14,15 +16,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.shared.model.Journal
 import app.logdate.ui.content.JournalContentCover
 import app.logdate.ui.theme.Spacing
 import kotlin.time.Clock
-import androidx.compose.ui.tooling.preview.Preview
 
 /**
  * A composable that displays a list of journals with their covers and titles.
- * 
+ *
  * @param journals The list of journals to display
  * @param onJournalClick Callback when a journal is clicked
  * @param modifier Modifier for the list
@@ -34,20 +36,20 @@ fun JournalsList(
     journals: List<Journal>,
     onJournalClick: (Journal) -> Unit,
     modifier: Modifier = Modifier,
-    listState: LazyListState = rememberLazyListState()
+    listState: LazyListState = rememberLazyListState(),
 ) {
     LazyColumn(
         state = listState,
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(Spacing.md)
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         items(
             items = journals,
-            key = { it.id.toString() }
+            key = { it.id.toString() },
         ) { journal ->
             JournalListItem(
                 journal = journal,
-                onClick = { onJournalClick(journal) }
+                onClick = { onJournalClick(journal) },
             )
         }
     }
@@ -55,7 +57,7 @@ fun JournalsList(
 
 /**
  * A single item in the journals list.
- * 
+ *
  * @param journal The journal to display
  * @param onClick Callback when this journal is clicked
  * @param modifier Modifier for the item
@@ -64,25 +66,26 @@ fun JournalsList(
 private fun JournalListItem(
     journal: Journal,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.md)
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         // Journal cover on the left
         JournalContentCover(
-            imageUri = null // TODO: Add support for journal cover images
+            imageUri = null, // TODO: Add support for journal cover images
         )
-        
+
         // Journal title on the right
         Text(
             text = journal.title.ifEmpty { "Untitled Journal" },
-            style = MaterialTheme.typography.bodyLarge
+            style = MaterialTheme.typography.bodyLarge,
         )
     }
 }
@@ -90,27 +93,28 @@ private fun JournalListItem(
 @Preview
 @Composable
 private fun JournalsListPreview() {
-    val sampleJournals = listOf(
-        Journal(
-            title = "Travel Journal",
-            created = Clock.System.now()
-        ),
-        Journal(
-            title = "Daily Notes",
-            created = Clock.System.now()
-        ),
-        Journal(
-            title = "Work Log",
-            created = Clock.System.now()
-        ),
-        Journal(
-            title = "", // Will show as "Untitled Journal"
-            created = Clock.System.now()
+    val sampleJournals =
+        listOf(
+            Journal(
+                title = "Travel Journal",
+                created = Clock.System.now(),
+            ),
+            Journal(
+                title = "Daily Notes",
+                created = Clock.System.now(),
+            ),
+            Journal(
+                title = "Work Log",
+                created = Clock.System.now(),
+            ),
+            Journal(
+                title = "", // Will show as "Untitled Journal"
+                created = Clock.System.now(),
+            ),
         )
-    )
-    
+
     JournalsList(
         journals = sampleJournals,
-        onJournalClick = {}
+        onJournalClick = {},
     )
 }

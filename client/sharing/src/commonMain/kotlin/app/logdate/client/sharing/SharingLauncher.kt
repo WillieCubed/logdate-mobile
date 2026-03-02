@@ -10,8 +10,11 @@ interface SharingLauncher {
      * will be thrown.
      * @param theme The theme to use for the shared content
      */
-    fun shareJournalToInstagram(journalId: Uuid, theme: ShareTheme = ShareTheme.Light)
-    
+    fun shareJournalToInstagram(
+        journalId: Uuid,
+        theme: ShareTheme = ShareTheme.Light,
+    )
+
     /**
      * Shares a journal using the system share sheet.
      *
@@ -39,7 +42,7 @@ interface SharingLauncher {
      * @param videoId The ID of the video to share
      */
     fun shareVideoToInstagramFeed(videoId: String)
-    
+
     /**
      * Gets a URI for a media file by its ID.
      *

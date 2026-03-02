@@ -3,7 +3,6 @@ package app.logdate.ui.foldable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -89,7 +88,8 @@ fun rememberFoldableDeviceInfo(): FoldableDeviceInfo {
     val density = LocalDensity.current
 
     val windowInfoTracker = remember { WindowInfoTracker.getOrCreate(context) }
-    val windowLayoutInfo by windowInfoTracker.windowLayoutInfo(context)
+    val windowLayoutInfo by windowInfoTracker
+        .windowLayoutInfo(context)
         .collectAsStateWithLifecycle(initialValue = WindowLayoutInfo(emptyList()))
 
     return remember(windowLayoutInfo, density.density) {
@@ -110,7 +110,7 @@ actual fun rememberFoldableState(): FoldableState {
         isFoldable = foldableInfo.isFoldable,
         isHalfOpened = foldableInfo.foldingFeature?.state == FoldingFeature.State.HALF_OPENED,
         hasVerticalHinge = foldableInfo.foldingFeature?.orientation == FoldingFeature.Orientation.VERTICAL,
-        hasHorizontalHinge = foldableInfo.foldingFeature?.orientation == FoldingFeature.Orientation.HORIZONTAL
+        hasHorizontalHinge = foldableInfo.foldingFeature?.orientation == FoldingFeature.Orientation.HORIZONTAL,
     )
 }
 
@@ -123,11 +123,12 @@ actual fun rememberFoldableState(): FoldableState {
  */
 fun processFoldableInfo(
     windowLayoutInfo: WindowLayoutInfo,
-    densityDpi: Float
+    densityDpi: Float,
 ): FoldableDeviceInfo {
-    val foldingFeature = windowLayoutInfo.displayFeatures
-        .filterIsInstance<FoldingFeature>()
-        .firstOrNull()
+    val foldingFeature =
+        windowLayoutInfo.displayFeatures
+            .filterIsInstance<FoldingFeature>()
+            .firstOrNull()
 
     if (foldingFeature == null) {
         return FoldableDeviceInfo(isFoldable = false)
@@ -136,44 +137,46 @@ fun processFoldableInfo(
     val bounds = foldingFeature.bounds
     val pxToDp = { px: Int -> px / (densityDpi / 160f) }
 
-    val hingePosition = when (foldingFeature.orientation) {
-        FoldingFeature.Orientation.VERTICAL -> {
-            HingePosition(
-                x = pxToDp(bounds.left),
-                y = null,
-                orientation = FoldingFeature.Orientation.VERTICAL
-            )
+    val hingePosition =
+        when (foldingFeature.orientation) {
+            FoldingFeature.Orientation.VERTICAL -> {
+                HingePosition(
+                    x = pxToDp(bounds.left),
+                    y = null,
+                    orientation = FoldingFeature.Orientation.VERTICAL,
+                )
+            }
+            FoldingFeature.Orientation.HORIZONTAL -> {
+                HingePosition(
+                    x = null,
+                    y = pxToDp(bounds.top),
+                    orientation = FoldingFeature.Orientation.HORIZONTAL,
+                )
+            }
+            else -> {
+                HingePosition(
+                    x = null,
+                    y = null,
+                    orientation = foldingFeature.orientation,
+                )
+            }
         }
-        FoldingFeature.Orientation.HORIZONTAL -> {
-            HingePosition(
-                x = null,
-                y = pxToDp(bounds.top),
-                orientation = FoldingFeature.Orientation.HORIZONTAL
-            )
-        }
-        else -> {
-            HingePosition(
-                x = null,
-                y = null,
-                orientation = foldingFeature.orientation
-            )
-        }
-    }
 
-    val hingeBounds = HingeBounds(
-        left = pxToDp(bounds.left),
-        top = pxToDp(bounds.top),
-        right = pxToDp(bounds.right),
-        bottom = pxToDp(bounds.bottom),
-        width = pxToDp(bounds.width()),
-        height = pxToDp(bounds.height())
-    )
+    val hingeBounds =
+        HingeBounds(
+            left = pxToDp(bounds.left),
+            top = pxToDp(bounds.top),
+            right = pxToDp(bounds.right),
+            bottom = pxToDp(bounds.bottom),
+            width = pxToDp(bounds.width()),
+            height = pxToDp(bounds.height()),
+        )
 
     return FoldableDeviceInfo(
         isFoldable = true,
         foldingFeature = foldingFeature,
         hingePosition = hingePosition,
-        hingeBounds = hingeBounds
+        hingeBounds = hingeBounds,
     )
 }
 

@@ -10,7 +10,7 @@ actual suspend fun LogDateDatabase.clearAllLogDateTables() {
     useWriterConnection { connection ->
         val tables = mutableListOf<String>()
         connection.usePrepared(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
         ) { statement ->
             while (statement.step()) {
                 tables.add(statement.getText(0))

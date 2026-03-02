@@ -19,7 +19,7 @@ interface ConflictResolver<T> {
         local: T,
         remote: T,
         localTimestamp: Instant,
-        remoteTimestamp: Instant
+        remoteTimestamp: Instant,
     ): ConflictResolution<T>
 }
 
@@ -30,17 +30,23 @@ sealed class ConflictResolution<T> {
     /**
      * Keep the local version, discard the remote.
      */
-    data class KeepLocal<T>(val value: T) : ConflictResolution<T>()
+    data class KeepLocal<T>(
+        val value: T,
+    ) : ConflictResolution<T>()
 
     /**
      * Keep the remote version, discard the local.
      */
-    data class KeepRemote<T>(val value: T) : ConflictResolution<T>()
+    data class KeepRemote<T>(
+        val value: T,
+    ) : ConflictResolution<T>()
 
     /**
      * Merge both versions into a new version.
      */
-    data class Merge<T>(val merged: T) : ConflictResolution<T>()
+    data class Merge<T>(
+        val merged: T,
+    ) : ConflictResolution<T>()
 
     /**
      * Conflict requires manual user intervention.
@@ -48,7 +54,7 @@ sealed class ConflictResolution<T> {
     data class RequiresManualResolution<T>(
         val local: T,
         val remote: T,
-        val reason: String
+        val reason: String,
     ) : ConflictResolution<T>()
 }
 
@@ -61,12 +67,11 @@ class LastWriteWinsResolver<T> : ConflictResolver<T> {
         local: T,
         remote: T,
         localTimestamp: Instant,
-        remoteTimestamp: Instant
-    ): ConflictResolution<T> {
-        return when {
+        remoteTimestamp: Instant,
+    ): ConflictResolution<T> =
+        when {
             remoteTimestamp > localTimestamp -> ConflictResolution.KeepRemote(remote)
             localTimestamp > remoteTimestamp -> ConflictResolution.KeepLocal(local)
             else -> ConflictResolution.KeepLocal(local) // Equal timestamps, prefer local
         }
-    }
 }

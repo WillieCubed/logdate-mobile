@@ -8,12 +8,10 @@ import kotlinx.coroutines.flow.Flow
  * Use case for fetching all entry drafts.
  */
 class GetAllDraftsUseCase(
-    private val entryDraftRepository: EntryDraftRepository
+    private val entryDraftRepository: EntryDraftRepository,
 ) {
     /**
      * Returns a flow of all entry drafts, sorted by most recently updated first.
      */
-    operator fun invoke(): Flow<List<EntryDraft>> {
-        return entryDraftRepository.getDrafts()
-    }
+    operator fun invoke(): Flow<List<EntryDraft>> = entryDraftRepository.getDrafts()
 }

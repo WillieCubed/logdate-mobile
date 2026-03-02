@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:max-line-length")
+
 package app.logdate.feature.core.settings.ui
 
 import androidx.compose.animation.AnimatedVisibility
@@ -40,16 +42,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
-import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.theme.Spacing
-import androidx.compose.ui.tooling.preview.Preview
-import org.koin.compose.viewmodel.koinViewModel
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.core.generated.resources.*
 import logdate.client.feature.core.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
+
 /**
  * Advanced settings screen for developer and power-user options.
  *
@@ -78,7 +80,7 @@ fun AdvancedSettingsScreen(
         onUpdateLocalAddress = viewModel::updateLocalServerAddress,
         onUpdateCustomUrl = viewModel::updateCustomServerUrl,
         onValidateAndSave = viewModel::validateAndSaveServer,
-        isPotentialDetailPane = resolvedIsDetailPane
+        isPotentialDetailPane = resolvedIsDetailPane,
     )
 }
 
@@ -91,14 +93,15 @@ private fun AdvancedSettingsContent(
     onUpdateLocalAddress: (String) -> Unit,
     onUpdateCustomUrl: (String) -> Unit,
     onValidateAndSave: () -> Unit,
-    isPotentialDetailPane: Boolean = false
+    isPotentialDetailPane: Boolean = false,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     Scaffold(
-        modifier = Modifier
-            .applyScreenStyles()
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier =
+            Modifier
+                .applyScreenStyles()
+                .nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             if (!isPotentialDetailPane) {
                 TopAppBar(
@@ -111,20 +114,20 @@ private fun AdvancedSettingsContent(
                     scrollBehavior = scrollBehavior,
                 )
             }
-        }
+        },
     ) { paddingValues ->
         DefaultSettingsContentContainer {
             LazyColumn(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = paddingValues,
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
                 if (isPotentialDetailPane) {
                     item {
                         Text(
                             text = stringResource(Res.string.advanced),
                             style = MaterialTheme.typography.headlineSmall,
-                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)
+                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
                         )
                     }
                 }
@@ -136,7 +139,7 @@ private fun AdvancedSettingsContent(
                         onUpdateLocalAddress = onUpdateLocalAddress,
                         onUpdateCustomUrl = onUpdateCustomUrl,
                         onValidateAndSave = onValidateAndSave,
-                        modifier = Modifier.padding(horizontal = Spacing.lg)
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }
             }
@@ -151,39 +154,40 @@ private fun ServerSelectionSection(
     onUpdateLocalAddress: (String) -> Unit,
     onUpdateCustomUrl: (String) -> Unit,
     onValidateAndSave: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         Text(
             text = stringResource(Res.string.server_configuration),
-            style = MaterialTheme.typography.titleMedium
+            style = MaterialTheme.typography.titleMedium,
         )
 
         // Non-production warning
         AnimatedVisibility(visible = serverSelectionState.selectedPreset != ServerPreset.PRODUCTION) {
             Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
-                ),
-                modifier = Modifier.fillMaxWidth()
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    ),
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Row(
                     modifier = Modifier.padding(Spacing.md),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
                         imageVector = Icons.Default.Warning,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onTertiaryContainer
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
                     )
                     Spacer(modifier = Modifier.width(Spacing.sm))
                     Text(
                         text = stringResource(Res.string.you_are_using_a_non_production_server_your_data_will_not_sync_with_logdate_cloud),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
                     )
                 }
             }
@@ -197,14 +201,14 @@ private fun ServerSelectionSection(
                     title = "Production",
                     description = "Official LogDate Cloud server (cloud.logdate.app)",
                     selected = serverSelectionState.selectedPreset == ServerPreset.PRODUCTION,
-                    onClick = { onSelectPreset(ServerPreset.PRODUCTION) }
+                    onClick = { onSelectPreset(ServerPreset.PRODUCTION) },
                 )
 
                 ServerPresetOption(
                     title = "Local",
                     description = "Local development server",
                     selected = serverSelectionState.selectedPreset == ServerPreset.LOCAL,
-                    onClick = { onSelectPreset(ServerPreset.LOCAL) }
+                    onClick = { onSelectPreset(ServerPreset.LOCAL) },
                 )
 
                 AnimatedVisibility(visible = serverSelectionState.selectedPreset == ServerPreset.LOCAL) {
@@ -214,9 +218,10 @@ private fun ServerSelectionSection(
                         label = { Text(stringResource(Res.string.server_address)) },
                         placeholder = { Text(stringResource(Res.string.localhost_8765)) },
                         singleLine = true,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = Spacing.md, vertical = Spacing.sm)
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
                     )
                 }
 
@@ -224,7 +229,7 @@ private fun ServerSelectionSection(
                     title = "Custom",
                     description = "Connect to a self-hosted server",
                     selected = serverSelectionState.selectedPreset == ServerPreset.CUSTOM,
-                    onClick = { onSelectPreset(ServerPreset.CUSTOM) }
+                    onClick = { onSelectPreset(ServerPreset.CUSTOM) },
                 )
 
                 AnimatedVisibility(visible = serverSelectionState.selectedPreset == ServerPreset.CUSTOM) {
@@ -234,9 +239,10 @@ private fun ServerSelectionSection(
                         label = { Text(stringResource(Res.string.server_url)) },
                         placeholder = { Text(stringResource(Res.string.https_your_server_example_com)) },
                         singleLine = true,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = Spacing.md, vertical = Spacing.sm)
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
                     )
                 }
             }
@@ -248,31 +254,37 @@ private fun ServerSelectionSection(
         ValidationStatusSection(
             validationState = serverSelectionState.validationState,
             onValidate = onValidateAndSave,
-            isValidationNeeded = serverSelectionState.selectedPreset != ServerPreset.PRODUCTION
+            isValidationNeeded = serverSelectionState.selectedPreset != ServerPreset.PRODUCTION,
         )
 
         // Info card
         Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            ),
-            modifier = Modifier.fillMaxWidth()
+            colors =
+                CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                ),
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Row(
                 modifier = Modifier.padding(Spacing.md),
-                verticalAlignment = Alignment.Top
+                verticalAlignment = Alignment.Top,
             ) {
                 Icon(
                     imageVector = Icons.Default.Info,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp),
                 )
                 Spacer(modifier = Modifier.width(Spacing.sm))
+                val switchingServersText =
+                    stringResource(
+                        Res.string
+                            .switching_servers_keeps_your_local_data_intact_data_is_stored_separately_per_server_and_will_not_automatically_sync_between_different_servers,
+                    )
                 Text(
-                    text = stringResource(Res.string.switching_servers_keeps_your_local_data_intact_data_is_stored_separately_per_server_and_will_not_automatically_sync_between_different_servers),
+                    text = switchingServersText,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -285,33 +297,33 @@ private fun ServerPresetOption(
     description: String,
     selected: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .selectable(
-                selected = selected,
-                onClick = onClick,
-                role = Role.RadioButton
-            )
-            .padding(Spacing.md),
-        verticalAlignment = Alignment.CenterVertically
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .selectable(
+                    selected = selected,
+                    onClick = onClick,
+                    role = Role.RadioButton,
+                ).padding(Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         RadioButton(
             selected = selected,
-            onClick = null
+            onClick = null,
         )
         Spacer(modifier = Modifier.width(Spacing.md))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.bodyLarge,
             )
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -322,13 +334,13 @@ private fun ValidationStatusSection(
     validationState: ServerValidationState,
     onValidate: () -> Unit,
     isValidationNeeded: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             when (validationState) {
                 is ServerValidationState.Idle -> {
@@ -336,7 +348,7 @@ private fun ValidationStatusSection(
                         Text(
                             text = stringResource(Res.string.test_connection_before_saving),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     } else {
                         Spacer(modifier = Modifier.weight(1f))
@@ -346,13 +358,13 @@ private fun ValidationStatusSection(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp
+                            strokeWidth = 2.dp,
                         )
                         Spacer(modifier = Modifier.width(Spacing.sm))
                         Text(
                             text = stringResource(Res.string.testing_connection),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -362,16 +374,17 @@ private fun ValidationStatusSection(
                             imageVector = Icons.Default.Check,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(16.dp),
                         )
                         Spacer(modifier = Modifier.width(Spacing.xs))
                         Text(
-                            text = buildString {
-                                append("Connected")
-                                validationState.serverVersion?.let { append(" (v$it)") }
-                            },
+                            text =
+                                buildString {
+                                    append("Connected")
+                                    validationState.serverVersion?.let { append(" (v$it)") }
+                                },
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.primary,
                         )
                     }
                 }
@@ -381,13 +394,13 @@ private fun ValidationStatusSection(
                             imageVector = Icons.Default.Error,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(16.dp),
                         )
                         Spacer(modifier = Modifier.width(Spacing.xs))
                         Text(
                             text = validationState.message,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
+                            color = MaterialTheme.colorScheme.error,
                         )
                     }
                 }
@@ -397,13 +410,14 @@ private fun ValidationStatusSection(
 
             Button(
                 onClick = onValidate,
-                enabled = validationState !is ServerValidationState.Validating
+                enabled = validationState !is ServerValidationState.Validating,
             ) {
                 Text(
-                    text = when (validationState) {
-                        is ServerValidationState.Success -> "Save"
-                        else -> "Test Connection"
-                    }
+                    text =
+                        when (validationState) {
+                            is ServerValidationState.Success -> "Save"
+                            else -> "Test Connection"
+                        },
                 )
             }
         }
@@ -420,7 +434,7 @@ private fun AdvancedSettingsScreenPreview() {
         onUpdateLocalAddress = {},
         onUpdateCustomUrl = {},
         onValidateAndSave = {},
-        isPotentialDetailPane = false
+        isPotentialDetailPane = false,
     )
 }
 
@@ -429,15 +443,16 @@ private fun AdvancedSettingsScreenPreview() {
 private fun AdvancedSettingsScreenLocalSelectedPreview() {
     AdvancedSettingsContent(
         onBack = {},
-        serverSelectionState = ServerSelectionState(
-            selectedPreset = ServerPreset.LOCAL,
-            localServerAddress = "192.168.1.100:8765"
-        ),
+        serverSelectionState =
+            ServerSelectionState(
+                selectedPreset = ServerPreset.LOCAL,
+                localServerAddress = "192.168.1.100:8765",
+            ),
         onSelectPreset = {},
         onUpdateLocalAddress = {},
         onUpdateCustomUrl = {},
         onValidateAndSave = {},
-        isPotentialDetailPane = false
+        isPotentialDetailPane = false,
     )
 }
 
@@ -446,14 +461,15 @@ private fun AdvancedSettingsScreenLocalSelectedPreview() {
 private fun AdvancedSettingsScreenValidatingPreview() {
     AdvancedSettingsContent(
         onBack = {},
-        serverSelectionState = ServerSelectionState(
-            selectedPreset = ServerPreset.LOCAL,
-            validationState = ServerValidationState.Validating
-        ),
+        serverSelectionState =
+            ServerSelectionState(
+                selectedPreset = ServerPreset.LOCAL,
+                validationState = ServerValidationState.Validating,
+            ),
         onSelectPreset = {},
         onUpdateLocalAddress = {},
         onUpdateCustomUrl = {},
         onValidateAndSave = {},
-        isPotentialDetailPane = false
+        isPotentialDetailPane = false,
     )
 }

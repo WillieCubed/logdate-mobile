@@ -9,4 +9,3 @@ import androidx.compose.runtime.compositionLocalOf
 
 val LocalNavAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
-

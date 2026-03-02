@@ -14,7 +14,7 @@ interface IntegrityDao {
         FROM journal_content_links AS links
         LEFT JOIN journals AS journals ON links.journal_id = journals.id
         WHERE journals.id IS NULL
-        """
+        """,
     )
     suspend fun countOrphanedJournalLinks(): Int
 
@@ -30,7 +30,7 @@ interface IntegrityDao {
           AND imageNotes.uid IS NULL
           AND audioNotes.uid IS NULL
           AND videoNotes.uid IS NULL
-        """
+        """,
     )
     suspend fun countOrphanedContentLinks(): Int
 
@@ -46,7 +46,7 @@ interface IntegrityDao {
             UNION SELECT uid FROM audio_notes
             UNION SELECT uid FROM video_notes
         )
-        """
+        """,
     )
     suspend fun deleteOrphanedContentLinks(): Int
 
@@ -57,7 +57,7 @@ interface IntegrityDao {
         LEFT JOIN journals AS journals ON pending.entityId = journals.id
         WHERE pending.entityType = 'JOURNAL'
           AND journals.id IS NULL
-        """
+        """,
     )
     suspend fun countPendingMissingJournals(): Int
 
@@ -72,7 +72,7 @@ interface IntegrityDao {
             UNION SELECT uid FROM audio_notes
             UNION SELECT uid FROM video_notes
           )
-        """
+        """,
     )
     suspend fun countPendingMissingNotes(): Int
 
@@ -81,7 +81,7 @@ interface IntegrityDao {
         DELETE FROM pending_uploads
         WHERE entityType = 'JOURNAL'
           AND entityId NOT IN (SELECT id FROM journals)
-        """
+        """,
     )
     suspend fun deletePendingMissingJournals(): Int
 
@@ -95,7 +95,7 @@ interface IntegrityDao {
             UNION SELECT uid FROM audio_notes
             UNION SELECT uid FROM video_notes
           )
-        """
+        """,
     )
     suspend fun deletePendingMissingNotes(): Int
 }

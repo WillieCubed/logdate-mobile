@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.ui.audio
 
 import androidx.compose.runtime.Composable
@@ -12,15 +14,16 @@ data class TranscriptionState(
     val requestTranscription: (noteId: Uuid) -> Unit = { _ -> },
     val getTranscriptionText: (noteId: Uuid) -> String? = { _ -> null },
     val isTranscriptionInProgress: (noteId: Uuid) -> Boolean = { _ -> false },
-    val getTranscriptionError: (noteId: Uuid) -> String? = { _ -> null }
+    val getTranscriptionError: (noteId: Uuid) -> String? = { _ -> null },
 )
 
 /**
  * CompositionLocal for accessing the transcription state from anywhere in the app.
  */
-val LocalTranscriptionState = compositionLocalOf { 
-    TranscriptionState() 
-}
+val LocalTranscriptionState =
+    compositionLocalOf {
+        TranscriptionState()
+    }
 
 /**
  * Provider composable that makes transcription functionality available to all descendants.
@@ -28,7 +31,7 @@ val LocalTranscriptionState = compositionLocalOf {
 @Composable
 fun TranscriptionProvider(
     state: TranscriptionState,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     CompositionLocalProvider(LocalTranscriptionState provides state) {
         content()

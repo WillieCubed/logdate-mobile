@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:filename")
+
 package app.logdate.client
 
 import android.app.Application
@@ -12,8 +14,9 @@ import org.koin.core.component.KoinComponent
  *
  * For app UI, see [MainActivity].
  */
-class LogdateApplication : Application(), KoinComponent {
-
+class LogdateApplication :
+    Application(),
+    KoinComponent {
     override fun onCreate() {
         super.onCreate()
         Log.i(APP_STARTUP_TAG, "Application onCreate: initializing logging and DI")

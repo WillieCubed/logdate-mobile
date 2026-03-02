@@ -13,11 +13,12 @@ import kotlinx.coroutines.withContext
  */
 class RoomSyncTransactionManager(
     private val database: RoomDatabase,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : SyncTransactionManager {
-    override suspend fun <T> withTransaction(block: suspend () -> T): T = withContext(ioDispatcher) {
-        database.useWriterConnection { transactor ->
-            transactor.immediateTransaction { block() }
+    override suspend fun <T> withTransaction(block: suspend () -> T): T =
+        withContext(ioDispatcher) {
+            database.useWriterConnection { transactor ->
+                transactor.immediateTransaction { block() }
+            }
         }
-    }
 }

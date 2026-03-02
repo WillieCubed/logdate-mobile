@@ -21,6 +21,7 @@ import org.koin.compose.viewmodel.koinViewModel
 /**
  * A window that allows the user to edit a journal entry.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 internal fun EntryEditorWindow(
     appState: LogDateApplicationState,
@@ -34,7 +35,7 @@ internal fun EntryEditorWindow(
     ) {
         SharedTransitionLayout {
             CompositionLocalProvider(
-                LocalSharedTransitionScope provides this
+                LocalSharedTransitionScope provides this,
             ) {
                 // TODO: Implement logic to automatically update title
                 AnimatedVisibility(true) {
@@ -46,7 +47,7 @@ internal fun EntryEditorWindow(
                             },
                             onEntrySaved = {
                                 state.exit()
-                            }
+                            },
                         )
                     }
                 }
@@ -65,7 +66,6 @@ class EntryEditorWindowState(
     appState: LogDateApplicationState,
     initialTitle: String = "New Entry",
 ) : LogDateWindowState {
-
     var title: String by mutableStateOf(initialTitle)
         private set
 

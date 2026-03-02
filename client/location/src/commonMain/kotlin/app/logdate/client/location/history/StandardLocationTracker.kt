@@ -7,12 +7,11 @@ import app.logdate.shared.model.Location
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
-import kotlin.time.Clock
-import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.plus
+import kotlin.time.Instant
 
 /**
  * Standard implementation of LocationTracker that combines a location provider
@@ -22,71 +21,72 @@ class StandardLocationTracker(
     private val locationProvider: ClientLocationProvider,
     private val locationHistoryRepository: LocationHistoryRepository,
     private val deviceId: String,
-    private val userId: String = "default_user" // Should be injected from auth system
+    private val userId: String = "default_user", // Should be injected from auth system
 ) : LocationTracker {
+    override suspend fun getLastLocation(): LocationHistoryItem? = locationHistoryRepository.getLastLocation()
 
-    override suspend fun getLastLocation(): LocationHistoryItem? {
-        return locationHistoryRepository.getLastLocation()
-    }
-    
-    override fun observeCurrentLocation(): Flow<LocationHistoryItem?> {
-        return locationHistoryRepository.observeLastLocation()
-            .catch { e -> 
+    override fun observeCurrentLocation(): Flow<LocationHistoryItem?> =
+        locationHistoryRepository
+            .observeLastLocation()
+            .catch { e ->
                 Napier.e("Error observing location", e)
                 emit(null)
             }
-    }
-    
+
     override suspend fun getLocationHistoryForDate(date: LocalDate): List<LocationHistoryItem> {
         val startTime = date.atStartOfDayIn(TimeZone.currentSystemDefault())
-        val endTime = date.plus(kotlinx.datetime.DatePeriod(days = 1))
-            .atStartOfDayIn(TimeZone.currentSystemDefault())
+        val endTime =
+            date
+                .plus(kotlinx.datetime.DatePeriod(days = 1))
+                .atStartOfDayIn(TimeZone.currentSystemDefault())
 
         val startInstant = startTime
         val endInstant = endTime
         return locationHistoryRepository.getLocationHistoryBetween(startInstant, endInstant)
     }
-    
-    override suspend fun getLocationHistoryBetween(start: Instant, end: Instant): List<LocationHistoryItem> {
-        return locationHistoryRepository.getLocationHistoryBetween(start, end)
-    }
-    
-    override suspend fun logCurrentLocation(): Result<LocationHistoryItem> {
-        return try {
+
+    override suspend fun getLocationHistoryBetween(
+        start: Instant,
+        end: Instant,
+    ): List<LocationHistoryItem> = locationHistoryRepository.getLocationHistoryBetween(start, end)
+
+    override suspend fun logCurrentLocation(): Result<LocationHistoryItem> =
+        try {
             val location = locationProvider.getCurrentLocation()
             logLocation(location)
         } catch (e: Exception) {
             Napier.e("Failed to log current location", e)
             Result.failure(e)
         }
-    }
-    
+
     override suspend fun logLocation(
         location: Location,
         timestamp: Instant,
-        metadata: Map<String, Any>
-    ): Result<LocationHistoryItem> {
-        return try {
+        metadata: Map<String, Any>,
+    ): Result<LocationHistoryItem> =
+        try {
             val confidence = metadata["confidence"] as? Float ?: 1.0f
             val isGenuine = metadata["isGenuine"] as? Boolean ?: true
-            
-            val result = locationHistoryRepository.logLocation(
-                location = location,
-                userId = userId,
-                deviceId = deviceId,
-                confidence = confidence,
-                isGenuine = isGenuine
-            )
-            
-            if (result.isSuccess) {
-                val historyItem = LocationHistoryItem(
+
+            val result =
+                locationHistoryRepository.logLocation(
+                    location = location,
                     userId = userId,
                     deviceId = deviceId,
-                    timestamp = timestamp,
-                    location = location,
                     confidence = confidence,
-                    isGenuine = isGenuine
+                    isGenuine = isGenuine,
                 )
+
+            if (result.isSuccess) {
+                val historyItem =
+                    LocationHistoryItem(
+                        userId = userId,
+                        deviceId = deviceId,
+                        timestamp = timestamp,
+                        location = location,
+                        confidence = confidence,
+                        isGenuine = isGenuine,
+                    )
                 Result.success(historyItem)
             } else {
                 Result.failure(result.exceptionOrNull() ?: Exception("Failed to log location"))
@@ -95,22 +95,21 @@ class StandardLocationTracker(
             Napier.e("Failed to log location", e)
             Result.failure(e)
         }
-    }
-    
-    override suspend fun deleteLocationEntry(historyItem: LocationHistoryItem): Result<Unit> {
-        return locationHistoryRepository.deleteLocationEntry(
+
+    override suspend fun deleteLocationEntry(historyItem: LocationHistoryItem): Result<Unit> =
+        locationHistoryRepository.deleteLocationEntry(
             userId = historyItem.userId,
             deviceId = historyItem.deviceId,
-            timestamp = historyItem.timestamp
+            timestamp = historyItem.timestamp,
         )
-    }
-    
-    override suspend fun clearLocationHistory(start: Instant, end: Instant): Result<Unit> {
-        return locationHistoryRepository.deleteLocationsBetween(start, end)
-    }
-    
-    override suspend fun clearAllLocationHistory(): Result<Unit> {
-        return try {
+
+    override suspend fun clearLocationHistory(
+        start: Instant,
+        end: Instant,
+    ): Result<Unit> = locationHistoryRepository.deleteLocationsBetween(start, end)
+
+    override suspend fun clearAllLocationHistory(): Result<Unit> =
+        try {
             // Since the repository doesn't have a direct method for this,
             // we use a very wide time range
             val startTime = Instant.fromEpochMilliseconds(0) // Beginning of time
@@ -120,5 +119,4 @@ class StandardLocationTracker(
             Napier.e("Failed to clear all location history", e)
             Result.failure(e)
         }
-    }
 }

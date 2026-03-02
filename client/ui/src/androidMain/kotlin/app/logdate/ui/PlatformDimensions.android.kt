@@ -11,7 +11,7 @@ actual object PlatformDimensions {
         val configuration = LocalConfiguration.current
         return configuration.screenWidthDp.dp
     }
-    
+
     @Composable
     actual fun getScreenHeight(): Dp {
         val configuration = LocalConfiguration.current

@@ -27,10 +27,17 @@ interface LocationHistoryDao {
     suspend fun getRecentLocationHistory(limit: Int): List<LocationLogEntity>
 
     @Query("SELECT * FROM location_logs WHERE timestamp >= :startTime AND timestamp <= :endTime ORDER BY timestamp DESC")
-    suspend fun getLocationHistoryBetween(startTime: Instant, endTime: Instant): List<LocationLogEntity>
+    suspend fun getLocationHistoryBetween(
+        startTime: Instant,
+        endTime: Instant,
+    ): List<LocationLogEntity>
 
     @Query("SELECT * FROM location_logs WHERE user_id = :userId AND device_id = :deviceId AND timestamp = :timestamp")
-    suspend fun getLocationById(userId: String, deviceId: String, timestamp: Instant): LocationLogEntity?
+    suspend fun getLocationById(
+        userId: String,
+        deviceId: String,
+        timestamp: Instant,
+    ): LocationLogEntity?
 
     @Insert
     suspend fun addLocationLog(locationLog: LocationLogEntity)
@@ -42,10 +49,17 @@ interface LocationHistoryDao {
     suspend fun deleteLog(locationLog: LocationLogEntity)
 
     @Query("DELETE FROM location_logs WHERE user_id = :userId AND device_id = :deviceId AND timestamp = :timestamp")
-    suspend fun deleteLocationById(userId: String, deviceId: String, timestamp: Instant)
+    suspend fun deleteLocationById(
+        userId: String,
+        deviceId: String,
+        timestamp: Instant,
+    )
 
     @Query("DELETE FROM location_logs WHERE timestamp >= :start AND timestamp < :end")
-    suspend fun deleteLogsWithinRange(start: Instant, end: Instant)
+    suspend fun deleteLogsWithinRange(
+        start: Instant,
+        end: Instant,
+    )
 
     @Query("DELETE FROM location_logs WHERE device_id = :deviceId")
     suspend fun deleteLogsByDevice(deviceId: String)

@@ -16,7 +16,7 @@ data class ContentRecord(
     val createdAt: Long,
     val lastUpdated: Long,
     val serverVersion: Long,
-    val deviceId: DeviceId
+    val deviceId: DeviceId,
 )
 
 data class JournalRecord(
@@ -26,7 +26,7 @@ data class JournalRecord(
     val createdAt: Long,
     val lastUpdated: Long,
     val serverVersion: Long,
-    val deviceId: DeviceId
+    val deviceId: DeviceId,
 )
 
 data class AssociationRecord(
@@ -34,7 +34,7 @@ data class AssociationRecord(
     val contentId: String,
     val createdAt: Long,
     val serverVersion: Long,
-    val deviceId: DeviceId
+    val deviceId: DeviceId,
 )
 
 data class MediaRecord(
@@ -51,7 +51,7 @@ data class MediaRecord(
     val deviceId: DeviceId,
     val encryptionVersion: Int? = null,
     val encryptionKeyId: String? = null,
-    val encryptionMode: String? = null
+    val encryptionMode: String? = null,
 )
 
 data class BackupRecord(
@@ -61,14 +61,14 @@ data class BackupRecord(
     val manifest: String,
     val storagePath: String,
     val createdAt: Long,
-    val sizeBytes: Long
+    val sizeBytes: Long,
 )
 
 data class ChangeSet<T, D>(
     val changes: List<T>,
     val deletions: List<D>,
     val lastTimestamp: Long,
-    val hasMore: Boolean = false
+    val hasMore: Boolean = false,
 )
 
 /**
@@ -79,34 +79,104 @@ interface SyncRepository {
     fun status(userId: UUID): SyncStatus
 
     // Content
-    fun upsertContent(userId: UUID, record: ContentRecord): ContentRecord
-    fun getContent(userId: UUID, id: String): ContentRecord?
-    fun deleteContent(userId: UUID, id: String, deletedAt: Long)
-    fun contentChanges(userId: UUID, since: Long, limit: Int): ChangeSet<ContentRecord, ContentDeletionMarker>
+    fun upsertContent(
+        userId: UUID,
+        record: ContentRecord,
+    ): ContentRecord
+
+    fun getContent(
+        userId: UUID,
+        id: String,
+    ): ContentRecord?
+
+    fun deleteContent(
+        userId: UUID,
+        id: String,
+        deletedAt: Long,
+    )
+
+    fun contentChanges(
+        userId: UUID,
+        since: Long,
+        limit: Int,
+    ): ChangeSet<ContentRecord, ContentDeletionMarker>
 
     // Journals
-    fun upsertJournal(userId: UUID, record: JournalRecord): JournalRecord
-    fun getJournal(userId: UUID, id: String): JournalRecord?
-    fun deleteJournal(userId: UUID, id: String, deletedAt: Long)
-    fun journalChanges(userId: UUID, since: Long, limit: Int): ChangeSet<JournalRecord, JournalDeletionMarker>
+    fun upsertJournal(
+        userId: UUID,
+        record: JournalRecord,
+    ): JournalRecord
+
+    fun getJournal(
+        userId: UUID,
+        id: String,
+    ): JournalRecord?
+
+    fun deleteJournal(
+        userId: UUID,
+        id: String,
+        deletedAt: Long,
+    )
+
+    fun journalChanges(
+        userId: UUID,
+        since: Long,
+        limit: Int,
+    ): ChangeSet<JournalRecord, JournalDeletionMarker>
 
     // Associations
-    fun upsertAssociations(userId: UUID, records: List<AssociationRecord>)
-    fun deleteAssociations(userId: UUID, keys: List<AssociationKey>, deletedAt: Long)
-    fun associationChanges(userId: UUID, since: Long, limit: Int): ChangeSet<AssociationRecord, AssociationDeletionMarker>
+    fun upsertAssociations(
+        userId: UUID,
+        records: List<AssociationRecord>,
+    )
+
+    fun deleteAssociations(
+        userId: UUID,
+        keys: List<AssociationKey>,
+        deletedAt: Long,
+    )
+
+    fun associationChanges(
+        userId: UUID,
+        since: Long,
+        limit: Int,
+    ): ChangeSet<AssociationRecord, AssociationDeletionMarker>
 
     // Media
-    fun upsertMedia(userId: UUID, record: MediaRecord): MediaRecord
-    fun getMedia(userId: UUID, mediaId: String): MediaRecord?
+    fun upsertMedia(
+        userId: UUID,
+        record: MediaRecord,
+    ): MediaRecord
+
+    fun getMedia(
+        userId: UUID,
+        mediaId: String,
+    ): MediaRecord?
 
     // Backups
-    fun createBackupRecord(userId: UUID, record: BackupRecord): BackupRecord
-    fun getBackupRecord(userId: UUID, id: UUID): BackupRecord?
+    fun createBackupRecord(
+        userId: UUID,
+        record: BackupRecord,
+    ): BackupRecord
+
+    fun getBackupRecord(
+        userId: UUID,
+        id: UUID,
+    ): BackupRecord?
+
     fun listBackups(userId: UUID): List<BackupRecord>
-    fun deleteBackup(userId: UUID, id: UUID)
+
+    fun deleteBackup(
+        userId: UUID,
+        id: UUID,
+    )
 
     // Maintenance
-    fun purgeTombstones(userId: UUID, olderThan: Long): SyncPurgeResult
+    fun purgeTombstones(
+        userId: UUID,
+        olderThan: Long,
+    ): SyncPurgeResult
+
     fun purgeTombstonesOlderThan(olderThan: Long): SyncPurgeResult
 }
 
@@ -114,18 +184,33 @@ data class SyncStatus(
     val contentCount: Int,
     val journalCount: Int,
     val associationCount: Int,
-    val lastTimestamp: Long
+    val lastTimestamp: Long,
 )
 
-data class ContentDeletionMarker(val id: String, val deletedAt: Long)
-data class JournalDeletionMarker(val id: String, val deletedAt: Long)
-data class AssociationKey(val journalId: String, val contentId: String)
-data class AssociationDeletionMarker(val key: AssociationKey, val deletedAt: Long)
+data class ContentDeletionMarker(
+    val id: String,
+    val deletedAt: Long,
+)
+
+data class JournalDeletionMarker(
+    val id: String,
+    val deletedAt: Long,
+)
+
+data class AssociationKey(
+    val journalId: String,
+    val contentId: String,
+)
+
+data class AssociationDeletionMarker(
+    val key: AssociationKey,
+    val deletedAt: Long,
+)
 
 data class SyncPurgeResult(
     val contentPurged: Int,
     val journalPurged: Int,
     val associationPurged: Int,
     val mediaPurged: Int,
-    val cutoff: Long
+    val cutoff: Long,
 )

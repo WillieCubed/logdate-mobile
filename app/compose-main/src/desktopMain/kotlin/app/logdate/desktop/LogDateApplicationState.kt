@@ -11,7 +11,6 @@ import app.logdate.desktop.notification.DesktopNotification
  * This manages state for the entire application, including all windows, dialogs, and notifications.
  */
 class LogDateApplicationState {
-
     val windows: List<LogDateWindowState>
         get() = _windows
 
@@ -23,7 +22,6 @@ class LogDateApplicationState {
     }
 
     fun openJournal(journalId: String) {
-
     }
 
     fun openNoteEditor() {
@@ -50,15 +48,15 @@ class LogDateApplicationState {
  * Utility function to remember the [LogDateApplicationState] in a composable.
  */
 @Composable
-fun rememberApplicationState(): LogDateApplicationState = remember {
-    LogDateApplicationState()
-}
+fun rememberApplicationState(): LogDateApplicationState =
+    remember {
+        LogDateApplicationState()
+    }
 
 /**
  * A generic interface for a window in the LogDate application.
  */
 sealed interface LogDateWindowState {
-
     /**
      * Attempts to close this window.
      *

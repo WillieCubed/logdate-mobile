@@ -10,9 +10,9 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
-import kotlin.time.Clock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
@@ -20,9 +20,8 @@ import kotlin.uuid.Uuid
  */
 class LocalDraftRepositoryOld(
     private val dataStore: DataStore<Preferences>,
-    private val json: Json
+    private val json: Json,
 ) : DraftRepository {
-
     companion object {
         private val KEY_DRAFTS = stringPreferencesKey("entry_drafts")
     }
@@ -30,10 +29,10 @@ class LocalDraftRepositoryOld(
     override suspend fun saveDraft(draft: EditorDraft) {
         try {
             Napier.d("Saving draft with ID: ${draft.id}, blocks: ${draft.blocks.size}")
-            
+
             // Get existing drafts
             val existingDrafts = getAllDrafts().toMutableList()
-            
+
             // Update existing draft or add new one
             val index = existingDrafts.indexOfFirst { it.id == draft.id }
             if (index >= 0) {
@@ -45,16 +44,16 @@ class LocalDraftRepositoryOld(
                 existingDrafts.add(draft)
                 Napier.d("Added new draft, total drafts: ${existingDrafts.size}")
             }
-            
+
             // Save all drafts
             val draftsJson = json.encodeToString(existingDrafts)
             Napier.d("Draft JSON length: ${draftsJson.length}")
-            
+
             // Save to DataStore
             dataStore.edit { preferences ->
                 preferences[KEY_DRAFTS] = draftsJson
             }
-            
+
             Napier.d("Successfully saved draft ${draft.id}")
         } catch (e: Exception) {
             Napier.e("Error saving draft: ${e.message}", e)
@@ -66,12 +65,12 @@ class LocalDraftRepositoryOld(
             Napier.d("Getting latest draft...")
             val allDrafts = getAllDrafts()
             Napier.d("Found ${allDrafts.size} drafts")
-            
+
             if (allDrafts.isEmpty()) {
                 Napier.d("No drafts found")
                 return null
             }
-            
+
             val latestDraft = allDrafts.maxByOrNull { it.lastModifiedAt }
             Napier.d("Latest draft ID: ${latestDraft?.id}, blocks: ${latestDraft?.blocks?.size}")
             return latestDraft
@@ -84,17 +83,18 @@ class LocalDraftRepositoryOld(
     override suspend fun getAllDrafts(): List<EditorDraft> {
         try {
             // Get the drafts JSON from DataStore
-            val draftsJson = dataStore.data
-                .map { it[KEY_DRAFTS] ?: "" }
-                .firstOrNull() ?: ""
-                
+            val draftsJson =
+                dataStore.data
+                    .map { it[KEY_DRAFTS] ?: "" }
+                    .firstOrNull() ?: ""
+
             if (draftsJson.isEmpty()) {
                 Napier.d("No drafts JSON found in DataStore")
                 return emptyList()
             }
-            
+
             Napier.d("Found drafts JSON, length: ${draftsJson.length}")
-            
+
             // Parse the JSON into EditorDraft objects
             return try {
                 val drafts = json.decodeFromString<List<EditorDraft>>(draftsJson)
@@ -110,29 +110,30 @@ class LocalDraftRepositoryOld(
         }
     }
 
-    override val allDrafts: Flow<List<EditorDraft>> = dataStore.data
-        .map { preferences ->
-            try {
-                val draftsJson = preferences[KEY_DRAFTS]
-                if (draftsJson.isNullOrEmpty()) {
-                    Napier.d("Flow: No drafts JSON found in DataStore")
-                    emptyList()
-                } else {
-                    Napier.d("Flow: Found drafts JSON, length: ${draftsJson.length}")
-                    try {
-                        val drafts = json.decodeFromString<List<EditorDraft>>(draftsJson)
-                        Napier.d("Flow: Successfully decoded ${drafts.size} drafts")
-                        drafts
-                    } catch (e: Exception) {
-                        Napier.e("Flow: Error decoding drafts JSON: ${e.message}", e)
+    override val allDrafts: Flow<List<EditorDraft>> =
+        dataStore.data
+            .map { preferences ->
+                try {
+                    val draftsJson = preferences[KEY_DRAFTS]
+                    if (draftsJson.isNullOrEmpty()) {
+                        Napier.d("Flow: No drafts JSON found in DataStore")
                         emptyList()
+                    } else {
+                        Napier.d("Flow: Found drafts JSON, length: ${draftsJson.length}")
+                        try {
+                            val drafts = json.decodeFromString<List<EditorDraft>>(draftsJson)
+                            Napier.d("Flow: Successfully decoded ${drafts.size} drafts")
+                            drafts
+                        } catch (e: Exception) {
+                            Napier.e("Flow: Error decoding drafts JSON: ${e.message}", e)
+                            emptyList()
+                        }
                     }
+                } catch (e: Exception) {
+                    Napier.e("Flow: Error getting all drafts: ${e.message}", e)
+                    emptyList()
                 }
-            } catch (e: Exception) {
-                Napier.e("Flow: Error getting all drafts: ${e.message}", e)
-                emptyList()
             }
-        }
 
     override suspend fun getDraft(id: Uuid): EditorDraft? {
         try {
@@ -156,12 +157,12 @@ class LocalDraftRepositoryOld(
             val existingDrafts = getAllDrafts().toMutableList()
             val initialSize = existingDrafts.size
             existingDrafts.removeAll { it.id == id }
-            
+
             if (initialSize == existingDrafts.size) {
                 Napier.d("No draft found with ID: $id to delete")
                 return
             }
-            
+
             val draftsJson = json.encodeToString(existingDrafts)
             dataStore.edit { preferences ->
                 preferences[KEY_DRAFTS] = draftsJson

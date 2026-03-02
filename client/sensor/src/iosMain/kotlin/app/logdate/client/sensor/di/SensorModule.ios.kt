@@ -12,18 +12,19 @@ import org.koin.dsl.module
 /**
  * iOS-specific implementation of the sensor module.
  */
-actual val sensorModule: Module = module {
-    single<GyroSensorProvider> {
-        IosGyroSensorProvider(
-            coroutineScope = get()
-        )
+actual val sensorModule: Module =
+    module {
+        single<GyroSensorProvider> {
+            IosGyroSensorProvider(
+                coroutineScope = get(),
+            )
+        }
+
+        single<BatteryInfoProvider> {
+            IosBatteryInfoProvider()
+        }
+
+        single<NetworkSaverModeProvider> {
+            IosNetworkSaverModeProvider()
+        }
     }
-    
-    single<BatteryInfoProvider> {
-        IosBatteryInfoProvider() 
-    }
-    
-    single<NetworkSaverModeProvider> { 
-        IosNetworkSaverModeProvider() 
-    }
-}

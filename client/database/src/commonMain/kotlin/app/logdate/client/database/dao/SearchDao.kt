@@ -3,7 +3,6 @@ package app.logdate.client.database.dao
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.SkipQueryVerification
-import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -19,7 +18,6 @@ import kotlin.uuid.Uuid
 @Dao
 @SkipQueryVerification
 interface SearchDao {
-
     /**
      * Searches all entries using FTS5 MATCH operator.
      *
@@ -33,12 +31,14 @@ interface SearchDao {
      * @param query The search query (will be used in FTS5 MATCH clause)
      * @return List of search results ordered by relevance and date
      */
-    @Query("""
+    @Query(
+        """
         SELECT uid, content, created, contentType
         FROM entries_fts
         WHERE entries_fts MATCH :query
         ORDER BY rank, created DESC
-    """)
+    """,
+    )
     suspend fun search(query: String): List<SearchResultEntity>
 
     /**
@@ -50,14 +50,19 @@ interface SearchDao {
      * @param limit Maximum number of results to return
      * @return List of limited search results
      */
-    @Query("""
+    @Query(
+        """
         SELECT uid, content, created, contentType
         FROM entries_fts
         WHERE entries_fts MATCH :query
         ORDER BY rank, created DESC
         LIMIT :limit
-    """)
-    suspend fun searchWithLimit(query: String, limit: Int): List<SearchResultEntity>
+    """,
+    )
+    suspend fun searchWithLimit(
+        query: String,
+        limit: Int,
+    ): List<SearchResultEntity>
 
     /**
      * Searches entries with highlighted snippets.
@@ -68,7 +73,8 @@ interface SearchDao {
      * @param query The search query
      * @return List of search results with highlighted snippets
      */
-    @Query("""
+    @Query(
+        """
         SELECT
             uid,
             snippet(entries_fts, 1, '[', ']', '...', 32) as content,
@@ -77,7 +83,8 @@ interface SearchDao {
         FROM entries_fts
         WHERE entries_fts MATCH :query
         ORDER BY rank, created DESC
-    """)
+    """,
+    )
     suspend fun searchWithSnippets(query: String): List<SearchResultEntity>
 }
 

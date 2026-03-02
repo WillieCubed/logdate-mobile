@@ -9,7 +9,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  */
 @OptIn(ExperimentalEncodingApi::class)
 class DatabasePassphraseProvider(
-    private val secureStorage: SecureStorage
+    private val secureStorage: SecureStorage,
 ) {
     suspend fun getOrCreatePassphrase(): ByteArray {
         val existing = secureStorage.getString(DB_KEY_STORAGE_KEY)

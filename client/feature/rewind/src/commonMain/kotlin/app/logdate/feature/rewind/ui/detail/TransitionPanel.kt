@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.rewind.ui.detail
 
 import androidx.compose.foundation.background
@@ -10,7 +12,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -44,17 +45,19 @@ fun TransitionPanel(
     modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-                        MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
-                    )
-                )
-            ),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors =
+                            listOf(
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                            ),
+                    ),
+                ),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             text = transitionText,
@@ -63,7 +66,7 @@ fun TransitionPanel(
             textAlign = TextAlign.Center,
             fontStyle = FontStyle.Italic,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(horizontal = 48.dp, vertical = 24.dp)
+            modifier = Modifier.padding(horizontal = 48.dp, vertical = 24.dp),
         )
     }
 }

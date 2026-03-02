@@ -8,10 +8,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -20,7 +20,7 @@ import kotlinx.coroutines.launch
 data class UserSession(
     val accessToken: String,
     val refreshToken: String,
-    val accountId: String
+    val accountId: String,
 )
 
 /**
@@ -59,9 +59,8 @@ interface SessionStorage {
  */
 class DataStoreSessionStorage(
     private val dataStore: DataStore<Preferences>,
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) : SessionStorage {
-    
     companion object {
         private val ACCESS_TOKEN_KEY = stringPreferencesKey("access_token")
         private val REFRESH_TOKEN_KEY = stringPreferencesKey("refresh_token")
@@ -82,21 +81,18 @@ class DataStoreSessionStorage(
                         UserSession(
                             accessToken = accessToken,
                             refreshToken = refreshToken,
-                            accountId = accountId
+                            accountId = accountId,
                         )
                     } else {
                         null
                     }
-                }
-                .distinctUntilChanged()
+                }.distinctUntilChanged()
                 .collect { sessionState.value = it }
         }
     }
 
-    override fun getSession(): UserSession? {
-        return sessionState.value
-    }
-    
+    override fun getSession(): UserSession? = sessionState.value
+
     override fun saveSession(session: UserSession) {
         sessionState.value = session
         scope.launch {
@@ -107,7 +103,7 @@ class DataStoreSessionStorage(
             }
         }
     }
-    
+
     override fun clearSession() {
         sessionState.value = null
         scope.launch {
@@ -118,12 +114,12 @@ class DataStoreSessionStorage(
             }
         }
     }
-    
+
     /**
      * Flow-based version of getSession for reactive use cases
      */
     override fun getSessionFlow() = sessionState.asStateFlow()
-    
+
     /**
      * Check if a valid session exists
      */

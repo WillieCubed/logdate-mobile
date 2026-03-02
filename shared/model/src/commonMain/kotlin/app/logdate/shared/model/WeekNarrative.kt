@@ -22,7 +22,6 @@ data class WeekNarrative(
      * - ["milestone achieved", "celebration", "reflection"]
      */
     val themes: List<String>,
-
     /**
      * Overall emotional tone of the week.
      *
@@ -33,14 +32,12 @@ data class WeekNarrative(
      * - "triumphant"
      */
     val emotionalTone: String,
-
     /**
      * Key story beats - the defining moments of the week.
      *
      * Typically 4-7 beats that form the narrative arc.
      */
     val storyBeats: List<StoryBeat>,
-
     /**
      * Overall narrative summary in 2-3 sentences.
      *
@@ -49,7 +46,7 @@ data class WeekNarrative(
      * you'd been searching for. Evenings were dedicated to the taco truck tour
      * you'd been planning. Sometimes the best trips are the ones you've dreamed about."
      */
-    val overallNarrative: String
+    val overallNarrative: String,
 )
 
 /**
@@ -69,7 +66,6 @@ data class StoryBeat(
      * - "Raid team finally cleared Mythic"
      */
     val moment: String,
-
     /**
      * Context and meaning of this moment.
      *
@@ -79,7 +75,6 @@ data class StoryBeat(
      * - "Gaming friends providing support during tough week"
      */
     val context: String,
-
     /**
      * Emotional weight or tone of this moment.
      *
@@ -90,12 +85,11 @@ data class StoryBeat(
      * - "frustrated"
      */
     val emotionalWeight: String,
-
     /**
      * IDs of journal content (entries, photos, videos) that serve as evidence.
      *
      * These are the specific quotes, photos, or moments that illustrate this beat.
      * Used to find supporting material when creating rewind panels.
      */
-    val evidenceIds: List<String>
+    val evidenceIds: List<String>,
 )

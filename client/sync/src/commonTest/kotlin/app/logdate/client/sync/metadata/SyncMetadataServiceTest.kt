@@ -4,13 +4,12 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import kotlin.time.Clock
-import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -18,7 +17,6 @@ import kotlin.uuid.Uuid
  * Uses an in-memory implementation for testing.
  */
 class SyncMetadataServiceTest {
-
     /**
      * In-memory implementation for testing.
      */
@@ -27,24 +25,33 @@ class SyncMetadataServiceTest {
         private val syncTimes = mutableMapOf<EntityType, Instant>()
         private val _pendingCount = MutableStateFlow(0)
 
-        override suspend fun getPendingUploads(entityType: EntityType): List<PendingUpload> {
-            return pendingUploads[entityType]?.values?.toList() ?: emptyList()
-        }
+        override suspend fun getPendingUploads(entityType: EntityType): List<PendingUpload> =
+            pendingUploads[entityType]?.values?.toList() ?: emptyList()
 
-        override suspend fun markAsSynced(entityId: String, entityType: EntityType, syncedAt: Instant, version: Long) {
+        override suspend fun markAsSynced(
+            entityId: String,
+            entityType: EntityType,
+            syncedAt: Instant,
+            version: Long,
+        ) {
             pendingUploads[entityType]?.remove(entityId)
             updatePendingCount()
         }
 
-        override suspend fun getLastSyncTime(entityType: EntityType): Instant? {
-            return syncTimes[entityType]
-        }
+        override suspend fun getLastSyncTime(entityType: EntityType): Instant? = syncTimes[entityType]
 
-        override suspend fun updateLastSyncTime(entityType: EntityType, syncedAt: Instant) {
+        override suspend fun updateLastSyncTime(
+            entityType: EntityType,
+            syncedAt: Instant,
+        ) {
             updateSyncTime(entityType, syncedAt)
         }
 
-        override suspend fun enqueuePending(entityId: String, entityType: EntityType, operation: PendingOperation) {
+        override suspend fun enqueuePending(
+            entityId: String,
+            entityType: EntityType,
+            operation: PendingOperation,
+        ) {
             val existing = pendingUploads[entityType]?.get(entityId)
             val resolved = resolveOperation(existing?.operation, operation)
             if (resolved == null) {
@@ -57,21 +64,23 @@ class SyncMetadataServiceTest {
             updatePendingCount()
         }
 
-        override suspend fun resetSyncStatus(entityId: String, entityType: EntityType) {
+        override suspend fun resetSyncStatus(
+            entityId: String,
+            entityType: EntityType,
+        ) {
             pendingUploads.getOrPut(entityType) { mutableMapOf() }[entityId] =
                 PendingUpload(entityId, PendingOperation.UPDATE, retryCount = 0)
             updatePendingCount()
         }
 
-        override suspend fun getPendingCount(): Int {
-            return pendingUploads.values.sumOf { it.size }
-        }
+        override suspend fun getPendingCount(): Int = pendingUploads.values.sumOf { it.size }
 
-        override fun observePendingCount(): Flow<Int> {
-            return _pendingCount
-        }
+        override fun observePendingCount(): Flow<Int> = _pendingCount
 
-        override suspend fun incrementRetryCount(entityId: String, entityType: EntityType) {
+        override suspend fun incrementRetryCount(
+            entityId: String,
+            entityType: EntityType,
+        ) {
             val existing = pendingUploads[entityType]?.get(entityId) ?: return
             pendingUploads.getOrPut(entityType) { mutableMapOf() }[entityId] =
                 existing.copy(retryCount = existing.retryCount + 1)
@@ -82,13 +91,20 @@ class SyncMetadataServiceTest {
         }
 
         // Test helper
-        fun addPending(entityId: String, entityType: EntityType, operation: PendingOperation = PendingOperation.UPDATE) {
+        fun addPending(
+            entityId: String,
+            entityType: EntityType,
+            operation: PendingOperation = PendingOperation.UPDATE,
+        ) {
             pendingUploads.getOrPut(entityType) { mutableMapOf() }[entityId] =
                 PendingUpload(entityId, operation)
             updatePendingCount()
         }
 
-        private fun updateSyncTime(entityType: EntityType, syncedAt: Instant) {
+        private fun updateSyncTime(
+            entityType: EntityType,
+            syncedAt: Instant,
+        ) {
             val current = syncTimes[entityType]
             if (current == null || syncedAt >= current) {
                 syncTimes[entityType] = syncedAt
@@ -97,151 +113,162 @@ class SyncMetadataServiceTest {
 
         private fun resolveOperation(
             existing: PendingOperation?,
-            incoming: PendingOperation
+            incoming: PendingOperation,
         ): PendingOperation? {
             if (existing == null) return incoming
             return when (existing) {
-                PendingOperation.CREATE -> when (incoming) {
-                    PendingOperation.UPDATE -> PendingOperation.CREATE
-                    PendingOperation.DELETE -> null
-                    PendingOperation.CREATE -> PendingOperation.CREATE
-                }
-                PendingOperation.UPDATE -> when (incoming) {
-                    PendingOperation.DELETE -> PendingOperation.DELETE
-                    PendingOperation.CREATE -> PendingOperation.CREATE
-                    PendingOperation.UPDATE -> PendingOperation.UPDATE
-                }
-                PendingOperation.DELETE -> when (incoming) {
-                    PendingOperation.CREATE -> PendingOperation.CREATE
-                    PendingOperation.UPDATE -> PendingOperation.CREATE
-                    PendingOperation.DELETE -> PendingOperation.DELETE
-                }
+                PendingOperation.CREATE ->
+                    when (incoming) {
+                        PendingOperation.UPDATE -> PendingOperation.CREATE
+                        PendingOperation.DELETE -> null
+                        PendingOperation.CREATE -> PendingOperation.CREATE
+                    }
+                PendingOperation.UPDATE ->
+                    when (incoming) {
+                        PendingOperation.DELETE -> PendingOperation.DELETE
+                        PendingOperation.CREATE -> PendingOperation.CREATE
+                        PendingOperation.UPDATE -> PendingOperation.UPDATE
+                    }
+                PendingOperation.DELETE ->
+                    when (incoming) {
+                        PendingOperation.CREATE -> PendingOperation.CREATE
+                        PendingOperation.UPDATE -> PendingOperation.CREATE
+                        PendingOperation.DELETE -> PendingOperation.DELETE
+                    }
             }
         }
     }
 
     @Test
-    fun `initially has no pending uploads`() = runTest {
-        val service = InMemorySyncMetadataService()
+    fun `initially has no pending uploads`() =
+        runTest {
+            val service = InMemorySyncMetadataService()
 
-        assertEquals(0, service.getPendingCount())
-        assertTrue(service.getPendingUploads(EntityType.NOTE).isEmpty())
-        assertTrue(service.getPendingUploads(EntityType.JOURNAL).isEmpty())
-    }
-
-    @Test
-    fun `initially has no last sync time`() = runTest {
-        val service = InMemorySyncMetadataService()
-
-        assertNull(service.getLastSyncTime(EntityType.NOTE))
-        assertNull(service.getLastSyncTime(EntityType.JOURNAL))
-    }
+            assertEquals(0, service.getPendingCount())
+            assertTrue(service.getPendingUploads(EntityType.NOTE).isEmpty())
+            assertTrue(service.getPendingUploads(EntityType.JOURNAL).isEmpty())
+        }
 
     @Test
-    fun `resetSyncStatus adds entity to pending uploads`() = runTest {
-        val service = InMemorySyncMetadataService()
-        val entityId = Uuid.random().toString()
+    fun `initially has no last sync time`() =
+        runTest {
+            val service = InMemorySyncMetadataService()
 
-        service.resetSyncStatus(entityId, EntityType.NOTE)
-
-        val pending = service.getPendingUploads(EntityType.NOTE)
-        assertEquals(1, pending.size)
-        assertEquals(entityId, pending.first().entityId)
-        assertEquals(1, service.getPendingCount())
-    }
+            assertNull(service.getLastSyncTime(EntityType.NOTE))
+            assertNull(service.getLastSyncTime(EntityType.JOURNAL))
+        }
 
     @Test
-    fun `markAsSynced removes entity from pending uploads`() = runTest {
-        val service = InMemorySyncMetadataService()
-        val entityId = Uuid.random().toString()
-        val syncTime = Clock.System.now()
+    fun `resetSyncStatus adds entity to pending uploads`() =
+        runTest {
+            val service = InMemorySyncMetadataService()
+            val entityId = Uuid.random().toString()
 
-        // Add to pending first
-        service.resetSyncStatus(entityId, EntityType.NOTE)
-        assertEquals(1, service.getPendingCount())
+            service.resetSyncStatus(entityId, EntityType.NOTE)
 
-        // Mark as synced
-        service.markAsSynced(entityId, EntityType.NOTE, syncTime, 1L)
-
-        assertEquals(0, service.getPendingCount())
-        assertTrue(service.getPendingUploads(EntityType.NOTE).isEmpty())
-        assertNull(service.getLastSyncTime(EntityType.NOTE))
-    }
+            val pending = service.getPendingUploads(EntityType.NOTE)
+            assertEquals(1, pending.size)
+            assertEquals(entityId, pending.first().entityId)
+            assertEquals(1, service.getPendingCount())
+        }
 
     @Test
-    fun `pending uploads are tracked per entity type`() = runTest {
-        val service = InMemorySyncMetadataService()
-        val noteId = Uuid.random().toString()
-        val journalId = Uuid.random().toString()
+    fun `markAsSynced removes entity from pending uploads`() =
+        runTest {
+            val service = InMemorySyncMetadataService()
+            val entityId = Uuid.random().toString()
+            val syncTime = Clock.System.now()
 
-        service.resetSyncStatus(noteId, EntityType.NOTE)
-        service.resetSyncStatus(journalId, EntityType.JOURNAL)
+            // Add to pending first
+            service.resetSyncStatus(entityId, EntityType.NOTE)
+            assertEquals(1, service.getPendingCount())
 
-        assertEquals(1, service.getPendingUploads(EntityType.NOTE).size)
-        assertEquals(1, service.getPendingUploads(EntityType.JOURNAL).size)
-        assertEquals(2, service.getPendingCount())
-    }
+            // Mark as synced
+            service.markAsSynced(entityId, EntityType.NOTE, syncTime, 1L)
 
-    @Test
-    fun `sync times are tracked per entity type`() = runTest {
-        val service = InMemorySyncMetadataService()
-        val noteTime = Instant.fromEpochMilliseconds(1000)
-        val journalTime = Instant.fromEpochMilliseconds(2000)
-
-        service.updateLastSyncTime(EntityType.NOTE, noteTime)
-        service.updateLastSyncTime(EntityType.JOURNAL, journalTime)
-
-        assertEquals(noteTime, service.getLastSyncTime(EntityType.NOTE))
-        assertEquals(journalTime, service.getLastSyncTime(EntityType.JOURNAL))
-    }
+            assertEquals(0, service.getPendingCount())
+            assertTrue(service.getPendingUploads(EntityType.NOTE).isEmpty())
+            assertNull(service.getLastSyncTime(EntityType.NOTE))
+        }
 
     @Test
-    fun `observePendingCount emits updates`() = runTest {
-        val service = InMemorySyncMetadataService()
-        val entityId = Uuid.random().toString()
+    fun `pending uploads are tracked per entity type`() =
+        runTest {
+            val service = InMemorySyncMetadataService()
+            val noteId = Uuid.random().toString()
+            val journalId = Uuid.random().toString()
 
-        // Initial state
-        assertEquals(0, service.observePendingCount().first())
+            service.resetSyncStatus(noteId, EntityType.NOTE)
+            service.resetSyncStatus(journalId, EntityType.JOURNAL)
 
-        // After adding pending
-        service.resetSyncStatus(entityId, EntityType.NOTE)
-        assertEquals(1, service.observePendingCount().first())
-
-        // After syncing
-        service.markAsSynced(entityId, EntityType.NOTE, Clock.System.now(), 1L)
-        assertEquals(0, service.observePendingCount().first())
-    }
+            assertEquals(1, service.getPendingUploads(EntityType.NOTE).size)
+            assertEquals(1, service.getPendingUploads(EntityType.JOURNAL).size)
+            assertEquals(2, service.getPendingCount())
+        }
 
     @Test
-    fun `multiple pending entities for same type are tracked correctly`() = runTest {
-        val service = InMemorySyncMetadataService()
-        val id1 = Uuid.random().toString()
-        val id2 = Uuid.random().toString()
-        val id3 = Uuid.random().toString()
+    fun `sync times are tracked per entity type`() =
+        runTest {
+            val service = InMemorySyncMetadataService()
+            val noteTime = Instant.fromEpochMilliseconds(1000)
+            val journalTime = Instant.fromEpochMilliseconds(2000)
 
-        service.resetSyncStatus(id1, EntityType.NOTE)
-        service.resetSyncStatus(id2, EntityType.NOTE)
-        service.resetSyncStatus(id3, EntityType.NOTE)
+            service.updateLastSyncTime(EntityType.NOTE, noteTime)
+            service.updateLastSyncTime(EntityType.JOURNAL, journalTime)
 
-        assertEquals(3, service.getPendingUploads(EntityType.NOTE).size)
-        assertEquals(3, service.getPendingCount())
-
-        // Sync one
-        service.markAsSynced(id1, EntityType.NOTE, Clock.System.now(), 1L)
-        assertEquals(2, service.getPendingUploads(EntityType.NOTE).size)
-        assertEquals(2, service.getPendingCount())
-    }
+            assertEquals(noteTime, service.getLastSyncTime(EntityType.NOTE))
+            assertEquals(journalTime, service.getLastSyncTime(EntityType.JOURNAL))
+        }
 
     @Test
-    fun `create then delete clears pending entry`() = runTest {
-        val service = InMemorySyncMetadataService()
-        val entityId = Uuid.random().toString()
+    fun `observePendingCount emits updates`() =
+        runTest {
+            val service = InMemorySyncMetadataService()
+            val entityId = Uuid.random().toString()
 
-        service.enqueuePending(entityId, EntityType.NOTE, PendingOperation.CREATE)
-        service.enqueuePending(entityId, EntityType.NOTE, PendingOperation.DELETE)
+            // Initial state
+            assertEquals(0, service.observePendingCount().first())
 
-        assertTrue(service.getPendingUploads(EntityType.NOTE).isEmpty())
-        assertEquals(0, service.getPendingCount())
-    }
+            // After adding pending
+            service.resetSyncStatus(entityId, EntityType.NOTE)
+            assertEquals(1, service.observePendingCount().first())
 
+            // After syncing
+            service.markAsSynced(entityId, EntityType.NOTE, Clock.System.now(), 1L)
+            assertEquals(0, service.observePendingCount().first())
+        }
+
+    @Test
+    fun `multiple pending entities for same type are tracked correctly`() =
+        runTest {
+            val service = InMemorySyncMetadataService()
+            val id1 = Uuid.random().toString()
+            val id2 = Uuid.random().toString()
+            val id3 = Uuid.random().toString()
+
+            service.resetSyncStatus(id1, EntityType.NOTE)
+            service.resetSyncStatus(id2, EntityType.NOTE)
+            service.resetSyncStatus(id3, EntityType.NOTE)
+
+            assertEquals(3, service.getPendingUploads(EntityType.NOTE).size)
+            assertEquals(3, service.getPendingCount())
+
+            // Sync one
+            service.markAsSynced(id1, EntityType.NOTE, Clock.System.now(), 1L)
+            assertEquals(2, service.getPendingUploads(EntityType.NOTE).size)
+            assertEquals(2, service.getPendingCount())
+        }
+
+    @Test
+    fun `create then delete clears pending entry`() =
+        runTest {
+            val service = InMemorySyncMetadataService()
+            val entityId = Uuid.random().toString()
+
+            service.enqueuePending(entityId, EntityType.NOTE, PendingOperation.CREATE)
+            service.enqueuePending(entityId, EntityType.NOTE, PendingOperation.DELETE)
+
+            assertTrue(service.getPendingUploads(EntityType.NOTE).isEmpty())
+            assertEquals(0, service.getPendingCount())
+        }
 }

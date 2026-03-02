@@ -2,23 +2,30 @@ package app.logdate.server.database
 
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountRepository
+import org.jetbrains.exposed.sql.ResultRow
+import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
+import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
 import kotlin.time.Clock
 import kotlin.time.Instant
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.transactions.transaction
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class)
 class PostgreSQLAccountRepository : AccountRepository {
-    
-    override suspend fun save(account: Account): Account {
-        return transaction {
-            val existingAccount = AccountsTable.selectAll()
-                .where { AccountsTable.id eq account.id.toJavaUUID() }
-                .singleOrNull()
-            
+    override suspend fun save(account: Account): Account =
+        transaction {
+            val existingAccount =
+                AccountsTable
+                    .selectAll()
+                    .where { AccountsTable.id eq account.id.toJavaUUID() }
+                    .singleOrNull()
+
             if (existingAccount != null) {
                 // Update existing account
                 AccountsTable.update({ AccountsTable.id eq account.id.toJavaUUID() }) {
@@ -47,95 +54,93 @@ class PostgreSQLAccountRepository : AccountRepository {
                 account
             }
         }
-    }
-    
-    override suspend fun findById(id: Uuid): Account? {
-        return transaction {
-            AccountsTable.selectAll()
+
+    override suspend fun findById(id: Uuid): Account? =
+        transaction {
+            AccountsTable
+                .selectAll()
                 .where { AccountsTable.id eq id.toJavaUUID() }
                 .singleOrNull()
                 ?.toAccount()
         }
-    }
-    
-    override suspend fun findByUsername(username: String): Account? {
-        return transaction {
-            AccountsTable.selectAll()
+
+    override suspend fun findByUsername(username: String): Account? =
+        transaction {
+            AccountsTable
+                .selectAll()
                 .where { AccountsTable.username eq username }
                 .singleOrNull()
                 ?.toAccount()
         }
-    }
-    
-    override suspend fun findByEmail(email: String): Account? {
-        return transaction {
-            AccountsTable.selectAll()
+
+    override suspend fun findByEmail(email: String): Account? =
+        transaction {
+            AccountsTable
+                .selectAll()
                 .where { AccountsTable.email eq email }
                 .singleOrNull()
                 ?.toAccount()
         }
-    }
-    
-    override suspend fun usernameExists(username: String): Boolean {
-        return transaction {
-            AccountsTable.selectAll()
+
+    override suspend fun usernameExists(username: String): Boolean =
+        transaction {
+            AccountsTable
+                .selectAll()
                 .where { AccountsTable.username eq username }
                 .count() > 0
         }
-    }
-    
-    override suspend fun emailExists(email: String): Boolean {
-        return transaction {
-            AccountsTable.selectAll()
+
+    override suspend fun emailExists(email: String): Boolean =
+        transaction {
+            AccountsTable
+                .selectAll()
                 .where { AccountsTable.email eq email }
                 .count() > 0
         }
-    }
-    
-    override suspend fun updateLastSignIn(accountId: Uuid): Boolean {
-        return transaction {
-            val updatedRows = AccountsTable.update({ AccountsTable.id eq accountId.toJavaUUID() }) {
-                it[lastSignInAt] = Clock.System.now()
-            }
+
+    override suspend fun updateLastSignIn(accountId: Uuid): Boolean =
+        transaction {
+            val updatedRows =
+                AccountsTable.update({ AccountsTable.id eq accountId.toJavaUUID() }) {
+                    it[lastSignInAt] = Clock.System.now()
+                }
             updatedRows > 0
         }
-    }
-    
-    override suspend fun deactivateAccount(accountId: Uuid): Boolean {
-        return transaction {
-            val updatedRows = AccountsTable.update({ AccountsTable.id eq accountId.toJavaUUID() }) {
-                it[isActive] = false
-            }
+
+    override suspend fun deactivateAccount(accountId: Uuid): Boolean =
+        transaction {
+            val updatedRows =
+                AccountsTable.update({ AccountsTable.id eq accountId.toJavaUUID() }) {
+                    it[isActive] = false
+                }
             updatedRows > 0
         }
-    }
-    
-    override suspend fun getAllAccounts(): List<Account> {
-        return transaction {
-            AccountsTable.selectAll()
+
+    override suspend fun getAllAccounts(): List<Account> =
+        transaction {
+            AccountsTable
+                .selectAll()
                 .orderBy(AccountsTable.createdAt, SortOrder.DESC)
                 .map { it.toAccount() }
         }
-    }
-    
-    override suspend fun getAccountsCreatedAfter(timestamp: Instant): List<Account> {
-        return transaction {
-            AccountsTable.selectAll()
+
+    override suspend fun getAccountsCreatedAfter(timestamp: Instant): List<Account> =
+        transaction {
+            AccountsTable
+                .selectAll()
                 .where { AccountsTable.createdAt greater timestamp }
                 .orderBy(AccountsTable.createdAt, SortOrder.DESC)
                 .map { it.toAccount() }
         }
-    }
-    
-    override suspend fun deleteAccount(accountId: Uuid): Boolean {
-        return transaction {
+
+    override suspend fun deleteAccount(accountId: Uuid): Boolean =
+        transaction {
             val deletedRows = AccountsTable.deleteWhere { id eq accountId.toJavaUUID() }
             deletedRows > 0
         }
-    }
-    
-    private fun ResultRow.toAccount(): Account {
-        return Account(
+
+    private fun ResultRow.toAccount(): Account =
+        Account(
             id = this[AccountsTable.id].toKotlinUuid(),
             username = this[AccountsTable.username],
             displayName = this[AccountsTable.displayName],
@@ -144,7 +149,6 @@ class PostgreSQLAccountRepository : AccountRepository {
             createdAt = this[AccountsTable.createdAt],
             lastSignInAt = this[AccountsTable.lastSignInAt],
             isActive = this[AccountsTable.isActive],
-            preferences = this[AccountsTable.preferences]
+            preferences = this[AccountsTable.preferences],
         )
-    }
 }

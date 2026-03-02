@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:filename")
+
 package app.logdate
 
 import androidx.compose.ui.window.application
@@ -11,11 +13,12 @@ import org.koin.compose.KoinApplication
 /**
  * Launches the LogDate application.
  */
-fun main() = application {
-    KoinApplication(application = {
-        modules(appModule)
-    }) {
-        Napier.base(DebugAntilog())
-        LogDateApplication(rememberApplicationState())
+fun main() =
+    application {
+        KoinApplication(application = {
+            modules(appModule)
+        }) {
+            Napier.base(DebugAntilog())
+            LogDateApplication(rememberApplicationState())
+        }
     }
-}

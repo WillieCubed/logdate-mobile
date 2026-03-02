@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.feature.timeline.ui.details
 
 import androidx.compose.foundation.background
@@ -14,17 +16,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
-import kotlin.time.Instant
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.timeline.generated.resources.*
 import logdate.client.feature.timeline.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Instant
+
 @Composable
 internal fun EventsSection(
     events: List<DayEvent>,
     onOpenEvent: (eventId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-
     Column(
         modifier = modifier.padding(horizontal = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -52,12 +54,13 @@ private fun EventItem(
     onOpenEvent: () -> Unit,
 ) {
     Box(
-        modifier = Modifier
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .padding(Spacing.lg)
-            .fillMaxWidth()
-            .height(120.dp)
-            .clickable { onOpenEvent() },
+        modifier =
+            Modifier
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                .padding(Spacing.lg)
+                .fillMaxWidth()
+                .height(120.dp)
+                .clickable { onOpenEvent() },
     ) {
         Text(event.title, style = MaterialTheme.typography.bodyMedium)
     }

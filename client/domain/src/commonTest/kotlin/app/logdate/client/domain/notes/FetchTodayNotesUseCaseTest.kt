@@ -6,18 +6,16 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
-import kotlin.time.Clock
-import kotlin.time.Instant
-import kotlinx.datetime.LocalDate
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class FetchTodayNotesUseCaseTest {
-
     private lateinit var mockRepository: MockJournalNotesRepository
     private lateinit var useCase: FetchTodayNotesUseCase
 
@@ -28,126 +26,135 @@ class FetchTodayNotesUseCaseTest {
     }
 
     @Test
-    fun `invoke should return notes for today with default buffer`() = runTest {
-        // Given
-        val testNotes = listOf(
-            createTestNote("Morning note"),
-            createTestNote("Afternoon note")
-        )
-        mockRepository.notesForRange = testNotes
-        
-        // When
-        val result = useCase().first()
-        
-        // Then
-        assertEquals(testNotes, result)
-        assertEquals(1, mockRepository.observeCallCount)
-    }
+    fun `invoke should return notes for today with default buffer`() =
+        runTest {
+            // Given
+            val testNotes =
+                listOf(
+                    createTestNote("Morning note"),
+                    createTestNote("Afternoon note"),
+                )
+            mockRepository.notesForRange = testNotes
 
-    @Test
-    fun `invoke should return empty list when no notes exist for today`() = runTest {
-        // Given
-        mockRepository.notesForRange = emptyList()
-        
-        // When
-        val result = useCase().first()
-        
-        // Then
-        assertTrue(result.isEmpty())
-        assertEquals(1, mockRepository.observeCallCount)
-    }
+            // When
+            val result = useCase().first()
 
-    @Test
-    fun `invoke should use default 4-hour buffer`() = runTest {
-        // Given
-        mockRepository.notesForRange = emptyList()
-        
-        // When
-        useCase().first()
-        
-        // Then
-        assertEquals(1, mockRepository.observeCallCount)
-        // Verify the buffer is applied (start time should be 4 hours before start of day)
-        val timeDifference = mockRepository.lastEndTime!! - mockRepository.lastStartTime!!
-        assertEquals(28.hours, timeDifference)
-    }
-
-    @Test
-    fun `invoke should use custom buffer when provided`() = runTest {
-        // Given
-        val customBuffer = 2.hours
-        mockRepository.notesForRange = emptyList()
-        
-        // When
-        useCase(buffer = customBuffer).first()
-        
-        // Then
-        assertEquals(1, mockRepository.observeCallCount)
-        // Verify the custom buffer is applied
-        val timeDifference = mockRepository.lastEndTime!! - mockRepository.lastStartTime!!
-        assertEquals(26.hours, timeDifference)
-    }
-
-    @Test
-    fun `invoke should handle zero buffer`() = runTest {
-        // Given
-        val noBuffer = 0.hours
-        mockRepository.notesForRange = emptyList()
-        
-        // When
-        useCase(buffer = noBuffer).first()
-        
-        // Then
-        assertEquals(1, mockRepository.observeCallCount)
-        // Verify no buffer is applied
-        val timeDifference = mockRepository.lastEndTime!! - mockRepository.lastStartTime!!
-        assertEquals(24.hours, timeDifference)
-    }
-
-    @Test
-    fun `invoke should return large list of notes correctly`() = runTest {
-        // Given
-        val manyNotes = (1..100).map { 
-            createTestNote("Note number $it")
+            // Then
+            assertEquals(testNotes, result)
+            assertEquals(1, mockRepository.observeCallCount)
         }
-        mockRepository.notesForRange = manyNotes
-        
-        // When
-        val result = useCase().first()
-        
-        // Then
-        assertEquals(100, result.size)
-        assertEquals(manyNotes, result)
-    }
 
     @Test
-    fun `invoke should include notes from previous day with buffer`() = runTest {
-        // Given
-        val notesIncludingPreviousDay = listOf(
-            createTestNote("Late night note from yesterday"),
-            createTestNote("Early morning note from today"),
-            createTestNote("Regular note from today")
-        )
-        mockRepository.notesForRange = notesIncludingPreviousDay
-        
-        // When
-        val result = useCase(buffer = 6.hours).first()
-        
-        // Then
-        assertEquals(notesIncludingPreviousDay, result)
-        // Verify 6-hour buffer is applied
-        val timeDifference = mockRepository.lastEndTime!! - mockRepository.lastStartTime!!
-        assertEquals(30.hours, timeDifference)
-    }
+    fun `invoke should return empty list when no notes exist for today`() =
+        runTest {
+            // Given
+            mockRepository.notesForRange = emptyList()
 
-    private fun createTestNote(
-        content: String = "Test note content",
-    ) = JournalNote.Text(
-        uid = Uuid.random(),
-        content = content,
-        creationTimestamp = Clock.System.now(),
-        lastUpdated = Clock.System.now()
-    )
+            // When
+            val result = useCase().first()
+
+            // Then
+            assertTrue(result.isEmpty())
+            assertEquals(1, mockRepository.observeCallCount)
+        }
+
+    @Test
+    fun `invoke should use default 4-hour buffer`() =
+        runTest {
+            // Given
+            mockRepository.notesForRange = emptyList()
+
+            // When
+            useCase().first()
+
+            // Then
+            assertEquals(1, mockRepository.observeCallCount)
+            // Verify the buffer is applied (start time should be 4 hours before start of day)
+            val timeDifference = mockRepository.lastEndTime!! - mockRepository.lastStartTime!!
+            assertEquals(28.hours, timeDifference)
+        }
+
+    @Test
+    fun `invoke should use custom buffer when provided`() =
+        runTest {
+            // Given
+            val customBuffer = 2.hours
+            mockRepository.notesForRange = emptyList()
+
+            // When
+            useCase(buffer = customBuffer).first()
+
+            // Then
+            assertEquals(1, mockRepository.observeCallCount)
+            // Verify the custom buffer is applied
+            val timeDifference = mockRepository.lastEndTime!! - mockRepository.lastStartTime!!
+            assertEquals(26.hours, timeDifference)
+        }
+
+    @Test
+    fun `invoke should handle zero buffer`() =
+        runTest {
+            // Given
+            val noBuffer = 0.hours
+            mockRepository.notesForRange = emptyList()
+
+            // When
+            useCase(buffer = noBuffer).first()
+
+            // Then
+            assertEquals(1, mockRepository.observeCallCount)
+            // Verify no buffer is applied
+            val timeDifference = mockRepository.lastEndTime!! - mockRepository.lastStartTime!!
+            assertEquals(24.hours, timeDifference)
+        }
+
+    @Test
+    fun `invoke should return large list of notes correctly`() =
+        runTest {
+            // Given
+            val manyNotes =
+                (1..100).map {
+                    createTestNote("Note number $it")
+                }
+            mockRepository.notesForRange = manyNotes
+
+            // When
+            val result = useCase().first()
+
+            // Then
+            assertEquals(100, result.size)
+            assertEquals(manyNotes, result)
+        }
+
+    @Test
+    fun `invoke should include notes from previous day with buffer`() =
+        runTest {
+            // Given
+            val notesIncludingPreviousDay =
+                listOf(
+                    createTestNote("Late night note from yesterday"),
+                    createTestNote("Early morning note from today"),
+                    createTestNote("Regular note from today"),
+                )
+            mockRepository.notesForRange = notesIncludingPreviousDay
+
+            // When
+            val result = useCase(buffer = 6.hours).first()
+
+            // Then
+            assertEquals(notesIncludingPreviousDay, result)
+            // Verify 6-hour buffer is applied
+            val timeDifference = mockRepository.lastEndTime!! - mockRepository.lastStartTime!!
+            assertEquals(30.hours, timeDifference)
+        }
+
+    private fun createTestNote(content: String = "Test note content") =
+        JournalNote.Text(
+            uid = Uuid.random(),
+            content = content,
+            creationTimestamp = Clock.System.now(),
+            lastUpdated = Clock.System.now(),
+        )
 
     private class MockJournalNotesRepository : JournalNotesRepository {
         var notesForRange = emptyList<JournalNote>()
@@ -155,7 +162,10 @@ class FetchTodayNotesUseCaseTest {
         var lastStartTime: Instant? = null
         var lastEndTime: Instant? = null
 
-        override fun observeNotesInRange(start: Instant, end: Instant): Flow<List<JournalNote>> {
+        override fun observeNotesInRange(
+            start: Instant,
+            end: Instant,
+        ): Flow<List<JournalNote>> {
             observeCallCount++
             lastStartTime = start
             lastEndTime = end
@@ -163,15 +173,34 @@ class FetchTodayNotesUseCaseTest {
         }
 
         override val allNotesObserved: Flow<List<JournalNote>> = flowOf(emptyList())
+
         override fun observeNotesInJournal(journalId: Uuid) = flowOf(emptyList<JournalNote>())
-        override fun observeNotesPage(pageSize: Int, offset: Int) = flowOf(emptyList<JournalNote>())
+
+        override fun observeNotesPage(
+            pageSize: Int,
+            offset: Int,
+        ) = flowOf(emptyList<JournalNote>())
+
         override fun observeNotesStream(pageSize: Int) = flowOf(emptyList<JournalNote>())
+
         override fun observeRecentNotes(limit: Int) = flowOf(emptyList<JournalNote>())
+
         override suspend fun create(note: JournalNote): Uuid = note.uid
+
         override suspend fun remove(note: JournalNote) = Unit
+
         override suspend fun removeById(noteId: Uuid) = Unit
-        override suspend fun create(note: JournalNote, journalId: Uuid) = Unit
-        override suspend fun removeFromJournal(noteId: Uuid, journalId: Uuid) = Unit
+
+        override suspend fun create(
+            note: JournalNote,
+            journalId: Uuid,
+        ) = Unit
+
+        override suspend fun removeFromJournal(
+            noteId: Uuid,
+            journalId: Uuid,
+        ) = Unit
+
         override suspend fun getNoteById(noteId: Uuid): JournalNote? = null
     }
 }

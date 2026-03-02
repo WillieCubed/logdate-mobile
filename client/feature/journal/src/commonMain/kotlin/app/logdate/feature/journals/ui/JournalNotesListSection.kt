@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.feature.journals.ui
 
 import androidx.compose.animation.AnimatedVisibility
@@ -28,9 +30,10 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.journal.generated.resources.*
 import logdate.client.feature.journal.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+
 /**
  * A section that displays a list of notes associated with a journal.
  */
@@ -38,37 +41,37 @@ import logdate.client.feature.journal.generated.resources.Res
 fun JournalNotesListSection(
     notes: List<JournalNote>,
     onNoteClick: (JournalNote) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface
+        color = MaterialTheme.colorScheme.surface,
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(16.dp),
         ) {
             Text(
                 text = stringResource(Res.string.journal_entries),
-                style = MaterialTheme.typography.titleMedium
+                style = MaterialTheme.typography.titleMedium,
             )
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             if (notes.isEmpty()) {
                 Text(
                     text = stringResource(Res.string.no_entries_in_this_journal_yet),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(vertical = 8.dp)
+                    contentPadding = PaddingValues(vertical = 8.dp),
                 ) {
                     items(notes) { note ->
                         JournalNoteItem(
                             note = note,
                             onClick = { onNoteClick(note) },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
@@ -82,78 +85,79 @@ fun JournalNotesListSection(
 private fun JournalNoteItem(
     note: JournalNote,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    
+
     Column(modifier = modifier) {
         // Display date and time above the card
         Text(
             text = note.creationTimestamp.toReadableDateTimeShort(),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 4.dp)
+            modifier = Modifier.padding(bottom = 4.dp),
         )
-        
+
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { expanded = !expanded }
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
         ) {
             Column(
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(16.dp),
             ) {
                 when (note) {
                     is JournalNote.Text -> {
                         AnimatedVisibility(
                             visible = !expanded,
                             enter = expandVertically(),
-                            exit = shrinkVertically()
+                            exit = shrinkVertically(),
                         ) {
                             Text(
                                 text = note.content,
                                 style = MaterialTheme.typography.bodyMedium,
                                 maxLines = 4,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.heightIn(min = 40.dp)
+                                modifier = Modifier.heightIn(min = 40.dp),
                             )
                         }
-                        
+
                         AnimatedVisibility(
                             visible = expanded,
                             enter = expandVertically(),
-                            exit = shrinkVertically()
+                            exit = shrinkVertically(),
                         ) {
                             Text(
                                 text = note.content,
                                 style = MaterialTheme.typography.bodyMedium,
                                 // No maxLines constraint to ensure all content is shown
                                 // and no text overflow limitation
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
                             )
                         }
                     }
                     is JournalNote.Image -> {
                         Text(
                             text = stringResource(Res.string.image_note),
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.bodyMedium,
                         )
                         AsyncImage(
                             model = note.mediaRef,
                             contentDescription = null,
-                            modifier = if (expanded) Modifier.fillMaxWidth() else Modifier
+                            modifier = if (expanded) Modifier.fillMaxWidth() else Modifier,
                         )
                     }
                     is JournalNote.Video -> {
                         Text(
                             text = stringResource(Res.string.video_note),
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.bodyMedium,
                         )
                     }
                     is JournalNote.Audio -> {
                         Text(
                             text = stringResource(Res.string.audio_note),
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.bodyMedium,
                         )
                     }
                 }

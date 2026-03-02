@@ -5,10 +5,11 @@ import app.logdate.shared.model.BeginAccountCreationResponse
 import app.logdate.shared.model.CompleteAccountCreationRequest
 import app.logdate.shared.model.CompleteAccountCreationResponse
 import app.logdate.shared.model.LogDateAccount
+
 /**
  * Interface defining the API client for LogDate Cloud services.
- * 
- * This client handles communication with the LogDate Cloud API for 
+ *
+ * This client handles communication with the LogDate Cloud API for
  * account management, authentication, and data synchronization.
  */
 interface CloudApiClient {
@@ -20,21 +21,19 @@ interface CloudApiClient {
      * @throws CloudApiException If the request fails.
      */
     suspend fun checkUsernameAvailability(username: String): Result<CheckUsernameAvailabilityResponse>
-    
+
     /**
      * Begins the account creation process.
      *
-     * This initiates the passkey registration process and returns 
+     * This initiates the passkey registration process and returns
      * the necessary challenge and options for creating a WebAuthn credential.
      *
      * @param request The account creation request containing user details.
      * @return Response with session token and registration options.
      * @throws CloudApiException If the request fails.
      */
-    suspend fun beginAccountCreation(
-        request: BeginAccountCreationRequest
-    ): Result<BeginAccountCreationResponse>
-    
+    suspend fun beginAccountCreation(request: BeginAccountCreationRequest): Result<BeginAccountCreationResponse>
+
     /**
      * Completes the account creation process.
      *
@@ -45,10 +44,8 @@ interface CloudApiClient {
      * @return Response with the created account details and authentication tokens.
      * @throws CloudApiException If the request fails.
      */
-    suspend fun completeAccountCreation(
-        request: CompleteAccountCreationRequest
-    ): Result<CompleteAccountCreationResponse>
-    
+    suspend fun completeAccountCreation(request: CompleteAccountCreationRequest): Result<CompleteAccountCreationResponse>
+
     /**
      * Refreshes an expired access token.
      *
@@ -57,7 +54,7 @@ interface CloudApiClient {
      * @throws CloudApiException If the request fails.
      */
     suspend fun refreshAccessToken(refreshToken: String): Result<String>
-    
+
     /**
      * Gets the current account information.
      *
@@ -66,75 +63,123 @@ interface CloudApiClient {
      * @throws CloudApiException If the request fails.
      */
     suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount>
-    
+
     // Content Sync Operations
+
     /**
      * Uploads new content (notes) to the cloud.
      */
-    suspend fun uploadContent(accessToken: String, content: ContentUploadRequest): Result<ContentUploadResponse>
-    
+    suspend fun uploadContent(
+        accessToken: String,
+        content: ContentUploadRequest,
+    ): Result<ContentUploadResponse>
+
     /**
      * Downloads content changes since the specified timestamp.
      */
-    suspend fun getContentChanges(accessToken: String, since: Long, limit: Int? = null): Result<ContentChangesResponse>
-    
+    suspend fun getContentChanges(
+        accessToken: String,
+        since: Long,
+        limit: Int? = null,
+    ): Result<ContentChangesResponse>
+
     /**
      * Updates existing content.
      */
-    suspend fun updateContent(accessToken: String, contentId: String, content: ContentUpdateRequest): Result<ContentUpdateResponse>
-    
+    suspend fun updateContent(
+        accessToken: String,
+        contentId: String,
+        content: ContentUpdateRequest,
+    ): Result<ContentUpdateResponse>
+
     /**
      * Deletes content by ID.
      */
-    suspend fun deleteContent(accessToken: String, contentId: String): Result<Unit>
-    
+    suspend fun deleteContent(
+        accessToken: String,
+        contentId: String,
+    ): Result<Unit>
+
     // Journal Metadata Sync Operations
+
     /**
      * Uploads journal metadata to the cloud.
      */
-    suspend fun uploadJournal(accessToken: String, journal: JournalUploadRequest): Result<JournalUploadResponse>
-    
+    suspend fun uploadJournal(
+        accessToken: String,
+        journal: JournalUploadRequest,
+    ): Result<JournalUploadResponse>
+
     /**
      * Downloads journal changes since the specified timestamp.
      */
-    suspend fun getJournalChanges(accessToken: String, since: Long, limit: Int? = null): Result<JournalChangesResponse>
-    
+    suspend fun getJournalChanges(
+        accessToken: String,
+        since: Long,
+        limit: Int? = null,
+    ): Result<JournalChangesResponse>
+
     /**
      * Updates existing journal metadata.
      */
-    suspend fun updateJournal(accessToken: String, journalId: String, journal: JournalUpdateRequest): Result<JournalUpdateResponse>
-    
+    suspend fun updateJournal(
+        accessToken: String,
+        journalId: String,
+        journal: JournalUpdateRequest,
+    ): Result<JournalUpdateResponse>
+
     /**
      * Deletes journal by ID.
      */
-    suspend fun deleteJournal(accessToken: String, journalId: String): Result<Unit>
-    
+    suspend fun deleteJournal(
+        accessToken: String,
+        journalId: String,
+    ): Result<Unit>
+
     // Association Sync Operations
+
     /**
      * Uploads journal-content associations to the cloud.
      */
-    suspend fun uploadAssociations(accessToken: String, associations: AssociationUploadRequest): Result<AssociationUploadResponse>
-    
+    suspend fun uploadAssociations(
+        accessToken: String,
+        associations: AssociationUploadRequest,
+    ): Result<AssociationUploadResponse>
+
     /**
      * Downloads association changes since the specified timestamp.
      */
-    suspend fun getAssociationChanges(accessToken: String, since: Long, limit: Int? = null): Result<AssociationChangesResponse>
-    
+    suspend fun getAssociationChanges(
+        accessToken: String,
+        since: Long,
+        limit: Int? = null,
+    ): Result<AssociationChangesResponse>
+
     /**
      * Deletes specific associations.
      */
-    suspend fun deleteAssociations(accessToken: String, associations: AssociationDeleteRequest): Result<Unit>
-    
+    suspend fun deleteAssociations(
+        accessToken: String,
+        associations: AssociationDeleteRequest,
+    ): Result<Unit>
+
     // Media Operations
+
     /**
      * Uploads media files to the cloud.
      */
-    suspend fun uploadMedia(accessToken: String, media: MediaUploadRequest): Result<MediaUploadResponse>
-    
+    suspend fun uploadMedia(
+        accessToken: String,
+        media: MediaUploadRequest,
+    ): Result<MediaUploadResponse>
+
     /**
      * Downloads media file by ID.
      */
-    suspend fun downloadMedia(accessToken: String, mediaId: String): Result<MediaDownloadResponse>
+    suspend fun downloadMedia(
+        accessToken: String,
+        mediaId: String,
+    ): Result<MediaDownloadResponse>
 }
 
 /**
@@ -143,7 +188,7 @@ interface CloudApiClient {
 @kotlinx.serialization.Serializable
 data class CheckUsernameAvailabilityResponse(
     val available: Boolean,
-    val username: String
+    val username: String,
 )
 
 /**
@@ -153,5 +198,5 @@ class CloudApiException(
     val errorCode: String,
     override val message: String,
     val statusCode: Int? = null,
-    cause: Throwable? = null
+    cause: Throwable? = null,
 ) : Exception(message, cause)

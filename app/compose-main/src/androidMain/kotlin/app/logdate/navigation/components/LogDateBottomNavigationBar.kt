@@ -1,8 +1,8 @@
 package app.logdate.navigation.components
 
+import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -18,12 +18,13 @@ import app.logdate.navigation.scenes.HomeTab
  * @param modifier Modifier for the component
  * @param tabs The list of tabs to display, defaults to HomeTab entries
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun LogDateBottomNavigationBar(
     selectedTab: HomeTab,
     onTabSelected: (HomeTab) -> Unit,
     modifier: Modifier = Modifier,
-    tabs: List<HomeTab> = HomeTab.entries
+    tabs: List<HomeTab> = HomeTab.entries,
 ) {
     NavigationBar(
         modifier = modifier,
@@ -34,19 +35,19 @@ fun LogDateBottomNavigationBar(
             NavigationBarItem(
                 selected = tab == selectedTab,
                 onClick = { onTabSelected(tab) },
-                icon = { 
+                icon = {
                     Icon(
-                        imageVector = if (tab == selectedTab) tab.selectedIcon else tab.unselectedIcon, 
-                        contentDescription = tab.title
-                    ) 
+                        imageVector = if (tab == selectedTab) tab.selectedIcon else tab.unselectedIcon,
+                        contentDescription = tab.title,
+                    )
                 },
-                label = { 
+                label = {
                     Text(
                         text = tab.title,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    ) 
-                }
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
             )
         }
     }

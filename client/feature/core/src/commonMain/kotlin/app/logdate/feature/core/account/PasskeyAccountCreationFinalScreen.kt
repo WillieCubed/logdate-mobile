@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports", "ktlint:standard:max-line-length")
+
 package app.logdate.feature.core.account
 
 import androidx.compose.foundation.layout.*
@@ -17,12 +19,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
-import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.core.generated.resources.*
 import logdate.client.feature.core.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+
 @Composable
 fun PasskeyAccountCreationFinalContent(
     displayName: String,
@@ -35,176 +37,189 @@ fun PasskeyAccountCreationFinalContent(
     errorMessage: String?,
     onClearError: () -> Unit,
     isPasskeySupported: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val focusManager = LocalFocusManager.current
-    
+
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(Spacing.lg)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.SpaceBetween
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(Spacing.lg)
+                .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Column(
-            verticalArrangement = Arrangement.spacedBy(Spacing.xl)
+            verticalArrangement = Arrangement.spacedBy(Spacing.xl),
         ) {
             // Header with back button
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(Res.string.go_back)
+                        contentDescription = stringResource(Res.string.go_back),
                     )
                 }
-                
+
                 LinearProgressIndicator(
                     progress = { 1.0f }, // Step 3 of 3
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = Spacing.md),
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .padding(horizontal = Spacing.md),
                 )
-                
+
                 Text(
                     text = stringResource(Res.string.text_3_of_3),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            
+
             Spacer(modifier = Modifier.height(Spacing.lg))
-            
+
             // Title and description
             Column(
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
                     text = stringResource(Res.string.almost_ready),
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
-                
+
                 Text(
-                    text = stringResource(Res.string.review_your_details_and_create_your_secure_passkey_to_complete_your_logdate_cloud_account),
+                    text =
+                        stringResource(
+                            Res.string.review_your_details_and_create_your_secure_passkey_to_complete_your_logdate_cloud_account,
+                        ),
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Spacing.md)
+                    modifier = Modifier.padding(horizontal = Spacing.md),
                 )
             }
-            
+
             // Account summary
             Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    ),
             ) {
                 Column(
                     modifier = Modifier.padding(Spacing.md),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.md)
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
                 ) {
                     Text(
                         text = stringResource(Res.string.your_logdate_cloud_account),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
-                    
+
                     // Display name
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
                             imageVector = Icons.Default.Person,
                             contentDescription = null,
                             modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         )
                         Column {
                             Text(
                                 text = stringResource(Res.string.display_name),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                             )
                             Text(
                                 text = displayName,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
                             )
                         }
                     }
-                    
+
                     // Username
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
                             imageVector = Icons.Default.AlternateEmail,
                             contentDescription = null,
                             modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         )
                         Column {
                             Text(
                                 text = stringResource(Res.string.username),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                             )
                             Text(
-                                text = stringResource(
-                                    Res.string.unique_address_username,
-                                    username
-                                ),
+                                text =
+                                    stringResource(
+                                        Res.string.unique_address_username,
+                                        username,
+                                    ),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
                             )
                         }
                     }
                 }
             }
-            
+
             // Passkey support check
             if (!isPasskeySupported) {
                 Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer
-                    )
+                    colors =
+                        CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                        ),
                 ) {
                     Column(
                         modifier = Modifier.padding(Spacing.md),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Warning,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onErrorContainer
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
                             )
                             Text(
                                 text = stringResource(Res.string.passkeys_not_supported),
                                 style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onErrorContainer
+                                color = MaterialTheme.colorScheme.onErrorContainer,
                             )
                         }
+                        val noPasskeyMsg =
+                            stringResource(
+                                Res.string
+                                    .your_device_doesnt_support_passkeys_please_use_a_device_with_biometric_authentication_or_a_security_key,
+                            )
                         Text(
-                            text = stringResource(Res.string.your_device_doesnt_support_passkeys_please_use_a_device_with_biometric_authentication_or_a_security_key),
+                            text = noPasskeyMsg,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onErrorContainer
+                            color = MaterialTheme.colorScheme.onErrorContainer,
                         )
                     }
                 }
             }
-            
+
             // Bio field (optional)
             OutlinedTextField(
                 value = bio,
@@ -214,102 +229,110 @@ fun PasskeyAccountCreationFinalContent(
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Description,
-                        contentDescription = null
+                        contentDescription = null,
                     )
                 },
                 supportingText = { Text(stringResource(Res.string.share_something_about_yourself_with_the_logdate_community)) },
-                keyboardOptions = KeyboardOptions(
-                    imeAction = ImeAction.Done,
-                    capitalization = KeyboardCapitalization.Sentences
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = { focusManager.clearFocus() }
-                ),
+                keyboardOptions =
+                    KeyboardOptions(
+                        imeAction = ImeAction.Done,
+                        capitalization = KeyboardCapitalization.Sentences,
+                    ),
+                keyboardActions =
+                    KeyboardActions(
+                        onDone = { focusManager.clearFocus() },
+                    ),
                 minLines = 3,
                 maxLines = 5,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
-            
+
             // Error message
             errorMessage?.let { error ->
                 Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer
-                    )
+                    colors =
+                        CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                        ),
                 ) {
                     Row(
                         modifier = Modifier.padding(Spacing.md),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
                         Icon(
                             imageVector = Icons.Default.Error,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onErrorContainer
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
                         )
                         Text(
                             text = error,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
                         )
                         IconButton(onClick = onClearError) {
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = stringResource(Res.string.dismiss),
-                                tint = MaterialTheme.colorScheme.onErrorContainer
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
                             )
                         }
                     }
                 }
             }
-            
+
             // Information about passkeys
             Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    ),
             ) {
                 Column(
                     modifier = Modifier.padding(Spacing.md),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
                             imageVector = Icons.Default.Key,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(20.dp),
                         )
                         Text(
                             text = stringResource(Res.string.about_passkeys),
                             style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
                         )
                     }
                     Text(
-                        text = "• No passwords to remember or type\n• Uses your device's biometric authentication\n• More secure than traditional passwords\n• Works across all your devices",
+                        text =
+                            "• No passwords to remember or type\n" +
+                                "• Uses your device's biometric authentication\n" +
+                                "• More secure than traditional passwords\n" +
+                                "• Works across all your devices",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
         }
-        
+
         // Create account button
         Button(
             onClick = onCreateAccount,
             enabled = !isCreatingAccount && isPasskeySupported,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         ) {
             if (isCreatingAccount) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(20.dp),
                     strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onPrimary
+                    color = MaterialTheme.colorScheme.onPrimary,
                 )
                 Spacer(modifier = Modifier.width(Spacing.sm))
                 Text(stringResource(Res.string.creating_account))
@@ -317,7 +340,7 @@ fun PasskeyAccountCreationFinalContent(
                 Icon(
                     imageVector = Icons.Default.Key,
                     contentDescription = null,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp),
                 )
                 Spacer(modifier = Modifier.width(Spacing.sm))
                 Text(stringResource(Res.string.create_account_with_passkey))
@@ -341,7 +364,7 @@ private fun PasskeyAccountCreationFinalScreenPreview() {
                 isCreatingAccount = false,
                 errorMessage = null,
                 onClearError = {},
-                isPasskeySupported = true
+                isPasskeySupported = true,
             )
         }
     }
@@ -362,7 +385,7 @@ private fun PasskeyAccountCreationFinalScreenLoadingPreview() {
                 isCreatingAccount = true,
                 errorMessage = null,
                 onClearError = {},
-                isPasskeySupported = true
+                isPasskeySupported = true,
             )
         }
     }

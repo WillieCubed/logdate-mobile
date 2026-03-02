@@ -20,10 +20,11 @@ import kotlin.uuid.Uuid
  */
 @Deprecated("Use Navigation 3 when possible.")
 @Serializable
-data class JournalDetailsRoute(val journalId: String) {
+data class JournalDetailsRoute(
+    val journalId: String,
+) {
     constructor(journalId: Uuid) : this(journalId.toString())
 }
-
 
 /**
  * Navigation helper for the journal detail screen.
@@ -33,6 +34,7 @@ data class JournalDetailsRoute(val journalId: String) {
 fun NavController.navigateToJournal(journalId: String) {
     navigate(JournalDetailsRoute(journalId))
 }
+
 /**
  * Navigation helper for the journal detail screen.
  *
@@ -53,7 +55,6 @@ fun NavController.navigateToJournalFromNew(journalId: Uuid) {
     }
 }
 
-
 /**
  * Navigation entry for journal details.
  */
@@ -73,7 +74,7 @@ fun NavGraphBuilder.journalDetailsRoute(
             slideOutOfContainer(
                 towards = AnimatedContentTransitionScope.SlideDirection.Right,
             )
-        }
+        },
     ) { backStackEntry ->
         CompositionLocalProvider(
             LocalNavAnimatedVisibilityScope provides this,

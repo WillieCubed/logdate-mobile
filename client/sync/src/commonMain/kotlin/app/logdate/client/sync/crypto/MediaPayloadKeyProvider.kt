@@ -7,7 +7,7 @@ import app.logdate.client.device.storage.putBytes
 
 class MediaPayloadKeyProvider(
     private val secureStorage: SecureStorage,
-    private val cryptoManager: CryptoManager
+    private val cryptoManager: CryptoManager,
 ) {
     suspend fun getOrCreateKey(): ByteArray {
         val existing = secureStorage.getBytes(KEY_STORAGE_KEY)

@@ -8,12 +8,13 @@ import org.koin.dsl.module
 /**
  * iOS-specific Koin module for location history.
  */
-actual val locationHistoryModule: Module = module {
-    single<LocationTracker> {
-        StandardLocationTracker(
-            locationProvider = get(),
-            locationHistoryRepository = get(),
-            deviceId = get()
-        )
+actual val locationHistoryModule: Module =
+    module {
+        single<LocationTracker> {
+            StandardLocationTracker(
+                locationProvider = get(),
+                locationHistoryRepository = get(),
+                deviceId = get(),
+            )
+        }
     }
-}

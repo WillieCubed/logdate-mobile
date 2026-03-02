@@ -10,7 +10,6 @@ sealed class Place(
     val latitude: Double,
     val longitude: Double,
 ) {
-    
     /**
      * User-defined place with custom name and location.
      */
@@ -21,6 +20,6 @@ sealed class Place(
         val lat: Double,
         val lng: Double,
         val radiusMeters: Double = 100.0,
-        val description: String? = null
+        val description: String? = null,
     ) : Place(id, displayName, lat, lng)
 }

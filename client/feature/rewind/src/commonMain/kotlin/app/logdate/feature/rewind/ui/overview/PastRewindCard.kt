@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.rewind.ui.overview
 
 import androidx.compose.material3.MaterialTheme

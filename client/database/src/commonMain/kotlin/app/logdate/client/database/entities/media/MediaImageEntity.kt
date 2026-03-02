@@ -5,7 +5,7 @@ import androidx.room.PrimaryKey
 import kotlin.time.Instant
 
 @Entity(
-    tableName = "media_images"
+    tableName = "media_images",
 )
 data class MediaImageEntity(
     @PrimaryKey(autoGenerate = true)

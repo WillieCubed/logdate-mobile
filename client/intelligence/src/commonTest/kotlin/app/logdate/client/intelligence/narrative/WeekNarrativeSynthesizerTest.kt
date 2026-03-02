@@ -13,28 +13,28 @@ import app.logdate.shared.model.Person
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
-import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class WeekNarrativeSynthesizerTest {
-
     private val testDispatcher = StandardTestDispatcher()
     private val fakeCache = FakeGenerativeAICache()
     private val fakeAIClient = FakeGenerativeAIChatClient()
     private val fakeNetworkMonitor = TestNetworkAvailabilityMonitor()
 
-    private val synthesizer = WeekNarrativeSynthesizer(
-        generativeAICache = fakeCache,
-        genAIClient = fakeAIClient,
-        networkAvailabilityMonitor = fakeNetworkMonitor,
-        ioDispatcher = testDispatcher
-    )
+    private val synthesizer =
+        WeekNarrativeSynthesizer(
+            generativeAICache = fakeCache,
+            genAIClient = fakeAIClient,
+            networkAvailabilityMonitor = fakeNetworkMonitor,
+            ioDispatcher = testDispatcher,
+        )
 
     private fun setup() {
         fakeCache.clear()
@@ -44,40 +44,41 @@ class WeekNarrativeSynthesizerTest {
     private fun cacheRequestFor(
         textEntries: List<JournalNote.Text>,
         media: List<IndexedMedia>,
-        people: List<Person>
+        people: List<Person>,
     ): GenerativeAICacheRequest {
-        val summary = buildString {
-            appendLine("=== TEXT ENTRIES ===")
-            textEntries.forEach { entry ->
-                appendLine("\n[${entry.creationTimestamp}] (ID: ${entry.uid})")
-                appendLine(entry.content.take(500))
-                if (entry.content.length > 500) appendLine("... [truncated]")
-            }
+        val summary =
+            buildString {
+                appendLine("=== TEXT ENTRIES ===")
+                textEntries.forEach { entry ->
+                    appendLine("\n[${entry.creationTimestamp}] (ID: ${entry.uid})")
+                    appendLine(entry.content.take(500))
+                    if (entry.content.length > 500) appendLine("... [truncated]")
+                }
 
-            appendLine("\n=== MEDIA ===")
-            media.forEach { item ->
-                when (item) {
-                    is IndexedMedia.Image -> {
-                        appendLine("\n[${item.timestamp}] Photo (ID: ${item.uid})")
-                        item.caption?.let { appendLine("Caption: $it") }
-                    }
-                    is IndexedMedia.Video -> {
-                        appendLine("\n[${item.timestamp}] Video (ID: ${item.uid}) - Duration: ${item.duration}")
-                        item.caption?.let { appendLine("Caption: $it") }
+                appendLine("\n=== MEDIA ===")
+                media.forEach { item ->
+                    when (item) {
+                        is IndexedMedia.Image -> {
+                            appendLine("\n[${item.timestamp}] Photo (ID: ${item.uid})")
+                            item.caption?.let { appendLine("Caption: $it") }
+                        }
+                        is IndexedMedia.Video -> {
+                            appendLine("\n[${item.timestamp}] Video (ID: ${item.uid}) - Duration: ${item.duration}")
+                            item.caption?.let { appendLine("Caption: $it") }
+                        }
                     }
                 }
-            }
 
-            if (people.isNotEmpty()) {
-                appendLine("\n=== PEOPLE MENTIONED ===")
-                appendLine(people.joinToString(", ") { it.name })
-            }
+                if (people.isNotEmpty()) {
+                    appendLine("\n=== PEOPLE MENTIONED ===")
+                    appendLine(people.joinToString(", ") { it.name })
+                }
 
-            appendLine("\n=== SUMMARY STATS ===")
-            appendLine("Total entries: ${textEntries.size}")
-            appendLine("Total media: ${media.size}")
-            appendLine("People mentioned: ${people.size}")
-        }
+                appendLine("\n=== SUMMARY STATS ===")
+                appendLine("Total entries: ${textEntries.size}")
+                appendLine("Total media: ${media.size}")
+                appendLine("People mentioned: ${people.size}")
+            }
 
         return GenerativeAICacheRequest(
             contentType = GenerativeAICacheContentType.Narrative,
@@ -87,385 +88,414 @@ class WeekNarrativeSynthesizerTest {
             promptVersion = "narrative-v1",
             schemaVersion = "week-narrative-json-v1",
             templateId = "week-narrative",
-            policy = AICachePolicy(ttlSeconds = 60L * 60L * 24L * 30L)
+            policy = AICachePolicy(ttlSeconds = 60L * 60L * 24L * 30L),
         )
     }
 
     @Test
-    fun synthesize_withVacationWeek_generatesCorrectNarrative() = runTest(testDispatcher) {
-        setup()
-        val weekId = "2024-W30"
+    fun synthesize_withVacationWeek_generatesCorrectNarrative() =
+        runTest(testDispatcher) {
+            setup()
+            val weekId = "2024-W30"
 
-        val textEntries = listOf(
-            JournalNote.Text(
-                uid = Uuid.random(),
-                creationTimestamp = Instant.parse("2024-07-22T10:00:00Z"),
-                lastUpdated = Instant.parse("2024-07-22T10:00:00Z"),
-                content = "Finally found the hidden beach at Point Reyes! It was everything I hoped for."
-            ),
-            JournalNote.Text(
-                uid = Uuid.random(),
-                creationTimestamp = Instant.parse("2024-07-23T19:00:00Z"),
-                lastUpdated = Instant.parse("2024-07-23T19:00:00Z"),
-                content = "Taco truck tour night 1. This might become a tradition."
-            )
-        )
-
-        val media = listOf(
-            IndexedMedia.Image(
-                uid = Uuid.random(),
-                uri = "file:///beach-sunset.jpg",
-                timestamp = Instant.parse("2024-07-22T18:30:00Z"),
-                caption = "Sunset at the hidden beach"
-            )
-        )
-
-        val vacationNarrativeResponse = """
-        {
-          "themes": ["vacation", "exploration", "culinary adventure"],
-          "emotionalTone": "excited and refreshed",
-          "storyBeats": [
-            {
-              "moment": "Finally found the hidden beach at Point Reyes",
-              "context": "Long-anticipated goal you'd been searching for",
-              "emotionalWeight": "triumphant",
-              "evidenceIds": ["${textEntries[0].uid}"]
-            },
-            {
-              "moment": "Taco truck tour became the evening ritual",
-              "context": "Spontaneous tradition that defined the trip",
-              "emotionalWeight": "joyful",
-              "evidenceIds": ["${textEntries[1].uid}"]
-            }
-          ],
-          "overallNarrative": "You explored the California coast, finally finding that hidden beach you'd been searching for. Evenings were dedicated to the taco truck tour you'd been planning."
-        }
-        """.trimIndent()
-
-        fakeAIClient.defaultResponse = vacationNarrativeResponse
-
-        val result = synthesizer.synthesize(
-            weekId = weekId,
-            textEntries = textEntries,
-            media = media,
-            people = emptyList(),
-            useCached = false
-        )
-
-        val narrative = assertSuccess(result)
-        assertEquals(3, narrative.themes.size)
-        assertTrue(narrative.themes.contains("vacation"))
-        assertTrue(narrative.themes.contains("exploration"))
-        assertTrue(narrative.themes.contains("culinary adventure"))
-        assertEquals("excited and refreshed", narrative.emotionalTone)
-        assertEquals(2, narrative.storyBeats.size)
-        assertEquals("Finally found the hidden beach at Point Reyes", narrative.storyBeats[0].moment)
-        assertEquals("triumphant", narrative.storyBeats[0].emotionalWeight)
-    }
-
-    @Test
-    fun synthesize_withToughWeek_generatesCorrectNarrative() = runTest(testDispatcher) {
-        setup()
-        val weekId = "2024-W31"
-
-        val textEntries = listOf(
-            JournalNote.Text(
-                uid = Uuid.random(),
-                creationTimestamp = Instant.parse("2024-07-29T22:00:00Z"),
-                lastUpdated = Instant.parse("2024-07-29T22:00:00Z"),
-                content = "Sarah being out of town is harder than I expected. Missing her a lot."
-            ),
-            JournalNote.Text(
-                uid = Uuid.random(),
-                creationTimestamp = Instant.parse("2024-07-30T23:30:00Z"),
-                lastUpdated = Instant.parse("2024-07-30T23:30:00Z"),
-                content = "Another late night at the office. This deadline is killing me."
-            ),
-            JournalNote.Text(
-                uid = Uuid.random(),
-                creationTimestamp = Instant.parse("2024-07-31T01:00:00Z"),
-                lastUpdated = Instant.parse("2024-07-31T01:00:00Z"),
-                content = "WE DID IT! Raid team finally cleared Mythic! Gaming friends are the best."
-            )
-        )
-
-        val people = listOf(Person(name = "Sarah"))
-
-        val toughWeekResponse = """
-        {
-          "themes": ["relationship strain", "work pressure", "gaming as therapy"],
-          "emotionalTone": "stressful but resilient",
-          "storyBeats": [
-            {
-              "moment": "Sarah being out of town hit harder than expected",
-              "context": "Unexpected loneliness highlighting relationship importance",
-              "emotionalWeight": "melancholy",
-              "evidenceIds": ["${textEntries[0].uid}"]
-            },
-            {
-              "moment": "Project deadline had you working late every night",
-              "context": "Work stress compounding personal challenges",
-              "emotionalWeight": "exhausted",
-              "evidenceIds": ["${textEntries[1].uid}"]
-            },
-            {
-              "moment": "Raid team finally cleared Mythic",
-              "context": "Gaming friends providing support and victory during tough time",
-              "emotionalWeight": "grateful",
-              "evidenceIds": ["${textEntries[2].uid}"]
-            }
-          ],
-          "overallNarrative": "This week was rough - Sarah being out of town hit harder than expected, and that project deadline had you working late every night. At least the raid team finally cleared Mythic - sometimes gaming friends are the best therapy."
-        }
-        """.trimIndent()
-
-        fakeAIClient.defaultResponse = toughWeekResponse
-
-        val result = synthesizer.synthesize(
-            weekId = weekId,
-            textEntries = textEntries,
-            media = emptyList(),
-            people = people,
-            useCached = false
-        )
-
-        val narrative = assertSuccess(result)
-        assertEquals(3, narrative.themes.size)
-        assertTrue(narrative.themes.contains("relationship strain"))
-        assertEquals("stressful but resilient", narrative.emotionalTone)
-        assertEquals(3, narrative.storyBeats.size)
-        assertEquals("melancholy", narrative.storyBeats[0].emotionalWeight)
-        assertEquals("grateful", narrative.storyBeats[2].emotionalWeight)
-    }
-
-    @Test
-    fun synthesize_withCachedResponse_usesCachedNarrative() = runTest(testDispatcher) {
-        setup()
-        val weekId = "2024-W32"
-
-        val cachedResponse = """
-        {
-          "themes": ["relaxation"],
-          "emotionalTone": "peaceful",
-          "storyBeats": [
-            {
-              "moment": "A quiet week",
-              "context": "Taking it easy",
-              "emotionalWeight": "calm",
-              "evidenceIds": []
-            }
-          ],
-          "overallNarrative": "A peaceful week of rest."
-        }
-        """.trimIndent()
-
-        val cacheRequest = cacheRequestFor(emptyList(), emptyList(), emptyList())
-        fakeCache.setEntry(cacheRequest, cachedResponse)
-
-        val result = synthesizer.synthesize(
-            weekId = weekId,
-            textEntries = emptyList(),
-            media = emptyList(),
-            people = emptyList(),
-            useCached = true
-        )
-
-        val narrative = assertSuccess(result)
-        assertEquals(listOf("relaxation"), narrative.themes)
-        assertEquals("peaceful", narrative.emotionalTone)
-
-        // Verify AI client was not called (cached response used)
-        assertEquals(0, fakeAIClient.submissions.size)
-    }
-
-    @Test
-    fun synthesize_withNoContent_handlesGracefully() = runTest(testDispatcher) {
-        setup()
-        val weekId = "2024-W33"
-
-        val emptyWeekResponse = """
-        {
-          "themes": ["quiet"],
-          "emotionalTone": "unremarkable",
-          "storyBeats": [],
-          "overallNarrative": "Not much happened this week."
-        }
-        """.trimIndent()
-
-        fakeAIClient.defaultResponse = emptyWeekResponse
-
-        val result = synthesizer.synthesize(
-            weekId = weekId,
-            textEntries = emptyList(),
-            media = emptyList(),
-            people = emptyList(),
-            useCached = false
-        )
-
-        val narrative = assertSuccess(result)
-        assertEquals(listOf("quiet"), narrative.themes)
-        assertTrue(narrative.storyBeats.isEmpty())
-    }
-
-    @Test
-    fun synthesize_whenOffline_returnsUnavailable() = runTest(testDispatcher) {
-        setup()
-        fakeNetworkMonitor.setAvailable(false)
-        val weekId = "2024-W33-offline"
-
-        val result = synthesizer.synthesize(
-            weekId = weekId,
-            textEntries = emptyList(),
-            media = emptyList(),
-            people = emptyList(),
-            useCached = false
-        )
-
-        assertTrue(result is AIResult.Unavailable)
-        assertEquals(0, fakeAIClient.submissions.size)
-    }
-
-    @Test
-    fun synthesize_withNullAIResponse_returnsNull() = runTest(testDispatcher) {
-        setup()
-        val weekId = "2024-W34"
-
-        fakeAIClient.defaultResponse = null
-
-        val result = synthesizer.synthesize(
-            weekId = weekId,
-            textEntries = listOf(
-                JournalNote.Text(
-                    uid = Uuid.random(),
-                    creationTimestamp = Instant.parse("2024-08-19T10:00:00Z"),
-                    lastUpdated = Instant.parse("2024-08-19T10:00:00Z"),
-                    content = "Test entry"
+            val textEntries =
+                listOf(
+                    JournalNote.Text(
+                        uid = Uuid.random(),
+                        creationTimestamp = Instant.parse("2024-07-22T10:00:00Z"),
+                        lastUpdated = Instant.parse("2024-07-22T10:00:00Z"),
+                        content = "Finally found the hidden beach at Point Reyes! It was everything I hoped for.",
+                    ),
+                    JournalNote.Text(
+                        uid = Uuid.random(),
+                        creationTimestamp = Instant.parse("2024-07-23T19:00:00Z"),
+                        lastUpdated = Instant.parse("2024-07-23T19:00:00Z"),
+                        content = "Taco truck tour night 1. This might become a tradition.",
+                    ),
                 )
-            ),
-            media = emptyList(),
-            people = emptyList(),
-            useCached = false
-        )
 
-        assertTrue(result is AIResult.Error)
-    }
-
-    @Test
-    fun synthesize_withInvalidJSON_returnsNull() = runTest(testDispatcher) {
-        setup()
-        val weekId = "2024-W35"
-
-        fakeAIClient.defaultResponse = "This is not valid JSON"
-
-        val result = synthesizer.synthesize(
-            weekId = weekId,
-            textEntries = listOf(
-                JournalNote.Text(
-                    uid = Uuid.random(),
-                    creationTimestamp = Instant.parse("2024-08-26T10:00:00Z"),
-                    lastUpdated = Instant.parse("2024-08-26T10:00:00Z"),
-                    content = "Test entry"
+            val media =
+                listOf(
+                    IndexedMedia.Image(
+                        uid = Uuid.random(),
+                        uri = "file:///beach-sunset.jpg",
+                        timestamp = Instant.parse("2024-07-22T18:30:00Z"),
+                        caption = "Sunset at the hidden beach",
+                    ),
                 )
-            ),
-            media = emptyList(),
-            people = emptyList(),
-            useCached = false
-        )
 
-        assertTrue(result is AIResult.Error)
-    }
+            val vacationNarrativeResponse =
+                """
+                {
+                  "themes": ["vacation", "exploration", "culinary adventure"],
+                  "emotionalTone": "excited and refreshed",
+                  "storyBeats": [
+                    {
+                      "moment": "Finally found the hidden beach at Point Reyes",
+                      "context": "Long-anticipated goal you'd been searching for",
+                      "emotionalWeight": "triumphant",
+                      "evidenceIds": ["${textEntries[0].uid}"]
+                    },
+                    {
+                      "moment": "Taco truck tour became the evening ritual",
+                      "context": "Spontaneous tradition that defined the trip",
+                      "emotionalWeight": "joyful",
+                      "evidenceIds": ["${textEntries[1].uid}"]
+                    }
+                  ],
+                  "overallNarrative": "You explored the California coast, finally finding that hidden beach you'd been searching for. Evenings were dedicated to the taco truck tour you'd been planning."
+                }
+                """.trimIndent()
 
-    @Test
-    fun synthesize_includesPeopleInContentSummary() = runTest(testDispatcher) {
-        setup()
-        val weekId = "2024-W36"
+            fakeAIClient.defaultResponse = vacationNarrativeResponse
 
-        val people = listOf(
-            Person(name = "Alice"),
-            Person(name = "Bob"),
-            Person(name = "Charlie")
-        )
+            val result =
+                synthesizer.synthesize(
+                    weekId = weekId,
+                    textEntries = textEntries,
+                    media = media,
+                    people = emptyList(),
+                    useCached = false,
+                )
 
-        val narrativeResponse = """
-        {
-          "themes": ["social"],
-          "emotionalTone": "connected",
-          "storyBeats": [],
-          "overallNarrative": "A social week with friends."
+            val narrative = assertSuccess(result)
+            assertEquals(3, narrative.themes.size)
+            assertTrue(narrative.themes.contains("vacation"))
+            assertTrue(narrative.themes.contains("exploration"))
+            assertTrue(narrative.themes.contains("culinary adventure"))
+            assertEquals("excited and refreshed", narrative.emotionalTone)
+            assertEquals(2, narrative.storyBeats.size)
+            assertEquals("Finally found the hidden beach at Point Reyes", narrative.storyBeats[0].moment)
+            assertEquals("triumphant", narrative.storyBeats[0].emotionalWeight)
         }
-        """.trimIndent()
-
-        fakeAIClient.defaultResponse = narrativeResponse
-
-        synthesizer.synthesize(
-            weekId = weekId,
-            textEntries = emptyList(),
-            media = emptyList(),
-            people = people,
-            useCached = false
-        )
-
-        val lastSubmission = fakeAIClient.getLastSubmission()
-        assertNotNull(lastSubmission)
-
-        val userMessage = lastSubmission.find { it.role == "user" }
-        assertNotNull(userMessage)
-        assertTrue(userMessage.content.contains("Alice"))
-        assertTrue(userMessage.content.contains("Bob"))
-        assertTrue(userMessage.content.contains("Charlie"))
-        assertTrue(userMessage.content.contains("PEOPLE MENTIONED"))
-    }
 
     @Test
-    fun synthesize_includesMediaInContentSummary() = runTest(testDispatcher) {
-        setup()
-        val weekId = "2024-W37"
+    fun synthesize_withToughWeek_generatesCorrectNarrative() =
+        runTest(testDispatcher) {
+            setup()
+            val weekId = "2024-W31"
 
-        val media = listOf(
-            IndexedMedia.Image(
-                uid = Uuid.random(),
-                uri = "file:///photo1.jpg",
-                timestamp = Instant.parse("2024-09-09T14:00:00Z"),
-                caption = "Beautiful sunset"
-            ),
-            IndexedMedia.Video(
-                uid = Uuid.random(),
-                uri = "file:///video1.mp4",
-                timestamp = Instant.parse("2024-09-10T16:00:00Z"),
-                caption = "Cooking adventure",
-                duration = 120.seconds
+            val textEntries =
+                listOf(
+                    JournalNote.Text(
+                        uid = Uuid.random(),
+                        creationTimestamp = Instant.parse("2024-07-29T22:00:00Z"),
+                        lastUpdated = Instant.parse("2024-07-29T22:00:00Z"),
+                        content = "Sarah being out of town is harder than I expected. Missing her a lot.",
+                    ),
+                    JournalNote.Text(
+                        uid = Uuid.random(),
+                        creationTimestamp = Instant.parse("2024-07-30T23:30:00Z"),
+                        lastUpdated = Instant.parse("2024-07-30T23:30:00Z"),
+                        content = "Another late night at the office. This deadline is killing me.",
+                    ),
+                    JournalNote.Text(
+                        uid = Uuid.random(),
+                        creationTimestamp = Instant.parse("2024-07-31T01:00:00Z"),
+                        lastUpdated = Instant.parse("2024-07-31T01:00:00Z"),
+                        content = "WE DID IT! Raid team finally cleared Mythic! Gaming friends are the best.",
+                    ),
+                )
+
+            val people = listOf(Person(name = "Sarah"))
+
+            val toughWeekResponse =
+                """
+                {
+                  "themes": ["relationship strain", "work pressure", "gaming as therapy"],
+                  "emotionalTone": "stressful but resilient",
+                  "storyBeats": [
+                    {
+                      "moment": "Sarah being out of town hit harder than expected",
+                      "context": "Unexpected loneliness highlighting relationship importance",
+                      "emotionalWeight": "melancholy",
+                      "evidenceIds": ["${textEntries[0].uid}"]
+                    },
+                    {
+                      "moment": "Project deadline had you working late every night",
+                      "context": "Work stress compounding personal challenges",
+                      "emotionalWeight": "exhausted",
+                      "evidenceIds": ["${textEntries[1].uid}"]
+                    },
+                    {
+                      "moment": "Raid team finally cleared Mythic",
+                      "context": "Gaming friends providing support and victory during tough time",
+                      "emotionalWeight": "grateful",
+                      "evidenceIds": ["${textEntries[2].uid}"]
+                    }
+                  ],
+                  "overallNarrative": "This week was rough - Sarah being out of town hit harder than expected, and that project deadline had you working late every night. At least the raid team finally cleared Mythic - sometimes gaming friends are the best therapy."
+                }
+                """.trimIndent()
+
+            fakeAIClient.defaultResponse = toughWeekResponse
+
+            val result =
+                synthesizer.synthesize(
+                    weekId = weekId,
+                    textEntries = textEntries,
+                    media = emptyList(),
+                    people = people,
+                    useCached = false,
+                )
+
+            val narrative = assertSuccess(result)
+            assertEquals(3, narrative.themes.size)
+            assertTrue(narrative.themes.contains("relationship strain"))
+            assertEquals("stressful but resilient", narrative.emotionalTone)
+            assertEquals(3, narrative.storyBeats.size)
+            assertEquals("melancholy", narrative.storyBeats[0].emotionalWeight)
+            assertEquals("grateful", narrative.storyBeats[2].emotionalWeight)
+        }
+
+    @Test
+    fun synthesize_withCachedResponse_usesCachedNarrative() =
+        runTest(testDispatcher) {
+            setup()
+            val weekId = "2024-W32"
+
+            val cachedResponse =
+                """
+                {
+                  "themes": ["relaxation"],
+                  "emotionalTone": "peaceful",
+                  "storyBeats": [
+                    {
+                      "moment": "A quiet week",
+                      "context": "Taking it easy",
+                      "emotionalWeight": "calm",
+                      "evidenceIds": []
+                    }
+                  ],
+                  "overallNarrative": "A peaceful week of rest."
+                }
+                """.trimIndent()
+
+            val cacheRequest = cacheRequestFor(emptyList(), emptyList(), emptyList())
+            fakeCache.setEntry(cacheRequest, cachedResponse)
+
+            val result =
+                synthesizer.synthesize(
+                    weekId = weekId,
+                    textEntries = emptyList(),
+                    media = emptyList(),
+                    people = emptyList(),
+                    useCached = true,
+                )
+
+            val narrative = assertSuccess(result)
+            assertEquals(listOf("relaxation"), narrative.themes)
+            assertEquals("peaceful", narrative.emotionalTone)
+
+            // Verify AI client was not called (cached response used)
+            assertEquals(0, fakeAIClient.submissions.size)
+        }
+
+    @Test
+    fun synthesize_withNoContent_handlesGracefully() =
+        runTest(testDispatcher) {
+            setup()
+            val weekId = "2024-W33"
+
+            val emptyWeekResponse =
+                """
+                {
+                  "themes": ["quiet"],
+                  "emotionalTone": "unremarkable",
+                  "storyBeats": [],
+                  "overallNarrative": "Not much happened this week."
+                }
+                """.trimIndent()
+
+            fakeAIClient.defaultResponse = emptyWeekResponse
+
+            val result =
+                synthesizer.synthesize(
+                    weekId = weekId,
+                    textEntries = emptyList(),
+                    media = emptyList(),
+                    people = emptyList(),
+                    useCached = false,
+                )
+
+            val narrative = assertSuccess(result)
+            assertEquals(listOf("quiet"), narrative.themes)
+            assertTrue(narrative.storyBeats.isEmpty())
+        }
+
+    @Test
+    fun synthesize_whenOffline_returnsUnavailable() =
+        runTest(testDispatcher) {
+            setup()
+            fakeNetworkMonitor.setAvailable(false)
+            val weekId = "2024-W33-offline"
+
+            val result =
+                synthesizer.synthesize(
+                    weekId = weekId,
+                    textEntries = emptyList(),
+                    media = emptyList(),
+                    people = emptyList(),
+                    useCached = false,
+                )
+
+            assertTrue(result is AIResult.Unavailable)
+            assertEquals(0, fakeAIClient.submissions.size)
+        }
+
+    @Test
+    fun synthesize_withNullAIResponse_returnsNull() =
+        runTest(testDispatcher) {
+            setup()
+            val weekId = "2024-W34"
+
+            fakeAIClient.defaultResponse = null
+
+            val result =
+                synthesizer.synthesize(
+                    weekId = weekId,
+                    textEntries =
+                        listOf(
+                            JournalNote.Text(
+                                uid = Uuid.random(),
+                                creationTimestamp = Instant.parse("2024-08-19T10:00:00Z"),
+                                lastUpdated = Instant.parse("2024-08-19T10:00:00Z"),
+                                content = "Test entry",
+                            ),
+                        ),
+                    media = emptyList(),
+                    people = emptyList(),
+                    useCached = false,
+                )
+
+            assertTrue(result is AIResult.Error)
+        }
+
+    @Test
+    fun synthesize_withInvalidJSON_returnsNull() =
+        runTest(testDispatcher) {
+            setup()
+            val weekId = "2024-W35"
+
+            fakeAIClient.defaultResponse = "This is not valid JSON"
+
+            val result =
+                synthesizer.synthesize(
+                    weekId = weekId,
+                    textEntries =
+                        listOf(
+                            JournalNote.Text(
+                                uid = Uuid.random(),
+                                creationTimestamp = Instant.parse("2024-08-26T10:00:00Z"),
+                                lastUpdated = Instant.parse("2024-08-26T10:00:00Z"),
+                                content = "Test entry",
+                            ),
+                        ),
+                    media = emptyList(),
+                    people = emptyList(),
+                    useCached = false,
+                )
+
+            assertTrue(result is AIResult.Error)
+        }
+
+    @Test
+    fun synthesize_includesPeopleInContentSummary() =
+        runTest(testDispatcher) {
+            setup()
+            val weekId = "2024-W36"
+
+            val people =
+                listOf(
+                    Person(name = "Alice"),
+                    Person(name = "Bob"),
+                    Person(name = "Charlie"),
+                )
+
+            val narrativeResponse =
+                """
+                {
+                  "themes": ["social"],
+                  "emotionalTone": "connected",
+                  "storyBeats": [],
+                  "overallNarrative": "A social week with friends."
+                }
+                """.trimIndent()
+
+            fakeAIClient.defaultResponse = narrativeResponse
+
+            synthesizer.synthesize(
+                weekId = weekId,
+                textEntries = emptyList(),
+                media = emptyList(),
+                people = people,
+                useCached = false,
             )
-        )
 
-        val narrativeResponse = """
-        {
-          "themes": ["photography", "cooking"],
-          "emotionalTone": "creative",
-          "storyBeats": [],
-          "overallNarrative": "A creative week capturing moments."
+            val lastSubmission = fakeAIClient.getLastSubmission()
+            assertNotNull(lastSubmission)
+
+            val userMessage = lastSubmission.find { it.role == "user" }
+            assertNotNull(userMessage)
+            assertTrue(userMessage.content.contains("Alice"))
+            assertTrue(userMessage.content.contains("Bob"))
+            assertTrue(userMessage.content.contains("Charlie"))
+            assertTrue(userMessage.content.contains("PEOPLE MENTIONED"))
         }
-        """.trimIndent()
 
-        fakeAIClient.defaultResponse = narrativeResponse
+    @Test
+    fun synthesize_includesMediaInContentSummary() =
+        runTest(testDispatcher) {
+            setup()
+            val weekId = "2024-W37"
 
-        synthesizer.synthesize(
-            weekId = weekId,
-            textEntries = emptyList(),
-            media = media,
-            useCached = false
-        )
+            val media =
+                listOf(
+                    IndexedMedia.Image(
+                        uid = Uuid.random(),
+                        uri = "file:///photo1.jpg",
+                        timestamp = Instant.parse("2024-09-09T14:00:00Z"),
+                        caption = "Beautiful sunset",
+                    ),
+                    IndexedMedia.Video(
+                        uid = Uuid.random(),
+                        uri = "file:///video1.mp4",
+                        timestamp = Instant.parse("2024-09-10T16:00:00Z"),
+                        caption = "Cooking adventure",
+                        duration = 120.seconds,
+                    ),
+                )
 
-        val lastSubmission = fakeAIClient.getLastSubmission()
-        assertNotNull(lastSubmission)
+            val narrativeResponse =
+                """
+                {
+                  "themes": ["photography", "cooking"],
+                  "emotionalTone": "creative",
+                  "storyBeats": [],
+                  "overallNarrative": "A creative week capturing moments."
+                }
+                """.trimIndent()
 
-        val userMessage = lastSubmission.find { it.role == "user" }
-        assertNotNull(userMessage)
-        assertTrue(userMessage.content.contains("Photo"))
-        assertTrue(userMessage.content.contains("Beautiful sunset"))
-        assertTrue(userMessage.content.contains("Video"))
-        assertTrue(userMessage.content.contains("Cooking adventure"))
-        assertTrue(userMessage.content.contains("MEDIA"))
-    }
+            fakeAIClient.defaultResponse = narrativeResponse
+
+            synthesizer.synthesize(
+                weekId = weekId,
+                textEntries = emptyList(),
+                media = media,
+                useCached = false,
+            )
+
+            val lastSubmission = fakeAIClient.getLastSubmission()
+            assertNotNull(lastSubmission)
+
+            val userMessage = lastSubmission.find { it.role == "user" }
+            assertNotNull(userMessage)
+            assertTrue(userMessage.content.contains("Photo"))
+            assertTrue(userMessage.content.contains("Beautiful sunset"))
+            assertTrue(userMessage.content.contains("Video"))
+            assertTrue(userMessage.content.contains("Cooking adventure"))
+            assertTrue(userMessage.content.contains("MEDIA"))
+        }
 
     private fun assertSuccess(result: AIResult<app.logdate.shared.model.WeekNarrative>): app.logdate.shared.model.WeekNarrative {
         assertTrue(result is AIResult.Success)
@@ -473,7 +503,7 @@ class WeekNarrativeSynthesizerTest {
     }
 
     private class TestNetworkAvailabilityMonitor(
-        private var available: Boolean = true
+        private var available: Boolean = true,
     ) : NetworkAvailabilityMonitor {
         override fun isNetworkAvailable(): Boolean = available
 

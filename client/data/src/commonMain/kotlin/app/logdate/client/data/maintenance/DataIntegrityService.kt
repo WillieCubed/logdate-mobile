@@ -14,7 +14,7 @@ import kotlin.time.Instant
 class DataIntegrityService(
     private val integrityDao: IntegrityDao,
     private val syncMetadataDao: SyncMetadataDao,
-    private val journalContentDao: JournalContentDao
+    private val journalContentDao: JournalContentDao,
 ) {
     suspend fun audit(): IntegrityReport {
         val orphanedJournalLinks = integrityDao.countOrphanedJournalLinks()
@@ -30,7 +30,7 @@ class DataIntegrityService(
             pendingMissingJournals = pendingMissingJournals,
             pendingMissingNotes = pendingMissingNotes,
             pendingAssociationMissingLinks = associationAudit.missingLinks,
-            pendingAssociationMalformed = associationAudit.malformed
+            pendingAssociationMalformed = associationAudit.malformed,
         )
     }
 
@@ -47,7 +47,7 @@ class DataIntegrityService(
             orphanedContentLinksRemoved = orphanedContentLinksRemoved,
             pendingMissingJournalsRemoved = pendingMissingJournalsRemoved,
             pendingMissingNotesRemoved = pendingMissingNotesRemoved,
-            pendingAssociationsRemoved = pendingAssociationsRemoved
+            pendingAssociationsRemoved = pendingAssociationsRemoved,
         )
     }
 
@@ -101,7 +101,7 @@ data class IntegrityReport(
     val pendingMissingJournals: Int,
     val pendingMissingNotes: Int,
     val pendingAssociationMissingLinks: Int,
-    val pendingAssociationMalformed: Int
+    val pendingAssociationMalformed: Int,
 )
 
 data class IntegrityRepairResult(
@@ -110,10 +110,10 @@ data class IntegrityRepairResult(
     val orphanedContentLinksRemoved: Int,
     val pendingMissingJournalsRemoved: Int,
     val pendingMissingNotesRemoved: Int,
-    val pendingAssociationsRemoved: Int
+    val pendingAssociationsRemoved: Int,
 )
 
 private data class PendingAssociationAudit(
     val missingLinks: Int,
-    val malformed: Int
+    val malformed: Int,
 )

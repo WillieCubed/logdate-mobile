@@ -20,7 +20,7 @@ import kotlin.time.Instant
  */
 @Entity(
     tableName = "location_logs",
-    primaryKeys = ["user_id", "device_id", "timestamp"]
+    primaryKeys = ["user_id", "device_id", "timestamp"],
 )
 data class LocationLogEntity(
     /**

@@ -17,12 +17,11 @@ class IosSecureIdentityStorage(
         private const val MIGRATION_STATE_KEY = "app.logdate.migration.state"
     }
 
-    suspend fun getUserId(): Uuid? {
-        return runCatching {
+    suspend fun getUserId(): Uuid? =
+        runCatching {
             keychainWrapper.getString(USER_ID_KEY)?.let(Uuid::parse)
         }.onFailure { Napier.e("Failed to read user ID", it) }
             .getOrNull()
-    }
 
     suspend fun setUserId(userId: Uuid) {
         runCatching {

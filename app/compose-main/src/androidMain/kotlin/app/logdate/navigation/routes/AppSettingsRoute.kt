@@ -1,7 +1,5 @@
 package app.logdate.navigation.routes
 
-import app.logdate.navigation.routes.routeEntry
-
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.core.profile.ui.ProfileScreen
@@ -26,6 +24,7 @@ import app.logdate.navigation.routes.core.LocationSettingsRoute
 import app.logdate.navigation.routes.core.OnboardingStart
 import app.logdate.navigation.routes.core.PrivacySettingsRoute
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
+import app.logdate.navigation.routes.routeEntry
 
 /**
  * Resets the app by safely clearing the back stack and navigating to the onboarding start screen.
@@ -36,14 +35,14 @@ fun MainAppNavigator.resetApp() {
     if (!backStack.contains(OnboardingStart)) {
         backStack.add(OnboardingStart)
     }
-    
+
     // Navigate to onboarding start, keeping it as the first (and only) entry in the backstack
     safelyPopBackstackTo(OnboardingStart, keepFirst = true)
 }
 
 /**
  * Extension function to open the main settings overview screen.
- * 
+ *
  * This provides a consistent way to navigate to the settings screen from anywhere in the app.
  */
 fun MainAppNavigator.openSettings() {
@@ -113,7 +112,6 @@ fun MainAppNavigator.openAdvancedSettings() {
     backStack.add(AdvancedSettingsRoute)
 }
 
-
 /**
  * Provides the navigation routes for app settings-related screens.
  *
@@ -145,7 +143,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onNavigateToAdvanced: () -> Unit,
 ) {
     // Main settings overview screen
-    routeEntry<SettingsOverviewRoute>() { _ ->
+    routeEntry<SettingsOverviewRoute> { _ ->
         SettingsOverviewScreen(
             onBack = onBack,
             onNavigateToProfile = onNavigateToProfile,
@@ -155,72 +153,72 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
             onNavigateToDangerZone = onNavigateToDangerZone,
             onNavigateToDevices = onNavigateToDevices,
             onNavigateToLocation = onNavigateToLocation,
-            onNavigateToAdvanced = onNavigateToAdvanced
+            onNavigateToAdvanced = onNavigateToAdvanced,
         )
     }
-    
+
     // Profile screen with Material 3 Expressive design
-    routeEntry<ProfileRoute>() { _ ->
+    routeEntry<ProfileRoute> { _ ->
         ProfileScreen(
-            onBack = onBack
+            onBack = onBack,
         )
     }
 
     // Connected devices screen
-    routeEntry<DevicesSettingsRoute>() { _ ->
+    routeEntry<DevicesSettingsRoute> { _ ->
         DevicesScreen(
-            onBackClick = onBack
+            onBackClick = onBack,
         )
     }
-    
+
     // Account management settings screen
-    routeEntry<AccountSettingsRoute>() { _ ->
+    routeEntry<AccountSettingsRoute> { _ ->
         AccountSettingsScreen(
             onBack = onBack,
             onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
-            onNavigateToBirthdaySettings = onNavigateToBirthdaySettings
+            onNavigateToBirthdaySettings = onNavigateToBirthdaySettings,
         )
     }
-    
+
     // Birthday settings screen
-    routeEntry<BirthdaySettingsRoute>() { _ ->
+    routeEntry<BirthdaySettingsRoute> { _ ->
         BirthdaySettingsScreen(
-            onBack = onBack
+            onBack = onBack,
         )
     }
-    
+
     // Privacy and security settings screen
-    routeEntry<PrivacySettingsRoute>() { _ ->
+    routeEntry<PrivacySettingsRoute> { _ ->
         PrivacySettingsScreen(
             onBack = onBack,
-            onNavigateToLocationSettings = onNavigateToLocation
+            onNavigateToLocationSettings = onNavigateToLocation,
         )
     }
-    
+
     // Data and storage settings screen
-    routeEntry<DataSettingsRoute>() { _ ->
+    routeEntry<DataSettingsRoute> { _ ->
         DataSettingsScreen(
-            onBack = onBack
+            onBack = onBack,
         )
     }
-    
+
     // Danger zone settings screen with destructive actions
-    routeEntry<DangerZoneSettingsRoute>() { _ ->
+    routeEntry<DangerZoneSettingsRoute> { _ ->
         DangerZoneSettingsScreen(
             onBack = onBack,
-            onAppReset = onAppReset
+            onAppReset = onAppReset,
         )
     }
-    
+
     // Location settings screen
-    routeEntry<LocationSettingsRoute>() { _ ->
+    routeEntry<LocationSettingsRoute> { _ ->
         LocationSettingsScreen(
             onBack = onBack,
         )
     }
 
     // Advanced settings screen
-    routeEntry<AdvancedSettingsRoute>() { _ ->
+    routeEntry<AdvancedSettingsRoute> { _ ->
         AdvancedSettingsScreen(
             onBack = onBack,
         )

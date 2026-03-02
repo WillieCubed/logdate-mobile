@@ -18,7 +18,6 @@ class DangerZoneSettingsViewModel(
     private val passkeyAccountRepository: PasskeyAccountRepository,
     private val userStateRepository: UserStateRepository,
 ) : ViewModel() {
-
     fun clearLocalData(onComplete: (() -> Unit)? = null) {
         viewModelScope.launch {
             clearLocalDataInternal()
@@ -46,11 +45,12 @@ class DangerZoneSettingsViewModel(
     }
 
     private suspend fun clearLocalDataInternal() {
-        val result = runCatching {
-            withContext(Dispatchers.Default) {
-                database.clearAllLogDateTables()
+        val result =
+            runCatching {
+                withContext(Dispatchers.Default) {
+                    database.clearAllLogDateTables()
+                }
             }
-        }
 
         if (result.isFailure) {
             Napier.e("Failed to clear local data", result.exceptionOrNull())

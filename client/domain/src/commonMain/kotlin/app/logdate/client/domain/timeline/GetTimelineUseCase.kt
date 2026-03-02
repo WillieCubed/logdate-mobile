@@ -7,10 +7,10 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.shared.model.Person
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.transform
-import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Instant
 
 /**
  * A use case to get the timeline of timeline events.
@@ -20,39 +20,39 @@ import kotlinx.datetime.toLocalDateTime
  */
 class GetTimelineUseCase(
     private val notesRepository: JournalNotesRepository,
-    private val getTimelineDayUseCase: GetTimelineDayUseCase
+    private val getTimelineDayUseCase: GetTimelineDayUseCase,
 ) {
-
-    operator fun invoke(sortOrder: TimelineSortOrder = TimelineSortOrder.REVERSE_CHRONOLOGICAL): Flow<Timeline> {
-        return notesRepository.allNotesObserved
+    operator fun invoke(sortOrder: TimelineSortOrder = TimelineSortOrder.REVERSE_CHRONOLOGICAL): Flow<Timeline> =
+        notesRepository.allNotesObserved
             .transform { allNotes ->
                 // Group notes by day using string components for more reliable grouping
                 val improvedNotesByDay = mutableMapOf<LocalDate, MutableList<JournalNote>>()
-                
+
                 allNotes.forEach { note ->
                     val noteDateTime = note.creationTimestamp.toLocalDateTime(TimeZone.currentSystemDefault())
                     val noteDate = noteDateTime.date
-                    
+
                     if (!improvedNotesByDay.containsKey(noteDate)) {
                         improvedNotesByDay[noteDate] = mutableListOf()
                     }
-                    
+
                     improvedNotesByDay[noteDate]?.add(note)
                 }
                 // Process each day's entries
-                val timelineDays = improvedNotesByDay.map { (date, entries) ->
-                    getTimelineDayUseCase(date, entries)
-                }
+                val timelineDays =
+                    improvedNotesByDay.map { (date, entries) ->
+                        getTimelineDayUseCase(date, entries)
+                    }
 
                 // Apply sorting based on the requested order
-                val sortedDays = when (sortOrder) {
-                    TimelineSortOrder.CHRONOLOGICAL -> timelineDays.sortedBy { it.date }
-                    TimelineSortOrder.REVERSE_CHRONOLOGICAL -> timelineDays.sortedByDescending { it.date }
-                }
+                val sortedDays =
+                    when (sortOrder) {
+                        TimelineSortOrder.CHRONOLOGICAL -> timelineDays.sortedBy { it.date }
+                        TimelineSortOrder.REVERSE_CHRONOLOGICAL -> timelineDays.sortedByDescending { it.date }
+                    }
 
                 emit(Timeline(sortedDays))
             }
-    }
 }
 
 data class Timeline(
@@ -101,7 +101,7 @@ data class DayPart(
 
 enum class TimelineSortOrder {
     CHRONOLOGICAL,
-    REVERSE_CHRONOLOGICAL
+    REVERSE_CHRONOLOGICAL,
 }
 
 /**
@@ -112,7 +112,6 @@ class GetTimelineDayUseCase(
     private val getMediaUrisUseCase: GetMediaUrisUseCase,
     private val extractPeopleUseCase: ExtractPeopleUseCase,
 ) {
-
     /**
      * Creates a TimelineDay from journal entries for a specific date.
      *
@@ -120,23 +119,33 @@ class GetTimelineDayUseCase(
      * @param entries The journal entries for the date
      * @return A TimelineDay object representing the aggregated data for the day
      */
-    suspend operator fun invoke(date: LocalDate, entries: List<JournalNote>): TimelineDay {
-        val summary = when (val result = summarizeJournalEntriesUseCase(entries)) {
-            SummarizeJournalEntriesResult.NetworkUnavailable -> "Summary currently not available."
-            is SummarizeJournalEntriesResult.Success -> result.summary
-            SummarizeJournalEntriesResult.SummaryUnavailable -> "No summary available."
-        }
+    suspend operator fun invoke(
+        date: LocalDate,
+        entries: List<JournalNote>,
+    ): TimelineDay {
+        val summary =
+            when (val result = summarizeJournalEntriesUseCase(entries)) {
+                SummarizeJournalEntriesResult.NetworkUnavailable -> "Summary currently not available."
+                is SummarizeJournalEntriesResult.Success -> result.summary
+                SummarizeJournalEntriesResult.SummaryUnavailable -> "No summary available."
+            }
 
         val mediaUris = getMediaUrisUseCase(date)
-        val people = when (val peopleResult = extractPeopleUseCase(
-            documentId = "people_summary_" + date.toEpochDays().toString(),
-            text = entries.filterIsInstance<JournalNote.Text>()
-                .joinToString("\n") { note -> note.content }
-        )) {
-            is AIResult.Success -> peopleResult.value
-            is AIResult.Unavailable -> emptyList()
-            is AIResult.Error -> emptyList()
-        }
+        val people =
+            when (
+                val peopleResult =
+                    extractPeopleUseCase(
+                        documentId = "people_summary_" + date.toEpochDays().toString(),
+                        text =
+                            entries
+                                .filterIsInstance<JournalNote.Text>()
+                                .joinToString("\n") { note -> note.content },
+                    )
+            ) {
+                is AIResult.Success -> peopleResult.value
+                is AIResult.Unavailable -> emptyList()
+                is AIResult.Error -> emptyList()
+            }
 
         return TimelineDay(
             tldr = summary,

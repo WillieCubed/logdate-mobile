@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.rewind.ui.detail
 
 import androidx.compose.foundation.background
@@ -50,7 +52,7 @@ fun NarrativeContextPanel(
 ) {
     Box(
         modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         // Background
         if (backgroundImageUri != null) {
@@ -58,45 +60,50 @@ fun NarrativeContextPanel(
                 model = backgroundImageUri,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
             )
 
             // Gradient overlay for text readability
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Black.copy(alpha = 0.5f),
-                                Color.Black.copy(alpha = 0.7f)
-                            )
-                        )
-                    )
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors =
+                                    listOf(
+                                        Color.Black.copy(alpha = 0.5f),
+                                        Color.Black.copy(alpha = 0.7f),
+                                    ),
+                            ),
+                        ),
             )
         } else {
             // Subtle gradient background when no image
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primaryContainer,
-                                MaterialTheme.colorScheme.primary
-                            )
-                        )
-                    )
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors =
+                                    listOf(
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                        MaterialTheme.colorScheme.primary,
+                                    ),
+                            ),
+                        ),
             )
         }
 
         // Content container with subtle backdrop
         Box(
-            modifier = Modifier
-                .padding(horizontal = 32.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(Color.Black.copy(alpha = 0.2f))
-                .padding(32.dp)
+            modifier =
+                Modifier
+                    .padding(horizontal = 32.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color.Black.copy(alpha = 0.2f))
+                    .padding(32.dp),
         ) {
             Text(
                 text = contextText,
@@ -104,7 +111,7 @@ fun NarrativeContextPanel(
                 color = Color.White,
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.Bold,
-                lineHeight = MaterialTheme.typography.headlineLarge.lineHeight * 1.3f
+                lineHeight = MaterialTheme.typography.headlineLarge.lineHeight * 1.3f,
             )
         }
     }

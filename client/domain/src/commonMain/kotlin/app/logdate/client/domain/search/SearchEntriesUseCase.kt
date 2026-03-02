@@ -33,8 +33,8 @@ class SearchEntriesUseCase(
      * @param queryFlow Flow of search queries from the UI
      * @return Flow of search results
      */
-    operator fun invoke(queryFlow: Flow<String>): Flow<List<SearchResult>> {
-        return queryFlow
+    operator fun invoke(queryFlow: Flow<String>): Flow<List<SearchResult>> =
+        queryFlow
             .debounce(searchDebounceMs)
             .distinctUntilChanged()
             .flatMapLatest { query ->
@@ -44,7 +44,6 @@ class SearchEntriesUseCase(
                     searchRepository.searchWithSnippets(query)
                 }
             }
-    }
 
     /**
      * Searches with a limit on results (useful for autocomplete/suggestions).
@@ -53,8 +52,11 @@ class SearchEntriesUseCase(
      * @param limit Maximum number of results
      * @return Flow of limited search results
      */
-    fun searchWithLimit(queryFlow: Flow<String>, limit: Int): Flow<List<SearchResult>> {
-        return queryFlow
+    fun searchWithLimit(
+        queryFlow: Flow<String>,
+        limit: Int,
+    ): Flow<List<SearchResult>> =
+        queryFlow
             .debounce(searchDebounceMs)
             .distinctUntilChanged()
             .flatMapLatest { query ->
@@ -64,5 +66,4 @@ class SearchEntriesUseCase(
                     searchRepository.searchWithLimit(query, limit)
                 }
             }
-    }
 }

@@ -10,31 +10,30 @@ import kotlinx.coroutines.flow.Flow
  * Platform-specific implementations handle the actual WebAuthn interactions.
  */
 interface PasskeyManager {
-    
     /**
      * Check if passkeys are supported on this platform
      */
     suspend fun getCapabilities(): PasskeyCapabilities
-    
+
     /**
      * Check if platform authenticator (built-in biometrics) is available
      */
     suspend fun isPlatformAuthenticatorAvailable(): Boolean
-    
+
     /**
      * Register a new passkey
      * @param options Registration options from the server
      * @return Registration credential response as JSON string
      */
     suspend fun registerPasskey(options: PasskeyRegistrationOptions): Result<String>
-    
+
     /**
      * Authenticate with a passkey
      * @param options Authentication options from the server
      * @return Authentication credential response as JSON string
      */
     suspend fun authenticateWithPasskey(options: PasskeyAuthenticationOptions): Result<String>
-    
+
     /**
      * Get availability status of passkey features
      */
@@ -47,7 +46,7 @@ interface PasskeyManager {
 class PasskeyException(
     message: String,
     val errorCode: String? = null,
-    cause: Throwable? = null
+    cause: Throwable? = null,
 ) : Exception(message, cause)
 
 /**

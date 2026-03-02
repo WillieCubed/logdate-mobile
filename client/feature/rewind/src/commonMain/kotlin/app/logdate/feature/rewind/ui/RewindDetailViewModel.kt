@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:max-line-length")
+
 package app.logdate.feature.rewind.ui
 
 import androidx.lifecycle.ViewModel
@@ -15,9 +17,9 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -43,40 +45,38 @@ class RewindDetailViewModel(
     private val getRewindUseCase: GetRewindUseCase,
 //    savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-
-    private val _rewindId = MutableStateFlow<Uuid?>(null)
+    private val rewindIdState = MutableStateFlow<Uuid?>(null)
 
 //    private val rewindData = savedStateHandle.toRoute<RewindDetailRoute>()
 
-    val uiState: StateFlow<RewindDetailUiState> = _rewindId
-        .flatMapLatest { rewindId ->
-            if (rewindId == null) {
-                // Return a specific RewindNotSelected error state when rewindId is null
-                flowOf(RewindDetailUiState.Error.RewindNotSelected)
-            } else {
-                // Use the rewindId to fetch data
-                getRewindUseCase(rewindId)
-                    .map { rewind ->
-                        // Transform rewind data into story panels
-                        val panels = transformRewindToStoryPanels(rewind)
+    val uiState: StateFlow<RewindDetailUiState> =
+        rewindIdState
+            .flatMapLatest { rewindId ->
+                if (rewindId == null) {
+                    // Return a specific RewindNotSelected error state when rewindId is null
+                    flowOf(RewindDetailUiState.Error.RewindNotSelected)
+                } else {
+                    // Use the rewindId to fetch data
+                    getRewindUseCase(rewindId)
+                        .map { rewind ->
+                            // Transform rewind data into story panels
+                            val panels = transformRewindToStoryPanels(rewind)
 
-                        if (panels.isEmpty()) {
-                            RewindDetailUiState.Error.EmptyContent
-                        } else {
-                            RewindDetailUiState.Success(panels = panels)
+                            if (panels.isEmpty()) {
+                                RewindDetailUiState.Error.EmptyContent
+                            } else {
+                                RewindDetailUiState.Success(panels = panels)
+                            }
+                        }.catch { e ->
+                            Napier.e("Error loading rewind", e)
+                            emit(RewindDetailUiState.Error.LoadingFailed)
                         }
-                    }
-                    .catch { e ->
-                        Napier.e("Error loading rewind", e)
-                        emit(RewindDetailUiState.Error.LoadingFailed)
-                    }
-            }
-        }
-        .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5000),
-            RewindDetailUiState.Loading
-        )
+                }
+            }.stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                RewindDetailUiState.Loading,
+            )
 
     /**
      * Loads rewind data for the specified ID.
@@ -84,7 +84,7 @@ class RewindDetailViewModel(
      * @param rewindId The unique identifier of the rewind to load
      */
     fun loadRewind(rewindId: Uuid) {
-        _rewindId.value = rewindId
+        rewindIdState.value = rewindId
     }
 
     /**
@@ -107,67 +107,69 @@ class RewindDetailViewModel(
                 subtitle = "From ${
                     formatDateRange(
                         rewind.startDate,
-                        rewind.endDate
+                        rewind.endDate,
                     )
                 }\nYour journey through time and memories",
-                backgroundUri = null
-            )
+                backgroundUri = null,
+            ),
         )
 
         // 2. Transform content items to panels
-        val contentPanels = rewind.content.map { content ->
-            when (content) {
-                is RewindContent.TextNote -> {
-                    TextNoteRewindPanelUiState(
-                        sourceId = content.sourceId,
-                        timestamp = content.timestamp,
-                        content = content.content,
-                        dateFormatted = formatTimestamp(content.timestamp),
-                        background = RewindPanelBackgroundSpec(
-                            color = 0xFF1A1A1A // Dark gray background by default
+        val contentPanels =
+            rewind.content.map { content ->
+                when (content) {
+                    is RewindContent.TextNote -> {
+                        TextNoteRewindPanelUiState(
+                            sourceId = content.sourceId,
+                            timestamp = content.timestamp,
+                            content = content.content,
+                            dateFormatted = formatTimestamp(content.timestamp),
+                            background =
+                                RewindPanelBackgroundSpec(
+                                    color = 0xFF1A1A1A, // Dark gray background by default
+                                ),
                         )
-                    )
-                }
+                    }
 
-                is RewindContent.Image -> {
-                    ImageRewindPanelUiState(
-                        sourceId = content.sourceId,
-                        timestamp = content.timestamp,
-                        imageUri = content.uri,
-                        caption = content.caption,
-                        dateFormatted = formatTimestamp(content.timestamp)
-                    )
-                }
+                    is RewindContent.Image -> {
+                        ImageRewindPanelUiState(
+                            sourceId = content.sourceId,
+                            timestamp = content.timestamp,
+                            imageUri = content.uri,
+                            caption = content.caption,
+                            dateFormatted = formatTimestamp(content.timestamp),
+                        )
+                    }
 
-                is RewindContent.Video -> {
-                    // For now, treat videos like images - video playback support can be added later
-                    ImageRewindPanelUiState(
-                        sourceId = content.sourceId,
-                        timestamp = content.timestamp,
-                        imageUri = content.uri,
-                        caption = content.caption,
-                        dateFormatted = formatTimestamp(content.timestamp)
-                    )
-                }
+                    is RewindContent.Video -> {
+                        // For now, treat videos like images - video playback support can be added later
+                        ImageRewindPanelUiState(
+                            sourceId = content.sourceId,
+                            timestamp = content.timestamp,
+                            imageUri = content.uri,
+                            caption = content.caption,
+                            dateFormatted = formatTimestamp(content.timestamp),
+                        )
+                    }
 
-                is RewindContent.NarrativeContext -> {
-                    NarrativeContextRewindPanelUiState(
-                        sourceId = content.sourceId,
-                        timestamp = content.timestamp,
-                        contextText = content.contextText,
-                        backgroundImageUri = content.backgroundImage
-                    )
-                }
+                    is RewindContent.NarrativeContext -> {
+                        NarrativeContextRewindPanelUiState(
+                            sourceId = content.sourceId,
+                            timestamp = content.timestamp,
+                            contextText = content.contextText,
+                            backgroundImageUri = content.backgroundImage,
+                        )
+                    }
 
-                is RewindContent.Transition -> {
-                    TransitionRewindPanelUiState(
-                        sourceId = content.sourceId,
-                        timestamp = content.timestamp,
-                        transitionText = content.transitionText
-                    )
+                    is RewindContent.Transition -> {
+                        TransitionRewindPanelUiState(
+                            sourceId = content.sourceId,
+                            timestamp = content.timestamp,
+                            transitionText = content.transitionText,
+                        )
+                    }
                 }
             }
-        }
 
         panels.addAll(contentPanels)
 
@@ -182,10 +184,11 @@ class RewindDetailViewModel(
                         statistic = textNoteCount.toString(),
                         units = "entries",
                         description = "You captured thoughts and memories $textNoteCount times this week. Each entry is a window into this moment in your life.",
-                        background = RewindPanelBackgroundSpec(
-                            color = 0xFF9C27B0 // Purple
-                        )
-                    )
+                        background =
+                            RewindPanelBackgroundSpec(
+                                color = 0xFF9C27B0, // Purple
+                            ),
+                    ),
                 )
             }
 
@@ -198,10 +201,11 @@ class RewindDetailViewModel(
                         statistic = imageCount.toString(),
                         units = "photos",
                         description = "You preserved $imageCount visual memories this week. Each image tells a unique story from your perspective.",
-                        background = RewindPanelBackgroundSpec(
-                            color = 0xFF2196F3 // Blue
-                        )
-                    )
+                        background =
+                            RewindPanelBackgroundSpec(
+                                color = 0xFF2196F3, // Blue
+                            ),
+                    ),
                 )
             }
         }
@@ -210,10 +214,11 @@ class RewindDetailViewModel(
         panels.add(
             BasicTextRewindPanelUiState(
                 text = "This week brought new experiences, personal growth, and countless small moments that make life beautiful. Here's to next week's adventures!",
-                background = RewindPanelBackgroundSpec(
-                    color = 0xFFFF9800 // Orange
-                )
-            )
+                background =
+                    RewindPanelBackgroundSpec(
+                        color = 0xFFFF9800, // Orange
+                    ),
+            ),
         )
 
         return panels
@@ -227,20 +232,21 @@ class RewindDetailViewModel(
      */
     private fun formatTimestamp(timestamp: Instant): String {
         val localDateTime = timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
-        val month = when (localDateTime.month) {
-            kotlinx.datetime.Month.JANUARY -> "Jan"
-            kotlinx.datetime.Month.FEBRUARY -> "Feb"
-            kotlinx.datetime.Month.MARCH -> "Mar"
-            kotlinx.datetime.Month.APRIL -> "Apr"
-            kotlinx.datetime.Month.MAY -> "May"
-            kotlinx.datetime.Month.JUNE -> "Jun"
-            kotlinx.datetime.Month.JULY -> "Jul"
-            kotlinx.datetime.Month.AUGUST -> "Aug"
-            kotlinx.datetime.Month.SEPTEMBER -> "Sep"
-            kotlinx.datetime.Month.OCTOBER -> "Oct"
-            kotlinx.datetime.Month.NOVEMBER -> "Nov"
-            kotlinx.datetime.Month.DECEMBER -> "Dec"
-        }
+        val month =
+            when (localDateTime.month) {
+                kotlinx.datetime.Month.JANUARY -> "Jan"
+                kotlinx.datetime.Month.FEBRUARY -> "Feb"
+                kotlinx.datetime.Month.MARCH -> "Mar"
+                kotlinx.datetime.Month.APRIL -> "Apr"
+                kotlinx.datetime.Month.MAY -> "May"
+                kotlinx.datetime.Month.JUNE -> "Jun"
+                kotlinx.datetime.Month.JULY -> "Jul"
+                kotlinx.datetime.Month.AUGUST -> "Aug"
+                kotlinx.datetime.Month.SEPTEMBER -> "Sep"
+                kotlinx.datetime.Month.OCTOBER -> "Oct"
+                kotlinx.datetime.Month.NOVEMBER -> "Nov"
+                kotlinx.datetime.Month.DECEMBER -> "Dec"
+            }
 
         return "$month ${localDateTime.day}, ${localDateTime.year}"
     }
@@ -252,24 +258,28 @@ class RewindDetailViewModel(
      * @param endDate End of the date range
      * @return Formatted date range string (e.g., "November 18-24, 2024")
      */
-    private fun formatDateRange(startDate: Instant, endDate: Instant): String {
+    private fun formatDateRange(
+        startDate: Instant,
+        endDate: Instant,
+    ): String {
         val startLocal = startDate.toLocalDateTime(TimeZone.currentSystemDefault())
         val endLocal = endDate.toLocalDateTime(TimeZone.currentSystemDefault())
 
-        val startMonth = when (startLocal.month) {
-            kotlinx.datetime.Month.JANUARY -> "January"
-            kotlinx.datetime.Month.FEBRUARY -> "February"
-            kotlinx.datetime.Month.MARCH -> "March"
-            kotlinx.datetime.Month.APRIL -> "April"
-            kotlinx.datetime.Month.MAY -> "May"
-            kotlinx.datetime.Month.JUNE -> "June"
-            kotlinx.datetime.Month.JULY -> "July"
-            kotlinx.datetime.Month.AUGUST -> "August"
-            kotlinx.datetime.Month.SEPTEMBER -> "September"
-            kotlinx.datetime.Month.OCTOBER -> "October"
-            kotlinx.datetime.Month.NOVEMBER -> "November"
-            kotlinx.datetime.Month.DECEMBER -> "December"
-        }
+        val startMonth =
+            when (startLocal.month) {
+                kotlinx.datetime.Month.JANUARY -> "January"
+                kotlinx.datetime.Month.FEBRUARY -> "February"
+                kotlinx.datetime.Month.MARCH -> "March"
+                kotlinx.datetime.Month.APRIL -> "April"
+                kotlinx.datetime.Month.MAY -> "May"
+                kotlinx.datetime.Month.JUNE -> "June"
+                kotlinx.datetime.Month.JULY -> "July"
+                kotlinx.datetime.Month.AUGUST -> "August"
+                kotlinx.datetime.Month.SEPTEMBER -> "September"
+                kotlinx.datetime.Month.OCTOBER -> "October"
+                kotlinx.datetime.Month.NOVEMBER -> "November"
+                kotlinx.datetime.Month.DECEMBER -> "December"
+            }
 
         // If same month
         if (startLocal.month == endLocal.month && startLocal.year == endLocal.year) {
@@ -277,20 +287,21 @@ class RewindDetailViewModel(
         }
 
         // Different months
-        val endMonth = when (endLocal.month) {
-            kotlinx.datetime.Month.JANUARY -> "January"
-            kotlinx.datetime.Month.FEBRUARY -> "February"
-            kotlinx.datetime.Month.MARCH -> "March"
-            kotlinx.datetime.Month.APRIL -> "April"
-            kotlinx.datetime.Month.MAY -> "May"
-            kotlinx.datetime.Month.JUNE -> "June"
-            kotlinx.datetime.Month.JULY -> "July"
-            kotlinx.datetime.Month.AUGUST -> "August"
-            kotlinx.datetime.Month.SEPTEMBER -> "September"
-            kotlinx.datetime.Month.OCTOBER -> "October"
-            kotlinx.datetime.Month.NOVEMBER -> "November"
-            kotlinx.datetime.Month.DECEMBER -> "December"
-        }
+        val endMonth =
+            when (endLocal.month) {
+                kotlinx.datetime.Month.JANUARY -> "January"
+                kotlinx.datetime.Month.FEBRUARY -> "February"
+                kotlinx.datetime.Month.MARCH -> "March"
+                kotlinx.datetime.Month.APRIL -> "April"
+                kotlinx.datetime.Month.MAY -> "May"
+                kotlinx.datetime.Month.JUNE -> "June"
+                kotlinx.datetime.Month.JULY -> "July"
+                kotlinx.datetime.Month.AUGUST -> "August"
+                kotlinx.datetime.Month.SEPTEMBER -> "September"
+                kotlinx.datetime.Month.OCTOBER -> "October"
+                kotlinx.datetime.Month.NOVEMBER -> "November"
+                kotlinx.datetime.Month.DECEMBER -> "December"
+            }
 
         return "$startMonth ${startLocal.day} - $endMonth ${endLocal.day}, ${endLocal.year}"
     }
@@ -300,48 +311,51 @@ class RewindDetailViewModel(
      *
      * @return List of sample rewind panels
      */
-    private fun createSamplePanels(): List<RewindPanelUiState> {
-        return listOf(
+    private fun createSamplePanels(): List<RewindPanelUiState> =
+        listOf(
             SubtitledRewindPanelUiState(
                 title = "A Week to Remember",
                 subtitle = "From November 18-24, 2024\nYour journey through time and memories",
-                backgroundUri = null
+                backgroundUri = null,
             ),
             BigStatisticRewindPanelUiState(
                 title = "Steps Taken",
                 statistic = "47,832",
                 units = "steps",
                 description = "You walked the equivalent of 22 miles this week - that's impressive dedication to staying active!",
-                background = RewindPanelBackgroundSpec(
-                    color = 0xFF4CAF50 // Green
-                )
+                background =
+                    RewindPanelBackgroundSpec(
+                        color = 0xFF4CAF50, // Green
+                    ),
             ),
             BasicTextRewindPanelUiState(
                 text = "You visited 3 new coffee shops this week and tried 2 new types of pastries. Your adventurous spirit is inspiring!",
-                background = RewindPanelBackgroundSpec(
-                    color = 0xFF2196F3 // Blue
-                )
+                background =
+                    RewindPanelBackgroundSpec(
+                        color = 0xFF2196F3, // Blue
+                    ),
             ),
             BigStatisticRewindPanelUiState(
                 title = "Journal Entries",
                 statistic = "5",
                 units = "entries",
                 description = "You captured thoughts and memories 5 times this week. Each entry is a window into this moment in your life.",
-                background = RewindPanelBackgroundSpec(
-                    color = 0xFF9C27B0 // Purple
-                )
+                background =
+                    RewindPanelBackgroundSpec(
+                        color = 0xFF9C27B0, // Purple
+                    ),
             ),
             SubtitledRewindPanelUiState(
                 title = "Most Active Day",
                 subtitle = "Thursday was your busiest day with 12,847 steps and 3 journal entries. You were unstoppable!",
-                backgroundUri = null
+                backgroundUri = null,
             ),
             BasicTextRewindPanelUiState(
                 text = "This week brought new experiences, personal growth, and countless small moments that make life beautiful. Here's to next week's adventures!",
-                background = RewindPanelBackgroundSpec(
-                    color = 0xFFFF9800 // Orange
-                )
-            )
+                background =
+                    RewindPanelBackgroundSpec(
+                        color = 0xFFFF9800, // Orange
+                    ),
+            ),
         )
-    }
 }

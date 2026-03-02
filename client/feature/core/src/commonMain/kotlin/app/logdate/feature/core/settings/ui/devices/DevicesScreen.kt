@@ -1,4 +1,5 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:max-line-length")
 
 package app.logdate.feature.core.settings.ui.devices
 
@@ -45,30 +46,30 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import org.koin.compose.koinInject
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.core.generated.resources.*
 import logdate.client.feature.core.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
+
 /**
  * Screen that displays device information and allows management of devices.
  */
 @Composable
 fun DevicesScreen(
     onBackClick: () -> Unit,
-    viewModel: DevicesViewModel = koinInject()
+    viewModel: DevicesViewModel = koinInject(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    
+
     LaunchedEffect(Unit) {
         viewModel.loadDevices()
     }
-    
+
     var showRenameDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
     var selectedDevice by remember { mutableStateOf<DeviceInfoUiState?>(null) }
     var newDeviceName by remember { mutableStateOf("") }
-    
+
     if (showRenameDialog && selectedDevice != null) {
         RenameDeviceDialog(
             currentName = selectedDevice!!.name,
@@ -77,10 +78,10 @@ fun DevicesScreen(
                 viewModel.renameDevice(newDeviceName)
                 showRenameDialog = false
             },
-            onDismiss = { showRenameDialog = false }
+            onDismiss = { showRenameDialog = false },
         )
     }
-    
+
     if (showDeleteDialog && selectedDevice != null) {
         RemoveDeviceDialog(
             deviceName = selectedDevice!!.name,
@@ -88,20 +89,20 @@ fun DevicesScreen(
                 viewModel.removeDevice(selectedDevice!!.id)
                 showDeleteDialog = false
             },
-            onDismiss = { showDeleteDialog = false }
+            onDismiss = { showDeleteDialog = false },
         )
     }
-    
+
     if (showResetDialog) {
         ResetDeviceIdDialog(
             onConfirm = {
                 viewModel.resetDeviceId()
                 showResetDialog = false
             },
-            onDismiss = { showResetDialog = false }
+            onDismiss = { showResetDialog = false },
         )
     }
-    
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -110,19 +111,21 @@ fun DevicesScreen(
                     TextButton(onClick = onBackClick) {
                         Text(stringResource(Res.string.back))
                     }
-                }
+                },
             )
-        }
+        },
     ) { paddingValues ->
         Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
             ) {
                 if (uiState.isLoading) {
                     LoadingState()
@@ -137,19 +140,19 @@ fun DevicesScreen(
                         onRemoveClick = { device ->
                             selectedDevice = device
                             showDeleteDialog = true
-                        }
+                        },
                     )
-                    
+
                     Spacer(modifier = Modifier.height(16.dp))
-                    
+
                     Button(
                         onClick = { showResetDialog = true },
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
                     ) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(20.dp),
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(stringResource(Res.string.reset_device_id))
@@ -165,7 +168,7 @@ private fun LoadingState() {
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         CircularProgressIndicator()
         Spacer(modifier = Modifier.height(16.dp))
@@ -177,16 +180,16 @@ private fun LoadingState() {
 private fun DevicesList(
     devices: List<DeviceInfoUiState>,
     onRenameClick: (DeviceInfoUiState) -> Unit,
-    onRemoveClick: (DeviceInfoUiState) -> Unit
+    onRemoveClick: (DeviceInfoUiState) -> Unit,
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
     ) {
         items(devices) { device ->
             DeviceCard(
                 device = device,
                 onRenameClick = { onRenameClick(device) },
-                onRemoveClick = { onRemoveClick(device) }
+                onRemoveClick = { onRemoveClick(device) },
             )
             Spacer(modifier = Modifier.height(8.dp))
         }
@@ -197,86 +200,90 @@ private fun DevicesList(
 private fun DeviceCard(
     device: DeviceInfoUiState,
     onRenameClick: () -> Unit,
-    onRemoveClick: () -> Unit
+    onRemoveClick: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Outlined.Devices,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = MaterialTheme.colorScheme.primary,
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = device.name,
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.titleMedium,
                     )
                     if (device.isCurrentDevice) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = stringResource(Res.string.this_device),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.primary,
                         )
                     }
                 }
-                
+
                 Row {
                     IconButton(onClick = onRenameClick) {
                         Icon(
                             imageVector = Icons.Default.Edit,
-                            contentDescription = stringResource(Res.string.rename_device)
+                            contentDescription = stringResource(Res.string.rename_device),
                         )
                     }
-                    
+
                     if (!device.isCurrentDevice) {
                         IconButton(onClick = onRemoveClick) {
                             Icon(
                                 imageVector = Icons.Default.Delete,
-                                contentDescription = stringResource(Res.string.remove_device)
+                                contentDescription = stringResource(Res.string.remove_device),
                             )
                         }
                     }
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             Text(
-                text = stringResource(
-                    Res.string.platform_label,
-                    device.platformName
-                ),
-                style = MaterialTheme.typography.bodyMedium
+                text =
+                    stringResource(
+                        Res.string.platform_label,
+                        device.platformName,
+                    ),
+                style = MaterialTheme.typography.bodyMedium,
             )
-            
+
             Text(
-                text = stringResource(
-                    Res.string.last_active_label,
-                    device.lastActiveFormatted
-                ),
-                style = MaterialTheme.typography.bodyMedium
+                text =
+                    stringResource(
+                        Res.string.last_active_label,
+                        device.lastActiveFormatted,
+                    ),
+                style = MaterialTheme.typography.bodyMedium,
             )
-            
+
             Text(
-                text = stringResource(
-                    Res.string.app_version_label,
-                    device.appVersion
-                ),
-                style = MaterialTheme.typography.bodyMedium
+                text =
+                    stringResource(
+                        Res.string.app_version_label,
+                        device.appVersion,
+                    ),
+                style = MaterialTheme.typography.bodyMedium,
             )
         }
     }
@@ -287,10 +294,10 @@ private fun RenameDeviceDialog(
     currentName: String,
     onNameChange: (String) -> Unit,
     onConfirm: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf(currentName) }
-    
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(Res.string.rename_device_2)) },
@@ -300,20 +307,20 @@ private fun RenameDeviceDialog(
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = name,
-                    onValueChange = { 
+                    onValueChange = {
                         name = it
                         onNameChange(it)
                     },
                     label = { Text(stringResource(Res.string.device_name)) },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         },
         confirmButton = {
             Button(
                 onClick = onConfirm,
-                enabled = name.isNotBlank()
+                enabled = name.isNotBlank(),
             ) {
                 Text(stringResource(Res.string.rename))
             }
@@ -322,7 +329,7 @@ private fun RenameDeviceDialog(
             TextButton(onClick = onDismiss) {
                 Text(stringResource(Res.string.cancel))
             }
-        }
+        },
     )
 }
 
@@ -330,7 +337,7 @@ private fun RenameDeviceDialog(
 private fun RemoveDeviceDialog(
     deviceName: String,
     onConfirm: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -339,8 +346,8 @@ private fun RemoveDeviceDialog(
             Text(
                 stringResource(
                     Res.string.remove_device_confirmation,
-                    deviceName
-                )
+                    deviceName,
+                ),
             )
         },
         confirmButton = {
@@ -354,20 +361,25 @@ private fun RemoveDeviceDialog(
             TextButton(onClick = onDismiss) {
                 Text(stringResource(Res.string.cancel))
             }
-        }
+        },
     )
 }
 
 @Composable
 private fun ResetDeviceIdDialog(
     onConfirm: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(Res.string.reset_device_id)) },
         text = {
-            Text(stringResource(Res.string.are_you_sure_you_want_to_reset_this_devices_id_this_is_primarily_used_for_privacy_purposes_and_will_generate_a_new_unique_identifier_for_this_device_this_wont_affect_your_data_but_may_require_re_syncing_with_logdate_cloud))
+            val resetDeviceIdText =
+                stringResource(
+                    Res.string
+                        .are_you_sure_you_want_to_reset_this_devices_id_this_is_primarily_used_for_privacy_purposes_and_will_generate_a_new_unique_identifier_for_this_device_this_wont_affect_your_data_but_may_require_re_syncing_with_logdate_cloud,
+                )
+            Text(resetDeviceIdText)
         },
         confirmButton = {
             Button(
@@ -380,6 +392,6 @@ private fun ResetDeviceIdDialog(
             OutlinedButton(onClick = onDismiss) {
                 Text(stringResource(Res.string.cancel))
             }
-        }
+        },
     )
 }

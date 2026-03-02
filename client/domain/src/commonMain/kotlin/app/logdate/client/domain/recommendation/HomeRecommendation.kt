@@ -10,7 +10,6 @@ import kotlin.uuid.Uuid
  * recommendation as a reactive Flow.
  */
 sealed class HomeRecommendation {
-
     /** No recommendation to show — the user is up to date. */
     data object None : HomeRecommendation()
 

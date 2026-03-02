@@ -22,7 +22,6 @@ class NoteViewerViewModel(
     private val notesRepository: JournalNotesRepository,
     private val removeNoteUseCase: RemoveNoteUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow<NoteViewerUiState>(NoteViewerUiState.Loading)
     val uiState: StateFlow<NoteViewerUiState> = _uiState.asStateFlow()
 
@@ -34,11 +33,11 @@ class NoteViewerViewModel(
         viewModelScope.launch {
             notesRepository.allNotesObserved
                 .catch { error ->
-                    _uiState.value = NoteViewerUiState.Error(
-                        "Failed to load note: ${error.message}"
-                    )
-                }
-                .collect { notes ->
+                    _uiState.value =
+                        NoteViewerUiState.Error(
+                            "Failed to load note: ${error.message}",
+                        )
+                }.collect { notes ->
                     val note = notes.find { it.uid == noteId }
                     if (note == null) {
                         _uiState.value = NoteViewerUiState.Error("Note not found")
@@ -50,12 +49,13 @@ class NoteViewerViewModel(
     }
 
     private fun updateForNote(note: JournalNote) {
-        val shared = NoteViewerShared(
-            noteId = note.uid,
-            createdAt = note.creationTimestamp,
-            lastUpdated = note.lastUpdated,
-            location = note.location,
-        )
+        val shared =
+            NoteViewerShared(
+                noteId = note.uid,
+                createdAt = note.creationTimestamp,
+                lastUpdated = note.lastUpdated,
+                location = note.location,
+            )
         when (note) {
             is JournalNote.Text -> {
                 _uiState.value = NoteViewerUiState.TextContent(shared, note.content)
@@ -67,11 +67,12 @@ class NoteViewerViewModel(
                 _uiState.value = NoteViewerUiState.VideoContent(shared, note.mediaRef)
             }
             is JournalNote.Audio -> {
-                _uiState.value = NoteViewerUiState.AudioContent(
-                    shared = shared,
-                    mediaRef = note.mediaRef,
-                    durationMs = note.durationMs,
-                )
+                _uiState.value =
+                    NoteViewerUiState.AudioContent(
+                        shared = shared,
+                        mediaRef = note.mediaRef,
+                        durationMs = note.durationMs,
+                    )
             }
         }
     }
@@ -107,7 +108,10 @@ data class NoteViewerShared(
  */
 sealed interface NoteViewerUiState {
     data object Loading : NoteViewerUiState
-    data class Error(val message: String) : NoteViewerUiState
+
+    data class Error(
+        val message: String,
+    ) : NoteViewerUiState
 
     /**
      * Base contract for content-bearing viewer states.

@@ -1,8 +1,20 @@
 package app.logdate.server.routes
 
 import app.logdate.server.auth.TokenService
+import app.logdate.server.crypto.EncryptionService
 import app.logdate.server.responses.error
 import app.logdate.server.responses.simpleSuccess
+import app.logdate.server.sync.AssociationKey
+import app.logdate.server.sync.AssociationRecord
+import app.logdate.server.sync.BackupRecord
+import app.logdate.server.sync.ContentRecord
+import app.logdate.server.sync.GcsMediaStorage
+import app.logdate.server.sync.JournalRecord
+import app.logdate.server.sync.MediaAccessPolicy
+import app.logdate.server.sync.MediaEncryptionService
+import app.logdate.server.sync.MediaRecord
+import app.logdate.server.sync.SyncMetricsRegistry
+import app.logdate.server.sync.SyncRepository
 import app.logdate.shared.model.sync.AssociationChange
 import app.logdate.shared.model.sync.AssociationChangesResponse
 import app.logdate.shared.model.sync.AssociationDeleteRequest
@@ -31,24 +43,22 @@ import app.logdate.shared.model.sync.MediaDownloadResponse
 import app.logdate.shared.model.sync.MediaUploadRequest
 import app.logdate.shared.model.sync.MediaUploadResponse
 import app.logdate.shared.model.sync.VersionConstraint
-import app.logdate.server.sync.AssociationKey
-import app.logdate.server.sync.AssociationRecord
-import app.logdate.server.sync.BackupRecord
-import app.logdate.server.sync.ContentRecord
-import app.logdate.server.sync.GcsMediaStorage
-import app.logdate.server.sync.JournalRecord
-import app.logdate.server.crypto.EncryptionService
-import app.logdate.server.sync.MediaAccessPolicy
-import app.logdate.server.sync.MediaEncryptionService
-import app.logdate.server.sync.MediaRecord
-import app.logdate.server.sync.SyncMetricsRegistry
-import app.logdate.server.sync.SyncRepository
 import io.github.aakira.napier.Napier
-import io.ktor.http.*
-import io.ktor.server.application.*
-import io.ktor.server.request.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
+import io.ktor.server.application.call
+import io.ktor.server.request.header
+import io.ktor.server.request.receive
+import io.ktor.server.response.respond
+import io.ktor.server.response.respondBytes
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.delete
+import io.ktor.server.routing.get
+import io.ktor.server.routing.post
+import io.ktor.server.routing.route
 import kotlinx.serialization.Serializable
 import java.util.UUID
 
@@ -57,7 +67,7 @@ private data class SyncStatusSnapshot(
     val contentCount: Int,
     val journalCount: Int,
     val associationCount: Int,
-    val lastTimestamp: Long
+    val lastTimestamp: Long,
 )
 
 private const val DEFAULT_SYNC_PAGE_SIZE = 200
@@ -87,12 +97,12 @@ private const val MILLIS_PER_DAY = 86_400_000L
  */
 private suspend fun extractUserId(
     call: ApplicationCall,
-    tokenService: TokenService?
+    tokenService: TokenService?,
 ): UUID? {
     if (tokenService == null) {
         call.respond(
             HttpStatusCode.InternalServerError,
-            error("SERVER_MISCONFIGURED", "Token service is not configured")
+            error("SERVER_MISCONFIGURED", "Token service is not configured"),
         )
         return null
     }
@@ -101,7 +111,7 @@ private suspend fun extractUserId(
     if (authHeader == null || !authHeader.startsWith("Bearer ")) {
         call.respond(
             HttpStatusCode.Unauthorized,
-            error("UNAUTHORIZED", "Missing or invalid Authorization header")
+            error("UNAUTHORIZED", "Missing or invalid Authorization header"),
         )
         return null
     }
@@ -111,7 +121,7 @@ private suspend fun extractUserId(
     if (accountId == null) {
         call.respond(
             HttpStatusCode.Unauthorized,
-            error("UNAUTHORIZED", "Invalid or expired token")
+            error("UNAUTHORIZED", "Invalid or expired token"),
         )
         return null
     }
@@ -122,7 +132,7 @@ private suspend fun extractUserId(
         Napier.e("Invalid account ID format in token: $accountId", e)
         call.respond(
             HttpStatusCode.Unauthorized,
-            error("UNAUTHORIZED", "Invalid token payload")
+            error("UNAUTHORIZED", "Invalid token payload"),
         )
         null
     }
@@ -139,7 +149,7 @@ fun Route.syncRoutes(
     metrics: SyncMetricsRegistry,
     mediaAccessPolicy: MediaAccessPolicy = MediaAccessPolicy.fromEnvironment(),
     mediaEncryption: MediaEncryptionService = MediaEncryptionService.fromEnvironment(),
-    encryptionService: EncryptionService = EncryptionService.fromEnvironment()
+    encryptionService: EncryptionService = EncryptionService.fromEnvironment(),
 ) {
     route("/sync") {
         // High-level status (used by smoke tests)
@@ -149,12 +159,13 @@ fun Route.syncRoutes(
             try {
                 val userId = extractUserId(call, tokenService) ?: return@get
                 val status = repository.status(userId)
-                val snapshot = SyncStatusSnapshot(
-                    contentCount = status.contentCount,
-                    journalCount = status.journalCount,
-                    associationCount = status.associationCount,
-                    lastTimestamp = status.lastTimestamp
-                )
+                val snapshot =
+                    SyncStatusSnapshot(
+                        contentCount = status.contentCount,
+                        journalCount = status.journalCount,
+                        associationCount = status.associationCount,
+                        lastTimestamp = status.lastTimestamp,
+                    )
                 call.respond(simpleSuccess(snapshot))
                 success = true
             } finally {
@@ -187,7 +198,7 @@ fun Route.syncRoutes(
                 val snapshot = metrics.snapshot()
                 call.respondText(
                     snapshot.toPrometheus(),
-                    ContentType.Text.Plain
+                    ContentType.Text.Plain,
                 )
                 success = true
             } finally {
@@ -204,26 +215,27 @@ fun Route.syncRoutes(
                     val userId = extractUserId(call, tokenService) ?: return@post
                     val req = call.receive<ContentUploadRequest>()
                     Napier.d("Content upload for user $userId: ${req.id}")
-                    val stored = repository.upsertContent(
-                        userId,
-                        ContentRecord(
-                            id = req.id,
-                            type = req.type,
-                            content = req.content,
-                            mediaUri = req.mediaUri,
-                            durationMs = req.durationMs,
-                            createdAt = req.createdAt,
-                            lastUpdated = req.lastUpdated,
-                            serverVersion = 0L,
-                            deviceId = req.deviceId
+                    val stored =
+                        repository.upsertContent(
+                            userId,
+                            ContentRecord(
+                                id = req.id,
+                                type = req.type,
+                                content = req.content,
+                                mediaUri = req.mediaUri,
+                                durationMs = req.durationMs,
+                                createdAt = req.createdAt,
+                                lastUpdated = req.lastUpdated,
+                                serverVersion = 0L,
+                                deviceId = req.deviceId,
+                            ),
                         )
-                    )
                     call.respond(
                         ContentUploadResponse(
                             id = stored.id,
                             serverVersion = stored.serverVersion,
-                            uploadedAt = stored.lastUpdated
-                        )
+                            uploadedAt = stored.lastUpdated,
+                        ),
                     )
                     success = true
                 } finally {
@@ -236,28 +248,30 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@get
-                    val since = call.request.queryParameters["since"]?.toLongOrNull()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            error("MISSING_PARAMETER", "since parameter is required")
-                        )
+                    val since =
+                        call.request.queryParameters["since"]?.toLongOrNull()
+                            ?: return@get call.respond(
+                                HttpStatusCode.BadRequest,
+                                error("MISSING_PARAMETER", "since parameter is required"),
+                            )
 
                     val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_SYNC_PAGE_SIZE
                     val pageSize = limit.coerceIn(1, MAX_SYNC_PAGE_SIZE)
                     val changeSet = repository.contentChanges(userId, since, pageSize)
-                    val changes = changeSet.changes.map {
-                        ContentChange(
-                            id = it.id,
-                            type = it.type,
-                            content = it.content,
-                            mediaUri = it.mediaUri,
-                            durationMs = it.durationMs ?: 0,
-                            createdAt = it.createdAt,
-                            lastUpdated = it.lastUpdated,
-                            serverVersion = it.serverVersion,
-                            isDeleted = false
-                        )
-                    }
+                    val changes =
+                        changeSet.changes.map {
+                            ContentChange(
+                                id = it.id,
+                                type = it.type,
+                                content = it.content,
+                                mediaUri = it.mediaUri,
+                                durationMs = it.durationMs ?: 0,
+                                createdAt = it.createdAt,
+                                lastUpdated = it.lastUpdated,
+                                serverVersion = it.serverVersion,
+                                isDeleted = false,
+                            )
+                        }
                     val deletions = changeSet.deletions.map { ContentDeletion(id = it.id, deletedAt = it.deletedAt) }
                     call.respond(ContentChangesResponse(changes, deletions, changeSet.lastTimestamp, changeSet.hasMore))
                     success = true
@@ -271,10 +285,11 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@post
-                    val contentId = call.parameters["contentId"] ?: return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        error("MISSING_PARAMETER", "contentId is required")
-                    )
+                    val contentId =
+                        call.parameters["contentId"] ?: return@post call.respond(
+                            HttpStatusCode.BadRequest,
+                            error("MISSING_PARAMETER", "contentId is required"),
+                        )
                     val req = call.receive<ContentUpdateRequest>()
                     val existing = repository.getContent(userId, contentId)
                     when (val constraint = req.versionConstraint) {
@@ -285,27 +300,28 @@ fun Route.syncRoutes(
                                     HttpStatusCode.Conflict,
                                     error(
                                         "CONFLICT",
-                                        "Server has a newer version (${constraint.serverVersion} < ${existing.serverVersion})"
-                                    )
+                                        "Server has a newer version (${constraint.serverVersion} < ${existing.serverVersion})",
+                                    ),
                                 )
                             }
                         }
                         VersionConstraint.None -> Unit
                     }
-                    val updated = repository.upsertContent(
-                        userId,
-                        ContentRecord(
-                            id = contentId,
-                            type = existing?.type ?: "TEXT",
-                            content = req.content ?: existing?.content,
-                            mediaUri = req.mediaUri ?: existing?.mediaUri,
-                            durationMs = req.durationMs ?: existing?.durationMs,
-                            createdAt = existing?.createdAt ?: System.currentTimeMillis(),
-                            lastUpdated = req.lastUpdated,
-                            serverVersion = existing?.serverVersion ?: 0L,
-                            deviceId = req.deviceId
+                    val updated =
+                        repository.upsertContent(
+                            userId,
+                            ContentRecord(
+                                id = contentId,
+                                type = existing?.type ?: "TEXT",
+                                content = req.content ?: existing?.content,
+                                mediaUri = req.mediaUri ?: existing?.mediaUri,
+                                durationMs = req.durationMs ?: existing?.durationMs,
+                                createdAt = existing?.createdAt ?: System.currentTimeMillis(),
+                                lastUpdated = req.lastUpdated,
+                                serverVersion = existing?.serverVersion ?: 0L,
+                                deviceId = req.deviceId,
+                            ),
                         )
-                    )
                     call.respond(ContentUpdateResponse(contentId, updated.serverVersion, updated.lastUpdated))
                     success = true
                 } finally {
@@ -318,10 +334,11 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@post
-                    val contentId = call.parameters["contentId"] ?: return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        error("MISSING_PARAMETER", "contentId is required")
-                    )
+                    val contentId =
+                        call.parameters["contentId"] ?: return@post call.respond(
+                            HttpStatusCode.BadRequest,
+                            error("MISSING_PARAMETER", "contentId is required"),
+                        )
                     val deletedAt = System.currentTimeMillis()
                     repository.deleteContent(userId, contentId, deletedAt)
                     call.respond(HttpStatusCode.OK)
@@ -341,18 +358,19 @@ fun Route.syncRoutes(
                     val userId = extractUserId(call, tokenService) ?: return@post
                     val req = call.receive<JournalUploadRequest>()
                     Napier.d("Journal upload for user $userId: ${req.id}")
-                    val stored = repository.upsertJournal(
-                        userId,
-                        JournalRecord(
-                            id = req.id,
-                            title = req.title,
-                            description = req.description,
-                            createdAt = req.createdAt,
-                            lastUpdated = req.lastUpdated,
-                            serverVersion = 0L,
-                            deviceId = req.deviceId
+                    val stored =
+                        repository.upsertJournal(
+                            userId,
+                            JournalRecord(
+                                id = req.id,
+                                title = req.title,
+                                description = req.description,
+                                createdAt = req.createdAt,
+                                lastUpdated = req.lastUpdated,
+                                serverVersion = 0L,
+                                deviceId = req.deviceId,
+                            ),
                         )
-                    )
                     call.respond(JournalUploadResponse(req.id, stored.serverVersion, stored.lastUpdated))
                     success = true
                 } finally {
@@ -365,25 +383,27 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@get
-                    val since = call.request.queryParameters["since"]?.toLongOrNull()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            error("MISSING_PARAMETER", "since parameter is required")
-                        )
+                    val since =
+                        call.request.queryParameters["since"]?.toLongOrNull()
+                            ?: return@get call.respond(
+                                HttpStatusCode.BadRequest,
+                                error("MISSING_PARAMETER", "since parameter is required"),
+                            )
                     val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_SYNC_PAGE_SIZE
                     val pageSize = limit.coerceIn(1, MAX_SYNC_PAGE_SIZE)
                     val changeSet = repository.journalChanges(userId, since, pageSize)
-                    val changes = changeSet.changes.map {
-                        JournalChange(
-                            id = it.id,
-                            title = it.title,
-                            description = it.description,
-                            createdAt = it.createdAt,
-                            lastUpdated = it.lastUpdated,
-                            serverVersion = it.serverVersion,
-                            isDeleted = false
-                        )
-                    }
+                    val changes =
+                        changeSet.changes.map {
+                            JournalChange(
+                                id = it.id,
+                                title = it.title,
+                                description = it.description,
+                                createdAt = it.createdAt,
+                                lastUpdated = it.lastUpdated,
+                                serverVersion = it.serverVersion,
+                                isDeleted = false,
+                            )
+                        }
                     val deletions = changeSet.deletions.map { JournalDeletion(id = it.id, deletedAt = it.deletedAt) }
                     call.respond(JournalChangesResponse(changes, deletions, changeSet.lastTimestamp, changeSet.hasMore))
                     success = true
@@ -397,10 +417,11 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@post
-                    val journalId = call.parameters["journalId"] ?: return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        error("MISSING_PARAMETER", "journalId is required")
-                    )
+                    val journalId =
+                        call.parameters["journalId"] ?: return@post call.respond(
+                            HttpStatusCode.BadRequest,
+                            error("MISSING_PARAMETER", "journalId is required"),
+                        )
                     val req = call.receive<JournalUpdateRequest>()
                     val existing = repository.getJournal(userId, journalId)
                     when (val constraint = req.versionConstraint) {
@@ -411,26 +432,27 @@ fun Route.syncRoutes(
                                     HttpStatusCode.Conflict,
                                     error(
                                         "CONFLICT",
-                                        "Server has a newer version (${constraint.serverVersion} < ${existing.serverVersion})"
-                                    )
+                                        "Server has a newer version (${constraint.serverVersion} < ${existing.serverVersion})",
+                                    ),
                                 )
                             }
                         }
                         VersionConstraint.None -> Unit
                     }
                     val updatedAt = System.currentTimeMillis()
-                    val stored = repository.upsertJournal(
-                        userId,
-                        JournalRecord(
-                            id = journalId,
-                            title = req.title ?: existing?.title.orEmpty(),
-                            description = req.description ?: existing?.description.orEmpty(),
-                            createdAt = existing?.createdAt ?: updatedAt,
-                            lastUpdated = req.lastUpdated,
-                            serverVersion = existing?.serverVersion ?: 0L,
-                            deviceId = req.deviceId
+                    val stored =
+                        repository.upsertJournal(
+                            userId,
+                            JournalRecord(
+                                id = journalId,
+                                title = req.title ?: existing?.title.orEmpty(),
+                                description = req.description ?: existing?.description.orEmpty(),
+                                createdAt = existing?.createdAt ?: updatedAt,
+                                lastUpdated = req.lastUpdated,
+                                serverVersion = existing?.serverVersion ?: 0L,
+                                deviceId = req.deviceId,
+                            ),
                         )
-                    )
                     call.respond(JournalUpdateResponse(journalId, stored.serverVersion, stored.lastUpdated))
                     success = true
                 } finally {
@@ -443,10 +465,11 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@post
-                    val journalId = call.parameters["journalId"] ?: return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        error("MISSING_PARAMETER", "journalId is required")
-                    )
+                    val journalId =
+                        call.parameters["journalId"] ?: return@post call.respond(
+                            HttpStatusCode.BadRequest,
+                            error("MISSING_PARAMETER", "journalId is required"),
+                        )
                     val deletedAt = System.currentTimeMillis()
                     repository.deleteJournal(userId, journalId, deletedAt)
                     call.respond(HttpStatusCode.OK)
@@ -474,9 +497,9 @@ fun Route.syncRoutes(
                                 contentId = it.contentId,
                                 createdAt = it.createdAt,
                                 serverVersion = 0L,
-                                deviceId = it.deviceId
+                                deviceId = it.deviceId,
                             )
-                        }
+                        },
                     )
                     call.respond(AssociationUploadResponse(req.associations.size, uploadedAt))
                     success = true
@@ -490,32 +513,35 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@get
-                    val since = call.request.queryParameters["since"]?.toLongOrNull()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            error("MISSING_PARAMETER", "since parameter is required")
-                        )
+                    val since =
+                        call.request.queryParameters["since"]?.toLongOrNull()
+                            ?: return@get call.respond(
+                                HttpStatusCode.BadRequest,
+                                error("MISSING_PARAMETER", "since parameter is required"),
+                            )
                     val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_SYNC_PAGE_SIZE
                     val pageSize = limit.coerceIn(1, MAX_SYNC_PAGE_SIZE)
                     val changeSet = repository.associationChanges(userId, since, pageSize)
-                    val changes = changeSet.changes.map {
-                        AssociationChange(
-                            journalId = it.journalId,
-                            contentId = it.contentId,
-                            createdAt = it.createdAt,
-                            serverVersion = it.serverVersion,
-                            isDeleted = false
-                        )
-                    }
-                    val deletions = changeSet.deletions.map {
-                        AssociationDeletion(
-                            journalId = it.key.journalId,
-                            contentId = it.key.contentId,
-                            deletedAt = it.deletedAt
-                        )
-                    }
+                    val changes =
+                        changeSet.changes.map {
+                            AssociationChange(
+                                journalId = it.journalId,
+                                contentId = it.contentId,
+                                createdAt = it.createdAt,
+                                serverVersion = it.serverVersion,
+                                isDeleted = false,
+                            )
+                        }
+                    val deletions =
+                        changeSet.deletions.map {
+                            AssociationDeletion(
+                                journalId = it.key.journalId,
+                                contentId = it.key.contentId,
+                                deletedAt = it.deletedAt,
+                            )
+                        }
                     call.respond(
-                        AssociationChangesResponse(changes, deletions, changeSet.lastTimestamp, changeSet.hasMore)
+                        AssociationChangesResponse(changes, deletions, changeSet.lastTimestamp, changeSet.hasMore),
                     )
                     success = true
                 } finally {
@@ -533,7 +559,7 @@ fun Route.syncRoutes(
                     repository.deleteAssociations(
                         userId,
                         req.associations.map { AssociationKey(it.journalId, it.contentId) },
-                        deletedAt
+                        deletedAt,
                     )
                     call.respond(HttpStatusCode.OK)
                     success = true
@@ -555,72 +581,77 @@ fun Route.syncRoutes(
                     bytes = req.sizeBytes
                     Napier.d("Media upload for user $userId: ${req.fileName}")
                     val mediaId = UUID.randomUUID().toString()
-                    
-                    val encryptedPayload = runCatching {
-                        encryptionService.processMediaUpload(
-                            req.data,
-                            userId.toString(),
-                            mediaId,
-                            req.contentId
-                        )
-                    }.getOrElse { error ->
-                        Napier.e("Failed to encrypt media payload", error)
-                        return@post call.respond(
-                            HttpStatusCode.InternalServerError,
-                            error("MEDIA_ENCRYPT_FAILED", "Failed to encrypt media payload")
-                        )
-                    }
-                    
-                    val storagePath = if (mediaStorage != null) {
+
+                    val encryptedPayload =
                         runCatching {
-                            mediaStorage.uploadMedia(
-                                userId = userId,
-                                mediaId = UUID.fromString(mediaId),
-                                fileName = req.fileName,
-                                mimeType = req.mimeType,
-                                data = encryptedPayload.data
+                            encryptionService.processMediaUpload(
+                                req.data,
+                                userId.toString(),
+                                mediaId,
+                                req.contentId,
                             )
                         }.getOrElse { error ->
-                            Napier.e("Failed to upload media to external storage", error)
+                            Napier.e("Failed to encrypt media payload", error)
                             return@post call.respond(
                                 HttpStatusCode.InternalServerError,
-                                error("MEDIA_UPLOAD_FAILED", "Failed to store media")
+                                error("MEDIA_ENCRYPT_FAILED", "Failed to encrypt media payload"),
                             )
                         }
-                    } else {
-                        null
-                    }
-                    val stored = repository.upsertMedia(
-                        userId,
-                        MediaRecord(
-                            mediaId = mediaId,
-                            contentId = req.contentId,
-                            userId = userId,
-                            fileName = req.fileName,
-                            mimeType = req.mimeType,
-                            sizeBytes = req.sizeBytes,
-                            data = if (storagePath == null) encryptedPayload.data else ByteArray(0),
-                            storagePath = storagePath,
-                            createdAt = System.currentTimeMillis(),
-                            serverVersion = 0L,
-                            deviceId = req.deviceId,
-                            encryptionVersion = 1,
-                            encryptionKeyId = "default",
-                            encryptionMode = "SERVER"
+
+                    val storagePath =
+                        if (mediaStorage != null) {
+                            runCatching {
+                                mediaStorage.uploadMedia(
+                                    userId = userId,
+                                    mediaId = UUID.fromString(mediaId),
+                                    fileName = req.fileName,
+                                    mimeType = req.mimeType,
+                                    data = encryptedPayload.data,
+                                )
+                            }.getOrElse { error ->
+                                Napier.e("Failed to upload media to external storage", error)
+                                return@post call.respond(
+                                    HttpStatusCode.InternalServerError,
+                                    error("MEDIA_UPLOAD_FAILED", "Failed to store media"),
+                                )
+                            }
+                        } else {
+                            null
+                        }
+                    val stored =
+                        repository.upsertMedia(
+                            userId,
+                            MediaRecord(
+                                mediaId = mediaId,
+                                contentId = req.contentId,
+                                userId = userId,
+                                fileName = req.fileName,
+                                mimeType = req.mimeType,
+                                sizeBytes = req.sizeBytes,
+                                data = if (storagePath == null) encryptedPayload.data else ByteArray(0),
+                                storagePath = storagePath,
+                                createdAt = System.currentTimeMillis(),
+                                serverVersion = 0L,
+                                deviceId = req.deviceId,
+                                encryptionVersion = 1,
+                                encryptionKeyId = "default",
+                                encryptionMode = "SERVER",
+                            ),
                         )
-                    )
-                    val downloadUrl = resolveMediaDownloadUrl(
-                        call,
-                        stored,
-                        mediaStorage,
-                        mediaAccessPolicy
-                    )
-                    val response = MediaUploadResponse(
-                        contentId = req.contentId,
-                        mediaId = stored.mediaId,
-                        downloadUrl = downloadUrl,
-                        uploadedAt = stored.createdAt
-                    )
+                    val downloadUrl =
+                        resolveMediaDownloadUrl(
+                            call,
+                            stored,
+                            mediaStorage,
+                            mediaAccessPolicy,
+                        )
+                    val response =
+                        MediaUploadResponse(
+                            contentId = req.contentId,
+                            mediaId = stored.mediaId,
+                            downloadUrl = downloadUrl,
+                            uploadedAt = stored.createdAt,
+                        )
                     call.respond(response)
                     success = true
                 } finally {
@@ -628,7 +659,7 @@ fun Route.syncRoutes(
                         METRIC_MEDIA_UPLOAD,
                         System.currentTimeMillis() - start,
                         success,
-                        bytes
+                        bytes,
                     )
                 }
             }
@@ -639,37 +670,42 @@ fun Route.syncRoutes(
                 var bytes = 0L
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@get
-                    val mediaId = call.parameters["mediaId"] ?: return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        error("MISSING_PARAMETER", "mediaId is required")
-                    )
-                    val record = repository.getMedia(userId, mediaId)
-                        ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Media not found"))
-                    
-                    val encryptedPayload = if (record.storagePath != null) {
-                        val storage = mediaStorage
-                            ?: return@get call.respond(
-                                HttpStatusCode.InternalServerError,
-                                error("MEDIA_STORAGE_UNAVAILABLE", "Media storage not configured")
-                            )
-                        storage.downloadMedia(record.storagePath)
-                            ?: return@get call.respond(
-                                HttpStatusCode.NotFound,
-                                error("NOT_FOUND", "Media not found")
-                            )
-                    } else {
-                        record.data
-                    }
-                    
-                    val payload = runCatching {
-                        encryptionService.processMediaDownload(encryptedPayload, shouldDecrypt = true)
-                    }.getOrElse { error ->
-                        Napier.e("Failed to decrypt media payload for $mediaId", error)
-                        return@get call.respond(
-                            HttpStatusCode.InternalServerError,
-                            error("MEDIA_DECRYPT_FAILED", "Failed to decrypt media payload")
+                    val mediaId =
+                        call.parameters["mediaId"] ?: return@get call.respond(
+                            HttpStatusCode.BadRequest,
+                            error("MISSING_PARAMETER", "mediaId is required"),
                         )
-                    }
+                    val record =
+                        repository.getMedia(userId, mediaId)
+                            ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Media not found"))
+
+                    val encryptedPayload =
+                        if (record.storagePath != null) {
+                            val storage =
+                                mediaStorage
+                                    ?: return@get call.respond(
+                                        HttpStatusCode.InternalServerError,
+                                        error("MEDIA_STORAGE_UNAVAILABLE", "Media storage not configured"),
+                                    )
+                            storage.downloadMedia(record.storagePath)
+                                ?: return@get call.respond(
+                                    HttpStatusCode.NotFound,
+                                    error("NOT_FOUND", "Media not found"),
+                                )
+                        } else {
+                            record.data
+                        }
+
+                    val payload =
+                        runCatching {
+                            encryptionService.processMediaDownload(encryptedPayload, shouldDecrypt = true)
+                        }.getOrElse { error ->
+                            Napier.e("Failed to decrypt media payload for $mediaId", error)
+                            return@get call.respond(
+                                HttpStatusCode.InternalServerError,
+                                error("MEDIA_DECRYPT_FAILED", "Failed to decrypt media payload"),
+                            )
+                        }
                     bytes = payload.size.toLong()
                     call.respond(
                         MediaDownloadResponse(
@@ -678,13 +714,14 @@ fun Route.syncRoutes(
                             mimeType = record.mimeType,
                             sizeBytes = record.sizeBytes,
                             data = payload,
-                            downloadUrl = resolveMediaDownloadUrl(
-                                call,
-                                record,
-                                mediaStorage,
-                                mediaAccessPolicy
-                            )
-                        )
+                            downloadUrl =
+                                resolveMediaDownloadUrl(
+                                    call,
+                                    record,
+                                    mediaStorage,
+                                    mediaAccessPolicy,
+                                ),
+                        ),
                     )
                     success = true
                 } finally {
@@ -692,7 +729,7 @@ fun Route.syncRoutes(
                         METRIC_MEDIA_DOWNLOAD,
                         System.currentTimeMillis() - start,
                         success,
-                        bytes
+                        bytes,
                     )
                 }
             }
@@ -708,49 +745,53 @@ fun Route.syncRoutes(
                     val userId = extractUserId(call, tokenService) ?: return@post
                     val req = call.receive<BackupUploadRequest>()
                     bytes = req.data.size.toLong()
-                    
-                    val storage = mediaStorage ?: return@post call.respond(
-                        HttpStatusCode.InternalServerError,
-                        error("BACKUP_STORAGE_UNAVAILABLE", "Backup storage not configured")
-                    )
-                    
-                    val backupId = UUID.randomUUID()
-                    
-                    val encryptedData = runCatching {
-                        encryptionService.processBackupUpload(
-                            req.data,
-                            userId.toString(),
-                            backupId.toString()
-                        ).data
-                    }.getOrElse { error ->
-                        Napier.e("Failed to encrypt backup", error)
-                        return@post call.respond(
+
+                    val storage =
+                        mediaStorage ?: return@post call.respond(
                             HttpStatusCode.InternalServerError,
-                            error("BACKUP_ENCRYPT_FAILED", "Failed to encrypt backup")
+                            error("BACKUP_STORAGE_UNAVAILABLE", "Backup storage not configured"),
                         )
-                    }
-                    
+
+                    val backupId = UUID.randomUUID()
+
+                    val encryptedData =
+                        runCatching {
+                            encryptionService
+                                .processBackupUpload(
+                                    req.data,
+                                    userId.toString(),
+                                    backupId.toString(),
+                                ).data
+                        }.getOrElse { error ->
+                            Napier.e("Failed to encrypt backup", error)
+                            return@post call.respond(
+                                HttpStatusCode.InternalServerError,
+                                error("BACKUP_ENCRYPT_FAILED", "Failed to encrypt backup"),
+                            )
+                        }
+
                     val storagePath = storage.uploadBackup(userId, backupId, encryptedData)
-                    
-                    val record = repository.createBackupRecord(
-                        userId,
-                        BackupRecord(
-                            id = backupId,
-                            userId = userId,
-                            deviceId = req.deviceId,
-                            manifest = req.manifest,
-                            storagePath = storagePath,
-                            createdAt = System.currentTimeMillis(),
-                            sizeBytes = bytes
+
+                    val record =
+                        repository.createBackupRecord(
+                            userId,
+                            BackupRecord(
+                                id = backupId,
+                                userId = userId,
+                                deviceId = req.deviceId,
+                                manifest = req.manifest,
+                                storagePath = storagePath,
+                                createdAt = System.currentTimeMillis(),
+                                sizeBytes = bytes,
+                            ),
                         )
-                    )
-                    
+
                     call.respond(
                         BackupUploadResponse(
                             id = record.id.toString(),
                             createdAt = record.createdAt,
-                            sizeBytes = record.sizeBytes
-                        )
+                            sizeBytes = record.sizeBytes,
+                        ),
                     )
                     success = true
                 } finally {
@@ -773,10 +814,10 @@ fun Route.syncRoutes(
                                     manifest = it.manifest,
                                     createdAt = it.createdAt,
                                     sizeBytes = it.sizeBytes,
-                                    downloadUrl = resolveBackupDownloadUrl(call, it, mediaStorage, mediaAccessPolicy)
+                                    downloadUrl = resolveBackupDownloadUrl(call, it, mediaStorage, mediaAccessPolicy),
                                 )
-                            }
-                        )
+                            },
+                        ),
                     )
                     success = true
                 } finally {
@@ -789,32 +830,37 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@get
-                    val backupId = call.parameters["backupId"]?.let { UUID.fromString(it) } ?: return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        error("INVALID_ID", "Invalid backupId")
-                    )
-                    
-                    val record = repository.getBackupRecord(userId, backupId)
-                        ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Backup not found"))
-                        
-                    val storage = mediaStorage ?: return@get call.respond(
-                        HttpStatusCode.InternalServerError,
-                        error("BACKUP_STORAGE_UNAVAILABLE", "Backup storage not configured")
-                    )
-                    
-                    val encryptedData = storage.downloadMedia(record.storagePath)
-                        ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Backup file not found"))
-                    
-                    val decryptedData = runCatching {
-                        encryptionService.processBackupDownload(encryptedData, shouldDecrypt = true)
-                    }.getOrElse { error ->
-                        Napier.e("Failed to decrypt backup $backupId", error)
-                        return@get call.respond(
-                            HttpStatusCode.InternalServerError,
-                            error("BACKUP_DECRYPT_FAILED", "Failed to decrypt backup")
+                    val backupId =
+                        call.parameters["backupId"]?.let { UUID.fromString(it) } ?: return@get call.respond(
+                            HttpStatusCode.BadRequest,
+                            error("INVALID_ID", "Invalid backupId"),
                         )
-                    }
-                    
+
+                    val record =
+                        repository.getBackupRecord(userId, backupId)
+                            ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Backup not found"))
+
+                    val storage =
+                        mediaStorage ?: return@get call.respond(
+                            HttpStatusCode.InternalServerError,
+                            error("BACKUP_STORAGE_UNAVAILABLE", "Backup storage not configured"),
+                        )
+
+                    val encryptedData =
+                        storage.downloadMedia(record.storagePath)
+                            ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Backup file not found"))
+
+                    val decryptedData =
+                        runCatching {
+                            encryptionService.processBackupDownload(encryptedData, shouldDecrypt = true)
+                        }.getOrElse { error ->
+                            Napier.e("Failed to decrypt backup $backupId", error)
+                            return@get call.respond(
+                                HttpStatusCode.InternalServerError,
+                                error("BACKUP_DECRYPT_FAILED", "Failed to decrypt backup"),
+                            )
+                        }
+
                     call.respondBytes(decryptedData, ContentType.Application.OctetStream)
                     success = true
                 } finally {
@@ -827,17 +873,18 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@delete
-                    val backupId = call.parameters["backupId"]?.let { UUID.fromString(it) } ?: return@delete call.respond(
-                        HttpStatusCode.BadRequest,
-                        error("INVALID_ID", "Invalid backupId")
-                    )
-                    
+                    val backupId =
+                        call.parameters["backupId"]?.let { UUID.fromString(it) } ?: return@delete call.respond(
+                            HttpStatusCode.BadRequest,
+                            error("INVALID_ID", "Invalid backupId"),
+                        )
+
                     val record = repository.getBackupRecord(userId, backupId)
                     if (record != null) {
                         mediaStorage?.deleteMedia(record.storagePath)
                         repository.deleteBackup(userId, backupId)
                     }
-                    
+
                     call.respond(HttpStatusCode.OK)
                     success = true
                 } finally {
@@ -857,7 +904,7 @@ fun Route.syncRoutes(
                     if (retentionDays <= 0) {
                         return@post call.respond(
                             HttpStatusCode.BadRequest,
-                            error("INVALID_PARAMETER", "retentionDays must be > 0")
+                            error("INVALID_PARAMETER", "retentionDays must be > 0"),
                         )
                     }
                     val safeRetentionDays = retentionDays.coerceAtMost(3650L)
@@ -873,10 +920,14 @@ fun Route.syncRoutes(
     }
 }
 
-private fun buildMediaDownloadUrl(call: ApplicationCall, mediaId: String): String {
+private fun buildMediaDownloadUrl(
+    call: ApplicationCall,
+    mediaId: String,
+): String {
     val origin = call.request.local
-    val defaultPort = (origin.scheme == "http" && origin.localPort == 80) ||
-        (origin.scheme == "https" && origin.localPort == 443)
+    val defaultPort =
+        (origin.scheme == "http" && origin.localPort == 80) ||
+            (origin.scheme == "https" && origin.localPort == 443)
     val portPart = if (defaultPort) "" else ":${origin.localPort}"
     return "${origin.scheme}://${origin.localHost}$portPart/api/v1/sync/media/$mediaId"
 }
@@ -885,7 +936,7 @@ private fun resolveMediaDownloadUrl(
     call: ApplicationCall,
     record: MediaRecord,
     mediaStorage: GcsMediaStorage?,
-    accessPolicy: MediaAccessPolicy
+    accessPolicy: MediaAccessPolicy,
 ): String {
     if (accessPolicy.useSignedUrls && mediaStorage != null && record.storagePath != null) {
         return runCatching {
@@ -902,7 +953,7 @@ private fun resolveBackupDownloadUrl(
     call: ApplicationCall,
     record: BackupRecord,
     mediaStorage: GcsMediaStorage?,
-    accessPolicy: MediaAccessPolicy
+    accessPolicy: MediaAccessPolicy,
 ): String {
     if (accessPolicy.useSignedUrls && mediaStorage != null) {
         return runCatching {
@@ -915,10 +966,14 @@ private fun resolveBackupDownloadUrl(
     return buildBackupDownloadUrl(call, record.id.toString())
 }
 
-private fun buildBackupDownloadUrl(call: ApplicationCall, backupId: String): String {
+private fun buildBackupDownloadUrl(
+    call: ApplicationCall,
+    backupId: String,
+): String {
     val origin = call.request.local
-    val defaultPort = (origin.scheme == "http" && origin.localPort == 80) ||
-        (origin.scheme == "https" && origin.localPort == 443)
+    val defaultPort =
+        (origin.scheme == "http" && origin.localPort == 80) ||
+            (origin.scheme == "https" && origin.localPort == 443)
     val portPart = if (defaultPort) "" else ":${origin.localPort}"
     return "${origin.scheme}://${origin.localHost}$portPart/api/v1/sync/backups/$backupId"
 }
@@ -948,6 +1003,4 @@ private fun app.logdate.server.sync.SyncMetricsSnapshot.toPrometheus(): String {
     return builder.toString()
 }
 
-private fun escapeLabelValue(value: String): String {
-    return value.replace("\\", "\\\\").replace("\"", "\\\"")
-}
+private fun escapeLabelValue(value: String): String = value.replace("\\", "\\\\").replace("\"", "\\\"")

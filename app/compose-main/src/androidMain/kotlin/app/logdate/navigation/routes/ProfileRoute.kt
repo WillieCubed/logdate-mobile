@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 
 /**
  * Navigation route for the profile screen.
- * 
+ *
  * This screen allows users to view and edit their profile information including
  * display name, username, bio, birthday, and other account details.
  */

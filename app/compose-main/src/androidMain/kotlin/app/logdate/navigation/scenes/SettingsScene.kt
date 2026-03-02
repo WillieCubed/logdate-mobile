@@ -38,10 +38,11 @@ import app.logdate.navigation.routes.core.LocationSettingsRoute
 import app.logdate.navigation.routes.core.PrivacySettingsRoute
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
 import app.logdate.navigation.routes.routeClass
-import kotlin.reflect.KClass
-import org.jetbrains.compose.resources.stringResource
-import logdate.app.composemain.generated.resources.*
 import logdate.app.composemain.generated.resources.Res
+import logdate.app.composemain.generated.resources.select_a_setting_to_configure
+import org.jetbrains.compose.resources.stringResource
+import kotlin.reflect.KClass
+
 /**
  * CompositionLocal for providing AnimatedVisibilityScope throughout the settings scene.
  */
@@ -55,12 +56,12 @@ sealed class SettingsRouteClassification {
      * The main settings overview/list that should be displayed as the list pane.
      */
     data object SettingsList : SettingsRouteClassification()
-    
+
     /**
      * Detail routes that should be displayed in the detail pane alongside the list.
      */
     data object SettingsDetail : SettingsRouteClassification()
-    
+
     /**
      * Routes that should be excluded from SettingsScene entirely.
      */
@@ -74,8 +75,8 @@ private object SettingsRouteConfig {
     /**
      * Classifies a settings route based on its NavKey.
      */
-    fun classifyRoute(routeClass: KClass<out NavKey>?): SettingsRouteClassification {
-        return when (routeClass) {
+    fun classifyRoute(routeClass: KClass<out NavKey>?): SettingsRouteClassification =
+        when (routeClass) {
             SettingsOverviewRoute::class -> SettingsRouteClassification.SettingsList
 
             // Detail settings screens
@@ -86,12 +87,12 @@ private object SettingsRouteConfig {
             LocationSettingsRoute::class,
             BirthdaySettingsRoute::class,
             DangerZoneSettingsRoute::class,
-            AdvancedSettingsRoute::class -> SettingsRouteClassification.SettingsDetail
+            AdvancedSettingsRoute::class,
+            -> SettingsRouteClassification.SettingsDetail
 
             else -> SettingsRouteClassification.Excluded
         }
-    }
-    
+
     /**
      * Determines if a route should always be full-screen regardless of screen size.
      */
@@ -101,8 +102,8 @@ private object SettingsRouteConfig {
     }
 }
 
-private fun resolveSelectedDetail(routeClass: KClass<out NavKey>?): String? {
-    return when (routeClass) {
+private fun resolveSelectedDetail(routeClass: KClass<out NavKey>?): String? =
+    when (routeClass) {
         AccountSettingsRoute::class -> "account"
         PrivacySettingsRoute::class -> "privacy"
         DataSettingsRoute::class -> "data"
@@ -113,7 +114,6 @@ private fun resolveSelectedDetail(routeClass: KClass<out NavKey>?): String? {
         AdvancedSettingsRoute::class -> "advanced"
         else -> null
     }
-}
 
 /**
  * Creates a SettingsScene for the settings list only.
@@ -122,13 +122,14 @@ private fun <T : NavKey> createListOnlySettingsScene(
     entry: NavEntry<T>,
     previousEntries: List<NavEntry<T>>,
     onBack: () -> Unit,
-): SettingsScene<T> = SettingsScene(
-    key = Pair("SettingsScene", entry.contentKey),
-    previousEntries = previousEntries,
-    listEntry = entry,
-    detailEntry = null,
-    onBack = onBack
-)
+): SettingsScene<T> =
+    SettingsScene(
+        key = Pair("SettingsScene", entry.contentKey),
+        previousEntries = previousEntries,
+        listEntry = entry,
+        detailEntry = null,
+        onBack = onBack,
+    )
 
 /**
  * Creates a SettingsScene for list-detail layout.
@@ -138,13 +139,14 @@ private fun <T : NavKey> createListDetailSettingsScene(
     detailEntry: NavEntry<T>,
     previousEntries: List<NavEntry<T>>,
     onBack: () -> Unit,
-): SettingsScene<T> = SettingsScene(
-    key = Triple("SettingsScene", listEntry.contentKey, detailEntry.contentKey),
-    previousEntries = previousEntries,
-    listEntry = listEntry,
-    detailEntry = detailEntry,
-    onBack = onBack
-)
+): SettingsScene<T> =
+    SettingsScene(
+        key = Triple("SettingsScene", listEntry.contentKey, detailEntry.contentKey),
+        previousEntries = previousEntries,
+        listEntry = listEntry,
+        detailEntry = detailEntry,
+        onBack = onBack,
+    )
 
 /**
  * Creates a SettingsScene for full-screen detail view.
@@ -153,13 +155,14 @@ private fun <T : NavKey> createDetailOnlySettingsScene(
     entry: NavEntry<T>,
     previousEntries: List<NavEntry<T>>,
     onBack: () -> Unit,
-): SettingsScene<T> = SettingsScene(
-    key = Pair("SettingsScene", entry.contentKey),
-    previousEntries = previousEntries,
-    listEntry = entry,
-    detailEntry = null,
-    onBack = onBack
-)
+): SettingsScene<T> =
+    SettingsScene(
+        key = Pair("SettingsScene", entry.contentKey),
+        previousEntries = previousEntries,
+        listEntry = entry,
+        detailEntry = null,
+        onBack = onBack,
+    )
 
 /**
  * A custom [Scene] that implements a list-detail adaptive navigation pattern for settings.
@@ -191,11 +194,12 @@ class SettingsScene<T : NavKey>(
     val detailEntry: NavEntry<T>? = null,
     private val onBack: () -> Unit,
 ) : Scene<T> {
-    override val entries: List<NavEntry<T>> = if (detailEntry != null) {
-        listOf(listEntry, detailEntry)
-    } else {
-        listOf(listEntry)
-    }
+    override val entries: List<NavEntry<T>> =
+        if (detailEntry != null) {
+            listOf(listEntry, detailEntry)
+        } else {
+            listOf(listEntry)
+        }
 
     override val content: @Composable (() -> Unit) = {
         // Wrap the entire content with AnimatedVisibility to provide AnimatedVisibilityScope
@@ -205,16 +209,18 @@ class SettingsScene<T : NavKey>(
             }
         }
     }
-    
+
     @OptIn(ExperimentalMaterial3AdaptiveApi::class)
+    @Suppress("ktlint:standard:function-naming")
     @Composable
     private fun SettingsSceneContent() {
         val navigator = rememberListDetailPaneScaffoldNavigator<Nothing>()
         val hasListDetailContext = detailEntry != null && listEntry.routeClass() == SettingsOverviewRoute::class
         val adaptiveInfo = currentWindowAdaptiveInfo()
         val windowSizeClass = adaptiveInfo.windowSizeClass
-        val isInTwoPaneMode = windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND) &&
-            listEntry.routeClass() == SettingsOverviewRoute::class
+        val isInTwoPaneMode =
+            windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND) &&
+                listEntry.routeClass() == SettingsOverviewRoute::class
         val selectedDetail = resolveSelectedDetail(detailEntry?.routeClass())
 
         // Navigate to detail pane when we have a detail entry
@@ -235,11 +241,12 @@ class SettingsScene<T : NavKey>(
             listPane = {
                 AnimatedPane {
                     CompositionLocalProvider(
-                        LocalSettingsLayoutInfo provides SettingsLayoutInfo(
-                            isInTwoPaneMode = isInTwoPaneMode,
-                            selectedDetail = selectedDetail,
-                            isDetailPane = false
-                        )
+                        LocalSettingsLayoutInfo provides
+                            SettingsLayoutInfo(
+                                isInTwoPaneMode = isInTwoPaneMode,
+                                selectedDetail = selectedDetail,
+                                isDetailPane = false,
+                            ),
                     ) {
                         listEntry.Content()
                     }
@@ -248,11 +255,12 @@ class SettingsScene<T : NavKey>(
             detailPane = {
                 AnimatedPane {
                     CompositionLocalProvider(
-                        LocalSettingsLayoutInfo provides SettingsLayoutInfo(
-                            isInTwoPaneMode = isInTwoPaneMode,
-                            selectedDetail = selectedDetail,
-                            isDetailPane = true
-                        )
+                        LocalSettingsLayoutInfo provides
+                            SettingsLayoutInfo(
+                                isInTwoPaneMode = isInTwoPaneMode,
+                                selectedDetail = selectedDetail,
+                                isDetailPane = true,
+                            ),
                     ) {
                         detailEntry?.Content()
                             ?: SettingsEmptyDetailPane()
@@ -276,16 +284,17 @@ class SettingsScene<T : NavKey>(
 /**
  * A placeholder composable shown in the detail pane when no specific setting is selected.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 private fun SettingsEmptyDetailPane() {
     Box(
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = androidx.compose.ui.Alignment.Center
+        contentAlignment = androidx.compose.ui.Alignment.Center,
     ) {
         androidx.compose.material3.Text(
             text = stringResource(Res.string.select_a_setting_to_configure),
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -309,10 +318,7 @@ private fun SettingsEmptyDetailPane() {
  *    - Handles transitions between different settings screens appropriately
  */
 class SettingsSceneStrategy<T : NavKey> : SceneStrategy<T> {
-    
-    override fun SceneStrategyScope<T>.calculateScene(
-        entries: List<NavEntry<T>>,
-    ): Scene<T>? {
+    override fun SceneStrategyScope<T>.calculateScene(entries: List<NavEntry<T>>): Scene<T>? {
         if (entries.isEmpty()) return null
 
         val lastEntry = entries.last()
@@ -326,15 +332,16 @@ class SettingsSceneStrategy<T : NavKey> : SceneStrategy<T> {
                 createListOnlySettingsScene(
                     entry = lastEntry,
                     previousEntries = entries.dropLast(1),
-                    onBack = onBack
+                    onBack = onBack,
                 )
             }
 
             SettingsRouteClassification.SettingsDetail -> {
                 // Check if we have a list entry as the previous entry
-                val listEntry = previousEntry?.takeIf {
-                    SettingsRouteConfig.classifyRoute(it.routeClass()) == SettingsRouteClassification.SettingsList
-                }
+                val listEntry =
+                    previousEntry?.takeIf {
+                        SettingsRouteConfig.classifyRoute(it.routeClass()) == SettingsRouteClassification.SettingsList
+                    }
 
                 // Always create list-detail scene when we have both entries.
                 // The Scene's content uses ListDetailPaneScaffold which handles
@@ -344,13 +351,13 @@ class SettingsSceneStrategy<T : NavKey> : SceneStrategy<T> {
                         listEntry = listEntry,
                         detailEntry = lastEntry,
                         previousEntries = entries.dropLast(2),
-                        onBack = onBack
+                        onBack = onBack,
                     )
                 } else {
                     createDetailOnlySettingsScene(
                         entry = lastEntry,
                         previousEntries = entries.dropLast(1),
-                        onBack = onBack
+                        onBack = onBack,
                     )
                 }
             }

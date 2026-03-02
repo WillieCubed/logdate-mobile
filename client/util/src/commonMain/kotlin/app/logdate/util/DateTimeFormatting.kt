@@ -1,7 +1,5 @@
 package app.logdate.util
 
-import kotlin.time.Clock
-import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
@@ -13,39 +11,59 @@ import kotlinx.datetime.format.Padding
 import kotlinx.datetime.format.char
 import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 /**
  * Returns the current date in the system's default time zone.
  *
  * @param timeZone The time zone to use for the current date. Defaults to the system's default time zone.
  */
-fun LocalDate.Companion.now(
-    timeZone: TimeZone = TimeZone.currentSystemDefault(),
-): LocalDate = Clock.System.now().toLocalDateTime(timeZone).date
+fun LocalDate.Companion.now(timeZone: TimeZone = TimeZone.currentSystemDefault()): LocalDate =
+    Clock.System
+        .now()
+        .toLocalDateTime(timeZone)
+        .date
 
-fun LocalDateTime.toReadableDateShort(): String = format(LocalDateTime.Format {
-    monthName(MonthNames.ENGLISH_FULL)
-    char(' ')
-    day(Padding.SPACE)
-    if (year != Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).year) {
-        // TODO: Add support for multiple locales
-        char(',')
-        char(' ')
-        year()
-    }
-})
+fun LocalDateTime.toReadableDateShort(): String =
+    format(
+        LocalDateTime.Format {
+            monthName(MonthNames.ENGLISH_FULL)
+            char(' ')
+            day(Padding.SPACE)
+            if (year !=
+                Clock.System
+                    .now()
+                    .toLocalDateTime(TimeZone.currentSystemDefault())
+                    .year
+            ) {
+                // TODO: Add support for multiple locales
+                char(',')
+                char(' ')
+                year()
+            }
+        },
+    )
 
-fun LocalDate.toReadableDateShort(): String = format(LocalDate.Format {
-    monthName(MonthNames.ENGLISH_FULL)
-    char(' ')
-    day(Padding.SPACE)
-    if (year != Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).year) {
-        // TODO: Add support for multiple locales
-        char(',')
-        char(' ')
-        year()
-    }
-})
+fun LocalDate.toReadableDateShort(): String =
+    format(
+        LocalDate.Format {
+            monthName(MonthNames.ENGLISH_FULL)
+            char(' ')
+            day(Padding.SPACE)
+            if (year !=
+                Clock.System
+                    .now()
+                    .toLocalDateTime(TimeZone.currentSystemDefault())
+                    .year
+            ) {
+                // TODO: Add support for multiple locales
+                char(',')
+                char(' ')
+                year()
+            }
+        },
+    )
 
 /**
  * Converts an [Instant] into a short readable form
@@ -64,22 +82,23 @@ fun Instant.toReadableDateShort(): String {
  */
 fun Instant.toReadableDateTimeShort(): String {
     val localDatetime = toLocalDateTime(TimeZone.currentSystemDefault())
-    return "${localDatetime.toReadableDateShort()}, ${localTime}"
+    return "${localDatetime.toReadableDateShort()}, $localTime"
 }
 
 val Instant.localTime: String
     get() {
         val localDateTime = toLocalDateTime(TimeZone.currentSystemDefault()).time
-        return localDateTime.format(LocalTime.Format {
-            // TODO: Support 24-hour times
-            amPmHour(padding = Padding.ZERO)
-            char(':')
-            minute()
-            char(' ')
-            amPmMarker("a.m.", "p.m.")
-        })
+        return localDateTime.format(
+            LocalTime.Format {
+                // TODO: Support 24-hour times
+                amPmHour(padding = Padding.ZERO)
+                char(':')
+                minute()
+                char(' ')
+                amPmMarker("a.m.", "p.m.")
+            },
+        )
     }
-
 
 /**
  * Returns the week of the year for this date.
@@ -126,8 +145,11 @@ val LocalDateTime.weekOfYear: Int
 
             // Year has 53 weeks if December 31st is on Thursday
             // OR if December 31st is on Wednesday in a leap year
-            if (weekNumber == 53 && (december31WeekDay != 4 &&
-                        !(december31WeekDay == 3 && isLeapYear(year)))
+            if (weekNumber == 53 &&
+                (
+                    december31WeekDay != 4 &&
+                        !(december31WeekDay == 3 && isLeapYear(year))
+                )
             ) {
                 weekNumber = 1
             }
@@ -139,9 +161,7 @@ val LocalDateTime.weekOfYear: Int
 /**
  * Helper function to determine if a year is a leap year
  */
-private fun isLeapYear(year: Int): Boolean {
-    return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
-}
+private fun isLeapYear(year: Int): Boolean = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
 
 val Instant.weekOfYear: Int
     get() {
@@ -155,7 +175,11 @@ val Instant.daysUntilNow: Int
     get() {
         val timeZone = TimeZone.currentSystemDefault()
         val startDate = toLocalDateTime(timeZone).date
-        val endDate = Clock.System.now().toLocalDateTime(timeZone).date
+        val endDate =
+            Clock.System
+                .now()
+                .toLocalDateTime(timeZone)
+                .date
         return startDate.daysUntil(endDate)
     }
 

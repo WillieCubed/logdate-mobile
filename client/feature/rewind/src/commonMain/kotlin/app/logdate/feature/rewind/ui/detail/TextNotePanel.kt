@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.rewind.ui.detail
 
 import androidx.compose.foundation.background
@@ -27,16 +29,16 @@ import coil3.compose.AsyncImage
 
 /**
  * A panel displaying a text journal note in story format.
- * 
+ *
  * Renders a journal text entry with date information and stylized presentation.
  * Designed to showcase written content in an elegant, readable format.
- * 
+ *
  * ## Visual Design:
  * - **Content Area**: Padded container with subtle background
  * - **Typography**: Clear, readable text styles with appropriate sizing
  * - **Date Display**: Secondary emphasis for contextual information
  * - **Background Options**: Supports both solid colors and image backgrounds
- * 
+ *
  * @param content The text content from the journal note
  * @param dateFormatted Formatted date string showing when the note was created
  * @param backgroundColor Solid background color (used when no image provided)
@@ -53,7 +55,7 @@ fun TextNotePanel(
 ) {
     Box(
         modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         // Background
         if (backgroundImageUri != null) {
@@ -61,58 +63,68 @@ fun TextNotePanel(
                 model = backgroundImageUri,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
             )
-            
+
             // Gradient overlay for text readability
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Black.copy(alpha = 0.4f),
-                                Color.Black.copy(alpha = 0.7f)
-                            )
-                        )
-                    )
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors =
+                                    listOf(
+                                        Color.Black.copy(alpha = 0.4f),
+                                        Color.Black.copy(alpha = 0.7f),
+                                    ),
+                            ),
+                        ),
             )
         } else {
             // Apply a gradient to the solid color background for visual interest
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                backgroundColor,
-                                backgroundColor.copy(red = backgroundColor.red * 0.8f, green = backgroundColor.green * 0.8f, blue = backgroundColor.blue * 0.8f)
-                            )
-                        )
-                    )
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors =
+                                    listOf(
+                                        backgroundColor,
+                                        backgroundColor.copy(
+                                            red = backgroundColor.red * 0.8f,
+                                            green = backgroundColor.green * 0.8f,
+                                            blue =
+                                                backgroundColor.blue * 0.8f,
+                                        ),
+                                    ),
+                            ),
+                        ),
             )
         }
-        
+
         // Content container
         Column(
-            modifier = Modifier
-                .fillMaxWidth(0.85f)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color.Black.copy(alpha = 0.3f))
-                .padding(24.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth(0.85f)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.Black.copy(alpha = 0.3f))
+                    .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
         ) {
             // Quote marks for styling
             Text(
                 text = "\u201C",
                 style = MaterialTheme.typography.displaySmall,
                 color = Color.White.copy(alpha = 0.5f),
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             // Main journal content
             Text(
                 text = content,
@@ -120,17 +132,17 @@ fun TextNotePanel(
                 color = Color.White,
                 textAlign = TextAlign.Center,
                 lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.2f,
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.padding(horizontal = 16.dp),
             )
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             // Date information
             Text(
                 text = dateFormatted,
                 style = MaterialTheme.typography.labelMedium,
                 color = Color.White.copy(alpha = 0.7f),
-                fontStyle = FontStyle.Italic
+                fontStyle = FontStyle.Italic,
             )
         }
     }

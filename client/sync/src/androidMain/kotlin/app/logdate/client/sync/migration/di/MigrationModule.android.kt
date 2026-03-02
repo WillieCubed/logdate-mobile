@@ -9,7 +9,8 @@ import org.koin.dsl.module
 /**
  * Android-specific migration dependencies.
  */
-actual val migrationModule: Module = module {
-    // Provide Android-specific migration storage
-    single<MigrationStorage> { SharedPreferencesMigrationStorage(androidContext(), get()) }
-}
+actual val migrationModule: Module =
+    module {
+        // Provide Android-specific migration storage
+        single<MigrationStorage> { SharedPreferencesMigrationStorage(androidContext(), get()) }
+    }

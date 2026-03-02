@@ -11,14 +11,14 @@ import kotlin.uuid.Uuid
 interface IdentitySyncProvider {
     /**
      * Gets the current user ID.
-     * 
+     *
      * @return Flow emitting the current user ID
      */
     fun getUserId(): Flow<Uuid>
-    
+
     /**
      * Sets the current user ID and migrates existing content.
-     * 
+     *
      * @param userId The user ID to set
      * @return Flow of migration progress updates
      */

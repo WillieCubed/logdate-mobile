@@ -20,9 +20,8 @@ import kotlinx.serialization.json.Json
  * Android-specific implementation for launching data restore using Storage Access Framework and WorkManager.
  */
 class AndroidRestoreLauncher(
-    private val context: Context
+    private val context: Context,
 ) : RestoreLauncher {
-
     private val json = Json { ignoreUnknownKeys = true }
 
     private var pendingRestoreCallback: (() -> Unit)? = null
@@ -45,46 +44,50 @@ class AndroidRestoreLauncher(
      */
     fun setupWorkObserver(lifecycleOwner: LifecycleOwner) {
         if (workInfoObserver != null) {
-            WorkManager.getInstance(context)
+            WorkManager
+                .getInstance(context)
                 .getWorkInfosForUniqueWorkLiveData(RestoreWorker.WORK_NAME)
                 .removeObserver(workInfoObserver!!)
         }
 
-        workInfoObserver = Observer { workInfoList ->
-            if (workInfoList.isEmpty()) return@Observer
+        workInfoObserver =
+            Observer { workInfoList ->
+                if (workInfoList.isEmpty()) return@Observer
 
-            val workInfo = workInfoList[0]
+                val workInfo = workInfoList[0]
 
-            when (workInfo.state) {
-                WorkInfo.State.SUCCEEDED -> {
-                    val summaryJson = workInfo.outputData.getString(RestoreWorker.SUMMARY_JSON_KEY)
-                    if (summaryJson != null) {
-                        val summary = runCatching { json.decodeFromString<RestoreSummary>(summaryJson) }
-                            .getOrNull()
-                        if (summary != null) {
-                            completionCallback?.invoke(RestoreOutcome.Success(summary))
+                when (workInfo.state) {
+                    WorkInfo.State.SUCCEEDED -> {
+                        val summaryJson = workInfo.outputData.getString(RestoreWorker.SUMMARY_JSON_KEY)
+                        if (summaryJson != null) {
+                            val summary =
+                                runCatching { json.decodeFromString<RestoreSummary>(summaryJson) }
+                                    .getOrNull()
+                            if (summary != null) {
+                                completionCallback?.invoke(RestoreOutcome.Success(summary))
+                            } else {
+                                completionCallback?.invoke(RestoreOutcome.Failure("Restore completed, but summary was invalid"))
+                            }
                         } else {
-                            completionCallback?.invoke(RestoreOutcome.Failure("Restore completed, but summary was invalid"))
+                            completionCallback?.invoke(RestoreOutcome.Failure("Restore completed, but no summary was returned"))
                         }
-                    } else {
-                        completionCallback?.invoke(RestoreOutcome.Failure("Restore completed, but no summary was returned"))
+                    }
+                    WorkInfo.State.FAILED -> {
+                        val error = workInfo.outputData.getString(RestoreWorker.ERROR_KEY)
+                        completionCallback?.invoke(RestoreOutcome.Failure(error ?: "Restore failed"))
+                    }
+                    WorkInfo.State.CANCELLED -> {
+                        completionCallback?.invoke(RestoreOutcome.Cancelled)
+                    }
+                    else -> {
+                        // Still in progress, do nothing
                     }
                 }
-                WorkInfo.State.FAILED -> {
-                    val error = workInfo.outputData.getString(RestoreWorker.ERROR_KEY)
-                    completionCallback?.invoke(RestoreOutcome.Failure(error ?: "Restore failed"))
-                }
-                WorkInfo.State.CANCELLED -> {
-                    completionCallback?.invoke(RestoreOutcome.Cancelled)
-                }
-                else -> {
-                    // Still in progress, do nothing
-                }
             }
-        }
 
         if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-            WorkManager.getInstance(context)
+            WorkManager
+                .getInstance(context)
                 .getWorkInfosForUniqueWorkLiveData(RestoreWorker.WORK_NAME)
                 .observe(lifecycleOwner, workInfoObserver!!)
         }
@@ -95,11 +98,12 @@ class AndroidRestoreLauncher(
     }
 
     override fun startRestore() {
-        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE)
-            type = "*/*"
-            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/zip", "application/octet-stream"))
-        }
+        val intent =
+            Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "*/*"
+                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/zip", "application/octet-stream"))
+            }
 
         try {
             pendingRestoreCallback = {
@@ -139,7 +143,7 @@ class AndroidRestoreLauncher(
             try {
                 context.contentResolver.takePersistableUriPermission(
                     uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
                 )
                 Napier.i("User selected restore source: $uri")
                 pendingRestoreCallback?.invoke()
@@ -158,19 +162,23 @@ class AndroidRestoreLauncher(
     private fun startRestoreWorker(uri: Uri) {
         completionCallback?.invoke(RestoreOutcome.Started)
 
-        val inputData = Data.Builder()
-            .putString(RestoreWorker.SOURCE_URI_KEY, uri.toString())
-            .build()
+        val inputData =
+            Data
+                .Builder()
+                .putString(RestoreWorker.SOURCE_URI_KEY, uri.toString())
+                .build()
 
-        val workRequest = OneTimeWorkRequestBuilder<RestoreWorker>()
-            .setInputData(inputData)
-            .build()
+        val workRequest =
+            OneTimeWorkRequestBuilder<RestoreWorker>()
+                .setInputData(inputData)
+                .build()
 
-        WorkManager.getInstance(context)
+        WorkManager
+            .getInstance(context)
             .enqueueUniqueWork(
                 RestoreWorker.WORK_NAME,
                 ExistingWorkPolicy.REPLACE,
-                workRequest
+                workRequest,
             )
 
         Napier.i("Restore work enqueued with WorkManager")

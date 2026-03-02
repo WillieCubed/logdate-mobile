@@ -19,31 +19,34 @@ import io.github.aakira.napier.Napier
  * @param initialRoute The initial route to add to the backstack.
  * @property backStack The navigation back stack containing the history of screens
  */
-class MainAppNavigator(initialRoute: NavKey? = null) {
+class MainAppNavigator(
+    initialRoute: NavKey? = null,
+) {
     /**
      * The app's navigation back stack. This maintains the full history of screens
      * and is used by NavDisplay to render the appropriate UI.
      */
-    val backStack = mutableStateListOf<NavKey>().apply {
-        if (initialRoute != null) {
-            add(initialRoute)
-            Napier.i("Navigation: Initial route set to ${initialRoute}")
+    val backStack =
+        mutableStateListOf<NavKey>().apply {
+            if (initialRoute != null) {
+                add(initialRoute)
+                Napier.i("Navigation: Initial route set to $initialRoute")
+            }
         }
-    }
-    
+
     /**
      * Tracks the current navigation stack size to detect changes
      */
     private var currentStackSize by mutableIntStateOf(backStack.size)
-    
+
     init {
         // Set up a collector to log navigation changes
-        backStack.onChange { 
+        backStack.onChange {
             val lastItem = backStack.lastOrNull()
             Napier.i("Navigation: Changed to $lastItem, stack size: ${backStack.size}")
         }
     }
-    
+
     /**
      * Extension function to observe list changes
      */
@@ -54,28 +57,31 @@ class MainAppNavigator(initialRoute: NavKey? = null) {
                 onChange()
                 return result
             }
-            
-            override fun add(index: Int, element: T) {
+
+            override fun add(
+                index: Int,
+                element: T,
+            ) {
                 this@onChange.add(index, element)
                 onChange()
             }
-            
+
             override fun remove(element: T): Boolean {
                 val result = this@onChange.remove(element)
                 if (result) onChange()
                 return result
             }
-            
+
             override fun removeAt(index: Int): T {
                 val result = this@onChange.removeAt(index)
                 onChange()
                 return result
             }
-            
+
             // Additional methods would need to be implemented for complete coverage
         }
     }
-    
+
     /**
      * Safely removes the last entry from the back stack, ensuring we never have
      * an empty stack. If removing the last entry would result in an empty stack,
@@ -96,7 +102,7 @@ class MainAppNavigator(initialRoute: NavKey? = null) {
             false
         }
     }
-    
+
     /**
      * Safely clears the entire back stack and sets the provided entry as the new
      * root entry. This ensures we never have an empty back stack.
@@ -107,7 +113,7 @@ class MainAppNavigator(initialRoute: NavKey? = null) {
         Napier.i("Navigation: Clearing backstack and setting root to $rootEntry")
         // First add the new root entry to ensure we never have an empty stack
         backStack.add(rootEntry)
-        
+
         // Then clear all other entries
         while (backStack.size > 1) {
             // Always remove the first entry (index 0) until only rootEntry remains
@@ -116,7 +122,7 @@ class MainAppNavigator(initialRoute: NavKey? = null) {
             Napier.d("Navigation: Removed $removedEntry during backstack clearing")
         }
     }
-    
+
     /**
      * Safely pops the back stack to a specific entry, removing all entries after it.
      * If the specified entry is not found, this method does nothing.
@@ -125,10 +131,13 @@ class MainAppNavigator(initialRoute: NavKey? = null) {
      * @param keepFirst Whether to keep the entry as the first item in the backstack (default: false)
      * @return true if the operation succeeded, false otherwise
      */
-    fun safelyPopBackstackTo(entry: NavKey, keepFirst: Boolean = false): Boolean {
+    fun safelyPopBackstackTo(
+        entry: NavKey,
+        keepFirst: Boolean = false,
+    ): Boolean {
         val index = backStack.indexOfFirst { it == entry }
         Napier.i("Navigation: Attempting to pop backstack to $entry (keepFirst=$keepFirst), found at index $index")
-        
+
         // If the entry exists and it's not the only entry
         if (index >= 0 && backStack.size > 1) {
             if (keepFirst && index > 0) {
@@ -136,11 +145,11 @@ class MainAppNavigator(initialRoute: NavKey? = null) {
                 val targetEntry = backStack[index]
                 backStack.removeAt(index)
                 Napier.d("Navigation: Removed $targetEntry from index $index to move to front")
-                
+
                 // Clear everything except the target entry
                 backStack.add(0, targetEntry) // Add at front
                 Napier.d("Navigation: Added $targetEntry to front of backstack")
-                
+
                 // Remove all other entries
                 while (backStack.size > 1) {
                     val removedEntry = backStack[1]
@@ -158,7 +167,7 @@ class MainAppNavigator(initialRoute: NavKey? = null) {
             Napier.i("Navigation: Successfully popped backstack to $entry")
             return true
         }
-        
+
         Napier.w("Navigation: Failed to pop backstack to $entry - entry not found or is the only entry")
         return false
     }

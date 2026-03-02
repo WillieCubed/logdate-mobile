@@ -10,12 +10,13 @@ import org.koin.dsl.module
 /**
  * JVM-specific implementation of the sensor module.
  */
-actual val sensorModule: Module = module {
-    single<BatteryInfoProvider> {
-        JvmBatteryInfoProvider() 
+actual val sensorModule: Module =
+    module {
+        single<BatteryInfoProvider> {
+            JvmBatteryInfoProvider()
+        }
+
+        single<NetworkSaverModeProvider> {
+            JvmNetworkSaverModeProvider()
+        }
     }
-    
-    single<NetworkSaverModeProvider> { 
-        JvmNetworkSaverModeProvider() 
-    }
-}

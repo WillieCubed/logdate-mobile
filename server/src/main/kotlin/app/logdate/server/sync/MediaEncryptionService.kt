@@ -8,7 +8,7 @@ import javax.crypto.spec.SecretKeySpec
 
 class MediaEncryptionService internal constructor(
     private val keyBytes: ByteArray?,
-    private val secureRandom: SecureRandom = SecureRandom()
+    private val secureRandom: SecureRandom = SecureRandom(),
 ) {
     fun encryptIfConfigured(data: ByteArray): ByteArray {
         if (keyBytes == null) return data
@@ -44,7 +44,10 @@ class MediaEncryptionService internal constructor(
         return cipher.doFinal(cipherText)
     }
 
-    private fun cipher(mode: Int, iv: ByteArray): Cipher {
+    private fun cipher(
+        mode: Int,
+        iv: ByteArray,
+    ): Cipher {
         val key = requireNotNull(keyBytes) { "MEDIA_ENCRYPTION_KEY is not configured." }
         val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
         val keySpec = SecretKeySpec(key, KEY_ALGORITHM)
@@ -75,22 +78,21 @@ class MediaEncryptionService internal constructor(
             return MediaEncryptionService(keyBytes)
         }
 
-        internal fun fromKeyBytes(keyBytes: ByteArray): MediaEncryptionService {
-            return MediaEncryptionService(keyBytes.copyOf())
-        }
+        internal fun fromKeyBytes(keyBytes: ByteArray): MediaEncryptionService = MediaEncryptionService(keyBytes.copyOf())
 
         internal fun clientPrefixBytes(): ByteArray = CLIENT_PREFIX_BYTES.copyOf()
 
         private fun decodeKey(rawKey: String): ByteArray {
-            val decoded = try {
-                Base64.getDecoder().decode(rawKey)
-            } catch (e: IllegalArgumentException) {
-                throw IllegalArgumentException("MEDIA_ENCRYPTION_KEY must be base64-encoded.", e)
-            }
+            val decoded =
+                try {
+                    Base64.getDecoder().decode(rawKey)
+                } catch (e: IllegalArgumentException) {
+                    throw IllegalArgumentException("MEDIA_ENCRYPTION_KEY must be base64-encoded.", e)
+                }
 
             if (decoded.size !in setOf(16, 24, 32)) {
                 throw IllegalArgumentException(
-                    "MEDIA_ENCRYPTION_KEY must decode to 16, 24, or 32 bytes (AES-128/192/256)."
+                    "MEDIA_ENCRYPTION_KEY must decode to 16, 24, or 32 bytes (AES-128/192/256).",
                 )
             }
 

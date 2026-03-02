@@ -1,7 +1,7 @@
 package app.logdate.client.intelligence.entity.people
 
-import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.AIError
+import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.cache.AICachePolicy
 import app.logdate.client.intelligence.cache.GenerativeAICache
 import app.logdate.client.intelligence.cache.GenerativeAICacheContentType
@@ -34,7 +34,6 @@ class PeopleExtractor(
     private val networkAvailabilityMonitor: NetworkAvailabilityMonitor,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-
     companion object {
         // TODO: Use additional logic to extract text fragments that could be resolved to people
         private const val ADVANCED_EXTRACTION_PROMPT = """
@@ -84,16 +83,17 @@ If no names are present, return an empty array.
         useCached: Boolean = true,
     ): AIResult<List<Person>> =
         withContext(ioDispatcher) {
-            val cacheRequest = GenerativeAICacheRequest(
-                contentType = GenerativeAICacheContentType.People,
-                inputText = text,
-                providerId = generativeAIChatClient.providerId,
-                model = generativeAIChatClient.defaultModel,
-                promptVersion = PROMPT_VERSION,
-                schemaVersion = SCHEMA_VERSION,
-                templateId = TEMPLATE_ID,
-                policy = AICachePolicy(ttlSeconds = CACHE_TTL_SECONDS)
-            )
+            val cacheRequest =
+                GenerativeAICacheRequest(
+                    contentType = GenerativeAICacheContentType.People,
+                    inputText = text,
+                    providerId = generativeAIChatClient.providerId,
+                    model = generativeAIChatClient.defaultModel,
+                    promptVersion = PROMPT_VERSION,
+                    schemaVersion = SCHEMA_VERSION,
+                    templateId = TEMPLATE_ID,
+                    policy = AICachePolicy(ttlSeconds = CACHE_TTL_SECONDS),
+                )
             if (useCached) {
                 val cachedResponse = generativeAICache.getEntry(cacheRequest)
                 if (cachedResponse != null) {
@@ -108,25 +108,29 @@ If no names are present, return an empty array.
             if (unavailableReason != null) {
                 return@withContext AIResult.Unavailable(unavailableReason)
             }
-            val prompts = listOf(
-                GenerativeAIChatMessage("system", EXTRACTION_PROMPT),
-                GenerativeAIChatMessage("user", text),
-            )
-            val response = generativeAIChatClient.submit(
-                GenerativeAIRequest(
-                    messages = prompts,
-                    model = cacheRequest.model,
-                    responseFormat = GenerativeAIResponseFormat.JsonSchema(
-                        name = "people_extraction",
-                        schema = RESPONSE_SCHEMA
-                    )
+            val prompts =
+                listOf(
+                    GenerativeAIChatMessage("system", EXTRACTION_PROMPT),
+                    GenerativeAIChatMessage("user", text),
                 )
-            )
+            val response =
+                generativeAIChatClient.submit(
+                    GenerativeAIRequest(
+                        messages = prompts,
+                        model = cacheRequest.model,
+                        responseFormat =
+                            GenerativeAIResponseFormat.JsonSchema(
+                                name = "people_extraction",
+                                schema = RESPONSE_SCHEMA,
+                            ),
+                    ),
+                )
             when (response) {
                 is AIResult.Success -> {
                     val content = response.value.content
-                    val people = parsePeopleResponse(content)
-                        ?: return@withContext AIResult.Error(AIError.InvalidResponse)
+                    val people =
+                        parsePeopleResponse(content)
+                            ?: return@withContext AIResult.Error(AIError.InvalidResponse)
                     Napier.d(tag = "PeopleExtractor", message = "Caching response for:\n$text")
                     Napier.d(tag = "PeopleExtractor") { "Response: ${content.trim()}" }
                     generativeAICache.putEntry(cacheRequest, content.trim())
@@ -137,7 +141,7 @@ If no names are present, return an empty array.
                     Napier.e(
                         tag = "PeopleExtractor",
                         message = "Failed to extract people",
-                        throwable = response.throwable
+                        throwable = response.throwable,
                     )
                     response
                 }
@@ -145,11 +149,12 @@ If no names are present, return an empty array.
         }
 
     private fun parsePeopleResponse(raw: String): List<Person>? {
-        val parser = JsonStructuredOutputParser(
-            json = json,
-            serializer = PeopleResponse.serializer(),
-            allowEmbeddedJson = true
-        )
+        val parser =
+            JsonStructuredOutputParser(
+                json = json,
+                serializer = PeopleResponse.serializer(),
+                allowEmbeddedJson = true,
+            )
         return when (val result = parser.parse(raw)) {
             is StructuredOutputResult.Success ->
                 result.value.names
@@ -163,6 +168,6 @@ If no names are present, return an empty array.
 
     @Serializable
     private data class PeopleResponse(
-        val names: List<String>
+        val names: List<String>,
     )
 }

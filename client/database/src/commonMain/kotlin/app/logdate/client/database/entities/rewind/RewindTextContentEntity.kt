@@ -9,7 +9,7 @@ import kotlin.uuid.Uuid
 
 /**
  * Entity representing a text note in a rewind.
- * 
+ *
  * This entity stores text content such as journal entries or notes
  * that are included in a rewind.
  */
@@ -20,13 +20,13 @@ import kotlin.uuid.Uuid
             entity = RewindEntity::class,
             parentColumns = [RewindConstants.COLUMN_UID],
             childColumns = [RewindConstants.COLUMN_REWIND_ID],
-            onDelete = ForeignKey.CASCADE
-        )
+            onDelete = ForeignKey.CASCADE,
+        ),
     ],
     indices = [
         Index(RewindConstants.COLUMN_REWIND_ID),
-        Index(RewindConstants.COLUMN_SOURCE_ID)
-    ]
+        Index(RewindConstants.COLUMN_SOURCE_ID),
+    ],
 )
 data class RewindTextContentEntity(
     @PrimaryKey
@@ -34,9 +34,8 @@ data class RewindTextContentEntity(
     override val rewindId: Uuid,
     override val sourceId: Uuid,
     override val timestamp: Instant,
-    
     /**
      * The text content of the note.
      */
-    val content: String
+    val content: String,
 ) : BaseRewindContentEntity()

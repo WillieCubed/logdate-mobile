@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.Flow
  */
 @Dao
 interface UserDevicesDao {
-
     /**
      * Retrieves all [UserDeviceEntity]s.
      */

@@ -1,6 +1,7 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.feature.journals.ui.share
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,7 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import app.logdate.ui.common.AspectRatios
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,8 +23,8 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,22 +39,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import app.logdate.client.sharing.SharingLauncher
 import app.logdate.shared.model.Journal
+import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.common.MaterialContainer
-import org.koin.compose.koinInject
-import org.koin.core.parameter.parametersOf
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.journal.generated.resources.*
 import logdate.client.feature.journal.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
+
 /**
  * Screen for sharing a journal with others.
- * 
+ *
  * Provides options to share via the system share sheet or Instagram.
  *
  * @param journalId ID of the journal to share
@@ -67,17 +65,18 @@ fun ShareJournalScreen(
     onGoBack: () -> Unit,
 ) {
     val viewModel = koinInject<ShareJournalViewModel>()
-    val parsedId = remember(journalId) {
-        kotlin.uuid.Uuid.parse(journalId)
-    }
-    
+    val parsedId =
+        remember(journalId) {
+            kotlin.uuid.Uuid.parse(journalId)
+        }
+
     // Set the journal ID in the ViewModel
     LaunchedEffect(parsedId) {
         viewModel.setJournalId(parsedId)
     }
-    
+
     val uiState by viewModel.uiState.collectAsState()
-    
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -86,19 +85,19 @@ fun ShareJournalScreen(
                     IconButton(onClick = onGoBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(Res.string.go_back)
+                            contentDescription = stringResource(Res.string.go_back),
                         )
                     }
-                }
+                },
             )
-        }
+        },
     ) { paddingValues ->
         when (val state = uiState) {
             is ShareJournalUiState.Loading -> {
                 // Show loading state
                 Box(
                     modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(stringResource(Res.string.loading))
                 }
@@ -107,7 +106,7 @@ fun ShareJournalScreen(
                 // Show error state
                 Box(
                     modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(stringResource(Res.string.failed_to_load_journal))
                 }
@@ -118,7 +117,7 @@ fun ShareJournalScreen(
                     lastUpdatedText = state.lastUpdatedDisplay,
                     onShareToInstagram = { viewModel.shareToInstagram(state.journal) },
                     onShareJournal = { viewModel.shareJournal(state.journal) },
-                    modifier = Modifier.padding(paddingValues)
+                    modifier = Modifier.padding(paddingValues),
                 )
             }
         }
@@ -140,117 +139,123 @@ private fun ShareJournalContent(
     lastUpdatedText: String,
     onShareToInstagram: () -> Unit,
     onShareJournal: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+        verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         // Journal preview
         JournalPreview(
             title = journal.title,
             lastUpdatedText = lastUpdatedText,
-            modifier = Modifier
-                .width(240.dp)
-                .aspectRatio(AspectRatios.RATIO_3_4)
+            modifier =
+                Modifier
+                    .width(240.dp)
+                    .aspectRatio(AspectRatios.RATIO_3_4),
         )
-        
+
         // Web availability text
         MaterialContainer {
             SurfaceItem {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     Icon(
                         Icons.Rounded.Public,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         text = stringResource(Res.string.this_journal_is_available_on_the_web_anyone_with_the_link_can_view_it),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
         }
-        
+
         // Share buttons
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // Instagram button
             Button(
                 onClick = onShareToInstagram,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(56.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFF5F5F5),
-                    contentColor = Color.Black
-                )
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .height(56.dp),
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFF5F5F5),
+                        contentColor = Color.Black,
+                    ),
             ) {
-                // Instagram icon 
+                // Instagram icon
                 Icon(
                     imageVector = Icons.Default.QrCode,
                     contentDescription = null,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(24.dp),
                 )
             }
-            
+
             // General share button
             Button(
                 onClick = onShareJournal,
-                modifier = Modifier
-                    .weight(3f)
-                    .height(56.dp),
+                modifier =
+                    Modifier
+                        .weight(3f)
+                        .height(56.dp),
             ) {
                 Icon(
                     imageVector = Icons.Default.Share,
-                    contentDescription = null
+                    contentDescription = null,
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(text = stringResource(Res.string.share))
             }
         }
-        
+
         Spacer(modifier = Modifier.weight(1f))
-        
+
         // Bottom info about nearby sharing
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Icon(
                 imageVector = Icons.Default.QrCode,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 text = stringResource(Res.string.also_sharing_to_nearby_logdate_contacts),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 text = stringResource(Res.string.bring_your_devices_together_to_invite_someone_to_add_stuff),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
         }
-        
+
         // Bottom indicator
         HorizontalDivider(
-            modifier = Modifier
-                .width(32.dp)
-                .padding(vertical = 16.dp),
+            modifier =
+                Modifier
+                    .width(32.dp)
+                    .padding(vertical = 16.dp),
             thickness = 4.dp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
         )
     }
 }
@@ -266,42 +271,44 @@ private fun ShareJournalContent(
 private fun JournalPreview(
     title: String,
     lastUpdatedText: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        shadowElevation = 4.dp
+        shadowElevation = 4.dp,
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Image preview (70% of height)
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(0.7f)
-                    .background(MaterialTheme.colorScheme.primaryContainer)
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(0.7f)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
             ) {
                 // This would be the journal cover image
                 // For now we're using a placeholder color
             }
-            
+
             // Journal title and last updated (30% of height)
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(0.3f)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(0.3f)
+                        .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
                     text = title.ifEmpty { "Untitled Journal" },
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     text = lastUpdatedText,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

@@ -10,10 +10,10 @@ import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class)
 class OfflineFirstActivityTimelineRepository : ActivityTimelineRepository {
-
-    private val allItems: MutableStateFlow<List<ActivityTimelineItem>> = MutableStateFlow(
-        listOf()
-    )
+    private val allItems: MutableStateFlow<List<ActivityTimelineItem>> =
+        MutableStateFlow(
+            listOf(),
+        )
 
     override val allItemsObserved: Flow<List<ActivityTimelineItem>> = allItems
 
@@ -46,13 +46,12 @@ class OfflineFirstActivityTimelineRepository : ActivityTimelineRepository {
         }
     }
 
-    override fun fetchActivitiesByType(type: String): Flow<List<ActivityTimelineItem>> {
-        return allItemsObserved.map { items ->
+    override fun fetchActivitiesByType(type: String): Flow<List<ActivityTimelineItem>> =
+        allItemsObserved.map { items ->
             items.filter { item ->
                 // For now, return all items as we don't have type classification
                 // This could be enhanced later to filter by activity type
                 true
             }
         }
-    }
 }

@@ -3,9 +3,9 @@ package app.logdate.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import platform.UIKit.UIScreen
-import platform.CoreGraphics.CGRectGetWidth
 import platform.CoreGraphics.CGRectGetHeight
+import platform.CoreGraphics.CGRectGetWidth
+import platform.UIKit.UIScreen
 
 @OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 actual object PlatformDimensions {
@@ -16,7 +16,7 @@ actual object PlatformDimensions {
         // Convert points to dp (approximate conversion)
         return (screenWidth / UIScreen.mainScreen.scale).dp
     }
-    
+
     @Composable
     actual fun getScreenHeight(): Dp {
         // Use CGRectGetHeight to get the height instead of accessing the field directly

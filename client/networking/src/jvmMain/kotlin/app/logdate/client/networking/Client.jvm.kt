@@ -8,6 +8,7 @@ import io.ktor.client.engine.okhttp.OkHttp
  *
  * Logging is enabled by default.
  */
-actual val httpClient: HttpClient = HttpClient(OkHttp) {
-    configureClientDefaults()
-}
+actual val httpClient: HttpClient =
+    HttpClient(OkHttp) {
+        configureClientDefaults()
+    }

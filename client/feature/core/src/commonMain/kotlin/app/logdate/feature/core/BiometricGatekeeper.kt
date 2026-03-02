@@ -35,7 +35,6 @@ interface BiometricGatekeeper {
     fun requestEnrollment()
 }
 
-
 /**
  * A flag representing the current state of the app's biometric authentication.
  *

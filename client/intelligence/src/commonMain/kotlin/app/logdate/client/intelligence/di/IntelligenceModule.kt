@@ -14,16 +14,17 @@ import org.koin.dsl.module
 /**
  * Module that provides app intelligence features.
  */
-val intelligenceModule: Module = module {
-    includes(clientsModule)
-    includes(cacheModule)
+val intelligenceModule: Module =
+    module {
+        includes(clientsModule)
+        includes(cacheModule)
 
-    single<RewindGenerator> { DefaultRewindGenerator() }
-    single<RewindMessageGenerator> { WittyRewindMessageGenerator() }
-    single { EntrySummarizer(get(), get(), networkAvailabilityMonitor = get()) }
-    single { PeopleExtractor(get(), get(), networkAvailabilityMonitor = get()) }
-    single { WeekNarrativeSynthesizer(get(), get(), networkAvailabilityMonitor = get()) }
-    single { RewindSequencer() }
-}
+        single<RewindGenerator> { DefaultRewindGenerator() }
+        single<RewindMessageGenerator> { WittyRewindMessageGenerator() }
+        single { EntrySummarizer(get(), get(), networkAvailabilityMonitor = get()) }
+        single { PeopleExtractor(get(), get(), networkAvailabilityMonitor = get()) }
+        single { WeekNarrativeSynthesizer(get(), get(), networkAvailabilityMonitor = get()) }
+        single { RewindSequencer() }
+    }
 
 expect val cacheModule: Module

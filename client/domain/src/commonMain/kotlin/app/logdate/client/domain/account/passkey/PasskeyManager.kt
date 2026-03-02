@@ -14,7 +14,7 @@ interface PasskeyManager {
      * @return The result of the passkey creation operation.
      */
     suspend fun createPasskey(options: RegistrationOptions): Result<PasskeyRegistrationResult>
-    
+
     /**
      * Gets a passkey for authentication.
      *
@@ -22,7 +22,7 @@ interface PasskeyManager {
      * @return The result of the passkey retrieval operation.
      */
     suspend fun getPasskey(options: AuthenticationOptions): Result<PasskeyAuthenticationResult>
-    
+
     /**
      * Checks if passkey authentication is supported on this device.
      *
@@ -49,7 +49,7 @@ data class RegistrationOptions(
     val userId: String,
     val username: String,
     val displayName: String,
-    val timeout: Long
+    val timeout: Long,
 )
 
 /**
@@ -62,7 +62,7 @@ data class RegistrationOptions(
 data class PasskeyRegistrationResult(
     val credentialId: String,
     val clientDataJSON: String,
-    val attestationObject: String
+    val attestationObject: String,
 )
 
 /**
@@ -77,7 +77,7 @@ data class AuthenticationOptions(
     val challenge: String,
     val rpId: String,
     val allowCredentials: List<String>?,
-    val timeout: Long
+    val timeout: Long,
 )
 
 /**
@@ -94,7 +94,7 @@ data class PasskeyAuthenticationResult(
     val clientDataJSON: String,
     val authenticatorData: String,
     val signature: String,
-    val userHandle: String
+    val userHandle: String,
 )
 
 /**
@@ -106,7 +106,7 @@ enum class PasskeyErrorCode {
     SECURITY_ERROR,
     NETWORK_ERROR,
     TIMEOUT,
-    UNKNOWN_ERROR
+    UNKNOWN_ERROR,
 }
 
 /**
@@ -115,5 +115,5 @@ enum class PasskeyErrorCode {
 class PasskeyException(
     val errorCode: PasskeyErrorCode,
     override val message: String,
-    cause: Throwable? = null
+    cause: Throwable? = null,
 ) : Exception(message, cause)

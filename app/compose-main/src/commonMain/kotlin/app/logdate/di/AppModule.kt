@@ -26,14 +26,15 @@ expect val appModule: Module
  *
  * This includes all feature modules.
  */
-internal val defaultModules: Set<Module> = setOf(
-    coreFeatureModule,
-    accountFeatureModule,
-    onboardingFeatureModule,
-    editorFeatureModule,
-    timelineFeatureModule,
-    rewindFeatureModule,
-    journalsFeatureModule,
-    locationTimelineModule,
-    searchFeatureModule,
-)
+internal val defaultModules: Set<Module> =
+    setOf(
+        coreFeatureModule,
+        accountFeatureModule,
+        onboardingFeatureModule,
+        editorFeatureModule,
+        timelineFeatureModule,
+        rewindFeatureModule,
+        journalsFeatureModule,
+        locationTimelineModule,
+        searchFeatureModule,
+    )

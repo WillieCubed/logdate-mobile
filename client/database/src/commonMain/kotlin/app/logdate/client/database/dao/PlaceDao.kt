@@ -35,24 +35,29 @@ interface PlaceDao {
     @Query("SELECT * FROM places WHERE name LIKE '%' || :query || '%' AND deleted_at IS NULL")
     suspend fun searchByName(query: String): List<PlaceEntity>
 
-    @Query("""
+    @Query(
+        """
         SELECT * FROM places
         WHERE deleted_at IS NULL
         AND latitude BETWEEN :minLat AND :maxLat
         AND longitude BETWEEN :minLng AND :maxLng
-    """)
+    """,
+    )
     suspend fun findInBounds(
         minLat: Double,
         maxLat: Double,
         minLng: Double,
-        maxLng: Double
+        maxLng: Double,
     ): List<PlaceEntity>
 
     @Query("SELECT * FROM places WHERE ap_uri = :uri AND deleted_at IS NULL")
     suspend fun getByApUri(uri: String): PlaceEntity?
 
     @Query("UPDATE places SET deleted_at = :deletedAt WHERE id = :id")
-    suspend fun softDelete(id: Uuid, deletedAt: Long)
+    suspend fun softDelete(
+        id: Uuid,
+        deletedAt: Long,
+    )
 
     @Query("DELETE FROM places WHERE id = :id")
     suspend fun hardDelete(id: Uuid)

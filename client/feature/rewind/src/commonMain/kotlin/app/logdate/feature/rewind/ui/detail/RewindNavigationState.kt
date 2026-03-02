@@ -20,11 +20,8 @@ import androidx.compose.runtime.setValue
  * @see RewindNavigationState
  */
 @Composable
-internal fun rememberRewindNavigationState(
-    startingPanel: Int = 0,
-): RewindNavigationState {
-    return remember { RewindNavigationState(startingPanel) }
-}
+internal fun rememberRewindNavigationState(startingPanel: Int = 0): RewindNavigationState =
+    remember { RewindNavigationState(startingPanel) }
 
 /**
  * A class that manages the navigation state of a Rewind.

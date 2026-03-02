@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.core.main
 
 import androidx.compose.foundation.background
@@ -29,7 +31,6 @@ import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
 import app.logdate.client.domain.recommendation.HomeRecommendation
 import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
 import app.logdate.client.repository.journals.JournalNote
-import app.logdate.ui.timeline.TimelineSuggestionBlock
 import app.logdate.feature.journals.ui.JournalClickCallback
 import app.logdate.feature.journals.ui.JournalsOverviewScreen
 import app.logdate.feature.location.timeline.ui.LocationTimelineScreen
@@ -45,6 +46,7 @@ import app.logdate.ui.timeline.TimelineDaySelection
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelineLoadingState
 import app.logdate.ui.timeline.TimelinePane
+import app.logdate.ui.timeline.TimelineSuggestionBlock
 import app.logdate.ui.timeline.TimelineUiState
 import app.logdate.ui.timeline.VideoNoteUiState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -59,11 +61,11 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.plus
+import logdate.client.feature.core.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.core.generated.resources.*
-import logdate.client.feature.core.generated.resources.Res
+
 @Composable
 fun HomeScreen(
     onNewEntry: () -> Unit,
@@ -84,7 +86,7 @@ fun HomeScreen(
                 else -> onNewEntry()
             }
         },
-        modifier = modifier
+        modifier = modifier,
     ) { currentDestination ->
         when (currentDestination) {
             HomeRouteDestination.Timeline -> {
@@ -97,16 +99,17 @@ fun HomeScreen(
                     onProfileClick = onOpenSettings,
                     timelineSuggestion = uiState.timelineSuggestion,
                     // onHistoryClick handled in TimelinePaneScreen
-                    modifier = Modifier
-                        .applyScreenStyles()
-                        .safeDrawingPadding()
+                    modifier =
+                        Modifier
+                            .applyScreenStyles()
+                            .safeDrawingPadding(),
                 )
             }
 
             HomeRouteDestination.Rewind -> {
                 RewindOverviewScreen(
                     onOpenRewind = onOpenRewind,
-                    modifier = Modifier.applyScreenStyles()
+                    modifier = Modifier.applyScreenStyles(),
                 )
             }
 
@@ -115,15 +118,16 @@ fun HomeScreen(
                     onOpenJournal = onOpenJournal,
                     onBrowseJournals = onBrowseJournals,
                     onCreateJournal = onCreateJournal,
-                    modifier = Modifier.applyScreenStyles()
+                    modifier = Modifier.applyScreenStyles(),
                 )
             }
 
             HomeRouteDestination.LocationHistory -> {
                 LocationTimelineScreen(
-                    modifier = Modifier
-                        .applyScreenStyles()
-                        .safeDrawingPadding()
+                    modifier =
+                        Modifier
+                            .applyScreenStyles()
+                            .safeDrawingPadding(),
                 )
             }
         }
@@ -146,23 +150,24 @@ internal fun HomeScaffoldWrapper(
 
         // Bottom navigation bar
         NavigationBar(
-            modifier = Modifier.align(Alignment.BottomCenter)
+            modifier = Modifier.align(Alignment.BottomCenter),
         ) {
             HomeRouteDestination.ALL.forEach { destination ->
                 NavigationBarItem(
                     icon = {
                         Icon(
-                            imageVector = if (destination == currentDestination) {
-                                destination.selectedIcon
-                            } else {
-                                destination.unselectedIcon
-                            },
-                            contentDescription = destination.label
+                            imageVector =
+                                if (destination == currentDestination) {
+                                    destination.selectedIcon
+                                } else {
+                                    destination.unselectedIcon
+                                },
+                            contentDescription = destination.label,
                         )
                     },
                     label = { Text(destination.label) },
                     selected = destination == currentDestination,
-                    onClick = { currentDestination = destination }
+                    onClick = { currentDestination = destination },
                 )
             }
         }
@@ -170,10 +175,11 @@ internal fun HomeScaffoldWrapper(
         if (showFab) {
             FloatingActionButton(
                 onClick = { onFabClick(currentDestination) },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .systemBarsPadding()
-                    .padding(16.dp)
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .systemBarsPadding()
+                        .padding(16.dp),
             ) {
                 Icon(
                     Icons.Default.EditNote,
@@ -183,7 +189,6 @@ internal fun HomeScaffoldWrapper(
         }
     }
 }
-
 
 /**
  * ViewModel for the home screen.
@@ -200,92 +205,104 @@ class HomeViewModel(
     private val notesRepository: app.logdate.client.repository.journals.JournalNotesRepository,
     private val getHomeRecommendation: GetHomeRecommendationUseCase,
 ) : ViewModel() {
-    private val _selectedItemUiState =
+    private val selectedItemUiState =
         MutableStateFlow<TimelineDaySelection>(TimelineDaySelection.NotSelected)
 
     private val selectedNotes = MutableStateFlow(emptyList<JournalNote>())
     private val selectedDayFlow = MutableStateFlow<LocalDate?>(null)
-    
-    val uiState: StateFlow<HomeTimelineUiState> = combine(
-        getStreamingTimelineUseCase(),
-        selectedNotes,
-        _selectedItemUiState,
-        selectedDayFlow,
-        getHomeRecommendation(),
-    ) { timeline, notes, selection, selectedDayDate, recommendation ->
-        val items = timeline.days.map { day ->
-            TimelineDayUiState(
-                summary = day.tldr,
-                date = day.date,
-                people = day.people.map(Person::toUiState),
-                events = day.events,
-                isLoadingSummary = day.tldr.isEmpty(),
-                notes = if (day.date == selectedDayDate) {
-                    // Only include notes for the selected day
-                    notes.map {
-                        when (it) {
-                            is JournalNote.Text -> TextNoteUiState(
-                                noteId = it.uid,
-                                text = it.content,
-                                timestamp = it.creationTimestamp,
-                            )
-                            is JournalNote.Image -> ImageNoteUiState(
-                                noteId = it.uid,
-                                uri = it.mediaRef,
-                                timestamp = it.creationTimestamp,
-                            )
-                            is JournalNote.Audio -> AudioNoteUiState(
-                                noteId = it.uid,
-                                uri = it.mediaRef,
-                                timestamp = it.creationTimestamp,
-                                duration = it.durationMs,
-                            )
-                            is JournalNote.Video -> VideoNoteUiState(
-                                noteId = it.uid,
-                                uri = it.mediaRef,
-                                timestamp = it.creationTimestamp,
-                            )
-                        }
-                    }
-                } else {
-                    emptyList()
+
+    val uiState: StateFlow<HomeTimelineUiState> =
+        combine(
+            getStreamingTimelineUseCase(),
+            selectedNotes,
+            selectedItemUiState,
+            selectedDayFlow,
+            getHomeRecommendation(),
+        ) { timeline, notes, selection, selectedDayDate, recommendation ->
+            val items =
+                timeline.days.map { day ->
+                    TimelineDayUiState(
+                        summary = day.tldr,
+                        date = day.date,
+                        people = day.people.map(Person::toUiState),
+                        events = day.events,
+                        isLoadingSummary = day.tldr.isEmpty(),
+                        notes =
+                            if (day.date == selectedDayDate) {
+                                // Only include notes for the selected day
+                                notes.map {
+                                    when (it) {
+                                        is JournalNote.Text ->
+                                            TextNoteUiState(
+                                                noteId = it.uid,
+                                                text = it.content,
+                                                timestamp = it.creationTimestamp,
+                                            )
+                                        is JournalNote.Image ->
+                                            ImageNoteUiState(
+                                                noteId = it.uid,
+                                                uri = it.mediaRef,
+                                                timestamp = it.creationTimestamp,
+                                            )
+                                        is JournalNote.Audio ->
+                                            AudioNoteUiState(
+                                                noteId = it.uid,
+                                                uri = it.mediaRef,
+                                                timestamp = it.creationTimestamp,
+                                                duration = it.durationMs,
+                                            )
+                                        is JournalNote.Video ->
+                                            VideoNoteUiState(
+                                                noteId = it.uid,
+                                                uri = it.mediaRef,
+                                                timestamp = it.creationTimestamp,
+                                            )
+                                    }
+                                }
+                            } else {
+                                emptyList()
+                            },
+                    )
                 }
+
+            // Determine the selected day based on the current selection state
+            val selectedDay =
+                when (selection) {
+                    is TimelineDaySelection.Selected -> {
+                        items.find { it.date == selection.day }
+                    }
+                    is TimelineDaySelection.DateSelected -> {
+                        items.find { it.date == selection.date }
+                    }
+                    TimelineDaySelection.NotSelected -> null
+                }
+
+            HomeTimelineUiState(
+                items = items,
+                selectedItem = selection,
+                selectedDay = selectedDay,
+                showEmptyState = items.isEmpty(),
+                timelineSuggestion =
+                    when (recommendation) {
+                        is HomeRecommendation.CompleteYourDraft ->
+                            TimelineSuggestionBlock.OngoingEvent(
+                                memoryId = recommendation.draftId.toString(),
+                                message =
+                                    "You have an unfinished entry." +
+                                        recommendation.notePreview?.let { " \"${it.take(60)}\"" }.orEmpty(),
+                            )
+                        is HomeRecommendation.CaptureToday ->
+                            TimelineSuggestionBlock.OngoingEvent(
+                                memoryId = "",
+                                message = recommendation.message,
+                            )
+                        HomeRecommendation.None -> null
+                    },
+                isLoading = false,
+                loadingState = if (items.isEmpty()) TimelineLoadingState.InitialLoading else TimelineLoadingState.Loaded,
             )
-        }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeTimelineUiState())
 
-        // Determine the selected day based on the current selection state
-        val selectedDay = when (selection) {
-            is TimelineDaySelection.Selected -> {
-                items.find { it.date == selection.day }
-            }
-            is TimelineDaySelection.DateSelected -> {
-                items.find { it.date == selection.date }
-            }
-            TimelineDaySelection.NotSelected -> null
-        }
-
-        HomeTimelineUiState(
-            items = items,
-            selectedItem = selection,
-            selectedDay = selectedDay,
-            showEmptyState = items.isEmpty(),
-            timelineSuggestion = when (recommendation) {
-                is HomeRecommendation.CompleteYourDraft -> TimelineSuggestionBlock.OngoingEvent(
-                    memoryId = recommendation.draftId.toString(),
-                    message = "You have an unfinished entry." +
-                        recommendation.notePreview?.let { " \"${it.take(60)}\"" }.orEmpty(),
-                )
-                is HomeRecommendation.CaptureToday -> TimelineSuggestionBlock.OngoingEvent(
-                    memoryId = "",
-                    message = recommendation.message,
-                )
-                HomeRecommendation.None -> null
-            },
-            isLoading = false,
-            loadingState = if (items.isEmpty()) TimelineLoadingState.InitialLoading else TimelineLoadingState.Loaded
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeTimelineUiState())
-        
     /**
      * Selects a timeline day for detailed viewing.
      *
@@ -293,73 +310,76 @@ class HomeViewModel(
      */
     fun selectDay(date: LocalDate) {
         println("Selecting day: $date")
-        _selectedItemUiState.value = TimelineDaySelection.Selected(
-            id = date.toString(),
-            day = date
-        )
+        selectedItemUiState.value =
+            TimelineDaySelection.Selected(
+                id = date.toString(),
+                day = date,
+            )
         selectedDayFlow.value = date
-        
+
         // Automatically fetch notes when a day is selected
         fetchNotesForDate(date)
     }
-    
+
     /**
      * Clears the current day selection.
      */
     fun clearSelection() {
-        _selectedItemUiState.value = TimelineDaySelection.NotSelected
+        selectedItemUiState.value = TimelineDaySelection.NotSelected
         selectedDayFlow.value = null
     }
-    
+
     /**
      * Fetches notes for a specific date.
-     * 
+     *
      * @param date The date to fetch notes for
      */
     fun fetchNotesForDate(date: LocalDate) {
         println("Fetching notes for date: $date")
-        
+
         io.github.aakira.napier.Napier.d(
             tag = "HomeViewModel",
-            message = "EXPLICIT FETCH: Getting notes for date $date"
+            message = "EXPLICIT FETCH: Getting notes for date $date",
         )
-        
+
         // Create time range for the day
         val tz = TimeZone.currentSystemDefault()
         val startInstant = date.atStartOfDayIn(tz)
         val endInstant = date.plus(1, DateTimeUnit.DAY).atStartOfDayIn(tz)
-        
+
         // Simply fetch notes for this date range
         viewModelScope.launch {
             try {
                 // Direct repository call for simplicity
                 val notes = notesRepository.observeNotesInRange(startInstant, endInstant).first()
-                
+
                 io.github.aakira.napier.Napier.d(
-                    tag = "HomeViewModel", 
-                    message = "EXPLICIT FETCH RESULT: Found ${notes.size} notes for $date: " +
-                        "${notes.count { it is JournalNote.Text }} text, " +
-                        "${notes.count { it is JournalNote.Image }} image, " +
-                        "${notes.count { it is JournalNote.Audio }} audio, " +
-                        "${notes.count { it is JournalNote.Video }} video notes"
+                    tag = "HomeViewModel",
+                    message =
+                        "EXPLICIT FETCH RESULT: Found ${notes.size} notes for $date: " +
+                            "${notes.count { it is JournalNote.Text }} text, " +
+                            "${notes.count { it is JournalNote.Image }} image, " +
+                            "${notes.count { it is JournalNote.Audio }} audio, " +
+                            "${notes.count { it is JournalNote.Video }} video notes",
                 )
-                
+
                 // Log audio notes specifically
                 val audioNotes = notes.filterIsInstance<JournalNote.Audio>()
                 if (audioNotes.isNotEmpty()) {
                     io.github.aakira.napier.Napier.d(
                         tag = "HomeViewModel",
-                        message = "AUDIO NOTES IN FETCH: ${audioNotes.size} audio notes for date $date - " +
-                            "UIDs: ${audioNotes.map { it.uid }}, " +
-                            "URIs: ${audioNotes.map { it.mediaRef }}"
+                        message =
+                            "AUDIO NOTES IN FETCH: ${audioNotes.size} audio notes for date $date - " +
+                                "UIDs: ${audioNotes.map { it.uid }}, " +
+                                "URIs: ${audioNotes.map { it.mediaRef }}",
                     )
                 }
-                
+
                 // Update the selected notes state
                 selectedNotes.value = notes
-                
             } catch (e: Exception) {
-                io.github.aakira.napier.Napier.e("Failed to fetch notes for date $date", e)
+                io.github.aakira.napier.Napier
+                    .e("Failed to fetch notes for date $date", e)
                 selectedNotes.value = emptyList()
             }
         }

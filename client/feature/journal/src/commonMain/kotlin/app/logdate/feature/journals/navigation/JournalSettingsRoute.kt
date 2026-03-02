@@ -18,7 +18,9 @@ import kotlin.uuid.Uuid
  * Route for the journal settings screen.
  */
 @Serializable
-data class JournalSettingsRoute(val journalId: String) {
+data class JournalSettingsRoute(
+    val journalId: String,
+) {
     constructor(journalId: Uuid) : this(journalId.toString())
 }
 
@@ -50,11 +52,11 @@ fun NavGraphBuilder.journalSettingsRoute(
             slideOutOfContainer(
                 towards = AnimatedContentTransitionScope.SlideDirection.Right,
             )
-        }
+        },
     ) { backStackEntry ->
         val route = backStackEntry.savedStateHandle.toRoute<JournalSettingsRoute>()
         val journalId = Uuid.parse(route.journalId)
-        
+
         CompositionLocalProvider(
             LocalNavAnimatedVisibilityScope provides this,
         ) {

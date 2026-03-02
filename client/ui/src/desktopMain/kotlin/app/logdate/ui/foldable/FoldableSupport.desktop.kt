@@ -9,6 +9,4 @@ import androidx.compose.runtime.Composable
  * a non-foldable state.
  */
 @Composable
-actual fun rememberFoldableState(): FoldableState {
-    return FoldableState(isFoldable = false)
-}
+actual fun rememberFoldableState(): FoldableState = FoldableState(isFoldable = false)

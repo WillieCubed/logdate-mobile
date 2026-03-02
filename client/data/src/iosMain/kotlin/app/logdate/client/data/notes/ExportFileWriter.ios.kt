@@ -1,6 +1,6 @@
 @file:OptIn(
     kotlinx.cinterop.BetaInteropApi::class,
-    kotlinx.cinterop.ExperimentalForeignApi::class
+    kotlinx.cinterop.ExperimentalForeignApi::class,
 )
 
 package app.logdate.client.data.notes
@@ -22,16 +22,18 @@ import platform.Foundation.writeToFile
 internal actual fun writeExportFile(
     destination: String,
     content: String,
-    overwrite: Boolean
+    overwrite: Boolean,
 ) {
     val fileManager = NSFileManager.defaultManager
     if (!overwrite && fileManager.fileExistsAtPath(destination)) {
         throw IllegalStateException("File already exists and overwrite is set to false.")
     }
 
-    val data = NSString.create(string = content)
-        .dataUsingEncoding(NSUTF8StringEncoding)
-        ?: throw IllegalStateException("Failed to encode export content.")
+    val data =
+        NSString
+            .create(string = content)
+            .dataUsingEncoding(NSUTF8StringEncoding)
+            ?: throw IllegalStateException("Failed to encode export content.")
 
     if (!data.writeToFile(destination, true)) {
         throw IllegalStateException("Failed to write export file.")

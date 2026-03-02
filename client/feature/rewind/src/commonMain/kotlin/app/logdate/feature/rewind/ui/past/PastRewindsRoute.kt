@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.feature.rewind.ui.past
 
 import androidx.compose.foundation.layout.Spacer
@@ -15,9 +17,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.rewind.generated.resources.*
 import logdate.client.feature.rewind.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+
 @Composable
 fun PastRewindsRoute(onGoBack: () -> Unit) {
     PastRewindsScreen(onGoBack = onGoBack)
@@ -39,14 +42,14 @@ fun PastRewindsScreen(onGoBack: () -> Unit) {
         },
     ) {
         LazyColumn(
-            contentPadding = it
+            contentPadding = it,
         ) {
             // TODO: Show past rewinds
             item {
                 Spacer(
                     Modifier.windowInsetsBottomHeight(
-                        WindowInsets.systemBars
-                    )
+                        WindowInsets.systemBars,
+                    ),
                 )
             }
         }
@@ -54,5 +57,4 @@ fun PastRewindsScreen(onGoBack: () -> Unit) {
 }
 
 fun PastRewindCard() {
-
 }

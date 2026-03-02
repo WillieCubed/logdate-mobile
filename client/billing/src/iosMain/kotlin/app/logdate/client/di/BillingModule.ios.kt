@@ -5,7 +5,8 @@ import app.logdate.client.billing.SubscriptionBiller
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
-actual val billingModule: Module = module {
-    // TODO: Implement billing on iOS
-    single<SubscriptionBiller> { StubSubscriptionBiller() }
-}
+actual val billingModule: Module =
+    module {
+        // TODO: Implement billing on iOS
+        single<SubscriptionBiller> { StubSubscriptionBiller() }
+    }

@@ -8,6 +8,7 @@ import io.ktor.client.engine.darwin.Darwin
  *
  * Logging is enabled by default.
  */
-actual val httpClient: HttpClient = HttpClient(Darwin) {
-    configureClientDefaults()
-}
+actual val httpClient: HttpClient =
+    HttpClient(Darwin) {
+        configureClientDefaults()
+    }

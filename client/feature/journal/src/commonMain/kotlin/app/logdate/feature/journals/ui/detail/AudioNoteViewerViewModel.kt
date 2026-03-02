@@ -18,11 +18,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToLong
 import kotlin.time.Duration
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -35,7 +35,6 @@ class AudioNoteViewerViewModel(
     private val durationResolver: AudioDurationResolver,
     private val audioPlaybackManager: AudioPlaybackManager,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow<AudioNoteViewerUiState>(AudioNoteViewerUiState.Loading)
     val uiState: StateFlow<AudioNoteViewerUiState> = _uiState.asStateFlow()
 
@@ -55,11 +54,11 @@ class AudioNoteViewerViewModel(
         viewModelScope.launch {
             notesRepository.allNotesObserved
                 .catch { error ->
-                    _uiState.value = AudioNoteViewerUiState.Error(
-                        "Failed to load audio note: ${error.message}"
-                    )
-                }
-                .collect { notes ->
+                    _uiState.value =
+                        AudioNoteViewerUiState.Error(
+                            "Failed to load audio note: ${error.message}",
+                        )
+                }.collect { notes ->
                     val note = notes.find { it.uid == noteId }
                     if (note == null) {
                         _uiState.value = AudioNoteViewerUiState.Error("Audio note not found")
@@ -81,14 +80,16 @@ class AudioNoteViewerViewModel(
 
     private fun updateForAudio(note: JournalNote.Audio) {
         viewModelScope.launch {
-            val durationMs = if (note.durationMs > 0) {
-                note.durationMs
-            } else {
-                durationResolver.resolveDurationMs(note.mediaRef) ?: 0L
-            }
-            val shouldProcess = cachedAudioMediaRef != note.mediaRef ||
-                cachedAudioDurationMs != durationMs ||
-                cachedAudioContext == null
+            val durationMs =
+                if (note.durationMs > 0) {
+                    note.durationMs
+                } else {
+                    durationResolver.resolveDurationMs(note.mediaRef) ?: 0L
+                }
+            val shouldProcess =
+                cachedAudioMediaRef != note.mediaRef ||
+                    cachedAudioDurationMs != durationMs ||
+                    cachedAudioContext == null
 
             if (shouldProcess) {
                 cachedAudioMediaRef = note.mediaRef
@@ -97,13 +98,14 @@ class AudioNoteViewerViewModel(
                 _uiState.value = AudioNoteViewerUiState.Loading
                 processAudioContext(note, durationMs)
             } else {
-                _uiState.value = AudioNoteViewerUiState.Ready(
-                    mediaRef = note.mediaRef,
-                    durationMs = durationMs,
-                    createdAt = note.creationTimestamp,
-                    context = cachedAudioContext ?: return@launch,
-                    playbackState = cachedPlaybackState,
-                )
+                _uiState.value =
+                    AudioNoteViewerUiState.Ready(
+                        mediaRef = note.mediaRef,
+                        durationMs = durationMs,
+                        createdAt = note.creationTimestamp,
+                        context = cachedAudioContext ?: return@launch,
+                        playbackState = cachedPlaybackState,
+                    )
             }
         }
     }
@@ -113,47 +115,52 @@ class AudioNoteViewerViewModel(
         durationMs: Long,
     ) {
         audioProcessingJob?.cancel()
-        audioProcessingJob = viewModelScope.launch {
-            val result = runCatching {
-                audioContextProcessor.process(
-                    audioUri = note.mediaRef,
-                    durationMs = durationMs,
-                    createdAt = note.creationTimestamp,
-                    latitude = note.location?.effectiveLatitude,
-                    longitude = note.location?.effectiveLongitude,
-                )
-            }.getOrNull()
+        audioProcessingJob =
+            viewModelScope.launch {
+                val result =
+                    runCatching {
+                        audioContextProcessor.process(
+                            audioUri = note.mediaRef,
+                            durationMs = durationMs,
+                            createdAt = note.creationTimestamp,
+                            latitude = note.location?.effectiveLatitude,
+                            longitude = note.location?.effectiveLongitude,
+                        )
+                    }.getOrNull()
 
-            if (result == null) {
-                _uiState.value = AudioNoteViewerUiState.Error("Audio context unavailable")
-                return@launch
+                if (result == null) {
+                    _uiState.value = AudioNoteViewerUiState.Error("Audio context unavailable")
+                    return@launch
+                }
+
+                cachedAudioContext = result
+                _uiState.value =
+                    AudioNoteViewerUiState.Ready(
+                        mediaRef = note.mediaRef,
+                        durationMs = durationMs,
+                        createdAt = note.creationTimestamp,
+                        context = result,
+                        playbackState = cachedPlaybackState,
+                    )
             }
-
-            cachedAudioContext = result
-            _uiState.value = AudioNoteViewerUiState.Ready(
-                mediaRef = note.mediaRef,
-                durationMs = durationMs,
-                createdAt = note.creationTimestamp,
-                context = result,
-                playbackState = cachedPlaybackState,
-            )
-        }
     }
 
     private fun observePlaybackStatus() {
         statusProvider ?: return
         viewModelScope.launch {
             statusProvider.playbackStatus.collect { status ->
-                val durationMs = if (status.duration > Duration.ZERO) {
-                    status.duration.inWholeMilliseconds
-                } else {
-                    cachedAudioDurationMs
-                }
+                val durationMs =
+                    if (status.duration > Duration.ZERO) {
+                        status.duration.inWholeMilliseconds
+                    } else {
+                        cachedAudioDurationMs
+                    }
                 cachedAudioDurationMs = durationMs
-                cachedPlaybackState = cachedPlaybackState.copy(
-                    progress = status.progress,
-                    isPlaying = status.isPlaying,
-                )
+                cachedPlaybackState =
+                    cachedPlaybackState.copy(
+                        progress = status.progress,
+                        isPlaying = status.isPlaying,
+                    )
 
                 _uiState.update { state ->
                     val ready = state as? AudioNoteViewerUiState.Ready ?: return@update state
@@ -177,7 +184,7 @@ class AudioNoteViewerViewModel(
             _uiState.update { state ->
                 val ready = state as? AudioNoteViewerUiState.Ready ?: return@update state
                 ready.copy(
-                    playbackState = ready.playbackState.copy(isPlaying = false)
+                    playbackState = ready.playbackState.copy(isPlaying = false),
                 )
             }
         } else {
@@ -195,7 +202,7 @@ class AudioNoteViewerViewModel(
         _uiState.update { state ->
             val ready = state as? AudioNoteViewerUiState.Ready ?: return@update state
             ready.copy(
-                playbackState = ready.playbackState.copy(progress = safeProgress)
+                playbackState = ready.playbackState.copy(progress = safeProgress),
             )
         }
     }
@@ -213,44 +220,50 @@ class AudioNoteViewerViewModel(
     }
 
     private fun startPlayback(content: AudioNoteViewerUiState.Ready) {
-        val subtitle = formatDateLocalized(
-            content.createdAt.toLocalDateTime(TimeZone.currentSystemDefault()).date
-        )
-        val metadata = AudioPlaybackMetadata(
-            title = "Audio Entry",
-            subtitle = subtitle,
-            noteId = noteId,
-        )
+        val subtitle =
+            formatDateLocalized(
+                content.createdAt.toLocalDateTime(TimeZone.currentSystemDefault()).date,
+            )
+        val metadata =
+            AudioPlaybackMetadata(
+                title = "Audio Entry",
+                subtitle = subtitle,
+                noteId = noteId,
+            )
         audioPlaybackManager.startPlayback(
             uri = content.mediaRef,
             metadata = metadata,
             onProgressUpdated = { progress ->
-                cachedPlaybackState = cachedPlaybackState.copy(
-                    progress = progress,
-                    isPlaying = true,
-                )
+                cachedPlaybackState =
+                    cachedPlaybackState.copy(
+                        progress = progress,
+                        isPlaying = true,
+                    )
                 _uiState.update { state ->
                     val ready = state as? AudioNoteViewerUiState.Ready ?: return@update state
                     ready.copy(
-                        playbackState = ready.playbackState.copy(
-                            progress = progress,
-                            isPlaying = true,
-                        )
+                        playbackState =
+                            ready.playbackState.copy(
+                                progress = progress,
+                                isPlaying = true,
+                            ),
                     )
                 }
             },
             onPlaybackCompleted = {
-                cachedPlaybackState = cachedPlaybackState.copy(
-                    progress = 1f,
-                    isPlaying = false,
-                )
+                cachedPlaybackState =
+                    cachedPlaybackState.copy(
+                        progress = 1f,
+                        isPlaying = false,
+                    )
                 _uiState.update { state ->
                     val ready = state as? AudioNoteViewerUiState.Ready ?: return@update state
                     ready.copy(
-                        playbackState = ready.playbackState.copy(
-                            progress = 1f,
-                            isPlaying = false,
-                        )
+                        playbackState =
+                            ready.playbackState.copy(
+                                progress = 1f,
+                                isPlaying = false,
+                            ),
                     )
                 }
             },
@@ -277,7 +290,10 @@ data class AudioPlaybackUiState(
  */
 sealed interface AudioNoteViewerUiState {
     data object Loading : AudioNoteViewerUiState
-    data class Error(val message: String) : AudioNoteViewerUiState
+
+    data class Error(
+        val message: String,
+    ) : AudioNoteViewerUiState
 
     /**
      * Ready state for audio notes with context and playback status.

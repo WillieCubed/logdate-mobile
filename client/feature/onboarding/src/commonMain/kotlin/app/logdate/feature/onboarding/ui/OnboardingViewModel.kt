@@ -23,7 +23,6 @@ class OnboardingViewModel(
     private val userStateRepository: UserStateRepository,
 //    private val notifier: Notifier,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(OnboardingUiState())
 
     val uiState: StateFlow<OnboardingUiState> =
@@ -40,14 +39,14 @@ class OnboardingViewModel(
                     content = newEntryData.textContent,
                     creationTimestamp = newEntryData.timestamp,
                     lastUpdated = newEntryData.timestamp,
-                )
+                ),
             )
             _uiState.update {
                 it.copy(entrySubmitted = true)
             }
             Napier.d(
                 tag = "OnboardingViewModel",
-                message = "Successfully added entry: $newEntryData"
+                message = "Successfully added entry: $newEntryData",
             )
         }
     }
@@ -82,7 +81,6 @@ class OnboardingViewModel(
     }
 
     fun capturePhoto() {
-
     }
 
     /**

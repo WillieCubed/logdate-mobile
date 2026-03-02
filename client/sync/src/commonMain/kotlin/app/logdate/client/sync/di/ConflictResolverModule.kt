@@ -25,17 +25,18 @@ object SyncQualifiers {
  * Common module providing conflict resolution strategies and sync metadata service.
  * This module is included by all platform-specific sync modules.
  */
-val conflictResolverModule: Module = module {
-    // Conflict resolvers with named qualifiers
-    single<ConflictResolver<Journal>>(named(SyncQualifiers.JOURNAL_CONFLICT_RESOLVER)) {
-        JournalConflictResolver()
-    }
-    single<ConflictResolver<JournalNote>>(named(SyncQualifiers.NOTE_CONFLICT_RESOLVER)) {
-        JournalNoteConflictResolver()
-    }
+val conflictResolverModule: Module =
+    module {
+        // Conflict resolvers with named qualifiers
+        single<ConflictResolver<Journal>>(named(SyncQualifiers.JOURNAL_CONFLICT_RESOLVER)) {
+            JournalConflictResolver()
+        }
+        single<ConflictResolver<JournalNote>>(named(SyncQualifiers.NOTE_CONFLICT_RESOLVER)) {
+            JournalNoteConflictResolver()
+        }
 
-    // Sync metadata service backed by Room database
-    single<SyncMetadataService> {
-        DatabaseSyncMetadataService(get<SyncMetadataDao>())
+        // Sync metadata service backed by Room database
+        single<SyncMetadataService> {
+            DatabaseSyncMetadataService(get<SyncMetadataDao>())
+        }
     }
-}

@@ -1,3 +1,4 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
 @file:OptIn(ExperimentalSharedTransitionApi::class)
 
 package app.logdate.feature.journals.ui.settings
@@ -7,17 +8,12 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.updateTransition
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.expandIn
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -25,13 +21,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
-import app.logdate.ui.common.AspectRatios
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
@@ -66,13 +60,15 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.journals.ui.JournalCover
 import app.logdate.shared.model.Journal
+import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
-import org.koin.compose.viewmodel.koinViewModel
-import kotlin.uuid.Uuid
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.journal.generated.resources.*
 import logdate.client.feature.journal.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
+import kotlin.uuid.Uuid
+
 /**
  * A settings screen that allows a user to change various properties of a journal.
  * Implements scroll behavior that adapts the top app bar to the scroll state.
@@ -92,7 +88,7 @@ fun JournalSettingsScreen(
     LaunchedEffect(journalId) {
         viewModel.setSelectedJournalId(journalId)
     }
-    
+
     // Create a scroll behavior for the top app bar
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
 
@@ -100,7 +96,7 @@ fun JournalSettingsScreen(
         is JournalSettingsUiState.Unknown -> {
             Box(
                 modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Text(stringResource(Res.string.loading))
             }
@@ -108,7 +104,7 @@ fun JournalSettingsScreen(
 
         is JournalSettingsUiState.Loaded -> {
             val loadedState = state as JournalSettingsUiState.Loaded
-            
+
             Scaffold(
                 topBar = {
                     TopAppBar(
@@ -117,102 +113,110 @@ fun JournalSettingsScreen(
                             IconButton(onClick = onGoBack) {
                                 Icon(
                                     Icons.AutoMirrored.Default.ArrowBack,
-                                    contentDescription = stringResource(Res.string.back)
+                                    contentDescription = stringResource(Res.string.back),
                                 )
                             }
                         },
                         actions = {
                             // Show save button with attractive animation when there are unsaved changes
-                            val visibilityState = remember(loadedState.hasUnsavedChanges) {
-                                MutableTransitionState(!loadedState.hasUnsavedChanges).apply {
-                                    targetState = loadedState.hasUnsavedChanges
+                            val visibilityState =
+                                remember(loadedState.hasUnsavedChanges) {
+                                    MutableTransitionState(!loadedState.hasUnsavedChanges).apply {
+                                        targetState = loadedState.hasUnsavedChanges
+                                    }
                                 }
-                            }
-                            
+
                             AnimatedVisibility(
                                 visibleState = visibilityState,
-                                enter = fadeIn(
-                                    animationSpec = tween(150, easing = FastOutSlowInEasing)
-                                ) + scaleIn(
-                                    initialScale = 0.8f,
-                                    animationSpec = spring(
-                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                        stiffness = Spring.StiffnessLow
-                                    )
-                                ),
-                                exit = scaleOut(
-                                    targetScale = 0.8f,
-                                    animationSpec = tween(100)
-                                ) + fadeOut(
-                                    animationSpec = tween(100)
-                                )
+                                enter =
+                                    fadeIn(
+                                        animationSpec = tween(150, easing = FastOutSlowInEasing),
+                                    ) +
+                                        scaleIn(
+                                            initialScale = 0.8f,
+                                            animationSpec =
+                                                spring(
+                                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                    stiffness = Spring.StiffnessLow,
+                                                ),
+                                        ),
+                                exit =
+                                    scaleOut(
+                                        targetScale = 0.8f,
+                                        animationSpec = tween(100),
+                                    ) +
+                                        fadeOut(
+                                            animationSpec = tween(100),
+                                        ),
                             ) {
                                 // Use an IconButton for a cleaner, more compact appearance
                                 IconButton(
-                                    onClick = { 
+                                    onClick = {
                                         viewModel.saveJournalChanges { onGoBack() }
-                                    }
+                                    },
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Save,
-                                        contentDescription = stringResource(Res.string.save_changes)
+                                        contentDescription = stringResource(Res.string.save_changes),
                                     )
                                 }
                             }
                         },
-                        scrollBehavior = scrollBehavior
+                        scrollBehavior = scrollBehavior,
                     )
                 },
-                modifier = Modifier
-                    .applyScreenStyles()
-                    .nestedScroll(scrollBehavior.nestedScrollConnection),
-                contentWindowInsets = WindowInsets(0, 0, 0, 0)
+                modifier =
+                    Modifier
+                        .applyScreenStyles()
+                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
             ) { paddingValues ->
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.lg)
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.lg),
                 ) {
                     // Journal overview section
                     item {
                         JournalOverviewSection(
                             journal = loadedState.journal,
-                            onShareJournal = viewModel::shareJournal
+                            onShareJournal = viewModel::shareJournal,
                         )
                     }
-                    
+
                     // Journal name section
                     item {
                         JournalNameField(
                             journalName = loadedState.editedName,
                             onNameChange = viewModel::updateJournalName,
-                            modifier = Modifier.padding(horizontal = Spacing.lg)
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
                         )
                     }
-                    
+
                     // Journal privacy settings
                     item {
                         JournalPrivacySettings(
-                            modifier = Modifier.padding(horizontal = Spacing.lg)
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
                         )
                     }
-                    
+
                     // Danger zone
                     item {
                         JournalDangerZone(
                             onDeleteClick = { openDeleteConfirmation = true },
-                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)
+                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
                         )
                     }
-                    
+
                     // Add bottom spacing
                     item {
                         Spacer(modifier = Modifier.padding(Spacing.lg))
                     }
                 }
             }
-            
+
             if (openDeleteConfirmation) {
                 DeleteConfirmationDialog(
                     onDismissRequest = { openDeleteConfirmation = false },
@@ -221,7 +225,7 @@ fun JournalSettingsScreen(
                             openDeleteConfirmation = false
                             onJournalDeleted()
                         }
-                    }
+                    },
                 )
             }
         }
@@ -229,23 +233,21 @@ fun JournalSettingsScreen(
 }
 
 @Composable
-private fun JournalPrivacySettings(
-    modifier: Modifier = Modifier,
-) {
+private fun JournalPrivacySettings(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md)
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         Text(
             text = stringResource(Res.string.privacy),
             style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary
+            color = MaterialTheme.colorScheme.primary,
         )
-        
+
         // Privacy settings content would go here
         Text(
             text = stringResource(Res.string.journal_privacy_settings_will_appear_here_in_future_updates),
-            style = MaterialTheme.typography.bodyMedium
+            style = MaterialTheme.typography.bodyMedium,
         )
     }
 }
@@ -257,26 +259,27 @@ private fun JournalDangerZone(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md)
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         Text(
             text = stringResource(Res.string.danger_zone),
             style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.error
+            color = MaterialTheme.colorScheme.error,
         )
-        
+
         ElevatedButton(
             onClick = onDeleteClick,
-            colors = ButtonDefaults.elevatedButtonColors(
-                containerColor = MaterialTheme.colorScheme.errorContainer,
-                contentColor = MaterialTheme.colorScheme.onErrorContainer
-            ),
-            modifier = Modifier.fillMaxWidth()
+            colors =
+                ButtonDefaults.elevatedButtonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                ),
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Icon(
                 imageVector = Icons.Default.Delete,
                 contentDescription = stringResource(Res.string.delete_journal),
-                modifier = Modifier.padding(end = Spacing.sm)
+                modifier = Modifier.padding(end = Spacing.sm),
             )
             Text(stringResource(Res.string.delete_journal))
         }
@@ -291,20 +294,23 @@ private fun JournalOverviewSection(
 ) {
     // Use BoxWithConstraints to create a responsive layout
     BoxWithConstraints(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(Spacing.lg),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(Spacing.lg),
+        contentAlignment = Alignment.Center,
     ) {
         // Calculate the available space
         val availableWidth = maxWidth
-        
+
         // Container with 1:1 aspect ratio
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(AspectRatios.RATIO_1_1), // Using raw ratio since this is just a container
-            contentAlignment = Alignment.Center
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(AspectRatios.RATIO_1_1),
+            // Using raw ratio since this is just a container
+            contentAlignment = Alignment.Center,
         ) {
             // Use Column with space between to position elements
             Column(
@@ -314,33 +320,35 @@ private fun JournalOverviewSection(
             ) {
                 // Journal cover in a constrained box
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                    contentAlignment = Alignment.Center,
                 ) {
                     // Use a fixed width for the cover based on container size
                     JournalCover(
                         journal = journal,
                         // Apply constraints rather than percentage
-                        modifier = Modifier
-                            .widthIn(max = availableWidth - Spacing.xl)
-                            .padding(Spacing.md),
+                        modifier =
+                            Modifier
+                                .widthIn(max = availableWidth - Spacing.xl)
+                                .padding(Spacing.md),
                         elevation = 4.dp,
                     )
                 }
-                
+
                 // Fixed spacing
                 Spacer(modifier = Modifier.padding(Spacing.sm))
-                
+
                 // Button sized to its content
                 ElevatedButton(
-                    onClick = onShareJournal
+                    onClick = onShareJournal,
                 ) {
                     Icon(
                         imageVector = Icons.Default.Share,
                         contentDescription = stringResource(Res.string.share_journal),
-                        modifier = Modifier.padding(end = Spacing.sm)
+                        modifier = Modifier.padding(end = Spacing.sm),
                     )
                     Text(stringResource(Res.string.share_journal))
                 }
@@ -362,9 +370,9 @@ private fun JournalNameField(
         textStyle = MaterialTheme.typography.headlineMedium,
         modifier = modifier.fillMaxWidth(),
         singleLine = true,
-        supportingText = { 
-            Text(stringResource(Res.string.enter_a_descriptive_name_for_your_journal)) 
-        }
+        supportingText = {
+            Text(stringResource(Res.string.enter_a_descriptive_name_for_your_journal))
+        },
     )
 }
 
@@ -377,13 +385,13 @@ private fun JournalNameField(
 @Composable
 fun DeleteConfirmationDialog(
     onDismissRequest: () -> Unit,
-    onConfirmation: () -> Unit
+    onConfirmation: () -> Unit,
 ) {
     AlertDialog(
         icon = {
             Icon(
                 imageVector = Icons.Default.WarningAmber,
-                contentDescription = null
+                contentDescription = null,
             )
         },
         title = {
@@ -391,15 +399,16 @@ fun DeleteConfirmationDialog(
         },
         text = {
             Text(
-                "Are you sure you want to delete this journal? This action cannot be undone and all entries in this journal will be permanently deleted."
+                "Are you sure you want to delete this journal? This action cannot be undone and all entries in this journal will be permanently deleted.",
             )
         },
         confirmButton = {
             TextButton(
                 onClick = onConfirmation,
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error
-                )
+                colors =
+                    ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error,
+                    ),
             ) {
                 Text(stringResource(Res.string.delete))
             }
@@ -409,6 +418,6 @@ fun DeleteConfirmationDialog(
                 Text(stringResource(Res.string.cancel))
             }
         },
-        onDismissRequest = onDismissRequest
+        onDismissRequest = onDismissRequest,
     )
 }

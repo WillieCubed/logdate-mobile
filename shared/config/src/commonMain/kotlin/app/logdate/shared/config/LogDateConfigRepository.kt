@@ -16,11 +16,15 @@ interface LogDateConfigRepository {
     val localServerAddress: StateFlow<String>
 
     suspend fun updateBackendUrl(url: String)
+
     suspend fun updateApiVersion(version: String)
+
     suspend fun updateLocalServerAddress(address: String)
+
     suspend fun resetToDefaults()
 
     fun getCurrentBackendUrl(): String
+
     fun getCurrentApiBaseUrl(): String
 }
 
@@ -30,9 +34,8 @@ interface LogDateConfigRepository {
 class DefaultLogDateConfigRepository(
     initialBackendUrl: String = DEFAULT_BACKEND_URL,
     initialApiVersion: String = DEFAULT_API_VERSION,
-    initialLocalServerAddress: String = DEFAULT_LOCAL_SERVER_ADDRESS
+    initialLocalServerAddress: String = DEFAULT_LOCAL_SERVER_ADDRESS,
 ) : LogDateConfigRepository {
-
     companion object {
         const val DEFAULT_BACKEND_URL = "https://cloud.logdate.app"
         const val DEFAULT_API_VERSION = "v1"
@@ -42,27 +45,29 @@ class DefaultLogDateConfigRepository(
     private val _backendUrl = MutableStateFlow(initialBackendUrl)
     private val _apiVersion = MutableStateFlow(initialApiVersion)
     private val _localServerAddress = MutableStateFlow(initialLocalServerAddress)
-    
+
     override val backendUrl: StateFlow<String> = _backendUrl.asStateFlow()
     override val apiVersion: StateFlow<String> = _apiVersion.asStateFlow()
     override val localServerAddress: StateFlow<String> = _localServerAddress.asStateFlow()
 
-    override val apiBaseUrl: Flow<String> = combine(
-        backendUrl,
-        apiVersion
-    ) { url, version ->
-        "${url.trimEnd('/')}/api/$version"
-    }
-    
+    override val apiBaseUrl: Flow<String> =
+        combine(
+            backendUrl,
+            apiVersion,
+        ) { url, version ->
+            "${url.trimEnd('/')}/api/$version"
+        }
+
     override suspend fun updateBackendUrl(url: String) {
         val cleanUrl = url.trimEnd('/')
-        _backendUrl.value = if (cleanUrl.startsWith("http")) {
-            cleanUrl
-        } else {
-            "https://$cleanUrl"
-        }
+        _backendUrl.value =
+            if (cleanUrl.startsWith("http")) {
+                cleanUrl
+            } else {
+                "https://$cleanUrl"
+            }
     }
-    
+
     override suspend fun updateApiVersion(version: String) {
         _apiVersion.value = version
     }
@@ -76,8 +81,8 @@ class DefaultLogDateConfigRepository(
         _apiVersion.value = DEFAULT_API_VERSION
         _localServerAddress.value = DEFAULT_LOCAL_SERVER_ADDRESS
     }
-    
+
     override fun getCurrentBackendUrl(): String = _backendUrl.value
-    
+
     override fun getCurrentApiBaseUrl(): String = "${getCurrentBackendUrl()}/api/${_apiVersion.value}"
 }

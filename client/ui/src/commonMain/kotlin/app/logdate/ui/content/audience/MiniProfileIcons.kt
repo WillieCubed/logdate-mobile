@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.ui.content.audience
 
 import androidx.compose.foundation.Canvas
@@ -17,9 +19,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.ui.profiles.PersonUiState
 
 @Composable
-fun MiniProfileIcons(
-    people: List<PersonUiState>,
-) {
+fun MiniProfileIcons(people: List<PersonUiState>) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.Start),
         verticalAlignment = Alignment.Top,
@@ -31,18 +31,16 @@ fun MiniProfileIcons(
     }
 }
 
-
 @Composable
-fun MiniProfileIcon(
-    photoUri: String?,
-) {
+fun MiniProfileIcon(photoUri: String?) {
     Canvas(
-        modifier = Modifier
-            .border(width = 2.dp, color = MaterialTheme.colorScheme.onSurface)
-            .padding(2.dp)
-            .size(16.dp)
-            .background(color = MaterialTheme.colorScheme.primaryContainer)
-            .clip(CircleShape)
+        modifier =
+            Modifier
+                .border(width = 2.dp, color = MaterialTheme.colorScheme.onSurface)
+                .padding(2.dp)
+                .size(16.dp)
+                .background(color = MaterialTheme.colorScheme.primaryContainer)
+                .clip(CircleShape),
     ) {
         // TODO: Render profile image
     }

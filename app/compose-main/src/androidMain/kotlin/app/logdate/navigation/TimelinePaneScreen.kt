@@ -22,23 +22,24 @@ import org.koin.compose.viewmodel.koinViewModel
  * @param onOpenSearch Callback for when the user clicks the search icon
  * @param viewModel HomeViewModel that contains timeline data
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun TimelinePaneScreen(
     onNewEntry: () -> Unit,
     onOpenDay: (LocalDate) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit = {},
-    viewModel: HomeViewModel = koinViewModel()
+    viewModel: HomeViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showLocationTimeline by remember { mutableStateOf(false) }
-    
+
     // Location timeline bottom sheet
     LocationTimelineBottomSheet(
         isVisible = showLocationTimeline,
-        onDismiss = { showLocationTimeline = false }
+        onDismiss = { showLocationTimeline = false },
     )
-    
+
     TimelinePane(
         uiState = TimelineUiState(items = uiState.items),
         onNewEntry = onNewEntry,

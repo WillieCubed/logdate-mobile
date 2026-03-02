@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:filename")
+
 package app.logdate.client.intelligence.cache
 
 import io.github.aakira.napier.Napier
@@ -27,7 +29,10 @@ class AndroidAICacheLocalDataSource(
         }.getOrNull()
     }
 
-    override fun set(key: String, entry: GenerativeAICacheEntry) {
+    override fun set(
+        key: String,
+        entry: GenerativeAICacheEntry,
+    ) {
         val file = File(getGenerativeCacheDir(), getRealFilename(key))
         runCatching {
             file.writeText(codec.encode(entry))
@@ -50,9 +55,11 @@ class AndroidAICacheLocalDataSource(
 
     override fun entries(): List<GenerativeAICacheEntry> {
         val cacheDir = getGenerativeCacheDir()
-        val files = cacheDir.listFiles()
-            ?.filter { it.isFile && it.name.endsWith(FILE_SUFFIX) }
-            .orEmpty()
+        val files =
+            cacheDir
+                .listFiles()
+                ?.filter { it.isFile && it.name.endsWith(FILE_SUFFIX) }
+                .orEmpty()
         if (files.isEmpty()) {
             return emptyList()
         }

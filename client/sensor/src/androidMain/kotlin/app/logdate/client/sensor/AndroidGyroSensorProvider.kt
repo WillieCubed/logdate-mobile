@@ -19,31 +19,36 @@ class AndroidGyroSensorProvider(
     private val gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
     private val _currentValue = MutableSharedFlow<GyroOffset>()
 
-    private val gyroscopeListener = object : SensorEventListener {
-        override fun onSensorChanged(event: SensorEvent) {
-            val (x, y) = event.values
-            _currentValue.tryEmit(GyroOffset(x, y))
-        }
+    private val gyroscopeListener =
+        object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                val (x, y) = event.values
+                _currentValue.tryEmit(GyroOffset(x, y))
+            }
 
-        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-            // No-op
+            override fun onAccuracyChanged(
+                sensor: Sensor?,
+                accuracy: Int,
+            ) {
+                // No-op
+            }
         }
-    }
 
     init {
         if (gyroscope != null) {
             sensorManager.registerListener(
                 gyroscopeListener,
                 gyroscope,
-                SensorManager.SENSOR_DELAY_NORMAL
+                SensorManager.SENSOR_DELAY_NORMAL,
             )
         }
     }
 
-    override val currentValue: SharedFlow<GyroOffset> = _currentValue.shareIn(
-        coroutineScope,
-        started = SharingStarted.WhileSubscribed(),
-    )
+    override val currentValue: SharedFlow<GyroOffset> =
+        _currentValue.shareIn(
+            coroutineScope,
+            started = SharingStarted.WhileSubscribed(),
+        )
 
     override fun cleanup() {
         sensorManager.unregisterListener(gyroscopeListener)

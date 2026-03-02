@@ -17,14 +17,12 @@ import androidx.compose.ui.unit.dp
  * @return A modifier with a colored border and background that is clearly visible
  */
 @Composable
-fun Modifier.createTestModifier(): Modifier {
-    return this
+fun Modifier.createTestModifier(): Modifier =
+    this
         .clip(MaterialTheme.shapes.medium)
         .border(
             width = 4.dp,
             color = Color.Red.copy(alpha = 0.7f),
-            shape = MaterialTheme.shapes.medium
-        )
-        .background(Color.Yellow.copy(alpha = 0.2f))
+            shape = MaterialTheme.shapes.medium,
+        ).background(Color.Yellow.copy(alpha = 0.2f))
         .padding(8.dp)
-}

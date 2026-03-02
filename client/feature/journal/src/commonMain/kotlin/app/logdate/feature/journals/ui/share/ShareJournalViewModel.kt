@@ -1,10 +1,12 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.journals.ui.share
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.repository.journals.JournalRepository
-import app.logdate.client.sharing.SharingLauncher
 import app.logdate.client.sharing.ShareTheme
+import app.logdate.client.sharing.SharingLauncher
 import app.logdate.shared.model.Journal
 import app.logdate.util.toReadableDateShort
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -32,46 +34,46 @@ class ShareJournalViewModel(
     private val sharingLauncher: SharingLauncher,
 ) : ViewModel() {
     private val _error = MutableStateFlow<String?>(null)
-    
+
     /**
      * Error state for handling sharing failures
      */
     val error: StateFlow<String?> = _error
-    
+
     // Journal ID to share
-    private val _journalId = MutableStateFlow<Uuid?>(null)
+    private val journalIdState = MutableStateFlow<Uuid?>(null)
 
     /**
      * UI state for the share journal screen
      */
-    val uiState: StateFlow<ShareJournalUiState> = _journalId
-        .filterNotNull()
-        .flatMapLatest { journalId ->
-            journalRepository.observeJournalById(journalId)
-                .map { journal ->
-                    ShareJournalUiState.Success(
-                        journal = journal,
-                        lastUpdatedDisplay = "Last updated ${journal.lastUpdated.toReadableDateShort()}"
-                    ) as ShareJournalUiState
-                }
-        }
-        .catch { error ->
-            _error.value = error.message
-            emit(ShareJournalUiState.Error)
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = ShareJournalUiState.Loading
-        )
-        
+    val uiState: StateFlow<ShareJournalUiState> =
+        journalIdState
+            .filterNotNull()
+            .flatMapLatest { journalId ->
+                journalRepository
+                    .observeJournalById(journalId)
+                    .map { journal ->
+                        ShareJournalUiState.Success(
+                            journal = journal,
+                            lastUpdatedDisplay = "Last updated ${journal.lastUpdated.toReadableDateShort()}",
+                        ) as ShareJournalUiState
+                    }
+            }.catch { error ->
+                _error.value = error.message
+                emit(ShareJournalUiState.Error)
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = ShareJournalUiState.Loading,
+            )
+
     /**
      * Sets the journal ID to be shared
      *
      * @param id The UUID of the journal to share
      */
     fun setJournalId(id: Uuid) {
-        _journalId.value = id
+        journalIdState.value = id
     }
 
     /**
@@ -109,12 +111,12 @@ sealed interface ShareJournalUiState {
      * Loading state while journal data is being fetched
      */
     object Loading : ShareJournalUiState
-    
+
     /**
      * Error state when journal data couldn't be loaded
      */
     object Error : ShareJournalUiState
-    
+
     /**
      * Success state when journal data is loaded and ready to display
      *

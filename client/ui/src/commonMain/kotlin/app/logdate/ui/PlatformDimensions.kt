@@ -2,7 +2,6 @@ package app.logdate.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 
 /**
  * Platform-specific dimensions provider that works across all platforms.
@@ -14,7 +13,7 @@ expect object PlatformDimensions {
      */
     @Composable
     fun getScreenWidth(): Dp
-    
+
     /**
      * Gets the current screen height in dp
      */

@@ -10,6 +10,6 @@ sealed interface JournalListItemUiState {
     data class ExistingJournal(
         val data: Journal,
     ) : JournalListItemUiState
-    
+
     data object CreateJournalPlaceholder : JournalListItemUiState
 }

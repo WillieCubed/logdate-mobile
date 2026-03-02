@@ -22,7 +22,6 @@ import javax.swing.SwingUtilities
  * with platform-specific capabilities or use a library like Yubico's WebAuthn server.
  */
 class DesktopPasskeyManager : PasskeyManager {
-
     /**
      * Creates a new passkey for the given registration options.
      *
@@ -32,39 +31,40 @@ class DesktopPasskeyManager : PasskeyManager {
      * @param options The passkey registration options.
      * @return The result of the passkey creation operation.
      */
-    override suspend fun createPasskey(options: RegistrationOptions): Result<PasskeyRegistrationResult> {
-        return try {
+    override suspend fun createPasskey(options: RegistrationOptions): Result<PasskeyRegistrationResult> =
+        try {
             // Show a confirmation dialog to the user
-            val confirmed = showConfirmationDialog(
-                "Create Passkey",
-                "Would you like to create a passkey for ${options.rpName}?\n" +
-                "Username: ${options.username}\n" +
-                "This will be used to sign in to your account securely without a password."
-            )
-            
+            val confirmed =
+                showConfirmationDialog(
+                    "Create Passkey",
+                    "Would you like to create a passkey for ${options.rpName}?\n" +
+                        "Username: ${options.username}\n" +
+                        "This will be used to sign in to your account securely without a password.",
+                )
+
             if (confirmed) {
                 // Simulate passkey creation with dummy data
                 // In a real implementation, this would use platform-specific APIs
                 val mockCredentialId = "desktop_credential_${System.currentTimeMillis()}"
                 val encodedCredentialId = Base64.getEncoder().encodeToString(mockCredentialId.toByteArray())
-                
+
                 // Create mock response data
                 val mockClientData = createMockClientData(options.challenge, options.rpId)
                 val mockAttestationObject = createMockAttestationObject()
-                
+
                 Result.success(
                     PasskeyRegistrationResult(
                         credentialId = encodedCredentialId,
                         clientDataJSON = mockClientData,
-                        attestationObject = mockAttestationObject
-                    )
+                        attestationObject = mockAttestationObject,
+                    ),
                 )
             } else {
                 Result.failure(
                     PasskeyException(
                         PasskeyErrorCode.USER_CANCELLED,
-                        "User cancelled passkey creation"
-                    )
+                        "User cancelled passkey creation",
+                    ),
                 )
             }
         } catch (e: Exception) {
@@ -73,12 +73,11 @@ class DesktopPasskeyManager : PasskeyManager {
                 PasskeyException(
                     PasskeyErrorCode.UNKNOWN_ERROR,
                     "Failed to create passkey: ${e.message}",
-                    e
-                )
+                    e,
+                ),
             )
         }
-    }
-    
+
     /**
      * Gets a passkey for authentication.
      *
@@ -88,42 +87,43 @@ class DesktopPasskeyManager : PasskeyManager {
      * @param options The authentication options.
      * @return The result of the passkey retrieval operation.
      */
-    override suspend fun getPasskey(options: AuthenticationOptions): Result<PasskeyAuthenticationResult> {
-        return try {
+    override suspend fun getPasskey(options: AuthenticationOptions): Result<PasskeyAuthenticationResult> =
+        try {
             // Show a confirmation dialog to the user
-            val confirmed = showConfirmationDialog(
-                "Sign In with Passkey",
-                "Would you like to sign in to ${options.rpId} with your passkey?\n" +
-                "This will securely authenticate you without using a password."
-            )
-            
+            val confirmed =
+                showConfirmationDialog(
+                    "Sign In with Passkey",
+                    "Would you like to sign in to ${options.rpId} with your passkey?\n" +
+                        "This will securely authenticate you without using a password.",
+                )
+
             if (confirmed) {
                 // Simulate passkey retrieval with dummy data
                 // In a real implementation, this would use platform-specific APIs
                 val mockCredentialId = "desktop_credential_${System.currentTimeMillis()}"
                 val encodedCredentialId = Base64.getEncoder().encodeToString(mockCredentialId.toByteArray())
-                
+
                 // Create mock response data
                 val mockClientData = createMockClientData(options.challenge, options.rpId)
                 val mockAuthenticatorData = createMockAuthenticatorData()
                 val mockSignature = createMockSignature()
                 val mockUserHandle = createMockUserHandle()
-                
+
                 Result.success(
                     PasskeyAuthenticationResult(
                         credentialId = encodedCredentialId,
                         clientDataJSON = mockClientData,
                         authenticatorData = mockAuthenticatorData,
                         signature = mockSignature,
-                        userHandle = mockUserHandle
-                    )
+                        userHandle = mockUserHandle,
+                    ),
                 )
             } else {
                 Result.failure(
                     PasskeyException(
                         PasskeyErrorCode.USER_CANCELLED,
-                        "User cancelled passkey authentication"
-                    )
+                        "User cancelled passkey authentication",
+                    ),
                 )
             }
         } catch (e: Exception) {
@@ -132,12 +132,11 @@ class DesktopPasskeyManager : PasskeyManager {
                 PasskeyException(
                     PasskeyErrorCode.UNKNOWN_ERROR,
                     "Failed to get passkey: ${e.message}",
-                    e
-                )
+                    e,
+                ),
             )
         }
-    }
-    
+
     /**
      * Checks if passkey authentication is supported on this device.
      *
@@ -148,7 +147,7 @@ class DesktopPasskeyManager : PasskeyManager {
         // In a real app, you'd check for actual platform support
         return true
     }
-    
+
     /**
      * Shows a confirmation dialog to the user.
      *
@@ -156,9 +155,12 @@ class DesktopPasskeyManager : PasskeyManager {
      * @param message The dialog message.
      * @return True if the user confirmed, false otherwise.
      */
-    private fun showConfirmationDialog(title: String, message: String): Boolean {
+    private fun showConfirmationDialog(
+        title: String,
+        message: String,
+    ): Boolean {
         var result = false
-        
+
         try {
             // Ensure we're on the event dispatch thread
             if (SwingUtilities.isEventDispatchThread()) {
@@ -166,7 +168,7 @@ class DesktopPasskeyManager : PasskeyManager {
                     null,
                     message,
                     title,
-                    JOptionPane.YES_NO_OPTION
+                    JOptionPane.YES_NO_OPTION,
                 ) == JOptionPane.YES_OPTION
             } else {
                 // Execute synchronously on the event dispatch thread
@@ -175,7 +177,7 @@ class DesktopPasskeyManager : PasskeyManager {
                         null,
                         message,
                         title,
-                        JOptionPane.YES_NO_OPTION
+                        JOptionPane.YES_NO_OPTION,
                     ) == JOptionPane.YES_OPTION
                 }
             }
@@ -183,23 +185,27 @@ class DesktopPasskeyManager : PasskeyManager {
             Napier.e("Error showing confirmation dialog", e)
             // Default to false on error
         }
-        
+
         return result
     }
-    
+
     /**
      * Creates mock client data for WebAuthn operations.
      */
-    private fun createMockClientData(challenge: String, rpId: String): String {
-        val clientData = buildJsonObject {
-            put("type", "webauthn.create")
-            put("challenge", challenge)
-            put("origin", "https://$rpId")
-        }.toString()
+    private fun createMockClientData(
+        challenge: String,
+        rpId: String,
+    ): String {
+        val clientData =
+            buildJsonObject {
+                put("type", "webauthn.create")
+                put("challenge", challenge)
+                put("origin", "https://$rpId")
+            }.toString()
 
         return Base64.getEncoder().encodeToString(clientData.toByteArray())
     }
-    
+
     /**
      * Creates a mock attestation object for WebAuthn registration.
      */
@@ -208,7 +214,7 @@ class DesktopPasskeyManager : PasskeyManager {
         val mockData = "mockAttestationObject${System.currentTimeMillis()}"
         return Base64.getEncoder().encodeToString(mockData.toByteArray())
     }
-    
+
     /**
      * Creates mock authenticator data for WebAuthn authentication.
      */
@@ -217,7 +223,7 @@ class DesktopPasskeyManager : PasskeyManager {
         val mockData = "mockAuthenticatorData${System.currentTimeMillis()}"
         return Base64.getEncoder().encodeToString(mockData.toByteArray())
     }
-    
+
     /**
      * Creates a mock signature for WebAuthn authentication.
      */
@@ -226,7 +232,7 @@ class DesktopPasskeyManager : PasskeyManager {
         val mockData = "mockSignature${System.currentTimeMillis()}"
         return Base64.getEncoder().encodeToString(mockData.toByteArray())
     }
-    
+
     /**
      * Creates a mock user handle for WebAuthn authentication.
      */

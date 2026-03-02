@@ -13,9 +13,7 @@ fun NavController.navigateToProfile() {
     navigate(ProfileRoute)
 }
 
-fun NavGraphBuilder.profileRoute(
-    onGoBack: () -> Unit,
-) {
+fun NavGraphBuilder.profileRoute(onGoBack: () -> Unit) {
     composable<ProfileRoute> {
         ProfileScreen(onBack = onGoBack)
     }

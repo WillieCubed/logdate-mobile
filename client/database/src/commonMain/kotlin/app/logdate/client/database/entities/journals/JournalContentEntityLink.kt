@@ -20,13 +20,13 @@ import kotlin.uuid.Uuid
             entity = JournalEntity::class,
             parentColumns = ["id"],
             childColumns = ["journal_id"],
-            onDelete = ForeignKey.CASCADE
-        )
+            onDelete = ForeignKey.CASCADE,
+        ),
     ],
     indices = [
         Index(value = ["journal_id"]),
-        Index(value = ["content_id"])
-    ]
+        Index(value = ["content_id"]),
+    ],
 )
 data class JournalContentEntityLink(
     /**
@@ -34,13 +34,11 @@ data class JournalContentEntityLink(
      */
     @ColumnInfo(name = "journal_id")
     val journalId: Uuid,
-    
     /**
      * The UID of the content in this journal.
      */
     @ColumnInfo(name = "content_id")
     val contentId: Uuid,
-    
     /**
      * Sync metadata for tracking changes to this association.
      */

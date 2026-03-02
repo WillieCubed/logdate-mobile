@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.ui.timeline
 
 import androidx.compose.foundation.background
@@ -20,10 +22,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import coil3.compose.AsyncImage
-import androidx.compose.ui.tooling.preview.Preview
 
 /**
  * The UI state for [SpecialMessageSection]
@@ -62,20 +64,21 @@ fun SpecialMessageSection(
 ) {
     Column(
         modifier = modifier.padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg)
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         SpecialMessagePreviewCarousel(
             mediaUris = uiState.mediaUris,
-            onDismiss = onDismiss
+            onDismiss = onDismiss,
         )
         Text(uiState.title, style = MaterialTheme.typography.titleLarge)
         FilledTonalButton(onClick = onOpen) {
             Icon(
                 Icons.Default.Celebration,
                 contentDescription = null,
-                modifier = Modifier.Companion
-                    .size(24.dp)
-                    .padding(end = Spacing.sm)
+                modifier =
+                    Modifier.Companion
+                        .size(24.dp)
+                        .padding(end = Spacing.sm),
             )
             Text(uiState.actionText)
         }
@@ -91,10 +94,11 @@ internal fun SpecialMessagePreviewCarousel(
     onDismiss: () -> Unit,
 ) {
     Box(
-        modifier = Modifier
-            .aspectRatio(4 / 5f)
-            .clip(MaterialTheme.shapes.medium)
-            .background(MaterialTheme.colorScheme.tertiaryContainer)
+        modifier =
+            Modifier
+                .aspectRatio(4 / 5f)
+                .clip(MaterialTheme.shapes.medium)
+                .background(MaterialTheme.colorScheme.tertiaryContainer),
     ) {
         // TODO: Maybe turn into interactive-ish carousel, support animations/video
         AsyncImage(
@@ -117,10 +121,11 @@ internal fun SpecialMessagePreviewCarousel(
 @Preview
 @Composable
 private fun SpecialMessageSectionPreview() {
-    val messageUiState = SpecialMessageUiState(
-        title = "A few of your friends had some special messages for you.",
-        actionText = "Take a peek",
-    )
+    val messageUiState =
+        SpecialMessageUiState(
+            title = "A few of your friends had some special messages for you.",
+            actionText = "Take a peek",
+        )
     Surface {
         SpecialMessageSection(
             uiState = messageUiState,

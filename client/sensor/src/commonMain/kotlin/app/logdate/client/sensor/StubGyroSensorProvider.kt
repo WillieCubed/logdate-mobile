@@ -11,14 +11,15 @@ import kotlinx.coroutines.flow.shareIn
  * This can be used on platforms where gyroscope access is not yet implemented.
  */
 class StubGyroSensorProvider(
-    coroutineScope: CoroutineScope
+    coroutineScope: CoroutineScope,
 ) : GyroSensorProvider {
     private val _currentValue = MutableSharedFlow<GyroOffset>()
 
-    override val currentValue: SharedFlow<GyroOffset> = _currentValue.shareIn(
-        coroutineScope,
-        started = SharingStarted.WhileSubscribed(),
-    )
+    override val currentValue: SharedFlow<GyroOffset> =
+        _currentValue.shareIn(
+            coroutineScope,
+            started = SharingStarted.WhileSubscribed(),
+        )
 
     override fun cleanup() {
         // No-op for stub implementation

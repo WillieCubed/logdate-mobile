@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.feature.timeline.ui.details
 
 import androidx.compose.foundation.border
@@ -12,9 +14,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.timeline.generated.resources.*
 import logdate.client.feature.timeline.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+
 /**
  * A summary of the events that occurred on a given day.
  */
@@ -29,14 +32,14 @@ internal fun TldrSection(
     ) {
         Text(stringResource(Res.string.tl_dr), style = MaterialTheme.typography.titleSmall)
         Box(
-            modifier = Modifier
-                .border(
-                    1.dp,
-                    MaterialTheme.colorScheme.outlineVariant,
-                    shape = MaterialTheme.shapes.medium,
-                )
-                .padding(Spacing.lg)
-                .fillMaxWidth(),
+            modifier =
+                Modifier
+                    .border(
+                        1.dp,
+                        MaterialTheme.colorScheme.outlineVariant,
+                        shape = MaterialTheme.shapes.medium,
+                    ).padding(Spacing.lg)
+                    .fillMaxWidth(),
         ) {
             Text(content, style = MaterialTheme.typography.bodyMedium)
         }

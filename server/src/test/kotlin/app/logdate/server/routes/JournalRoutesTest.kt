@@ -11,15 +11,15 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class JournalRoutesTest {
-
     @Test
-    fun testJournalRoutesAreNotExposed() = testApplication {
-        application { module() }
+    fun testJournalRoutesAreNotExposed() =
+        testApplication {
+            application { module() }
 
-        assertEquals(HttpStatusCode.NotFound, client.get("/api/v1/journals").status)
-        assertEquals(HttpStatusCode.NotFound, client.get("/api/v1/journals/test").status)
-        assertEquals(HttpStatusCode.NotFound, client.post("/api/v1/journals").status)
-        assertEquals(HttpStatusCode.NotFound, client.put("/api/v1/journals/test").status)
-        assertEquals(HttpStatusCode.NotFound, client.delete("/api/v1/journals/test").status)
-    }
+            assertEquals(HttpStatusCode.NotFound, client.get("/api/v1/journals").status)
+            assertEquals(HttpStatusCode.NotFound, client.get("/api/v1/journals/test").status)
+            assertEquals(HttpStatusCode.NotFound, client.post("/api/v1/journals").status)
+            assertEquals(HttpStatusCode.NotFound, client.put("/api/v1/journals/test").status)
+            assertEquals(HttpStatusCode.NotFound, client.delete("/api/v1/journals/test").status)
+        }
 }

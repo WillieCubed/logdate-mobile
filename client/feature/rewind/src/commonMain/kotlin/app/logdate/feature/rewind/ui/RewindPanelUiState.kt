@@ -5,7 +5,7 @@ import kotlin.uuid.Uuid
 
 /**
  * Base interface for all rewind panel UI states.
- * 
+ *
  * This sealed interface represents the various types of panels that can be displayed
  * in a rewind story, each with specific content and display requirements.
  */
@@ -15,7 +15,7 @@ sealed interface RewindPanelUiState {
 
 /**
  * UI state for a panel with basic text content.
- * 
+ *
  * Represents a simple panel with centered text and customizable background.
  * Ideal for introductory or concluding panels in a rewind story.
  *
@@ -24,12 +24,12 @@ sealed interface RewindPanelUiState {
  */
 data class BasicTextRewindPanelUiState(
     val text: String,
-    val background: RewindPanelBackgroundSpec = RewindPanelBackgroundSpec()
+    val background: RewindPanelBackgroundSpec = RewindPanelBackgroundSpec(),
 ) : RewindPanelUiState
 
 /**
  * UI state for a panel with title and subtitle.
- * 
+ *
  * Represents a panel with hierarchical text content - a prominent title and
  * supporting subtitle text. Optional background image for visual interest.
  *
@@ -40,12 +40,12 @@ data class BasicTextRewindPanelUiState(
 data class SubtitledRewindPanelUiState(
     val title: String,
     val subtitle: String,
-    val backgroundUri: String? = null
+    val backgroundUri: String? = null,
 ) : RewindPanelUiState
 
 /**
  * UI state for a panel displaying a significant statistic.
- * 
+ *
  * Represents a panel highlighting an important numerical value with context.
  * Designed for metrics and achievements in the rewind story.
  *
@@ -60,16 +60,16 @@ data class BigStatisticRewindPanelUiState(
     val statistic: String,
     val units: String,
     val description: String,
-    val background: RewindPanelBackgroundSpec = RewindPanelBackgroundSpec()
+    val background: RewindPanelBackgroundSpec = RewindPanelBackgroundSpec(),
 ) : RewindPanelUiState
 
 /**
  * UI state for a panel displaying a text note.
- * 
+ *
  * Represents a panel showing journal text content with date information.
  *
  * @property sourceId Unique identifier of the original note
- * @property timestamp When the note was created 
+ * @property timestamp When the note was created
  * @property content The text content from the journal note
  * @property dateFormatted Formatted date string showing when the note was created
  * @property background Background styling information
@@ -79,14 +79,15 @@ data class TextNoteRewindPanelUiState(
     val timestamp: Instant,
     val content: String,
     val dateFormatted: String,
-    val background: RewindPanelBackgroundSpec = RewindPanelBackgroundSpec(
-        color = 0xFF1A1A1A // Dark gray background by default
-    )
+    val background: RewindPanelBackgroundSpec =
+        RewindPanelBackgroundSpec(
+            color = 0xFF1A1A1A, // Dark gray background by default
+        ),
 ) : RewindPanelUiState
 
 /**
  * UI state for a panel displaying an image note.
- * 
+ *
  * Represents a panel showing a photo with optional caption and date information.
  *
  * @property sourceId Unique identifier of the original image
@@ -100,7 +101,7 @@ data class ImageRewindPanelUiState(
     val timestamp: Instant,
     val imageUri: String,
     val caption: String? = null,
-    val dateFormatted: String
+    val dateFormatted: String,
 ) : RewindPanelUiState
 
 /**
@@ -120,7 +121,7 @@ data class NarrativeContextRewindPanelUiState(
     val sourceId: Uuid,
     val timestamp: Instant,
     val contextText: String,
-    val backgroundImageUri: String? = null
+    val backgroundImageUri: String? = null,
 ) : RewindPanelUiState
 
 /**
@@ -138,7 +139,7 @@ data class NarrativeContextRewindPanelUiState(
 data class TransitionRewindPanelUiState(
     val sourceId: Uuid,
     val timestamp: Instant,
-    val transitionText: String
+    val transitionText: String,
 ) : RewindPanelUiState
 
 /**
@@ -152,7 +153,7 @@ data class TransitionRewindPanelUiState(
  */
 data class RewindPanelBackgroundSpec(
     val color: Long? = null,
-    val uri: String? = null
+    val uri: String? = null,
 )
 
 /**

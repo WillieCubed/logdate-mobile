@@ -5,24 +5,28 @@ import app.logdate.server.passkeys.StoredPasskeyData
 import app.logdate.server.util.toKotlinInstant
 import app.logdate.server.util.toKotlinxInstant
 import app.logdate.shared.model.PasskeyInfo
-import kotlin.time.Clock
-import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.ResultRow
+import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
+import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class)
 class PostgreSQLPasskeyRepository : PasskeyRepository {
-    
     override suspend fun storePasskey(
         userId: Uuid,
         credentialId: String,
         publicKey: ByteArray,
         signCount: Long,
-        info: PasskeyInfo
-    ): Boolean {
-        return try {
+        info: PasskeyInfo,
+    ): Boolean =
+        try {
             transaction {
                 PasskeysTable.insert {
                     it[id] = info.id.toJavaUUID()
@@ -42,125 +46,126 @@ class PostgreSQLPasskeyRepository : PasskeyRepository {
         } catch (e: Exception) {
             false
         }
-    }
-    
-    override suspend fun getPasskeyByCredentialId(credentialId: String): Pair<Uuid, StoredPasskeyData>? {
-        return transaction {
-            PasskeysTable.selectAll()
+
+    override suspend fun getPasskeyByCredentialId(credentialId: String): Pair<Uuid, StoredPasskeyData>? =
+        transaction {
+            PasskeysTable
+                .selectAll()
                 .where { PasskeysTable.credentialId eq credentialId }
                 .singleOrNull()
                 ?.let { row ->
                     val userId = row[PasskeysTable.accountId].toKotlinUuid()
-                    val storedData = StoredPasskeyData(
-                        credentialId = row[PasskeysTable.credentialId],
-                        publicKey = row[PasskeysTable.publicKey].toByteArray(), // Convert back to bytes
-                        signCount = row[PasskeysTable.signCount],
-                        info = row.toPasskeyInfo(),
-                        userId = userId
-                    )
+                    val storedData =
+                        StoredPasskeyData(
+                            credentialId = row[PasskeysTable.credentialId],
+                            publicKey = row[PasskeysTable.publicKey].toByteArray(), // Convert back to bytes
+                            signCount = row[PasskeysTable.signCount],
+                            info = row.toPasskeyInfo(),
+                            userId = userId,
+                        )
                     userId to storedData
                 }
         }
-    }
-    
-    override suspend fun getPasskeysForUser(userId: Uuid): List<PasskeyInfo> {
-        return transaction {
-            PasskeysTable.selectAll()
+
+    override suspend fun getPasskeysForUser(userId: Uuid): List<PasskeyInfo> =
+        transaction {
+            PasskeysTable
+                .selectAll()
                 .where { (PasskeysTable.accountId eq userId.toJavaUUID()) and (PasskeysTable.isActive eq true) }
                 .orderBy(PasskeysTable.lastUsedAt, SortOrder.DESC)
                 .map { it.toPasskeyInfo() }
         }
-    }
-    
-    override suspend fun updateSignCount(credentialId: String, newSignCount: Long): Boolean {
-        return transaction {
-            val updatedRows = PasskeysTable.update({ PasskeysTable.credentialId eq credentialId }) {
-                it[signCount] = newSignCount
-                it[lastUsedAt] = Clock.System.now()
-            }
+
+    override suspend fun updateSignCount(
+        credentialId: String,
+        newSignCount: Long,
+    ): Boolean =
+        transaction {
+            val updatedRows =
+                PasskeysTable.update({ PasskeysTable.credentialId eq credentialId }) {
+                    it[signCount] = newSignCount
+                    it[lastUsedAt] = Clock.System.now()
+                }
             updatedRows > 0
         }
-    }
-    
-    override suspend fun deactivatePasskey(credentialId: String, userId: Uuid): Boolean {
-        return transaction {
-            val updatedRows = PasskeysTable.update({ 
-                (PasskeysTable.credentialId eq credentialId) and (PasskeysTable.accountId eq userId.toJavaUUID())
-            }) {
-                it[isActive] = false
-            }
+
+    override suspend fun deactivatePasskey(
+        credentialId: String,
+        userId: Uuid,
+    ): Boolean =
+        transaction {
+            val updatedRows =
+                PasskeysTable.update({
+                    (PasskeysTable.credentialId eq credentialId) and (PasskeysTable.accountId eq userId.toJavaUUID())
+                }) {
+                    it[isActive] = false
+                }
             updatedRows > 0
         }
-    }
-    
-    override suspend fun getCredentialIdsForUser(userId: Uuid): List<String> {
-        return transaction {
-            PasskeysTable.selectAll()
+
+    override suspend fun getCredentialIdsForUser(userId: Uuid): List<String> =
+        transaction {
+            PasskeysTable
+                .selectAll()
                 .where { (PasskeysTable.accountId eq userId.toJavaUUID()) and (PasskeysTable.isActive eq true) }
                 .map { it[PasskeysTable.credentialId] }
         }
-    }
-    
-    override suspend fun credentialExists(credentialId: String): Boolean {
-        return transaction {
-            PasskeysTable.selectAll()
+
+    override suspend fun credentialExists(credentialId: String): Boolean =
+        transaction {
+            PasskeysTable
+                .selectAll()
                 .where { PasskeysTable.credentialId eq credentialId }
                 .count() > 0
         }
-    }
-    
+
     // Additional utility methods for internal use
-    suspend fun findById(passkeyId: Uuid): PasskeyInfo? {
-        return transaction {
-            PasskeysTable.selectAll()
+    suspend fun findById(passkeyId: Uuid): PasskeyInfo? =
+        transaction {
+            PasskeysTable
+                .selectAll()
                 .where { PasskeysTable.id eq passkeyId.toJavaUUID() }
                 .singleOrNull()
                 ?.toPasskeyInfo()
         }
-    }
-    
-    suspend fun findByCredentialId(credentialId: String): PasskeyInfo? {
-        return transaction {
-            PasskeysTable.selectAll()
+
+    suspend fun findByCredentialId(credentialId: String): PasskeyInfo? =
+        transaction {
+            PasskeysTable
+                .selectAll()
                 .where { PasskeysTable.credentialId eq credentialId }
                 .singleOrNull()
                 ?.toPasskeyInfo()
         }
-    }
-    
-    suspend fun findByAccountId(accountId: Uuid): List<PasskeyInfo> {
-        return transaction {
-            PasskeysTable.selectAll()
+
+    suspend fun findByAccountId(accountId: Uuid): List<PasskeyInfo> =
+        transaction {
+            PasskeysTable
+                .selectAll()
                 .where { PasskeysTable.accountId eq accountId.toJavaUUID() }
                 .orderBy(PasskeysTable.createdAt, SortOrder.DESC)
                 .map { it.toPasskeyInfo() }
         }
-    }
-    
-    suspend fun findActiveByAccountId(accountId: Uuid): List<PasskeyInfo> {
-        return getPasskeysForUser(accountId)
-    }
-    
-    suspend fun updateLastUsed(credentialId: String): Boolean {
-        return transaction {
-            val updatedRows = PasskeysTable.update({ PasskeysTable.credentialId eq credentialId }) {
-                it[lastUsedAt] = Clock.System.now()
-            }
+
+    suspend fun findActiveByAccountId(accountId: Uuid): List<PasskeyInfo> = getPasskeysForUser(accountId)
+
+    suspend fun updateLastUsed(credentialId: String): Boolean =
+        transaction {
+            val updatedRows =
+                PasskeysTable.update({ PasskeysTable.credentialId eq credentialId }) {
+                    it[lastUsedAt] = Clock.System.now()
+                }
             updatedRows > 0
         }
-    }
-    
-    suspend fun deletePasskey(passkeyId: Uuid): Boolean {
-        return transaction {
+
+    suspend fun deletePasskey(passkeyId: Uuid): Boolean =
+        transaction {
             val deletedRows = PasskeysTable.deleteWhere { id eq passkeyId.toJavaUUID() }
             deletedRows > 0
         }
-    }
-    
-    suspend fun getCredentialIdsForAccount(accountId: Uuid): List<String> {
-        return getCredentialIdsForUser(accountId)
-    }
-    
+
+    suspend fun getCredentialIdsForAccount(accountId: Uuid): List<String> = getCredentialIdsForUser(accountId)
+
     /**
      * Save a passkey with additional WebAuthn data (public key, sign count, etc.)
      * This is used by the WebAuthn service to store cryptographic data.
@@ -170,9 +175,9 @@ class PostgreSQLPasskeyRepository : PasskeyRepository {
         passkey: PasskeyInfo,
         publicKey: String,
         signCount: Long,
-        webauthnData: String = "{}"
-    ): PasskeyInfo {
-        return transaction {
+        webauthnData: String = "{}",
+    ): PasskeyInfo =
+        transaction {
             PasskeysTable.insert {
                 it[id] = passkey.id.toJavaUUID()
                 it[this.accountId] = accountId.toJavaUUID()
@@ -188,35 +193,33 @@ class PostgreSQLPasskeyRepository : PasskeyRepository {
             }
             passkey
         }
-    }
-    
+
     /**
      * Get the stored public key and sign count for a credential
      */
-    suspend fun getWebAuthnData(credentialId: String): Triple<String, Long, String>? {
-        return transaction {
-            PasskeysTable.selectAll()
+    suspend fun getWebAuthnData(credentialId: String): Triple<String, Long, String>? =
+        transaction {
+            PasskeysTable
+                .selectAll()
                 .where { PasskeysTable.credentialId eq credentialId }
                 .singleOrNull()
                 ?.let { row ->
                     Triple(
                         row[PasskeysTable.publicKey],
                         row[PasskeysTable.signCount],
-                        row[PasskeysTable.webauthnData]
+                        row[PasskeysTable.webauthnData],
                     )
                 }
         }
-    }
-    
-    private fun ResultRow.toPasskeyInfo(): PasskeyInfo {
-        return PasskeyInfo(
+
+    private fun ResultRow.toPasskeyInfo(): PasskeyInfo =
+        PasskeyInfo(
             id = this[PasskeysTable.id].toKotlinUuid(),
             credentialId = this[PasskeysTable.credentialId],
             nickname = this[PasskeysTable.nickname],
             deviceType = this[PasskeysTable.deviceType],
             createdAt = this[PasskeysTable.createdAt].toKotlinInstant(),
             lastUsedAt = this[PasskeysTable.lastUsedAt]?.toKotlinInstant(),
-            isActive = this[PasskeysTable.isActive]
+            isActive = this[PasskeysTable.isActive],
         )
-    }
 }

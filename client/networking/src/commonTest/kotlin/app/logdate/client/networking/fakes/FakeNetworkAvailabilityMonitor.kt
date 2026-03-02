@@ -26,11 +26,11 @@ import kotlin.time.Clock
  * // Set up specific network state
  * val monitor = FakeNetworkAvailabilityMonitor()
  * monitor.setNetworkAvailable(false)
- * 
+ *
  * // Emit state changes
  * monitor.emitConnected()
  * monitor.emitDisconnected()
- * 
+ *
  * // Verify interactions
  * assertEquals(2, monitor.observeNetworkCalls)
  * ```
@@ -46,43 +46,42 @@ import kotlin.time.Clock
  * @see app.logdate.client.networking.NetworkState
  */
 class FakeNetworkAvailabilityMonitor : NetworkAvailabilityMonitor {
-    
-    private val _networkState = MutableSharedFlow<NetworkState>()
-    
+    private val networkStateFlow = MutableSharedFlow<NetworkState>()
+
     // Configurable network availability state
     var isAvailable: Boolean = true
-    
+
     // Track method calls for verification
     var isNetworkAvailableCalls = 0
     var observeNetworkCalls = 0
-    
+
     override fun isNetworkAvailable(): Boolean {
         isNetworkAvailableCalls++
         return isAvailable
     }
-    
+
     override fun observeNetwork(): SharedFlow<NetworkState> {
         observeNetworkCalls++
-        return _networkState
+        return networkStateFlow
     }
-    
+
     // Test utilities
     suspend fun emitNetworkState(state: NetworkState) {
-        _networkState.emit(state)
+        networkStateFlow.emit(state)
     }
-    
+
     suspend fun emitConnected() {
-        _networkState.emit(NetworkState.Connected(Clock.System.now()))
+        networkStateFlow.emit(NetworkState.Connected(Clock.System.now()))
     }
-    
+
     suspend fun emitDisconnected() {
-        _networkState.emit(NetworkState.NotConnected(Clock.System.now()))
+        networkStateFlow.emit(NetworkState.NotConnected(Clock.System.now()))
     }
-    
+
     fun setNetworkAvailable(available: Boolean) {
         isAvailable = available
     }
-    
+
     fun clear() {
         isAvailable = true
         isNetworkAvailableCalls = 0

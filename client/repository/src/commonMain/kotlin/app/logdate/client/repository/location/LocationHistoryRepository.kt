@@ -8,40 +8,39 @@ import kotlin.time.Instant
  * Repository for managing location history and logging.
  */
 interface LocationHistoryRepository {
-    
     /**
      * Gets all location history, ordered by most recent first.
      */
     suspend fun getAllLocationHistory(): List<LocationHistoryItem>
-    
+
     /**
      * Observes all location history.
      */
     fun observeLocationHistory(): Flow<List<LocationHistoryItem>>
-    
+
     /**
      * Gets recent location history with a limit.
      */
     suspend fun getRecentLocationHistory(limit: Int = 50): List<LocationHistoryItem>
-    
+
     /**
      * Gets location history between two timestamps.
      */
     suspend fun getLocationHistoryBetween(
-        startTime: Instant, 
-        endTime: Instant
+        startTime: Instant,
+        endTime: Instant,
     ): List<LocationHistoryItem>
-    
+
     /**
      * Gets the most recent location.
      */
     suspend fun getLastLocation(): LocationHistoryItem?
-    
+
     /**
      * Observes the most recent location.
      */
     fun observeLastLocation(): Flow<LocationHistoryItem?>
-    
+
     /**
      * Logs a new location entry.
      */
@@ -50,26 +49,26 @@ interface LocationHistoryRepository {
         userId: String,
         deviceId: String,
         confidence: Float = 1.0f,
-        isGenuine: Boolean = true
+        isGenuine: Boolean = true,
     ): Result<Unit>
-    
+
     /**
      * Deletes a specific location entry.
      */
     suspend fun deleteLocationEntry(
         userId: String,
         deviceId: String,
-        timestamp: Instant
+        timestamp: Instant,
     ): Result<Unit>
-    
+
     /**
      * Deletes location entries within a time range.
      */
     suspend fun deleteLocationsBetween(
         startTime: Instant,
-        endTime: Instant
+        endTime: Instant,
     ): Result<Unit>
-    
+
     /**
      * Gets total count of location entries.
      */
@@ -85,5 +84,5 @@ data class LocationHistoryItem(
     val timestamp: Instant,
     val location: Location,
     val confidence: Float,
-    val isGenuine: Boolean
+    val isGenuine: Boolean,
 )

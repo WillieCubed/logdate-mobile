@@ -20,68 +20,75 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class AuthRoutesTest {
-
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
-    fun testUsernameAvailability() = testApplication {
-        application { module() }
+    fun testUsernameAvailability() =
+        testApplication {
+            application { module() }
 
-        val response = client.get("/api/v1/accounts/username/testuser/available")
-        assertEquals(HttpStatusCode.OK, response.status)
+            val response = client.get("/api/v1/accounts/username/testuser/available")
+            assertEquals(HttpStatusCode.OK, response.status)
 
-        val responseBody = json.parseToJsonElement(response.bodyAsText()).jsonObject
-        val data = responseBody["data"]?.jsonObject
-        assertNotNull(data)
-        assertEquals("testuser", data["username"]?.jsonPrimitive?.content)
-        val available = data["available"]?.jsonPrimitive?.content?.toBoolean() ?: false
-        assertTrue(available)
-    }
-
-    @Test
-    fun testUsernameAvailabilityValidation() = testApplication {
-        application { module() }
-
-        val response = client.get("/api/v1/accounts/username/a/available")
-        assertEquals(HttpStatusCode.BadRequest, response.status)
-    }
-
-    @Test
-    fun testRefreshWithInvalidToken() = testApplication {
-        application { module() }
-
-        val response = client.post("/api/v1/accounts/refresh") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"refreshToken":"invalid"}""")
+            val responseBody = json.parseToJsonElement(response.bodyAsText()).jsonObject
+            val data = responseBody["data"]?.jsonObject
+            assertNotNull(data)
+            assertEquals("testuser", data["username"]?.jsonPrimitive?.content)
+            val available = data["available"]?.jsonPrimitive?.content?.toBoolean() ?: false
+            assertTrue(available)
         }
 
-        assertEquals(HttpStatusCode.Unauthorized, response.status)
-    }
-
     @Test
-    fun testGetAccountWithoutToken() = testApplication {
-        application { module() }
+    fun testUsernameAvailabilityValidation() =
+        testApplication {
+            application { module() }
 
-        val response = client.get("/api/v1/accounts/me")
-        assertEquals(HttpStatusCode.Unauthorized, response.status)
-    }
-
-    @Test
-    fun testUpdateAccountWithoutToken() = testApplication {
-        application { module() }
-
-        val response = client.put("/api/v1/accounts/me") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"displayName":"Test"}""")
+            val response = client.get("/api/v1/accounts/username/a/available")
+            assertEquals(HttpStatusCode.BadRequest, response.status)
         }
-        assertEquals(HttpStatusCode.Unauthorized, response.status)
-    }
 
     @Test
-    fun testDeletePasskeyWithoutToken() = testApplication {
-        application { module() }
+    fun testRefreshWithInvalidToken() =
+        testApplication {
+            application { module() }
 
-        val response = client.delete("/api/v1/accounts/me/passkeys/test-credential")
-        assertEquals(HttpStatusCode.Unauthorized, response.status)
-    }
+            val response =
+                client.post("/api/v1/accounts/refresh") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"refreshToken":"invalid"}""")
+                }
+
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }
+
+    @Test
+    fun testGetAccountWithoutToken() =
+        testApplication {
+            application { module() }
+
+            val response = client.get("/api/v1/accounts/me")
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }
+
+    @Test
+    fun testUpdateAccountWithoutToken() =
+        testApplication {
+            application { module() }
+
+            val response =
+                client.put("/api/v1/accounts/me") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"displayName":"Test"}""")
+                }
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }
+
+    @Test
+    fun testDeletePasskeyWithoutToken() =
+        testApplication {
+            application { module() }
+
+            val response = client.delete("/api/v1/accounts/me/passkeys/test-credential")
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }
 }

@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.feature.timeline.ui
 
 import androidx.compose.animation.AnimatedContent
@@ -45,13 +47,12 @@ import app.logdate.util.toReadableDateShort
 import app.logdate.util.weeksAgo
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownTypography
-import kotlin.time.Clock
 import kotlinx.datetime.DatePeriod
-import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
+import logdate.client.feature.timeline.generated.resources.*
 import logdate.client.feature.timeline.generated.resources.Res
 import logdate.client.feature.timeline.generated.resources.period_last_week
 import logdate.client.feature.timeline.generated.resources.period_months_ago
@@ -60,9 +61,11 @@ import logdate.client.feature.timeline.generated.resources.period_weeks_ago
 import logdate.client.feature.timeline.generated.resources.period_years_ago
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
-import logdate.client.feature.timeline.generated.resources.*
+
 /**
  * Checks that there is an entry within the past eight hours.
  */
@@ -96,7 +99,8 @@ internal fun Timeline(
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
-        modifier = modifier, contentPadding = PaddingValues(top = Spacing.xl)
+        modifier = modifier,
+        contentPadding = PaddingValues(top = Spacing.xl),
     ) {
         constructTimeline(
             items = timelineItems,
@@ -116,10 +120,11 @@ internal fun Timeline(
 @Composable
 private fun TimelineContentHeader(title: String) {
     Row(
-        modifier = Modifier
-            .height(56.dp)
-            .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
-            .fillMaxWidth(),
+        modifier =
+            Modifier
+                .height(56.dp)
+                .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+                .fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -152,7 +157,8 @@ private fun EntryDropdownMenu(
     modifier: Modifier = Modifier,
 ) {
     DropdownMenu(
-        expanded = isExpanded, onDismissRequest = onDismiss,
+        expanded = isExpanded,
+        onDismissRequest = onDismiss,
         modifier = modifier,
     ) {
         DropdownMenuItem(
@@ -206,10 +212,11 @@ private fun TimelineItemMetadataBlock(
     ) {
         if (metadata.peopleSeen > 0) {
             MetadataItem(
-                text = stringResource(
-                    Res.string.metadata_people_count,
-                    metadata.peopleSeen
-                ),
+                text =
+                    stringResource(
+                        Res.string.metadata_people_count,
+                        metadata.peopleSeen,
+                    ),
                 icon = {
                     Icon(imageVector = Icons.Outlined.PeopleAlt, contentDescription = stringResource(Res.string.people))
                 },
@@ -217,10 +224,11 @@ private fun TimelineItemMetadataBlock(
         }
         if (metadata.placesVisited > 0) {
             MetadataItem(
-                text = stringResource(
-                    Res.string.metadata_places_count,
-                    metadata.placesVisited
-                ),
+                text =
+                    stringResource(
+                        Res.string.metadata_places_count,
+                        metadata.placesVisited,
+                    ),
                 icon = {
                     Icon(imageVector = Icons.Default.LocationOn, contentDescription = stringResource(Res.string.places))
                 },
@@ -228,21 +236,21 @@ private fun TimelineItemMetadataBlock(
         }
         if (metadata.notesRecorded > 0) {
             MetadataItem(
-                text = stringResource(
-                    Res.string.metadata_notes_count,
-                    metadata.notesRecorded
-                ),
+                text =
+                    stringResource(
+                        Res.string.metadata_notes_count,
+                        metadata.notesRecorded,
+                    ),
                 icon = {
                     Icon(
                         imageVector = Icons.AutoMirrored.Default.Note,
-                        contentDescription = stringResource(Res.string.notes)
+                        contentDescription = stringResource(Res.string.notes),
                     )
                 },
             )
         }
     }
 }
-
 
 @Composable
 internal fun MetadataItem(
@@ -252,8 +260,7 @@ internal fun MetadataItem(
     Row(
         horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
-        Box(modifier = Modifier.size(20.dp))
-        {
+        Box(modifier = Modifier.size(20.dp)) {
             icon()
         }
         Text(text = text)
@@ -271,33 +278,37 @@ private fun TimelineContentItem(
 ) {
     var showOptions by rememberSaveable { mutableStateOf(false) }
     Row(
-        modifier = Modifier
-            .clip(MaterialTheme.shapes.medium)
-            .clickable {
-                onItemSelected(item.uid)
-            }
-            .fillMaxWidth()
-            .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        modifier =
+            Modifier
+                .clip(MaterialTheme.shapes.medium)
+                .clickable {
+                    onItemSelected(item.uid)
+                }.fillMaxWidth()
+                .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
         horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         TimelineLine(
-            modifier = Modifier
-                .padding(top = Spacing.lg)
-                .fillMaxHeight(),
+            modifier =
+                Modifier
+                    .padding(top = Spacing.lg)
+                    .fillMaxHeight(),
         )
         Column(
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-        ) { // Content container
+        ) {
+            // Content container
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
                 verticalAlignment = Alignment.CenterVertically,
-            ) { // Header block
+            ) {
+                // Header block
                 Column(
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(vertical = Spacing.sm),
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .padding(vertical = Spacing.sm),
                 ) {
                     Text(
                         item.creationTimestamp.toReadableDateShort(),
@@ -306,8 +317,9 @@ private fun TimelineContentItem(
                     TimelineItemMetadataBlock(metadata = metadata)
                 }
                 Box(
-                    modifier = Modifier
-                        .wrapContentSize(Alignment.TopEnd),
+                    modifier =
+                        Modifier
+                            .wrapContentSize(Alignment.TopEnd),
                 ) {
                     EntryDropdownMenu(
                         isExpanded = showOptions,
@@ -334,11 +346,13 @@ private fun TimelineContentItem(
                 is JournalNote.Text -> {
                     Markdown(
                         content = item.content,
-                        typography = markdownTypography(
-                            text = MaterialTheme.typography.bodyMedium.copy(
-                                lineBreak = MaterialTheme.typography.bodyMedium.lineBreak,
-                            )
-                        )
+                        typography =
+                            markdownTypography(
+                                text =
+                                    MaterialTheme.typography.bodyMedium.copy(
+                                        lineBreak = MaterialTheme.typography.bodyMedium.lineBreak,
+                                    ),
+                            ),
                     )
 //                    Text(
 //                        item.content,
@@ -353,7 +367,7 @@ private fun TimelineContentItem(
                     Text(
                         "Tap to view ${item.type.name.lowercase()} content",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -390,7 +404,6 @@ private fun determineHeaderTitle(date: Instant): String {
             val yearsAgo = today.date.year - localDateTime.date.year
             stringResource(Res.string.period_years_ago, yearsAgo)
         }
-
     }
 }
 
@@ -446,13 +459,13 @@ fun LazyListScope.constructTimeline(
     zoomLevel: ZoomLevel = ZoomLevel.DETAILED,
 ) {
     // Sort items in reverse order, grouping them by weeks before this week, adding headers for each week.
-    val itemsGroupedByWeek = items.sortedByDescending { it.creationTimestamp }.groupBy {
-        val weeksBeforeNow = it.creationTimestamp.weeksAgo()
-        weeksBeforeNow
-    }
+    val itemsGroupedByWeek =
+        items.sortedByDescending { it.creationTimestamp }.groupBy {
+            val weeksBeforeNow = it.creationTimestamp.weeksAgo()
+            weeksBeforeNow
+        }
 
     // Group items by day, sort in reverse order of created
-
 
     // Now we have a map of week number to list of items for that week.
     itemsGroupedByWeek.forEach { (_, items) ->
@@ -474,9 +487,10 @@ fun LazyListScope.constructTimeline(
                     item {
                         TimelineContentItem(
                             item,
-                            metadata = TimelineItemMetadata(
-                                notesRecorded = 1,
-                            ),
+                            metadata =
+                                TimelineItemMetadata(
+                                    notesRecorded = 1,
+                                ),
                             onItemSelected = onItemSelected,
                             onDeleteItem = onItemDeleted,
                             onOpenInNewWindow = onOpenInNewWindow,
@@ -485,14 +499,11 @@ fun LazyListScope.constructTimeline(
                 }
 
                 ZoomLevel.DEFAULT -> {
-
                 }
             }
         }
     }
 }
-
-
 
 @Composable
 fun PinchableContainer(

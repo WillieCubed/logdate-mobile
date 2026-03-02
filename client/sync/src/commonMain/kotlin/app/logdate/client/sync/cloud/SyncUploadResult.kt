@@ -7,5 +7,5 @@ import kotlin.time.Instant
  */
 data class SyncUploadResult(
     val serverVersion: Long,
-    val syncedAt: Instant
+    val syncedAt: Instant,
 )

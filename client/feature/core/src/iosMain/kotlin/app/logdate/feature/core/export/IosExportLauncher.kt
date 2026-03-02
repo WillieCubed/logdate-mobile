@@ -15,8 +15,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
-import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.number
 import kotlinx.datetime.toLocalDateTime
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -30,7 +30,7 @@ import platform.Foundation.dataUsingEncoding
 import platform.Foundation.writeToFile
 import platform.UIKit.UIActivityViewController
 import platform.UIKit.UIViewController
-import kotlinx.datetime.number
+import kotlin.time.Clock
 
 /**
  * iOS-specific implementation for launching data export.
@@ -40,9 +40,9 @@ import kotlinx.datetime.number
  */
 @OptIn(ExperimentalForeignApi::class)
 class IosExportLauncher(
-    private val rootViewController: () -> UIViewController
-) : ExportLauncher, KoinComponent {
-
+    private val rootViewController: () -> UIViewController,
+) : ExportLauncher,
+    KoinComponent {
     private val exportUserDataUseCase: ExportUserDataUseCase by inject()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var currentExportJob: Job? = null
@@ -58,67 +58,68 @@ class IosExportLauncher(
         currentExportJob?.cancel()
 
         // Start a new export job
-        currentExportJob = scope.launch {
-            try {
-                Napier.i("iOS: Starting export process")
+        currentExportJob =
+            scope.launch {
+                try {
+                    Napier.i("iOS: Starting export process")
 
-                exportUserDataUseCase.exportUserData()
-                    .catch { exception ->
-                        Napier.e("iOS: Export failed", exception)
-                        showAlert(
-                            title = "Export Failed",
-                            message = exception.message ?: "Unknown error occurred"
-                        )
-                        completionCallback?.invoke(null)
-                    }
-                    .collect { progress ->
-                        when (progress) {
-                            is ExportProgress.Starting -> {
-                                Napier.i("iOS: Export started")
-                            }
+                    exportUserDataUseCase
+                        .exportUserData()
+                        .catch { exception ->
+                            Napier.e("iOS: Export failed", exception)
+                            showAlert(
+                                title = "Export Failed",
+                                message = exception.message ?: "Unknown error occurred",
+                            )
+                            completionCallback?.invoke(null)
+                        }.collect { progress ->
+                            when (progress) {
+                                is ExportProgress.Starting -> {
+                                    Napier.i("iOS: Export started")
+                                }
 
-                            is ExportProgress.InProgress -> {
-                                val progressInt = (progress.percentage * 100).toInt()
-                                Napier.d("iOS: Export progress: $progressInt% - ${progress.message}")
-                            }
+                                is ExportProgress.InProgress -> {
+                                    val progressInt = (progress.percentage * 100).toInt()
+                                    Napier.d("iOS: Export progress: $progressInt% - ${progress.message}")
+                                }
 
-                            is ExportProgress.Completed -> {
-                                try {
-                                    val exportDirPath = createExportDirectoryPath()
-                                    saveExportFiles(exportDirPath, progress.result)
-                                    presentShareSheet(exportDirPath)
+                                is ExportProgress.Completed -> {
+                                    try {
+                                        val exportDirPath = createExportDirectoryPath()
+                                        saveExportFiles(exportDirPath, progress.result)
+                                        presentShareSheet(exportDirPath)
 
-                                    Napier.i("iOS: Export completed and share sheet presented")
-                                    completionCallback?.invoke(exportDirPath)
-                                } catch (e: Exception) {
-                                    Napier.e("iOS: Failed to save or share export", e)
+                                        Napier.i("iOS: Export completed and share sheet presented")
+                                        completionCallback?.invoke(exportDirPath)
+                                    } catch (e: Exception) {
+                                        Napier.e("iOS: Failed to save or share export", e)
+                                        showAlert(
+                                            title = "Export Failed",
+                                            message = "Could not save or share the export files: ${e.message}",
+                                        )
+                                        completionCallback?.invoke(null)
+                                    }
+                                }
+
+                                is ExportProgress.Failed -> {
+                                    Napier.e("iOS: Export failed: ${progress.reason}")
                                     showAlert(
                                         title = "Export Failed",
-                                        message = "Could not save or share the export files: ${e.message}"
+                                        message = progress.reason,
                                     )
                                     completionCallback?.invoke(null)
                                 }
                             }
-
-                            is ExportProgress.Failed -> {
-                                Napier.e("iOS: Export failed: ${progress.reason}")
-                                showAlert(
-                                    title = "Export Failed",
-                                    message = progress.reason
-                                )
-                                completionCallback?.invoke(null)
-                            }
                         }
-                    }
-            } catch (e: Exception) {
-                Napier.e("iOS: Export process failed", e)
-                showAlert(
-                    title = "Export Failed",
-                    message = "Export process failed: ${e.message}"
-                )
-                completionCallback?.invoke(null)
+                } catch (e: Exception) {
+                    Napier.e("iOS: Export process failed", e)
+                    showAlert(
+                        title = "Export Failed",
+                        message = "Export process failed: ${e.message}",
+                    )
+                    completionCallback?.invoke(null)
+                }
             }
-        }
     }
 
     override fun cancelExport() {
@@ -129,25 +130,30 @@ class IosExportLauncher(
     }
 
     private fun createExportDirectoryPath(): String {
-        val timestamp = Clock.System.now()
-            .toLocalDateTime(TimeZone.currentSystemDefault())
-            .let {
-                "${it.year}-${it.month.number.toString().padStart(2, '0')}-${it.day.toString().padStart(2, '0')}_" +
-                    "${it.hour.toString().padStart(2, '0')}-${it.minute.toString().padStart(2, '0')}"
-            }
+        val timestamp =
+            Clock.System
+                .now()
+                .toLocalDateTime(TimeZone.currentSystemDefault())
+                .let {
+                    "${it.year}-${it.month.number.toString().padStart(2, '0')}-${it.day.toString().padStart(2, '0')}_" +
+                        "${it.hour.toString().padStart(2, '0')}-${it.minute.toString().padStart(2, '0')}"
+                }
         val basePath = NSTemporaryDirectory().trimEnd('/')
         val exportDirPath = "$basePath/logdate_export_$timestamp"
         NSFileManager.defaultManager.createDirectoryAtPath(
             exportDirPath,
             withIntermediateDirectories = true,
             attributes = null,
-            error = null
+            error = null,
         )
         return exportDirPath
     }
 
     @OptIn(ExperimentalForeignApi::class)
-    private fun saveExportFiles(exportDirPath: String, result: ExportResult) {
+    private fun saveExportFiles(
+        exportDirPath: String,
+        result: ExportResult,
+    ) {
         writeJsonFile(exportDirPath, "metadata.json", result.metadata)
         writeJsonFile(exportDirPath, "journals.json", result.journals)
         writeJsonFile(exportDirPath, "notes.json", result.notes)
@@ -163,7 +169,11 @@ class IosExportLauncher(
     }
 
     @OptIn(ExperimentalForeignApi::class)
-    private fun writeJsonFile(directoryPath: String, fileName: String, contents: String) {
+    private fun writeJsonFile(
+        directoryPath: String,
+        fileName: String,
+        contents: String,
+    ) {
         val filePath = "$directoryPath/$fileName"
         autoreleasepool {
             val nsString = NSString.create(string = contents)
@@ -172,7 +182,10 @@ class IosExportLauncher(
         }
     }
 
-    private fun copyMediaFile(exportDirPath: String, mediaFile: ExportMediaFile) {
+    private fun copyMediaFile(
+        exportDirPath: String,
+        mediaFile: ExportMediaFile,
+    ) {
         val sourceUri = mediaFile.sourceUri
         if (sourceUri.contains("://") && !sourceUri.startsWith("file://")) {
             Napier.w("iOS: Skipping media export for unsupported URI: $sourceUri")
@@ -206,7 +219,7 @@ class IosExportLauncher(
             directoryPath,
             withIntermediateDirectories = true,
             attributes = null,
-            error = null
+            error = null,
         )
     }
 
@@ -216,40 +229,45 @@ class IosExportLauncher(
     private fun presentShareSheet(path: String) {
         val fileURL = NSURL.fileURLWithPath(path)
 
-        val activityViewController = UIActivityViewController(
-            activityItems = listOf(fileURL),
-            applicationActivities = null
-        )
+        val activityViewController =
+            UIActivityViewController(
+                activityItems = listOf(fileURL),
+                applicationActivities = null,
+            )
 
         rootViewController().presentViewController(
             viewControllerToPresent = activityViewController,
             animated = true,
-            completion = null
+            completion = null,
         )
     }
 
     /**
      * Shows a simple alert dialog.
      */
-    private fun showAlert(title: String, message: String) {
-        val alertController = platform.UIKit.UIAlertController.alertControllerWithTitle(
-            title = title,
-            message = message,
-            preferredStyle = platform.UIKit.UIAlertControllerStyleAlert
-        )
+    private fun showAlert(
+        title: String,
+        message: String,
+    ) {
+        val alertController =
+            platform.UIKit.UIAlertController.alertControllerWithTitle(
+                title = title,
+                message = message,
+                preferredStyle = platform.UIKit.UIAlertControllerStyleAlert,
+            )
 
         alertController.addAction(
             platform.UIKit.UIAlertAction.actionWithTitle(
                 title = "OK",
                 style = platform.UIKit.UIAlertActionStyleDefault,
-                handler = null
-            )
+                handler = null,
+            ),
         )
 
         rootViewController().presentViewController(
             viewControllerToPresent = alertController,
             animated = true,
-            completion = null
+            completion = null,
         )
     }
 }

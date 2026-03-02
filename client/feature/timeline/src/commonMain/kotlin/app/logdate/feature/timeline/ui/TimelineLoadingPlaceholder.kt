@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.timeline.ui
 
 import androidx.compose.foundation.layout.Box
@@ -11,7 +13,7 @@ import androidx.compose.ui.Modifier
 fun TimelineLoadingPlaceholder(modifier: Modifier = Modifier) {
     Box(
         contentAlignment = Alignment.Center,
-        modifier = modifier.fillMaxSize()
+        modifier = modifier.fillMaxSize(),
     ) {
         CircularProgressIndicator()
     }

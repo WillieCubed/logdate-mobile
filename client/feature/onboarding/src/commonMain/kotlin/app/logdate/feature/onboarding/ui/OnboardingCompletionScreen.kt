@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.feature.onboarding.ui
 
 import androidx.compose.animation.AnimatedContent
@@ -28,14 +30,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import logdate.client.feature.onboarding.generated.resources.action_onboarding_continue
 import org.jetbrains.compose.resources.stringResource
-import androidx.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
-import logdate.client.feature.onboarding.generated.resources.*
+
 /**
  * The last screen of the onboarding flow.
  *
@@ -62,8 +65,8 @@ fun OnboardingCompletionScreen(
 
 @Composable
 private fun OnboardingCompletionContent(
-    shouldShowFinish: Boolean, 
-    onContinue: () -> Unit, 
+    shouldShowFinish: Boolean,
+    onContinue: () -> Unit,
     onFinish: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -79,40 +82,40 @@ private fun OnboardingCompletionContent(
         modifier = modifier,
         transitionSpec = {
             fadeIn(
-                animationSpec = tween(3000)
-            ) togetherWith fadeOut(
-                animationSpec = tween(3000)
-            )
+                animationSpec = tween(3000),
+            ) togetherWith
+                fadeOut(
+                    animationSpec = tween(3000),
+                )
         },
-        label = "Show Finish Screen"
+        label = "Show Finish Screen",
     ) { isShowingFinish ->
         if (isShowingFinish) {
             CompletionFinalContent()
         } else {
             CompletionStreakContent(onContinue = onContinue)
         }
-
     }
 }
 
 @Composable
-private fun CompletionStreakContent(
-    onContinue: () -> Unit,
-) {
+private fun CompletionStreakContent(onContinue: () -> Unit) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) { contentPadding ->
         Box(
-            modifier = Modifier
-                .padding(contentPadding)
-                .fillMaxSize(),
+            modifier =
+                Modifier
+                    .padding(contentPadding)
+                    .fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
             Column(
-                modifier = Modifier
-                    .padding(app.logdate.ui.theme.Spacing.lg)
-                    .widthIn(max = 320.dp),
+                modifier =
+                    Modifier
+                        .padding(app.logdate.ui.theme.Spacing.lg)
+                        .widthIn(max = 320.dp),
                 verticalArrangement = Arrangement.spacedBy(48.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -121,24 +124,25 @@ private fun CompletionStreakContent(
                     verticalArrangement = Arrangement.spacedBy(app.logdate.ui.theme.Spacing.xl),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-
                     Text(
-                        "Your streak begins today.", style = MaterialTheme.typography.headlineMedium
+                        "Your streak begins today.",
+                        style = MaterialTheme.typography.headlineMedium,
                     )
                     StreakCounterBox()
                     Text(
                         "Write, photograph, or record something every day to keep it up.",
                         style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
                 }
             }
             Button(
                 onContinue,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(app.logdate.ui.theme.Spacing.lg)
-                    .fillMaxWidth()
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(app.logdate.ui.theme.Spacing.lg)
+                        .fillMaxWidth(),
             ) {
                 Text(stringResource(Res.string.action_onboarding_continue))
             }
@@ -147,16 +151,15 @@ private fun CompletionStreakContent(
 }
 
 @Composable
-private fun StreakCounterBox(
-    count: Int = 1
-) {
+private fun StreakCounterBox(count: Int = 1) {
     Box(
-        modifier = Modifier
-            .size(96.dp)
-            .background(
-                MaterialTheme.colorScheme.surfaceContainerHighest, MaterialTheme.shapes.large
-            )
-            .padding(16.dp),
+        modifier =
+            Modifier
+                .size(96.dp)
+                .background(
+                    MaterialTheme.colorScheme.surfaceContainerHighest,
+                    MaterialTheme.shapes.large,
+                ).padding(16.dp),
     ) {
         Text(
             count.toString(),
@@ -174,10 +177,11 @@ private fun CompletionFinalContent() {
     ) {
         Column(
             verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                "Happy logging!", style = MaterialTheme.typography.headlineMedium,
+                "Happy logging!",
+                style = MaterialTheme.typography.headlineMedium,
             )
         }
     }

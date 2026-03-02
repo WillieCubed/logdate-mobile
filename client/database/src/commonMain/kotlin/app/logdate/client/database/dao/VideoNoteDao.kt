@@ -10,7 +10,6 @@ import kotlin.uuid.Uuid
 
 @Dao
 interface VideoNoteDao {
-
     /**
      * Retrieves an observable [VideoNoteEntity] by the given ID.
      */
@@ -35,7 +34,6 @@ interface VideoNoteDao {
     @Query("SELECT * FROM video_notes")
     suspend fun getAll(): List<VideoNoteEntity>
 
-
     /**
      * Fast query for recent notes to enable immediate timeline display.
      */
@@ -46,7 +44,10 @@ interface VideoNoteDao {
      * Returns notes within a specific date range.
      */
     @Query("SELECT * FROM video_notes WHERE created BETWEEN :startTimestamp AND :endTimestamp ORDER BY created DESC")
-    fun getNotesInRange(startTimestamp: Long, endTimestamp: Long): Flow<List<VideoNoteEntity>>
+    fun getNotesInRange(
+        startTimestamp: Long,
+        endTimestamp: Long,
+    ): Flow<List<VideoNoteEntity>>
 
     /**
      * Inserts a [note] into the DB if it doesn't exist, and ignores it if it does.
@@ -67,8 +68,15 @@ interface VideoNoteDao {
     suspend fun removeNote(noteIds: List<Uuid>)
 
     @Query("UPDATE video_notes SET syncVersion = :syncVersion, lastSynced = :lastSynced WHERE uid = :noteId")
-    suspend fun updateSyncMetadata(noteId: Uuid, syncVersion: Long, lastSynced: kotlin.time.Instant)
+    suspend fun updateSyncMetadata(
+        noteId: Uuid,
+        syncVersion: Long,
+        lastSynced: kotlin.time.Instant,
+    )
 
     @Query("UPDATE video_notes SET contentUri = :contentUri WHERE uid = :noteId")
-    suspend fun updateContentUri(noteId: Uuid, contentUri: String)
+    suspend fun updateContentUri(
+        noteId: Uuid,
+        contentUri: String,
+    )
 }

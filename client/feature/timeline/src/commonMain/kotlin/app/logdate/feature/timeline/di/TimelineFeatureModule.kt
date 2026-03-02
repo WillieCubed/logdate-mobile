@@ -8,10 +8,11 @@ import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
-val timelineFeatureModule: Module = module {
-    includes(domainModule)
-    includes(intelligenceModule)
-    includes(networkingModule)
+val timelineFeatureModule: Module =
+    module {
+        includes(domainModule)
+        includes(intelligenceModule)
+        includes(networkingModule)
 
-    viewModel { TimelineViewModel(get(), get(), get(), get(), get(), get()) }
-}
+        viewModel { TimelineViewModel(get(), get(), get(), get(), get(), get()) }
+    }

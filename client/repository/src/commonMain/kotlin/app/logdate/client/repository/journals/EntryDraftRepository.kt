@@ -4,9 +4,9 @@ package app.logdate.client.repository.journals
 
 import app.logdate.util.UuidSerializer
 import kotlinx.coroutines.flow.Flow
-import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -36,7 +36,10 @@ interface EntryDraftRepository {
     /**
      * Updates a draft with the given notes and returns its ID.
      */
-    suspend fun updateDraft(uid: Uuid, notes: List<JournalNote>): Uuid
+    suspend fun updateDraft(
+        uid: Uuid,
+        notes: List<JournalNote>,
+    ): Uuid
 
     /**
      * Deletes any drafts with the given UID.

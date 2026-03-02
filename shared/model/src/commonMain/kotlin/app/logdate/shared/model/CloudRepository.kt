@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:filename")
+
 package app.logdate.shared.model
 
 import kotlinx.coroutines.flow.Flow
@@ -18,7 +20,7 @@ interface CloudAccountRepository {
      * @return True if the username is available, false otherwise.
      */
     suspend fun isUsernameAvailable(username: String): Result<Boolean>
-    
+
     /**
      * Begins the account creation process.
      *
@@ -30,9 +32,9 @@ interface CloudAccountRepository {
     suspend fun beginAccountCreation(
         username: String,
         displayName: String,
-        deviceInfo: DeviceInfo?
+        deviceInfo: DeviceInfo?,
     ): Result<BeginAccountCreationResult>
-    
+
     /**
      * Completes the account creation process with a passkey.
      *
@@ -46,23 +48,23 @@ interface CloudAccountRepository {
         sessionToken: String,
         credentialId: String,
         clientDataJSON: String,
-        attestationObject: String
+        attestationObject: String,
     ): Result<AuthenticationResult>
-    
+
     /**
      * Gets the currently authenticated account.
      *
      * @return The current account, or null if not authenticated.
      */
     suspend fun getCurrentAccount(): CloudAccount?
-    
+
     /**
      * Observes the current authentication state.
      *
      * @return A flow emitting the current account whenever it changes.
      */
     fun observeCurrentAccount(): Flow<CloudAccount?>
-    
+
     /**
      * Refreshes the access token using a refresh token.
      *
@@ -70,21 +72,21 @@ interface CloudAccountRepository {
      * @return The new access token if successful.
      */
     suspend fun refreshAccessToken(refreshToken: String): Result<String>
-    
+
     /**
      * Signs out the current user.
      *
      * @return True if the sign-out was successful.
      */
     suspend fun signOut(): Result<Boolean>
-    
+
     /**
      * Gets all passkeys associated with the current account.
      *
      * @return List of passkey credentials.
      */
     suspend fun getPasskeyCredentials(): Result<List<PasskeyCredential>>
-    
+
     /**
      * Associates the user's local identity with their cloud account.
      *
@@ -92,5 +94,8 @@ interface CloudAccountRepository {
      * @param accountId The cloud account ID.
      * @return True if the association was successful.
      */
-    suspend fun associateUserIdentity(userId: Uuid, accountId: String): Result<Boolean>
+    suspend fun associateUserIdentity(
+        userId: Uuid,
+        accountId: String,
+    ): Result<Boolean>
 }

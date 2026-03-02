@@ -2,24 +2,23 @@ package app.logdate.client.sync.conflict
 
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.shared.model.Journal
-import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
  * Tests for conflict resolution strategies.
  */
 class ConflictResolutionTest {
-
     private val resolver = LastWriteWinsResolver<TestEntity>()
     private val journalResolver = JournalConflictResolver()
     private val noteResolver = JournalNoteConflictResolver()
 
     data class TestEntity(
         val id: String,
-        val content: String
+        val content: String,
     )
 
     @Test
@@ -108,20 +107,22 @@ class ConflictResolutionTest {
     fun `journal resolver merges when only description differs`() {
         val now = Instant.fromEpochMilliseconds(1000)
         val journalId = Uuid.random()
-        val local = Journal(
-            id = journalId,
-            title = "Travel Notes",
-            description = "",
-            isFavorited = false,
-            created = now,
-            lastUpdated = now,
-            syncVersion = 1
-        )
-        val remote = local.copy(
-            description = "Remote update",
-            lastUpdated = Instant.fromEpochMilliseconds(2000),
-            syncVersion = 2
-        )
+        val local =
+            Journal(
+                id = journalId,
+                title = "Travel Notes",
+                description = "",
+                isFavorited = false,
+                created = now,
+                lastUpdated = now,
+                syncVersion = 1,
+            )
+        val remote =
+            local.copy(
+                description = "Remote update",
+                lastUpdated = Instant.fromEpochMilliseconds(2000),
+                syncVersion = 2,
+            )
 
         val result = journalResolver.resolve(local, remote, local.lastUpdated, remote.lastUpdated)
 
@@ -136,21 +137,23 @@ class ConflictResolutionTest {
     fun `journal resolver requires manual when title and description conflict`() {
         val now = Instant.fromEpochMilliseconds(1000)
         val journalId = Uuid.random()
-        val local = Journal(
-            id = journalId,
-            title = "Local Title",
-            description = "Local description",
-            isFavorited = false,
-            created = now,
-            lastUpdated = now,
-            syncVersion = 1
-        )
-        val remote = local.copy(
-            title = "Remote Title",
-            description = "Remote description",
-            lastUpdated = Instant.fromEpochMilliseconds(2000),
-            syncVersion = 2
-        )
+        val local =
+            Journal(
+                id = journalId,
+                title = "Local Title",
+                description = "Local description",
+                isFavorited = false,
+                created = now,
+                lastUpdated = now,
+                syncVersion = 1,
+            )
+        val remote =
+            local.copy(
+                title = "Remote Title",
+                description = "Remote description",
+                lastUpdated = Instant.fromEpochMilliseconds(2000),
+                syncVersion = 2,
+            )
 
         val result = journalResolver.resolve(local, remote, local.lastUpdated, remote.lastUpdated)
 
@@ -160,17 +163,19 @@ class ConflictResolutionTest {
     @Test
     fun `note resolver merges divergent text content`() {
         val created = Instant.fromEpochMilliseconds(1000)
-        val local = JournalNote.Text(
-            uid = Uuid.random(),
-            creationTimestamp = created,
-            lastUpdated = Instant.fromEpochMilliseconds(1500),
-            content = "Local content"
-        )
-        val remote = local.copy(
-            lastUpdated = Instant.fromEpochMilliseconds(2000),
-            content = "Remote content",
-            syncVersion = 2
-        )
+        val local =
+            JournalNote.Text(
+                uid = Uuid.random(),
+                creationTimestamp = created,
+                lastUpdated = Instant.fromEpochMilliseconds(1500),
+                content = "Local content",
+            )
+        val remote =
+            local.copy(
+                lastUpdated = Instant.fromEpochMilliseconds(2000),
+                content = "Remote content",
+                syncVersion = 2,
+            )
 
         val result = noteResolver.resolve(local, remote, local.lastUpdated, remote.lastUpdated)
 
@@ -184,17 +189,19 @@ class ConflictResolutionTest {
     @Test
     fun `note resolver requires manual when media refs differ`() {
         val created = Instant.fromEpochMilliseconds(1000)
-        val local = JournalNote.Image(
-            uid = Uuid.random(),
-            creationTimestamp = created,
-            lastUpdated = Instant.fromEpochMilliseconds(1500),
-            mediaRef = "local-media"
-        )
-        val remote = local.copy(
-            lastUpdated = Instant.fromEpochMilliseconds(2000),
-            mediaRef = "remote-media",
-            syncVersion = 2
-        )
+        val local =
+            JournalNote.Image(
+                uid = Uuid.random(),
+                creationTimestamp = created,
+                lastUpdated = Instant.fromEpochMilliseconds(1500),
+                mediaRef = "local-media",
+            )
+        val remote =
+            local.copy(
+                lastUpdated = Instant.fromEpochMilliseconds(2000),
+                mediaRef = "remote-media",
+                syncVersion = 2,
+            )
 
         val result = noteResolver.resolve(local, remote, local.lastUpdated, remote.lastUpdated)
 

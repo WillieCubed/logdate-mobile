@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:max-line-length")
+
 package app.logdate.feature.core.settings.ui
 
 import androidx.compose.foundation.layout.Arrangement
@@ -24,16 +26,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.MaterialContainerScope
 import app.logdate.ui.theme.Spacing
+import logdate.client.feature.core.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
 import kotlin.time.Instant
-import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.core.generated.resources.*
-import logdate.client.feature.core.generated.resources.Res
+
 /**
  * UI-facing metadata for a passkey credential.
  *
@@ -65,21 +67,21 @@ fun PasskeysInfoSection(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        verticalArrangement = Arrangement.spacedBy(Spacing.md)
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-            modifier = Modifier.padding(Spacing.lg)
+            modifier = Modifier.padding(Spacing.lg),
         ) {
             Text(
                 text = stringResource(Res.string.passkeys),
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
             )
             Text(
                 text = stringResource(Res.string.passkeys_are_a_quick_and_secure_way_to_sign_into_your_logdate_account),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
 
@@ -88,7 +90,7 @@ fun PasskeysInfoSection(
             if (passkeys.isEmpty()) {
                 // Empty state
                 SurfaceItem(
-                    color = MaterialTheme.colorScheme.surfaceVariant
+                    color = MaterialTheme.colorScheme.surfaceVariant,
                 ) {
                     Column(
                         verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -97,17 +99,22 @@ fun PasskeysInfoSection(
                         Text(
                             text = stringResource(Res.string.create_a_passkey_2),
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
+                        val passkeysText =
+                            stringResource(
+                                Res.string
+                                    .with_passkeys_you_dont_need_to_remember_your_password_instead_use_your_fingerprint_face_or_screen_lock_to_sign_in,
+                            )
                         Text(
-                            text = stringResource(Res.string.with_passkeys_you_dont_need_to_remember_your_password_instead_use_your_fingerprint_face_or_screen_lock_to_sign_in),
+                            text = passkeysText,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
                             text = stringResource(Res.string.learn_more),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.primary,
                         )
                     }
                 }
@@ -117,7 +124,7 @@ fun PasskeysInfoSection(
                     Text(
                         text = stringResource(Res.string.your_passkeys),
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
 
@@ -125,7 +132,7 @@ fun PasskeysInfoSection(
                 passkeys.forEach { passkey ->
                     PasskeyItem(
                         passkey = passkey,
-                        onRevokePasskey = onRevokePasskey
+                        onRevokePasskey = onRevokePasskey,
                     )
                 }
             }
@@ -133,20 +140,20 @@ fun PasskeysInfoSection(
             // Create passkey button (always shown)
             if (showCreatePasskeyAction) {
                 SurfaceItem(
-                    color = MaterialTheme.colorScheme.primaryContainer
+                    color = MaterialTheme.colorScheme.primaryContainer,
                 ) {
                     Button(
                         onClick = onCreatePasskey,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         Icon(
                             imageVector = Icons.Default.Key,
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(18.dp),
                         )
                         Text(
                             text = stringResource(Res.string.create_passkey),
-                            modifier = Modifier.padding(start = Spacing.sm)
+                            modifier = Modifier.padding(start = Spacing.sm),
                         )
                     }
                 }
@@ -165,37 +172,37 @@ private fun MaterialContainerScope.PasskeyItem(
 
     SurfaceItem(
         modifier = modifier,
-        color = MaterialTheme.colorScheme.surfaceVariant
+        color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
         Column {
             // Main passkey row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
                 ) {
                     Text(
                         text = passkey.name,
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = "Stored on ${passkey.device} • Last used ${formatPasskeyLastUsed(passkey.lastUsed)}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 IconButton(
-                    onClick = { expanded = !expanded }
+                    onClick = { expanded = !expanded },
                 ) {
                     Icon(
                         imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                         contentDescription = if (expanded) "Collapse passkey options" else "Expand passkey options",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -204,30 +211,30 @@ private fun MaterialContainerScope.PasskeyItem(
             if (expanded) {
                 HorizontalDivider(
                     modifier = Modifier.padding(vertical = Spacing.md),
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
                 )
 
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     Text(
                         text = passkey.device,
                         style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = "Last used ${formatPasskeyLastUsed(passkey.lastUsed)}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
                         TextButton(
                             onClick = { onRevokePasskey(passkey) },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
                         ) {
                             Text(stringResource(Res.string.delete))
                         }
@@ -243,7 +250,7 @@ private fun MaterialContainerScope.PasskeyItem(
 private fun PasskeysInfoSectionEmptyPreview() {
     PasskeysInfoSection(
         passkeys = emptyList(),
-        onCreatePasskey = {}
+        onCreatePasskey = {},
     )
 }
 
@@ -251,15 +258,16 @@ private fun PasskeysInfoSectionEmptyPreview() {
 @Composable
 private fun PasskeysInfoSectionSinglePreview() {
     PasskeysInfoSection(
-        passkeys = listOf(
-            PasskeyInfo(
-                id = "1",
-                name = "Passkey #1",
-                device = "your Pixel 7",
-                lastUsed = Instant.parse("2024-03-13T00:00:00Z")
-            )
-        ),
-        onCreatePasskey = {}
+        passkeys =
+            listOf(
+                PasskeyInfo(
+                    id = "1",
+                    name = "Passkey #1",
+                    device = "your Pixel 7",
+                    lastUsed = Instant.parse("2024-03-13T00:00:00Z"),
+                ),
+            ),
+        onCreatePasskey = {},
     )
 }
 
@@ -267,20 +275,21 @@ private fun PasskeysInfoSectionSinglePreview() {
 @Composable
 private fun PasskeysInfoSectionMultiplePreview() {
     PasskeysInfoSection(
-        passkeys = listOf(
-            PasskeyInfo(
-                id = "1",
-                name = "Passkey #1",
-                device = "your Pixel 7",
-                lastUsed = Instant.parse("2024-03-13T00:00:00Z")
+        passkeys =
+            listOf(
+                PasskeyInfo(
+                    id = "1",
+                    name = "Passkey #1",
+                    device = "your Pixel 7",
+                    lastUsed = Instant.parse("2024-03-13T00:00:00Z"),
+                ),
+                PasskeyInfo(
+                    id = "2",
+                    name = "Passkey #2",
+                    device = "Windows Device",
+                    lastUsed = Instant.parse("2024-03-13T00:00:00Z"),
+                ),
             ),
-            PasskeyInfo(
-                id = "2",
-                name = "Passkey #2",
-                device = "Windows Device",
-                lastUsed = Instant.parse("2024-03-13T00:00:00Z")
-            )
-        ),
-        onCreatePasskey = {}
+        onCreatePasskey = {},
     )
 }

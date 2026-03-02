@@ -10,12 +10,13 @@ import kotlinx.coroutines.flow.asSharedFlow
 
 object StubLocationProvider : ClientLocationProvider {
     // Mock location: Apple Park, Cupertino, CA (Apple's headquarters)
-    private val mockLocation = Location(
-        latitude = 37.3349,
-        longitude = -122.0090,
-        altitude = LocationAltitude(100.0, AltitudeUnit.FEET)
-    )
-    
+    private val mockLocation =
+        Location(
+            latitude = 37.3349,
+            longitude = -122.0090,
+            altitude = LocationAltitude(100.0, AltitudeUnit.FEET),
+        )
+
     private val _currentLocation = MutableStateFlow(mockLocation)
     override val currentLocation: SharedFlow<Location>
         get() = _currentLocation.asSharedFlow()

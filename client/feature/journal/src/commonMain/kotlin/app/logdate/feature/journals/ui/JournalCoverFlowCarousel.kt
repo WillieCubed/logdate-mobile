@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.journals.ui
 
 import androidx.compose.animation.AnimatedContent
@@ -19,11 +21,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.shared.model.Journal
 import app.logdate.ui.theme.Spacing
 import kotlin.time.Clock
-import androidx.compose.ui.tooling.preview.Preview
 import kotlin.uuid.Uuid
 
 /**
@@ -64,10 +66,11 @@ fun JournalCoverFlowCarousel(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
-        contentPadding = PaddingValues(
-            horizontal = Spacing.xxxl,
-            vertical = Spacing.lg
-        )
+        contentPadding =
+            PaddingValues(
+                horizontal = Spacing.xxxl,
+                vertical = Spacing.lg,
+            ),
     ) {
         itemsIndexed(journals) { index, item ->
             val isCentralItem = index == centralItemIndex
@@ -77,11 +80,12 @@ fun JournalCoverFlowCarousel(
 
             val scale by animateFloatAsState(
                 targetValue = targetScale,
-                animationSpec = tween(
-                    durationMillis = 300,
-                    easing = FastOutSlowInEasing
-                ),
-                label = "Cover Scale Animation"
+                animationSpec =
+                    tween(
+                        durationMillis = 300,
+                        easing = FastOutSlowInEasing,
+                    ),
+                label = "Cover Scale Animation",
             )
 
             when (item) {
@@ -91,10 +95,11 @@ fun JournalCoverFlowCarousel(
                             journal = item.data,
                             onClick = { onOpenJournal(item.data.id) },
                             backgroundColor = MaterialTheme.colorScheme.tertiaryContainer,
-                            modifier = Modifier
-                                .scale(scale)
-                                .widthIn(min = 240.dp)
-                                .heightIn(max = 400.dp),
+                            modifier =
+                                Modifier
+                                    .scale(scale)
+                                    .widthIn(min = 240.dp)
+                                    .heightIn(max = 400.dp),
                         )
                     }
                 }
@@ -102,10 +107,11 @@ fun JournalCoverFlowCarousel(
                 is JournalListItemUiState.CreateJournalPlaceholder -> {
                     CreateJournalPlaceholder(
                         onClick = onCreateJournal,
-                        modifier = Modifier
-                            .scale(scale)
-                            .widthIn(min = 240.dp)
-                            .heightIn(max = 400.dp),
+                        modifier =
+                            Modifier
+                                .scale(scale)
+                                .widthIn(min = 240.dp)
+                                .heightIn(max = 400.dp),
                     )
                 }
             }
@@ -117,32 +123,33 @@ fun JournalCoverFlowCarousel(
 @Composable
 private fun JournalCoverFlowPreview() {
     JournalCoverFlowCarousel(
-        journals = listOf(
-            Journal(
-                id = Uuid.random(),
-                title = "Journal 1",
-                created = Clock.System.now(),
-                description = "Journal 1 description",
-                isFavorited = false,
-                lastUpdated = Clock.System.now(),
-            ),
-            Journal(
-                id = Uuid.random(),
-                title = "Journal 2",
-                created = Clock.System.now(),
-                description = "Journal 2 description",
-                isFavorited = false,
-                lastUpdated = Clock.System.now(),
-            ),
-            Journal(
-                id = Uuid.random(),
-                title = "Journal 3",
-                created = Clock.System.now(),
-                description = "Journal 3 description",
-                isFavorited = false,
-                lastUpdated = Clock.System.now(),
-            ),
-        ).map { JournalListItemUiState.ExistingJournal(it) },
+        journals =
+            listOf(
+                Journal(
+                    id = Uuid.random(),
+                    title = "Journal 1",
+                    created = Clock.System.now(),
+                    description = "Journal 1 description",
+                    isFavorited = false,
+                    lastUpdated = Clock.System.now(),
+                ),
+                Journal(
+                    id = Uuid.random(),
+                    title = "Journal 2",
+                    created = Clock.System.now(),
+                    description = "Journal 2 description",
+                    isFavorited = false,
+                    lastUpdated = Clock.System.now(),
+                ),
+                Journal(
+                    id = Uuid.random(),
+                    title = "Journal 3",
+                    created = Clock.System.now(),
+                    description = "Journal 3 description",
+                    isFavorited = false,
+                    lastUpdated = Clock.System.now(),
+                ),
+            ).map { JournalListItemUiState.ExistingJournal(it) },
         onOpenJournal = {},
         onCreateJournal = {},
     )

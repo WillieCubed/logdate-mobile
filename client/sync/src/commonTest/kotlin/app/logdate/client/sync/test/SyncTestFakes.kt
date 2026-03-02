@@ -4,19 +4,45 @@ import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.StubMediaManager
+import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
-import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.sync.DefaultSyncManager
+import app.logdate.client.sync.SyncError
+import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncResult
 import app.logdate.client.sync.SyncStatus
-import app.logdate.client.sync.SyncError
-import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.SyncTransactionManager
-import app.logdate.client.sync.cloud.*
+import app.logdate.client.sync.cloud.AssociationChangesResponse
+import app.logdate.client.sync.cloud.AssociationDeleteRequest
+import app.logdate.client.sync.cloud.AssociationUploadRequest
+import app.logdate.client.sync.cloud.AssociationUploadResponse
+import app.logdate.client.sync.cloud.CheckUsernameAvailabilityResponse
+import app.logdate.client.sync.cloud.CloudApiClient
+import app.logdate.client.sync.cloud.CloudAssociationDataSource
+import app.logdate.client.sync.cloud.CloudContentDataSource
+import app.logdate.client.sync.cloud.CloudJournalDataSource
+import app.logdate.client.sync.cloud.CloudMediaDataSource
+import app.logdate.client.sync.cloud.ContentChangesResponse
+import app.logdate.client.sync.cloud.ContentUpdateRequest
+import app.logdate.client.sync.cloud.ContentUpdateResponse
+import app.logdate.client.sync.cloud.ContentUploadRequest
+import app.logdate.client.sync.cloud.ContentUploadResponse
+import app.logdate.client.sync.cloud.DefaultCloudAssociationDataSource
+import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
+import app.logdate.client.sync.cloud.DefaultCloudJournalDataSource
+import app.logdate.client.sync.cloud.DefaultCloudMediaDataSource
+import app.logdate.client.sync.cloud.JournalChangesResponse
+import app.logdate.client.sync.cloud.JournalUpdateRequest
+import app.logdate.client.sync.cloud.JournalUpdateResponse
+import app.logdate.client.sync.cloud.JournalUploadRequest
+import app.logdate.client.sync.cloud.JournalUploadResponse
+import app.logdate.client.sync.cloud.MediaDownloadResponse
+import app.logdate.client.sync.cloud.MediaUploadRequest
+import app.logdate.client.sync.cloud.MediaUploadResponse
 import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.LastWriteWinsResolver
 import app.logdate.client.sync.conflict.SyncConflictRecord
@@ -30,7 +56,19 @@ import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
-import app.logdate.shared.model.*
+import app.logdate.shared.model.AuthenticationResult
+import app.logdate.shared.model.BeginAccountCreationRequest
+import app.logdate.shared.model.BeginAccountCreationResponse
+import app.logdate.shared.model.BeginAccountCreationResult
+import app.logdate.shared.model.CloudAccount
+import app.logdate.shared.model.CloudAccountRepository
+import app.logdate.shared.model.CompleteAccountCreationRequest
+import app.logdate.shared.model.CompleteAccountCreationResponse
+import app.logdate.shared.model.DeviceInfo
+import app.logdate.shared.model.EditorDraft
+import app.logdate.shared.model.Journal
+import app.logdate.shared.model.LogDateAccount
+import app.logdate.shared.model.PasskeyCredential
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,13 +82,13 @@ import kotlin.uuid.Uuid
 
 fun fakeCloudApiClient(): FakeCloudApiClient = FakeCloudApiClient()
 
-fun fakeCloudApiClient(configure: FakeCloudApiClient.() -> Unit): FakeCloudApiClient =
-    FakeCloudApiClient().apply(configure)
+fun fakeCloudApiClient(configure: FakeCloudApiClient.() -> Unit): FakeCloudApiClient = FakeCloudApiClient().apply(configure)
 
-fun failingCloudApiClient(): FakeCloudApiClient = FakeCloudApiClient().apply {
-    configureContentSyncFailure()
-    configureJournalSyncFailure()
-}
+fun failingCloudApiClient(): FakeCloudApiClient =
+    FakeCloudApiClient().apply {
+        configureContentSyncFailure()
+        configureJournalSyncFailure()
+    }
 
 fun fakeAccountRepository(authenticated: Boolean = true): FakeCloudAccountRepository =
     FakeCloudAccountRepository().apply { setAuthenticated(authenticated) }
@@ -93,27 +131,28 @@ fun testDefaultSyncManager(
     deadLetterStore: SyncDeadLetterStore = InMemorySyncDeadLetterStore(),
     retryScheduleStore: SyncRetryScheduleStore = InMemorySyncRetryScheduleStore(),
     syncMetadataService: SyncMetadataService = fakeSyncMetadataService(),
-    transactionManager: SyncTransactionManager = testSyncTransactionManager()
-): DefaultSyncManager = DefaultSyncManager(
-    cloudContentDataSource = cloudContentDataSource,
-    cloudJournalDataSource = cloudJournalDataSource,
-    cloudAssociationDataSource = cloudAssociationDataSource,
-    cloudMediaDataSource = cloudMediaDataSource,
-    cloudAccountRepository = cloudAccountRepository,
-    sessionStorage = sessionStorage,
-    mediaManager = mediaManager,
-    mediaSyncRefStore = mediaSyncRefStore,
-    journalRepository = journalRepository,
-    journalNotesRepository = journalNotesRepository,
-    journalContentRepository = journalContentRepository,
-    journalConflictResolver = journalConflictResolver,
-    noteConflictResolver = noteConflictResolver,
-    conflictStore = conflictStore,
-    deadLetterStore = deadLetterStore,
-    retryScheduleStore = retryScheduleStore,
-    syncMetadataService = syncMetadataService,
-    transactionManager = transactionManager
-)
+    transactionManager: SyncTransactionManager = testSyncTransactionManager(),
+): DefaultSyncManager =
+    DefaultSyncManager(
+        cloudContentDataSource = cloudContentDataSource,
+        cloudJournalDataSource = cloudJournalDataSource,
+        cloudAssociationDataSource = cloudAssociationDataSource,
+        cloudMediaDataSource = cloudMediaDataSource,
+        cloudAccountRepository = cloudAccountRepository,
+        sessionStorage = sessionStorage,
+        mediaManager = mediaManager,
+        mediaSyncRefStore = mediaSyncRefStore,
+        journalRepository = journalRepository,
+        journalNotesRepository = journalNotesRepository,
+        journalContentRepository = journalContentRepository,
+        journalConflictResolver = journalConflictResolver,
+        noteConflictResolver = noteConflictResolver,
+        conflictStore = conflictStore,
+        deadLetterStore = deadLetterStore,
+        retryScheduleStore = retryScheduleStore,
+        syncMetadataService = syncMetadataService,
+        transactionManager = transactionManager,
+    )
 
 // =============================================================================
 // Fake implementations
@@ -124,7 +163,6 @@ fun testDefaultSyncManager(
  * All responses are successful by default; configure failures via [configureContentSyncFailure].
  */
 open class FakeCloudApiClient : CloudApiClient {
-
     var uploadContentResponse: Result<ContentUploadResponse> =
         Result.success(ContentUploadResponse("test-id", 1, Clock.System.now().toEpochMilliseconds()))
 
@@ -194,74 +232,118 @@ open class FakeCloudApiClient : CloudApiClient {
     }
 
     // Content sync methods
-    override suspend fun uploadContent(accessToken: String, content: ContentUploadRequest): Result<ContentUploadResponse> {
+    override suspend fun uploadContent(
+        accessToken: String,
+        content: ContentUploadRequest,
+    ): Result<ContentUploadResponse> {
         methodCalls.add("uploadContent")
         uploadContentCalls.add(accessToken to content)
         return uploadContentResponse
     }
 
-    override suspend fun updateContent(accessToken: String, contentId: String, content: ContentUpdateRequest): Result<ContentUpdateResponse> {
+    override suspend fun updateContent(
+        accessToken: String,
+        contentId: String,
+        content: ContentUpdateRequest,
+    ): Result<ContentUpdateResponse> {
         methodCalls.add("updateContent")
         updateContentCalls.add(Triple(accessToken, contentId, content))
         return updateContentResponse
     }
 
-    override suspend fun deleteContent(accessToken: String, contentId: String): Result<Unit> {
+    override suspend fun deleteContent(
+        accessToken: String,
+        contentId: String,
+    ): Result<Unit> {
         methodCalls.add("deleteContent")
         deleteContentCalls.add(accessToken to contentId)
         return deleteContentResponse
     }
 
-    override suspend fun getContentChanges(accessToken: String, since: Long, limit: Int?): Result<ContentChangesResponse> {
+    override suspend fun getContentChanges(
+        accessToken: String,
+        since: Long,
+        limit: Int?,
+    ): Result<ContentChangesResponse> {
         methodCalls.add("getContentChanges")
         getContentChangesCalls.add(accessToken to since)
         return getContentChangesResponse
     }
 
     // Journal sync methods
-    override suspend fun uploadJournal(accessToken: String, journal: JournalUploadRequest): Result<JournalUploadResponse> {
+    override suspend fun uploadJournal(
+        accessToken: String,
+        journal: JournalUploadRequest,
+    ): Result<JournalUploadResponse> {
         methodCalls.add("uploadJournal")
         return uploadJournalResponse
     }
 
-    override suspend fun updateJournal(accessToken: String, journalId: String, journal: JournalUpdateRequest): Result<JournalUpdateResponse> {
+    override suspend fun updateJournal(
+        accessToken: String,
+        journalId: String,
+        journal: JournalUpdateRequest,
+    ): Result<JournalUpdateResponse> {
         methodCalls.add("updateJournal")
         return updateJournalResponse
     }
 
-    override suspend fun deleteJournal(accessToken: String, journalId: String): Result<Unit> {
+    override suspend fun deleteJournal(
+        accessToken: String,
+        journalId: String,
+    ): Result<Unit> {
         methodCalls.add("deleteJournal")
         return deleteJournalResponse
     }
 
-    override suspend fun getJournalChanges(accessToken: String, since: Long, limit: Int?): Result<JournalChangesResponse> {
+    override suspend fun getJournalChanges(
+        accessToken: String,
+        since: Long,
+        limit: Int?,
+    ): Result<JournalChangesResponse> {
         methodCalls.add("getJournalChanges")
         return getJournalChangesResponse
     }
 
     // Association sync methods
-    override suspend fun uploadAssociations(accessToken: String, associations: AssociationUploadRequest): Result<AssociationUploadResponse> {
+    override suspend fun uploadAssociations(
+        accessToken: String,
+        associations: AssociationUploadRequest,
+    ): Result<AssociationUploadResponse> {
         methodCalls.add("uploadAssociations")
         return uploadAssociationsResponse
     }
 
-    override suspend fun getAssociationChanges(accessToken: String, since: Long, limit: Int?): Result<AssociationChangesResponse> {
+    override suspend fun getAssociationChanges(
+        accessToken: String,
+        since: Long,
+        limit: Int?,
+    ): Result<AssociationChangesResponse> {
         methodCalls.add("getAssociationChanges")
         return getAssociationChangesResponse
     }
 
-    override suspend fun deleteAssociations(accessToken: String, associations: AssociationDeleteRequest): Result<Unit> {
+    override suspend fun deleteAssociations(
+        accessToken: String,
+        associations: AssociationDeleteRequest,
+    ): Result<Unit> {
         methodCalls.add("deleteAssociations")
         return deleteAssociationsResponse
     }
 
     // Media sync methods
-    override suspend fun uploadMedia(accessToken: String, media: MediaUploadRequest): Result<MediaUploadResponse> {
+    override suspend fun uploadMedia(
+        accessToken: String,
+        media: MediaUploadRequest,
+    ): Result<MediaUploadResponse> {
         methodCalls.add("uploadMedia")
         return uploadMediaResponse
     }
 
-    override suspend fun downloadMedia(accessToken: String, mediaId: String): Result<MediaDownloadResponse> {
+    override suspend fun downloadMedia(
+        accessToken: String,
+        mediaId: String,
+    ): Result<MediaDownloadResponse> {
         methodCalls.add("downloadMedia")
         return downloadMediaResponse
     }
@@ -297,13 +379,13 @@ open class FakeCloudApiClient : CloudApiClient {
  * Fake CloudAccountRepository for testing authenticated vs unauthenticated states.
  */
 class FakeCloudAccountRepository : CloudAccountRepository {
-    private var _isAuthenticated: Boolean = true
+    private var isAuthenticatedState: Boolean = true
     var accessToken: String? = "test-access-token"
 
-    private val _accountFlow = MutableStateFlow<CloudAccount?>(null)
+    private val accountFlow = MutableStateFlow<CloudAccount?>(null)
 
-    override suspend fun getCurrentAccount(): CloudAccount? {
-        return if (_isAuthenticated) {
+    override suspend fun getCurrentAccount(): CloudAccount? =
+        if (isAuthenticatedState) {
             CloudAccount(
                 id = Uuid.random(),
                 username = "testuser",
@@ -311,38 +393,58 @@ class FakeCloudAccountRepository : CloudAccountRepository {
                 userId = Uuid.random(),
                 createdAt = Clock.System.now(),
                 updatedAt = Clock.System.now(),
-                passkeyCredentialIds = emptyList()
+                passkeyCredentialIds = emptyList(),
             )
-        } else null
-    }
+        } else {
+            null
+        }
 
-    override fun observeCurrentAccount(): Flow<CloudAccount?> = _accountFlow.asStateFlow()
+    override fun observeCurrentAccount(): Flow<CloudAccount?> = accountFlow.asStateFlow()
 
     override suspend fun isUsernameAvailable(username: String): Result<Boolean> =
         Result.failure(NotImplementedError("Use for sync testing only"))
-    override suspend fun beginAccountCreation(username: String, displayName: String, deviceInfo: DeviceInfo?): Result<BeginAccountCreationResult> =
-        Result.failure(NotImplementedError("Use for sync testing only"))
-    override suspend fun completeAccountCreation(sessionToken: String, credentialId: String, clientDataJSON: String, attestationObject: String): Result<AuthenticationResult> =
-        Result.failure(NotImplementedError("Use for sync testing only"))
+
+    override suspend fun beginAccountCreation(
+        username: String,
+        displayName: String,
+        deviceInfo: DeviceInfo?,
+    ): Result<BeginAccountCreationResult> = Result.failure(NotImplementedError("Use for sync testing only"))
+
+    override suspend fun completeAccountCreation(
+        sessionToken: String,
+        credentialId: String,
+        clientDataJSON: String,
+        attestationObject: String,
+    ): Result<AuthenticationResult> = Result.failure(NotImplementedError("Use for sync testing only"))
+
     override suspend fun refreshAccessToken(refreshToken: String): Result<String> = Result.success("new-token")
+
     override suspend fun signOut(): Result<Boolean> = Result.success(true)
+
     override suspend fun getPasskeyCredentials(): Result<List<PasskeyCredential>> = Result.success(emptyList())
-    override suspend fun associateUserIdentity(userId: Uuid, accountId: String): Result<Boolean> = Result.success(true)
+
+    override suspend fun associateUserIdentity(
+        userId: Uuid,
+        accountId: String,
+    ): Result<Boolean> = Result.success(true)
 
     fun setAuthenticated(authenticated: Boolean) {
-        _isAuthenticated = authenticated
+        isAuthenticatedState = authenticated
         accessToken = if (authenticated) "test-access-token" else null
-        _accountFlow.value = if (authenticated) {
-            CloudAccount(
-                id = Uuid.random(),
-                username = "testuser",
-                displayName = "Test User",
-                userId = Uuid.random(),
-                createdAt = Clock.System.now(),
-                updatedAt = Clock.System.now(),
-                passkeyCredentialIds = emptyList()
-            )
-        } else null
+        accountFlow.value =
+            if (authenticated) {
+                CloudAccount(
+                    id = Uuid.random(),
+                    username = "testuser",
+                    displayName = "Test User",
+                    userId = Uuid.random(),
+                    createdAt = Clock.System.now(),
+                    updatedAt = Clock.System.now(),
+                    passkeyCredentialIds = emptyList(),
+                )
+            } else {
+                null
+            }
     }
 }
 
@@ -350,25 +452,28 @@ class FakeCloudAccountRepository : CloudAccountRepository {
  * Fake SessionStorage for testing.
  */
 class FakeSessionStorage : SessionStorage {
-    private var _session: UserSession? = UserSession(
-        accessToken = "test-access-token",
-        refreshToken = "test-refresh-token",
-        accountId = "test-account-id"
-    )
-    private val _sessionFlow = MutableStateFlow(_session)
+    private var sessionState: UserSession? =
+        UserSession(
+            accessToken = "test-access-token",
+            refreshToken = "test-refresh-token",
+            accountId = "test-account-id",
+        )
+    private val sessionStateFlow = MutableStateFlow(sessionState)
 
-    override fun getSession(): UserSession? = _session
-    override fun getSessionFlow(): Flow<UserSession?> = _sessionFlow.asStateFlow()
-    override suspend fun hasValidSession(): Boolean = _session != null
+    override fun getSession(): UserSession? = sessionState
+
+    override fun getSessionFlow(): Flow<UserSession?> = sessionStateFlow.asStateFlow()
+
+    override suspend fun hasValidSession(): Boolean = sessionState != null
 
     override fun saveSession(session: UserSession) {
-        _session = session
-        _sessionFlow.value = session
+        sessionState = session
+        sessionStateFlow.value = session
     }
 
     override fun clearSession() {
-        _session = null
-        _sessionFlow.value = null
+        sessionState = null
+        sessionStateFlow.value = null
     }
 }
 
@@ -379,7 +484,7 @@ class FakeSyncMetadataService : SyncMetadataService {
     private val pendingUploads = mutableMapOf<EntityType, MutableMap<String, PendingOperation>>()
     private val retryCounts = mutableMapOf<EntityType, MutableMap<String, Int>>()
     private val syncTimes = mutableMapOf<EntityType, Instant>()
-    private val _pendingCount = MutableStateFlow(0)
+    private val pendingCountFlow = MutableStateFlow(0)
 
     override suspend fun getPendingUploads(entityType: EntityType): List<PendingUpload> =
         pendingUploads[entityType]
@@ -389,7 +494,12 @@ class FakeSyncMetadataService : SyncMetadataService {
             }
             ?: emptyList()
 
-    override suspend fun markAsSynced(entityId: String, entityType: EntityType, syncedAt: Instant, version: Long) {
+    override suspend fun markAsSynced(
+        entityId: String,
+        entityType: EntityType,
+        syncedAt: Instant,
+        version: Long,
+    ) {
         pendingUploads[entityType]?.remove(entityId)
         retryCounts[entityType]?.remove(entityId)
         updatePendingCount()
@@ -397,35 +507,52 @@ class FakeSyncMetadataService : SyncMetadataService {
 
     override suspend fun getLastSyncTime(entityType: EntityType): Instant? = syncTimes[entityType]
 
-    override suspend fun updateLastSyncTime(entityType: EntityType, syncedAt: Instant) {
+    override suspend fun updateLastSyncTime(
+        entityType: EntityType,
+        syncedAt: Instant,
+    ) {
         updateSyncTime(entityType, syncedAt)
     }
 
-    override suspend fun enqueuePending(entityId: String, entityType: EntityType, operation: PendingOperation) {
+    override suspend fun enqueuePending(
+        entityId: String,
+        entityType: EntityType,
+        operation: PendingOperation,
+    ) {
         pendingUploads.getOrPut(entityType) { mutableMapOf() }[entityId] = operation
         retryCounts.getOrPut(entityType) { mutableMapOf() }.putIfAbsent(entityId, 0)
         updatePendingCount()
     }
 
-    override suspend fun resetSyncStatus(entityId: String, entityType: EntityType) {
+    override suspend fun resetSyncStatus(
+        entityId: String,
+        entityType: EntityType,
+    ) {
         enqueuePending(entityId, entityType, PendingOperation.UPDATE)
         updatePendingCount()
     }
 
     override suspend fun getPendingCount(): Int = pendingUploads.values.sumOf { it.size }
 
-    override fun observePendingCount(): Flow<Int> = _pendingCount
+    override fun observePendingCount(): Flow<Int> = pendingCountFlow
 
-    override suspend fun incrementRetryCount(entityId: String, entityType: EntityType) {
+    override suspend fun incrementRetryCount(
+        entityId: String,
+        entityType: EntityType,
+    ) {
         val counts = retryCounts.getOrPut(entityType) { mutableMapOf() }
         counts[entityId] = (counts[entityId] ?: 0) + 1
     }
 
     private fun updatePendingCount() {
-        _pendingCount.value = pendingUploads.values.sumOf { it.size }
+        pendingCountFlow.value = pendingUploads.values.sumOf { it.size }
     }
 
-    fun addPending(entityId: Uuid, entityType: EntityType, operation: PendingOperation = PendingOperation.UPDATE) {
+    fun addPending(
+        entityId: Uuid,
+        entityType: EntityType,
+        operation: PendingOperation = PendingOperation.UPDATE,
+    ) {
         pendingUploads.getOrPut(entityType) { mutableMapOf() }[entityId.toString()] = operation
         updatePendingCount()
     }
@@ -434,10 +561,13 @@ class FakeSyncMetadataService : SyncMetadataService {
         pendingUploads.clear()
         retryCounts.clear()
         syncTimes.clear()
-        _pendingCount.value = 0
+        pendingCountFlow.value = 0
     }
 
-    private fun updateSyncTime(entityType: EntityType, syncedAt: Instant) {
+    private fun updateSyncTime(
+        entityType: EntityType,
+        syncedAt: Instant,
+    ) {
         val current = syncTimes[entityType]
         if (current == null || syncedAt >= current) {
             syncTimes[entityType] = syncedAt
@@ -450,42 +580,57 @@ class FakeSyncMetadataService : SyncMetadataService {
  */
 class FakeJournalNotesRepository : SyncableJournalNotesRepository {
     private val notes = mutableListOf<JournalNote>()
-    private val _notesFlow = MutableStateFlow<List<JournalNote>>(emptyList())
+    private val notesStateFlow = MutableStateFlow<List<JournalNote>>(emptyList())
 
-    override val allNotesObserved: Flow<List<JournalNote>> = _notesFlow.asStateFlow()
+    override val allNotesObserved: Flow<List<JournalNote>> = notesStateFlow.asStateFlow()
 
-    override fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> = _notesFlow.asStateFlow()
-    override fun observeNotesInRange(start: Instant, end: Instant): Flow<List<JournalNote>> = _notesFlow.asStateFlow()
-    override fun observeNotesPage(pageSize: Int, offset: Int): Flow<List<JournalNote>> = _notesFlow.asStateFlow()
-    override fun observeNotesStream(pageSize: Int): Flow<List<JournalNote>> = _notesFlow.asStateFlow()
-    override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> = _notesFlow.asStateFlow()
+    override fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> = notesStateFlow.asStateFlow()
+
+    override fun observeNotesInRange(
+        start: Instant,
+        end: Instant,
+    ): Flow<List<JournalNote>> = notesStateFlow.asStateFlow()
+
+    override fun observeNotesPage(
+        pageSize: Int,
+        offset: Int,
+    ): Flow<List<JournalNote>> = notesStateFlow.asStateFlow()
+
+    override fun observeNotesStream(pageSize: Int): Flow<List<JournalNote>> = notesStateFlow.asStateFlow()
+
+    override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> = notesStateFlow.asStateFlow()
 
     override suspend fun create(note: JournalNote): Uuid {
         notes.add(note)
-        _notesFlow.value = notes.toList()
+        notesStateFlow.value = notes.toList()
         return note.uid
     }
 
     override suspend fun remove(note: JournalNote) {
         notes.removeAll { it.uid == note.uid }
-        _notesFlow.value = notes.toList()
+        notesStateFlow.value = notes.toList()
     }
 
     override suspend fun removeById(noteId: Uuid) {
         notes.removeAll { it.uid == noteId }
-        _notesFlow.value = notes.toList()
+        notesStateFlow.value = notes.toList()
     }
 
-    override suspend fun create(note: JournalNote, journalId: Uuid) {
+    override suspend fun create(
+        note: JournalNote,
+        journalId: Uuid,
+    ) {
         create(note)
     }
 
-    override suspend fun removeFromJournal(noteId: Uuid, journalId: Uuid) {
+    override suspend fun removeFromJournal(
+        noteId: Uuid,
+        journalId: Uuid,
+    ) {
         // No-op for testing
     }
 
-    override suspend fun getNoteById(noteId: Uuid): JournalNote? =
-        notes.find { it.uid == noteId }
+    override suspend fun getNoteById(noteId: Uuid): JournalNote? = notes.find { it.uid == noteId }
 
     override suspend fun createFromSync(note: JournalNote) {
         create(note)
@@ -495,54 +640,61 @@ class FakeJournalNotesRepository : SyncableJournalNotesRepository {
         removeById(noteId)
     }
 
-    override suspend fun updateSyncMetadata(note: JournalNote, syncVersion: Long, syncedAt: Instant) {
+    override suspend fun updateSyncMetadata(
+        note: JournalNote,
+        syncVersion: Long,
+        syncedAt: Instant,
+    ) {
         // For testing, just update the note
         val index = notes.indexOfFirst { it.uid == note.uid }
         if (index >= 0) {
             notes[index] = note
-            _notesFlow.value = notes.toList()
+            notesStateFlow.value = notes.toList()
         }
     }
 
-    override suspend fun updateMediaRef(noteId: Uuid, mediaRef: String) {
+    override suspend fun updateMediaRef(
+        noteId: Uuid,
+        mediaRef: String,
+    ) {
         val index = notes.indexOfFirst { it.uid == noteId }
         if (index >= 0) {
             val current = notes[index]
-            val updated = when (current) {
-                is JournalNote.Image -> current.copy(mediaRef = mediaRef)
-                is JournalNote.Video -> current.copy(mediaRef = mediaRef)
-                is JournalNote.Audio -> current.copy(mediaRef = mediaRef)
-                else -> current
-            }
+            val updated =
+                when (current) {
+                    is JournalNote.Image -> current.copy(mediaRef = mediaRef)
+                    is JournalNote.Video -> current.copy(mediaRef = mediaRef)
+                    is JournalNote.Audio -> current.copy(mediaRef = mediaRef)
+                    else -> current
+                }
             notes[index] = updated
-            _notesFlow.value = notes.toList()
+            notesStateFlow.value = notes.toList()
         }
     }
 
     fun addTestNote(content: String): JournalNote.Text {
-        val note = JournalNote.Text(
-            uid = Uuid.random(),
-            creationTimestamp = Clock.System.now(),
-            lastUpdated = Clock.System.now(),
-            content = content
-        )
+        val note =
+            JournalNote.Text(
+                uid = Uuid.random(),
+                creationTimestamp = Clock.System.now(),
+                lastUpdated = Clock.System.now(),
+                content = content,
+            )
         notes.add(note)
-        _notesFlow.value = notes.toList()
+        notesStateFlow.value = notes.toList()
         return note
     }
 
     fun clear() {
         notes.clear()
-        _notesFlow.value = emptyList()
+        notesStateFlow.value = emptyList()
     }
 }
 
 class FailingJournalNotesRepository(
-    private val delegate: JournalNotesRepository = FakeJournalNotesRepository()
+    private val delegate: JournalNotesRepository = FakeJournalNotesRepository(),
 ) : JournalNotesRepository by delegate {
-    override suspend fun create(note: JournalNote): Uuid {
-        throw IllegalStateException("Simulated note create failure")
-    }
+    override suspend fun create(note: JournalNote): Uuid = throw IllegalStateException("Simulated note create failure")
 }
 
 /**
@@ -550,19 +702,17 @@ class FailingJournalNotesRepository(
  */
 class FakeJournalRepository : JournalRepository {
     private val journals = mutableListOf<Journal>()
-    private val _journalsFlow = MutableStateFlow<List<Journal>>(emptyList())
+    private val journalsStateFlow = MutableStateFlow<List<Journal>>(emptyList())
 
-    override val allJournalsObserved: Flow<List<Journal>> = _journalsFlow.asStateFlow()
+    override val allJournalsObserved: Flow<List<Journal>> = journalsStateFlow.asStateFlow()
 
-    override fun observeJournalById(id: Uuid): Flow<Journal> {
-        throw NotImplementedError("Not implemented in fake")
-    }
+    override fun observeJournalById(id: Uuid): Flow<Journal> = throw NotImplementedError("Not implemented in fake")
 
     override suspend fun getJournalById(id: Uuid): Journal? = journals.find { it.id == id }
 
     override suspend fun create(journal: Journal): Uuid {
         journals.add(journal)
-        _journalsFlow.value = journals.toList()
+        journalsStateFlow.value = journals.toList()
         return journal.id
     }
 
@@ -570,24 +720,28 @@ class FakeJournalRepository : JournalRepository {
         val index = journals.indexOfFirst { it.id == journal.id }
         if (index >= 0) {
             journals[index] = journal
-            _journalsFlow.value = journals.toList()
+            journalsStateFlow.value = journals.toList()
         }
     }
 
     override suspend fun delete(journalId: Uuid) {
         journals.removeAll { it.id == journalId }
-        _journalsFlow.value = journals.toList()
+        journalsStateFlow.value = journals.toList()
     }
 
     override suspend fun saveDraft(draft: EditorDraft) {}
+
     override suspend fun getLatestDraft(): EditorDraft? = null
+
     override suspend fun getAllDrafts(): List<EditorDraft> = emptyList()
+
     override suspend fun getDraft(id: Uuid): EditorDraft? = null
+
     override suspend fun deleteDraft(id: Uuid) {}
 
     fun clear() {
         journals.clear()
-        _journalsFlow.value = emptyList()
+        journalsStateFlow.value = emptyList()
     }
 }
 
@@ -596,33 +750,57 @@ class FakeJournalRepository : JournalRepository {
  */
 class FakeJournalContentRepository : JournalContentRepository {
     override fun observeContentForJournal(journalId: Uuid): Flow<List<JournalNote>> = MutableStateFlow(emptyList())
+
     override fun observeJournalsForContent(contentId: Uuid): Flow<List<Journal>> = MutableStateFlow(emptyList())
-    override suspend fun addContentToJournal(contentId: Uuid, journalId: Uuid) {}
-    override suspend fun removeContentFromJournal(contentId: Uuid, journalId: Uuid) {}
-    override suspend fun addContentToJournals(contentId: Uuid, journalIds: List<Uuid>) {}
+
+    override suspend fun addContentToJournal(
+        contentId: Uuid,
+        journalId: Uuid,
+    ) {}
+
+    override suspend fun removeContentFromJournal(
+        contentId: Uuid,
+        journalId: Uuid,
+    ) {}
+
+    override suspend fun addContentToJournals(
+        contentId: Uuid,
+        journalIds: List<Uuid>,
+    ) {}
+
     override suspend fun removeContentFromAllJournals(contentId: Uuid) {}
 }
 
 class TrackingJournalContentRepository : JournalContentRepository {
-    private data class AssociationKey(val contentId: Uuid, val journalId: Uuid)
+    private data class AssociationKey(
+        val contentId: Uuid,
+        val journalId: Uuid,
+    )
 
     private val associations = mutableSetOf<AssociationKey>()
 
-    override fun observeContentForJournal(journalId: Uuid): Flow<List<JournalNote>> =
-        MutableStateFlow(emptyList())
+    override fun observeContentForJournal(journalId: Uuid): Flow<List<JournalNote>> = MutableStateFlow(emptyList())
 
-    override fun observeJournalsForContent(contentId: Uuid): Flow<List<Journal>> =
-        MutableStateFlow(emptyList())
+    override fun observeJournalsForContent(contentId: Uuid): Flow<List<Journal>> = MutableStateFlow(emptyList())
 
-    override suspend fun addContentToJournal(contentId: Uuid, journalId: Uuid) {
+    override suspend fun addContentToJournal(
+        contentId: Uuid,
+        journalId: Uuid,
+    ) {
         associations.add(AssociationKey(contentId, journalId))
     }
 
-    override suspend fun removeContentFromJournal(contentId: Uuid, journalId: Uuid) {
+    override suspend fun removeContentFromJournal(
+        contentId: Uuid,
+        journalId: Uuid,
+    ) {
         associations.remove(AssociationKey(contentId, journalId))
     }
 
-    override suspend fun addContentToJournals(contentId: Uuid, journalIds: List<Uuid>) {
+    override suspend fun addContentToJournals(
+        contentId: Uuid,
+        journalIds: List<Uuid>,
+    ) {
         journalIds.forEach { journalId ->
             addContentToJournal(contentId, journalId)
         }
@@ -632,9 +810,10 @@ class TrackingJournalContentRepository : JournalContentRepository {
         associations.removeAll { it.contentId == contentId }
     }
 
-    fun hasAssociation(contentId: Uuid, journalId: Uuid): Boolean {
-        return associations.contains(AssociationKey(contentId, journalId))
-    }
+    fun hasAssociation(
+        contentId: Uuid,
+        journalId: Uuid,
+    ): Boolean = associations.contains(AssociationKey(contentId, journalId))
 }
 
 /**
@@ -651,22 +830,53 @@ class TrackingSyncManager : SyncManager {
     var getSyncStatusCalls = 0
 
     var syncResult: SyncResult = SyncResult(success = true)
-    var syncStatus: SyncStatus = SyncStatus(
-        isEnabled = true,
-        lastSyncTime = null,
-        pendingUploads = 0,
-        isSyncing = false,
-        hasErrors = false
-    )
+    var syncStatus: SyncStatus =
+        SyncStatus(
+            isEnabled = true,
+            lastSyncTime = null,
+            pendingUploads = 0,
+            isSyncing = false,
+            hasErrors = false,
+        )
 
-    override fun sync(startNow: Boolean) { syncCalls++ }
-    override suspend fun uploadPendingChanges(): SyncResult { uploadPendingChangesCalls++; return syncResult }
-    override suspend fun downloadRemoteChanges(): SyncResult { downloadRemoteChangesCalls++; return syncResult }
-    override suspend fun syncContent(): SyncResult { syncContentCalls++; return syncResult }
-    override suspend fun syncJournals(): SyncResult { syncJournalsCalls++; return syncResult }
-    override suspend fun syncAssociations(): SyncResult { syncAssociationsCalls++; return syncResult }
-    override suspend fun fullSync(): SyncResult { fullSyncCalls++; return syncResult }
-    override suspend fun getSyncStatus(): SyncStatus { getSyncStatusCalls++; return syncStatus }
+    override fun sync(startNow: Boolean) {
+        syncCalls++
+    }
+
+    override suspend fun uploadPendingChanges(): SyncResult {
+        uploadPendingChangesCalls++
+        return syncResult
+    }
+
+    override suspend fun downloadRemoteChanges(): SyncResult {
+        downloadRemoteChangesCalls++
+        return syncResult
+    }
+
+    override suspend fun syncContent(): SyncResult {
+        syncContentCalls++
+        return syncResult
+    }
+
+    override suspend fun syncJournals(): SyncResult {
+        syncJournalsCalls++
+        return syncResult
+    }
+
+    override suspend fun syncAssociations(): SyncResult {
+        syncAssociationsCalls++
+        return syncResult
+    }
+
+    override suspend fun fullSync(): SyncResult {
+        fullSyncCalls++
+        return syncResult
+    }
+
+    override suspend fun getSyncStatus(): SyncStatus {
+        getSyncStatusCalls++
+        return syncStatus
+    }
 
     fun reset() {
         syncCalls = 0
@@ -680,19 +890,24 @@ class TrackingSyncManager : SyncManager {
     }
 
     fun configureSyncFailure(errorMessage: String = "Sync failed") {
-        syncResult = SyncResult(
-            success = false,
-            errors = listOf(SyncError(SyncErrorType.NETWORK_ERROR, errorMessage))
-        )
+        syncResult =
+            SyncResult(
+                success = false,
+                errors = listOf(SyncError(SyncErrorType.NETWORK_ERROR, errorMessage)),
+            )
     }
 
-    fun configureSyncSuccess(uploadedItems: Int = 0, downloadedItems: Int = 0) {
-        syncResult = SyncResult(
-            success = true,
-            uploadedItems = uploadedItems,
-            downloadedItems = downloadedItems,
-            lastSyncTime = Clock.System.now()
-        )
+    fun configureSyncSuccess(
+        uploadedItems: Int = 0,
+        downloadedItems: Int = 0,
+    ) {
+        syncResult =
+            SyncResult(
+                success = true,
+                uploadedItems = uploadedItems,
+                downloadedItems = downloadedItems,
+                lastSyncTime = Clock.System.now(),
+            )
     }
 }
 
@@ -701,17 +916,13 @@ class TrackingSyncManager : SyncManager {
  * without actual transaction semantics (suitable for in-memory testing).
  */
 class TestSyncTransactionManager : SyncTransactionManager {
-    override suspend fun <T> withTransaction(block: suspend () -> T): T {
-        return block()
-    }
+    override suspend fun <T> withTransaction(block: suspend () -> T): T = block()
 }
 
 class InMemoryMediaSyncRefStore : MediaSyncRefStore {
     private val refs = mutableMapOf<String, MediaSyncRef>()
 
-    override suspend fun get(noteId: Uuid): MediaSyncRef? {
-        return refs[noteId.toString()]
-    }
+    override suspend fun get(noteId: Uuid): MediaSyncRef? = refs[noteId.toString()]
 
     override suspend fun upsert(ref: MediaSyncRef) {
         refs[ref.noteId] = ref
@@ -725,9 +936,7 @@ class InMemoryMediaSyncRefStore : MediaSyncRefStore {
 class InMemorySyncConflictStore : SyncConflictStore {
     private val conflicts = mutableMapOf<String, SyncConflictRecord>()
 
-    override suspend fun list(): List<SyncConflictRecord> {
-        return conflicts.values.toList()
-    }
+    override suspend fun list(): List<SyncConflictRecord> = conflicts.values.toList()
 
     override suspend fun add(record: SyncConflictRecord) {
         conflicts[record.id] = record
@@ -745,9 +954,7 @@ class InMemorySyncConflictStore : SyncConflictStore {
 class InMemorySyncDeadLetterStore : SyncDeadLetterStore {
     private val deadLetters = mutableMapOf<String, SyncDeadLetterRecord>()
 
-    override suspend fun list(): List<SyncDeadLetterRecord> {
-        return deadLetters.values.toList()
-    }
+    override suspend fun list(): List<SyncDeadLetterRecord> = deadLetters.values.toList()
 
     override suspend fun add(record: SyncDeadLetterRecord) {
         deadLetters[record.id] = record
@@ -765,15 +972,23 @@ class InMemorySyncDeadLetterStore : SyncDeadLetterStore {
 class InMemorySyncRetryScheduleStore : SyncRetryScheduleStore {
     private val schedule = mutableMapOf<String, Long>()
 
-    override suspend fun nextAttemptAt(entityType: EntityType, entityId: String): Long? {
-        return schedule["${entityType.name}:$entityId"]
-    }
+    override suspend fun nextAttemptAt(
+        entityType: EntityType,
+        entityId: String,
+    ): Long? = schedule["${entityType.name}:$entityId"]
 
-    override suspend fun setNextAttemptAt(entityType: EntityType, entityId: String, timestamp: Long) {
+    override suspend fun setNextAttemptAt(
+        entityType: EntityType,
+        entityId: String,
+        timestamp: Long,
+    ) {
         schedule["${entityType.name}:$entityId"] = timestamp
     }
 
-    override suspend fun clear(entityType: EntityType, entityId: String) {
+    override suspend fun clear(
+        entityType: EntityType,
+        entityId: String,
+    ) {
         schedule.remove("${entityType.name}:$entityId")
     }
 }

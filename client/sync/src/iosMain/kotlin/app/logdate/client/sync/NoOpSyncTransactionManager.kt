@@ -5,7 +5,5 @@ package app.logdate.client.sync
  * Simply executes the block without transaction semantics.
  */
 class NoOpSyncTransactionManager : SyncTransactionManager {
-    override suspend fun <T> withTransaction(block: suspend () -> T): T {
-        return block()
-    }
+    override suspend fun <T> withTransaction(block: suspend () -> T): T = block()
 }

@@ -1,9 +1,8 @@
 package app.logdate.shared.model
 
 import app.logdate.util.UuidSerializer
-import kotlin.time.Instant
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -21,10 +20,13 @@ data class CloudAccount(
     val userId: Uuid,
     val createdAt: Instant,
     val updatedAt: Instant,
-    val passkeyCredentialIds: List<@Serializable(with = UuidSerializer::class) Uuid>,
+    val passkeyCredentialIds: List<
+        @Serializable(with = UuidSerializer::class)
+        Uuid,
+    >,
     val bio: String? = null,
     val isVerified: Boolean = false,
-    val lastLoginAt: Instant? = null
+    val lastLoginAt: Instant? = null,
 )
 
 /**
@@ -34,7 +36,7 @@ data class CloudAccount(
 data class AccountCredentials(
     val accessToken: String,
     val refreshToken: String,
-    val expiresIn: Long
+    val expiresIn: Long,
 )
 
 /**
@@ -45,13 +47,13 @@ sealed class AuthenticationResult {
     @Serializable
     data class Success(
         val account: CloudAccount,
-        val credentials: AccountCredentials
+        val credentials: AccountCredentials,
     ) : AuthenticationResult()
 
     @Serializable
     data class Error(
         val errorCode: String,
-        val message: String
+        val message: String,
     ) : AuthenticationResult()
 }
 
@@ -62,7 +64,7 @@ sealed class AuthenticationResult {
 data class DeviceInfo(
     val platform: String,
     val deviceName: String?,
-    val deviceType: DeviceType
+    val deviceType: DeviceType,
 )
 
 /**
@@ -72,7 +74,7 @@ data class DeviceInfo(
 data class DeviceInfoDto(
     val platform: String,
     val deviceName: String? = null,
-    val deviceType: String = "MOBILE"
+    val deviceType: String = "MOBILE",
 )
 
 /**
@@ -83,7 +85,7 @@ enum class DeviceType {
     MOBILE,
     TABLET,
     DESKTOP,
-    UNKNOWN
+    UNKNOWN,
 }
 
 /**
@@ -95,7 +97,7 @@ data class PasskeyCredential(
     val credentialId: Uuid,
     val nickname: String,
     val deviceInfo: DeviceInfo?,
-    val createdAt: Instant
+    val createdAt: Instant,
 )
 
 /**
@@ -111,5 +113,5 @@ data class BeginAccountCreationResult(
     val userId: Uuid,
     val username: String,
     val displayName: String,
-    val timeout: Long
+    val timeout: Long,
 )

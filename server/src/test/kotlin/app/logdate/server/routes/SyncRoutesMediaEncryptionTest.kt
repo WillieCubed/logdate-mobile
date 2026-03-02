@@ -9,17 +9,23 @@ import app.logdate.shared.model.sync.DeviceId
 import app.logdate.shared.model.sync.MediaDownloadResponse
 import app.logdate.shared.model.sync.MediaUploadRequest
 import app.logdate.shared.model.sync.MediaUploadResponse
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.util.UUID
 import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
@@ -31,135 +37,145 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SyncRoutesMediaEncryptionTest {
-
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
-    fun `media upload encrypts at rest and download returns plaintext`() = testApplication {
-        val repository = InMemorySyncRepository()
-        val tokenService = StubTokenService()
-        val metrics = SyncMetricsRegistry()
-        val encryptionKey = ByteArray(32) { index -> (index + 1).toByte() }
-        val mediaEncryption = MediaEncryptionService.fromKeyBytes(encryptionKey)
+    fun `media upload encrypts at rest and download returns plaintext`() =
+        testApplication {
+            val repository = InMemorySyncRepository()
+            val tokenService = StubTokenService()
+            val metrics = SyncMetricsRegistry()
+            val encryptionKey = ByteArray(32) { index -> (index + 1).toByte() }
+            val mediaEncryption = MediaEncryptionService.fromKeyBytes(encryptionKey)
 
-        application {
-            install(ContentNegotiation) {
-                json(json)
-            }
-            routing {
-                route("/api/v1") {
-                    syncRoutes(
-                        repository = repository,
-                        tokenService = tokenService,
-                        mediaStorage = null,
-                        metrics = metrics,
-                        mediaAccessPolicy = MediaAccessPolicy(useSignedUrls = false, signedUrlTtlHours = 1),
-                        mediaEncryption = mediaEncryption
-                    )
+            application {
+                install(ContentNegotiation) {
+                    json(json)
+                }
+                routing {
+                    route("/api/v1") {
+                        syncRoutes(
+                            repository = repository,
+                            tokenService = tokenService,
+                            mediaStorage = null,
+                            metrics = metrics,
+                            mediaAccessPolicy = MediaAccessPolicy(useSignedUrls = false, signedUrlTtlHours = 1),
+                            mediaEncryption = mediaEncryption,
+                        )
+                    }
                 }
             }
+
+            val userId = UUID.randomUUID()
+            val authHeader = "Bearer ${tokenService.generateAccessToken(userId.toString())}"
+            val bytes = byteArrayOf(10, 11, 12, 13)
+            val uploadRequest =
+                MediaUploadRequest(
+                    contentId = "note-encrypted",
+                    fileName = "photo.jpg",
+                    mimeType = "image/jpeg",
+                    sizeBytes = bytes.size.toLong(),
+                    data = bytes,
+                    deviceId = DeviceId("dev-1"),
+                )
+            val upload =
+                client.post("/api/v1/sync/media") {
+                    header(HttpHeaders.Authorization, authHeader)
+                    contentType(ContentType.Application.Json)
+                    setBody(json.encodeToString(uploadRequest))
+                }
+            assertEquals(HttpStatusCode.OK, upload.status)
+
+            val uploadPayload = json.decodeFromString<MediaUploadResponse>(upload.bodyAsText())
+            val stored = repository.getMedia(userId, uploadPayload.mediaId)
+            assertNotNull(stored)
+            assertFalse(stored.data.contentEquals(bytes))
+            assertTrue(stored.data.size > bytes.size)
+            val prefix = String(stored.data.copyOfRange(0, 5), Charsets.UTF_8)
+            assertEquals("LDSM1", prefix)
+
+            val download =
+                client.get("/api/v1/sync/media/${uploadPayload.mediaId}") {
+                    header(HttpHeaders.Authorization, authHeader)
+                }
+            assertEquals(HttpStatusCode.OK, download.status)
+
+            val downloadPayload = json.decodeFromString<MediaDownloadResponse>(download.bodyAsText())
+            assertTrue(downloadPayload.data.contentEquals(bytes))
         }
-
-        val userId = UUID.randomUUID()
-        val authHeader = "Bearer ${tokenService.generateAccessToken(userId.toString())}"
-        val bytes = byteArrayOf(10, 11, 12, 13)
-        val uploadRequest = MediaUploadRequest(
-            contentId = "note-encrypted",
-            fileName = "photo.jpg",
-            mimeType = "image/jpeg",
-            sizeBytes = bytes.size.toLong(),
-            data = bytes,
-            deviceId = DeviceId("dev-1")
-        )
-        val upload = client.post("/api/v1/sync/media") {
-            header(HttpHeaders.Authorization, authHeader)
-            contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(uploadRequest))
-        }
-        assertEquals(HttpStatusCode.OK, upload.status)
-
-        val uploadPayload = json.decodeFromString<MediaUploadResponse>(upload.bodyAsText())
-        val stored = repository.getMedia(userId, uploadPayload.mediaId)
-        assertNotNull(stored)
-        assertFalse(stored.data.contentEquals(bytes))
-        assertTrue(stored.data.size > bytes.size)
-        val prefix = String(stored.data.copyOfRange(0, 5), Charsets.UTF_8)
-        assertEquals("LDSM1", prefix)
-
-        val download = client.get("/api/v1/sync/media/${uploadPayload.mediaId}") {
-            header(HttpHeaders.Authorization, authHeader)
-        }
-        assertEquals(HttpStatusCode.OK, download.status)
-
-        val downloadPayload = json.decodeFromString<MediaDownloadResponse>(download.bodyAsText())
-        assertTrue(downloadPayload.data.contentEquals(bytes))
-    }
 
     @Test
-    fun `client encrypted media round trips without server decryption`() = testApplication {
-        val repository = InMemorySyncRepository()
-        val tokenService = StubTokenService()
-        val metrics = SyncMetricsRegistry()
-        val serverKey = ByteArray(32) { index -> (index + 10).toByte() }
-        val mediaEncryption = MediaEncryptionService.fromKeyBytes(serverKey)
+    fun `client encrypted media round trips without server decryption`() =
+        testApplication {
+            val repository = InMemorySyncRepository()
+            val tokenService = StubTokenService()
+            val metrics = SyncMetricsRegistry()
+            val serverKey = ByteArray(32) { index -> (index + 10).toByte() }
+            val mediaEncryption = MediaEncryptionService.fromKeyBytes(serverKey)
 
-        application {
-            install(ContentNegotiation) {
-                json(json)
-            }
-            routing {
-                route("/api/v1") {
-                    syncRoutes(
-                        repository = repository,
-                        tokenService = tokenService,
-                        mediaStorage = null,
-                        metrics = metrics,
-                        mediaAccessPolicy = MediaAccessPolicy(useSignedUrls = false, signedUrlTtlHours = 1),
-                        mediaEncryption = mediaEncryption
-                    )
+            application {
+                install(ContentNegotiation) {
+                    json(json)
+                }
+                routing {
+                    route("/api/v1") {
+                        syncRoutes(
+                            repository = repository,
+                            tokenService = tokenService,
+                            mediaStorage = null,
+                            metrics = metrics,
+                            mediaAccessPolicy = MediaAccessPolicy(useSignedUrls = false, signedUrlTtlHours = 1),
+                            mediaEncryption = mediaEncryption,
+                        )
+                    }
                 }
             }
+
+            val userId = UUID.randomUUID()
+            val authHeader = "Bearer ${tokenService.generateAccessToken(userId.toString())}"
+            val clientKey = ByteArray(32) { index -> (index + 42).toByte() }
+            val plaintext = "client-encrypted".encodeToByteArray()
+            val clientCiphertext = encryptClientMedia(clientKey, plaintext)
+            val uploadRequest =
+                MediaUploadRequest(
+                    contentId = "note-client-encrypted",
+                    fileName = "secret.bin",
+                    mimeType = "application/octet-stream",
+                    sizeBytes = clientCiphertext.size.toLong(),
+                    data = clientCiphertext,
+                    deviceId = DeviceId("dev-1"),
+                )
+            val upload =
+                client.post("/api/v1/sync/media") {
+                    header(HttpHeaders.Authorization, authHeader)
+                    contentType(ContentType.Application.Json)
+                    setBody(json.encodeToString(uploadRequest))
+                }
+            assertEquals(HttpStatusCode.OK, upload.status)
+
+            val uploadPayload = json.decodeFromString<MediaUploadResponse>(upload.bodyAsText())
+            val stored = repository.getMedia(userId, uploadPayload.mediaId)
+            assertNotNull(stored)
+            assertTrue(stored.data.contentEquals(clientCiphertext))
+            val prefix = String(stored.data.copyOfRange(0, 5), Charsets.UTF_8)
+            assertEquals("LDCE1", prefix)
+
+            val download =
+                client.get("/api/v1/sync/media/${uploadPayload.mediaId}") {
+                    header(HttpHeaders.Authorization, authHeader)
+                }
+            assertEquals(HttpStatusCode.OK, download.status)
+
+            val downloadPayload = json.decodeFromString<MediaDownloadResponse>(download.bodyAsText())
+            assertTrue(downloadPayload.data.contentEquals(clientCiphertext))
+            val decrypted = decryptClientMedia(clientKey, downloadPayload.data)
+            assertTrue(decrypted.contentEquals(plaintext))
         }
 
-        val userId = UUID.randomUUID()
-        val authHeader = "Bearer ${tokenService.generateAccessToken(userId.toString())}"
-        val clientKey = ByteArray(32) { index -> (index + 42).toByte() }
-        val plaintext = "client-encrypted".encodeToByteArray()
-        val clientCiphertext = encryptClientMedia(clientKey, plaintext)
-        val uploadRequest = MediaUploadRequest(
-            contentId = "note-client-encrypted",
-            fileName = "secret.bin",
-            mimeType = "application/octet-stream",
-            sizeBytes = clientCiphertext.size.toLong(),
-            data = clientCiphertext,
-            deviceId = DeviceId("dev-1")
-        )
-        val upload = client.post("/api/v1/sync/media") {
-            header(HttpHeaders.Authorization, authHeader)
-            contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(uploadRequest))
-        }
-        assertEquals(HttpStatusCode.OK, upload.status)
-
-        val uploadPayload = json.decodeFromString<MediaUploadResponse>(upload.bodyAsText())
-        val stored = repository.getMedia(userId, uploadPayload.mediaId)
-        assertNotNull(stored)
-        assertTrue(stored.data.contentEquals(clientCiphertext))
-        val prefix = String(stored.data.copyOfRange(0, 5), Charsets.UTF_8)
-        assertEquals("LDCE1", prefix)
-
-        val download = client.get("/api/v1/sync/media/${uploadPayload.mediaId}") {
-            header(HttpHeaders.Authorization, authHeader)
-        }
-        assertEquals(HttpStatusCode.OK, download.status)
-
-        val downloadPayload = json.decodeFromString<MediaDownloadResponse>(download.bodyAsText())
-        assertTrue(downloadPayload.data.contentEquals(clientCiphertext))
-        val decrypted = decryptClientMedia(clientKey, downloadPayload.data)
-        assertTrue(decrypted.contentEquals(plaintext))
-    }
-
-    private fun encryptClientMedia(key: ByteArray, plaintext: ByteArray): ByteArray {
+    private fun encryptClientMedia(
+        key: ByteArray,
+        plaintext: ByteArray,
+    ): ByteArray {
         // Fixed IV for deterministic test vectors.
         val iv = ByteArray(12) { index -> (index + 7).toByte() }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -175,7 +191,10 @@ class SyncRoutesMediaEncryptionTest {
         return output
     }
 
-    private fun decryptClientMedia(key: ByteArray, payload: ByteArray): ByteArray {
+    private fun decryptClientMedia(
+        key: ByteArray,
+        payload: ByteArray,
+    ): ByteArray {
         val prefix = MediaEncryptionService.clientPrefixBytes()
         val ivStart = prefix.size
         val ivEnd = ivStart + 12

@@ -1,15 +1,15 @@
 package app.logdate.server.auth
 
-import kotlin.time.Instant
+import app.logdate.shared.model.PasskeyAuthenticationOptions
+import app.logdate.shared.model.PasskeyAuthenticationResponse
+import app.logdate.shared.model.PasskeyInfo
+import app.logdate.shared.model.PasskeyRegistrationOptions
+import app.logdate.shared.model.PasskeyRegistrationResponse
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
+import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
-import app.logdate.shared.model.PasskeyRegistrationOptions
-import app.logdate.shared.model.PasskeyAuthenticationOptions
-import app.logdate.shared.model.PasskeyInfo
-import app.logdate.shared.model.PasskeyRegistrationResponse
-import app.logdate.shared.model.PasskeyAuthenticationResponse
 
 @OptIn(ExperimentalUuidApi::class)
 @Serializable
@@ -24,7 +24,7 @@ data class Account(
     val timezone: String? = null,
     val locale: String? = null,
     val preferences: String? = null,
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
 )
 
 @OptIn(ExperimentalUuidApi::class)
@@ -34,7 +34,7 @@ data class AccountInfo(
     val username: String,
     val displayName: String,
     val createdAt: Instant,
-    val lastSignInAt: Instant? = null
+    val lastSignInAt: Instant? = null,
 )
 
 @OptIn(ExperimentalUuidApi::class)
@@ -44,7 +44,7 @@ data class DeviceInfo(
     val deviceName: String,
     val osVersion: String? = null,
     val appVersion: String? = null,
-    val capabilities: List<String> = emptyList() // ["uv", "rk", "up"]
+    val capabilities: List<String> = emptyList(), // ["uv", "rk", "up"]
 )
 
 @OptIn(ExperimentalUuidApi::class)
@@ -60,13 +60,13 @@ data class TemporarySession(
     val sessionType: SessionType,
     val createdAt: Instant,
     val expiresAt: Instant,
-    val isUsed: Boolean = false
+    val isUsed: Boolean = false,
 )
 
 @Serializable
 enum class SessionType {
     ACCOUNT_CREATION,
-    AUTHENTICATION
+    AUTHENTICATION,
 }
 
 @OptIn(ExperimentalUuidApi::class)
@@ -74,7 +74,7 @@ enum class SessionType {
 data class SessionTokens(
     val accessToken: String,
     val refreshToken: String,
-    val expiresIn: Long // seconds
+    val expiresIn: Long, // seconds
 )
 
 @OptIn(ExperimentalUuidApi::class)
@@ -83,7 +83,7 @@ data class SyncData(
     val serverEndpoint: String,
     val initialSyncRequired: Boolean = false,
     val lastSyncTimestamp: Instant? = null,
-    val pendingChanges: Int = 0
+    val pendingChanges: Int = 0,
 )
 
 // Request/Response models for passkey account creation
@@ -92,7 +92,7 @@ data class SyncData(
 @Serializable
 data class BeginAccountCreationRequest(
     val preferredUsername: String? = null,
-    val deviceInfo: DeviceInfo? = null
+    val deviceInfo: DeviceInfo? = null,
 )
 
 @OptIn(ExperimentalUuidApi::class)
@@ -101,7 +101,7 @@ data class BeginAccountCreationResponse(
     val challenge: String,
     val userId: String, // Base64URL encoded temporary user ID
     val sessionId: String,
-    val registrationOptions: PublicKeyCredentialCreationOptions
+    val registrationOptions: PublicKeyCredentialCreationOptions,
 )
 
 @OptIn(ExperimentalUuidApi::class)
@@ -110,7 +110,7 @@ data class AccountPreferences(
     val displayName: String? = null,
     val timezone: String? = null,
     val locale: String? = null,
-    val enableSync: Boolean = true
+    val enableSync: Boolean = true,
 )
 
 @OptIn(ExperimentalUuidApi::class)
@@ -118,7 +118,7 @@ data class AccountPreferences(
 data class CompleteAccountCreationRequest(
     val sessionId: String,
     val credential: PasskeyRegistrationResponse,
-    val accountPreferences: AccountPreferences? = null
+    val accountPreferences: AccountPreferences? = null,
 )
 
 @OptIn(ExperimentalUuidApi::class)
@@ -128,7 +128,7 @@ data class AccountCreationResponse(
     val account: AccountInfo,
     val session: SessionTokens,
     val passkey: PasskeySummaryResponse,
-    val syncData: SyncData
+    val syncData: SyncData,
 )
 
 // Request/Response models for passkey authentication
@@ -137,7 +137,7 @@ data class AccountCreationResponse(
 @Serializable
 data class BeginAuthenticationRequest(
     val accountHint: String? = null, // username or account ID
-    val deviceInfo: DeviceInfo? = null
+    val deviceInfo: DeviceInfo? = null,
 )
 
 @OptIn(ExperimentalUuidApi::class)
@@ -145,14 +145,14 @@ data class BeginAuthenticationRequest(
 data class BeginAuthenticationResponse(
     val challenge: String,
     val sessionId: String,
-    val authenticationOptions: PublicKeyCredentialRequestOptions
+    val authenticationOptions: PublicKeyCredentialRequestOptions,
 )
 
 @OptIn(ExperimentalUuidApi::class)
 @Serializable
 data class CompleteAuthenticationRequest(
     val sessionId: String,
-    val credential: PasskeyAuthenticationResponse
+    val credential: PasskeyAuthenticationResponse,
 )
 
 @OptIn(ExperimentalUuidApi::class)
@@ -161,7 +161,7 @@ data class AuthenticationResponse(
     val success: Boolean,
     val account: AccountInfo,
     val session: SessionTokens,
-    val syncData: SyncData
+    val syncData: SyncData,
 )
 
 // Use shared passkey models
@@ -171,5 +171,5 @@ typealias PasskeySummaryResponse = PasskeyInfo
 
 @Serializable
 data class RefreshTokenRequest(
-    val refreshToken: String
+    val refreshToken: String,
 )

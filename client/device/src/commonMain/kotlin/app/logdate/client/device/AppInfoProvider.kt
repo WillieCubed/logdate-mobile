@@ -6,14 +6,16 @@ package app.logdate.client.device
 data class AppInfo(
     val versionName: String,
     val versionCode: Int,
-    val packageName: String
+    val packageName: String,
 )
 
 /**
  * Exception thrown when app info cannot be retrieved.
  */
-class AppInfoRetrievalException(message: String, cause: Throwable? = null) : 
-    RuntimeException(message, cause)
+class AppInfoRetrievalException(
+    message: String,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)
 
 /**
  * Interface for providing application information.
@@ -22,7 +24,7 @@ class AppInfoRetrievalException(message: String, cause: Throwable? = null) :
 interface AppInfoProvider {
     /**
      * Gets the application information.
-     * 
+     *
      * @return AppInfo with valid values
      * @throws AppInfoRetrievalException if app info cannot be retrieved
      */

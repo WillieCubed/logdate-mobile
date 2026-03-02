@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.feature.journals.ui.detail
 
 import androidx.compose.material.icons.Icons
@@ -8,9 +10,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.journal.generated.resources.*
 import logdate.client.feature.journal.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+
 /**
  * A dialog that asks the user to confirm deletion of a journal entry.
  */
@@ -44,6 +47,6 @@ fun ConfirmEntryDeletionDialog(
             ) {
                 Text(stringResource(Res.string.cancel))
             }
-        }
+        },
     )
 }

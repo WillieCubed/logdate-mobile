@@ -47,36 +47,38 @@ class DefaultAICacheKeyStrategy(
     override fun createKey(input: AICacheKeyInput): AICacheKey {
         val normalizedInput = normalizeInput(input.inputText)
         val sourceHash = hasher.hash(normalizedInput)
-        val debugPrefix = sanitize(
-            listOf(
-                input.contentType.id,
-                input.providerId ?: "unknown",
-                input.model ?: "default",
-                input.promptVersion,
-                input.schemaVersion,
-                input.templateId ?: "default",
-            ).joinToString("-")
-        )
+        val debugPrefix =
+            sanitize(
+                listOf(
+                    input.contentType.id,
+                    input.providerId ?: "unknown",
+                    input.model ?: "default",
+                    input.promptVersion,
+                    input.schemaVersion,
+                    input.templateId ?: "default",
+                ).joinToString("-"),
+            )
 
-        val keyParts = buildList {
-            add(input.contentType.id)
-            if (input.policy.includeProviderInKey) {
-                add(input.providerId ?: "unknown")
+        val keyParts =
+            buildList {
+                add(input.contentType.id)
+                if (input.policy.includeProviderInKey) {
+                    add(input.providerId ?: "unknown")
+                }
+                if (input.policy.includeModelInKey) {
+                    add(input.model ?: "default")
+                }
+                if (input.policy.includePromptVersionInKey) {
+                    add(input.promptVersion)
+                }
+                if (input.policy.includeSchemaVersionInKey) {
+                    add(input.schemaVersion)
+                }
+                if (input.policy.includeTemplateIdInKey) {
+                    add(input.templateId ?: "default")
+                }
+                add(normalizedInput)
             }
-            if (input.policy.includeModelInKey) {
-                add(input.model ?: "default")
-            }
-            if (input.policy.includePromptVersionInKey) {
-                add(input.promptVersion)
-            }
-            if (input.policy.includeSchemaVersionInKey) {
-                add(input.schemaVersion)
-            }
-            if (input.policy.includeTemplateIdInKey) {
-                add(input.templateId ?: "default")
-            }
-            add(normalizedInput)
-        }
 
         val keyHash = hasher.hash(keyParts.joinToString("|"))
         val key = "${debugPrefix.take(MAX_PREFIX_LENGTH)}-$keyHash"

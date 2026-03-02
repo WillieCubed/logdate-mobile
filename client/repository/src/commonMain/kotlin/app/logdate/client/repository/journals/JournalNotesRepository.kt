@@ -2,9 +2,9 @@ package app.logdate.client.repository.journals
 
 import app.logdate.util.UuidSerializer
 import kotlinx.coroutines.flow.Flow
-import kotlin.time.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 interface JournalNotesRepository {
@@ -12,12 +12,18 @@ interface JournalNotesRepository {
 
     fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>>
 
-    fun observeNotesInRange(start: Instant, end: Instant): Flow<List<JournalNote>>
+    fun observeNotesInRange(
+        start: Instant,
+        end: Instant,
+    ): Flow<List<JournalNote>>
 
     /**
      * Observes notes in pages for efficient loading.
      */
-    fun observeNotesPage(pageSize: Int, offset: Int): Flow<List<JournalNote>>
+    fun observeNotesPage(
+        pageSize: Int,
+        offset: Int,
+    ): Flow<List<JournalNote>>
 
     /**
      * Observes notes in a streaming fashion, emitting results as they become available.
@@ -55,9 +61,15 @@ interface JournalNotesRepository {
     /**
      * Creates a new note and add it to a journal.
      */
-    suspend fun create(note: JournalNote, journalId: Uuid)
+    suspend fun create(
+        note: JournalNote,
+        journalId: Uuid,
+    )
 
-    suspend fun removeFromJournal(noteId: Uuid, journalId: Uuid)
+    suspend fun removeFromJournal(
+        noteId: Uuid,
+        journalId: Uuid,
+    )
 }
 
 enum class NoteType {

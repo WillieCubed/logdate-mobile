@@ -10,15 +10,12 @@ import app.logdate.navigation.routes.core.NavigationStart
  * recompositions. This ensures navigation state is maintained through configuration
  * changes and activity recreations.
  *
- * @param initialRoute The initial route to add to the backstack. 
+ * @param initialRoute The initial route to add to the backstack.
  *                    Defaults to [NavigationStart].
  * @return A remembered [MainAppNavigator] instance
  */
 @Composable
-fun rememberMainAppNavigator(
-    initialRoute: NavKey = NavigationStart
-): MainAppNavigator {
-    return remember {
+fun rememberMainAppNavigator(initialRoute: NavKey = NavigationStart): MainAppNavigator =
+    remember {
         MainAppNavigator(initialRoute)
     }
-}

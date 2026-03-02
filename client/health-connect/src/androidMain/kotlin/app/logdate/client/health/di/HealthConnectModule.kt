@@ -10,19 +10,20 @@ import org.koin.dsl.module
 
 /**
  * Android-specific Koin module for health connect components.
- * 
+ *
  * @deprecated This module is being replaced by androidHealthModule which provides
  * implementations for the new LocalFirstHealthRepository architecture.
  */
 @Deprecated("Use androidHealthModule instead", ReplaceWith("androidHealthModule"))
-val healthConnectModule: Module = module {
-    // Only keep the SleepRepository that might be used by legacy code
-    single<SleepRepository> {
-        AndroidSleepRepository(androidContext())
+val healthConnectModule: Module =
+    module {
+        // Only keep the SleepRepository that might be used by legacy code
+        single<SleepRepository> {
+            AndroidSleepRepository(androidContext())
+        }
+
+        // Add the Android-specific remote data source
+        single<RemoteHealthDataSource> {
+            AndroidHealthConnectDataSource(androidContext())
+        }
     }
-    
-    // Add the Android-specific remote data source
-    single<RemoteHealthDataSource> {
-        AndroidHealthConnectDataSource(androidContext())
-    }
-}

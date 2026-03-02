@@ -17,8 +17,14 @@ kotlin {
     android {
         // TODO: Migrate to app.logdate.mobile once we have ability to migrate
         namespace = "co.reasonabletech.logdate"
-        compileSdk = libs.versions.android.compileSdk.get().toInt()
-        minSdk = libs.versions.android.minSdk.get().toInt()
+        compileSdk =
+            libs.versions.android.compileSdk
+                .get()
+                .toInt()
+        minSdk =
+            libs.versions.android.minSdk
+                .get()
+                .toInt()
         androidResources {
             enable = true
             noCompress += listOf("cvr")
@@ -30,7 +36,7 @@ kotlin {
 
     listOf(
         iosArm64(),
-        iosSimulatorArm64()
+        iosSimulatorArm64(),
     ).forEach { iosTarget ->
         iosTarget.binaries.framework {
             baseName = "composeApp"
@@ -115,18 +121,19 @@ kotlin {
 
 fun addToFirstExistingConfiguration(
     dependency: Any,
-    vararg configurationNames: String
+    vararg configurationNames: String,
 ) {
-    val targetConfiguration = configurationNames.firstOrNull { name ->
-        configurations.findByName(name) != null
-    } ?: return
+    val targetConfiguration =
+        configurationNames.firstOrNull { name ->
+            configurations.findByName(name) != null
+        } ?: return
     dependencies.add(targetConfiguration, dependency)
 }
 
 addToFirstExistingConfiguration(
     libs.compose.ui.tooling,
     "debugImplementation",
-    "androidDebugImplementation"
+    "androidDebugImplementation",
 )
 
 compose.resources {

@@ -22,13 +22,12 @@ class AndroidSecureIdentityStorage(
         private val MIGRATION_STATE_KEY = stringPreferencesKey("migration_state")
     }
 
-    suspend fun getUserId(): Uuid? {
-        return runCatching {
+    suspend fun getUserId(): Uuid? =
+        runCatching {
             val stored = dataStore.data.first()[USER_ID_KEY]
             stored?.let(Uuid::parse)
         }.onFailure { Napier.e("Failed to read user ID", it) }
             .getOrNull()
-    }
 
     suspend fun setUserId(userId: Uuid) {
         runCatching {

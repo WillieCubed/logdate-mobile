@@ -6,33 +6,30 @@ import kotlinx.coroutines.flow.asStateFlow
 import platform.Foundation.NSURLSessionConfiguration
 
 class IosNetworkSaverModeProvider : NetworkSaverModeProvider {
-    
     // URLSessionConfiguration gives us access to constrained network access settings
     private val sessionConfig = NSURLSessionConfiguration.defaultSessionConfiguration()
-    private val _networkSaverState = MutableStateFlow(getCurrentNetworkSaverStateInternal())
-    
-    override val dataSaverModeState: Flow<NetworkSaverState> = _networkSaverState.asStateFlow()
-    
-    override suspend fun getCurrentDataSaverState(): NetworkSaverState {
-        return getCurrentNetworkSaverStateInternal()
-    }
-    
+    private val networkSaverStateFlow = MutableStateFlow(getCurrentNetworkSaverStateInternal())
+
+    override val dataSaverModeState: Flow<NetworkSaverState> = networkSaverStateFlow.asStateFlow()
+
+    override suspend fun getCurrentDataSaverState(): NetworkSaverState = getCurrentNetworkSaverStateInternal()
+
     override suspend fun isDataSaverModeActive(): Boolean {
         // iOS has Low Data Mode which can be detected through URLSessionConfiguration
         // !allowsConstrainedNetworkAccess means Low Data Mode is active
         return !sessionConfig.allowsConstrainedNetworkAccess
     }
-    
+
     override fun cleanup() {
         // No-op: no background monitoring on iOS yet.
     }
-    
+
     private fun getCurrentNetworkSaverStateInternal(): NetworkSaverState {
         val isDataSaverEnabled = !sessionConfig.allowsConstrainedNetworkAccess
-        
+
         return NetworkSaverState(
             isDataSaverEnabled = isDataSaverEnabled,
-            connectionType = NetworkConnectionType.OTHER
+            connectionType = NetworkConnectionType.OTHER,
         )
     }
 }

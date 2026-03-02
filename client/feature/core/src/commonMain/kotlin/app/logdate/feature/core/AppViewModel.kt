@@ -23,7 +23,6 @@ class AppViewModel(
     private val biometricGatekeeper: BiometricGatekeeper,
     networkMonitor: NetworkAvailabilityMonitor,
 ) : ViewModel() {
-
     private val biometricState = biometricGatekeeper.authState
     private val appLockState = MutableStateFlow(AppLockState.Unlocked)
     private val securityLevelState = MutableStateFlow(AppSecurityLevel.NONE)
@@ -33,23 +32,24 @@ class AppViewModel(
     /**
      * The current UI state of the app.
      */
-    val uiState: StateFlow<GlobalAppUiState> = combine(
-        userStateRepository.userData,
-        biometricState,
-        networkState,
-        appLockState,
-    ) { userState, authState, networkState, lockState ->
-        GlobalAppUiLoadedState(
-            isOnboarded = userState.isOnboarded,
-            authState = resolveAuthState(
-                securityLevel = userState.securityLevel,
-                biometricState = authState,
-                appLockState = lockState,
-            ),
-            isOnline = networkState is NetworkState.Connected,
-        )
-    }
-        .stateIn(
+    val uiState: StateFlow<GlobalAppUiState> =
+        combine(
+            userStateRepository.userData,
+            biometricState,
+            networkState,
+            appLockState,
+        ) { userState, authState, networkState, lockState ->
+            GlobalAppUiLoadedState(
+                isOnboarded = userState.isOnboarded,
+                authState =
+                    resolveAuthState(
+                        securityLevel = userState.securityLevel,
+                        biometricState = authState,
+                        appLockState = lockState,
+                    ),
+                isOnline = networkState is NetworkState.Connected,
+            )
+        }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
             initialValue = GlobalAppUiLoadingState,
@@ -112,11 +112,12 @@ private fun resolveAuthState(
         AppAuthState.UNSUPPORTED,
         AppAuthState.UPDATE_REQUIRED,
         AppAuthState.UNKNOWN,
-            -> biometricState
+        -> biometricState
         AppAuthState.AUTHENTICATED -> AppAuthState.AUTHENTICATED
         AppAuthState.NO_PROMPT_NEEDED,
         AppAuthState.REQUIRE_PROMPT,
-            -> if (appLockState == AppLockState.Locked) {
+        ->
+            if (appLockState == AppLockState.Locked) {
                 AppAuthState.REQUIRE_PROMPT
             } else {
                 AppAuthState.NO_PROMPT_NEEDED

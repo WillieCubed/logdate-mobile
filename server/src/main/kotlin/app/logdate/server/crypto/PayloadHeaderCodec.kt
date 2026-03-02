@@ -3,14 +3,23 @@ package app.logdate.server.crypto
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-data class PayloadHeader(val keyId: String, val iv: ByteArray, val ciphertextOffset: Int)
+data class PayloadHeader(
+    val keyId: String,
+    val iv: ByteArray,
+    val ciphertextOffset: Int,
+)
 
 object PayloadHeaderCodec {
     private const val VERSION_1: Byte = 0x01
     private const val MIN_KEYID_LENGTH = 1
     private const val MAX_KEYID_LENGTH = 128
 
-    fun encode(prefix: ByteArray, keyId: String, iv: ByteArray, ciphertext: ByteArray): ByteArray {
+    fun encode(
+        prefix: ByteArray,
+        keyId: String,
+        iv: ByteArray,
+        ciphertext: ByteArray,
+    ): ByteArray {
         val keyIdBytes = keyId.toByteArray(Charsets.UTF_8)
         validateKeyId(keyIdBytes)
         validateIV(iv)
@@ -28,7 +37,10 @@ object PayloadHeaderCodec {
         return buffer.array()
     }
 
-    fun decode(payload: ByteArray, expectedPrefix: ByteArray): PayloadHeader {
+    fun decode(
+        payload: ByteArray,
+        expectedPrefix: ByteArray,
+    ): PayloadHeader {
         validatePrefix(payload, expectedPrefix)
         validateMinimumSize(payload, expectedPrefix.size)
 
@@ -51,13 +63,19 @@ object PayloadHeaderCodec {
         return PayloadHeader(keyId, iv, buffer.position())
     }
 
-    private fun validatePrefix(payload: ByteArray, expectedPrefix: ByteArray) {
+    private fun validatePrefix(
+        payload: ByteArray,
+        expectedPrefix: ByteArray,
+    ) {
         if (!payload.hasPrefix(expectedPrefix)) {
             throw EncryptionException("Invalid payload prefix")
         }
     }
 
-    private fun validateMinimumSize(payload: ByteArray, prefixSize: Int) {
+    private fun validateMinimumSize(
+        payload: ByteArray,
+        prefixSize: Int,
+    ) {
         val minSize = prefixSize + 1 + 2 + MIN_KEYID_LENGTH + AesGcmCipher.IV_SIZE_BYTES + AesGcmCipher.GCM_TAG_BYTES
         if (payload.size < minSize) {
             throw EncryptionException("Payload too short: ${payload.size} bytes (minimum: $minSize)")

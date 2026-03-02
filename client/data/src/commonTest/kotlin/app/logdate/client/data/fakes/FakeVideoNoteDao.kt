@@ -14,38 +14,34 @@ class FakeVideoNoteDao : VideoNoteDao {
     private val notes = mutableMapOf<Uuid, VideoNoteEntity>()
     private val notesFlow = MutableStateFlow<List<VideoNoteEntity>>(emptyList())
 
-    override fun getNote(uid: Uuid): Flow<VideoNoteEntity> {
-        return notesFlow.map { notes ->
+    override fun getNote(uid: Uuid): Flow<VideoNoteEntity> =
+        notesFlow.map { notes ->
             notes.find { it.uid == uid } ?: throw NoSuchElementException("Video note with ID $uid not found")
         }
-    }
 
-    override suspend fun getNoteOneOff(uid: Uuid): VideoNoteEntity {
-        return notes[uid] ?: throw NoSuchElementException("Video note with ID $uid not found")
-    }
+    override suspend fun getNoteOneOff(uid: Uuid): VideoNoteEntity =
+        notes[uid] ?: throw NoSuchElementException("Video note with ID $uid not found")
 
-    override fun getAllNotes(): Flow<List<VideoNoteEntity>> {
-        return notesFlow
-    }
+    override fun getAllNotes(): Flow<List<VideoNoteEntity>> = notesFlow
 
-    override suspend fun getAll(): List<VideoNoteEntity> {
-        return notes.values.toList()
-    }
+    override suspend fun getAll(): List<VideoNoteEntity> = notes.values.toList()
 
-    override fun getRecentNotes(limit: Int): Flow<List<VideoNoteEntity>> {
-        return notesFlow.map { notes ->
+    override fun getRecentNotes(limit: Int): Flow<List<VideoNoteEntity>> =
+        notesFlow.map { notes ->
             notes.sortedByDescending { it.created }.take(limit)
         }
-    }
 
-    override fun getNotesInRange(startTimestamp: Long, endTimestamp: Long): Flow<List<VideoNoteEntity>> {
-        return notesFlow.map { notes ->
-            notes.filter {
-                val createdMillis = it.created.toEpochMilliseconds()
-                createdMillis in startTimestamp..endTimestamp
-            }.sortedByDescending { it.created }
+    override fun getNotesInRange(
+        startTimestamp: Long,
+        endTimestamp: Long,
+    ): Flow<List<VideoNoteEntity>> =
+        notesFlow.map { notes ->
+            notes
+                .filter {
+                    val createdMillis = it.created.toEpochMilliseconds()
+                    createdMillis in startTimestamp..endTimestamp
+                }.sortedByDescending { it.created }
         }
-    }
 
     override suspend fun addNote(note: VideoNoteEntity) {
         notes[note.uid] = note
@@ -62,13 +58,20 @@ class FakeVideoNoteDao : VideoNoteDao {
         updateFlow()
     }
 
-    override suspend fun updateSyncMetadata(noteId: Uuid, syncVersion: Long, lastSynced: kotlin.time.Instant) {
+    override suspend fun updateSyncMetadata(
+        noteId: Uuid,
+        syncVersion: Long,
+        lastSynced: kotlin.time.Instant,
+    ) {
         val existing = notes[noteId] ?: return
         notes[noteId] = existing.copy(syncVersion = syncVersion, lastSynced = lastSynced)
         updateFlow()
     }
 
-    override suspend fun updateContentUri(noteId: Uuid, contentUri: String) {
+    override suspend fun updateContentUri(
+        noteId: Uuid,
+        contentUri: String,
+    ) {
         val existing = notes[noteId] ?: return
         notes[noteId] = existing.copy(contentUri = contentUri)
         updateFlow()

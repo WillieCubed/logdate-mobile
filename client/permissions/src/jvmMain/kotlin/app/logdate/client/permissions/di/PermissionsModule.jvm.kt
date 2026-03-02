@@ -10,14 +10,15 @@ import org.koin.dsl.module
 /**
  * JVM-specific permissions module
  */
-actual val permissionsModule: Module = module {
-    includes(commonPermissionsModule)
-    
-    // JVM-specific implementations
-    single<PasskeyManager> { DesktopPasskeyManager() }  // Reuse desktop implementation
-    
-    // Override the PermissionManager with JVM-specific implementation
-    single<PermissionManager>(createdAtStart = true) { 
-        JvmPermissionManager() 
+actual val permissionsModule: Module =
+    module {
+        includes(commonPermissionsModule)
+
+        // JVM-specific implementations
+        single<PasskeyManager> { DesktopPasskeyManager() } // Reuse desktop implementation
+
+        // Override the PermissionManager with JVM-specific implementation
+        single<PermissionManager>(createdAtStart = true) {
+            JvmPermissionManager()
+        }
     }
-}

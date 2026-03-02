@@ -69,7 +69,7 @@ fun scheduleDatabaseEncryption(secureStorage: SecureStorage) {
                 Files.write(encryptedFile, encrypted)
                 Files.deleteIfExists(dbFile)
             }
-        }
+        },
     )
 }
 
@@ -80,30 +80,31 @@ fun scheduleDatabaseEncryption(secureStorage: SecureStorage) {
  * the user's home directory.
  */
 private val DATABASE_PATH: Path
-    get() = when {
-        System.getProperty("os.name").contains("Windows", ignoreCase = true) -> {
-            Path(System.getenv("APPDATA"), "Haystack", DATABASE_NAME)
-        }
+    get() =
+        when {
+            System.getProperty("os.name").contains("Windows", ignoreCase = true) -> {
+                Path(System.getenv("APPDATA"), "Haystack", DATABASE_NAME)
+            }
 
-        System.getProperty("os.name").contains("Mac", ignoreCase = true) -> {
-            Path(
-                System.getProperty("user.home"),
-                "Library",
-                "Application Support",
-                "Haystack",
-                DATABASE_NAME
-            )
-        }
+            System.getProperty("os.name").contains("Mac", ignoreCase = true) -> {
+                Path(
+                    System.getProperty("user.home"),
+                    "Library",
+                    "Application Support",
+                    "Haystack",
+                    DATABASE_NAME,
+                )
+            }
 
-        else -> {
-            Path(
-                System.getProperty("user.home"),
-                ".local",
-                "share",
-                "haystack",
-                DATABASE_NAME
-            )
+            else -> {
+                Path(
+                    System.getProperty("user.home"),
+                    ".local",
+                    "share",
+                    "haystack",
+                    DATABASE_NAME,
+                )
+            }
         }
-    }
 
 private fun encryptedDatabasePath(): Path = DATABASE_PATH.resolveSibling("$DATABASE_NAME.enc")

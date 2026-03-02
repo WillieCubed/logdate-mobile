@@ -8,10 +8,11 @@ import org.koin.dsl.module
 /**
  * Module that exposes handles for sharing content outside of the app for desktop platforms.
  */
-actual val sharingModule: Module = module {
-    single<SharingLauncher> { 
-        DesktopSharingLauncher(
-            journalRepository = get()
-        ) 
+actual val sharingModule: Module =
+    module {
+        single<SharingLauncher> {
+            DesktopSharingLauncher(
+                journalRepository = get(),
+            )
+        }
     }
-}

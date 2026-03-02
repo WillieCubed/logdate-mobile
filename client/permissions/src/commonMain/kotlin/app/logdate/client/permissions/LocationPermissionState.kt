@@ -9,7 +9,7 @@ data class LocationPermissionState(
     val hasPermission: Boolean,
     val shouldShowRationale: Boolean,
     val permissionRequested: Boolean,
-    val requestPermission: () -> Unit
+    val requestPermission: () -> Unit,
 )
 
 /**

@@ -25,17 +25,20 @@ class SummarizeJournalEntriesUseCase(
             return SummarizeJournalEntriesResult.SummaryUnavailable
         }
         // Sort entries by creation timestamp to ensure chronological order
-        val sortedEntries = entries.filterIsInstance<JournalNote.Text>()
-            .sortedBy { it.creationTimestamp }
+        val sortedEntries =
+            entries
+                .filterIsInstance<JournalNote.Text>()
+                .sortedBy { it.creationTimestamp }
 
-        val summaryPrompt = sortedEntries
-            .joinToString("\n") {
-                """
+        val summaryPrompt =
+            sortedEntries
+                .joinToString("\n") {
+                    """
 Date: ${it.creationTimestamp.toLocalDateTime(TimeZone.currentSystemDefault()).date}
 Content:
 ${it.content}
-                """.trimIndent()
-            }
+                    """.trimIndent()
+                }
 
         // Create a fixed-length key by hashing the entry UIDs
         val summaryKey = generateHashKey(entries.map { it.uid.toString() })
@@ -43,15 +46,16 @@ ${it.content}
         return when (val result = summarizer.summarize(summaryKey, summaryPrompt)) {
             is AIResult.Success ->
                 SummarizeJournalEntriesResult.Success(result.value)
-            is AIResult.Unavailable -> when (result.reason) {
-                AIUnavailableReason.NoNetwork -> SummarizeJournalEntriesResult.NetworkUnavailable
-                else -> SummarizeJournalEntriesResult.SummaryUnavailable
-            }
+            is AIResult.Unavailable ->
+                when (result.reason) {
+                    AIUnavailableReason.NoNetwork -> SummarizeJournalEntriesResult.NetworkUnavailable
+                    else -> SummarizeJournalEntriesResult.SummaryUnavailable
+                }
             is AIResult.Error -> {
                 Napier.e(
                     tag = "SummarizeJournalEntriesUseCase",
                     throwable = result.throwable,
-                    message = "Could not summarize journal entries: ${result.error}"
+                    message = "Could not summarize journal entries: ${result.error}",
                 )
                 SummarizeJournalEntriesResult.SummaryUnavailable
             }
@@ -74,9 +78,10 @@ ${it.content}
             val hash = fnv1aHash(combinedKey)
 
             // Convert to Base64 for a compact string representation
-            val hashBytes = ByteArray(4) { i ->
-                ((hash shr (i * 8)) and 0xFF).toByte()
-            }
+            val hashBytes =
+                ByteArray(4) { i ->
+                    ((hash shr (i * 8)) and 0xFF).toByte()
+                }
 
             val base64 = Base64.encode(hashBytes)
 
@@ -132,5 +137,7 @@ sealed interface SummarizeJournalEntriesResult {
     /**
      * Journal entries were able to be summarized.
      */
-    data class Success(val summary: String) : SummarizeJournalEntriesResult
+    data class Success(
+        val summary: String,
+    ) : SummarizeJournalEntriesResult
 }

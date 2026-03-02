@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.onboarding.editor
 
 import androidx.compose.foundation.layout.Arrangement
@@ -15,12 +17,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import kotlin.time.Duration
 
 // TODO: Implement live audio entries
-//@Composable
-//fun LiveAudioPreview(
+// @Composable
+// fun LiveAudioPreview(
 //    audioPreviewData: AudioPreviewData,
 //    modifier: Modifier = Modifier,
 //    showWaveform: Boolean = true,
-//) {
+// ) {
 //    Column(
 //        modifier = modifier,
 //        verticalArrangement = Arrangement.spacedBy(app.logdate.ui.theme.Spacing.sm),
@@ -45,7 +47,7 @@ import kotlin.time.Duration
 //            Text("Audio permission not granted")
 //        }
 //    }
-//}
+// }
 
 /**
  * Renders an audio waveform.
@@ -67,9 +69,11 @@ private fun WaveformBlock(
             // Show a recording indicator if the audio is playing
             Row(
                 Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(
-                    app.logdate.ui.theme.Spacing.sm, Alignment.CenterHorizontally
-                ),
+                horizontalArrangement =
+                    Arrangement.spacedBy(
+                        app.logdate.ui.theme.Spacing.sm,
+                        Alignment.CenterHorizontally,
+                    ),
             ) {
                 Text(
                     text = if (isPlaying) "Playing" else "",
@@ -89,18 +93,15 @@ private fun WaveformBlock(
     }
 }
 
-@Preview(
-//    showBackground = true
-)
-//@Composable
-//private fun LiveAudioPreviewPreview() {
+// @Composable
+// private fun LiveAudioPreviewPreview() {
 //    LiveAudioPreview(
 //        audioPreviewData = AudioPreviewData.Empty.copy(
 //            currentText = "Public speaking sucks so much, you know? I had to give a presentation today on the ethics of AI, and it’s already bad enough this was a group project, but of course one of our team members just didn’t ",
 //            canUseAudio = true,
 //        ),
 //    )
-//}
+// }
 
 /**
  * Returns a formatted duration string from a Duration value.
@@ -114,6 +115,9 @@ private fun WaveformBlock(
  *
  * @throws IllegalArgumentException if the duration is negative
  */
+@Preview(
+//    showBackground = true
+)
 fun Duration.toFormattedDuration(): String {
     require(this.inWholeMilliseconds >= 0) {
         "Duration must be non-negative, but was: $this"

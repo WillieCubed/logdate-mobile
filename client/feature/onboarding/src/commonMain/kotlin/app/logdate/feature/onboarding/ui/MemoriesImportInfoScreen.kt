@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports", "ktlint:standard:max-line-length")
+
 package app.logdate.feature.onboarding.ui
 
 import androidx.compose.foundation.layout.Arrangement
@@ -20,12 +22,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
-import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+
 /**
  * Screen that explains the memories import feature during onboarding.
  */
@@ -50,10 +53,11 @@ fun MemoriesImportInfoScreen(
         },
     ) { contentPadding ->
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(contentPadding)
-                .padding(Spacing.lg)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(contentPadding)
+                    .padding(Spacing.lg),
         ) {
             Column(
                 modifier = Modifier.align(Alignment.TopStart),
@@ -64,7 +68,7 @@ fun MemoriesImportInfoScreen(
                     style = MaterialTheme.typography.headlineMedium,
                     textAlign = TextAlign.Start,
                 )
-                
+
                 Column(
                     verticalArrangement = Arrangement.spacedBy(Spacing.md),
                 ) {
@@ -72,19 +76,23 @@ fun MemoriesImportInfoScreen(
                         text = stringResource(Res.string.by_importing_your_memories_youll_be_able_to_see_memories_from_your_past),
                         style = MaterialTheme.typography.bodyLarge,
                     )
-                    
+
                     Text(
-                        text = stringResource(Res.string.weve_taken_the_effort_of_finding_some_photos_from_your_past_you_can_choose_which_ones_get_backed_up),
+                        text =
+                            stringResource(
+                                Res.string.weve_taken_the_effort_of_finding_some_photos_from_your_past_you_can_choose_which_ones_get_backed_up,
+                            ),
                         style = MaterialTheme.typography.bodyLarge,
                     )
                 }
             }
-            
+
             Button(
                 onClick = onContinue,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth(),
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth(),
             ) {
                 Text(stringResource(Res.string.`continue`))
             }

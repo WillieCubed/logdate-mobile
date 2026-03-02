@@ -4,18 +4,18 @@ import kotlin.uuid.Uuid
 
 /**
  * Represents a user's identity in the LogDate system.
- * 
+ *
  * This identity is used across all devices and persists regardless of cloud account status.
  */
 data class UserIdentity(
     val userId: Uuid,
     val isCloudLinked: Boolean = false,
-    val cloudAccountId: String? = null
+    val cloudAccountId: String? = null,
 )
 
 /**
  * Represents the state of user identity migration.
- * 
+ *
  * Used when migrating from a local-only identity to a cloud-linked identity.
  */
 data class IdentityMigrationState(
@@ -24,7 +24,7 @@ data class IdentityMigrationState(
     val newUserId: Uuid?,
     val itemsProcessed: Int,
     val totalItems: Int,
-    val lastProcessedId: String?
+    val lastProcessedId: String?,
 )
 
 /**
@@ -34,5 +34,5 @@ data class MigrationProgress(
     val inProgress: Boolean,
     val itemsProcessed: Int,
     val totalItems: Int,
-    val percentComplete: Float = if (totalItems > 0) itemsProcessed.toFloat() / totalItems else 0f
+    val percentComplete: Float = if (totalItems > 0) itemsProcessed.toFloat() / totalItems else 0f,
 )

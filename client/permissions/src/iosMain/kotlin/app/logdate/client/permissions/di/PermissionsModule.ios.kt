@@ -10,14 +10,15 @@ import org.koin.dsl.module
 /**
  * iOS-specific permissions module
  */
-actual val permissionsModule: Module = module {
-    includes(commonPermissionsModule)
-    
-    // iOS-specific implementations
-    single<PasskeyManager> { IosPasskeyManager() }
-    
-    // Override the PermissionManager with iOS-specific implementation
-    single<PermissionManager>(createdAtStart = true) { 
-        IosPermissionManager() 
+actual val permissionsModule: Module =
+    module {
+        includes(commonPermissionsModule)
+
+        // iOS-specific implementations
+        single<PasskeyManager> { IosPasskeyManager() }
+
+        // Override the PermissionManager with iOS-specific implementation
+        single<PermissionManager>(createdAtStart = true) {
+            IosPermissionManager()
+        }
     }
-}

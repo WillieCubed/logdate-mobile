@@ -13,8 +13,14 @@ plugins {
 kotlin {
     android {
         namespace = "app.logdate.client.health"
-        compileSdk = libs.versions.android.compileSdk.get().toInt()
-        minSdk = libs.versions.android.minSdk.get().toInt()
+        compileSdk =
+            libs.versions.android.compileSdk
+                .get()
+                .toInt()
+        minSdk =
+            libs.versions.android.minSdk
+                .get()
+                .toInt()
         optimization {
             consumerKeepRules.apply {
                 publish = true
@@ -36,7 +42,7 @@ kotlin {
             languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
             compilerOptions.freeCompilerArgs.set(listOf("-Xexpect-actual-classes"))
         }
-        
+
         androidMain.dependencies {
             // Android Health Connect dependencies
             implementation(libs.androidx.health.connect)
@@ -46,13 +52,13 @@ kotlin {
         commonMain.dependencies {
             // Project dependencies
             implementation(projects.shared.model)
-            
+
             // External dependencies
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.kotlinx.datetime)
             implementation(libs.napier)
-            
+
             // Koin
             implementation(project.dependencies.platform(libs.koin.bom))
             implementation(libs.koin.core)

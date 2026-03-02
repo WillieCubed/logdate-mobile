@@ -12,7 +12,6 @@ class SaveEntryUseCase(
     private val draftRepository: EntryDraftRepository,
     private val addNotes: AddNoteUseCase,
 ) {
-
     suspend operator fun invoke(entry: EntryDraft): List<Uuid> {
         addNotes(entry.notes)
         return listOf()

@@ -5,7 +5,10 @@ object InMemoryAICacheLocalDataSource : AICacheLocalDataSource {
 
     override fun get(key: String): GenerativeAICacheEntry? = cache[key]
 
-    override fun set(key: String, entry: GenerativeAICacheEntry) {
+    override fun set(
+        key: String,
+        entry: GenerativeAICacheEntry,
+    ) {
         cache[key] = entry
     }
 

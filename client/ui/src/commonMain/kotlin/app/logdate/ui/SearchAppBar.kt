@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.ui
 
 import androidx.compose.animation.core.animateDpAsState
@@ -27,22 +29,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.conditional
 import app.logdate.ui.theme.Spacing
-import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.ui.generated.resources.*
 import logdate.client.ui.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+
 @Stable
 class SearchAppBarState(
     var query: String = "",
 )
 
 @Composable
-fun rememberSearchAppBarState(
-    initialQuery: String = "",
-): SearchAppBarState {
+fun rememberSearchAppBarState(initialQuery: String = ""): SearchAppBarState {
     var query by remember { mutableStateOf(initialQuery) }
     return SearchAppBarState(
         query = query,
@@ -71,9 +71,10 @@ fun SearchBarBase(
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(cornerRadius),
-        modifier = modifier
-            .widthIn(min = 360.dp, max = 720.dp)
-            .heightIn(min = 56.dp),
+        modifier =
+            modifier
+                .widthIn(min = 360.dp, max = 720.dp)
+                .heightIn(min = 56.dp),
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
@@ -82,18 +83,18 @@ fun SearchBarBase(
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .padding(top = 4.dp)
-                    .conditional(
-                        expanded,
-                        modifyIfTrue = {
-                            padding(start = 8.dp, end = 16.dp)
-                        },
-                        modifyIfFalse = {
-                            padding(start = 12.dp, end = 16.dp)
-                        },
-                    )
-                    .fillMaxWidth(),
+                modifier =
+                    Modifier
+                        .padding(top = 4.dp)
+                        .conditional(
+                            expanded,
+                            modifyIfTrue = {
+                                padding(start = 8.dp, end = 16.dp)
+                            },
+                            modifyIfFalse = {
+                                padding(start = 12.dp, end = 16.dp)
+                            },
+                        ).fillMaxWidth(),
             ) {
                 IconButton(
                     onClick = {
@@ -104,25 +105,28 @@ fun SearchBarBase(
                         }
                     },
                 ) {
-                    val icon = if (expanded) {
-                        Icons.AutoMirrored.Default.ArrowBack
-                    } else {
-                        Icons.Default.Menu
-                    }
-                    val contentDescription = if (expanded) {
-                        "Close search"
-                    } else {
-                        "Open navigation"
-                    }
+                    val icon =
+                        if (expanded) {
+                            Icons.AutoMirrored.Default.ArrowBack
+                        } else {
+                            Icons.Default.Menu
+                        }
+                    val contentDescription =
+                        if (expanded) {
+                            "Close search"
+                        } else {
+                            "Open navigation"
+                        }
                     Icon(icon, contentDescription)
                 }
                 // TODO: Actually implement text field
                 Text(
                     text = hint,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(end = 8.dp),
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp),
                 )
                 Icon(Icons.Default.Search, contentDescription = stringResource(Res.string.search))
             }
@@ -141,10 +145,11 @@ fun SearchAppBar(
     expandedContent: @Composable () -> Unit = {},
 ) {
     SearchBarBase(
-        modifier = modifier
-            .conditional(!expanded) {
-                padding(vertical = Spacing.sm, horizontal = Spacing.lg)
-            },
+        modifier =
+            modifier
+                .conditional(!expanded) {
+                    padding(vertical = Spacing.sm, horizontal = Spacing.lg)
+                },
         expanded = expanded,
         onExpand = onExpand,
         onNavigationClick = onNavigationClick,

@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.ui.common
 
 import androidx.compose.foundation.border
@@ -20,20 +22,19 @@ fun MetadataChip(
     icon: @Composable () -> Unit,
 ) {
     Row(
-        modifier = Modifier.Companion
-            .clip(MaterialTheme.shapes.large)
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.primary,
-                shape = MaterialTheme.shapes.large,
-            )
-            .padding(
-                start = Spacing.sm,
-                end = Spacing.sm,
-                top = Spacing.xs,
-                bottom = Spacing.xs,
-            )
-            .widthIn(min = 80.dp),
+        modifier =
+            Modifier.Companion
+                .clip(MaterialTheme.shapes.large)
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.primary,
+                    shape = MaterialTheme.shapes.large,
+                ).padding(
+                    start = Spacing.sm,
+                    end = Spacing.sm,
+                    top = Spacing.xs,
+                    bottom = Spacing.xs,
+                ).widthIn(min = 80.dp),
         verticalAlignment = Alignment.Companion.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {

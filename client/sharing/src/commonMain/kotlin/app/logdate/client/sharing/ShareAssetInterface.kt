@@ -11,7 +11,10 @@ interface ShareAssetInterface {
      *
      * @return The URI of the generated background layer image.
      */
-    fun generateBackgroundLayer(journal: Journal, shareTheme: ShareTheme): String
+    fun generateBackgroundLayer(
+        journal: Journal,
+        shareTheme: ShareTheme,
+    ): String
 
     /**
      * Creates and returns a sticker layer for the given [journal].
@@ -22,5 +25,8 @@ interface ShareAssetInterface {
      *
      * @return The URI of the generated sticker layer image.
      */
-    fun generateStickerLayer(journal: Journal, theme: ShareTheme): String
+    fun generateStickerLayer(
+        journal: Journal,
+        theme: ShareTheme,
+    ): String
 }

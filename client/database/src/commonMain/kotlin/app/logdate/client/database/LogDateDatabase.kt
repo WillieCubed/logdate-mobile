@@ -11,25 +11,26 @@ import app.logdate.client.database.converters.LocationDataConverter
 import app.logdate.client.database.converters.MediaDimensionsConverter
 import app.logdate.client.database.converters.TimestampConverter
 import app.logdate.client.database.converters.UuidConverter
+import app.logdate.client.database.dao.AudioNoteDao
 import app.logdate.client.database.dao.ImageNoteDao
 import app.logdate.client.database.dao.JournalDao
 import app.logdate.client.database.dao.JournalNotesDao
 import app.logdate.client.database.dao.LocationHistoryDao
+import app.logdate.client.database.dao.PlaceDao
 import app.logdate.client.database.dao.SearchDao
 import app.logdate.client.database.dao.StorageMetadataDao
 import app.logdate.client.database.dao.TextNoteDao
-import app.logdate.client.database.dao.PlaceDao
 import app.logdate.client.database.dao.TranscriptionDao
 import app.logdate.client.database.dao.UserDevicesDao
 import app.logdate.client.database.dao.UserMediaDao
 import app.logdate.client.database.dao.VideoNoteDao
-import app.logdate.client.database.dao.AudioNoteDao
 import app.logdate.client.database.dao.journals.JournalContentDao
 import app.logdate.client.database.dao.maintenance.IntegrityDao
 import app.logdate.client.database.dao.media.IndexedMediaDao
 import app.logdate.client.database.dao.rewind.CachedRewindDao
 import app.logdate.client.database.dao.rewind.RewindGenerationRequestDao
 import app.logdate.client.database.dao.sync.SyncMetadataDao
+import app.logdate.client.database.entities.AudioNoteEntity
 import app.logdate.client.database.entities.ImageNoteEntity
 import app.logdate.client.database.entities.JournalEntity
 import app.logdate.client.database.entities.JournalNoteCrossRef
@@ -40,7 +41,6 @@ import app.logdate.client.database.entities.TextNoteEntity
 import app.logdate.client.database.entities.TranscriptionEntity
 import app.logdate.client.database.entities.UserDeviceEntity
 import app.logdate.client.database.entities.VideoNoteEntity
-import app.logdate.client.database.entities.AudioNoteEntity
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.database.entities.media.IndexedImageEntity
 import app.logdate.client.database.entities.media.IndexedVideoEntity
@@ -118,8 +118,6 @@ import kotlinx.coroutines.IO
     ],
     version = 23, // Rename voice_notes to audio_notes and enforce durationMs
     exportSchema = true,
-    autoMigrations = [
-    ],
 )
 @TypeConverters(
     TimestampConverter::class,
@@ -131,23 +129,41 @@ import kotlinx.coroutines.IO
 @ConstructedBy(LogDateDatabaseConstructor::class)
 abstract class LogDateDatabase : RoomDatabase() {
     abstract fun textNoteDao(): TextNoteDao
+
     abstract fun imageNoteDao(): ImageNoteDao
+
     abstract fun videoNoteDao(): VideoNoteDao
+
     abstract fun audioNoteDao(): AudioNoteDao
+
     abstract fun journalDao(): JournalDao
+
     abstract fun journalNotesDao(): JournalNotesDao
+
     abstract fun journalContentDao(): JournalContentDao
+
     abstract fun rewindDao(): CachedRewindDao
+
     abstract fun rewindGenerationRequestDao(): RewindGenerationRequestDao
+
     abstract fun locationHistoryDao(): LocationHistoryDao
+
     abstract fun storageMetadataDao(): StorageMetadataDao
+
     abstract fun userDevicesDao(): UserDevicesDao
+
     abstract fun userMediaDao(): UserMediaDao
+
     abstract fun indexedMediaDao(): IndexedMediaDao
+
     abstract fun transcriptionDao(): TranscriptionDao
+
     abstract fun searchDao(): SearchDao
+
     abstract fun syncMetadataDao(): SyncMetadataDao
+
     abstract fun integrityDao(): IntegrityDao
+
     abstract fun placeDao(): PlaceDao
 }
 
@@ -182,34 +198,34 @@ fun getRoomDatabase(
     destroyTablesOnUpgrade: Boolean = false,
     destroyTablesOnDowngrade: Boolean = false,
 ): LogDateDatabase {
-    val configured = builder
-        .addMigrations(
-            MIGRATION_1_2,
-            MIGRATION_2_3,
-            MIGRATION_3_4,
-            MIGRATION_4_5,
-            MIGRATION_5_6,
-            MIGRATION_6_7,
-            MIGRATION_7_8,
-            MIGRATION_8_9,
-            MIGRATION_9_10,
-            MIGRATION_10_11,
-            MIGRATION_11_12,
-            MIGRATION_12_13,
-            MIGRATION_13_14,
-            MIGRATION_14_15,
-            MIGRATION_15_16,
-            MIGRATION_16_17,
-            MIGRATION_17_18,
-            MIGRATION_18_19,
-            MIGRATION_19_20,
-            MIGRATION_20_21,
-            MIGRATION_21_22,
-            MIGRATION_22_23,
-        )
-        .fallbackToDestructiveMigration(destroyTablesOnUpgrade)
-        .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)
-        .setQueryCoroutineContext(dispatcher)
+    val configured =
+        builder
+            .addMigrations(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+                MIGRATION_4_5,
+                MIGRATION_5_6,
+                MIGRATION_6_7,
+                MIGRATION_7_8,
+                MIGRATION_8_9,
+                MIGRATION_9_10,
+                MIGRATION_10_11,
+                MIGRATION_11_12,
+                MIGRATION_12_13,
+                MIGRATION_13_14,
+                MIGRATION_14_15,
+                MIGRATION_15_16,
+                MIGRATION_16_17,
+                MIGRATION_17_18,
+                MIGRATION_18_19,
+                MIGRATION_19_20,
+                MIGRATION_20_21,
+                MIGRATION_21_22,
+                MIGRATION_22_23,
+            ).fallbackToDestructiveMigration(destroyTablesOnUpgrade)
+            .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)
+            .setQueryCoroutineContext(dispatcher)
 
     if (driver != null) {
         configured.setDriver(driver)

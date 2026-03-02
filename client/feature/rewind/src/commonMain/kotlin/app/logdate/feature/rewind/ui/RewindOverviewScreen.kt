@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 @file:OptIn(ExperimentalUuidApi::class)
 
 package app.logdate.feature.rewind.ui
@@ -13,23 +15,23 @@ import kotlin.uuid.ExperimentalUuidApi
 
 /**
  * The main entry point for the Rewind feature's overview screen.
- * 
+ *
  * This composable serves as the connection between the navigation layer and the underlying
  * UI components, handling ViewModel integration and state management. It provides a clean
  * interface for displaying the user's weekly rewinds in the floating card design.
- * 
+ *
  * ## Integration Points:
  * - **Navigation**: Receives callback for rewind detail navigation
  * - **State Management**: Connects to RewindOverviewViewModel for data flow
  * - **UI Rendering**: Delegates to RewindScreenContent for actual presentation
- * 
+ *
  * ## Architecture Role:
  * This screen acts as a "thin controller" that:
  * 1. Injects the appropriate ViewModel using Koin
  * 2. Observes UI state changes from the ViewModel
  * 3. Passes the callback through to child components
  * 4. Applies standard screen-level modifiers
- * 
+ *
  * ## Usage:
  * ```kotlin
  * RewindOverviewScreen(
@@ -38,7 +40,7 @@ import kotlin.uuid.ExperimentalUuidApi
  *     }
  * )
  * ```
- * 
+ *
  * @param onOpenRewind Callback invoked when user selects a rewind card to view details
  * @param viewModel The ViewModel managing rewind data (injected by Koin by default)
  */

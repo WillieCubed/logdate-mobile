@@ -8,10 +8,11 @@ import app.logdate.client.location.places.StubExternalPlacesProvider
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
-actual val locationModule: Module = module {
-    includes(locationTrackerModule)
-    includes(locationHistoryModule)
+actual val locationModule: Module =
+    module {
+        includes(locationTrackerModule)
+        includes(locationHistoryModule)
 
-    single<ClientLocationProvider> { IosLocationProvider() }
-    single<ExternalPlacesProvider> { StubExternalPlacesProvider() }
-}
+        single<ClientLocationProvider> { IosLocationProvider() }
+        single<ExternalPlacesProvider> { StubExternalPlacesProvider() }
+    }

@@ -16,10 +16,12 @@ import app.logdate.feature.core.AppViewModel
 import app.logdate.feature.core.GlobalAppUiLoadedState
 import app.logdate.feature.core.GlobalAppUiLoadingState
 import app.logdate.feature.core.GlobalAppUiState
-import org.koin.compose.viewmodel.koinViewModel
-import org.jetbrains.compose.resources.stringResource
-import logdate.app.composemain.generated.resources.*
 import logdate.app.composemain.generated.resources.Res
+import logdate.app.composemain.generated.resources.loading
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
+
+@Suppress("ktlint:standard:function-naming")
 @Composable
 internal fun MainWindow(
     appState: LogDateApplicationState,
@@ -42,6 +44,7 @@ internal fun MainWindow(
 /**
  * Must be called from inside a window.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 private fun MainWindowContent(
     onOpenEditor: () -> Unit,

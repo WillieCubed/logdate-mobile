@@ -25,7 +25,10 @@ interface SearchRepository {
      * @param limit Maximum number of results
      * @return Flow of limited search results
      */
-    fun searchWithLimit(query: String, limit: Int): Flow<List<SearchResult>>
+    fun searchWithLimit(
+        query: String,
+        limit: Int,
+    ): Flow<List<SearchResult>>
 
     /**
      * Searches with highlighted snippets.

@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.ui
 
 import androidx.compose.foundation.layout.Box
@@ -16,11 +18,9 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import kotlin.math.roundToInt
 
-
 @Composable
 fun ParallaxEnabledCanvas() {
 }
-
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -31,7 +31,6 @@ fun ParallaxImage(
     modifier: Modifier = Modifier,
     maxOffset: Dp = 25.dp,
 ) {
-
     // Dispose sensor listener when composable leaves composition
     DisposableEffect(Unit) {
         onDispose {
@@ -43,31 +42,37 @@ fun ParallaxImage(
     val offsetY = calculateOffset(offset.y, maxOffset)
 
     Box(
-        modifier = modifier
-            .fillMaxSize()
+        modifier =
+            modifier
+                .fillMaxSize(),
 //            .pointerInteropFilter {
 //                // Prevent touch events from interfering with parallax effect
 //                true
 //            }
     ) {
         AsyncImage(
-            model = ImageRequest.Builder(LocalPlatformContext.current)
-                .data(uri)
-                .build(),
+            model =
+                ImageRequest
+                    .Builder(LocalPlatformContext.current)
+                    .data(uri)
+                    .build(),
             contentDescription = contentDescription,
             contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    translationX = offsetX.toPx()
-                    translationY = offsetY.toPx()
-                }
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        translationX = offsetX.toPx()
+                        translationY = offsetY.toPx()
+                    },
         )
     }
 }
 
-private fun calculateOffset(value: Float, maxOffset: Dp): Dp {
+private fun calculateOffset(
+    value: Float,
+    maxOffset: Dp,
+): Dp {
     val offset = (value * maxOffset.value).roundToInt().dp
     return offset.coerceIn(-maxOffset, maxOffset)
 }
-

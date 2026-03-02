@@ -6,9 +6,9 @@ import app.logdate.shared.model.EditorDraft
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlin.time.Clock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
@@ -17,9 +17,8 @@ import kotlin.uuid.Uuid
  */
 class LocalFirstDraftRepository(
     private val keyValueStorage: KeyValueStorage,
-    private val json: Json
+    private val json: Json,
 ) : DraftRepository {
-
     companion object {
         private const val KEY_DRAFTS = "editor_drafts"
     }
@@ -27,10 +26,10 @@ class LocalFirstDraftRepository(
     override suspend fun saveDraft(draft: EditorDraft) {
         try {
             Napier.d("Saving draft with ID: ${draft.id}, blocks: ${draft.blocks.size}")
-            
+
             // Get existing drafts
             val existingDrafts = getAllDrafts().toMutableList()
-            
+
             // Update existing draft or add new one
             val index = existingDrafts.indexOfFirst { it.id == draft.id }
             if (index >= 0) {
@@ -42,14 +41,14 @@ class LocalFirstDraftRepository(
                 existingDrafts.add(draft)
                 Napier.d("Added new draft, total drafts: ${existingDrafts.size}")
             }
-            
+
             // Save all drafts
             val draftsJson = json.encodeToString(existingDrafts)
             Napier.d("Draft JSON length: ${draftsJson.length}")
-            
+
             // Save to KeyValueStorage
             keyValueStorage.putString(KEY_DRAFTS, draftsJson)
-            
+
             Napier.d("Successfully saved draft ${draft.id}")
         } catch (e: Exception) {
             Napier.e("Error saving draft: ${e.message}", e)
@@ -61,12 +60,12 @@ class LocalFirstDraftRepository(
             Napier.d("Getting latest draft...")
             val allDrafts = getAllDrafts()
             Napier.d("Found ${allDrafts.size} drafts")
-            
+
             if (allDrafts.isEmpty()) {
                 Napier.d("No drafts found")
                 return null
             }
-            
+
             val latestDraft = allDrafts.maxByOrNull { it.lastModifiedAt }
             Napier.d("Latest draft ID: ${latestDraft?.id}, blocks: ${latestDraft?.blocks?.size}")
             return latestDraft
@@ -80,14 +79,14 @@ class LocalFirstDraftRepository(
         try {
             // Get the drafts JSON from KeyValueStorage
             val draftsJson = keyValueStorage.getString(KEY_DRAFTS) ?: ""
-                
+
             if (draftsJson.isEmpty()) {
                 Napier.d("No drafts JSON found in storage")
                 return emptyList()
             }
-            
+
             Napier.d("Found drafts JSON, length: ${draftsJson.length}")
-            
+
             // Parse the JSON into EditorDraft objects
             return try {
                 val drafts = json.decodeFromString<List<EditorDraft>>(draftsJson)
@@ -103,28 +102,30 @@ class LocalFirstDraftRepository(
         }
     }
 
-    override val allDrafts: Flow<List<EditorDraft>> = keyValueStorage.observeString(KEY_DRAFTS)
-        .map { draftsJson ->
-            try {
-                if (draftsJson.isNullOrEmpty()) {
-                    Napier.d("Flow: No drafts JSON found in storage")
-                    emptyList()
-                } else {
-                    Napier.d("Flow: Found drafts JSON, length: ${draftsJson.length}")
-                    try {
-                        val drafts = json.decodeFromString<List<EditorDraft>>(draftsJson)
-                        Napier.d("Flow: Successfully decoded ${drafts.size} drafts")
-                        drafts
-                    } catch (e: Exception) {
-                        Napier.e("Flow: Error decoding drafts JSON: ${e.message}", e)
+    override val allDrafts: Flow<List<EditorDraft>> =
+        keyValueStorage
+            .observeString(KEY_DRAFTS)
+            .map { draftsJson ->
+                try {
+                    if (draftsJson.isNullOrEmpty()) {
+                        Napier.d("Flow: No drafts JSON found in storage")
                         emptyList()
+                    } else {
+                        Napier.d("Flow: Found drafts JSON, length: ${draftsJson.length}")
+                        try {
+                            val drafts = json.decodeFromString<List<EditorDraft>>(draftsJson)
+                            Napier.d("Flow: Successfully decoded ${drafts.size} drafts")
+                            drafts
+                        } catch (e: Exception) {
+                            Napier.e("Flow: Error decoding drafts JSON: ${e.message}", e)
+                            emptyList()
+                        }
                     }
+                } catch (e: Exception) {
+                    Napier.e("Flow: Error getting all drafts: ${e.message}", e)
+                    emptyList()
                 }
-            } catch (e: Exception) {
-                Napier.e("Flow: Error getting all drafts: ${e.message}", e)
-                emptyList()
             }
-        }
 
     override suspend fun getDraft(id: Uuid): EditorDraft? {
         try {
@@ -148,12 +149,12 @@ class LocalFirstDraftRepository(
             val existingDrafts = getAllDrafts().toMutableList()
             val initialSize = existingDrafts.size
             existingDrafts.removeAll { it.id == id }
-            
+
             if (initialSize == existingDrafts.size) {
                 Napier.d("No draft found with ID: $id to delete")
                 return
             }
-            
+
             val draftsJson = json.encodeToString(existingDrafts)
             keyValueStorage.putString(KEY_DRAFTS, draftsJson)
             Napier.d("Successfully deleted draft with ID: $id")

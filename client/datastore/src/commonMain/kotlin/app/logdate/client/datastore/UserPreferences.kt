@@ -5,5 +5,5 @@ package app.logdate.client.datastore
  */
 data class UserPreferences(
     val dayStartHour: Int? = null,
-    val dayEndHour: Int? = null
+    val dayEndHour: Int? = null,
 )

@@ -18,7 +18,8 @@ data class PersonUiState(
 )
 
 @OptIn(ExperimentalUuidApi::class)
-fun Person.toUiState(): PersonUiState = PersonUiState(
-    uid = this.uid,
-    name = this.name
-)
+fun Person.toUiState(): PersonUiState =
+    PersonUiState(
+        uid = this.uid,
+        name = this.name,
+    )

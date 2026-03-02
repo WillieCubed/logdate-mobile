@@ -48,7 +48,6 @@ import kotlin.test.assertTrue
  * @see app.logdate.client.networking.configureClientDefaults
  */
 class PlatformSpecificNetworkingTest {
-
     /**
      * Tests that the expect/actual pattern provides consistent HTTP client access.
      *
@@ -61,28 +60,30 @@ class PlatformSpecificNetworkingTest {
      * **Real App Usage**: Unified networking code across Android, iOS, Desktop, Web
      */
     @Test
-    fun httpClient_expectActualPattern_isConsistent() = runTest {
-        // Test that the expect/actual pattern provides a consistent interface
-        assertNotNull(httpClient, "HTTP client should be available on all platforms")
-        
-        // Verify the client has basic functionality
-        val mockClient = HttpClient(MockEngine) {
-            engine {
-                addHandler {
-                    respond(
-                        content = ByteReadChannel("""{"platform": "test"}"""),
-                        status = HttpStatusCode.OK,
-                        headers = headersOf(HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()))
-                    )
+    fun httpClient_expectActualPattern_isConsistent() =
+        runTest {
+            // Test that the expect/actual pattern provides a consistent interface
+            assertNotNull(httpClient, "HTTP client should be available on all platforms")
+
+            // Verify the client has basic functionality
+            val mockClient =
+                HttpClient(MockEngine) {
+                    engine {
+                        addHandler {
+                            respond(
+                                content = ByteReadChannel("""{"platform": "test"}"""),
+                                status = HttpStatusCode.OK,
+                                headers = headersOf(HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString())),
+                            )
+                        }
+                    }
+                    configureClientDefaults()
                 }
-            }
-            configureClientDefaults()
+
+            val response = mockClient.get("https://api.example.com/platform")
+            assertEquals(HttpStatusCode.OK, response.status)
+            mockClient.close()
         }
-        
-        val response = mockClient.get("https://api.example.com/platform")
-        assertEquals(HttpStatusCode.OK, response.status)
-        mockClient.close()
-    }
 
     /**
      * Tests that HTTP client configuration behaves consistently across platforms.
@@ -97,44 +98,47 @@ class PlatformSpecificNetworkingTest {
      * **Real App Usage**: Platform-agnostic networking behavior in shared code
      */
     @Test
-    fun httpClient_configurationConsistency() = runTest {
-        // Test that all platform implementations use the same configuration
-        val client1 = HttpClient(MockEngine) {
-            engine {
-                addHandler {
-                    respond(
-                        content = ByteReadChannel("""{"config": "test1"}"""),
-                        status = HttpStatusCode.OK,
-                        headers = headersOf(HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()))
-                    )
+    fun httpClient_configurationConsistency() =
+        runTest {
+            // Test that all platform implementations use the same configuration
+            val client1 =
+                HttpClient(MockEngine) {
+                    engine {
+                        addHandler {
+                            respond(
+                                content = ByteReadChannel("""{"config": "test1"}"""),
+                                status = HttpStatusCode.OK,
+                                headers = headersOf(HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString())),
+                            )
+                        }
+                    }
+                    configureClientDefaults()
                 }
-            }
-            configureClientDefaults()
-        }
-        
-        val client2 = HttpClient(MockEngine) {
-            engine {
-                addHandler {
-                    respond(
-                        content = ByteReadChannel("""{"config": "test2"}"""),
-                        status = HttpStatusCode.OK,
-                        headers = headersOf(HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()))
-                    )
+
+            val client2 =
+                HttpClient(MockEngine) {
+                    engine {
+                        addHandler {
+                            respond(
+                                content = ByteReadChannel("""{"config": "test2"}"""),
+                                status = HttpStatusCode.OK,
+                                headers = headersOf(HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString())),
+                            )
+                        }
+                    }
+                    configureClientDefaults()
                 }
-            }
-            configureClientDefaults()
+
+            val response1: String = client1.get("https://api.example.com/test1").bodyAsText()
+            val response2: String = client2.get("https://api.example.com/test2").bodyAsText()
+
+            // Both clients should handle JSON responses correctly
+            assertTrue(response1.contains("test1"))
+            assertTrue(response2.contains("test2"))
+
+            client1.close()
+            client2.close()
         }
-        
-        val response1: String = client1.get("https://api.example.com/test1").bodyAsText()
-        val response2: String = client2.get("https://api.example.com/test2").bodyAsText()
-        
-        // Both clients should handle JSON responses correctly
-        assertTrue(response1.contains("test1"))
-        assertTrue(response2.contains("test2"))
-        
-        client1.close()
-        client2.close()
-    }
 
     /**
      * Tests that JSON configuration works correctly across all platforms.
@@ -149,38 +153,43 @@ class PlatformSpecificNetworkingTest {
      * **Real App Usage**: API evolution compatibility, robust data handling
      */
     @Test
-    fun httpClient_jsonConfiguration_worksCorrectly() = runTest {
-        val client = HttpClient(MockEngine) {
-            engine {
-                addHandler {
-                    respond(
-                        content = ByteReadChannel("""
-                            {
-                                "prettyPrintedField": "value",
-                                "unknownField": "should_be_ignored",
-                                "nestedObject": {
-                                    "nested": true
-                                }
-                            }
-                        """.trimIndent()),
-                        status = HttpStatusCode.OK,
-                        headers = headersOf(HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()))
-                    )
+    fun httpClient_jsonConfiguration_worksCorrectly() =
+        runTest {
+            val client =
+                HttpClient(MockEngine) {
+                    engine {
+                        addHandler {
+                            respond(
+                                content =
+                                    ByteReadChannel(
+                                        """
+                                        {
+                                            "prettyPrintedField": "value",
+                                            "unknownField": "should_be_ignored",
+                                            "nestedObject": {
+                                                "nested": true
+                                            }
+                                        }
+                                        """.trimIndent(),
+                                    ),
+                                status = HttpStatusCode.OK,
+                                headers = headersOf(HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString())),
+                            )
+                        }
+                    }
+                    configureClientDefaults()
                 }
-            }
-            configureClientDefaults()
+
+            val response = client.get("https://api.example.com/json-test")
+            val responseBody: String = response.bodyAsText()
+
+            // Verify that the JSON configuration allows unknown keys to be ignored
+            assertTrue(responseBody.contains("prettyPrintedField"))
+            assertTrue(responseBody.contains("unknownField"))
+            assertTrue(responseBody.contains("nestedObject"))
+
+            client.close()
         }
-        
-        val response = client.get("https://api.example.com/json-test")
-        val responseBody: String = response.bodyAsText()
-        
-        // Verify that the JSON configuration allows unknown keys to be ignored
-        assertTrue(responseBody.contains("prettyPrintedField"))
-        assertTrue(responseBody.contains("unknownField"))
-        assertTrue(responseBody.contains("nestedObject"))
-        
-        client.close()
-    }
 
     /**
      * Tests that logging configuration is consistently applied across platforms.
@@ -194,26 +203,28 @@ class PlatformSpecificNetworkingTest {
      * **Real App Usage**: Development debugging, production monitoring
      */
     @Test
-    fun httpClient_loggingConfiguration_isPresent() = runTest {
-        // Test that logging configuration is applied consistently
-        val client = HttpClient(MockEngine) {
-            engine {
-                addHandler {
-                    respond(
-                        content = ByteReadChannel("""{"logged": true}"""),
-                        status = HttpStatusCode.OK,
-                        headers = headersOf(HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()))
-                    )
+    fun httpClient_loggingConfiguration_isPresent() =
+        runTest {
+            // Test that logging configuration is applied consistently
+            val client =
+                HttpClient(MockEngine) {
+                    engine {
+                        addHandler {
+                            respond(
+                                content = ByteReadChannel("""{"logged": true}"""),
+                                status = HttpStatusCode.OK,
+                                headers = headersOf(HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString())),
+                            )
+                        }
+                    }
+                    configureClientDefaults()
                 }
-            }
-            configureClientDefaults()
+
+            val response = client.get("https://api.example.com/logged")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            client.close()
         }
-        
-        val response = client.get("https://api.example.com/logged")
-        
-        assertEquals(HttpStatusCode.OK, response.status)
-        client.close()
-    }
 
     /**
      * Tests that all platform implementations respect the HTTP client interface contract.
@@ -227,28 +238,30 @@ class PlatformSpecificNetworkingTest {
      * **Real App Usage**: Shared networking logic, platform-agnostic features
      */
     @Test
-    fun httpClient_interfaceContract_isRespected() = runTest {
-        // Test that all platform implementations respect the interface contract
-        val client = HttpClient(MockEngine) {
-            engine {
-                addHandler {
-                    respond(
-                        content = ByteReadChannel("""{"success": true}"""),
-                        status = HttpStatusCode.OK,
-                        headers = headersOf(HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()))
-                    )
+    fun httpClient_interfaceContract_isRespected() =
+        runTest {
+            // Test that all platform implementations respect the interface contract
+            val client =
+                HttpClient(MockEngine) {
+                    engine {
+                        addHandler {
+                            respond(
+                                content = ByteReadChannel("""{"success": true}"""),
+                                status = HttpStatusCode.OK,
+                                headers = headersOf(HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString())),
+                            )
+                        }
+                    }
+                    configureClientDefaults()
                 }
-            }
-            configureClientDefaults()
+
+            val response = client.get("https://api.example.com/platform-test")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val responseBody: String = response.bodyAsText()
+            assertTrue(responseBody.contains("success"))
+            assertTrue(responseBody.contains("true"))
+
+            client.close()
         }
-        
-        val response = client.get("https://api.example.com/platform-test")
-        
-        assertEquals(HttpStatusCode.OK, response.status)
-        val responseBody: String = response.bodyAsText()
-        assertTrue(responseBody.contains("success"))
-        assertTrue(responseBody.contains("true"))
-        
-        client.close()
-    }
 }

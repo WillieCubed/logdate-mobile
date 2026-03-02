@@ -27,16 +27,15 @@ import app.logdate.feature.journals.navigation.newJournalRoute
 import app.logdate.feature.journals.navigation.noteDetailRoute
 import app.logdate.feature.onboarding.navigation.onboardingGraph
 import app.logdate.feature.onboarding.navigation.startOnboarding
-import app.logdate.feature.rewind.navigation.rewindRoutes
 import app.logdate.feature.rewind.navigation.navigateToRewind
+import app.logdate.feature.rewind.navigation.rewindRoutes
 
 /**
  * The root composable for app-wide navigation.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
-internal fun LogDateNavHost(
-    navController: NavHostController = rememberNavController(),
-) {
+internal fun LogDateNavHost(navController: NavHostController = rememberNavController()) {
     NavHost(
         navController = navController,
         startDestination = BaseRoute,
@@ -108,7 +107,7 @@ internal fun LogDateNavHost(
                 },
                 onEntrySaved = {
                     navController.navigateHome()
-                }
+                },
             )
         }
         noteDetailRoute(

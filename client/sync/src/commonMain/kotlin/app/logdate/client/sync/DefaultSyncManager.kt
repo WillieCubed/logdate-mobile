@@ -3,43 +3,43 @@ package app.logdate.client.sync
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaPayload
+import app.logdate.client.repository.journals.JournalContentRepository
+import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.journals.SyncableJournalContentRepository
+import app.logdate.client.repository.journals.SyncableJournalNotesRepository
+import app.logdate.client.repository.journals.SyncableJournalRepository
+import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.cloud.CloudAssociationDataSource
 import app.logdate.client.sync.cloud.CloudContentDataSource
 import app.logdate.client.sync.cloud.CloudJournalDataSource
 import app.logdate.client.sync.cloud.CloudMediaDataSource
-import app.logdate.client.sync.cloud.CloudApiException
-import app.logdate.client.sync.cloud.MediaFile
 import app.logdate.client.sync.cloud.JournalContentAssociation
-import app.logdate.client.sync.conflict.ConflictResolver
+import app.logdate.client.sync.cloud.MediaFile
 import app.logdate.client.sync.conflict.ConflictResolution
+import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.SyncConflictRecord
 import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.metadata.AssociationPendingKey
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.MediaSyncRef
 import app.logdate.client.sync.metadata.MediaSyncRefStore
-import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.PendingOperation
-import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.client.sync.metadata.SyncDeadLetterStore
+import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import app.logdate.shared.model.CloudAccountRepository
-import app.logdate.client.repository.journals.JournalRepository
-import app.logdate.client.repository.journals.JournalNotesRepository
-import app.logdate.client.repository.journals.JournalContentRepository
-import app.logdate.client.repository.journals.JournalNote
-import app.logdate.client.repository.journals.SyncableJournalContentRepository
-import app.logdate.client.repository.journals.SyncableJournalNotesRepository
-import app.logdate.client.repository.journals.SyncableJournalRepository
 import app.logdate.shared.model.Journal
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
@@ -71,21 +71,21 @@ class DefaultSyncManager(
     private val retryScheduleStore: SyncRetryScheduleStore,
     private val syncMetadataService: SyncMetadataService,
     private val transactionManager: SyncTransactionManager,
-    private val syncScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
+    private val syncScope: CoroutineScope = CoroutineScope(Dispatchers.IO),
 ) : SyncManager {
-
     // Thread-safe state management using StateFlow and Mutex
-    private val _syncState = MutableStateFlow<SyncState>(SyncState.Idle)
-    private val _lastError = MutableStateFlow<SyncError?>(null)
+    private val syncStateFlow = MutableStateFlow<SyncState>(SyncState.Idle)
+    private val lastErrorFlow = MutableStateFlow<SyncError?>(null)
     private val syncMutex = Mutex()
 
-    private var _isEnabled = true
+    private var isEnabled = true
 
     /**
      * Represents the current state of the sync operation.
      */
     private sealed class SyncState {
         object Idle : SyncState()
+
         object Syncing : SyncState()
     }
 
@@ -97,7 +97,7 @@ class DefaultSyncManager(
     private data class BatchResult(
         val downloadedCount: Int,
         val conflictsResolved: Int,
-        val errors: List<SyncError>
+        val errors: List<SyncError>,
     )
 
     override fun sync(startNow: Boolean) {
@@ -112,264 +112,312 @@ class DefaultSyncManager(
             }
         }
     }
-    
-    override suspend fun uploadPendingChanges(): SyncResult = syncMutex.withLock {
-        if (!_isEnabled) {
-            return SyncResult(success = false, errors = listOf(
-                SyncError(SyncErrorType.UNKNOWN_ERROR, "Sync is disabled")
-            ))
-        }
 
-        if (!isAuthenticated()) {
-            Napier.w("Upload attempted without authentication")
-            return SyncResult(success = false, errors = listOf(
-                SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated. Please sign in to sync.")
-            ))
-        }
-
-        _syncState.value = SyncState.Syncing
-        var totalUploaded = 0
-        val errors = mutableListOf<SyncError>()
-
-        try {
-            val accessToken = getAccessToken()
-                ?: return authError()
-
-            // Upload journals
-            val journalResult = uploadJournals(accessToken)
-            totalUploaded += journalResult.uploadedItems
-            errors.addAll(journalResult.errors)
-
-            // Upload content
-            val contentResult = uploadContent(accessToken)
-            totalUploaded += contentResult.uploadedItems
-            errors.addAll(contentResult.errors)
-
-            // Upload associations
-            val associationResult = uploadAssociations(accessToken)
-            totalUploaded += associationResult.uploadedItems
-            errors.addAll(associationResult.errors)
-
-            val success = errors.isEmpty()
-            if (success) {
-                _lastError.value = null
-            } else {
-                _lastError.value = errors.firstOrNull()
+    override suspend fun uploadPendingChanges(): SyncResult =
+        syncMutex.withLock {
+            if (!isEnabled) {
+                return SyncResult(
+                    success = false,
+                    errors =
+                        listOf(
+                            SyncError(SyncErrorType.UNKNOWN_ERROR, "Sync is disabled"),
+                        ),
+                )
             }
 
-            return SyncResult(
-                success = success,
-                uploadedItems = totalUploaded,
-                errors = errors,
-                lastSyncTime = latestSyncTime()
-            )
-
-        } catch (e: Exception) {
-            return handleSyncException(e, "Upload failed")
-        } finally {
-            _syncState.value = SyncState.Idle
-        }
-    }
-    
-    override suspend fun downloadRemoteChanges(): SyncResult = syncMutex.withLock {
-        if (!_isEnabled) {
-            return SyncResult(success = false, errors = listOf(
-                SyncError(SyncErrorType.UNKNOWN_ERROR, "Sync is disabled")
-            ))
-        }
-
-        if (!isAuthenticated()) {
-            Napier.w("Download attempted without authentication")
-            return SyncResult(success = false, errors = listOf(
-                SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated. Please sign in to sync.")
-            ))
-        }
-
-        _syncState.value = SyncState.Syncing
-        var totalDownloaded = 0
-        var conflictsResolved = 0
-        val errors = mutableListOf<SyncError>()
-
-        try {
-            val accessToken = getAccessToken()
-                ?: return authError()
-
-            val journalSince = cursorFor(EntityType.JOURNAL)
-            val contentSince = cursorFor(EntityType.NOTE)
-            val associationSince = cursorFor(EntityType.ASSOCIATION)
-
-            // Download journals
-            val journalResult = downloadJournals(accessToken, journalSince)
-            totalDownloaded += journalResult.downloadedItems
-            conflictsResolved += journalResult.conflictsResolved
-            errors.addAll(journalResult.errors)
-
-            // Download content
-            val contentResult = downloadContent(accessToken, contentSince)
-            totalDownloaded += contentResult.downloadedItems
-            conflictsResolved += contentResult.conflictsResolved
-            errors.addAll(contentResult.errors)
-
-            // Download associations
-            val associationResult = downloadAssociations(accessToken, associationSince)
-            totalDownloaded += associationResult.downloadedItems
-            conflictsResolved += associationResult.conflictsResolved
-            errors.addAll(associationResult.errors)
-
-            val success = errors.isEmpty()
-            if (success) {
-                _lastError.value = null
-            } else {
-                _lastError.value = errors.firstOrNull()
+            if (!isAuthenticated()) {
+                Napier.w("Upload attempted without authentication")
+                return SyncResult(
+                    success = false,
+                    errors =
+                        listOf(
+                            SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated. Please sign in to sync."),
+                        ),
+                )
             }
 
-            return SyncResult(
-                success = success,
-                downloadedItems = totalDownloaded,
-                conflictsResolved = conflictsResolved,
-                errors = errors,
-                lastSyncTime = latestSyncTime()
-            )
+            syncStateFlow.value = SyncState.Syncing
+            var totalUploaded = 0
+            val errors = mutableListOf<SyncError>()
 
-        } catch (e: Exception) {
-            return handleSyncException(e, "Download failed")
-        } finally {
-            _syncState.value = SyncState.Idle
+            try {
+                val accessToken =
+                    getAccessToken()
+                        ?: return authError()
+
+                // Upload journals
+                val journalResult = uploadJournals(accessToken)
+                totalUploaded += journalResult.uploadedItems
+                errors.addAll(journalResult.errors)
+
+                // Upload content
+                val contentResult = uploadContent(accessToken)
+                totalUploaded += contentResult.uploadedItems
+                errors.addAll(contentResult.errors)
+
+                // Upload associations
+                val associationResult = uploadAssociations(accessToken)
+                totalUploaded += associationResult.uploadedItems
+                errors.addAll(associationResult.errors)
+
+                val success = errors.isEmpty()
+                if (success) {
+                    lastErrorFlow.value = null
+                } else {
+                    lastErrorFlow.value = errors.firstOrNull()
+                }
+
+                return SyncResult(
+                    success = success,
+                    uploadedItems = totalUploaded,
+                    errors = errors,
+                    lastSyncTime = latestSyncTime(),
+                )
+            } catch (e: Exception) {
+                return handleSyncException(e, "Upload failed")
+            } finally {
+                syncStateFlow.value = SyncState.Idle
+            }
         }
-    }
-    
-    override suspend fun syncContent(): SyncResult = syncMutex.withLock {
-        if (!_isEnabled) {
-            return SyncResult(success = false, errors = listOf(
-                SyncError(SyncErrorType.UNKNOWN_ERROR, "Sync is disabled")
-            ))
-        }
 
-        if (!isAuthenticated()) {
-            return SyncResult(success = false, errors = listOf(
-                SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated")
-            ))
-        }
-
-        _syncState.value = SyncState.Syncing
-        try {
-            val accessToken = getAccessToken() ?: return authError()
-
-            val uploadResult = uploadContent(accessToken)
-            val since = cursorFor(EntityType.NOTE)
-            val downloadResult = downloadContent(
-                accessToken,
-                since
-            )
-
-            val success = uploadResult.success && downloadResult.success
-            if (success) {
-                _lastError.value = null
-            } else {
-                _lastError.value = (uploadResult.errors + downloadResult.errors).firstOrNull()
+    override suspend fun downloadRemoteChanges(): SyncResult =
+        syncMutex.withLock {
+            if (!isEnabled) {
+                return SyncResult(
+                    success = false,
+                    errors =
+                        listOf(
+                            SyncError(SyncErrorType.UNKNOWN_ERROR, "Sync is disabled"),
+                        ),
+                )
             }
 
-            return SyncResult(
-                success = success,
-                uploadedItems = uploadResult.uploadedItems,
-                downloadedItems = downloadResult.downloadedItems,
-                conflictsResolved = downloadResult.conflictsResolved,
-                errors = uploadResult.errors + downloadResult.errors,
-                lastSyncTime = latestSyncTime()
-            )
-        } finally {
-            _syncState.value = SyncState.Idle
-        }
-    }
-    
-    override suspend fun syncJournals(): SyncResult = syncMutex.withLock {
-        if (!_isEnabled) {
-            return SyncResult(success = false, errors = listOf(
-                SyncError(SyncErrorType.UNKNOWN_ERROR, "Sync is disabled")
-            ))
-        }
-
-        if (!isAuthenticated()) {
-            return SyncResult(success = false, errors = listOf(
-                SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated")
-            ))
-        }
-
-        _syncState.value = SyncState.Syncing
-        try {
-            val accessToken = getAccessToken() ?: return authError()
-
-            val uploadResult = uploadJournals(accessToken)
-            val since = cursorFor(EntityType.JOURNAL)
-            val downloadResult = downloadJournals(
-                accessToken,
-                since
-            )
-
-            val success = uploadResult.success && downloadResult.success
-            if (success) {
-                _lastError.value = null
-            } else {
-                _lastError.value = (uploadResult.errors + downloadResult.errors).firstOrNull()
+            if (!isAuthenticated()) {
+                Napier.w("Download attempted without authentication")
+                return SyncResult(
+                    success = false,
+                    errors =
+                        listOf(
+                            SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated. Please sign in to sync."),
+                        ),
+                )
             }
 
-            return SyncResult(
-                success = success,
-                uploadedItems = uploadResult.uploadedItems,
-                downloadedItems = downloadResult.downloadedItems,
-                conflictsResolved = downloadResult.conflictsResolved,
-                errors = uploadResult.errors + downloadResult.errors,
-                lastSyncTime = latestSyncTime()
-            )
-        } finally {
-            _syncState.value = SyncState.Idle
+            syncStateFlow.value = SyncState.Syncing
+            var totalDownloaded = 0
+            var conflictsResolved = 0
+            val errors = mutableListOf<SyncError>()
+
+            try {
+                val accessToken =
+                    getAccessToken()
+                        ?: return authError()
+
+                val journalSince = cursorFor(EntityType.JOURNAL)
+                val contentSince = cursorFor(EntityType.NOTE)
+                val associationSince = cursorFor(EntityType.ASSOCIATION)
+
+                // Download journals
+                val journalResult = downloadJournals(accessToken, journalSince)
+                totalDownloaded += journalResult.downloadedItems
+                conflictsResolved += journalResult.conflictsResolved
+                errors.addAll(journalResult.errors)
+
+                // Download content
+                val contentResult = downloadContent(accessToken, contentSince)
+                totalDownloaded += contentResult.downloadedItems
+                conflictsResolved += contentResult.conflictsResolved
+                errors.addAll(contentResult.errors)
+
+                // Download associations
+                val associationResult = downloadAssociations(accessToken, associationSince)
+                totalDownloaded += associationResult.downloadedItems
+                conflictsResolved += associationResult.conflictsResolved
+                errors.addAll(associationResult.errors)
+
+                val success = errors.isEmpty()
+                if (success) {
+                    lastErrorFlow.value = null
+                } else {
+                    lastErrorFlow.value = errors.firstOrNull()
+                }
+
+                return SyncResult(
+                    success = success,
+                    downloadedItems = totalDownloaded,
+                    conflictsResolved = conflictsResolved,
+                    errors = errors,
+                    lastSyncTime = latestSyncTime(),
+                )
+            } catch (e: Exception) {
+                return handleSyncException(e, "Download failed")
+            } finally {
+                syncStateFlow.value = SyncState.Idle
+            }
         }
-    }
-    
-    override suspend fun syncAssociations(): SyncResult = syncMutex.withLock {
-        if (!_isEnabled) {
-            return SyncResult(success = false, errors = listOf(
-                SyncError(SyncErrorType.UNKNOWN_ERROR, "Sync is disabled")
-            ))
-        }
 
-        if (!isAuthenticated()) {
-            return SyncResult(success = false, errors = listOf(
-                SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated")
-            ))
-        }
-
-        _syncState.value = SyncState.Syncing
-        try {
-            val accessToken = getAccessToken() ?: return authError()
-
-            val uploadResult = uploadAssociations(accessToken)
-            val since = cursorFor(EntityType.ASSOCIATION)
-            val downloadResult = downloadAssociations(
-                accessToken,
-                since
-            )
-
-            val success = uploadResult.success && downloadResult.success
-            if (success) {
-                _lastError.value = null
-            } else {
-                _lastError.value = (uploadResult.errors + downloadResult.errors).firstOrNull()
+    override suspend fun syncContent(): SyncResult =
+        syncMutex.withLock {
+            if (!isEnabled) {
+                return SyncResult(
+                    success = false,
+                    errors =
+                        listOf(
+                            SyncError(SyncErrorType.UNKNOWN_ERROR, "Sync is disabled"),
+                        ),
+                )
             }
 
-            return SyncResult(
-                success = success,
-                uploadedItems = uploadResult.uploadedItems,
-                downloadedItems = downloadResult.downloadedItems,
-                conflictsResolved = downloadResult.conflictsResolved,
-                errors = uploadResult.errors + downloadResult.errors,
-                lastSyncTime = latestSyncTime()
-            )
-        } finally {
-            _syncState.value = SyncState.Idle
+            if (!isAuthenticated()) {
+                return SyncResult(
+                    success = false,
+                    errors =
+                        listOf(
+                            SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated"),
+                        ),
+                )
+            }
+
+            syncStateFlow.value = SyncState.Syncing
+            try {
+                val accessToken = getAccessToken() ?: return authError()
+
+                val uploadResult = uploadContent(accessToken)
+                val since = cursorFor(EntityType.NOTE)
+                val downloadResult =
+                    downloadContent(
+                        accessToken,
+                        since,
+                    )
+
+                val success = uploadResult.success && downloadResult.success
+                if (success) {
+                    lastErrorFlow.value = null
+                } else {
+                    lastErrorFlow.value = (uploadResult.errors + downloadResult.errors).firstOrNull()
+                }
+
+                return SyncResult(
+                    success = success,
+                    uploadedItems = uploadResult.uploadedItems,
+                    downloadedItems = downloadResult.downloadedItems,
+                    conflictsResolved = downloadResult.conflictsResolved,
+                    errors = uploadResult.errors + downloadResult.errors,
+                    lastSyncTime = latestSyncTime(),
+                )
+            } finally {
+                syncStateFlow.value = SyncState.Idle
+            }
         }
-    }
-    
+
+    override suspend fun syncJournals(): SyncResult =
+        syncMutex.withLock {
+            if (!isEnabled) {
+                return SyncResult(
+                    success = false,
+                    errors =
+                        listOf(
+                            SyncError(SyncErrorType.UNKNOWN_ERROR, "Sync is disabled"),
+                        ),
+                )
+            }
+
+            if (!isAuthenticated()) {
+                return SyncResult(
+                    success = false,
+                    errors =
+                        listOf(
+                            SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated"),
+                        ),
+                )
+            }
+
+            syncStateFlow.value = SyncState.Syncing
+            try {
+                val accessToken = getAccessToken() ?: return authError()
+
+                val uploadResult = uploadJournals(accessToken)
+                val since = cursorFor(EntityType.JOURNAL)
+                val downloadResult =
+                    downloadJournals(
+                        accessToken,
+                        since,
+                    )
+
+                val success = uploadResult.success && downloadResult.success
+                if (success) {
+                    lastErrorFlow.value = null
+                } else {
+                    lastErrorFlow.value = (uploadResult.errors + downloadResult.errors).firstOrNull()
+                }
+
+                return SyncResult(
+                    success = success,
+                    uploadedItems = uploadResult.uploadedItems,
+                    downloadedItems = downloadResult.downloadedItems,
+                    conflictsResolved = downloadResult.conflictsResolved,
+                    errors = uploadResult.errors + downloadResult.errors,
+                    lastSyncTime = latestSyncTime(),
+                )
+            } finally {
+                syncStateFlow.value = SyncState.Idle
+            }
+        }
+
+    override suspend fun syncAssociations(): SyncResult =
+        syncMutex.withLock {
+            if (!isEnabled) {
+                return SyncResult(
+                    success = false,
+                    errors =
+                        listOf(
+                            SyncError(SyncErrorType.UNKNOWN_ERROR, "Sync is disabled"),
+                        ),
+                )
+            }
+
+            if (!isAuthenticated()) {
+                return SyncResult(
+                    success = false,
+                    errors =
+                        listOf(
+                            SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated"),
+                        ),
+                )
+            }
+
+            syncStateFlow.value = SyncState.Syncing
+            try {
+                val accessToken = getAccessToken() ?: return authError()
+
+                val uploadResult = uploadAssociations(accessToken)
+                val since = cursorFor(EntityType.ASSOCIATION)
+                val downloadResult =
+                    downloadAssociations(
+                        accessToken,
+                        since,
+                    )
+
+                val success = uploadResult.success && downloadResult.success
+                if (success) {
+                    lastErrorFlow.value = null
+                } else {
+                    lastErrorFlow.value = (uploadResult.errors + downloadResult.errors).firstOrNull()
+                }
+
+                return SyncResult(
+                    success = success,
+                    uploadedItems = uploadResult.uploadedItems,
+                    downloadedItems = downloadResult.downloadedItems,
+                    conflictsResolved = downloadResult.conflictsResolved,
+                    errors = uploadResult.errors + downloadResult.errors,
+                    lastSyncTime = latestSyncTime(),
+                )
+            } finally {
+                syncStateFlow.value = SyncState.Idle
+            }
+        }
+
     override suspend fun fullSync(): SyncResult {
         val uploadResult = uploadPendingChanges()
         val downloadResult = downloadRemoteChanges()
@@ -380,19 +428,19 @@ class DefaultSyncManager(
             downloadedItems = downloadResult.downloadedItems,
             conflictsResolved = downloadResult.conflictsResolved,
             errors = uploadResult.errors + downloadResult.errors,
-            lastSyncTime = latestSyncTime()
+            lastSyncTime = latestSyncTime(),
         )
     }
-    
+
     override suspend fun getSyncStatus(): SyncStatus {
         val pendingCount = syncMetadataService.getPendingCount()
         return SyncStatus(
-            isEnabled = _isEnabled,
+            isEnabled = isEnabled,
             lastSyncTime = latestSyncTime(),
             pendingUploads = pendingCount,
-            isSyncing = _syncState.value is SyncState.Syncing,
-            hasErrors = _lastError.value != null,
-            lastError = _lastError.value
+            isSyncing = syncStateFlow.value is SyncState.Syncing,
+            hasErrors = lastErrorFlow.value != null,
+            lastError = lastErrorFlow.value,
         )
     }
 
@@ -400,10 +448,10 @@ class DefaultSyncManager(
      * Gets the last sync error, used for network recovery decisions.
      * Returns null if the last sync succeeded.
      */
-    fun getLastSyncError(): SyncError? = _lastError.value
+    fun getLastSyncError(): SyncError? = lastErrorFlow.value
 
-    private suspend fun getAccessToken(): String? {
-        return try {
+    private suspend fun getAccessToken(): String? =
+        try {
             val session = sessionStorage.getSession()
             if (session != null) {
                 session.accessToken
@@ -415,30 +463,32 @@ class DefaultSyncManager(
             Napier.e("Failed to get access token", e)
             null
         }
-    }
 
-    private suspend fun isAuthenticated(): Boolean {
-        return sessionStorage.getSession() != null
-    }
-    
+    private suspend fun isAuthenticated(): Boolean = sessionStorage.getSession() != null
+
     /**
      * Helper to create authentication error result.
      */
-    private fun authError() = SyncResult(
-        success = false,
-        errors = listOf(SyncError(SyncErrorType.AUTHENTICATION_ERROR, "No access token"))
-    )
+    private fun authError() =
+        SyncResult(
+            success = false,
+            errors = listOf(SyncError(SyncErrorType.AUTHENTICATION_ERROR, "No access token")),
+        )
 
     /**
      * Helper to handle sync exceptions consistently.
      */
-    private fun handleSyncException(e: Exception, operation: String): SyncResult {
-        val error = SyncError(
-            type = SyncErrorType.UNKNOWN_ERROR,
-            message = "$operation: ${e.message}",
-            cause = e
-        )
-        _lastError.value = error
+    private fun handleSyncException(
+        e: Exception,
+        operation: String,
+    ): SyncResult {
+        val error =
+            SyncError(
+                type = SyncErrorType.UNKNOWN_ERROR,
+                message = "$operation: ${e.message}",
+                cause = e,
+            )
+        lastErrorFlow.value = error
         Napier.e("$operation failed", e)
         return SyncResult(success = false, errors = listOf(error))
     }
@@ -448,14 +498,19 @@ class DefaultSyncManager(
      * Distinguishes 401 Unauthorized errors from other server errors.
      */
     private fun handleCloudApiError(e: CloudApiException): SyncResult {
-        val errorType = if (e.statusCode == 401) {
-            SyncErrorType.AUTHENTICATION_ERROR
-        } else {
-            SyncErrorType.SERVER_ERROR
-        }
-        return SyncResult(success = false, errors = listOf(
-            SyncError(errorType, e.message, e)
-        ))
+        val errorType =
+            if (e.statusCode == 401) {
+                SyncErrorType.AUTHENTICATION_ERROR
+            } else {
+                SyncErrorType.SERVER_ERROR
+            }
+        return SyncResult(
+            success = false,
+            errors =
+                listOf(
+                    SyncError(errorType, e.message, e),
+                ),
+        )
     }
 
     /**
@@ -464,13 +519,13 @@ class DefaultSyncManager(
      */
     private suspend fun <T> retryWithFreshToken(
         operation: suspend (accessToken: String) -> Result<T>,
-        operationName: String
+        operationName: String,
     ): Result<T> {
         val currentSession = sessionStorage.getSession()
         if (currentSession == null) {
             Napier.w("No active session for $operationName")
             return Result.failure(
-                CloudApiException("NO_SESSION", "No active session available", statusCode = 401)
+                CloudApiException("NO_SESSION", "No active session available", statusCode = 401),
             )
         }
 
@@ -505,41 +560,44 @@ class DefaultSyncManager(
         return operation(newToken)
     }
 
-    private suspend fun cursorFor(entityType: EntityType): Instant {
-        return syncMetadataService.getLastSyncTime(entityType)
+    private suspend fun cursorFor(entityType: EntityType): Instant =
+        syncMetadataService.getLastSyncTime(entityType)
             ?: Instant.fromEpochMilliseconds(0)
-    }
 
     private suspend fun latestSyncTime(): Instant? {
-        val times = listOf(
-            syncMetadataService.getLastSyncTime(EntityType.JOURNAL),
-            syncMetadataService.getLastSyncTime(EntityType.NOTE),
-            syncMetadataService.getLastSyncTime(EntityType.ASSOCIATION),
-            syncMetadataService.getLastSyncTime(EntityType.MEDIA)
-        ).filterNotNull()
+        val times =
+            listOf(
+                syncMetadataService.getLastSyncTime(EntityType.JOURNAL),
+                syncMetadataService.getLastSyncTime(EntityType.NOTE),
+                syncMetadataService.getLastSyncTime(EntityType.ASSOCIATION),
+                syncMetadataService.getLastSyncTime(EntityType.MEDIA),
+            ).filterNotNull()
 
         return times.maxOrNull()
     }
 
-    private fun JournalNote.mediaRefOrNull(): String? = when (this) {
-        is JournalNote.Image -> mediaRef
-        is JournalNote.Video -> mediaRef
-        is JournalNote.Audio -> mediaRef
-        else -> null
-    }
+    private fun JournalNote.mediaRefOrNull(): String? =
+        when (this) {
+            is JournalNote.Image -> mediaRef
+            is JournalNote.Video -> mediaRef
+            is JournalNote.Audio -> mediaRef
+            else -> null
+        }
 
-    private fun JournalNote.withMediaRef(mediaRef: String): JournalNote = when (this) {
-        is JournalNote.Image -> copy(mediaRef = mediaRef)
-        is JournalNote.Video -> copy(mediaRef = mediaRef)
-        is JournalNote.Audio -> copy(mediaRef = mediaRef)
-        else -> this
-    }
+    private fun JournalNote.withMediaRef(mediaRef: String): JournalNote =
+        when (this) {
+            is JournalNote.Image -> copy(mediaRef = mediaRef)
+            is JournalNote.Video -> copy(mediaRef = mediaRef)
+            is JournalNote.Audio -> copy(mediaRef = mediaRef)
+            else -> this
+        }
 
-    private fun isRemoteMediaRef(mediaRef: String): Boolean {
-        return mediaRef.startsWith("http://") || mediaRef.startsWith("https://")
-    }
+    private fun isRemoteMediaRef(mediaRef: String): Boolean = mediaRef.startsWith("http://") || mediaRef.startsWith("https://")
 
-    private suspend fun uploadMediaIfNeeded(accessToken: String, note: JournalNote): Result<JournalNote> {
+    private suspend fun uploadMediaIfNeeded(
+        accessToken: String,
+        note: JournalNote,
+    ): Result<JournalNote> {
         val mediaRef = note.mediaRefOrNull() ?: return Result.success(note)
         if (isRemoteMediaRef(mediaRef)) {
             return Result.success(note)
@@ -551,16 +609,17 @@ class DefaultSyncManager(
 
         return runCatching {
             val payload = mediaManager.readMedia(mediaRef)
-            val uploadResult = cloudMediaDataSource.uploadMedia(
-                accessToken,
-                MediaFile(
-                    contentId = note.uid,
-                    fileName = payload.fileName,
-                    mimeType = payload.mimeType,
-                    sizeBytes = payload.sizeBytes,
-                    data = payload.data
+            val uploadResult =
+                cloudMediaDataSource.uploadMedia(
+                    accessToken,
+                    MediaFile(
+                        contentId = note.uid,
+                        fileName = payload.fileName,
+                        mimeType = payload.mimeType,
+                        sizeBytes = payload.sizeBytes,
+                        data = payload.data,
+                    ),
                 )
-            )
             uploadResult.getOrThrow()
         }.map { upload ->
             val remoteUrl = upload.downloadUrl
@@ -570,14 +629,17 @@ class DefaultSyncManager(
                     localUri = mediaRef,
                     remoteUrl = remoteUrl,
                     mediaId = upload.mediaId,
-                    updatedAt = Clock.System.now().toEpochMilliseconds()
-                )
+                    updatedAt = Clock.System.now().toEpochMilliseconds(),
+                ),
             )
             note.withMediaRef(remoteUrl)
         }
     }
 
-    private suspend fun downloadMediaIfNeeded(accessToken: String, note: JournalNote): JournalNote {
+    private suspend fun downloadMediaIfNeeded(
+        accessToken: String,
+        note: JournalNote,
+    ): JournalNote {
         val mediaRef = note.mediaRefOrNull() ?: return note
         if (!isRemoteMediaRef(mediaRef)) {
             return note
@@ -590,22 +652,23 @@ class DefaultSyncManager(
         }
         val mediaFile = downloadResult.getOrThrow()
         return runCatching {
-            val localUri = mediaManager.saveMedia(
-                MediaPayload(
-                    fileName = mediaFile.fileName,
-                    mimeType = mediaFile.mimeType,
-                    sizeBytes = mediaFile.sizeBytes,
-                    data = mediaFile.data
+            val localUri =
+                mediaManager.saveMedia(
+                    MediaPayload(
+                        fileName = mediaFile.fileName,
+                        mimeType = mediaFile.mimeType,
+                        sizeBytes = mediaFile.sizeBytes,
+                        data = mediaFile.data,
+                    ),
                 )
-            )
             mediaSyncRefStore.upsert(
                 MediaSyncRef(
                     noteId = note.uid.toString(),
                     localUri = localUri,
                     remoteUrl = mediaRef,
                     mediaId = mediaId,
-                    updatedAt = Clock.System.now().toEpochMilliseconds()
-                )
+                    updatedAt = Clock.System.now().toEpochMilliseconds(),
+                ),
             )
             note.withMediaRef(localUri)
         }.getOrElse { error ->
@@ -614,12 +677,13 @@ class DefaultSyncManager(
         }
     }
 
-    private fun extractMediaId(mediaRef: String): String? {
-        return runCatching {
-            val normalized = mediaRef
-                .substringBefore('#')
-                .substringBefore('?')
-                .trim()
+    private fun extractMediaId(mediaRef: String): String? =
+        runCatching {
+            val normalized =
+                mediaRef
+                    .substringBefore('#')
+                    .substringBefore('?')
+                    .trim()
 
             val lastSlashIndex = normalized.lastIndexOf('/')
             if (lastSlashIndex == -1 || lastSlashIndex == normalized.lastIndex) {
@@ -628,7 +692,6 @@ class DefaultSyncManager(
                 normalized.substring(lastSlashIndex + 1).takeIf { it.isNotBlank() }
             }
         }.getOrNull()
-    }
 
     private suspend fun recordConflict(
         entityType: EntityType,
@@ -637,7 +700,7 @@ class DefaultSyncManager(
         localVersion: Long?,
         remoteVersion: Long?,
         localUpdatedAt: Instant?,
-        remoteUpdatedAt: Instant?
+        remoteUpdatedAt: Instant?,
     ) {
         conflictStore.add(
             SyncConflictRecord(
@@ -649,8 +712,8 @@ class DefaultSyncManager(
                 localUpdatedAt = localUpdatedAt?.toEpochMilliseconds(),
                 remoteUpdatedAt = remoteUpdatedAt?.toEpochMilliseconds(),
                 reason = reason,
-                detectedAt = Clock.System.now().toEpochMilliseconds()
-            )
+                detectedAt = Clock.System.now().toEpochMilliseconds(),
+            ),
         )
     }
 
@@ -658,16 +721,18 @@ class DefaultSyncManager(
         localSyncVersion: Long,
         localUpdatedAt: Instant,
         remoteSyncVersion: Long,
-        remoteUpdatedAt: Instant
-    ): Pair<Instant, Instant> {
-        return if (localSyncVersion > 0L && remoteSyncVersion > 0L) {
+        remoteUpdatedAt: Instant,
+    ): Pair<Instant, Instant> =
+        if (localSyncVersion > 0L && remoteSyncVersion > 0L) {
             Instant.fromEpochMilliseconds(localSyncVersion) to Instant.fromEpochMilliseconds(remoteSyncVersion)
         } else {
             localUpdatedAt to remoteUpdatedAt
         }
-    }
 
-    private suspend fun shouldAttempt(entityType: EntityType, entityId: String): Boolean {
+    private suspend fun shouldAttempt(
+        entityType: EntityType,
+        entityId: String,
+    ): Boolean {
         val nextAttemptAt = retryScheduleStore.nextAttemptAt(entityType, entityId) ?: return true
         return Clock.System.now().toEpochMilliseconds() >= nextAttemptAt
     }
@@ -675,7 +740,7 @@ class DefaultSyncManager(
     private suspend fun handleRetryFailure(
         entityType: EntityType,
         pending: PendingUpload,
-        error: Throwable
+        error: Throwable,
     ): Boolean {
         val nextRetryCount = pending.retryCount + 1
         syncMetadataService.incrementRetryCount(pending.entityId, entityType)
@@ -689,14 +754,14 @@ class DefaultSyncManager(
                     operation = pending.operation.name,
                     retryCount = nextRetryCount,
                     lastError = error.message ?: "Unknown error",
-                    failedAt = Clock.System.now().toEpochMilliseconds()
-                )
+                    failedAt = Clock.System.now().toEpochMilliseconds(),
+                ),
             )
             syncMetadataService.markAsSynced(
                 pending.entityId,
                 entityType,
                 Clock.System.now(),
-                0L
+                0L,
             )
             retryScheduleStore.clear(entityType, pending.entityId)
             return true
@@ -706,7 +771,7 @@ class DefaultSyncManager(
         retryScheduleStore.setNextAttemptAt(
             entityType,
             pending.entityId,
-            Clock.System.now().toEpochMilliseconds() + delayMs
+            Clock.System.now().toEpochMilliseconds() + delayMs,
         )
         return false
     }
@@ -723,7 +788,7 @@ class DefaultSyncManager(
         const val RETRY_MAX_DELAY_MS = 300_000L
         const val SYNC_PAGE_SIZE = 200
     }
-    
+
     private suspend fun uploadJournals(accessToken: String): SyncResult {
         return try {
             var uploadedCount = 0
@@ -734,8 +799,10 @@ class DefaultSyncManager(
             }
 
             val syncableRepository = journalRepository as? SyncableJournalRepository
-            val journalsById = journalRepository.allJournalsObserved.first()
-                .associateBy { it.id.toString() }
+            val journalsById =
+                journalRepository.allJournalsObserved
+                    .first()
+                    .associateBy { it.id.toString() }
 
             for (pending in pendingUploads) {
                 val journalId = runCatching { Uuid.parse(pending.entityId) }.getOrNull()
@@ -744,14 +811,14 @@ class DefaultSyncManager(
                         SyncError(
                             SyncErrorType.UNKNOWN_ERROR,
                             "Invalid journal ID in outbox: ${pending.entityId}",
-                            retryable = false
-                        )
+                            retryable = false,
+                        ),
                     )
                     syncMetadataService.markAsSynced(
                         pending.entityId,
                         EntityType.JOURNAL,
                         Clock.System.now(),
-                        0L
+                        0L,
                     )
                     continue
                 }
@@ -761,34 +828,36 @@ class DefaultSyncManager(
 
                 when (pending.operation) {
                     PendingOperation.DELETE -> {
-                        val result = retryWithFreshToken(
-                            { token -> cloudJournalDataSource.deleteJournal(token, journalId) },
-                            "deleteJournal(${journalId})"
-                        )
+                        val result =
+                            retryWithFreshToken(
+                                { token -> cloudJournalDataSource.deleteJournal(token, journalId) },
+                                "deleteJournal($journalId)",
+                            )
                         if (result.isSuccess) {
                             uploadedCount++
                             syncMetadataService.markAsSynced(
                                 pending.entityId,
                                 EntityType.JOURNAL,
                                 Clock.System.now(),
-                                0L
+                                0L,
                             )
                             retryScheduleStore.clear(EntityType.JOURNAL, pending.entityId)
                             Napier.d("Successfully deleted journal: $journalId")
                         } else {
                             val error = result.exceptionOrNull() ?: Exception("Unknown delete error")
-                            val movedToDeadLetter = handleRetryFailure(
-                                entityType = EntityType.JOURNAL,
-                                pending = pending,
-                                error = error
-                            )
+                            val movedToDeadLetter =
+                                handleRetryFailure(
+                                    entityType = EntityType.JOURNAL,
+                                    pending = pending,
+                                    error = error,
+                                )
                             errors.add(
                                 SyncError(
                                     SyncErrorType.SERVER_ERROR,
                                     "Failed to delete journal $journalId: ${error.message}",
                                     error,
-                                    retryable = !movedToDeadLetter
-                                )
+                                    retryable = !movedToDeadLetter,
+                                ),
                             )
                             Napier.w("Failed to delete journal $journalId", error)
                             if (movedToDeadLetter) {
@@ -797,29 +866,31 @@ class DefaultSyncManager(
                         }
                     }
                     PendingOperation.CREATE,
-                    PendingOperation.UPDATE -> {
+                    PendingOperation.UPDATE,
+                    -> {
                         val journal = journalsById[pending.entityId]
                         if (journal == null) {
                             syncMetadataService.markAsSynced(
                                 pending.entityId,
                                 EntityType.JOURNAL,
                                 Clock.System.now(),
-                                0L
+                                0L,
                             )
                             continue
                         }
 
-                        val result = if (pending.operation == PendingOperation.CREATE) {
-                            retryWithFreshToken(
-                                { token -> cloudJournalDataSource.uploadJournal(token, journal) },
-                                "uploadJournal(${journal.id})"
-                            )
-                        } else {
-                            retryWithFreshToken(
-                                { token -> cloudJournalDataSource.updateJournal(token, journal) },
-                                "updateJournal(${journal.id})"
-                            )
-                        }
+                        val result =
+                            if (pending.operation == PendingOperation.CREATE) {
+                                retryWithFreshToken(
+                                    { token -> cloudJournalDataSource.uploadJournal(token, journal) },
+                                    "uploadJournal(${journal.id})",
+                                )
+                            } else {
+                                retryWithFreshToken(
+                                    { token -> cloudJournalDataSource.updateJournal(token, journal) },
+                                    "updateJournal(${journal.id})",
+                                )
+                            }
 
                         if (result.isSuccess) {
                             val upload = result.getOrThrow()
@@ -829,7 +900,7 @@ class DefaultSyncManager(
                                 pending.entityId,
                                 EntityType.JOURNAL,
                                 upload.syncedAt,
-                                upload.serverVersion
+                                upload.serverVersion,
                             )
                             retryScheduleStore.clear(EntityType.JOURNAL, pending.entityId)
                             Napier.d("Successfully uploaded journal: ${journal.id}")
@@ -843,31 +914,32 @@ class DefaultSyncManager(
                                     localVersion = journal.syncVersion,
                                     remoteVersion = null,
                                     localUpdatedAt = journal.lastUpdated,
-                                    remoteUpdatedAt = null
+                                    remoteUpdatedAt = null,
                                 )
                                 syncMetadataService.markAsSynced(
                                     pending.entityId,
                                     EntityType.JOURNAL,
                                     Clock.System.now(),
-                                    journal.syncVersion
+                                    journal.syncVersion,
                                 )
                                 errors.add(
                                     SyncError(
                                         SyncErrorType.CONFLICT_ERROR,
                                         "Conflict uploading journal ${journal.id}: ${error.message}",
                                         error,
-                                        retryable = false
-                                    )
+                                        retryable = false,
+                                    ),
                                 )
                                 Napier.w("Queued conflict for journal ${journal.id}", error)
                                 retryScheduleStore.clear(EntityType.JOURNAL, pending.entityId)
                                 continue
                             }
-                            val movedToDeadLetter = handleRetryFailure(
-                                entityType = EntityType.JOURNAL,
-                                pending = pending,
-                                error = error
-                            )
+                            val movedToDeadLetter =
+                                handleRetryFailure(
+                                    entityType = EntityType.JOURNAL,
+                                    pending = pending,
+                                    error = error,
+                                )
                             errors.add(
                                 SyncError(
                                     if ((error as? CloudApiException)?.statusCode == 409) {
@@ -877,8 +949,8 @@ class DefaultSyncManager(
                                     },
                                     "Failed to upload journal ${journal.id}: ${error.message}",
                                     error,
-                                    retryable = !movedToDeadLetter
-                                )
+                                    retryable = !movedToDeadLetter,
+                                ),
                             )
                             Napier.w("Failed to upload journal ${journal.id}", error)
                             if (movedToDeadLetter) {
@@ -896,7 +968,7 @@ class DefaultSyncManager(
             handleSyncException(e, "Upload journals")
         }
     }
-    
+
     private suspend fun uploadContent(accessToken: String): SyncResult {
         return try {
             var uploadedCount = 0
@@ -908,8 +980,10 @@ class DefaultSyncManager(
             }
 
             val syncableRepository = journalNotesRepository as? SyncableJournalNotesRepository
-            val notesById = journalNotesRepository.allNotesObserved.first()
-                .associateBy { it.uid.toString() }
+            val notesById =
+                journalNotesRepository.allNotesObserved
+                    .first()
+                    .associateBy { it.uid.toString() }
 
             for (pending in pendingUploads) {
                 val noteId = runCatching { Uuid.parse(pending.entityId) }.getOrNull()
@@ -918,14 +992,14 @@ class DefaultSyncManager(
                         SyncError(
                             SyncErrorType.UNKNOWN_ERROR,
                             "Invalid note ID in outbox: ${pending.entityId}",
-                            retryable = false
-                        )
+                            retryable = false,
+                        ),
                     )
                     syncMetadataService.markAsSynced(
                         pending.entityId,
                         EntityType.NOTE,
                         Clock.System.now(),
-                        0L
+                        0L,
                     )
                     continue
                 }
@@ -935,35 +1009,37 @@ class DefaultSyncManager(
 
                 when (pending.operation) {
                     PendingOperation.DELETE -> {
-                        val result = retryWithFreshToken(
-                            { token -> cloudContentDataSource.deleteNote(token, noteId) },
-                            "deleteNote(${noteId})"
-                        )
+                        val result =
+                            retryWithFreshToken(
+                                { token -> cloudContentDataSource.deleteNote(token, noteId) },
+                                "deleteNote($noteId)",
+                            )
                         if (result.isSuccess) {
                             uploadedCount++
                             syncMetadataService.markAsSynced(
                                 pending.entityId,
                                 EntityType.NOTE,
                                 Clock.System.now(),
-                                0L
+                                0L,
                             )
                             mediaSyncRefStore.delete(noteId)
                             retryScheduleStore.clear(EntityType.NOTE, pending.entityId)
                             Napier.d("Successfully deleted content: $noteId")
                         } else {
                             val error = result.exceptionOrNull() ?: Exception("Unknown delete error")
-                            val movedToDeadLetter = handleRetryFailure(
-                                entityType = EntityType.NOTE,
-                                pending = pending,
-                                error = error
-                            )
+                            val movedToDeadLetter =
+                                handleRetryFailure(
+                                    entityType = EntityType.NOTE,
+                                    pending = pending,
+                                    error = error,
+                                )
                             errors.add(
                                 SyncError(
                                     SyncErrorType.SERVER_ERROR,
                                     "Failed to delete content $noteId: ${error.message}",
                                     error,
-                                    retryable = !movedToDeadLetter
-                                )
+                                    retryable = !movedToDeadLetter,
+                                ),
                             )
                             Napier.w("Failed to delete content $noteId", error)
                             if (movedToDeadLetter) {
@@ -972,50 +1048,53 @@ class DefaultSyncManager(
                         }
                     }
                     PendingOperation.CREATE,
-                    PendingOperation.UPDATE -> {
+                    PendingOperation.UPDATE,
+                    -> {
                         val note = notesById[pending.entityId]
                         if (note == null) {
                             syncMetadataService.markAsSynced(
                                 pending.entityId,
                                 EntityType.NOTE,
                                 Clock.System.now(),
-                                0L
+                                0L,
                             )
                             continue
                         }
                         val mediaRef = note.mediaRefOrNull()
-                        val uploadReadyNote = if (mediaRef != null && !isRemoteMediaRef(mediaRef)) {
-                            val mediaUpload = uploadMediaIfNeeded(accessToken, note)
-                            if (mediaUpload.isFailure) {
-                                val error = mediaUpload.exceptionOrNull()
-                                errors.add(
-                                    SyncError(
-                                        SyncErrorType.STORAGE_ERROR,
-                                        "Failed to upload media for note ${note.uid}: ${error?.message}",
-                                        error,
-                                        retryable = true
+                        val uploadReadyNote =
+                            if (mediaRef != null && !isRemoteMediaRef(mediaRef)) {
+                                val mediaUpload = uploadMediaIfNeeded(accessToken, note)
+                                if (mediaUpload.isFailure) {
+                                    val error = mediaUpload.exceptionOrNull()
+                                    errors.add(
+                                        SyncError(
+                                            SyncErrorType.STORAGE_ERROR,
+                                            "Failed to upload media for note ${note.uid}: ${error?.message}",
+                                            error,
+                                            retryable = true,
+                                        ),
                                     )
-                                )
-                                Napier.w("Skipping note ${note.uid} sync; media upload failed", error)
-                                continue
+                                    Napier.w("Skipping note ${note.uid} sync; media upload failed", error)
+                                    continue
+                                }
+                                val updated = mediaUpload.getOrThrow()
+                                updated
+                            } else {
+                                note
                             }
-                            val updated = mediaUpload.getOrThrow()
-                            updated
-                        } else {
-                            note
-                        }
 
-                        val result = if (pending.operation == PendingOperation.CREATE) {
-                            retryWithFreshToken(
-                                { token -> cloudContentDataSource.uploadNote(token, uploadReadyNote) },
-                                "uploadNote(${note.uid})"
-                            )
-                        } else {
-                            retryWithFreshToken(
-                                { token -> cloudContentDataSource.updateNote(token, uploadReadyNote) },
-                                "updateNote(${note.uid})"
-                            )
-                        }
+                        val result =
+                            if (pending.operation == PendingOperation.CREATE) {
+                                retryWithFreshToken(
+                                    { token -> cloudContentDataSource.uploadNote(token, uploadReadyNote) },
+                                    "uploadNote(${note.uid})",
+                                )
+                            } else {
+                                retryWithFreshToken(
+                                    { token -> cloudContentDataSource.updateNote(token, uploadReadyNote) },
+                                    "updateNote(${note.uid})",
+                                )
+                            }
 
                         if (result.isSuccess) {
                             val upload = result.getOrThrow()
@@ -1025,7 +1104,7 @@ class DefaultSyncManager(
                                 pending.entityId,
                                 EntityType.NOTE,
                                 upload.syncedAt,
-                                upload.serverVersion
+                                upload.serverVersion,
                             )
                             retryScheduleStore.clear(EntityType.NOTE, pending.entityId)
                             Napier.d("Successfully uploaded content: ${note.uid}")
@@ -1039,31 +1118,32 @@ class DefaultSyncManager(
                                     localVersion = note.syncVersion,
                                     remoteVersion = null,
                                     localUpdatedAt = note.lastUpdated,
-                                    remoteUpdatedAt = null
+                                    remoteUpdatedAt = null,
                                 )
                                 syncMetadataService.markAsSynced(
                                     pending.entityId,
                                     EntityType.NOTE,
                                     Clock.System.now(),
-                                    note.syncVersion
+                                    note.syncVersion,
                                 )
                                 errors.add(
                                     SyncError(
                                         SyncErrorType.CONFLICT_ERROR,
                                         "Conflict uploading content ${note.uid}: ${error.message}",
                                         error,
-                                        retryable = false
-                                    )
+                                        retryable = false,
+                                    ),
                                 )
                                 Napier.w("Queued conflict for note ${note.uid}", error)
                                 retryScheduleStore.clear(EntityType.NOTE, pending.entityId)
                                 continue
                             }
-                            val movedToDeadLetter = handleRetryFailure(
-                                entityType = EntityType.NOTE,
-                                pending = pending,
-                                error = error
-                            )
+                            val movedToDeadLetter =
+                                handleRetryFailure(
+                                    entityType = EntityType.NOTE,
+                                    pending = pending,
+                                    error = error,
+                                )
                             errors.add(
                                 SyncError(
                                     if ((error as? CloudApiException)?.statusCode == 409) {
@@ -1073,8 +1153,8 @@ class DefaultSyncManager(
                                     },
                                     "Failed to upload content ${note.uid}: ${error.message}",
                                     error,
-                                    retryable = !movedToDeadLetter
-                                )
+                                    retryable = !movedToDeadLetter,
+                                ),
                             )
                             Napier.w("Failed to upload content ${note.uid}", error)
                             if (movedToDeadLetter) {
@@ -1092,7 +1172,7 @@ class DefaultSyncManager(
             handleSyncException(e, "Upload content")
         }
     }
-    
+
     private suspend fun uploadAssociations(accessToken: String): SyncResult {
         return try {
             var uploadedCount = 0
@@ -1119,23 +1199,24 @@ class DefaultSyncManager(
                         SyncError(
                             SyncErrorType.UNKNOWN_ERROR,
                             "Invalid association key in outbox: ${pending.entityId}",
-                            retryable = false
-                        )
+                            retryable = false,
+                        ),
                     )
                     syncMetadataService.markAsSynced(
                         pending.entityId,
                         EntityType.ASSOCIATION,
                         Clock.System.now(),
-                        0L
+                        0L,
                     )
                     return@forEach
                 }
 
-                val association = JournalContentAssociation(
-                    journalId = key.journalId,
-                    contentId = key.contentId,
-                    createdAt = Clock.System.now()
-                )
+                val association =
+                    JournalContentAssociation(
+                        journalId = key.journalId,
+                        contentId = key.contentId,
+                        createdAt = Clock.System.now(),
+                    )
 
                 when (pending.operation) {
                     PendingOperation.DELETE -> {
@@ -1143,7 +1224,8 @@ class DefaultSyncManager(
                         deleteIds.add(pending.entityId)
                     }
                     PendingOperation.CREATE,
-                    PendingOperation.UPDATE -> {
+                    PendingOperation.UPDATE,
+                    -> {
                         createAssociations.add(association)
                         createIds.add(pending.entityId)
                     }
@@ -1151,10 +1233,11 @@ class DefaultSyncManager(
             }
 
             if (createAssociations.isNotEmpty()) {
-                val result = retryWithFreshToken(
-                    { token -> cloudAssociationDataSource.uploadAssociations(token, createAssociations) },
-                    "uploadAssociations(${createAssociations.size} items)"
-                )
+                val result =
+                    retryWithFreshToken(
+                        { token -> cloudAssociationDataSource.uploadAssociations(token, createAssociations) },
+                        "uploadAssociations(${createAssociations.size} items)",
+                    )
                 if (result.isSuccess) {
                     val uploadedAt = result.getOrThrow()
                     createIds.forEach { id ->
@@ -1177,18 +1260,19 @@ class DefaultSyncManager(
                             SyncErrorType.SERVER_ERROR,
                             "Failed to upload associations: ${error.message}",
                             error,
-                            retryable = !movedToDeadLetter
-                        )
+                            retryable = !movedToDeadLetter,
+                        ),
                     )
                     Napier.w("Failed to upload associations", error)
                 }
             }
 
             if (deleteAssociations.isNotEmpty()) {
-                val result = retryWithFreshToken(
-                    { token -> cloudAssociationDataSource.deleteAssociations(token, deleteAssociations) },
-                    "deleteAssociations(${deleteAssociations.size} items)"
-                )
+                val result =
+                    retryWithFreshToken(
+                        { token -> cloudAssociationDataSource.deleteAssociations(token, deleteAssociations) },
+                        "deleteAssociations(${deleteAssociations.size} items)",
+                    )
                 if (result.isSuccess) {
                     val deletedAt = Clock.System.now()
                     deleteIds.forEach { id ->
@@ -1211,8 +1295,8 @@ class DefaultSyncManager(
                             SyncErrorType.SERVER_ERROR,
                             "Failed to delete associations: ${error.message}",
                             error,
-                            retryable = !movedToDeadLetter
-                        )
+                            retryable = !movedToDeadLetter,
+                        ),
                     )
                     Napier.w("Failed to delete associations", error)
                 }
@@ -1225,13 +1309,22 @@ class DefaultSyncManager(
             handleSyncException(e, "Upload associations")
         }
     }
-    
-    private suspend fun downloadJournals(accessToken: String, since: Instant): SyncResult {
-        return try {
-            val pendingJournals = syncMetadataService.getPendingUploads(EntityType.JOURNAL)
-                .map { it.entityId }
-                .toSet()
-            val localJournals = journalRepository.allJournalsObserved.first().associateBy { it.id }.toMutableMap()
+
+    private suspend fun downloadJournals(
+        accessToken: String,
+        since: Instant,
+    ): SyncResult =
+        try {
+            val pendingJournals =
+                syncMetadataService
+                    .getPendingUploads(EntityType.JOURNAL)
+                    .map { it.entityId }
+                    .toSet()
+            val localJournals =
+                journalRepository.allJournalsObserved
+                    .first()
+                    .associateBy { it.id }
+                    .toMutableMap()
             val syncableRepository = journalRepository as? SyncableJournalRepository
 
             var cursor = since
@@ -1243,153 +1336,157 @@ class DefaultSyncManager(
             while (hasMore) {
                 val result = cloudJournalDataSource.getJournalChanges(accessToken, cursor, SYNC_PAGE_SIZE).getOrThrow()
 
-                val batchResult = transactionManager.withTransaction {
-                    var downloadedCount = 0
-                    var conflictsResolved = 0
-                    val batchErrors = mutableListOf<SyncError>()
+                val batchResult =
+                    transactionManager.withTransaction {
+                        var downloadedCount = 0
+                        var conflictsResolved = 0
+                        val batchErrors = mutableListOf<SyncError>()
 
-                    for (journal in result.changes) {
-                        try {
-                            val existingJournal = localJournals[journal.id]
+                        for (journal in result.changes) {
+                            try {
+                                val existingJournal = localJournals[journal.id]
 
-                            if (existingJournal != null) {
-                                val hasPendingLocal = pendingJournals.contains(journal.id.toString())
+                                if (existingJournal != null) {
+                                    val hasPendingLocal = pendingJournals.contains(journal.id.toString())
+                                    if (hasPendingLocal) {
+                                        conflictsResolved++
+                                        Napier.w("Skipping journal update for ${journal.id} due to local pending changes")
+                                        recordConflict(
+                                            entityType = EntityType.JOURNAL,
+                                            entityId = journal.id.toString(),
+                                            reason = "Local pending changes vs remote update",
+                                            localVersion = existingJournal.syncVersion,
+                                            remoteVersion = journal.syncVersion,
+                                            localUpdatedAt = existingJournal.lastUpdated,
+                                            remoteUpdatedAt = journal.lastUpdated,
+                                        )
+                                        continue
+                                    }
+
+                                    val (localTimestamp, remoteTimestamp) =
+                                        conflictTimestamps(
+                                            localSyncVersion = existingJournal.syncVersion,
+                                            localUpdatedAt = existingJournal.lastUpdated,
+                                            remoteSyncVersion = journal.syncVersion,
+                                            remoteUpdatedAt = journal.lastUpdated,
+                                        )
+                                    val resolution =
+                                        journalConflictResolver.resolve(
+                                            local = existingJournal,
+                                            remote = journal,
+                                            localTimestamp = localTimestamp,
+                                            remoteTimestamp = remoteTimestamp,
+                                        )
+
+                                    when (resolution) {
+                                        is ConflictResolution.KeepRemote -> {
+                                            if (syncableRepository != null) {
+                                                syncableRepository.updateFromSync(resolution.value)
+                                            } else {
+                                                journalRepository.update(resolution.value)
+                                            }
+                                            localJournals[journal.id] = resolution.value
+                                            conflictsResolved++
+                                            Napier.d("Resolved conflict for journal ${journal.id}: keeping remote")
+                                        }
+                                        is ConflictResolution.KeepLocal -> {
+                                            Napier.d("Resolved conflict for journal ${journal.id}: keeping local")
+                                        }
+                                        is ConflictResolution.Merge -> {
+                                            if (syncableRepository != null) {
+                                                syncableRepository.updateFromSync(resolution.merged)
+                                            } else {
+                                                journalRepository.update(resolution.merged)
+                                            }
+                                            syncMetadataService.enqueuePending(
+                                                entityId = journal.id.toString(),
+                                                entityType = EntityType.JOURNAL,
+                                                operation = PendingOperation.UPDATE,
+                                            )
+                                            localJournals[journal.id] = resolution.merged
+                                            conflictsResolved++
+                                            Napier.d("Resolved conflict for journal ${journal.id}: merged")
+                                        }
+                                        is ConflictResolution.RequiresManualResolution -> {
+                                            Napier.w("Conflict for journal ${journal.id} requires manual resolution: ${resolution.reason}")
+                                            recordConflict(
+                                                entityType = EntityType.JOURNAL,
+                                                entityId = journal.id.toString(),
+                                                reason = resolution.reason,
+                                                localVersion = existingJournal.syncVersion,
+                                                remoteVersion = journal.syncVersion,
+                                                localUpdatedAt = existingJournal.lastUpdated,
+                                                remoteUpdatedAt = journal.lastUpdated,
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    if (syncableRepository != null) {
+                                        syncableRepository.createFromSync(journal)
+                                    } else {
+                                        journalRepository.create(journal)
+                                    }
+                                    localJournals[journal.id] = journal
+                                    downloadedCount++
+                                    Napier.d("Downloaded new journal: ${journal.id}")
+                                }
+                            } catch (e: Exception) {
+                                batchErrors.add(
+                                    SyncError(
+                                        SyncErrorType.UNKNOWN_ERROR,
+                                        "Failed to apply journal change for ${journal.id}: ${e.message}",
+                                        e,
+                                    ),
+                                )
+                                Napier.e("Failed to apply journal change for ${journal.id}", e)
+                            }
+                        }
+
+                        for (journalId in result.deletions) {
+                            try {
+                                val localJournal = localJournals[journalId]
+                                val hasPendingLocal =
+                                    localJournal != null &&
+                                        pendingJournals.contains(journalId.toString())
+
                                 if (hasPendingLocal) {
+                                    val journal = requireNotNull(localJournal)
                                     conflictsResolved++
-                                    Napier.w("Skipping journal update for ${journal.id} due to local pending changes")
+                                    Napier.w("Skipping journal deletion for $journalId due to local changes")
                                     recordConflict(
                                         entityType = EntityType.JOURNAL,
-                                        entityId = journal.id.toString(),
-                                        reason = "Local pending changes vs remote update",
-                                        localVersion = existingJournal.syncVersion,
-                                        remoteVersion = journal.syncVersion,
-                                        localUpdatedAt = existingJournal.lastUpdated,
-                                        remoteUpdatedAt = journal.lastUpdated
+                                        entityId = journalId.toString(),
+                                        reason = "Local pending changes vs remote deletion",
+                                        localVersion = journal.syncVersion,
+                                        remoteVersion = null,
+                                        localUpdatedAt = journal.lastUpdated,
+                                        remoteUpdatedAt = null,
                                     )
                                     continue
                                 }
 
-                                val (localTimestamp, remoteTimestamp) = conflictTimestamps(
-                                    localSyncVersion = existingJournal.syncVersion,
-                                    localUpdatedAt = existingJournal.lastUpdated,
-                                    remoteSyncVersion = journal.syncVersion,
-                                    remoteUpdatedAt = journal.lastUpdated
-                                )
-                                val resolution = journalConflictResolver.resolve(
-                                    local = existingJournal,
-                                    remote = journal,
-                                    localTimestamp = localTimestamp,
-                                    remoteTimestamp = remoteTimestamp
-                                )
-
-                                when (resolution) {
-                                    is ConflictResolution.KeepRemote -> {
-                                        if (syncableRepository != null) {
-                                            syncableRepository.updateFromSync(resolution.value)
-                                        } else {
-                                            journalRepository.update(resolution.value)
-                                        }
-                                        localJournals[journal.id] = resolution.value
-                                        conflictsResolved++
-                                        Napier.d("Resolved conflict for journal ${journal.id}: keeping remote")
-                                    }
-                                    is ConflictResolution.KeepLocal -> {
-                                        Napier.d("Resolved conflict for journal ${journal.id}: keeping local")
-                                    }
-                                    is ConflictResolution.Merge -> {
-                                        if (syncableRepository != null) {
-                                            syncableRepository.updateFromSync(resolution.merged)
-                                        } else {
-                                            journalRepository.update(resolution.merged)
-                                        }
-                                        syncMetadataService.enqueuePending(
-                                            entityId = journal.id.toString(),
-                                            entityType = EntityType.JOURNAL,
-                                            operation = PendingOperation.UPDATE
-                                        )
-                                        localJournals[journal.id] = resolution.merged
-                                        conflictsResolved++
-                                        Napier.d("Resolved conflict for journal ${journal.id}: merged")
-                                    }
-                                    is ConflictResolution.RequiresManualResolution -> {
-                                        Napier.w("Conflict for journal ${journal.id} requires manual resolution: ${resolution.reason}")
-                                        recordConflict(
-                                            entityType = EntityType.JOURNAL,
-                                            entityId = journal.id.toString(),
-                                            reason = resolution.reason,
-                                            localVersion = existingJournal.syncVersion,
-                                            remoteVersion = journal.syncVersion,
-                                            localUpdatedAt = existingJournal.lastUpdated,
-                                            remoteUpdatedAt = journal.lastUpdated
-                                        )
-                                    }
-                                }
-                            } else {
                                 if (syncableRepository != null) {
-                                    syncableRepository.createFromSync(journal)
+                                    syncableRepository.deleteFromSync(journalId)
                                 } else {
-                                    journalRepository.create(journal)
+                                    journalRepository.delete(journalId)
                                 }
-                                localJournals[journal.id] = journal
+                                localJournals.remove(journalId)
                                 downloadedCount++
-                                Napier.d("Downloaded new journal: ${journal.id}")
-                            }
-                        } catch (e: Exception) {
-                            batchErrors.add(
-                                SyncError(
-                                    SyncErrorType.UNKNOWN_ERROR,
-                                    "Failed to apply journal change for ${journal.id}: ${e.message}",
-                                    e
+                                Napier.d("Deleted journal: $journalId")
+                            } catch (e: Exception) {
+                                batchErrors.add(
+                                    SyncError(
+                                        SyncErrorType.UNKNOWN_ERROR,
+                                        "Failed to delete journal $journalId: ${e.message}",
+                                        e,
+                                    ),
                                 )
-                            )
-                            Napier.e("Failed to apply journal change for ${journal.id}", e)
+                                Napier.e("Failed to delete journal $journalId", e)
+                            }
                         }
+
+                        BatchResult(downloadedCount, conflictsResolved, batchErrors)
                     }
-
-                    for (journalId in result.deletions) {
-                        try {
-                            val localJournal = localJournals[journalId]
-                            val hasPendingLocal = localJournal != null &&
-                                pendingJournals.contains(journalId.toString())
-
-                            if (hasPendingLocal) {
-                                val journal = requireNotNull(localJournal)
-                                conflictsResolved++
-                                Napier.w("Skipping journal deletion for $journalId due to local changes")
-                                recordConflict(
-                                    entityType = EntityType.JOURNAL,
-                                    entityId = journalId.toString(),
-                                    reason = "Local pending changes vs remote deletion",
-                                    localVersion = journal.syncVersion,
-                                    remoteVersion = null,
-                                    localUpdatedAt = journal.lastUpdated,
-                                    remoteUpdatedAt = null
-                                )
-                                continue
-                            }
-
-                            if (syncableRepository != null) {
-                                syncableRepository.deleteFromSync(journalId)
-                            } else {
-                                journalRepository.delete(journalId)
-                            }
-                            localJournals.remove(journalId)
-                            downloadedCount++
-                            Napier.d("Deleted journal: $journalId")
-                        } catch (e: Exception) {
-                            batchErrors.add(
-                                SyncError(
-                                    SyncErrorType.UNKNOWN_ERROR,
-                                    "Failed to delete journal $journalId: ${e.message}",
-                                    e
-                                )
-                            )
-                            Napier.e("Failed to delete journal $journalId", e)
-                        }
-                    }
-
-                    BatchResult(downloadedCount, conflictsResolved, batchErrors)
-                }
 
                 totalDownloaded += batchResult.downloadedCount
                 totalConflicts += batchResult.conflictsResolved
@@ -1417,21 +1514,29 @@ class DefaultSyncManager(
                 success = errors.isEmpty(),
                 downloadedItems = totalDownloaded,
                 conflictsResolved = totalConflicts,
-                errors = errors
+                errors = errors,
             )
         } catch (e: CloudApiException) {
             handleCloudApiError(e)
         } catch (e: Exception) {
             handleSyncException(e, "Download journals")
         }
-    }
 
-    private suspend fun downloadContent(accessToken: String, since: Instant): SyncResult {
-        return try {
-            val pendingNotes = syncMetadataService.getPendingUploads(EntityType.NOTE)
-                .map { it.entityId }
-                .toSet()
-            val localNotes = journalNotesRepository.allNotesObserved.first().associateBy { it.uid }.toMutableMap()
+    private suspend fun downloadContent(
+        accessToken: String,
+        since: Instant,
+    ): SyncResult =
+        try {
+            val pendingNotes =
+                syncMetadataService
+                    .getPendingUploads(EntityType.NOTE)
+                    .map { it.entityId }
+                    .toSet()
+            val localNotes =
+                journalNotesRepository.allNotesObserved
+                    .first()
+                    .associateBy { it.uid }
+                    .toMutableMap()
             val syncableRepository = journalNotesRepository as? SyncableJournalNotesRepository
 
             var cursor = since
@@ -1444,158 +1549,162 @@ class DefaultSyncManager(
                 val result = cloudContentDataSource.getContentChanges(accessToken, cursor, SYNC_PAGE_SIZE).getOrThrow()
                 val hydratedChanges = result.changes.map { downloadMediaIfNeeded(accessToken, it) }
 
-                val batchResult = transactionManager.withTransaction {
-                    var downloadedCount = 0
-                    var conflictsResolved = 0
-                    val batchErrors = mutableListOf<SyncError>()
+                val batchResult =
+                    transactionManager.withTransaction {
+                        var downloadedCount = 0
+                        var conflictsResolved = 0
+                        val batchErrors = mutableListOf<SyncError>()
 
-                    for (note in hydratedChanges) {
-                        try {
-                            val existingNote = localNotes[note.uid]
+                        for (note in hydratedChanges) {
+                            try {
+                                val existingNote = localNotes[note.uid]
 
-                            if (existingNote != null) {
-                                val hasPendingLocal = pendingNotes.contains(note.uid.toString())
+                                if (existingNote != null) {
+                                    val hasPendingLocal = pendingNotes.contains(note.uid.toString())
+                                    if (hasPendingLocal) {
+                                        conflictsResolved++
+                                        Napier.w("Skipping note update for ${note.uid} due to local pending changes")
+                                        recordConflict(
+                                            entityType = EntityType.NOTE,
+                                            entityId = note.uid.toString(),
+                                            reason = "Local pending changes vs remote update",
+                                            localVersion = existingNote.syncVersion,
+                                            remoteVersion = note.syncVersion,
+                                            localUpdatedAt = existingNote.lastUpdated,
+                                            remoteUpdatedAt = note.lastUpdated,
+                                        )
+                                        continue
+                                    }
+
+                                    val (localTimestamp, remoteTimestamp) =
+                                        conflictTimestamps(
+                                            localSyncVersion = existingNote.syncVersion,
+                                            localUpdatedAt = existingNote.lastUpdated,
+                                            remoteSyncVersion = note.syncVersion,
+                                            remoteUpdatedAt = note.lastUpdated,
+                                        )
+                                    val resolution =
+                                        noteConflictResolver.resolve(
+                                            local = existingNote,
+                                            remote = note,
+                                            localTimestamp = localTimestamp,
+                                            remoteTimestamp = remoteTimestamp,
+                                        )
+
+                                    when (resolution) {
+                                        is ConflictResolution.KeepRemote -> {
+                                            if (syncableRepository != null) {
+                                                syncableRepository.deleteFromSync(existingNote.uid)
+                                                syncableRepository.createFromSync(resolution.value)
+                                            } else {
+                                                journalNotesRepository.remove(existingNote)
+                                                journalNotesRepository.create(resolution.value)
+                                            }
+                                            localNotes[note.uid] = resolution.value
+                                            conflictsResolved++
+                                            Napier.d("Resolved conflict for note ${note.uid}: keeping remote")
+                                        }
+                                        is ConflictResolution.KeepLocal -> {
+                                            Napier.d("Resolved conflict for note ${note.uid}: keeping local")
+                                        }
+                                        is ConflictResolution.Merge -> {
+                                            if (syncableRepository != null) {
+                                                syncableRepository.deleteFromSync(existingNote.uid)
+                                                syncableRepository.createFromSync(resolution.merged)
+                                            } else {
+                                                journalNotesRepository.remove(existingNote)
+                                                journalNotesRepository.create(resolution.merged)
+                                            }
+                                            syncMetadataService.enqueuePending(
+                                                entityId = existingNote.uid.toString(),
+                                                entityType = EntityType.NOTE,
+                                                operation = PendingOperation.UPDATE,
+                                            )
+                                            localNotes[note.uid] = resolution.merged
+                                            conflictsResolved++
+                                            Napier.d("Resolved conflict for note ${note.uid}: merged")
+                                        }
+                                        is ConflictResolution.RequiresManualResolution -> {
+                                            Napier.w("Conflict for note ${note.uid} requires manual resolution: ${resolution.reason}")
+                                            recordConflict(
+                                                entityType = EntityType.NOTE,
+                                                entityId = note.uid.toString(),
+                                                reason = resolution.reason,
+                                                localVersion = existingNote.syncVersion,
+                                                remoteVersion = note.syncVersion,
+                                                localUpdatedAt = existingNote.lastUpdated,
+                                                remoteUpdatedAt = note.lastUpdated,
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    if (syncableRepository != null) {
+                                        syncableRepository.createFromSync(note)
+                                    } else {
+                                        journalNotesRepository.create(note)
+                                    }
+                                    localNotes[note.uid] = note
+                                    downloadedCount++
+                                    Napier.d("Downloaded new note: ${note.uid}")
+                                }
+                            } catch (e: Exception) {
+                                batchErrors.add(
+                                    SyncError(
+                                        SyncErrorType.UNKNOWN_ERROR,
+                                        "Failed to apply content change for ${note.uid}: ${e.message}",
+                                        e,
+                                    ),
+                                )
+                                Napier.e("Failed to apply content change for ${note.uid}", e)
+                            }
+                        }
+
+                        for (noteId in result.deletions) {
+                            try {
+                                val localNote = localNotes[noteId]
+                                val hasPendingLocal =
+                                    localNote != null &&
+                                        pendingNotes.contains(noteId.toString())
+
                                 if (hasPendingLocal) {
+                                    val note = requireNotNull(localNote)
                                     conflictsResolved++
-                                    Napier.w("Skipping note update for ${note.uid} due to local pending changes")
+                                    Napier.w("Skipping note deletion for $noteId due to local changes")
                                     recordConflict(
                                         entityType = EntityType.NOTE,
-                                        entityId = note.uid.toString(),
-                                        reason = "Local pending changes vs remote update",
-                                        localVersion = existingNote.syncVersion,
-                                        remoteVersion = note.syncVersion,
-                                        localUpdatedAt = existingNote.lastUpdated,
-                                        remoteUpdatedAt = note.lastUpdated
+                                        entityId = noteId.toString(),
+                                        reason = "Local pending changes vs remote deletion",
+                                        localVersion = note.syncVersion,
+                                        remoteVersion = null,
+                                        localUpdatedAt = note.lastUpdated,
+                                        remoteUpdatedAt = null,
                                     )
                                     continue
                                 }
 
-                                val (localTimestamp, remoteTimestamp) = conflictTimestamps(
-                                    localSyncVersion = existingNote.syncVersion,
-                                    localUpdatedAt = existingNote.lastUpdated,
-                                    remoteSyncVersion = note.syncVersion,
-                                    remoteUpdatedAt = note.lastUpdated
-                                )
-                                val resolution = noteConflictResolver.resolve(
-                                    local = existingNote,
-                                    remote = note,
-                                    localTimestamp = localTimestamp,
-                                    remoteTimestamp = remoteTimestamp
-                                )
-
-                                when (resolution) {
-                                    is ConflictResolution.KeepRemote -> {
-                                        if (syncableRepository != null) {
-                                            syncableRepository.deleteFromSync(existingNote.uid)
-                                            syncableRepository.createFromSync(resolution.value)
-                                        } else {
-                                            journalNotesRepository.remove(existingNote)
-                                            journalNotesRepository.create(resolution.value)
-                                        }
-                                        localNotes[note.uid] = resolution.value
-                                        conflictsResolved++
-                                        Napier.d("Resolved conflict for note ${note.uid}: keeping remote")
-                                    }
-                                    is ConflictResolution.KeepLocal -> {
-                                        Napier.d("Resolved conflict for note ${note.uid}: keeping local")
-                                    }
-                                    is ConflictResolution.Merge -> {
-                                        if (syncableRepository != null) {
-                                            syncableRepository.deleteFromSync(existingNote.uid)
-                                            syncableRepository.createFromSync(resolution.merged)
-                                        } else {
-                                            journalNotesRepository.remove(existingNote)
-                                            journalNotesRepository.create(resolution.merged)
-                                        }
-                                        syncMetadataService.enqueuePending(
-                                            entityId = existingNote.uid.toString(),
-                                            entityType = EntityType.NOTE,
-                                            operation = PendingOperation.UPDATE
-                                        )
-                                        localNotes[note.uid] = resolution.merged
-                                        conflictsResolved++
-                                        Napier.d("Resolved conflict for note ${note.uid}: merged")
-                                    }
-                                    is ConflictResolution.RequiresManualResolution -> {
-                                        Napier.w("Conflict for note ${note.uid} requires manual resolution: ${resolution.reason}")
-                                        recordConflict(
-                                            entityType = EntityType.NOTE,
-                                            entityId = note.uid.toString(),
-                                            reason = resolution.reason,
-                                            localVersion = existingNote.syncVersion,
-                                            remoteVersion = note.syncVersion,
-                                            localUpdatedAt = existingNote.lastUpdated,
-                                            remoteUpdatedAt = note.lastUpdated
-                                        )
-                                    }
-                                }
-                            } else {
                                 if (syncableRepository != null) {
-                                    syncableRepository.createFromSync(note)
+                                    syncableRepository.deleteFromSync(noteId)
                                 } else {
-                                    journalNotesRepository.create(note)
+                                    journalNotesRepository.removeById(noteId)
                                 }
-                                localNotes[note.uid] = note
+                                mediaSyncRefStore.delete(noteId)
+                                localNotes.remove(noteId)
                                 downloadedCount++
-                                Napier.d("Downloaded new note: ${note.uid}")
-                            }
-                        } catch (e: Exception) {
-                            batchErrors.add(
-                                SyncError(
-                                    SyncErrorType.UNKNOWN_ERROR,
-                                    "Failed to apply content change for ${note.uid}: ${e.message}",
-                                    e
+                                Napier.d("Deleted note: $noteId")
+                            } catch (e: Exception) {
+                                batchErrors.add(
+                                    SyncError(
+                                        SyncErrorType.UNKNOWN_ERROR,
+                                        "Failed to delete note $noteId: ${e.message}",
+                                        e,
+                                    ),
                                 )
-                            )
-                            Napier.e("Failed to apply content change for ${note.uid}", e)
+                                Napier.e("Failed to delete note $noteId", e)
+                            }
                         }
+
+                        BatchResult(downloadedCount, conflictsResolved, batchErrors)
                     }
-
-                    for (noteId in result.deletions) {
-                        try {
-                            val localNote = localNotes[noteId]
-                            val hasPendingLocal = localNote != null &&
-                                pendingNotes.contains(noteId.toString())
-
-                            if (hasPendingLocal) {
-                                val note = requireNotNull(localNote)
-                                conflictsResolved++
-                                Napier.w("Skipping note deletion for $noteId due to local changes")
-                                recordConflict(
-                                    entityType = EntityType.NOTE,
-                                    entityId = noteId.toString(),
-                                    reason = "Local pending changes vs remote deletion",
-                                    localVersion = note.syncVersion,
-                                    remoteVersion = null,
-                                    localUpdatedAt = note.lastUpdated,
-                                    remoteUpdatedAt = null
-                                )
-                                continue
-                            }
-
-                            if (syncableRepository != null) {
-                                syncableRepository.deleteFromSync(noteId)
-                            } else {
-                                journalNotesRepository.removeById(noteId)
-                            }
-                            mediaSyncRefStore.delete(noteId)
-                            localNotes.remove(noteId)
-                            downloadedCount++
-                            Napier.d("Deleted note: $noteId")
-                        } catch (e: Exception) {
-                            batchErrors.add(
-                                SyncError(
-                                    SyncErrorType.UNKNOWN_ERROR,
-                                    "Failed to delete note $noteId: ${e.message}",
-                                    e
-                                )
-                            )
-                            Napier.e("Failed to delete note $noteId", e)
-                        }
-                    }
-
-                    BatchResult(downloadedCount, conflictsResolved, batchErrors)
-                }
 
                 totalDownloaded += batchResult.downloadedCount
                 totalConflicts += batchResult.conflictsResolved
@@ -1623,21 +1732,25 @@ class DefaultSyncManager(
                 success = errors.isEmpty(),
                 downloadedItems = totalDownloaded,
                 conflictsResolved = totalConflicts,
-                errors = errors
+                errors = errors,
             )
         } catch (e: CloudApiException) {
             handleCloudApiError(e)
         } catch (e: Exception) {
             handleSyncException(e, "Download content")
         }
-    }
 
-    private suspend fun downloadAssociations(accessToken: String, since: Instant): SyncResult {
-        return try {
+    private suspend fun downloadAssociations(
+        accessToken: String,
+        since: Instant,
+    ): SyncResult =
+        try {
             val syncableRepository = journalContentRepository as? SyncableJournalContentRepository
-            val pendingAssociations = syncMetadataService.getPendingUploads(EntityType.ASSOCIATION)
-                .map { it.entityId }
-                .toSet()
+            val pendingAssociations =
+                syncMetadataService
+                    .getPendingUploads(EntityType.ASSOCIATION)
+                    .map { it.entityId }
+                    .toSet()
 
             var cursor = since
             var hasMore = true
@@ -1648,99 +1761,100 @@ class DefaultSyncManager(
             while (hasMore) {
                 val result = cloudAssociationDataSource.getAssociationChanges(accessToken, cursor, SYNC_PAGE_SIZE).getOrThrow()
 
-                val batchResult = transactionManager.withTransaction {
-                    var downloadedCount = 0
-                    var conflictsResolved = 0
-                    val batchErrors = mutableListOf<SyncError>()
+                val batchResult =
+                    transactionManager.withTransaction {
+                        var downloadedCount = 0
+                        var conflictsResolved = 0
+                        val batchErrors = mutableListOf<SyncError>()
 
-                    for (association in result.additions) {
-                        try {
-                            val pendingKey = AssociationPendingKey(association.journalId, association.contentId).toPendingId()
-                            if (pendingAssociations.contains(pendingKey)) {
-                                conflictsResolved++
-                                Napier.w("Skipping association add for $pendingKey due to local pending changes")
-                                recordConflict(
-                                    entityType = EntityType.ASSOCIATION,
-                                    entityId = pendingKey,
-                                    reason = "Local pending changes vs remote association add",
-                                    localVersion = null,
-                                    remoteVersion = association.syncVersion,
-                                    localUpdatedAt = null,
-                                    remoteUpdatedAt = null
-                                )
-                                continue
-                            }
+                        for (association in result.additions) {
+                            try {
+                                val pendingKey = AssociationPendingKey(association.journalId, association.contentId).toPendingId()
+                                if (pendingAssociations.contains(pendingKey)) {
+                                    conflictsResolved++
+                                    Napier.w("Skipping association add for $pendingKey due to local pending changes")
+                                    recordConflict(
+                                        entityType = EntityType.ASSOCIATION,
+                                        entityId = pendingKey,
+                                        reason = "Local pending changes vs remote association add",
+                                        localVersion = null,
+                                        remoteVersion = association.syncVersion,
+                                        localUpdatedAt = null,
+                                        remoteUpdatedAt = null,
+                                    )
+                                    continue
+                                }
 
-                            if (syncableRepository != null) {
-                                syncableRepository.addContentToJournalFromSync(
-                                    contentId = association.contentId,
-                                    journalId = association.journalId
+                                if (syncableRepository != null) {
+                                    syncableRepository.addContentToJournalFromSync(
+                                        contentId = association.contentId,
+                                        journalId = association.journalId,
+                                    )
+                                } else {
+                                    journalContentRepository.addContentToJournal(
+                                        contentId = association.contentId,
+                                        journalId = association.journalId,
+                                    )
+                                }
+                                downloadedCount++
+                                Napier.d("Added association: journal ${association.journalId} -> content ${association.contentId}")
+                            } catch (e: Exception) {
+                                batchErrors.add(
+                                    SyncError(
+                                        SyncErrorType.UNKNOWN_ERROR,
+                                        "Failed to add association ${association.journalId}->${association.contentId}: ${e.message}",
+                                        e,
+                                    ),
                                 )
-                            } else {
-                                journalContentRepository.addContentToJournal(
-                                    contentId = association.contentId,
-                                    journalId = association.journalId
-                                )
+                                Napier.e("Failed to add association ${association.journalId}->${association.contentId}", e)
                             }
-                            downloadedCount++
-                            Napier.d("Added association: journal ${association.journalId} -> content ${association.contentId}")
-                        } catch (e: Exception) {
-                            batchErrors.add(
-                                SyncError(
-                                    SyncErrorType.UNKNOWN_ERROR,
-                                    "Failed to add association ${association.journalId}->${association.contentId}: ${e.message}",
-                                    e
-                                )
-                            )
-                            Napier.e("Failed to add association ${association.journalId}->${association.contentId}", e)
                         }
-                    }
 
-                    for (association in result.deletions) {
-                        try {
-                            val pendingKey = AssociationPendingKey(association.journalId, association.contentId).toPendingId()
-                            if (pendingAssociations.contains(pendingKey)) {
-                                conflictsResolved++
-                                Napier.w("Skipping association delete for $pendingKey due to local pending changes")
-                                recordConflict(
-                                    entityType = EntityType.ASSOCIATION,
-                                    entityId = pendingKey,
-                                    reason = "Local pending changes vs remote association delete",
-                                    localVersion = null,
-                                    remoteVersion = null,
-                                    localUpdatedAt = null,
-                                    remoteUpdatedAt = null
-                                )
-                                continue
-                            }
+                        for (association in result.deletions) {
+                            try {
+                                val pendingKey = AssociationPendingKey(association.journalId, association.contentId).toPendingId()
+                                if (pendingAssociations.contains(pendingKey)) {
+                                    conflictsResolved++
+                                    Napier.w("Skipping association delete for $pendingKey due to local pending changes")
+                                    recordConflict(
+                                        entityType = EntityType.ASSOCIATION,
+                                        entityId = pendingKey,
+                                        reason = "Local pending changes vs remote association delete",
+                                        localVersion = null,
+                                        remoteVersion = null,
+                                        localUpdatedAt = null,
+                                        remoteUpdatedAt = null,
+                                    )
+                                    continue
+                                }
 
-                            if (syncableRepository != null) {
-                                syncableRepository.removeContentFromJournalFromSync(
-                                    contentId = association.contentId,
-                                    journalId = association.journalId
+                                if (syncableRepository != null) {
+                                    syncableRepository.removeContentFromJournalFromSync(
+                                        contentId = association.contentId,
+                                        journalId = association.journalId,
+                                    )
+                                } else {
+                                    journalContentRepository.removeContentFromJournal(
+                                        contentId = association.contentId,
+                                        journalId = association.journalId,
+                                    )
+                                }
+                                downloadedCount++
+                                Napier.d("Removed association: journal ${association.journalId} -> content ${association.contentId}")
+                            } catch (e: Exception) {
+                                batchErrors.add(
+                                    SyncError(
+                                        SyncErrorType.UNKNOWN_ERROR,
+                                        "Failed to remove association ${association.journalId}->${association.contentId}: ${e.message}",
+                                        e,
+                                    ),
                                 )
-                            } else {
-                                journalContentRepository.removeContentFromJournal(
-                                    contentId = association.contentId,
-                                    journalId = association.journalId
-                                )
+                                Napier.e("Failed to remove association ${association.journalId}->${association.contentId}", e)
                             }
-                            downloadedCount++
-                            Napier.d("Removed association: journal ${association.journalId} -> content ${association.contentId}")
-                        } catch (e: Exception) {
-                            batchErrors.add(
-                                SyncError(
-                                    SyncErrorType.UNKNOWN_ERROR,
-                                    "Failed to remove association ${association.journalId}->${association.contentId}: ${e.message}",
-                                    e
-                                )
-                            )
-                            Napier.e("Failed to remove association ${association.journalId}->${association.contentId}", e)
                         }
-                    }
 
-                    BatchResult(downloadedCount, conflictsResolved, batchErrors)
-                }
+                        BatchResult(downloadedCount, conflictsResolved, batchErrors)
+                    }
 
                 totalDownloaded += batchResult.downloadedCount
                 totalConflicts += batchResult.conflictsResolved
@@ -1768,12 +1882,11 @@ class DefaultSyncManager(
                 success = errors.isEmpty(),
                 downloadedItems = totalDownloaded,
                 conflictsResolved = totalConflicts,
-                errors = errors
+                errors = errors,
             )
         } catch (e: CloudApiException) {
             handleCloudApiError(e)
         } catch (e: Exception) {
             handleSyncException(e, "Download associations")
         }
-    }
 }

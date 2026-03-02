@@ -9,6 +9,7 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 // TODO: Remove once Uuid can be serialized
+
 /**
  * A custom serializer for [Uuid] objects.
  *
@@ -27,11 +28,12 @@ import kotlin.uuid.Uuid
 object UuidSerializer : KSerializer<Uuid> {
     override val descriptor = PrimitiveSerialDescriptor("Uuid", PrimitiveKind.STRING)
 
-    override fun serialize(encoder: Encoder, value: Uuid) {
+    override fun serialize(
+        encoder: Encoder,
+        value: Uuid,
+    ) {
         encoder.encodeString(value.toString())
     }
 
-    override fun deserialize(decoder: Decoder): Uuid {
-        return Uuid.parse(decoder.decodeString())
-    }
+    override fun deserialize(decoder: Decoder): Uuid = Uuid.parse(decoder.decodeString())
 }

@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.feature.onboarding.ui
 
 import androidx.compose.foundation.layout.Arrangement
@@ -23,15 +25,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.AdaptiveLayout
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
-import androidx.compose.ui.tooling.preview.Preview
-import org.koin.compose.viewmodel.koinViewModel
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
+
 data class NotificationPermissionUiState(
     val hasPermission: Boolean = false,
     val launchPermissionRequest: () -> Unit,
@@ -93,13 +96,14 @@ private fun OnboardingNotificationContent(
                             IconButton(onClick = onBack) {
                                 Icon(
                                     Icons.AutoMirrored.Rounded.ArrowBack,
-                                    contentDescription = stringResource(Res.string.back)
+                                    contentDescription = stringResource(Res.string.back),
                                 )
                             }
                         },
-                        colors = TopAppBarDefaults.topAppBarColors().copy(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        ),
+                        colors =
+                            TopAppBarDefaults.topAppBarColors().copy(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            ),
                         modifier = Modifier.then(if (useCompactLayout) Modifier.fillMaxHeight() else Modifier),
                         scrollBehavior = scrollBehavior,
                     )
@@ -107,10 +111,11 @@ private fun OnboardingNotificationContent(
                 containerColor = MaterialTheme.colorScheme.surfaceContainer,
             ) { contentPadding ->
                 Column(
-                    modifier = Modifier
-                        .padding(contentPadding)
-                        .padding(Spacing.lg)
-                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    modifier =
+                        Modifier
+                            .padding(contentPadding)
+                            .padding(Spacing.lg)
+                            .nestedScroll(scrollBehavior.nestedScrollConnection),
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     LazyColumn(
@@ -120,11 +125,10 @@ private fun OnboardingNotificationContent(
                         item {
                             Text(
                                 "LogDate works best when you write about what's going on in the moment. Enable notifications to get smart reminders when to write.",
-                                style = MaterialTheme.typography.bodyLarge
+                                style = MaterialTheme.typography.bodyLarge,
                             )
                         }
                     }
-
                 }
             }
         },
@@ -139,7 +143,7 @@ private fun OnboardingNotificationContent(
                                 IconButton(onClick = onBack) {
                                     Icon(
                                         Icons.AutoMirrored.Rounded.ArrowBack,
-                                        contentDescription = stringResource(Res.string.back)
+                                        contentDescription = stringResource(Res.string.back),
                                     )
                                 }
                             },
@@ -148,11 +152,12 @@ private fun OnboardingNotificationContent(
                     },
                 ) { contentPadding ->
                     Column(
-                        modifier = Modifier
-                            .padding(contentPadding)
-                            .widthIn(max = 444.dp)
-                            .padding(Spacing.lg)
-                            .nestedScroll(scrollBehavior.nestedScrollConnection),
+                        modifier =
+                            Modifier
+                                .padding(contentPadding)
+                                .widthIn(max = 444.dp)
+                                .padding(Spacing.lg)
+                                .nestedScroll(scrollBehavior.nestedScrollConnection),
                         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
                         LazyColumn(
@@ -162,7 +167,7 @@ private fun OnboardingNotificationContent(
                             item {
                                 Text(
                                     "LogDate works best when you write about what's going on in the moment. Enable notifications to get smart reminders when to write.",
-                                    style = MaterialTheme.typography.bodyLarge
+                                    style = MaterialTheme.typography.bodyLarge,
                                 )
                             }
                         }
@@ -174,11 +179,12 @@ private fun OnboardingNotificationContent(
                 }
             } else {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(Spacing.lg)
-                        .padding(top = 96.dp)
-                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(Spacing.lg)
+                            .padding(top = 96.dp)
+                            .nestedScroll(scrollBehavior.nestedScrollConnection),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
@@ -191,7 +197,7 @@ private fun OnboardingNotificationContent(
                         item {
                             Text(
                                 "LogDate works best when you write about what's going on in the moment. Enable notifications to get smart reminders when to write.",
-                                style = MaterialTheme.typography.bodyLarge
+                                style = MaterialTheme.typography.bodyLarge,
                             )
                         }
                     }
@@ -204,7 +210,6 @@ private fun OnboardingNotificationContent(
             }
         },
     )
-
 }
 
 @Composable
@@ -232,15 +237,15 @@ private fun ActionsContainer(
     }
 }
 
-//@OptIn(ExperimentalPermissionsApi::class)
-//private object DummyPermissionState : PermissionState {
+// @OptIn(ExperimentalPermissionsApi::class)
+// private object DummyPermissionState : PermissionState {
 //    override val permission: String
 //        get() = "android.permission.POST_NOTIFICATIONS"
 //    override val status: PermissionStatus
 //        get() = PermissionStatus.Granted
 //
 //    override fun launchPermissionRequest() {}
-//}
+// }
 
 @Preview
 @Composable

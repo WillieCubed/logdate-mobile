@@ -1,5 +1,3 @@
-package app.logdate.client.sync.quota
+@file:Suppress("ktlint:standard:no-empty-file")
 
-import app.logdate.shared.model.CloudObjectType
-import app.logdate.shared.model.CloudQuotaManager
-import app.logdate.shared.model.CloudStorageQuota
+package app.logdate.client.sync.quota

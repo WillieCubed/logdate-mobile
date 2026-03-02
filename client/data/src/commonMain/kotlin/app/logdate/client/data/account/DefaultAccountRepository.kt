@@ -12,42 +12,43 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 class DefaultAccountRepository(
     private val passkeyApiClient: PasskeyApiClientContract,
-    private val tokenProvider: () -> String? // TODO: Replace with proper token management
+    private val tokenProvider: () -> String?, // TODO: Replace with proper token management
 ) : AccountRepository {
-    
     private val _currentAccount = MutableStateFlow<LogDateAccount?>(null)
     override val currentAccount: Flow<LogDateAccount?> = _currentAccount.asStateFlow()
-    
+
     override suspend fun updateProfile(
         displayName: String?,
-        username: String?
+        username: String?,
     ): Result<LogDateAccount> {
-        val token = tokenProvider() ?: return Result.failure(
-            IllegalStateException("No authentication token available")
-        )
-        
-        return passkeyApiClient.updateAccountProfile(
-            accessToken = token,
-            displayName = displayName,
-            username = username
-        ).onSuccess { updatedAccount ->
-            _currentAccount.value = updatedAccount
-        }
+        val token =
+            tokenProvider() ?: return Result.failure(
+                IllegalStateException("No authentication token available"),
+            )
+
+        return passkeyApiClient
+            .updateAccountProfile(
+                accessToken = token,
+                displayName = displayName,
+                username = username,
+            ).onSuccess { updatedAccount ->
+                _currentAccount.value = updatedAccount
+            }
     }
-    
+
     override suspend fun refreshAccount(): Result<LogDateAccount> {
-        val token = tokenProvider() ?: return Result.failure(
-            IllegalStateException("No authentication token available")
-        )
-        
+        val token =
+            tokenProvider() ?: return Result.failure(
+                IllegalStateException("No authentication token available"),
+            )
+
         return passkeyApiClient.getAccountInfo(token).onSuccess { account ->
             _currentAccount.value = account
         }
     }
-    
-    override suspend fun checkUsernameAvailability(username: String): Result<Boolean> {
-        return passkeyApiClient.checkUsernameAvailability(username).map { data ->
+
+    override suspend fun checkUsernameAvailability(username: String): Result<Boolean> =
+        passkeyApiClient.checkUsernameAvailability(username).map { data ->
             data.available
         }
-    }
 }

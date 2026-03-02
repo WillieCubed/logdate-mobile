@@ -11,38 +11,37 @@ import io.github.aakira.napier.Napier
  * This provides accurate version information from the application context.
  */
 class AndroidBuildConfigAppInfoProvider(
-    private val context: Context
+    private val context: Context,
 ) : AppInfoProvider {
-    
     override fun getAppInfo(): AppInfo {
         try {
             val packageManager = context.packageManager
             val packageName = context.packageName
-            
-            val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
-            } else {
-                @Suppress("DEPRECATION")
-                packageManager.getPackageInfo(packageName, 0)
-            }
-            
+
+            val packageInfo =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
+                } else {
+                    @Suppress("DEPRECATION")
+                    packageManager.getPackageInfo(packageName, 0)
+                }
+
             return AppInfo(
                 versionName = packageInfo.versionName ?: "unknown",
                 versionCode = getVersionCode(packageInfo),
-                packageName = packageName
+                packageName = packageName,
             )
         } catch (e: Exception) {
             Napier.e("Failed to retrieve app info", e)
             throw AppInfoRetrievalException("Failed to retrieve app info from PackageManager", e)
         }
     }
-    
-    private fun getVersionCode(packageInfo: PackageInfo): Int {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+
+    private fun getVersionCode(packageInfo: PackageInfo): Int =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             packageInfo.longVersionCode.toInt()
         } else {
             @Suppress("DEPRECATION")
             packageInfo.versionCode
         }
-    }
 }

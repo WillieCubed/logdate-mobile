@@ -14,7 +14,5 @@ import kotlinx.coroutines.flow.Flow
 class ObserveLocationUseCase(
     private val locationProvider: ClientLocationProvider,
 ) {
-    operator fun invoke(): Flow<Location> {
-        return locationProvider.currentLocation
-    }
+    operator fun invoke(): Flow<Location> = locationProvider.currentLocation
 }

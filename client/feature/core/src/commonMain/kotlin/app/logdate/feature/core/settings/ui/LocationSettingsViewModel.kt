@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.core.settings.ui
 
 import androidx.lifecycle.ViewModel
@@ -16,58 +18,58 @@ import kotlinx.coroutines.launch
  * ViewModel for managing location tracking settings.
  */
 class LocationSettingsViewModel(
-    private val settingsRepository: LocationTrackingSettingsRepository
+    private val settingsRepository: LocationTrackingSettingsRepository,
 ) : ViewModel() {
-    
     /**
      * UI state for the location settings screen.
      */
     data class UiState(
         val settings: LocationTrackingSettings = LocationTrackingSettings(),
         val isLoading: Boolean = false,
-        val errorMessage: String? = null
+        val errorMessage: String? = null,
     )
-    
-    private val _isLoading = MutableStateFlow(false)
-    private val _errorMessage = MutableStateFlow<String?>(null)
-    
+
+    private val isLoadingState = MutableStateFlow(false)
+    private val errorMessageState = MutableStateFlow<String?>(null)
+
     /**
      * Current UI state.
      */
-    val uiState: StateFlow<UiState> = combine(
-        settingsRepository.observeSettings(),
-        _isLoading,
-        _errorMessage
-    ) { settings, isLoading, errorMessage ->
-        UiState(
-            settings = settings,
-            isLoading = isLoading,
-            errorMessage = errorMessage
+    val uiState: StateFlow<UiState> =
+        combine(
+            settingsRepository.observeSettings(),
+            isLoadingState,
+            errorMessageState,
+        ) { settings, isLoading, errorMessage ->
+            UiState(
+                settings = settings,
+                isLoading = isLoading,
+                errorMessage = errorMessage,
+            )
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = UiState(isLoading = true),
         )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = UiState(isLoading = true)
-    )
-    
+
     /**
      * Toggle background location tracking.
      */
     fun toggleBackgroundTracking(enabled: Boolean) {
         viewModelScope.launch {
             try {
-                _isLoading.value = true
+                isLoadingState.value = true
                 settingsRepository.setBackgroundTrackingEnabled(enabled)
                 Napier.i("Background tracking set to: $enabled")
             } catch (e: Exception) {
                 Napier.e("Failed to toggle background tracking", e)
-                _errorMessage.value = "Failed to update setting: ${e.message}"
+                errorMessageState.value = "Failed to update setting: ${e.message}"
             } finally {
-                _isLoading.value = false
+                isLoadingState.value = false
             }
         }
     }
-    
+
     /**
      * Toggle auto-tracking for journal entries.
      */
@@ -76,16 +78,16 @@ class LocationSettingsViewModel(
             try {
                 val currentSettings = settingsRepository.getSettings()
                 settingsRepository.updateSettings(
-                    currentSettings.copy(autoTrackForJournalEntries = enabled)
+                    currentSettings.copy(autoTrackForJournalEntries = enabled),
                 )
                 Napier.i("Journal entry tracking set to: $enabled")
             } catch (e: Exception) {
                 Napier.e("Failed to toggle journal tracking", e)
-                _errorMessage.value = "Failed to update setting: ${e.message}"
+                errorMessageState.value = "Failed to update setting: ${e.message}"
             }
         }
     }
-    
+
     /**
      * Toggle auto-tracking for timeline viewing.
      */
@@ -94,16 +96,16 @@ class LocationSettingsViewModel(
             try {
                 val currentSettings = settingsRepository.getSettings()
                 settingsRepository.updateSettings(
-                    currentSettings.copy(autoTrackForTimelineReview = enabled)
+                    currentSettings.copy(autoTrackForTimelineReview = enabled),
                 )
                 Napier.i("Timeline tracking set to: $enabled")
             } catch (e: Exception) {
                 Napier.e("Failed to toggle timeline tracking", e)
-                _errorMessage.value = "Failed to update setting: ${e.message}"
+                errorMessageState.value = "Failed to update setting: ${e.message}"
             }
         }
     }
-    
+
     /**
      * Update the tracking interval.
      */
@@ -114,15 +116,15 @@ class LocationSettingsViewModel(
                 Napier.i("Tracking interval set to: $intervalMinutes minutes")
             } catch (e: Exception) {
                 Napier.e("Failed to update tracking interval", e)
-                _errorMessage.value = "Failed to update interval: ${e.message}"
+                errorMessageState.value = "Failed to update interval: ${e.message}"
             }
         }
     }
-    
+
     /**
      * Clear any error message.
      */
     fun clearErrorMessage() {
-        _errorMessage.value = null
+        errorMessageState.value = null
     }
 }

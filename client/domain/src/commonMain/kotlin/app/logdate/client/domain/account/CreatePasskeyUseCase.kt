@@ -6,21 +6,20 @@ import io.github.aakira.napier.Napier
 
 /**
  * Use case for creating a new passkey for an existing account.
- * 
+ *
  * This operation requires the user to be authenticated with an existing
  * LogDate Cloud account and will add a new passkey to their account.
  */
 class CreatePasskeyUseCase(
     private val passkeyAccountRepository: PasskeyAccountRepository,
 ) {
-    
     /**
      * Request to create a new passkey.
      */
     data class CreatePasskeyRequest(
-        val name: String? = null
+        val name: String? = null,
     )
-    
+
     /**
      * Result of a passkey creation operation.
      */
@@ -28,24 +27,29 @@ class CreatePasskeyUseCase(
         /**
          * Passkey was successfully created.
          */
-        data class Success(val account: LogDateAccount) : CreatePasskeyResult()
-        
+        data class Success(
+            val account: LogDateAccount,
+        ) : CreatePasskeyResult()
+
         /**
          * Passkey creation failed.
          */
-        data class Error(val message: String, val cause: Throwable? = null) : CreatePasskeyResult()
+        data class Error(
+            val message: String,
+            val cause: Throwable? = null,
+        ) : CreatePasskeyResult()
     }
-    
+
     /**
      * Create a new passkey for the current user's account.
-     * 
+     *
      * @param request The creation request
      * @return Result indicating success or failure
      */
     suspend operator fun invoke(request: CreatePasskeyRequest): CreatePasskeyResult {
         Napier.w("Passkey creation for existing accounts is not available yet (name=${request.name}).")
         return CreatePasskeyResult.Error(
-            message = "Adding passkeys from settings isn't supported yet."
+            message = "Adding passkeys from settings isn't supported yet.",
         )
     }
 }

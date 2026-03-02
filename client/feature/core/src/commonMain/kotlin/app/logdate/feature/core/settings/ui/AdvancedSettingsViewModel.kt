@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 enum class ServerPreset {
     PRODUCTION,
     LOCAL,
-    CUSTOM
+    CUSTOM,
 }
 
 /**
@@ -28,33 +28,40 @@ data class ServerSelectionState(
     val selectedPreset: ServerPreset = ServerPreset.PRODUCTION,
     val localServerAddress: String = DefaultLogDateConfigRepository.DEFAULT_LOCAL_SERVER_ADDRESS,
     val customServerUrl: String = "",
-    val validationState: ServerValidationState = ServerValidationState.Idle
+    val validationState: ServerValidationState = ServerValidationState.Idle,
 )
 
 sealed class ServerValidationState {
     data object Idle : ServerValidationState()
+
     data object Validating : ServerValidationState()
-    data class Success(val serverVersion: String?) : ServerValidationState()
-    data class Error(val message: String) : ServerValidationState()
+
+    data class Success(
+        val serverVersion: String?,
+    ) : ServerValidationState()
+
+    data class Error(
+        val message: String,
+    ) : ServerValidationState()
 }
 
 class AdvancedSettingsViewModel(
     private val serverHealthChecker: ServerHealthChecker,
     private val configRepository: LogDateConfigRepository,
 ) : ViewModel() {
-
-    private val _serverSelectionState = MutableStateFlow(
-        ServerSelectionState(
-            localServerAddress = DefaultLogDateConfigRepository.DEFAULT_LOCAL_SERVER_ADDRESS
+    private val _serverSelectionState =
+        MutableStateFlow(
+            ServerSelectionState(
+                localServerAddress = DefaultLogDateConfigRepository.DEFAULT_LOCAL_SERVER_ADDRESS,
+            ),
         )
-    )
     val serverSelectionState: StateFlow<ServerSelectionState> = _serverSelectionState.asStateFlow()
 
     fun selectServerPreset(preset: ServerPreset) {
         _serverSelectionState.update {
             it.copy(
                 selectedPreset = preset,
-                validationState = ServerValidationState.Idle
+                validationState = ServerValidationState.Idle,
             )
         }
     }
@@ -63,7 +70,7 @@ class AdvancedSettingsViewModel(
         _serverSelectionState.update {
             it.copy(
                 localServerAddress = address,
-                validationState = ServerValidationState.Idle
+                validationState = ServerValidationState.Idle,
             )
         }
     }
@@ -72,7 +79,7 @@ class AdvancedSettingsViewModel(
         _serverSelectionState.update {
             it.copy(
                 customServerUrl = url,
-                validationState = ServerValidationState.Idle
+                validationState = ServerValidationState.Idle,
             )
         }
     }
@@ -85,14 +92,15 @@ class AdvancedSettingsViewModel(
             return
         }
 
-        val serverUrl = when (currentState.selectedPreset) {
-            ServerPreset.LOCAL -> {
-                val address = currentState.localServerAddress
-                if (address.startsWith("http")) address else "http://$address"
+        val serverUrl =
+            when (currentState.selectedPreset) {
+                ServerPreset.LOCAL -> {
+                    val address = currentState.localServerAddress
+                    if (address.startsWith("http")) address else "http://$address"
+                }
+                ServerPreset.CUSTOM -> currentState.customServerUrl
+                ServerPreset.PRODUCTION -> DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL
             }
-            ServerPreset.CUSTOM -> currentState.customServerUrl
-            ServerPreset.PRODUCTION -> DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL
-        }
 
         if (serverUrl.isBlank()) {
             _serverSelectionState.update {
@@ -120,12 +128,13 @@ class AdvancedSettingsViewModel(
                     Napier.e("Server health check failed", error)
                     _serverSelectionState.update {
                         it.copy(
-                            validationState = ServerValidationState.Error(
-                                error.message ?: "Failed to connect to server"
-                            )
+                            validationState =
+                                ServerValidationState.Error(
+                                    error.message ?: "Failed to connect to server",
+                                ),
                         )
                     }
-                }
+                },
             )
         }
     }

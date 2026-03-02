@@ -14,30 +14,32 @@ import kotlin.uuid.Uuid
  */
 class GetDefaultSelectedJournalsUseCase(
     private val journalNotesRepository: JournalNotesRepository,
-    private val journalContentRepository: JournalContentRepository
+    private val journalContentRepository: JournalContentRepository,
 ) {
     /**
      * Returns a list of journal IDs that should be pre-selected when creating a new entry.
      * This is based on the journals used in the most recent entry.
      * If no entries exist, returns an empty list.
-     * 
+     *
      * This implementation efficiently chains flow operations to minimize conversions.
      */
     suspend operator fun invoke(): List<Uuid> {
         try {
             // Get the most recent note ID directly without collecting entire list
-            val mostRecentNote = journalNotesRepository.observeRecentNotes(1)
-                .map { notes -> notes.firstOrNull()?.uid }
-                .firstOrNull() ?: return emptyList()
-            
+            val mostRecentNote =
+                journalNotesRepository
+                    .observeRecentNotes(1)
+                    .map { notes -> notes.firstOrNull()?.uid }
+                    .firstOrNull() ?: return emptyList()
+
             // Convert journals to journal IDs in a single flow operation
-            return journalContentRepository.observeJournalsForContent(mostRecentNote)
+            return journalContentRepository
+                .observeJournalsForContent(mostRecentNote)
                 .map { journals -> journals.map { it.id } }
                 .catch { e ->
                     Napier.w("Error getting journals for note: ${e.message}", e)
                     emit(emptyList())
-                }
-                .firstOrNull() ?: emptyList()
+                }.firstOrNull() ?: emptyList()
         } catch (e: Exception) {
             Napier.w("Error getting default selected journals: ${e.message}", e)
             return emptyList()

@@ -1,17 +1,40 @@
 package app.logdate.client.networking
 
 import app.logdate.shared.config.LogDateConfigRepository
-import app.logdate.shared.model.*
+import app.logdate.shared.model.AccountInfoResponse
+import app.logdate.shared.model.ApiErrorResponse
+import app.logdate.shared.model.BeginAccountCreationData
+import app.logdate.shared.model.BeginAccountCreationRequest
+import app.logdate.shared.model.BeginAccountCreationResponse
+import app.logdate.shared.model.BeginAuthenticationData
+import app.logdate.shared.model.BeginAuthenticationRequest
+import app.logdate.shared.model.BeginAuthenticationResponse
+import app.logdate.shared.model.CompleteAccountCreationData
+import app.logdate.shared.model.CompleteAccountCreationRequest
+import app.logdate.shared.model.CompleteAccountCreationResponse
+import app.logdate.shared.model.CompleteAuthenticationData
+import app.logdate.shared.model.CompleteAuthenticationRequest
+import app.logdate.shared.model.CompleteAuthenticationResponse
+import app.logdate.shared.model.LogDateAccount
+import app.logdate.shared.model.RefreshTokenRequest
+import app.logdate.shared.model.RefreshTokenResponse
+import app.logdate.shared.model.UpdateAccountProfileRequest
+import app.logdate.shared.model.UsernameAvailabilityData
+import app.logdate.shared.model.UsernameAvailabilityResponse
 import app.logdate.util.UuidSerializer
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.flow.first
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.modules.SerializersModule
 import io.ktor.client.HttpClient
-import io.ktor.client.request.*
+import io.ktor.client.request.delete
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
 import kotlin.uuid.Uuid
 
 /**
@@ -19,19 +42,30 @@ import kotlin.uuid.Uuid
  */
 interface PasskeyApiClientContract {
     suspend fun checkUsernameAvailability(username: String): Result<UsernameAvailabilityData>
+
     suspend fun beginAccountCreation(request: BeginAccountCreationRequest): Result<BeginAccountCreationData>
+
     suspend fun completeAccountCreation(request: CompleteAccountCreationRequest): Result<CompleteAccountCreationData>
+
     suspend fun beginAuthentication(request: BeginAuthenticationRequest): Result<BeginAuthenticationData>
+
     suspend fun completeAuthentication(request: CompleteAuthenticationRequest): Result<CompleteAuthenticationData>
+
     suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount>
+
     suspend fun updateAccountProfile(
         accessToken: String,
         displayName: String? = null,
         username: String? = null,
-        bio: String? = null
+        bio: String? = null,
     ): Result<LogDateAccount>
+
     suspend fun refreshToken(refreshToken: String): Result<String>
-    suspend fun deletePasskey(accessToken: String, credentialId: String): Result<Unit>
+
+    suspend fun deletePasskey(
+        accessToken: String,
+        credentialId: String,
+    ): Result<Unit>
 }
 
 /**
@@ -40,28 +74,30 @@ interface PasskeyApiClientContract {
 class PasskeyApiClient(
     private val httpClient: HttpClient,
     private val configRepository: LogDateConfigRepository,
-    private val json: Json = Json {
-        ignoreUnknownKeys = true
-        encodeDefaults = false
-        serializersModule = SerializersModule {
-            contextual(Uuid::class, UuidSerializer)
-        }
-    }
+    private val json: Json =
+        Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = false
+            serializersModule =
+                SerializersModule {
+                    contextual(Uuid::class, UuidSerializer)
+                }
+        },
 ) : PasskeyApiClientContract {
     companion object {
         private const val ACCOUNTS_PATH = "/accounts"
     }
-    
+
     private suspend fun getBaseUrl(): String = configRepository.apiBaseUrl.first()
 
     /**
      * Check if a username is available for registration
      */
-    override suspend fun checkUsernameAvailability(username: String): Result<UsernameAvailabilityData> {
-        return try {
+    override suspend fun checkUsernameAvailability(username: String): Result<UsernameAvailabilityData> =
+        try {
             val baseUrl = getBaseUrl()
             val response = httpClient.get("$baseUrl$ACCOUNTS_PATH/username/$username/available")
-            
+
             if (response.status.value in 200..299) {
                 val apiResponse = json.decodeFromString<UsernameAvailabilityResponse>(response.bodyAsText())
                 Result.success(apiResponse.data)
@@ -73,19 +109,19 @@ class PasskeyApiClient(
             Napier.e("Failed to check username availability", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to check username availability", e))
         }
-    }
 
     /**
      * Begin the account creation process
      */
-    override suspend fun beginAccountCreation(request: BeginAccountCreationRequest): Result<BeginAccountCreationData> {
-        return try {
+    override suspend fun beginAccountCreation(request: BeginAccountCreationRequest): Result<BeginAccountCreationData> =
+        try {
             val baseUrl = getBaseUrl()
-            val response = httpClient.post("$baseUrl$ACCOUNTS_PATH/create/begin") {
-                contentType(ContentType.Application.Json)
-                setBody(json.encodeToString(BeginAccountCreationRequest.serializer(), request))
-            }
-            
+            val response =
+                httpClient.post("$baseUrl$ACCOUNTS_PATH/create/begin") {
+                    contentType(ContentType.Application.Json)
+                    setBody(json.encodeToString(BeginAccountCreationRequest.serializer(), request))
+                }
+
             if (response.status.value in 200..299) {
                 val apiResponse = json.decodeFromString<BeginAccountCreationResponse>(response.bodyAsText())
                 Result.success(apiResponse.data)
@@ -97,19 +133,19 @@ class PasskeyApiClient(
             Napier.e("Failed to begin account creation", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to begin account creation", e))
         }
-    }
 
     /**
      * Complete the account creation process with passkey credential
      */
-    override suspend fun completeAccountCreation(request: CompleteAccountCreationRequest): Result<CompleteAccountCreationData> {
-        return try {
+    override suspend fun completeAccountCreation(request: CompleteAccountCreationRequest): Result<CompleteAccountCreationData> =
+        try {
             val baseUrl = getBaseUrl()
-            val response = httpClient.post("$baseUrl$ACCOUNTS_PATH/create/complete") {
-                contentType(ContentType.Application.Json)
-                setBody(json.encodeToString(CompleteAccountCreationRequest.serializer(), request))
-            }
-            
+            val response =
+                httpClient.post("$baseUrl$ACCOUNTS_PATH/create/complete") {
+                    contentType(ContentType.Application.Json)
+                    setBody(json.encodeToString(CompleteAccountCreationRequest.serializer(), request))
+                }
+
             if (response.status.value in 200..299) {
                 val apiResponse = json.decodeFromString<CompleteAccountCreationResponse>(response.bodyAsText())
                 Result.success(apiResponse.data)
@@ -121,19 +157,19 @@ class PasskeyApiClient(
             Napier.e("Failed to complete account creation", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to complete account creation", e))
         }
-    }
 
     /**
      * Begin the authentication process
      */
-    override suspend fun beginAuthentication(request: BeginAuthenticationRequest): Result<BeginAuthenticationData> {
-        return try {
+    override suspend fun beginAuthentication(request: BeginAuthenticationRequest): Result<BeginAuthenticationData> =
+        try {
             val baseUrl = getBaseUrl()
-            val response = httpClient.post("$baseUrl$ACCOUNTS_PATH/authenticate/begin") {
-                contentType(ContentType.Application.Json)
-                setBody(json.encodeToString(BeginAuthenticationRequest.serializer(), request))
-            }
-            
+            val response =
+                httpClient.post("$baseUrl$ACCOUNTS_PATH/authenticate/begin") {
+                    contentType(ContentType.Application.Json)
+                    setBody(json.encodeToString(BeginAuthenticationRequest.serializer(), request))
+                }
+
             if (response.status.value in 200..299) {
                 val apiResponse = json.decodeFromString<BeginAuthenticationResponse>(response.bodyAsText())
                 Result.success(apiResponse.data)
@@ -145,19 +181,19 @@ class PasskeyApiClient(
             Napier.e("Failed to begin authentication", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to begin authentication", e))
         }
-    }
 
     /**
      * Complete the authentication process with passkey assertion
      */
-    override suspend fun completeAuthentication(request: CompleteAuthenticationRequest): Result<CompleteAuthenticationData> {
-        return try {
+    override suspend fun completeAuthentication(request: CompleteAuthenticationRequest): Result<CompleteAuthenticationData> =
+        try {
             val baseUrl = getBaseUrl()
-            val response = httpClient.post("$baseUrl$ACCOUNTS_PATH/authenticate/complete") {
-                contentType(ContentType.Application.Json)
-                setBody(json.encodeToString(CompleteAuthenticationRequest.serializer(), request))
-            }
-            
+            val response =
+                httpClient.post("$baseUrl$ACCOUNTS_PATH/authenticate/complete") {
+                    contentType(ContentType.Application.Json)
+                    setBody(json.encodeToString(CompleteAuthenticationRequest.serializer(), request))
+                }
+
             if (response.status.value in 200..299) {
                 val apiResponse = json.decodeFromString<CompleteAuthenticationResponse>(response.bodyAsText())
                 Result.success(apiResponse.data)
@@ -169,18 +205,18 @@ class PasskeyApiClient(
             Napier.e("Failed to complete authentication", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to complete authentication", e))
         }
-    }
 
     /**
      * Get current account information (requires authentication)
      */
-    override suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount> {
-        return try {
+    override suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount> =
+        try {
             val baseUrl = getBaseUrl()
-            val response = httpClient.get("$baseUrl$ACCOUNTS_PATH/me") {
-                header("Authorization", "Bearer $accessToken")
-            }
-            
+            val response =
+                httpClient.get("$baseUrl$ACCOUNTS_PATH/me") {
+                    header("Authorization", "Bearer $accessToken")
+                }
+
             if (response.status.value in 200..299) {
                 val accountResponse = json.decodeFromString<AccountInfoResponse>(response.bodyAsText())
                 Result.success(accountResponse.data)
@@ -192,7 +228,6 @@ class PasskeyApiClient(
             Napier.e("Failed to get account info", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to get account info", e))
         }
-    }
 
     /**
      * Update account profile information (requires authentication)
@@ -201,21 +236,23 @@ class PasskeyApiClient(
         accessToken: String,
         displayName: String?,
         username: String?,
-        bio: String?
-    ): Result<LogDateAccount> {
-        return try {
+        bio: String?,
+    ): Result<LogDateAccount> =
+        try {
             val baseUrl = getBaseUrl()
-            val updateRequest = UpdateAccountProfileRequest(
-                displayName = displayName,
-                username = username,
-                bio = bio
-            )
-            val response = httpClient.put("$baseUrl$ACCOUNTS_PATH/me") {
-                contentType(ContentType.Application.Json)
-                header("Authorization", "Bearer $accessToken")
-                setBody(json.encodeToString(UpdateAccountProfileRequest.serializer(), updateRequest))
-            }
-            
+            val updateRequest =
+                UpdateAccountProfileRequest(
+                    displayName = displayName,
+                    username = username,
+                    bio = bio,
+                )
+            val response =
+                httpClient.put("$baseUrl$ACCOUNTS_PATH/me") {
+                    contentType(ContentType.Application.Json)
+                    header("Authorization", "Bearer $accessToken")
+                    setBody(json.encodeToString(UpdateAccountProfileRequest.serializer(), updateRequest))
+                }
+
             if (response.status.value in 200..299) {
                 val accountResponse = json.decodeFromString<AccountInfoResponse>(response.bodyAsText())
                 Result.success(accountResponse.data)
@@ -227,19 +264,19 @@ class PasskeyApiClient(
             Napier.e("Failed to update account profile", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to update account profile", e))
         }
-    }
 
     /**
      * Refresh access token using refresh token
      */
-    override suspend fun refreshToken(refreshToken: String): Result<String> {
-        return try {
+    override suspend fun refreshToken(refreshToken: String): Result<String> =
+        try {
             val baseUrl = getBaseUrl()
-            val response = httpClient.post("$baseUrl$ACCOUNTS_PATH/refresh") {
-                contentType(ContentType.Application.Json)
-                setBody(json.encodeToString(RefreshTokenRequest.serializer(), RefreshTokenRequest(refreshToken)))
-            }
-            
+            val response =
+                httpClient.post("$baseUrl$ACCOUNTS_PATH/refresh") {
+                    contentType(ContentType.Application.Json)
+                    setBody(json.encodeToString(RefreshTokenRequest.serializer(), RefreshTokenRequest(refreshToken)))
+                }
+
             if (response.status.value in 200..299) {
                 val tokenResponse = json.decodeFromString<RefreshTokenResponse>(response.bodyAsText())
                 Result.success(tokenResponse.data.accessToken)
@@ -251,18 +288,21 @@ class PasskeyApiClient(
             Napier.e("Failed to refresh token", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to refresh token", e))
         }
-    }
 
     /**
      * Delete a specific passkey credential (requires authentication)
      */
-    override suspend fun deletePasskey(accessToken: String, credentialId: String): Result<Unit> {
-        return try {
+    override suspend fun deletePasskey(
+        accessToken: String,
+        credentialId: String,
+    ): Result<Unit> =
+        try {
             val baseUrl = getBaseUrl()
-            val response = httpClient.delete("$baseUrl$ACCOUNTS_PATH/me/passkeys/$credentialId") {
-                header("Authorization", "Bearer $accessToken")
-            }
-            
+            val response =
+                httpClient.delete("$baseUrl$ACCOUNTS_PATH/me/passkeys/$credentialId") {
+                    header("Authorization", "Bearer $accessToken")
+                }
+
             if (response.status.value in 200..299) {
                 Result.success(Unit)
             } else {
@@ -273,9 +313,7 @@ class PasskeyApiClient(
             Napier.e("Failed to delete passkey", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to delete passkey", e))
         }
-    }
 }
-
 
 /**
  * Exception thrown when passkey API operations fail
@@ -283,7 +321,7 @@ class PasskeyApiClient(
 class PasskeyApiException(
     val errorCode: String,
     message: String,
-    cause: Throwable? = null
+    cause: Throwable? = null,
 ) : Exception(message, cause)
 
 /**

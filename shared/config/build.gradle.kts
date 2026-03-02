@@ -42,7 +42,7 @@ kotlin {
     }
 }
 
-//android {
+// android {
 //    namespace = "app.logdate.client"
 //    compileSdk = libs.versions.android.compileSdk.get().toInt()
 //
@@ -60,4 +60,4 @@ kotlin {
 //        sourceCompatibility = JavaVersion.VERSION_17
 //        targetCompatibility = JavaVersion.VERSION_17
 //    }
-//}
+// }

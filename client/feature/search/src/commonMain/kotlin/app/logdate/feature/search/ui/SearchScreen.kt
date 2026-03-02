@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.feature.search.ui
 
 import androidx.compose.foundation.clickable
@@ -39,11 +41,11 @@ import app.logdate.util.toReadableDateTimeShort
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import org.koin.compose.viewmodel.koinViewModel
-import kotlin.uuid.Uuid
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.search.generated.resources.*
 import logdate.client.feature.search.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
+
 /**
  * Search screen for searching across all entries.
  *
@@ -80,14 +82,15 @@ fun SearchScreen(
                                 }
                             }
                         },
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                        ),
+                        colors =
+                            TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                            ),
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 },
                 navigationIcon = {
@@ -96,19 +99,21 @@ fun SearchScreen(
                     }
                 },
             )
-        }
+        },
     ) { paddingValues ->
         SearchResultsList(
             results = searchResults,
             onResultClick = { result ->
-                val date = result.created
-                    .toLocalDateTime(TimeZone.currentSystemDefault())
-                    .date
+                val date =
+                    result.created
+                        .toLocalDateTime(TimeZone.currentSystemDefault())
+                        .date
                 onNavigateToDay(date)
             },
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
         )
     }
 }
@@ -128,12 +133,12 @@ private fun SearchResultsList(
         LazyColumn(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = modifier
+            modifier = modifier,
         ) {
             items(results, key = { it.uid.toString() }) { result ->
                 SearchResultItem(
                     result = result,
-                    onClick = { onResultClick(result) }
+                    onClick = { onResultClick(result) },
                 )
             }
         }
@@ -147,12 +152,12 @@ private fun SearchResultsList(
 private fun EmptySearchState(modifier: Modifier = Modifier) {
     Box(
         contentAlignment = Alignment.Center,
-        modifier = modifier.fillMaxSize()
+        modifier = modifier.fillMaxSize(),
     ) {
         Text(
             text = stringResource(Res.string.search_for_entries),
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -167,9 +172,10 @@ private fun SearchResultItem(
     modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
     ) {
         ListItem(
             headlineContent = {
@@ -177,7 +183,7 @@ private fun SearchResultItem(
                     text = result.content,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
                 )
             },
             supportingContent = {
@@ -185,18 +191,19 @@ private fun SearchResultItem(
                     Text(
                         text = result.created.toReadableDateTimeShort(),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        text = when (result.type) {
-                            SearchResultType.TEXT_NOTE -> "Text note"
-                            SearchResultType.TRANSCRIPTION -> "Voice note"
-                        },
+                        text =
+                            when (result.type) {
+                                SearchResultType.TEXT_NOTE -> "Text note"
+                                SearchResultType.TRANSCRIPTION -> "Voice note"
+                            },
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.secondary
+                        color = MaterialTheme.colorScheme.secondary,
                     )
                 }
-            }
+            },
         )
     }
 }

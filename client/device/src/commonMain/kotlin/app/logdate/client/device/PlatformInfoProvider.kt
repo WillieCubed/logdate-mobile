@@ -11,6 +11,7 @@ import app.logdate.client.device.models.DeviceInfo
  */
 interface PlatformInfoProvider {
     // TODO: implement, separate from device manager
+
     /**
      * Retrieves platform-specific information about the device.
      *

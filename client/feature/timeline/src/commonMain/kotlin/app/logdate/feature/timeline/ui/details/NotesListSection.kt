@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+
 package app.logdate.feature.timeline.ui.details
 
 import androidx.compose.foundation.layout.Arrangement
@@ -20,9 +22,10 @@ import app.logdate.ui.timeline.TextNoteUiState
 import app.logdate.ui.timeline.VideoNoteUiState
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.timeline.generated.resources.*
 import logdate.client.feature.timeline.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+
 @Composable
 internal fun NotesListSection(
     notes: List<NoteUiState>,
@@ -60,9 +63,9 @@ private fun TextNoteSnippet(uiState: TextNoteUiState) {
             text = uiState.timestamp.toReadableDateTimeShort(),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 4.dp)
+            modifier = Modifier.padding(bottom = 4.dp),
         )
-        
+
         Surface(
             shape = MaterialTheme.shapes.small,
             color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -75,7 +78,7 @@ private fun TextNoteSnippet(uiState: TextNoteUiState) {
                 Text(
                     text = uiState.text,
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
@@ -92,9 +95,9 @@ private fun ImageNoteSnippet(uiState: ImageNoteUiState) {
             text = uiState.timestamp.toReadableDateTimeShort(),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 4.dp)
+            modifier = Modifier.padding(bottom = 4.dp),
         )
-        
+
         Surface(
             shape = MaterialTheme.shapes.small,
             color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -102,12 +105,12 @@ private fun ImageNoteSnippet(uiState: ImageNoteUiState) {
         ) {
             Box(
                 modifier = Modifier.padding(Spacing.md),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 AsyncImage(
                     model = uiState.uri,
                     contentDescription = null,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
@@ -124,9 +127,9 @@ private fun VideoNoteSnippet(uiState: VideoNoteUiState) {
             text = uiState.timestamp.toReadableDateTimeShort(),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 4.dp)
+            modifier = Modifier.padding(bottom = 4.dp),
         )
-        
+
         Surface(
             shape = MaterialTheme.shapes.small,
             color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -134,16 +137,16 @@ private fun VideoNoteSnippet(uiState: VideoNoteUiState) {
         ) {
             Box(
                 modifier = Modifier.padding(Spacing.md),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 // Use the thumbnail if available, otherwise use the video URI directly
                 // (which may display a thumbnail or first frame depending on the platform)
                 AsyncImage(
                     model = uiState.thumbnailUri ?: uiState.uri,
                     contentDescription = stringResource(Res.string.video_recording),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                
+
                 // In the future, we can add a play button overlay and video player here
             }
         }

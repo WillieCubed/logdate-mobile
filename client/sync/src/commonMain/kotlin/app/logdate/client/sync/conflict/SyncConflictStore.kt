@@ -1,11 +1,11 @@
 package app.logdate.client.sync.conflict
 
+import app.logdate.client.datastore.KeyValueStorage
+import io.github.aakira.napier.Napier
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import app.logdate.client.datastore.KeyValueStorage
-import io.github.aakira.napier.Napier
 
 @Serializable
 data class SyncConflictRecord(
@@ -17,21 +17,23 @@ data class SyncConflictRecord(
     val localUpdatedAt: Long?,
     val remoteUpdatedAt: Long?,
     val reason: String,
-    val detectedAt: Long
+    val detectedAt: Long,
 )
 
 interface SyncConflictStore {
     suspend fun list(): List<SyncConflictRecord>
+
     suspend fun add(record: SyncConflictRecord)
+
     suspend fun remove(id: String)
+
     suspend fun clear()
 }
 
 class KeyValueSyncConflictStore(
     private val storage: KeyValueStorage,
-    private val json: Json = Json { ignoreUnknownKeys = true }
+    private val json: Json = Json { ignoreUnknownKeys = true },
 ) : SyncConflictStore {
-
     override suspend fun list(): List<SyncConflictRecord> = readAll()
 
     override suspend fun add(record: SyncConflictRecord) {

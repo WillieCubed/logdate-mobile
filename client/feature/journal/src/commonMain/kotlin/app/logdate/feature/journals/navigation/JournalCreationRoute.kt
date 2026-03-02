@@ -40,7 +40,7 @@ fun NavGraphBuilder.newJournalRoute(
             slideOutOfContainer(
                 towards = AnimatedContentTransitionScope.SlideDirection.Right,
             )
-        }
+        },
     ) {
         JournalCreationScreen(
             onGoBack = onGoBack,

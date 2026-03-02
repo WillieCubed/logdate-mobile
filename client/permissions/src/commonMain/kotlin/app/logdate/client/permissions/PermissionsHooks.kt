@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:filename")
+
 package app.logdate.client.permissions
 
 import androidx.compose.runtime.Composable
@@ -6,5 +8,5 @@ import androidx.compose.runtime.Composable
 expect fun rememberNotificationPermissionState(): NotificationPermissionState
 
 data class NotificationPermissionState(
-    val permissionId: String
+    val permissionId: String,
 )

@@ -1,7 +1,6 @@
 package app.logdate.client.health.model
 
 import kotlin.time.Instant
-import kotlinx.datetime.LocalDate
 
 /**
  * Represents a sleep session with start and end times.
@@ -11,7 +10,7 @@ data class SleepSession(
     val startTime: Instant,
     val endTime: Instant,
     val sourceAppName: String? = null,
-    val stages: List<SleepStage> = emptyList()
+    val stages: List<SleepStage> = emptyList(),
 )
 
 /**
@@ -20,7 +19,7 @@ data class SleepSession(
 data class SleepStage(
     val type: SleepStageType,
     val startTime: Instant,
-    val endTime: Instant
+    val endTime: Instant,
 )
 
 /**
@@ -31,7 +30,7 @@ enum class SleepStageType {
     AWAKE,
     LIGHT,
     DEEP,
-    REM
+    REM,
 }
 
 // DayBounds class moved to its own file

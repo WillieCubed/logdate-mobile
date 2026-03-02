@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports", "ktlint:standard:max-line-length")
+
 package app.logdate.feature.onboarding.ui
 
 import androidx.compose.foundation.layout.Arrangement
@@ -44,15 +46,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.client.billing.model.LogDateBackupPlanOption
 import app.logdate.ui.AdaptiveLayout
 import app.logdate.ui.theme.Spacing
-import androidx.compose.ui.tooling.preview.Preview
-import org.koin.compose.viewmodel.koinViewModel
-import org.jetbrains.compose.resources.stringResource
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
+
 @Composable
 fun CloudAccountSetupScreen(
     onBack: () -> Unit,
@@ -63,7 +66,7 @@ fun CloudAccountSetupScreen(
     onboardingViewModel: OnboardingViewModel = koinViewModel(),
 ) {
     var selectedOption by remember { mutableStateOf<CloudSetupOption?>(null) }
-    
+
     CloudAccountSetupContent(
         useCompactLayout = useCompactLayout,
         selectedOption = selectedOption,
@@ -72,7 +75,7 @@ fun CloudAccountSetupScreen(
         onContinue = onContinue,
         onSkip = onSkip,
         onPlanSelected = onboardingViewModel::selectPlan,
-        modifier = modifier
+        modifier = modifier,
     )
 }
 
@@ -86,10 +89,10 @@ private fun CloudAccountSetupContent(
     onContinue: () -> Unit,
     onSkip: () -> Unit,
     onPlanSelected: (LogDateBackupPlanOption) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    
+
     when (selectedOption) {
         CloudSetupOption.CREATE_ACCOUNT -> {
             // TODO: Implement PasskeyAccountCreationScreen when core module is available
@@ -102,22 +105,23 @@ private fun CloudAccountSetupContent(
                             IconButton(onClick = { onOptionSelected(CloudSetupOption.SETUP_SYNC) }) {
                                 Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(Res.string.back))
                             }
-                        }
+                        },
                     )
-                }
+                },
             ) { paddingValues ->
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                        .padding(Spacing.lg),
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues)
+                            .padding(Spacing.lg),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                    verticalArrangement = Arrangement.Center,
                 ) {
                     Text(
                         text = stringResource(Res.string.account_creation_will_be_implemented_here),
                         style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
                     Spacer(modifier = Modifier.height(Spacing.md))
                     Button(onClick = onContinue) {
@@ -137,22 +141,23 @@ private fun CloudAccountSetupContent(
                             IconButton(onClick = { onOptionSelected(CloudSetupOption.SETUP_SYNC) }) {
                                 Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(Res.string.back))
                             }
-                        }
+                        },
                     )
-                }
+                },
             ) { paddingValues ->
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                        .padding(Spacing.lg),
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues)
+                            .padding(Spacing.lg),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                    verticalArrangement = Arrangement.Center,
                 ) {
                     Text(
                         text = stringResource(Res.string.sign_in_will_be_implemented_here),
                         style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
                     Spacer(modifier = Modifier.height(Spacing.md))
                     Button(onClick = onContinue) {
@@ -174,23 +179,25 @@ private fun CloudAccountSetupContent(
                                     IconButton(onClick = onBack) {
                                         Icon(
                                             Icons.AutoMirrored.Default.ArrowBack,
-                                            contentDescription = stringResource(Res.string.back)
+                                            contentDescription = stringResource(Res.string.back),
                                         )
                                     }
                                 },
-                                colors = TopAppBarDefaults.topAppBarColors().copy(
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                ),
+                                colors =
+                                    TopAppBarDefaults.topAppBarColors().copy(
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                    ),
                             )
                         },
                         containerColor = MaterialTheme.colorScheme.surfaceContainer,
                     ) { contentPadding ->
                         Column(
-                            modifier = Modifier
-                                .padding(contentPadding)
-                                .padding(Spacing.lg)
-                                .verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.spacedBy(Spacing.md)
+                            modifier =
+                                Modifier
+                                    .padding(contentPadding)
+                                    .padding(Spacing.lg)
+                                    .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.md),
                         ) {
                             InfoSection()
                         }
@@ -207,7 +214,7 @@ private fun CloudAccountSetupContent(
                                         IconButton(onClick = onBack) {
                                             Icon(
                                                 Icons.AutoMirrored.Default.ArrowBack,
-                                                contentDescription = stringResource(Res.string.back)
+                                                contentDescription = stringResource(Res.string.back),
                                             )
                                         }
                                     },
@@ -221,7 +228,7 @@ private fun CloudAccountSetupContent(
                                 onContinue = onContinue,
                                 onSkip = onSkip,
                                 onPlanSelected = onPlanSelected,
-                                modifier = Modifier.padding(contentPadding)
+                                modifier = Modifier.padding(contentPadding),
                             )
                         }
                     } else {
@@ -230,10 +237,10 @@ private fun CloudAccountSetupContent(
                             onOptionSelected = onOptionSelected,
                             onContinue = onContinue,
                             onSkip = onSkip,
-                            onPlanSelected = onPlanSelected
+                            onPlanSelected = onPlanSelected,
                         )
                     }
-                }
+                },
             )
         }
     }
@@ -242,60 +249,66 @@ private fun CloudAccountSetupContent(
 @Composable
 private fun InfoSection() {
     Column(
-        verticalArrangement = Arrangement.spacedBy(Spacing.md)
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         Card {
             Column(
                 modifier = Modifier.padding(Spacing.md),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     Icon(
                         imageVector = Icons.Default.CloudSync,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = MaterialTheme.colorScheme.primary,
                     )
                     Text(
                         text = stringResource(Res.string.logdate_cloud),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
                     )
                 }
                 Text(
-                    text = stringResource(Res.string.keep_your_memories_safe_and_accessible_across_all_your_devices_logdate_cloud_syncs_your_entries_photos_and_settings_securely),
+                    text =
+                        stringResource(
+                            Res.string.keep_your_memories_safe_and_accessible_across_all_your_devices_logdate_cloud_syncs_your_entries_photos_and_settings_securely,
+                        ),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
-        
+
         Card {
             Column(
                 modifier = Modifier.padding(Spacing.md),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Key,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = MaterialTheme.colorScheme.primary,
                     )
                     Text(
                         text = stringResource(Res.string.secure_with_passkeys),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
                     )
                 }
                 Text(
-                    text = stringResource(Res.string.no_passwords_to_remember_use_your_devices_biometric_authentication_face_id_touch_id_or_fingerprint_for_secure_convenient_access),
+                    text =
+                        stringResource(
+                            Res.string.no_passwords_to_remember_use_your_devices_biometric_authentication_face_id_touch_id_or_fingerprint_for_secure_convenient_access,
+                        ),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -309,25 +322,25 @@ private fun MainContent(
     onContinue: () -> Unit,
     onSkip: () -> Unit,
     onPlanSelected: (LogDateBackupPlanOption) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     LazyColumn(
         modifier = modifier.padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg)
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         item {
             InfoSection()
         }
-        
+
         item {
             Text(
                 text = stringResource(Res.string.choose_how_youd_like_to_proceed),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(top = Spacing.md)
+                modifier = Modifier.padding(top = Spacing.md),
             )
         }
-        
+
         // Account setup options
         item {
             CloudSetupOptionCard(
@@ -335,30 +348,30 @@ private fun MainContent(
                 title = "Create LogDate Cloud Account",
                 description = "Set up a new account with secure passkey authentication and choose your storage plan.",
                 isSelected = selectedOption == CloudSetupOption.CREATE_ACCOUNT,
-                onClick = { onOptionSelected(CloudSetupOption.CREATE_ACCOUNT) }
+                onClick = { onOptionSelected(CloudSetupOption.CREATE_ACCOUNT) },
             )
         }
-        
+
         item {
             CloudSetupOptionCard(
                 icon = Icons.Default.AccountCircle,
                 title = "Sign In to Existing Account",
                 description = "Already have a LogDate Cloud account? Sign in with your passkey to continue.",
                 isSelected = selectedOption == CloudSetupOption.SIGN_IN,
-                onClick = { onOptionSelected(CloudSetupOption.SIGN_IN) }
+                onClick = { onOptionSelected(CloudSetupOption.SIGN_IN) },
             )
         }
-        
+
         item {
             CloudSetupOptionCard(
                 icon = Icons.Default.CloudOff,
                 title = "Continue Without Cloud Sync",
                 description = "Keep using LogDate locally on this device only. You can set up cloud sync later in Settings.",
                 isSelected = selectedOption == CloudSetupOption.SKIP,
-                onClick = { onOptionSelected(CloudSetupOption.SKIP) }
+                onClick = { onOptionSelected(CloudSetupOption.SKIP) },
             )
         }
-        
+
         // Storage plans (shown when create account is selected)
         if (selectedOption == CloudSetupOption.CREATE_ACCOUNT) {
             item {
@@ -366,10 +379,10 @@ private fun MainContent(
                 Text(
                     text = stringResource(Res.string.choose_your_storage_plan),
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
-            
+
             item {
                 PlanOptionCard(
                     option = LogDateBackupPlanOption.BASIC,
@@ -377,10 +390,10 @@ private fun MainContent(
                     description = "Up to 10 GB of storage for text, photos, and videos. High-quality compression (1080p).",
                     price = "Free",
                     isRecommended = true,
-                    onPlanSelected = onPlanSelected
+                    onPlanSelected = onPlanSelected,
                 )
             }
-            
+
             item {
                 PlanOptionCard(
                     option = LogDateBackupPlanOption.STANDARD,
@@ -388,25 +401,25 @@ private fun MainContent(
                     description = "Up to 2 TB of storage with original quality photos and videos. Priority support.",
                     price = "$12/month",
                     isRecommended = false,
-                    onPlanSelected = onPlanSelected
+                    onPlanSelected = onPlanSelected,
                 )
             }
         }
-        
+
         // Action buttons
         item {
             Spacer(modifier = Modifier.height(Spacing.lg))
-            
+
             when (selectedOption) {
                 CloudSetupOption.CREATE_ACCOUNT -> {
                     Button(
                         onClick = { onOptionSelected(CloudSetupOption.CREATE_ACCOUNT) },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         Icon(
                             imageVector = Icons.Default.PersonAdd,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(20.dp),
                         )
                         Spacer(modifier = Modifier.width(Spacing.sm))
                         Text(stringResource(Res.string.create_account))
@@ -415,12 +428,12 @@ private fun MainContent(
                 CloudSetupOption.SIGN_IN -> {
                     Button(
                         onClick = { onOptionSelected(CloudSetupOption.SIGN_IN) },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         Icon(
                             imageVector = Icons.Default.AccountCircle,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(20.dp),
                         )
                         Spacer(modifier = Modifier.width(Spacing.sm))
                         Text(stringResource(Res.string.sign_in))
@@ -428,11 +441,11 @@ private fun MainContent(
                 }
                 CloudSetupOption.SKIP -> {
                     Column(
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
                         OutlinedButton(
                             onClick = onSkip,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(stringResource(Res.string.continue_without_cloud_sync))
                         }
@@ -441,7 +454,7 @@ private fun MainContent(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }
@@ -451,7 +464,7 @@ private fun MainContent(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
                 null -> {
@@ -460,7 +473,7 @@ private fun MainContent(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
@@ -474,73 +487,83 @@ private fun CloudSetupOptionCard(
     title: String,
     description: String,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     Card(
         onClick = onClick,
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) {
-                MaterialTheme.colorScheme.primaryContainer
+        colors =
+            CardDefaults.cardColors(
+                containerColor =
+                    if (isSelected) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surface
+                    },
+            ),
+        border =
+            if (isSelected) {
+                CardDefaults.outlinedCardBorder(enabled = true).copy(
+                    brush =
+                        androidx.compose.foundation
+                            .BorderStroke(
+                                2.dp,
+                                MaterialTheme.colorScheme.primary,
+                            ).brush,
+                )
             } else {
-                MaterialTheme.colorScheme.surface
-            }
-        ),
-        border = if (isSelected) {
-            CardDefaults.outlinedCardBorder(enabled = true).copy(
-                brush = androidx.compose.foundation.BorderStroke(
-                    2.dp,
-                    MaterialTheme.colorScheme.primary
-                ).brush
-            )
-        } else null
+                null
+            },
     ) {
         Row(
             modifier = Modifier.padding(Spacing.md),
             horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (isSelected) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                } else {
-                    MaterialTheme.colorScheme.primary
-                },
-                modifier = Modifier.size(32.dp)
+                tint =
+                    if (isSelected) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                modifier = Modifier.size(32.dp),
             )
-            
+
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (isSelected) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    }
+                    color =
+                        if (isSelected) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
                 )
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (isSelected) {
-                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
+                    color =
+                        if (isSelected) {
+                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                 )
             }
-            
+
             if (isSelected) {
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
                     contentDescription = stringResource(Res.string.selected),
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(24.dp),
                 )
             }
         }
@@ -554,51 +577,52 @@ private fun PlanOptionCard(
     description: String,
     price: String,
     isRecommended: Boolean,
-    onPlanSelected: (LogDateBackupPlanOption) -> Unit
+    onPlanSelected: (LogDateBackupPlanOption) -> Unit,
 ) {
     Card(
-        onClick = { onPlanSelected(option) }
+        onClick = { onPlanSelected(option) },
     ) {
         Column(
             modifier = Modifier.padding(Spacing.md),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
                 )
                 if (isRecommended) {
                     Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        )
+                        colors =
+                            CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                            ),
                     ) {
                         Text(
                             text = stringResource(Res.string.recommended),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs)
+                            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
                         )
                     }
                 }
             }
-            
+
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            
+
             Text(
                 text = price,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
             )
         }
     }
@@ -608,7 +632,7 @@ enum class CloudSetupOption {
     SETUP_SYNC,
     CREATE_ACCOUNT,
     SIGN_IN,
-    SKIP
+    SKIP,
 }
 
 @Preview
@@ -622,7 +646,7 @@ private fun CloudAccountSetupScreenPreview() {
             onOptionSelected = {},
             onContinue = {},
             onSkip = {},
-            onPlanSelected = {}
+            onPlanSelected = {},
         )
     }
 }

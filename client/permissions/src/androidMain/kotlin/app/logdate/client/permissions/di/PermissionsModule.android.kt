@@ -11,14 +11,15 @@ import org.koin.dsl.module
 /**
  * Android-specific permissions module
  */
-actual val permissionsModule: Module = module {
-    includes(commonPermissionsModule)
-    
-    // Android-specific implementations
-    single<PasskeyManager> { AndroidPasskeyManager(androidContext()) }
-    
-    // Override the PermissionManager with Android-specific implementation
-    single<PermissionManager>(createdAtStart = true) { 
-        AndroidPermissionManager(androidContext()) 
+actual val permissionsModule: Module =
+    module {
+        includes(commonPermissionsModule)
+
+        // Android-specific implementations
+        single<PasskeyManager> { AndroidPasskeyManager(androidContext()) }
+
+        // Override the PermissionManager with Android-specific implementation
+        single<PermissionManager>(createdAtStart = true) {
+            AndroidPermissionManager(androidContext())
+        }
     }
-}

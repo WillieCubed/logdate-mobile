@@ -4,76 +4,76 @@ package app.logdate.navigation.scenes
 
 /**
  * LogDate Navigation Architecture - Home Scene Implementation
- * 
+ *
  * This file implements the core navigation scenes and strategies for LogDate's adaptive UI,
  * built on Android's Navigation 3 framework. It provides a sophisticated navigation system
  * that adapts to different screen sizes and content types.
- * 
+ *
  * Architecture Overview:
- * 
+ *
  * The navigation system consists of three main components:
- * 
+ *
  * 1. Scene Types (UI Layout Controllers):
  *    - HomeScene: Renders content with navigation chrome (bottom nav/rail + content)
  *    - FullscreenScene: Renders content without any navigation UI for immersive experiences
- * 
+ *
  * 2. Route Classification System (Decision Logic):
  *    Routes are classified into four categories that determine their display behavior:
  *    - MainTab: Timeline, Journals, Rewind overview (always shown with navigation)
  *    - TwoPaneDetail: Timeline details (shown side-by-side on large screens)
  *    - FullscreenDetail: Rewind details, Journal details (always immersive)
  *    - Excluded: Onboarding, Settings, Editor (handled by other strategies or NavDisplay)
- * 
+ *
  * 3. Scene Strategy (Routing Logic):
  *    HomeSceneStrategy analyzes the navigation back stack and creates appropriate scenes:
  *    Back Stack Analysis → Route Classification → Scene Creation → UI Rendering
- * 
+ *
  * Navigation Flow Examples:
- * 
+ *
  * Example 1: Main Tab Navigation
  *   Timeline → Journals → Rewind
  *   ↓           ↓          ↓
  *   MainTab    MainTab    MainTab
  *   ↓           ↓          ↓
  *   HomeScene  HomeScene  HomeScene (with navigation chrome)
- * 
+ *
  * Example 2: Detail Navigation
  *   Timeline → Timeline Detail (Large Screen)
  *   ↓          ↓
  *   MainTab    TwoPaneDetail
  *   ↓          ↓
  *   HomeScene  HomeScene (main + detail side-by-side)
- * 
+ *
  *   Timeline → Timeline Detail (Small Screen)
  *   ↓          ↓
  *   MainTab    TwoPaneDetail
  *   ↓          ↓
  *   HomeScene  HomeScene (detail only, navigation hidden)
- * 
+ *
  * Example 3: Immersive Content
  *   Rewind List → Rewind Detail
  *   ↓             ↓
  *   MainTab       FullscreenDetail
  *   ↓             ↓
  *   HomeScene     FullscreenScene (no navigation chrome)
- * 
+ *
  * Screen Size Adaptations:
- * 
+ *
  * The system adapts to three screen size categories:
  * - Small (<600dp): Bottom navigation, single-pane content
- * - Medium (600dp-1240dp): Side navigation rail, single-pane content  
+ * - Medium (600dp-1240dp): Side navigation rail, single-pane content
  * - Large (≥1240dp): Side navigation rail, two-pane content (where supported)
- * 
+ *
  * Integration with Navigation 3:
- * 
+ *
  * This system integrates with Navigation 3's core concepts:
  * - NavDisplay: Main navigation container that hosts scenes
  * - Scene: Defines layout and content for a navigation state
  * - SceneStrategy: Determines which scene to create based on back stack
  * - NavEntry: Individual navigation entries with content and metadata
- * 
+ *
  * Key Design Principles:
- * 
+ *
  * 1. Adaptive by Default: All layouts respond to screen size changes
  * 2. Content-First: Navigation chrome adapts to content, not vice versa
  * 3. Immersive When Needed: Full-screen experiences for media and storytelling
@@ -84,10 +84,6 @@ package app.logdate.navigation.scenes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
-// TODO: Fix shared element API imports
-// import androidx.compose.animation.rememberSharedContentState
-// import androidx.compose.animation.sharedElement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -115,21 +111,19 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import app.logdate.navigation.LocalSharedTransitionScope
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.scene.SceneStrategyScope
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
-import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
-import app.logdate.navigation.components.LogDateBottomNavigationBar
-import app.logdate.navigation.components.LogDateNavigationRail
+import app.logdate.navigation.LocalSharedTransitionScope
 import app.logdate.navigation.routes.AccountCreationCompletionRoute
 import app.logdate.navigation.routes.CloudAccountIntroRoute
 import app.logdate.navigation.routes.DisplayNameSelectionRoute
@@ -142,6 +136,7 @@ import app.logdate.navigation.routes.core.DangerZoneSettingsRoute
 import app.logdate.navigation.routes.core.DataSettingsRoute
 import app.logdate.navigation.routes.core.DevicesSettingsRoute
 import app.logdate.navigation.routes.core.EntryEditor
+import app.logdate.navigation.routes.core.JournalDetail
 import app.logdate.navigation.routes.core.JournalList
 import app.logdate.navigation.routes.core.LocationSettingsRoute
 import app.logdate.navigation.routes.core.NavigationStart
@@ -157,13 +152,12 @@ import app.logdate.navigation.routes.core.RewindList
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
 import app.logdate.navigation.routes.core.TimelineDetail
 import app.logdate.navigation.routes.core.TimelineListRoute
-import app.logdate.navigation.routes.core.JournalDetail
-import androidx.compose.runtime.remember
 import app.logdate.navigation.routes.routeClass
-import kotlin.reflect.KClass
-import org.jetbrains.compose.resources.stringResource
-import logdate.app.composemain.generated.resources.*
 import logdate.app.composemain.generated.resources.Res
+import logdate.app.composemain.generated.resources.new_entry
+import org.jetbrains.compose.resources.stringResource
+import kotlin.reflect.KClass
+
 /**
  * CompositionLocal for providing AnimatedVisibilityScope throughout the home scene.
  */
@@ -178,13 +172,13 @@ private const val FAB_TO_EDITOR_SHARED_ELEMENT_KEY = "fab_to_editor"
 
 /**
  * Defines how different route types should be handled by the HomeSceneStrategy.
- * 
+ *
  * This sealed class provides a type-safe way to classify routes and determine their
  * display behavior in the navigation system. Each classification corresponds to a
  * specific UI pattern and user experience.
- * 
+ *
  * Route Classification Decision Matrix:
- * 
+ *
  * Route Type        | Screen Size    | Classification  | Scene Type      | Navigation Chrome
  * ----------------- | -------------- | --------------- | --------------- | -----------------
  * Timeline List     | Any            | MainTab         | HomeScene       | Yes (Bottom Nav/Rail)
@@ -197,27 +191,27 @@ private const val FAB_TO_EDITOR_SHARED_ELEMENT_KEY = "fab_to_editor"
  * Settings          | Any            | Excluded        | (SettingsStrategy)| Strategy-dependent
  * Onboarding        | Any            | Excluded        | (NavDisplay)    | No
  * Editor            | Any            | Excluded        | (NavDisplay)    | No
- * 
+ *
  * Classification Examples:
- * 
+ *
  * MainTab:
  *   These routes always show with navigation chrome
  *   TimelineListRoute -> RouteClassification.MainTab(HomeTab.TIMELINE)
  *   JournalList -> RouteClassification.MainTab(HomeTab.JOURNALS)
  *   RewindList -> RouteClassification.MainTab(HomeTab.REWIND)
- * 
+ *
  * TwoPaneDetail:
  *   These routes can show side-by-side with their parent on large screens
  *   TimelineDetail(LocalDate.now()) -> RouteClassification.TwoPaneDetail(HomeTab.TIMELINE)
  *   Becomes: Timeline List | Timeline Detail (on large screens)
  *        or: Timeline Detail only (on small screens)
- * 
+ *
  * FullscreenDetail:
  *   These routes always take over the entire screen
  *   RewindDetailRoute(uuid) -> RouteClassification.FullscreenDetail
  *   JournalDetail(uuid) -> RouteClassification.FullscreenDetail
  *   Result: Immersive, fullscreen experience without navigation UI
- * 
+ *
  * Excluded:
  *   These routes are handled by other strategies or NavDisplay directly
  *   OnboardingStart -> RouteClassification.Excluded
@@ -228,45 +222,49 @@ private const val FAB_TO_EDITOR_SHARED_ELEMENT_KEY = "fab_to_editor"
 sealed class RouteClassification {
     /**
      * Main tab routes that should be displayed with navigation UI.
-     * 
+     *
      * These are the primary destinations of the app (Timeline, Journals, Rewind overview)
      * that should always be accessible through bottom navigation or navigation rail.
-     * 
+     *
      * @param tab The specific tab this route represents
      */
-    data class MainTab(val tab: HomeTab) : RouteClassification()
-    
+    data class MainTab(
+        val tab: HomeTab,
+    ) : RouteClassification()
+
     /**
      * Detail routes that should be displayed in two-pane mode on large screens,
      * with both main and detail content visible.
-     * 
+     *
      * On smaller screens, these routes display as full-screen details with hidden navigation.
      * On larger screens (≥1240dp), they display side-by-side with their parent tab.
-     * 
+     *
      * Examples: Timeline day details that can show alongside the timeline list.
-     * 
+     *
      * @param parentTab The main tab that this detail belongs to
      */
-    data class TwoPaneDetail(val parentTab: HomeTab) : RouteClassification()
-    
+    data class TwoPaneDetail(
+        val parentTab: HomeTab,
+    ) : RouteClassification()
+
     /**
      * Detail routes that should always be displayed full-screen without navigation UI.
-     * 
+     *
      * These routes are designed for immersive experiences and always hide all navigation
      * chrome regardless of screen size. Used for media viewing, storytelling, and other
      * content that benefits from full-screen presentation.
-     * 
+     *
      * Examples: Rewind story details, journal reading mode, photo/video viewers.
      */
     data object FullscreenDetail : RouteClassification()
-    
+
     /**
      * Routes that should be excluded from HomeScene entirely.
-     * 
+     *
      * These routes are handled by other scene strategies (like SettingsSceneStrategy)
      * or by NavDisplay directly. They don't participate in the main app's adaptive
      * navigation patterns.
-     * 
+     *
      * Examples: Onboarding flows, settings screens, entry editor, authentication flows.
      */
     data object Excluded : RouteClassification()
@@ -274,7 +272,7 @@ sealed class RouteClassification {
 
 /**
  * Configuration for route classification and scene behavior.
- * 
+ *
  * This object contains the core logic for determining how different routes should be
  * displayed in the navigation system. It implements a hierarchical classification
  * algorithm that considers route types, context, and screen size capabilities.
@@ -282,34 +280,34 @@ sealed class RouteClassification {
 object RouteConfig {
     /**
      * Classifies a route based on its NavKey and context using type-safe route matching.
-     * 
+     *
      * This function implements a multi-stage classification algorithm:
-     * 
+     *
      * Classification Algorithm Flow:
-     * 
+     *
      * 1. Main Tab Check: Is this route one of the primary app tabs?
      *    - If yes → RouteClassification.MainTab
-     * 
+     *
      * 2. Exclusion Check: Should this route be handled elsewhere?
      *    - Onboarding flows → RouteClassification.Excluded (handled by NavDisplay)
      *    - Settings flows → RouteClassification.Excluded (handled by SettingsSceneStrategy)
      *    - Editor flows → RouteClassification.Excluded (handled by NavDisplay)
      *    - System flows → RouteClassification.Excluded (handled by NavDisplay)
-     * 
+     *
      * 3. Two-Pane Detail Check: Can this detail show alongside its parent?
      *    - Timeline details with Timeline parent → RouteClassification.TwoPaneDetail
      *    - Other supported detail types → RouteClassification.TwoPaneDetail
-     * 
+     *
      * 4. Default Fallback: All remaining routes
      *    - All other details → RouteClassification.FullscreenDetail
-     * 
+     *
      * Decision Factors:
-     * 
+     *
      * - Route Type: The specific NavKey class determines base behavior
      * - Previous Route Context: Parent route influences detail classification
      * - Content Requirements: Some content (rewinds, journals) always needs fullscreen
      * - UX Patterns: Consistent behavior across similar content types
-     * 
+     *
      * @param routeKey The route to classify
      * @param previousRouteKey The previous route in the back stack (for context)
      * @return The appropriate RouteClassification for this route
@@ -324,7 +322,7 @@ object RouteConfig {
         HomeTab.entries.find { it.route::class == route }?.let { tab ->
             return RouteClassification.MainTab(tab)
         }
-        
+
         // Check for excluded routes (should render without ANY navigation UI - not even fullscreen scenes)
         // Use type-safe matching instead of string comparison
         when (route) {
@@ -337,7 +335,8 @@ object RouteConfig {
             OnboardingEntryRoute::class,
             OnboardingImportRoute::class,
             OnboardingCompleteRoute::class,
-            OnboardingWelcomeBackRoute::class -> return RouteClassification.Excluded
+            OnboardingWelcomeBackRoute::class,
+            -> return RouteClassification.Excluded
 
             // Settings flows - all should be excluded (handled by SettingsSceneStrategy)
             SettingsOverviewRoute::class,
@@ -348,14 +347,16 @@ object RouteConfig {
             DangerZoneSettingsRoute::class,
             BirthdaySettingsRoute::class,
             LocationSettingsRoute::class,
-            AdvancedSettingsRoute::class -> return RouteClassification.Excluded
+            AdvancedSettingsRoute::class,
+            -> return RouteClassification.Excluded
 
             // Cloud account setup flows - all should be excluded
             CloudAccountIntroRoute::class,
             UsernameSelectionRoute::class,
             DisplayNameSelectionRoute::class,
             PasskeyCreationRoute::class,
-            AccountCreationCompletionRoute::class -> return RouteClassification.Excluded
+            AccountCreationCompletionRoute::class,
+            -> return RouteClassification.Excluded
 
             // Editor flows - always excluded (handled by NavDisplay directly)
             EntryEditor::class -> return RouteClassification.Excluded
@@ -363,7 +364,7 @@ object RouteConfig {
             // Default case for any other route not explicitly handled
             else -> { /* Continue to detail route classification */ }
         }
-        
+
         // Check for detail routes that support two-pane mode
         when (route) {
             TimelineDetail::class -> {
@@ -377,13 +378,12 @@ object RouteConfig {
         // All other detail routes are full-screen
         return RouteClassification.FullscreenDetail
     }
-    
+
     /**
      * Determines if a route should always be full-screen regardless of screen size.
      */
-    fun isAlwaysFullscreen(routeClass: KClass<out NavKey>?): Boolean {
-        return routeClass == RewindDetailRoute::class || routeClass == JournalDetail::class
-    }
+    fun isAlwaysFullscreen(routeClass: KClass<out NavKey>?): Boolean =
+        routeClass == RewindDetailRoute::class || routeClass == JournalDetail::class
 }
 
 /**
@@ -395,15 +395,16 @@ private fun <T : NavKey> createMainTabHomeScene(
     tab: HomeTab,
     onTabSelected: (HomeTab) -> Unit,
     onNewEntry: () -> Unit,
-): HomeScene<T> = HomeScene(
-    key = Pair("HomeScene", entry.contentKey),
-    previousEntries = previousEntries,
-    mainEntry = entry,
-    detailEntry = null,
-    onTabSelected = onTabSelected,
-    onNewEntry = onNewEntry,
-    selectedTab = tab
-)
+): HomeScene<T> =
+    HomeScene(
+        key = Pair("HomeScene", entry.contentKey),
+        previousEntries = previousEntries,
+        mainEntry = entry,
+        detailEntry = null,
+        onTabSelected = onTabSelected,
+        onNewEntry = onNewEntry,
+        selectedTab = tab,
+    )
 
 /**
  * Creates a HomeScene for a two-pane detail view.
@@ -415,15 +416,16 @@ private fun <T : NavKey> createTwoPaneHomeScene(
     tab: HomeTab,
     onTabSelected: (HomeTab) -> Unit,
     onNewEntry: () -> Unit,
-): HomeScene<T> = HomeScene(
-    key = Triple("HomeScene", mainEntry.contentKey, detailEntry.contentKey),
-    previousEntries = previousEntries,
-    mainEntry = mainEntry,
-    detailEntry = detailEntry,
-    onTabSelected = onTabSelected,
-    onNewEntry = onNewEntry,
-    selectedTab = tab
-)
+): HomeScene<T> =
+    HomeScene(
+        key = Triple("HomeScene", mainEntry.contentKey, detailEntry.contentKey),
+        previousEntries = previousEntries,
+        mainEntry = mainEntry,
+        detailEntry = detailEntry,
+        onTabSelected = onTabSelected,
+        onNewEntry = onNewEntry,
+        selectedTab = tab,
+    )
 
 /**
  * Creates a HomeScene for a full-screen detail view.
@@ -434,15 +436,16 @@ private fun <T : NavKey> createFullscreenHomeScene(
     tab: HomeTab,
     onTabSelected: (HomeTab) -> Unit,
     onNewEntry: () -> Unit,
-): HomeScene<T> = HomeScene(
-    key = Pair("HomeScene", entry.contentKey),
-    previousEntries = previousEntries,
-    mainEntry = entry,
-    detailEntry = null,
-    onTabSelected = onTabSelected,
-    onNewEntry = onNewEntry,
-    selectedTab = tab
-)
+): HomeScene<T> =
+    HomeScene(
+        key = Pair("HomeScene", entry.contentKey),
+        previousEntries = previousEntries,
+        mainEntry = entry,
+        detailEntry = null,
+        onTabSelected = onTabSelected,
+        onNewEntry = onNewEntry,
+        selectedTab = tab,
+    )
 
 /**
  * Creates a FullscreenScene for truly immersive content without any navigation chrome.
@@ -450,11 +453,12 @@ private fun <T : NavKey> createFullscreenHomeScene(
 private fun <T : NavKey> createFullscreenDetailScene(
     entry: NavEntry<T>,
     previousEntries: List<NavEntry<T>>,
-): FullscreenScene<T> = FullscreenScene(
-    key = Pair("FullscreenScene", entry.contentKey),
-    previousEntries = previousEntries,
-    entry = entry
-)
+): FullscreenScene<T> =
+    FullscreenScene(
+        key = Pair("FullscreenScene", entry.contentKey),
+        previousEntries = previousEntries,
+        entry = entry,
+    )
 
 /**
  * Represents the different tabs in the HomeScene
@@ -467,7 +471,7 @@ enum class HomeTab(
 ) {
     TIMELINE("Timeline", Icons.Filled.History, Icons.Outlined.History, TimelineListRoute),
     JOURNALS("Journals", Icons.Filled.Book, Icons.Outlined.Book, JournalList),
-    REWIND("Rewind", Icons.Filled.DateRange, Icons.Outlined.DateRange, RewindList)
+    REWIND("Rewind", Icons.Filled.DateRange, Icons.Outlined.DateRange, RewindList),
 }
 
 /**
@@ -509,11 +513,12 @@ class HomeScene<T : NavKey>(
     val onNewEntry: () -> Unit,
     val selectedTab: HomeTab,
 ) : Scene<T> {
-    override val entries: List<NavEntry<T>> = if (detailEntry != null) {
-        listOf(mainEntry, detailEntry)
-    } else {
-        listOf(mainEntry)
-    }
+    override val entries: List<NavEntry<T>> =
+        if (detailEntry != null) {
+            listOf(mainEntry, detailEntry)
+        } else {
+            listOf(mainEntry)
+        }
 
     /**
      * The main content composable that renders the entire HomeScene layout.
@@ -563,7 +568,8 @@ class HomeScene<T : NavKey>(
             }
         }
     }
-    
+
+    @Suppress("ktlint:standard:function-naming")
     @Composable
     private fun HomeSceneContent() {
         val adaptiveInfo = currentWindowAdaptiveInfo()
@@ -584,14 +590,15 @@ class HomeScene<T : NavKey>(
         ) { paddingValues ->
             // Use NavigationSuiteScaffold for automatic adaptive navigation
             NavigationSuiteScaffold(
-                layoutType = if (isDetailOnlyView) {
-                    // Hide navigation when showing detail-only views
-                    NavigationSuiteType.None
-                } else {
-                    // Let NavigationSuiteScaffold automatically choose based on screen size
-                    // (Bottom bar for small screens, Rail for medium/large)
-                    NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(adaptiveInfo)
-                },
+                layoutType =
+                    if (isDetailOnlyView) {
+                        // Hide navigation when showing detail-only views
+                        NavigationSuiteType.None
+                    } else {
+                        // Let NavigationSuiteScaffold automatically choose based on screen size
+                        // (Bottom bar for small screens, Rail for medium/large)
+                        NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(adaptiveInfo)
+                    },
                 navigationSuiteItems = {
                     HomeTab.entries.forEach { tab ->
                         item(
@@ -600,37 +607,40 @@ class HomeScene<T : NavKey>(
                             icon = {
                                 Icon(
                                     imageVector = if (selectedTab == tab) tab.selectedIcon else tab.unselectedIcon,
-                                    contentDescription = tab.title
+                                    contentDescription = tab.title,
                                 )
                             },
-                            label = { androidx.compose.material3.Text(tab.title) }
+                            label = { androidx.compose.material3.Text(tab.title) },
                         )
                     }
-                }
+                },
             ) {
                 Box(
-                    modifier = Modifier
-                        .padding(paddingValues)
-                        .fillMaxSize()
+                    modifier =
+                        Modifier
+                            .padding(paddingValues)
+                            .fillMaxSize(),
                 ) {
                     if (useTwoPane) {
                         // Two-pane layout (large screens with both main and detail content)
                         Row(modifier = Modifier.fillMaxSize()) {
                             // Left content
                             Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .widthIn(max = 360.dp)
-                                    .fillMaxHeight()
+                                modifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .widthIn(max = 360.dp)
+                                        .fillMaxHeight(),
                             ) {
                                 mainEntry.Content()
                             }
 
                             // Detail pane
                             Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
+                                modifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight(),
                             ) {
                                 detailEntry.Content()
                             }
@@ -652,9 +662,10 @@ class HomeScene<T : NavKey>(
                                 SharedElementFAB(
                                     onClick = onNewEntry,
                                     contentDescription = stringResource(Res.string.new_entry),
-                                    modifier = Modifier
-                                        .align(Alignment.BottomEnd)
-                                        .padding(16.dp)
+                                    modifier =
+                                        Modifier
+                                            .align(Alignment.BottomEnd)
+                                            .padding(16.dp),
                                 )
                             }
                         }
@@ -677,53 +688,53 @@ class HomeScene<T : NavKey>(
 
 /**
  * A [Scene] that renders content in fullscreen mode without any navigation chrome.
- * 
+ *
  * This scene is designed for immersive experiences like rewind details, photo/video viewers,
  * or any content that should take over the entire screen without navigation UI.
- * 
+ *
  * ## Key Characteristics
  * - **No Navigation Chrome**: No navigation bars, rails, FABs, or app bars
  * - **Full Screen Content**: Content fills the entire screen including system UI areas
  * - **Immersive Experience**: Optimized for media consumption and storytelling
  * - **System UI Responsibility**: Content must handle its own system UI (status bars, etc.)
- * 
+ *
  * ## Scene Lifecycle
- * 
+ *
  * ### Creation
  * 1. Created by `HomeSceneStrategy` when route is classified as `FullscreenDetail`
  * 2. Scene key generated as `Pair("FullscreenScene", entryKey)` for uniqueness
  * 3. Only the target entry is included in the scene's entry list
- * 
+ *
  * ### Content Rendering
  * 1. Scene's content composable is invoked by Navigation 3
  * 2. Content composable directly calls `entry.Content()`
  * 3. No additional UI layers or decorations are applied
- * 
+ *
  * ### Destruction
  * 1. Scene is destroyed when user navigates back or to a different route
  * 2. Navigation 3 handles cleanup of the scene and its entries
  * 3. Back navigation returns to the previous scene in the stack
- * 
+ *
  * ## Integration Requirements
- * 
+ *
  * ### Content Expectations
  * Content displayed in FullscreenScene must:
  * - Handle its own system UI visibility (status bars, navigation bars)
  * - Provide its own back navigation UI or gestures
  * - Manage its own loading and error states
  * - Be responsive to different screen sizes and orientations
- * 
+ *
  * ### Navigation Integration
  * - Uses standard Navigation 3 back handling
  * - Supports shared element transitions when content is designed for it
  * - Integrates with the app's transition specifications
- * 
+ *
  * ## Use Cases
  * - **Story-style content**: Rewind experiences, photo carousels
  * - **Media viewers**: Full-screen photo and video viewing
  * - **Reading modes**: Journal entries in immersive reading mode
  * - **Game-like experiences**: Interactive content that needs full control
- * 
+ *
  * @param key A unique identifier for this scene instance (typically from factory)
  * @param previousEntries The entries that precede this scene in the navigation stack
  * @param entry The entry to display in fullscreen mode
@@ -734,7 +745,7 @@ class FullscreenScene<T : NavKey>(
     val entry: NavEntry<T>,
 ) : Scene<T> {
     override val entries: List<NavEntry<T>> = listOf(entry)
-    
+
     override val content: @Composable (() -> Unit) = {
         // Render content directly without any navigation chrome or scaffolding
         // The content composable is responsible for its own layout and system UI handling
@@ -747,7 +758,7 @@ class FullscreenScene<T : NavKey>(
  *
  * This strategy implements the core logic for constructing adaptive layouts in the app,
  * serving as the bridge between Navigation 3's route management and the app's scene system.
- * 
+ *
  * ## Strategy Responsibilities
  *
  * ### 1. Back Stack Analysis
@@ -757,11 +768,11 @@ class FullscreenScene<T : NavKey>(
  *
  * ### 2. Scene Selection Logic
  * The strategy follows a hierarchical decision process:
- * 
+ *
  * ```
  * Navigation Entries → Route Classification → Scene Type Selection → Scene Creation
  * ```
- * 
+ *
  * - **MainTab routes** → `HomeScene` with navigation chrome
  * - **TwoPaneDetail routes** → `HomeScene` with adaptive layout (single/dual pane)
  * - **FullscreenDetail routes** → `FullscreenScene` without navigation chrome
@@ -780,48 +791,48 @@ class FullscreenScene<T : NavKey>(
  * - **Excluded routes**: No entries (handled elsewhere)
  *
  * ## Integration with Navigation 3
- * 
+ *
  * ### Strategy Lifecycle
  * 1. **Invocation**: Called by NavDisplay when back stack changes
  * 2. **Analysis**: Examines entries to determine current navigation context
  * 3. **Classification**: Routes are classified using RouteConfig logic
  * 4. **Creation**: Appropriate scene is created via HomeSceneFactory
  * 5. **Return**: Scene or null is returned to NavDisplay
- * 
+ *
  * ### Strategy Chaining
  * This strategy works as part of a chain in MainNavigationRoot:
  * ```kotlin
  * SettingsSceneStrategy → HomeSceneStrategy → NavDisplay Default
  * ```
- * 
+ *
  * ### State Management
  * - **Tab Selection**: Maintains selected tab state across navigation changes
  * - **Navigation Context**: Preserves user's place in the navigation hierarchy
  * - **Transition Context**: Provides appropriate scene keys for smooth transitions
- * 
+ *
  * ## Scene Creation Patterns
- * 
+ *
  * ### Main Tab Scenes
  * ```kotlin
  * TimelineListRoute → RouteClassification.MainTab → HomeScene (single pane)
  * ```
- * 
- * ### Two-Pane Detail Scenes  
+ *
+ * ### Two-Pane Detail Scenes
  * ```kotlin
  * Timeline → TimelineDetail → RouteClassification.TwoPaneDetail → HomeScene (adaptive)
  * ```
- * 
+ *
  * ### Fullscreen Detail Scenes
  * ```kotlin
  * RewindList → RewindDetail → RouteClassification.FullscreenDetail → FullscreenScene
  * ```
- * 
+ *
  * ## Performance Considerations
  * - Scenes are created on-demand when back stack changes
  * - Scene keys enable Navigation 3 to reuse scenes when possible
  * - Entry references are maintained efficiently to support transitions
  * - Route classification logic is optimized for common navigation patterns
- * 
+ *
  * This strategy works with MainNavigationRoot's scene setup to provide a cohesive,
  * adaptive navigation experience that scales from phones to tablets to desktop.
  */
@@ -859,19 +870,18 @@ class HomeSceneStrategy<T : NavKey>(
      * @param onBack Callback for when back navigation occurs
      * @return A HomeScene if appropriate for the current navigation state, or null
      */
-    override fun SceneStrategyScope<T>.calculateScene(
-        entries: List<NavEntry<T>>,
-    ): Scene<T>? {
+    override fun SceneStrategyScope<T>.calculateScene(entries: List<NavEntry<T>>): Scene<T>? {
         if (entries.isEmpty()) return null
 
         val lastEntry = entries.last()
         val previousEntry = entries.getOrNull(entries.size - 2)
 
         // Classify the current route
-        val classification = RouteConfig.classifyRoute(
-            lastEntry.routeClass(),
-            previousEntry?.routeClass()
-        )
+        val classification =
+            RouteConfig.classifyRoute(
+                lastEntry.routeClass(),
+                previousEntry?.routeClass(),
+            )
 
         return when (classification) {
             is RouteClassification.MainTab -> {
@@ -880,7 +890,7 @@ class HomeSceneStrategy<T : NavKey>(
                     previousEntries = entries.dropLast(1),
                     tab = classification.tab,
                     onTabSelected = onTabSelected,
-                    onNewEntry = onNewEntry
+                    onNewEntry = onNewEntry,
                 )
             }
 
@@ -892,7 +902,7 @@ class HomeSceneStrategy<T : NavKey>(
                         previousEntries = entries.dropLast(2),
                         tab = classification.parentTab,
                         onTabSelected = onTabSelected,
-                        onNewEntry = onNewEntry
+                        onNewEntry = onNewEntry,
                     )
                 } else {
                     createFullscreenHomeScene(
@@ -900,7 +910,7 @@ class HomeSceneStrategy<T : NavKey>(
                         previousEntries = entries.dropLast(1),
                         tab = classification.parentTab,
                         onTabSelected = onTabSelected,
-                        onNewEntry = onNewEntry
+                        onNewEntry = onNewEntry,
                     )
                 }
             }
@@ -908,7 +918,7 @@ class HomeSceneStrategy<T : NavKey>(
             is RouteClassification.FullscreenDetail -> {
                 createFullscreenDetailScene(
                     entry = lastEntry,
-                    previousEntries = entries.dropLast(1)
+                    previousEntries = entries.dropLast(1),
                 )
             }
 
@@ -922,37 +932,39 @@ class HomeSceneStrategy<T : NavKey>(
  * This composable encapsulates the shared element logic for consistent use
  * across different FAB instances (navigation rail and bottom navigation).
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 private fun SharedElementFAB(
     onClick: () -> Unit,
     contentDescription: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalAnimatedVisibilityScope.current
-    
+
     FloatingActionButton(
         onClick = onClick,
         containerColor = MaterialTheme.colorScheme.primaryContainer,
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        modifier = when {
-            sharedTransitionScope != null && animatedVisibilityScope != null -> {
-                // TODO: Fix shared element API compatibility
-                // with(sharedTransitionScope) {
-                //     modifier.sharedElement(
-                //         rememberSharedContentState(key = FAB_TO_EDITOR_SHARED_ELEMENT_KEY),
-                //         animatedVisibilityScope = animatedVisibilityScope
-                //     )
-                // }
-                modifier
-            }
-            else -> modifier
-        }
+        modifier =
+            when {
+                sharedTransitionScope != null && animatedVisibilityScope != null -> {
+                    // TODO: Fix shared element API compatibility
+                    // with(sharedTransitionScope) {
+                    //     modifier.sharedElement(
+                    //         rememberSharedContentState(key = FAB_TO_EDITOR_SHARED_ELEMENT_KEY),
+                    //         animatedVisibilityScope = animatedVisibilityScope
+                    //     )
+                    // }
+                    modifier
+                }
+                else -> modifier
+            },
     ) {
         Icon(
             Icons.Filled.Add,
             contentDescription = contentDescription,
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(24.dp),
         )
     }
 }

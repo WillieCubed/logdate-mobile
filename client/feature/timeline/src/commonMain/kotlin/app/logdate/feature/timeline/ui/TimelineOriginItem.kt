@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.timeline.ui
 
 import androidx.compose.foundation.background
@@ -16,43 +18,45 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.TimelineLine
 import app.logdate.util.daysUntilNow
 import app.logdate.util.toReadableDateShort
-import kotlin.time.Instant
 import logdate.client.feature.timeline.generated.resources.Res
 import logdate.client.feature.timeline.generated.resources.timeline_origin_day_birthday_message
 import logdate.client.feature.timeline.generated.resources.timeline_origin_day_counter
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
-import androidx.compose.ui.tooling.preview.Preview
+import kotlin.time.Instant
 
 /**
  * A timeline item that represents a user's birthday.
  */
 @Composable
-internal fun TimelineOriginItem(
-    originDate: Instant,
-) {
-    val background = Brush.verticalGradient(
-        colorStops = arrayOf(
-            0.0f to MaterialTheme.colorScheme.surface,
-            1.0f to MaterialTheme.colorScheme.primaryContainer,
+internal fun TimelineOriginItem(originDate: Instant) {
+    val background =
+        Brush.verticalGradient(
+            colorStops =
+                arrayOf(
+                    0.0f to MaterialTheme.colorScheme.surface,
+                    1.0f to MaterialTheme.colorScheme.primaryContainer,
+                ),
         )
-    )
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(brush = background),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(brush = background),
         verticalArrangement = Arrangement.spacedBy(0.dp, Alignment.Top),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = Spacing.sm, horizontal = Spacing.lg),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = Spacing.sm, horizontal = Spacing.lg),
             horizontalArrangement = Arrangement.spacedBy(Spacing.lg, Alignment.Start),
         ) {
             TimelineLine(
@@ -70,7 +74,10 @@ internal fun TimelineOriginItem(
                 .width(412.dp)
                 .height(540.dp)
                 .padding(
-                    start = Spacing.xl, top = 96.dp, end = Spacing.xl, bottom = 192.dp
+                    start = Spacing.xl,
+                    top = 96.dp,
+                    end = Spacing.xl,
+                    bottom = 192.dp,
                 ),
             verticalArrangement = Arrangement.spacedBy(Spacing.xl, Alignment.Top),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -79,7 +86,7 @@ internal fun TimelineOriginItem(
                 Modifier
                     .width(144.dp)
                     .height(144.dp)
-                    .background(color = MaterialTheme.colorScheme.primary)
+                    .background(color = MaterialTheme.colorScheme.primary),
             )
             Column(
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg, Alignment.Top),
@@ -93,7 +100,7 @@ internal fun TimelineOriginItem(
                     pluralStringResource(
                         Res.plurals.timeline_origin_day_counter,
                         originDate.daysUntilNow,
-                        originDate.daysUntilNow
+                        originDate.daysUntilNow,
                     ),
                     style = MaterialTheme.typography.headlineSmall,
                 )
@@ -106,7 +113,7 @@ internal fun TimelineOriginItem(
 @Composable
 private fun TimelineOriginItemPreview() {
     TimelineOriginItem(
-        originDate = TEST_ORIGIN_DATE
+        originDate = TEST_ORIGIN_DATE,
     )
 }
 

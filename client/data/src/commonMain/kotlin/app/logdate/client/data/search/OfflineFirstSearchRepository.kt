@@ -17,70 +17,81 @@ import kotlinx.coroutines.flow.flow
 class OfflineFirstSearchRepository(
     private val searchDao: SearchDao,
 ) : SearchRepository {
+    override fun search(query: String): Flow<List<SearchResult>> =
+        flow {
+            if (query.isBlank()) {
+                emit(emptyList())
+                return@flow
+            }
 
-    override fun search(query: String): Flow<List<SearchResult>> = flow {
-        if (query.isBlank()) {
-            emit(emptyList())
-            return@flow
-        }
-
-        val entities = searchDao.search(query)
-        val results = entities.map { entity ->
-            SearchResult(
-                uid = entity.getUuid(),
-                content = entity.content,
-                created = entity.getCreatedInstant(),
-                type = when {
-                    entity.isTextNote() -> SearchResultType.TEXT_NOTE
-                    entity.isTranscription() -> SearchResultType.TRANSCRIPTION
-                    else -> SearchResultType.TEXT_NOTE
+            val entities = searchDao.search(query)
+            val results =
+                entities.map { entity ->
+                    SearchResult(
+                        uid = entity.getUuid(),
+                        content = entity.content,
+                        created = entity.getCreatedInstant(),
+                        type =
+                            when {
+                                entity.isTextNote() -> SearchResultType.TEXT_NOTE
+                                entity.isTranscription() -> SearchResultType.TRANSCRIPTION
+                                else -> SearchResultType.TEXT_NOTE
+                            },
+                    )
                 }
-            )
-        }
-        emit(results)
-    }
-
-    override fun searchWithLimit(query: String, limit: Int): Flow<List<SearchResult>> = flow {
-        if (query.isBlank()) {
-            emit(emptyList())
-            return@flow
+            emit(results)
         }
 
-        val entities = searchDao.searchWithLimit(query, limit)
-        val results = entities.map { entity ->
-            SearchResult(
-                uid = entity.getUuid(),
-                content = entity.content,
-                created = entity.getCreatedInstant(),
-                type = when {
-                    entity.isTextNote() -> SearchResultType.TEXT_NOTE
-                    entity.isTranscription() -> SearchResultType.TRANSCRIPTION
-                    else -> SearchResultType.TEXT_NOTE
+    override fun searchWithLimit(
+        query: String,
+        limit: Int,
+    ): Flow<List<SearchResult>> =
+        flow {
+            if (query.isBlank()) {
+                emit(emptyList())
+                return@flow
+            }
+
+            val entities = searchDao.searchWithLimit(query, limit)
+            val results =
+                entities.map { entity ->
+                    SearchResult(
+                        uid = entity.getUuid(),
+                        content = entity.content,
+                        created = entity.getCreatedInstant(),
+                        type =
+                            when {
+                                entity.isTextNote() -> SearchResultType.TEXT_NOTE
+                                entity.isTranscription() -> SearchResultType.TRANSCRIPTION
+                                else -> SearchResultType.TEXT_NOTE
+                            },
+                    )
                 }
-            )
-        }
-        emit(results)
-    }
-
-    override fun searchWithSnippets(query: String): Flow<List<SearchResult>> = flow {
-        if (query.isBlank()) {
-            emit(emptyList())
-            return@flow
+            emit(results)
         }
 
-        val entities = searchDao.searchWithSnippets(query)
-        val results = entities.map { entity ->
-            SearchResult(
-                uid = entity.getUuid(),
-                content = entity.content,
-                created = entity.getCreatedInstant(),
-                type = when {
-                    entity.isTextNote() -> SearchResultType.TEXT_NOTE
-                    entity.isTranscription() -> SearchResultType.TRANSCRIPTION
-                    else -> SearchResultType.TEXT_NOTE
+    override fun searchWithSnippets(query: String): Flow<List<SearchResult>> =
+        flow {
+            if (query.isBlank()) {
+                emit(emptyList())
+                return@flow
+            }
+
+            val entities = searchDao.searchWithSnippets(query)
+            val results =
+                entities.map { entity ->
+                    SearchResult(
+                        uid = entity.getUuid(),
+                        content = entity.content,
+                        created = entity.getCreatedInstant(),
+                        type =
+                            when {
+                                entity.isTextNote() -> SearchResultType.TEXT_NOTE
+                                entity.isTranscription() -> SearchResultType.TRANSCRIPTION
+                                else -> SearchResultType.TEXT_NOTE
+                            },
+                    )
                 }
-            )
+            emit(results)
         }
-        emit(results)
-    }
 }

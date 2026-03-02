@@ -8,5 +8,5 @@ actual fun createDataStore(): DataStore<Preferences> {
     // TODO: Find a better way to get the user directory
     val userDirectory = System.getProperty("user.home")
     val haystackDirectory = "$userDirectory/.logdate"
-    return createDataStore { "$haystackDirectory/$dataStoreFileName" }
+    return createDataStore { "$haystackDirectory/$DATA_STORE_FILE_NAME" }
 }

@@ -11,14 +11,14 @@ import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
 import app.logdate.feature.core.account.ui.SaveAccountSetupDataUseCase
 import app.logdate.feature.core.export.AndroidExportLauncher
 import app.logdate.feature.core.export.ExportLauncher
-import app.logdate.feature.core.restore.AndroidRestoreLauncher
-import app.logdate.feature.core.restore.RestoreLauncher
 import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.feature.core.profile.ui.ProfileViewModel
+import app.logdate.feature.core.restore.AndroidRestoreLauncher
+import app.logdate.feature.core.restore.RestoreLauncher
 import app.logdate.feature.core.settings.ui.AccountSettingsViewModel
 import app.logdate.feature.core.settings.ui.AdvancedSettingsViewModel
-import app.logdate.feature.core.settings.ui.DataSettingsViewModel
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsViewModel
+import app.logdate.feature.core.settings.ui.DataSettingsViewModel
 import app.logdate.feature.core.settings.ui.LocationSettingsViewModel
 import app.logdate.feature.core.settings.ui.PrivacySettingsViewModel
 import org.koin.android.ext.koin.androidContext
@@ -30,78 +30,80 @@ import org.koin.dsl.module
 /**
  * Feature module exposing core app screens and functionality.
  */
-actual val coreFeatureModule: Module = module {
-    // Include our domain modules - note that accountModule is included separately to avoid circular deps
-    includes(domainModule)
-    includes(accountModule)
-    includes(devicesModule)
-    includes(locationSettingsModule)
-    
-    // TODO: Refactor to separate auth module
-    single<BiometricGatekeeper> { AndroidBiometricGatekeeper() }
-    single { AndroidBiometricGatekeeper() }
-    
-    // Export functionality with activity provider for file picker
-    // We use lazy provider for current activity that will be set by the MainActivity
-    single { ActivityProvider() }
-    
-    // Create AndroidExportLauncher and expose it both as itself and as ExportLauncher interface
-    single<ExportLauncher> { AndroidExportLauncher(androidContext()) }
-    single { AndroidExportLauncher(androidContext()) }
-    single<RestoreLauncher> { AndroidRestoreLauncher(androidContext()) }
-    single { AndroidRestoreLauncher(androidContext()) }
+actual val coreFeatureModule: Module =
+    module {
+        // Include our domain modules - note that accountModule is included separately to avoid circular deps
+        includes(domainModule)
+        includes(accountModule)
+        includes(devicesModule)
+        includes(locationSettingsModule)
 
-    // Account setup helpers
-    factoryOf(::SaveAccountSetupDataUseCase)
+        // TODO: Refactor to separate auth module
+        single<BiometricGatekeeper> { AndroidBiometricGatekeeper() }
+        single { AndroidBiometricGatekeeper() }
 
-    viewModel { AppViewModel(get(), get(), get()) }
-    viewModel {
-        AccountSettingsViewModel(
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get()
-        )
+        // Export functionality with activity provider for file picker
+        // We use lazy provider for current activity that will be set by the MainActivity
+        single { ActivityProvider() }
+
+        // Create AndroidExportLauncher and expose it both as itself and as ExportLauncher interface
+        single<ExportLauncher> { AndroidExportLauncher(androidContext()) }
+        single { AndroidExportLauncher(androidContext()) }
+        single<RestoreLauncher> { AndroidRestoreLauncher(androidContext()) }
+        single { AndroidRestoreLauncher(androidContext()) }
+
+        // Account setup helpers
+        factoryOf(::SaveAccountSetupDataUseCase)
+
+        viewModel { AppViewModel(get(), get(), get()) }
+        viewModel {
+            AccountSettingsViewModel(
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+            )
+        }
+        viewModel {
+            PrivacySettingsViewModel(
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+            )
+        }
+        viewModel {
+            DataSettingsViewModel(
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+            )
+        }
+        viewModel { AdvancedSettingsViewModel(get(), get()) }
+        viewModel {
+            DangerZoneSettingsViewModel(
+                get(),
+                get(),
+                get(),
+                get(),
+            )
+        }
+        viewModel { HomeViewModel(get(), get(), get(), get()) }
+        viewModel { CloudAccountOnboardingViewModel(get(), get(), get()) }
+        viewModel { LocationSettingsViewModel(get()) }
+        viewModel { ProfileViewModel(get(), get(), get(), get()) }
     }
-    viewModel {
-        PrivacySettingsViewModel(
-            get(),
-            get(),
-            get(),
-            get(),
-            get()
-        )
-    }
-    viewModel {
-        DataSettingsViewModel(
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get()
-        )
-    }
-    viewModel { AdvancedSettingsViewModel(get(), get()) }
-    viewModel {
-        DangerZoneSettingsViewModel(
-            get(),
-            get(),
-            get(),
-            get()
-        )
-    }
-    viewModel { HomeViewModel(get(), get(), get(), get()) }
-    viewModel { CloudAccountOnboardingViewModel(get(), get(), get()) }
-    viewModel { LocationSettingsViewModel(get()) }
-    viewModel { ProfileViewModel(get(), get(), get(), get()) }
-}
 
 // TODO: Fix this obvious code smell
+
 /**
  * Helper class to hold a reference to the current activity.
  * This is needed for launching the file picker.

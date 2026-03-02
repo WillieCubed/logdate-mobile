@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.core.settings.ui.dialogs
 
 import androidx.compose.foundation.layout.Column
@@ -25,7 +27,7 @@ import androidx.compose.ui.unit.dp
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.action_reset_app
 import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.core.generated.resources.*
+
 /**
  * Dialog for confirming application reset.
  * This shows a warning to the user about the consequences of resetting the app,
@@ -43,10 +45,11 @@ fun ResetAppConfirmationDialog(
         onDismissRequest = onDismissRequest,
         onConfirmation = onConfirmation,
         title = "Reset Entire App?",
-        message = "This action cannot be undone.\n\n" +
-            "This will permanently delete all your journals, entries, photos, " +
-            "settings, and account data on this device.\n\n" +
-            "Before continuing, export and verify a backup from Data & Storage.",
+        message =
+            "This action cannot be undone.\n\n" +
+                "This will permanently delete all your journals, entries, photos, " +
+                "settings, and account data on this device.\n\n" +
+                "Before continuing, export and verify a backup from Data & Storage.",
         confirmButtonText = stringResource(Res.string.action_reset_app),
         icon = Icons.Default.WarningAmber,
         acknowledgementLabel = "I understand that resetting may permanently remove encrypted local data.",
@@ -84,20 +87,24 @@ fun DangerConfirmationDialog(
             Icon(
                 icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.error
+                tint = MaterialTheme.colorScheme.error,
             )
         },
         title = {
             Text(
                 text = title,
-                color = MaterialTheme.colorScheme.error
+                color = MaterialTheme.colorScheme.error,
             )
         },
         text = {
             Column {
                 Text(text = message)
                 if (acknowledgementText != null) {
-                    Spacer(modifier = androidx.compose.ui.Modifier.height(12.dp))
+                    Spacer(
+                        modifier =
+                            androidx.compose.ui.Modifier
+                                .height(12.dp),
+                    )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(
                             checked = isAcknowledged,
@@ -112,9 +119,10 @@ fun DangerConfirmationDialog(
             Button(
                 onClick = onConfirmation,
                 enabled = !requiresAcknowledgement || isAcknowledged,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error
-                )
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                    ),
             ) {
                 Text(confirmButtonText)
             }
@@ -123,6 +131,6 @@ fun DangerConfirmationDialog(
             TextButton(onClick = onDismissRequest) {
                 Text(stringResource(Res.string.cancel))
             }
-        }
+        },
     )
 }

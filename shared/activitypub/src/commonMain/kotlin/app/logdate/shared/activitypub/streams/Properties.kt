@@ -1,7 +1,7 @@
 package app.logdate.shared.activitypub.streams
 
-import kotlin.time.Instant
 import kotlin.time.Duration
+import kotlin.time.Instant
 
 /**
  * URI: @id
@@ -382,8 +382,13 @@ interface Generator {
  * ```
  */
 sealed interface Icon {
-    interface ImageIcon : Icon, Image
-    interface LinkIcon : Icon, Link
+    interface ImageIcon :
+        Icon,
+        Image
+
+    interface LinkIcon :
+        Icon,
+        Link
 }
 
 /**
@@ -781,7 +786,6 @@ typealias Duration = Duration
  */
 interface Subject<T>
 
-
 /**
  * Identifies an exclusive option for a Question. Use of [OneOf] implies that the Question can have
  * only a single answer. To indicate that a Question can have multiple answers, use [AnyOf].
@@ -849,13 +853,21 @@ interface AnyOf<T>
  */
 interface Closed<T> {
     // TODO: Find more elegant solution for this
-    data class DateTimeClosed(val value: Instant) : Closed<DateTime>
-    data class BooleanClosed(val value: Boolean) : Closed<Boolean>
+    data class DateTimeClosed(
+        val value: Instant,
+    ) : Closed<DateTime>
+
+    data class BooleanClosed(
+        val value: Boolean,
+    ) : Closed<Boolean>
 }
 
 sealed interface Target<T>
+
 sealed interface Result<T>
+
 sealed interface Origin<T>
+
 sealed interface Instrument<T>
 
 /**

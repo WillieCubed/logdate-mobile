@@ -20,20 +20,20 @@ import app.logdate.client.database.entities.TranscriptionStatus as DbTranscripti
 class OfflineFirstTranscriptionRepository(
     private val transcriptionDao: TranscriptionDao,
     private val audioNoteDao: AudioNoteDao,
-    private val transcriptionManager: TranscriptionManager
+    private val transcriptionManager: TranscriptionManager,
 ) : TranscriptionRepository {
-
     override suspend fun requestTranscription(noteId: Uuid): Boolean {
         Napier.d("Requesting transcription for note $noteId")
-        
+
         // Check if the note exists
-        val note = try {
-            audioNoteDao.getNoteOneOff(noteId)
-        } catch (e: Exception) {
-            Napier.e("Cannot request transcription: Note $noteId does not exist", e)
-            return false
-        }
-        
+        val note =
+            try {
+                audioNoteDao.getNoteOneOff(noteId)
+            } catch (e: Exception) {
+                Napier.e("Cannot request transcription: Note $noteId does not exist", e)
+                return false
+            }
+
         // Check if a transcription already exists
         val existingTranscription = transcriptionDao.getTranscriptionByNoteId(noteId)
         if (existingTranscription != null) {
@@ -51,11 +51,12 @@ class OfflineFirstTranscriptionRepository(
                 DbTranscriptionStatus.FAILED -> {
                     // Create a new transcription request if previous one failed
                     val now = Clock.System.now()
-                    val updatedTranscription = existingTranscription.copy(
-                        status = DbTranscriptionStatus.PENDING,
-                        errorMessage = null,
-                        lastUpdated = now
-                    )
+                    val updatedTranscription =
+                        existingTranscription.copy(
+                            status = DbTranscriptionStatus.PENDING,
+                            errorMessage = null,
+                            lastUpdated = now,
+                        )
                     transcriptionDao.updateTranscription(updatedTranscription)
                     val audioUri = note.contentUri
                     transcriptionManager.enqueueTranscription(noteId, audioUri)
@@ -63,17 +64,18 @@ class OfflineFirstTranscriptionRepository(
                 }
             }
         }
-        
+
         // Create a new transcription entry
         val now = Clock.System.now()
-        val transcription = TranscriptionEntity(
-            noteId = noteId,
-            text = null,
-            status = DbTranscriptionStatus.PENDING,
-            created = now,
-            lastUpdated = now
-        )
-        
+        val transcription =
+            TranscriptionEntity(
+                noteId = noteId,
+                text = null,
+                status = DbTranscriptionStatus.PENDING,
+                created = now,
+                lastUpdated = now,
+            )
+
         // Insert into database
         try {
             transcriptionDao.insertTranscription(transcription)
@@ -87,14 +89,13 @@ class OfflineFirstTranscriptionRepository(
         }
     }
 
-    override suspend fun getTranscription(noteId: Uuid): TranscriptionData? {
-        return transcriptionDao.getTranscriptionByNoteId(noteId)?.toTranscriptionData()
-    }
+    override suspend fun getTranscription(noteId: Uuid): TranscriptionData? =
+        transcriptionDao.getTranscriptionByNoteId(noteId)?.toTranscriptionData()
 
-    override fun observeTranscription(noteId: Uuid): Flow<TranscriptionData?> {
-        return transcriptionDao.observeTranscriptionByNoteId(noteId)
+    override fun observeTranscription(noteId: Uuid): Flow<TranscriptionData?> =
+        transcriptionDao
+            .observeTranscriptionByNoteId(noteId)
             .map { it?.toTranscriptionData() }
-    }
 
     override suspend fun getPendingTranscriptions(): List<TranscriptionData> {
         val pendingEntities = transcriptionDao.getTranscriptionsByStatus(DbTranscriptionStatus.PENDING)
@@ -102,34 +103,36 @@ class OfflineFirstTranscriptionRepository(
     }
 
     override suspend fun updateTranscription(
-        noteId: Uuid, 
-        text: String?, 
+        noteId: Uuid,
+        text: String?,
         status: TranscriptionStatus,
-        errorMessage: String?
+        errorMessage: String?,
     ): Boolean {
         Napier.d("Updating transcription for note $noteId to status $status")
-        
+
         val transcription = transcriptionDao.getTranscriptionByNoteId(noteId)
         if (transcription == null) {
             Napier.e("Cannot update transcription: No transcription found for note $noteId")
             return false
         }
-        
+
         val now = Clock.System.now()
-        val dbStatus = when (status) {
-            TranscriptionStatus.PENDING -> DbTranscriptionStatus.PENDING
-            TranscriptionStatus.IN_PROGRESS -> DbTranscriptionStatus.IN_PROGRESS
-            TranscriptionStatus.COMPLETED -> DbTranscriptionStatus.COMPLETED
-            TranscriptionStatus.FAILED -> DbTranscriptionStatus.FAILED
-        }
-        
+        val dbStatus =
+            when (status) {
+                TranscriptionStatus.PENDING -> DbTranscriptionStatus.PENDING
+                TranscriptionStatus.IN_PROGRESS -> DbTranscriptionStatus.IN_PROGRESS
+                TranscriptionStatus.COMPLETED -> DbTranscriptionStatus.COMPLETED
+                TranscriptionStatus.FAILED -> DbTranscriptionStatus.FAILED
+            }
+
         return try {
-            val updated = transcription.copy(
-                text = text,
-                status = dbStatus,
-                errorMessage = errorMessage,
-                lastUpdated = now
-            )
+            val updated =
+                transcription.copy(
+                    text = text,
+                    status = dbStatus,
+                    errorMessage = errorMessage,
+                    lastUpdated = now,
+                )
             transcriptionDao.updateTranscription(updated)
             true
         } catch (e: Exception) {
@@ -140,7 +143,7 @@ class OfflineFirstTranscriptionRepository(
 
     override suspend fun deleteTranscription(noteId: Uuid): Boolean {
         Napier.d("Deleting transcription for note $noteId")
-        
+
         return try {
             val deleted = transcriptionDao.deleteTranscriptionByNoteId(noteId)
             deleted > 0
@@ -149,24 +152,24 @@ class OfflineFirstTranscriptionRepository(
             false
         }
     }
-    
+
     /**
      * Converts a [TranscriptionEntity] to a [TranscriptionData] object.
      */
-    private fun TranscriptionEntity.toTranscriptionData(): TranscriptionData {
-        return TranscriptionData(
+    private fun TranscriptionEntity.toTranscriptionData(): TranscriptionData =
+        TranscriptionData(
             noteId = noteId,
             text = text,
-            status = when (status) {
-                DbTranscriptionStatus.PENDING -> TranscriptionStatus.PENDING
-                DbTranscriptionStatus.IN_PROGRESS -> TranscriptionStatus.IN_PROGRESS
-                DbTranscriptionStatus.COMPLETED -> TranscriptionStatus.COMPLETED
-                DbTranscriptionStatus.FAILED -> TranscriptionStatus.FAILED
-            },
+            status =
+                when (status) {
+                    DbTranscriptionStatus.PENDING -> TranscriptionStatus.PENDING
+                    DbTranscriptionStatus.IN_PROGRESS -> TranscriptionStatus.IN_PROGRESS
+                    DbTranscriptionStatus.COMPLETED -> TranscriptionStatus.COMPLETED
+                    DbTranscriptionStatus.FAILED -> TranscriptionStatus.FAILED
+                },
             errorMessage = errorMessage,
             created = created,
             lastUpdated = lastUpdated,
-            id = id
+            id = id,
         )
-    }
 }

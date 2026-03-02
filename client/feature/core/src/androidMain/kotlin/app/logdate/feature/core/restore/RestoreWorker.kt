@@ -29,9 +29,9 @@ import java.util.zip.ZipFile
  */
 class RestoreWorker(
     private val context: Context,
-    params: WorkerParameters
-) : CoroutineWorker(context, params), KoinComponent {
-
+    params: WorkerParameters,
+) : CoroutineWorker(context, params),
+    KoinComponent {
     companion object {
         const val WORK_NAME = "restore_user_data"
         const val SOURCE_URI_KEY = "restore_source_uri"
@@ -49,63 +49,68 @@ class RestoreWorker(
     override suspend fun doWork(): Result {
         setForeground(notificationHelper.createForegroundInfo("Preparing restore..."))
 
-        val restoreUri = sourceUri
-            ?: return failure("Missing restore source")
+        val restoreUri =
+            sourceUri
+                ?: return failure("Missing restore source")
 
         val sourceLabel = resolveDisplayName(restoreUri) ?: restoreUri.toString()
-        val tempFile = copyToCache(restoreUri)
-            ?: return failure("Unable to read restore archive")
+        val tempFile =
+            copyToCache(restoreUri)
+                ?: return failure("Unable to read restore archive")
 
-        val zipFile = runCatching { ZipFile(tempFile) }
-            .getOrElse { error ->
-                tempFile.delete()
-                return failure("Unable to open restore archive: ${error.message}")
-            }
+        val zipFile =
+            runCatching { ZipFile(tempFile) }
+                .getOrElse { error ->
+                    tempFile.delete()
+                    return failure("Unable to open restore archive: ${error.message}")
+                }
 
         return try {
             val structure = ExportFileStructure()
-            val bundle = RestoreBundle(
-                metadataJson = readRequiredEntry(zipFile, structure.metadataFile),
-                journalsJson = readRequiredEntry(zipFile, structure.journalsFile),
-                notesJson = readRequiredEntry(zipFile, structure.notesFile),
-                journalNotesJson = readRequiredEntry(zipFile, structure.journalNotesFile),
-                draftsJson = readRequiredEntry(zipFile, structure.draftsFile),
-                mediaManifestJson = readOptionalEntry(zipFile, structure.mediaManifestFile)
-            )
+            val bundle =
+                RestoreBundle(
+                    metadataJson = readRequiredEntry(zipFile, structure.metadataFile),
+                    journalsJson = readRequiredEntry(zipFile, structure.journalsFile),
+                    notesJson = readRequiredEntry(zipFile, structure.notesFile),
+                    journalNotesJson = readRequiredEntry(zipFile, structure.journalNotesFile),
+                    draftsJson = readRequiredEntry(zipFile, structure.draftsFile),
+                    mediaManifestJson = readOptionalEntry(zipFile, structure.mediaManifestFile),
+                )
 
             setForeground(notificationHelper.createForegroundInfo("Restoring entries..."))
 
-            val mediaImporter = object : MediaImporter {
-                override suspend fun importMedia(exportPath: String): String? {
-                    return this@RestoreWorker.importMedia(zipFile, exportPath)
+            val mediaImporter =
+                object : MediaImporter {
+                    override suspend fun importMedia(exportPath: String): String? = this@RestoreWorker.importMedia(zipFile, exportPath)
                 }
-            }
 
-            val result = restoreUserDataUseCase.restore(
-                bundle = bundle,
-                options = RestoreOptions(),
-                mediaImporter = mediaImporter
-            )
+            val result =
+                restoreUserDataUseCase.restore(
+                    bundle = bundle,
+                    options = RestoreOptions(),
+                    mediaImporter = mediaImporter,
+                )
 
-            val summary = RestoreSummary(
-                source = sourceLabel,
-                exportDate = result.metadata.exportDate,
-                appVersion = result.metadata.appVersion,
-                deviceId = result.metadata.deviceId,
-                journalsImported = result.journalsImported,
-                notesImported = result.notesImported,
-                draftsImported = result.draftsImported,
-                journalLinksImported = result.journalLinksImported,
-                mediaImported = result.mediaImported,
-                warnings = result.warnings
-            )
+            val summary =
+                RestoreSummary(
+                    source = sourceLabel,
+                    exportDate = result.metadata.exportDate,
+                    appVersion = result.metadata.appVersion,
+                    deviceId = result.metadata.deviceId,
+                    journalsImported = result.journalsImported,
+                    notesImported = result.notesImported,
+                    draftsImported = result.draftsImported,
+                    journalLinksImported = result.journalLinksImported,
+                    mediaImported = result.mediaImported,
+                    warnings = result.warnings,
+                )
 
             setForeground(notificationHelper.createCompletionInfo("Restore completed"))
 
             Result.success(
                 workDataOf(
-                    SUMMARY_JSON_KEY to json.encodeToString(summary)
-                )
+                    SUMMARY_JSON_KEY to json.encodeToString(summary),
+                ),
             )
         } catch (e: Exception) {
             Napier.e("Restore failed", e)
@@ -117,9 +122,7 @@ class RestoreWorker(
         }
     }
 
-    private fun failure(message: String): Result {
-        return Result.failure(workDataOf(ERROR_KEY to message))
-    }
+    private fun failure(message: String): Result = Result.failure(workDataOf(ERROR_KEY to message))
 
     private fun copyToCache(uri: Uri): File? {
         val tempFile = File.createTempFile("logdate_restore", ".zip", context.cacheDir)
@@ -137,22 +140,32 @@ class RestoreWorker(
         }
     }
 
-    private fun readRequiredEntry(zipFile: ZipFile, entryName: String): String {
-        val entry = zipFile.getEntry(entryName)
-            ?: throw IllegalStateException("Missing required file: $entryName")
+    private fun readRequiredEntry(
+        zipFile: ZipFile,
+        entryName: String,
+    ): String {
+        val entry =
+            zipFile.getEntry(entryName)
+                ?: throw IllegalStateException("Missing required file: $entryName")
         return zipFile.getInputStream(entry).use { input ->
             input.readBytes().toString(Charsets.UTF_8)
         }
     }
 
-    private fun readOptionalEntry(zipFile: ZipFile, entryName: String): String? {
+    private fun readOptionalEntry(
+        zipFile: ZipFile,
+        entryName: String,
+    ): String? {
         val entry = zipFile.getEntry(entryName) ?: return null
         return zipFile.getInputStream(entry).use { input ->
             input.readBytes().toString(Charsets.UTF_8)
         }
     }
 
-    private suspend fun importMedia(zipFile: ZipFile, exportPath: String): String? {
+    private suspend fun importMedia(
+        zipFile: ZipFile,
+        exportPath: String,
+    ): String? {
         val normalizedPath = exportPath.trimStart('/')
         val entry = zipFile.getEntry(normalizedPath) ?: return null
         if (entry.isDirectory) {
@@ -160,12 +173,13 @@ class RestoreWorker(
         }
         val data = zipFile.getInputStream(entry).use { input -> input.readBytes() }
         val fileName = normalizedPath.substringAfterLast('/')
-        val payload = MediaPayload(
-            fileName = fileName,
-            mimeType = resolveMimeType(fileName),
-            sizeBytes = data.size.toLong(),
-            data = data
-        )
+        val payload =
+            MediaPayload(
+                fileName = fileName,
+                mimeType = resolveMimeType(fileName),
+                sizeBytes = data.size.toLong(),
+                data = data,
+            )
         return runCatching { mediaManager.saveMedia(payload) }
             .onFailure { Napier.e("Failed to import media during restore", it) }
             .getOrNull()
@@ -187,11 +201,12 @@ class RestoreWorker(
 
     private fun resolveMimeType(fileName: String): String {
         val extension = fileName.substringAfterLast('.', "").lowercase()
-        val mimeType = if (extension.isNotBlank()) {
-            MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
-        } else {
-            null
-        }
+        val mimeType =
+            if (extension.isNotBlank()) {
+                MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+            } else {
+                null
+            }
         return mimeType ?: "application/octet-stream"
     }
 }

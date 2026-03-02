@@ -1,7 +1,7 @@
 package app.logdate.client.device.identity
 
-import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.StateFlow
+import kotlin.uuid.Uuid
 
 /**
  * Provides a unique identifier for the current device.
@@ -15,12 +15,12 @@ interface DeviceIdProvider {
      * @return StateFlow containing the device identifier as a Uuid
      */
     fun getDeviceId(): StateFlow<Uuid>
-    
+
     /**
      * Generates a new device identifier, replacing any existing one.
      * This should be used in cases where device identity needs to be reset
      * or when the existing ID is invalid.
-     * 
+     *
      * This triggers an update in the device ID StateFlow.
      */
     suspend fun refreshDeviceId()

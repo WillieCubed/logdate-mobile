@@ -47,6 +47,7 @@ test|test:verify|Verify coverage meets threshold|./gradlew koverVerify
 quality|lint|Run Android lint|./gradlew lint
 quality|lint:check|Check Kotlin code style|./gradlew ktlintCheck
 quality|lint:format|Auto-format Kotlin code|./gradlew ktlintFormat
+quality|lint:modules|Verify ktlint task coverage for all modules|./scripts/verify-ktlint-task-coverage.sh
 quality|check|Run all checks (tests + lint)|./gradlew check
 
 docs|docs|Generate API documentation|./gradlew dokkaHtmlMultiModule

@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.journals.ui
 
 import androidx.compose.foundation.layout.Arrangement
@@ -20,11 +22,12 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 internal fun NoJournalsScreen(modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier
-            .padding(Spacing.lg)
-            .fillMaxHeight(
-                fraction = 0.5f,
-            ),
+        modifier =
+            modifier
+                .padding(Spacing.lg)
+                .fillMaxHeight(
+                    fraction = 0.5f,
+                ),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -35,7 +38,7 @@ internal fun NoJournalsScreen(modifier: Modifier = Modifier) {
         ) {
             Text(
                 stringResource(Res.string.state_journals_empty_title),
-                style = MaterialTheme.typography.headlineMedium
+                style = MaterialTheme.typography.headlineMedium,
             )
             Text(
                 stringResource(Res.string.state_journals_empty_description),
@@ -44,7 +47,7 @@ internal fun NoJournalsScreen(modifier: Modifier = Modifier) {
             )
             Text(
                 stringResource(Res.string.state_journals_empty_cta),
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.bodyLarge,
             )
         }
     }

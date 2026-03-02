@@ -1,9 +1,9 @@
 package app.logdate.shared.model
 
 import app.logdate.util.UuidSerializer
+import kotlinx.serialization.Serializable
 import kotlin.time.Clock
 import kotlin.time.Instant
-import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
 /**
@@ -11,11 +11,16 @@ import kotlin.uuid.Uuid
  */
 @Serializable
 data class EditorDraft(
-    val id: @Serializable(with = UuidSerializer::class) Uuid = Uuid.random(),
+    val id:
+        @Serializable(with = UuidSerializer::class)
+        Uuid = Uuid.random(),
     val blocks: List<SerializableEntryBlock> = emptyList(),
-    val selectedJournalIds: List<@Serializable(with = UuidSerializer::class) Uuid> = emptyList(),
+    val selectedJournalIds: List<
+        @Serializable(with = UuidSerializer::class)
+        Uuid,
+    > = emptyList(),
     val createdAt: Instant = Clock.System.now(),
-    val lastModifiedAt: Instant = Clock.System.now()
+    val lastModifiedAt: Instant = Clock.System.now(),
 )
 
 /**
@@ -23,7 +28,9 @@ data class EditorDraft(
  */
 @Serializable
 sealed class SerializableEntryBlock {
-    abstract val id: @Serializable(with = UuidSerializer::class) Uuid
+    abstract val id:
+        @Serializable(with = UuidSerializer::class)
+        Uuid
     abstract val timestamp: Instant
     abstract val locationLat: Double?
     abstract val locationLng: Double?
@@ -32,55 +39,65 @@ sealed class SerializableEntryBlock {
 
 @Serializable
 data class SerializableTextBlock(
-    override val id: @Serializable(with = UuidSerializer::class) Uuid,
+    override val id:
+        @Serializable(with = UuidSerializer::class)
+        Uuid,
     override val timestamp: Instant,
     override val locationLat: Double? = null,
     override val locationLng: Double? = null,
     override val altitude: Double? = null,
-    val content: String = ""
+    val content: String = "",
 ) : SerializableEntryBlock()
 
 @Serializable
 data class SerializableImageBlock(
-    override val id: @Serializable(with = UuidSerializer::class) Uuid,
+    override val id:
+        @Serializable(with = UuidSerializer::class)
+        Uuid,
     override val timestamp: Instant,
     override val locationLat: Double? = null,
     override val locationLng: Double? = null,
     override val altitude: Double? = null,
     val uri: String? = null,
-    val caption: String = ""
+    val caption: String = "",
 ) : SerializableEntryBlock()
 
 @Serializable
 data class SerializableVideoBlock(
-    override val id: @Serializable(with = UuidSerializer::class) Uuid,
+    override val id:
+        @Serializable(with = UuidSerializer::class)
+        Uuid,
     override val timestamp: Instant,
     override val locationLat: Double? = null,
     override val locationLng: Double? = null,
     override val altitude: Double? = null,
     val uri: String? = null,
     val thumbnailUri: String? = null,
-    val caption: String = ""
+    val caption: String = "",
 ) : SerializableEntryBlock()
 
 @Serializable
 data class SerializableAudioBlock(
-    override val id: @Serializable(with = UuidSerializer::class) Uuid,
+    override val id:
+        @Serializable(with = UuidSerializer::class)
+        Uuid,
     override val timestamp: Instant,
     override val locationLat: Double? = null,
     override val locationLng: Double? = null,
     override val altitude: Double? = null,
     val uri: String? = null,
     val duration: Long = 0L,
-    val transcription: String? = null
+    val transcription: String? = null,
 ) : SerializableEntryBlock()
 
 @Serializable
 data class SerializableCameraBlock(
-    override val id: @Serializable(with = UuidSerializer::class) Uuid,
+    override val id:
+        @Serializable(with = UuidSerializer::class)
+        Uuid,
     override val timestamp: Instant,
     override val locationLat: Double? = null,
     override val locationLng: Double? = null,
     override val altitude: Double? = null,
-    val uri: String? = null
+    val uri: String? = null,
 ) : SerializableEntryBlock()

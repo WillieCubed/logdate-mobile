@@ -13,20 +13,20 @@ import kotlin.uuid.Uuid
 class JournalsOverviewViewModel(
     private val repository: JournalRepository,
 ) : ViewModel() {
-
     // TODO: Use savedStateHandle to create filters
 
-    val uiState: StateFlow<JournalsOverviewUiState> = repository
-        .allJournalsObserved
-        .map { journals ->
-            val journalItems = journals.map { journal ->
-                JournalListItemUiState.ExistingJournal(journal)
-            }
-            val allItems = journalItems + JournalListItemUiState.CreateJournalPlaceholder
-            
-            JournalsOverviewUiState(journals = allItems)
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), JournalsOverviewUiState())
+    val uiState: StateFlow<JournalsOverviewUiState> =
+        repository
+            .allJournalsObserved
+            .map { journals ->
+                val journalItems =
+                    journals.map { journal ->
+                        JournalListItemUiState.ExistingJournal(journal)
+                    }
+                val allItems = journalItems + JournalListItemUiState.CreateJournalPlaceholder
+
+                JournalsOverviewUiState(journals = allItems)
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), JournalsOverviewUiState())
 
     fun removeJournal(journalId: Uuid) {
         viewModelScope.launch {
@@ -34,7 +34,8 @@ class JournalsOverviewViewModel(
         }
     }
 
-    fun addJournal() = viewModelScope.launch {
+    fun addJournal() =
+        viewModelScope.launch {
 //            repository.create()
-    }
+        }
 }

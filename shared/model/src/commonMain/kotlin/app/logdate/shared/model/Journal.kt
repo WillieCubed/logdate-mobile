@@ -1,10 +1,9 @@
 package app.logdate.shared.model
 
 import app.logdate.util.UuidSerializer
+import kotlinx.serialization.Serializable
 import kotlin.time.Clock
 import kotlin.time.Instant
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerialName
 import kotlin.uuid.Uuid
 
 @Serializable

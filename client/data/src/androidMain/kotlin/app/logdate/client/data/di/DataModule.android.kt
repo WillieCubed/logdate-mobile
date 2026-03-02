@@ -1,5 +1,7 @@
 package app.logdate.client.data.di
 
+import app.logdate.client.data.account.DefaultAccountRepository
+import app.logdate.client.data.account.DefaultPasskeyAccountRepository
 import app.logdate.client.data.journals.FirebaseRemoteJournalDataSource
 import app.logdate.client.data.journals.JournalUserDataRepository
 import app.logdate.client.data.journals.LocalFirstDraftRepository
@@ -7,46 +9,42 @@ import app.logdate.client.data.journals.OfflineFirstJournalContentRepository
 import app.logdate.client.data.journals.OfflineFirstJournalRepository
 import app.logdate.client.data.journals.OfflineFirstJournalUserDataRepository
 import app.logdate.client.data.journals.RemoteJournalDataSource
+import app.logdate.client.data.location.OfflineFirstLocationHistoryRepository
+import app.logdate.client.data.maintenance.DataIntegrityService
+import app.logdate.client.data.media.OfflineIndexedMediaRepository
 import app.logdate.client.data.notes.OfflineFirstJournalNotesRepository
 import app.logdate.client.data.notes.drafts.AndroidLocalEntryDraftStore
 import app.logdate.client.data.notes.drafts.LocalEntryDraftStore
 import app.logdate.client.data.notes.drafts.OfflineFirstEntryDraftRepository
-import app.logdate.client.data.rewind.DefaultRewindGenerationManager
-import app.logdate.client.data.rewind.OfflineFirstRewindRepository
-import app.logdate.client.data.media.OfflineIndexedMediaRepository
-import app.logdate.client.data.timeline.OfflineFirstActivityTimelineRepository
-import app.logdate.client.data.transcription.OfflineFirstTranscriptionRepository
-import app.logdate.client.data.location.OfflineFirstLocationHistoryRepository
-import app.logdate.client.data.maintenance.DataIntegrityService
-import app.logdate.client.data.account.DefaultPasskeyAccountRepository
-import app.logdate.client.data.account.DefaultAccountRepository
 import app.logdate.client.data.places.StubUserPlacesRepository
 import app.logdate.client.data.profile.OfflineFirstProfileRepository
 import app.logdate.client.data.quota.StubRemoteQuotaDataSource
+import app.logdate.client.data.rewind.DefaultRewindGenerationManager
+import app.logdate.client.data.rewind.OfflineFirstRewindRepository
 import app.logdate.client.data.search.OfflineFirstSearchRepository
-import app.logdate.client.datastore.SessionStorage
-import app.logdate.client.device.PlatformAccountManager
-import app.logdate.client.networking.PasskeyApiClient
-import app.logdate.client.networking.PasskeyApiClientContract
-import app.logdate.client.networking.httpClient
-import app.logdate.client.permissions.PasskeyManager
-import app.logdate.client.repository.account.AccountRepository
-import app.logdate.client.repository.account.PasskeyAccountRepository
-import app.logdate.client.repository.quota.RemoteQuotaDataSource
-import app.logdate.client.repository.location.LocationHistoryRepository
-import app.logdate.client.repository.places.UserPlacesRepository
-import app.logdate.client.repository.profile.ProfileRepository
+import app.logdate.client.data.timeline.OfflineFirstActivityTimelineRepository
+import app.logdate.client.data.transcription.OfflineFirstTranscriptionRepository
 import app.logdate.client.data.user.DefaultUserDeviceRepository
 import app.logdate.client.data.user.OfflineFirstUserStateRepository
 import app.logdate.client.database.databaseModule
 import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.di.datastoreModule
+import app.logdate.client.networking.PasskeyApiClient
+import app.logdate.client.networking.PasskeyApiClientContract
+import app.logdate.client.networking.httpClient
+import app.logdate.client.permissions.di.permissionsModule
+import app.logdate.client.repository.account.AccountRepository
+import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.media.IndexedMediaRepository
+import app.logdate.client.repository.places.UserPlacesRepository
+import app.logdate.client.repository.profile.ProfileRepository
+import app.logdate.client.repository.quota.RemoteQuotaDataSource
 import app.logdate.client.repository.rewind.RewindGenerationManager
 import app.logdate.client.repository.rewind.RewindRepository
 import app.logdate.client.repository.search.SearchRepository
@@ -54,113 +52,113 @@ import app.logdate.client.repository.timeline.ActivityTimelineRepository
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.repository.user.devices.UserDeviceRepository
-import app.logdate.client.permissions.di.permissionsModule
 import app.logdate.shared.config.configModule
 import kotlinx.serialization.json.Json
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
-actual val dataModule: Module = module {
-    includes(databaseModule)
-    includes(deviceInstanceModule)
-    includes(datastoreModule)
-    includes(configModule)
-    includes(permissionsModule)
+actual val dataModule: Module =
+    module {
+        includes(databaseModule)
+        includes(deviceInstanceModule)
+        includes(datastoreModule)
+        includes(configModule)
+        includes(permissionsModule)
 
-    // JSON serialization
-    single {
-        Json {
-            ignoreUnknownKeys = true
-            isLenient = true
-            prettyPrint = false
-            encodeDefaults = true
+        // JSON serialization
+        single {
+            Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+                prettyPrint = false
+                encodeDefaults = true
+            }
         }
+
+        // Journals
+        factory<RemoteJournalDataSource> { FirebaseRemoteJournalDataSource() }
+        single<JournalUserDataRepository> { OfflineFirstJournalUserDataRepository(get()) }
+        single<DraftRepository> { LocalFirstDraftRepository(get(), get()) }
+        single<JournalRepository> {
+            OfflineFirstJournalRepository(
+                get(),
+                get(),
+                get(),
+                syncManagerProvider = { get() },
+                syncMetadataService = get(),
+            )
+        }
+
+        // Notes
+        single<JournalNotesRepository> {
+            OfflineFirstJournalNotesRepository(
+                get(), // textNoteDao
+                get(), // imageNoteDao
+                get(), // voiceNoteDao
+                get(), // videoNoteDao
+                get(), // journalContentDao
+                get(), // journalRepository
+                syncManagerProvider = { get() },
+                syncMetadataService = get(),
+            )
+        }
+        single<JournalContentRepository> {
+            OfflineFirstJournalContentRepository(
+                get(),
+                get(),
+                get(),
+                syncMetadataService = get(),
+            )
+        }
+
+        single<EntryDraftRepository> { OfflineFirstEntryDraftRepository(get(), get()) }
+        factory<LocalEntryDraftStore> { AndroidLocalEntryDraftStore(get()) }
+
+        // Rewind
+        single<RewindRepository> { OfflineFirstRewindRepository(get()) }
+        single<RewindGenerationManager> { DefaultRewindGenerationManager(get()) }
+
+        // Media
+        single<IndexedMediaRepository> { OfflineIndexedMediaRepository(get()) }
+
+        // Timeline
+        single<ActivityTimelineRepository> { OfflineFirstActivityTimelineRepository() }
+
+        // Location
+        single<LocationHistoryRepository> { OfflineFirstLocationHistoryRepository(get()) }
+
+        // Places
+        single<UserPlacesRepository> { StubUserPlacesRepository() }
+
+        // Profile
+        single<ProfileRepository> { OfflineFirstProfileRepository(get()) }
+
+        // User
+        single<UserDeviceRepository> { DefaultUserDeviceRepository(get(), get(), get()) }
+        single<UserStateRepository> { OfflineFirstUserStateRepository(get()) }
+
+        // Networking
+        single<PasskeyApiClientContract> { PasskeyApiClient(httpClient, get(), get()) }
+
+        // Account
+        single<AccountRepository> { DefaultAccountRepository(get()) { null } } // TODO: Implement proper token provider
+        single<PasskeyAccountRepository> { DefaultPasskeyAccountRepository(get(), get(), get(), get(), get()) }
+
+        // Quota
+        factory<RemoteQuotaDataSource> { StubRemoteQuotaDataSource() }
+
+        // Transcription
+        single<TranscriptionRepository> {
+            OfflineFirstTranscriptionRepository(
+                get(), // transcriptionDao
+                get(), // voiceNoteDao
+                get(), // transcriptionManager
+            )
+        }
+
+        // Search
+        single<SearchRepository> { OfflineFirstSearchRepository(get()) }
+
+        // Integrity
+        single { DataIntegrityService(get(), get(), get()) }
     }
-
-    // Journals
-    factory<RemoteJournalDataSource> { FirebaseRemoteJournalDataSource() }
-    single<JournalUserDataRepository> { OfflineFirstJournalUserDataRepository(get()) }
-    single<DraftRepository> { LocalFirstDraftRepository(get(), get()) }
-    single<JournalRepository> {
-        OfflineFirstJournalRepository(
-            get(),
-            get(),
-            get(),
-            syncManagerProvider = { get() },
-            syncMetadataService = get()
-        )
-    }
-
-    // Notes
-    single<JournalNotesRepository> {
-        OfflineFirstJournalNotesRepository(
-            get(), // textNoteDao
-            get(), // imageNoteDao
-            get(), // voiceNoteDao
-            get(), // videoNoteDao
-            get(), // journalContentDao
-            get(), // journalRepository
-            syncManagerProvider = { get() },
-            syncMetadataService = get()
-        )
-    }
-    single<JournalContentRepository> {
-        OfflineFirstJournalContentRepository(
-            get(),
-            get(),
-            get(),
-            syncMetadataService = get()
-        )
-    }
-
-    single<EntryDraftRepository> { OfflineFirstEntryDraftRepository(get(), get()) }
-    factory<LocalEntryDraftStore> { AndroidLocalEntryDraftStore(get()) }
-
-    // Rewind
-    single<RewindRepository> { OfflineFirstRewindRepository(get()) }
-    single<RewindGenerationManager> { DefaultRewindGenerationManager(get()) }
-    
-    // Media
-    single<IndexedMediaRepository> { OfflineIndexedMediaRepository(get()) }
-
-    // Timeline
-    single<ActivityTimelineRepository> { OfflineFirstActivityTimelineRepository() }
-
-    // Location
-    single<LocationHistoryRepository> { OfflineFirstLocationHistoryRepository(get()) }
-    
-    // Places
-    single<UserPlacesRepository> { StubUserPlacesRepository() }
-
-    // Profile
-    single<ProfileRepository> { OfflineFirstProfileRepository(get()) }
-
-    // User
-    single<UserDeviceRepository> { DefaultUserDeviceRepository(get(), get(), get()) }
-    single<UserStateRepository> { OfflineFirstUserStateRepository(get()) }
-
-    // Networking
-    single<PasskeyApiClientContract> { PasskeyApiClient(httpClient, get(), get()) }
-
-    // Account
-    single<AccountRepository> { DefaultAccountRepository(get()) { null } } // TODO: Implement proper token provider
-    single<PasskeyAccountRepository> { DefaultPasskeyAccountRepository(get(), get(), get(), get(), get()) }
-
-    // Quota
-    factory<RemoteQuotaDataSource> { StubRemoteQuotaDataSource() }
-    
-    // Transcription
-    single<TranscriptionRepository> {
-        OfflineFirstTranscriptionRepository(
-            get(), // transcriptionDao
-            get(), // voiceNoteDao
-            get()  // transcriptionManager
-        )
-    }
-
-    // Search
-    single<SearchRepository> { OfflineFirstSearchRepository(get()) }
-
-    // Integrity
-    single { DataIntegrityService(get(), get(), get()) }
-}

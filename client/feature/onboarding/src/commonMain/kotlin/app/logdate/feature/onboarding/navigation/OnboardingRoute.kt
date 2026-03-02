@@ -109,7 +109,7 @@ fun NavGraphBuilder.onboardingGraph(
                 onNext = {
                     onGoToItem(AppOverview)
                 },
-                onBack = onNavigateBack
+                onBack = onNavigateBack,
             )
         }
         composable<AppOverview> {
@@ -119,7 +119,6 @@ fun NavGraphBuilder.onboardingGraph(
                     onGoToItem(MemoryImport)
                 },
             )
-
         }
         composable<FirstEntry> {
             // TODO: Re-add entry creation during onboarding
@@ -165,7 +164,7 @@ fun NavGraphBuilder.onboardingGraph(
                 },
                 onSkipOnboarding = {
                     onGoToItem(OnboardingPreferences)
-                }
+                },
             )
         }
         composable<OnboardingPreferences> {
@@ -186,7 +185,6 @@ fun NavGraphBuilder.onboardingGraph(
                     onGoToItem(OnboardingComplete)
                 },
             )
-
         }
         composable<SignIn> { }
         composable<OnboardingComplete> {

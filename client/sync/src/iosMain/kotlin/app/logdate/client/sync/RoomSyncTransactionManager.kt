@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
  * iOS does not expose Room's JVM transaction APIs, so we run the block directly.
  */
 class RoomSyncTransactionManager(
-    private val database: RoomDatabase
+    private val database: RoomDatabase,
 ) : SyncTransactionManager {
     override suspend fun <T> withTransaction(block: suspend () -> T): T = block()
 }

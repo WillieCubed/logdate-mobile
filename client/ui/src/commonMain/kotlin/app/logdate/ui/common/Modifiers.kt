@@ -2,7 +2,6 @@ package app.logdate.ui.common
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -27,14 +26,13 @@ expect fun Modifier.applyImeScroll(): Modifier
 fun Modifier.conditional(
     condition: Boolean,
     modifyIfTrue: @Composable Modifier.() -> Modifier,
-    modifyIfFalse: @Composable Modifier.() -> Modifier
-): Modifier {
-    return if (condition) {
+    modifyIfFalse: @Composable Modifier.() -> Modifier,
+): Modifier =
+    if (condition) {
         then(modifyIfTrue(Modifier))
     } else {
         then(modifyIfFalse(Modifier))
     }
-}
 
 /**
  * Apply the given modifier if the [condition] is `true`, otherwise do nothing.
@@ -43,13 +41,12 @@ fun Modifier.conditional(
 fun Modifier.conditional(
     condition: Boolean,
     modifyIfTrue: @Composable Modifier.() -> Modifier,
-): Modifier {
-    return if (condition) {
+): Modifier =
+    if (condition) {
         then(modifyIfTrue(Modifier))
     } else {
         this
     }
-}
 
 /**
  * Modifier that applies padding to the bottom of the layout if the current item is the last in the list.
@@ -63,35 +60,33 @@ fun Modifier.applyPaddingIfLast(
     currentIndex: Int,
     totalItems: Int,
     padding: PaddingValues = PaddingValues(bottom = 80.dp),
-): Modifier = conditional(currentIndex == totalItems - 1) {
-    padding(padding)
-}
+): Modifier =
+    conditional(currentIndex == totalItems - 1) {
+        padding(padding)
+    }
 
 /**
  * Applies standard screen styling to the composable, including an extra large shape clip.
- * 
+ *
  * This should be applied to all top-level screen composables to ensure consistent appearance
  * across the app.
- * 
+ *
  * @return A modifier with the screen styling applied
  */
 @Composable
-fun Modifier.applyScreenStyles(): Modifier {
-    return this
+fun Modifier.applyScreenStyles(): Modifier =
+    this
         .clip(MaterialTheme.shapes.extraLarge)
-}
 
 /**
  * Applies standard content width constraints to the composable.
- * 
+ *
  * This ensures content doesn't get too wide on large screens while maintaining
  * good readability and layout consistency.
- * 
+ *
  * @return A modifier with the standard content width applied
  */
 @Composable
-fun Modifier.applyStandardContentWidth(): Modifier {
-    return this
+fun Modifier.applyStandardContentWidth(): Modifier =
+    this
         .padding(horizontal = 16.dp)
-}
-

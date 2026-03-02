@@ -25,125 +25,135 @@ import kotlin.uuid.Uuid
 interface CachedRewindDao {
     /**
      * Retrieves all rewinds.
-     * 
+     *
      * @return Flow emitting a list of all rewinds
      */
     @Query("SELECT * FROM rewinds ORDER BY generationDate DESC")
     fun getAllRewinds(): Flow<List<RewindEntity>>
-    
+
     /**
      * Retrieves a rewind by its unique identifier.
-     * 
+     *
      * @param uid The unique identifier of the rewind to retrieve
      * @return Flow emitting the rewind if found
      */
     @Query("SELECT * FROM rewinds WHERE ${RewindConstants.COLUMN_UID} = :uid")
     fun getRewindById(uid: Uuid): Flow<RewindEntity>
-    
+
     /**
      * Retrieves a rewind for a given time period.
-     * 
+     *
      * @param start The start of the time period
      * @param end The end of the time period
      * @return Flow emitting the rewind for the given period, or null if none exists
      */
-    @Query("""
+    @Query(
+        """
         SELECT * FROM rewinds 
         WHERE ${RewindConstants.COLUMN_START_DATE} = :start 
         AND ${RewindConstants.COLUMN_END_DATE} = :end
         LIMIT 1
-    """)
-    fun getRewindForPeriod(start: Instant, end: Instant): Flow<RewindEntity?>
-    
+    """,
+    )
+    fun getRewindForPeriod(
+        start: Instant,
+        end: Instant,
+    ): Flow<RewindEntity?>
+
     /**
      * Checks if a rewind exists for the given time period.
-     * 
+     *
      * @param start The start of the time period
      * @param end The end of the time period
      * @return True if a rewind exists for the period, false otherwise
      */
-    @Query("""
+    @Query(
+        """
         SELECT EXISTS(
             SELECT 1 FROM rewinds 
             WHERE ${RewindConstants.COLUMN_START_DATE} = :start 
             AND ${RewindConstants.COLUMN_END_DATE} = :end
         )
-    """)
-    suspend fun rewindExistsForPeriod(start: Instant, end: Instant): Boolean
-    
+    """,
+    )
+    suspend fun rewindExistsForPeriod(
+        start: Instant,
+        end: Instant,
+    ): Boolean
+
     /**
      * Inserts a new rewind.
-     * 
+     *
      * @param rewind The rewind to insert
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRewind(rewind: RewindEntity)
-    
+
     /**
      * Retrieves all text content for a given rewind.
-     * 
+     *
      * @param rewindId The ID of the rewind
      * @return List of text content entities
      */
     @Query("SELECT * FROM rewind_text_content WHERE ${RewindConstants.COLUMN_REWIND_ID} = :rewindId ORDER BY timestamp ASC")
     suspend fun getTextContentForRewind(rewindId: Uuid): List<RewindTextContentEntity>
-    
+
     /**
      * Retrieves all image content for a given rewind.
-     * 
+     *
      * @param rewindId The ID of the rewind
      * @return List of image content entities
      */
     @Query("SELECT * FROM rewind_image_content WHERE ${RewindConstants.COLUMN_REWIND_ID} = :rewindId ORDER BY timestamp ASC")
     suspend fun getImageContentForRewind(rewindId: Uuid): List<RewindImageContentEntity>
-    
+
     /**
      * Retrieves all video content for a given rewind.
-     * 
+     *
      * @param rewindId The ID of the rewind
      * @return List of video content entities
      */
     @Query("SELECT * FROM rewind_video_content WHERE ${RewindConstants.COLUMN_REWIND_ID} = :rewindId ORDER BY timestamp ASC")
     suspend fun getVideoContentForRewind(rewindId: Uuid): List<RewindVideoContentEntity>
-    
+
     /**
      * Inserts text content.
-     * 
+     *
      * @param content The text content to insert
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTextContent(content: List<RewindTextContentEntity>)
-    
+
     /**
      * Inserts image content.
-     * 
+     *
      * @param content The image content to insert
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertImageContent(content: List<RewindImageContentEntity>)
-    
+
     /**
      * Inserts video content.
-     * 
+     *
      * @param content The video content to insert
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertVideoContent(content: List<RewindVideoContentEntity>)
-    
+
     /**
      * Deletes a rewind and all its content.
      * Due to foreign key constraints with CASCADE delete,
      * this will automatically delete all associated content.
-     * 
+     *
      * @param uid The unique identifier of the rewind to delete
      */
     @Query("DELETE FROM rewinds WHERE ${RewindConstants.COLUMN_UID} = :uid")
     suspend fun deleteRewind(uid: Uuid)
-    
+
     /**
      * Helper method to get all content for a rewind.
      * This combines text, image, and video content into respective lists.
-     * 
+     *
      * @param rewindId The ID of the rewind
      * @return RewindContent containing lists of text, image, and video content
      */
@@ -154,11 +164,11 @@ interface CachedRewindDao {
         val videoContent = getVideoContentForRewind(rewindId)
         return RewindContent(textContent, imageContent, videoContent)
     }
-    
+
     /**
      * Helper method to insert all content for a rewind.
      * This splits the content into the appropriate tables based on type.
-     * 
+     *
      * @param textContent List of text content entities
      * @param imageContent List of image content entities
      * @param videoContent List of video content entities
@@ -167,7 +177,7 @@ interface CachedRewindDao {
     suspend fun insertRewindContent(
         textContent: List<RewindTextContentEntity> = emptyList(),
         imageContent: List<RewindImageContentEntity> = emptyList(),
-        videoContent: List<RewindVideoContentEntity> = emptyList()
+        videoContent: List<RewindVideoContentEntity> = emptyList(),
     ) {
         if (textContent.isNotEmpty()) {
             insertTextContent(textContent)
@@ -187,5 +197,5 @@ interface CachedRewindDao {
 data class RewindContent(
     val textContent: List<RewindTextContentEntity>,
     val imageContent: List<RewindImageContentEntity>,
-    val videoContent: List<RewindVideoContentEntity>
+    val videoContent: List<RewindVideoContentEntity>,
 )

@@ -1,7 +1,8 @@
 @file:OptIn(
     kotlinx.cinterop.BetaInteropApi::class,
-    kotlinx.cinterop.ExperimentalForeignApi::class
+    kotlinx.cinterop.ExperimentalForeignApi::class,
 )
+@file:Suppress("ktlint:standard:filename")
 
 package app.logdate.client.intelligence.cache
 
@@ -10,8 +11,8 @@ import platform.Foundation.NSCachesDirectory
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSString
 import platform.Foundation.NSURL
-import platform.Foundation.NSUserDomainMask
 import platform.Foundation.NSUTF8StringEncoding
+import platform.Foundation.NSUserDomainMask
 import platform.Foundation.create
 import platform.Foundation.dataUsingEncoding
 import platform.Foundation.writeToFile
@@ -36,11 +37,13 @@ class IOSAICacheLocalDataSource(
             .onFailure { error ->
                 Napier.w(message = "Failed to decode AI cache entry for $key", throwable = error)
                 NSFileManager.defaultManager.removeItemAtPath(filePath, error = null)
-            }
-            .getOrNull()
+            }.getOrNull()
     }
 
-    override fun set(key: String, entry: GenerativeAICacheEntry) {
+    override fun set(
+        key: String,
+        entry: GenerativeAICacheEntry,
+    ) {
         ensureCacheDir()
         val encoded = codec.encode(entry)
         val nsString = NSString.create(string = encoded)
@@ -62,44 +65,44 @@ class IOSAICacheLocalDataSource(
 
     override fun entries(): List<GenerativeAICacheEntry> {
         val fileManager = NSFileManager.defaultManager
-        val files = fileManager.contentsOfDirectoryAtPath(cacheRootPath, error = null)
-            ?: return emptyList()
+        val files =
+            fileManager.contentsOfDirectoryAtPath(cacheRootPath, error = null)
+                ?: return emptyList()
         return files
             .filterIsInstance<String>()
             .filter { it.endsWith(FILE_SUFFIX) }
             .mapNotNull { filename ->
-                val data = NSFileManager.defaultManager
-                    .contentsAtPath("$cacheRootPath/$filename")
-                    ?: return@mapNotNull null
+                val data =
+                    NSFileManager.defaultManager
+                        .contentsAtPath("$cacheRootPath/$filename")
+                        ?: return@mapNotNull null
                 val raw = NSString.create(data = data, encoding = NSUTF8StringEncoding) ?: return@mapNotNull null
                 runCatching { codec.decode(raw.toString()) }
                     .onFailure { error ->
                         Napier.w(
                             message = "Failed to decode AI cache entry from $filename",
-                            throwable = error
+                            throwable = error,
                         )
                         NSFileManager.defaultManager.removeItemAtPath(
                             "$cacheRootPath/$filename",
-                            error = null
+                            error = null,
                         )
-                    }
-                    .getOrNull()
+                    }.getOrNull()
             }
     }
 
     override fun clear() {
         val fileManager = NSFileManager.defaultManager
         val files = fileManager.contentsOfDirectoryAtPath(cacheRootPath, error = null) ?: return
-        files.filterIsInstance<String>()
+        files
+            .filterIsInstance<String>()
             .filter { it.endsWith(FILE_SUFFIX) }
             .forEach { fileName ->
                 fileManager.removeItemAtPath("$cacheRootPath/$fileName", error = null)
             }
     }
 
-    private fun filePathForKey(key: String): String {
-        return "$cacheRootPath/$FILE_PREFIX${sanitize(key)}$FILE_SUFFIX"
-    }
+    private fun filePathForKey(key: String): String = "$cacheRootPath/$FILE_PREFIX${sanitize(key)}$FILE_SUFFIX"
 
     private fun ensureCacheDir() {
         val fileManager = NSFileManager.defaultManager
@@ -107,7 +110,7 @@ class IOSAICacheLocalDataSource(
             cacheRootPath,
             withIntermediateDirectories = true,
             attributes = null,
-            error = null
+            error = null,
         )
     }
 
@@ -116,13 +119,14 @@ class IOSAICacheLocalDataSource(
 
 private fun defaultCachePath(): String {
     val fileManager = NSFileManager.defaultManager
-    val url: NSURL? = fileManager.URLForDirectory(
-        directory = NSCachesDirectory,
-        inDomain = NSUserDomainMask,
-        appropriateForURL = null,
-        create = true,
-        error = null
-    )
+    val url: NSURL? =
+        fileManager.URLForDirectory(
+            directory = NSCachesDirectory,
+            inDomain = NSUserDomainMask,
+            appropriateForURL = null,
+            create = true,
+            error = null,
+        )
     val basePath = requireNotNull(url?.path)
     return "$basePath/$CACHE_DIR_NAME"
 }

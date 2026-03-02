@@ -1,10 +1,13 @@
 package app.logdate.server.routes
 
-import app.logdate.server.responses.*
-import io.ktor.http.*
-import io.ktor.server.application.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
+import app.logdate.server.responses.error
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.call
+import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
+import io.ktor.server.routing.post
+import io.ktor.server.routing.route
 
 /**
  * Stub implementations for all routes that are not yet implemented.
@@ -16,19 +19,19 @@ fun Route.authRoutes() {
         post("/login") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Login not implemented yet")
+                error("NOT_IMPLEMENTED", "Login not implemented yet"),
             )
         }
         post("/logout") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Logout not implemented yet")
+                error("NOT_IMPLEMENTED", "Logout not implemented yet"),
             )
         }
         post("/refresh") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Token refresh not implemented yet")
+                error("NOT_IMPLEMENTED", "Token refresh not implemented yet"),
             )
         }
     }
@@ -39,31 +42,31 @@ fun Route.passkeyRoutes() {
         get("/") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Passkey listing not implemented yet")
+                error("NOT_IMPLEMENTED", "Passkey listing not implemented yet"),
             )
         }
         post("/register/begin") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Passkey registration not implemented yet")
+                error("NOT_IMPLEMENTED", "Passkey registration not implemented yet"),
             )
         }
         post("/register/complete") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Passkey registration not implemented yet")
+                error("NOT_IMPLEMENTED", "Passkey registration not implemented yet"),
             )
         }
         post("/authenticate/begin") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Passkey authentication not implemented yet")
+                error("NOT_IMPLEMENTED", "Passkey authentication not implemented yet"),
             )
         }
         post("/authenticate/complete") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Passkey authentication not implemented yet")
+                error("NOT_IMPLEMENTED", "Passkey authentication not implemented yet"),
             )
         }
     }
@@ -74,19 +77,19 @@ fun Route.journalRoutes() {
         get("/") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Journal listing not implemented yet")
+                error("NOT_IMPLEMENTED", "Journal listing not implemented yet"),
             )
         }
         post("/") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Journal creation not implemented yet")
+                error("NOT_IMPLEMENTED", "Journal creation not implemented yet"),
             )
         }
         get("/{id}") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Journal details not implemented yet")
+                error("NOT_IMPLEMENTED", "Journal details not implemented yet"),
             )
         }
     }
@@ -97,13 +100,13 @@ fun Route.notesRoutes() {
         get("/") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Notes listing not implemented yet")
+                error("NOT_IMPLEMENTED", "Notes listing not implemented yet"),
             )
         }
         post("/") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Note creation not implemented yet")
+                error("NOT_IMPLEMENTED", "Note creation not implemented yet"),
             )
         }
     }
@@ -114,13 +117,13 @@ fun Route.draftRoutes() {
         get("/") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Drafts listing not implemented yet")
+                error("NOT_IMPLEMENTED", "Drafts listing not implemented yet"),
             )
         }
         post("/") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Draft creation not implemented yet")
+                error("NOT_IMPLEMENTED", "Draft creation not implemented yet"),
             )
         }
     }
@@ -131,13 +134,13 @@ fun Route.mediaRoutes() {
         get("/") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Media listing not implemented yet")
+                error("NOT_IMPLEMENTED", "Media listing not implemented yet"),
             )
         }
         post("/") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Media upload not implemented yet")
+                error("NOT_IMPLEMENTED", "Media upload not implemented yet"),
             )
         }
     }
@@ -148,7 +151,7 @@ fun Route.aiRoutes() {
         post("/summarize") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "AI summarization not implemented yet")
+                error("NOT_IMPLEMENTED", "AI summarization not implemented yet"),
             )
         }
     }
@@ -159,13 +162,13 @@ fun Route.deviceRoutes() {
         get("/") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Device listing not implemented yet")
+                error("NOT_IMPLEMENTED", "Device listing not implemented yet"),
             )
         }
         post("/") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Device registration not implemented yet")
+                error("NOT_IMPLEMENTED", "Device registration not implemented yet"),
             )
         }
     }
@@ -176,13 +179,13 @@ fun Route.rewindRoutes() {
         get("/") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Rewind listing not implemented yet")
+                error("NOT_IMPLEMENTED", "Rewind listing not implemented yet"),
             )
         }
         post("/") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Rewind creation not implemented yet")
+                error("NOT_IMPLEMENTED", "Rewind creation not implemented yet"),
             )
         }
     }
@@ -193,13 +196,13 @@ fun Route.timelineRoutes() {
         get("/") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Timeline listing not implemented yet")
+                error("NOT_IMPLEMENTED", "Timeline listing not implemented yet"),
             )
         }
         get("/{date}") {
             call.respond(
                 HttpStatusCode.NotImplemented,
-                error("NOT_IMPLEMENTED", "Timeline for date not implemented yet")
+                error("NOT_IMPLEMENTED", "Timeline for date not implemented yet"),
             )
         }
     }

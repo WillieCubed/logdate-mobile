@@ -27,7 +27,10 @@ interface RewindRepository {
      * @param end The end of the time period.
      * @return The Rewind for the given time period.
      */
-    fun getRewindBetween(start: Instant, end: Instant): Flow<Rewind?>
+    fun getRewindBetween(
+        start: Instant,
+        end: Instant,
+    ): Flow<Rewind?>
 
     /**
      * Retrieves a rewind using data between the given date to the current instant.
@@ -39,7 +42,10 @@ interface RewindRepository {
      *
      * If there is no content available for the given time period, the Rewind is not available.
      */
-    suspend fun isRewindAvailable(start: Instant, end: Instant): Boolean
+    suspend fun isRewindAvailable(
+        start: Instant,
+        end: Instant,
+    ): Boolean
 
     /**
      * Creates a new Rewind for the given time period.
@@ -54,11 +60,14 @@ interface RewindRepository {
      * @deprecated Use GenerateBasicRewindUseCase instead
      */
     @Deprecated("Use GenerateBasicRewindUseCase instead")
-    suspend fun createRewind(start: Instant, end: Instant): Rewind
-    
+    suspend fun createRewind(
+        start: Instant,
+        end: Instant,
+    ): Rewind
+
     /**
      * Saves a rewind to the repository.
-     * 
+     *
      * @param rewind The rewind to save
      */
     suspend fun saveRewind(rewind: Rewind)

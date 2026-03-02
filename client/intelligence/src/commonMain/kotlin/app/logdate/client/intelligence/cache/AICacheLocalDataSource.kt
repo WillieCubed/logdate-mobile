@@ -4,7 +4,6 @@ package app.logdate.client.intelligence.cache
  * A local cache that stores generative AI responses.
  */
 interface AICacheLocalDataSource {
-
     /**
      * Retrieves a generative AI response from the cache.
      */
@@ -13,7 +12,10 @@ interface AICacheLocalDataSource {
     /**
      * Stores a generative AI response in the cache.
      */
-    fun set(key: String, entry: GenerativeAICacheEntry)
+    fun set(
+        key: String,
+        entry: GenerativeAICacheEntry,
+    )
 
     /**
      * Removes a cached entry by key.

@@ -1,7 +1,6 @@
 package app.logdate.client.database.entities
 
 import kotlin.time.Instant
-
 import kotlin.uuid.Uuid
 
 /**

@@ -27,17 +27,21 @@ class FakeJournalNotesRepository(
 
     override fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> = flowOf(emptyList())
 
-    override fun observeNotesInRange(start: Instant, end: Instant): Flow<List<JournalNote>> = notesFlow
+    override fun observeNotesInRange(
+        start: Instant,
+        end: Instant,
+    ): Flow<List<JournalNote>> = notesFlow
 
-    override fun observeNotesPage(pageSize: Int, offset: Int): Flow<List<JournalNote>> = flowOf(emptyList())
+    override fun observeNotesPage(
+        pageSize: Int,
+        offset: Int,
+    ): Flow<List<JournalNote>> = flowOf(emptyList())
 
     override fun observeNotesStream(pageSize: Int): Flow<List<JournalNote>> = flowOf(emptyList())
 
     override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> = notesFlow
 
-    override suspend fun getNoteById(noteId: Uuid): JournalNote? {
-        return notesFlow.value.firstOrNull { it.uid == noteId }
-    }
+    override suspend fun getNoteById(noteId: Uuid): JournalNote? = notesFlow.value.firstOrNull { it.uid == noteId }
 
     override suspend fun create(note: JournalNote): Uuid {
         notesFlow.value = notesFlow.value + note
@@ -53,11 +57,17 @@ class FakeJournalNotesRepository(
         notesFlow.value = notesFlow.value.filterNot { it.uid == noteId }
     }
 
-    override suspend fun create(note: JournalNote, journalId: Uuid) {
+    override suspend fun create(
+        note: JournalNote,
+        journalId: Uuid,
+    ) {
         create(note)
     }
 
-    override suspend fun removeFromJournal(noteId: Uuid, journalId: Uuid) {
+    override suspend fun removeFromJournal(
+        noteId: Uuid,
+        journalId: Uuid,
+    ) {
         // No-op for tests.
     }
 
@@ -72,7 +82,9 @@ class FakeAudioDurationResolver(
     override suspend fun resolveDurationMs(uri: String): Long? = durationMs
 }
 
-class FakeAudioPlaybackManager : AudioPlaybackManager, AudioPlaybackStatusProvider {
+class FakeAudioPlaybackManager :
+    AudioPlaybackManager,
+    AudioPlaybackStatusProvider {
     private val statusFlow = MutableStateFlow(AudioPlaybackStatus())
 
     var startCalls = 0
@@ -126,13 +138,17 @@ class FakeAudioPlaybackManager : AudioPlaybackManager, AudioPlaybackStatusProvid
 class FakeAmplitudeExtractor(
     private val amplitudes: List<Float> = listOf(0.1f, 0.2f, 0.3f),
 ) : AmplitudeExtractor {
-    override suspend fun extractAmplitudes(uri: String, targetSampleCount: Int): List<Float> {
-        return amplitudes
-    }
+    override suspend fun extractAmplitudes(
+        uri: String,
+        targetSampleCount: Int,
+    ): List<Float> = amplitudes
 }
 
 class FakeWaveformStorage : WaveformStorage {
-    override suspend fun save(audioUri: String, amplitudes: List<Float>) = Unit
+    override suspend fun save(
+        audioUri: String,
+        amplitudes: List<Float>,
+    ) = Unit
 
     override suspend fun load(audioUri: String): List<Float>? = null
 

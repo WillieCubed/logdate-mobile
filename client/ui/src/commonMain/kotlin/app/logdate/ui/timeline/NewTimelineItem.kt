@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.ui.timeline
 
 import androidx.compose.animation.AnimatedContent
@@ -21,16 +23,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.LineBreak
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.conditional
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.asTime
+import logdate.client.ui.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
 import kotlin.time.Instant
-import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.ui.generated.resources.*
-import logdate.client.ui.generated.resources.Res
+
 /**
  * A timeline item represents a "day", where a day represents a block of connected events
  * spanning a maximum of roughly 24 hours.
@@ -46,15 +48,16 @@ fun NewTimelineItem(
     onOptionsClick: () -> Unit = {},
     showOptions: Boolean = true,
 ) {
-    val titleStyle = when (detailLevel) {
-        ItemDetailLevel.MAX -> {
-            MaterialTheme.typography.titleLarge
-        }
+    val titleStyle =
+        when (detailLevel) {
+            ItemDetailLevel.MAX -> {
+                MaterialTheme.typography.titleLarge
+            }
 
-        ItemDetailLevel.MIN -> {
-            MaterialTheme.typography.titleSmall
+            ItemDetailLevel.MIN -> {
+                MaterialTheme.typography.titleSmall
+            }
         }
-    }
     Row(
         modifier
             .animateContentSize()
@@ -66,15 +69,17 @@ fun NewTimelineItem(
         horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         TimelineLine(
-            modifier = Modifier
-                .padding(vertical = Spacing.md)
+            modifier =
+                Modifier
+                    .padding(vertical = Spacing.md),
         )
         LazyColumn {
             item {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = Spacing.sm),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = Spacing.sm),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -96,9 +101,10 @@ fun NewTimelineItem(
             item {
                 AnimatedContent(
                     targetState = detailLevel,
-                    modifier = Modifier
-                        .animateContentSize()
-                        .padding(end = Spacing.lg),
+                    modifier =
+                        Modifier
+                            .animateContentSize()
+                            .padding(end = Spacing.lg),
                     label = "Content View",
                 ) { targetDetailLevel ->
                     if (targetDetailLevel == ItemDetailLevel.MAX) {
@@ -106,13 +112,11 @@ fun NewTimelineItem(
                     } else {
                         summaryView()
                     }
-
                 }
             }
         }
     }
 }
-
 
 @Composable
 fun TextTimelineDetailItem(
@@ -122,25 +126,28 @@ fun TextTimelineDetailItem(
     onClick: () -> Unit = {},
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
     ) {
         Column(
-            modifier = Modifier
-                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            modifier =
+                Modifier
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.md),
         ) {
             Text(
                 text,
                 modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    lineBreak = LineBreak.Paragraph,
-                )
+                style =
+                    MaterialTheme.typography.bodyMedium.copy(
+                        lineBreak = LineBreak.Paragraph,
+                    ),
             )
         }
         Text(
             timestamp.asTime,
-            modifier = Modifier.padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.lg)
+            modifier = Modifier.padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.lg),
         )
     }
 }
@@ -153,22 +160,19 @@ fun NewTimelineItemPreview_MaxDetails() {
             title = "March 28",
             metadata = {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     Text(stringResource(Res.string.text_10_places), style = MaterialTheme.typography.labelSmall)
                     Text(stringResource(Res.string.text_2_people), style = MaterialTheme.typography.labelSmall)
                 }
             },
             summaryView = {
-
             },
             expandedView = {
-
             },
         )
     }
 }
-
 
 @Preview
 @Composable
@@ -178,7 +182,7 @@ fun NewTimelineItemPreview_MinDetails() {
             title = "March 28",
             metadata = {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     Text(stringResource(Res.string.text_10_places), style = MaterialTheme.typography.labelSmall)
                     Text(stringResource(Res.string.text_2_people), style = MaterialTheme.typography.labelSmall)
@@ -187,29 +191,29 @@ fun NewTimelineItemPreview_MinDetails() {
             summaryView = {
                 TextTimelineDetailItem(
                     text = "This is something cool.",
-                    timestamp = Clock.System.now()
+                    timestamp = Clock.System.now(),
                 )
                 TextTimelineDetailItem(
                     text = "This is something cool.",
-                    timestamp = Clock.System.now()
+                    timestamp = Clock.System.now(),
                 )
                 TextTimelineDetailItem(
                     text = "This is something cool.",
-                    timestamp = Clock.System.now()
+                    timestamp = Clock.System.now(),
                 )
             },
             expandedView = {
                 TextTimelineDetailItem(
                     text = "This is something cool.",
-                    timestamp = Clock.System.now()
+                    timestamp = Clock.System.now(),
                 )
                 TextTimelineDetailItem(
                     text = "This is something cool.",
-                    timestamp = Clock.System.now()
+                    timestamp = Clock.System.now(),
                 )
                 TextTimelineDetailItem(
                     text = "This is something cool.",
-                    timestamp = Clock.System.now()
+                    timestamp = Clock.System.now(),
                 )
             },
             detailLevel = ItemDetailLevel.MIN,

@@ -15,28 +15,28 @@ interface MigrationManager {
      * @return Flow of migration progress updates
      */
     suspend fun syncCloudIdentity(cloudId: Uuid): Flow<MigrationProgress>
-    
+
     /**
      * Checks if a migration is currently in progress.
      *
      * @return True if a migration is in progress
      */
     suspend fun isMigrationInProgress(): Boolean
-    
+
     /**
      * Resumes any interrupted migrations.
      *
      * @return Flow of migration progress updates, or null if no migration to resume
      */
     suspend fun resumeMigrationIfNeeded(): Flow<MigrationProgress>?
-    
+
     /**
      * Observes the current migration progress if any is in progress.
      *
      * @return Flow of migration progress updates
      */
     fun observeMigrationProgress(): Flow<MigrationProgress>
-    
+
     /**
      * Registers a content repository for migration operations.
      * Note: This method is not needed anymore since we're not using content repositories

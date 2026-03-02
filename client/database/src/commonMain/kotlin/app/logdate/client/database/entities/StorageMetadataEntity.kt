@@ -10,7 +10,7 @@ import kotlin.uuid.Uuid
  * This table tracks the actual storage footprint of content that counts toward quota.
  */
 @Entity(
-    tableName = "storage_metadata"
+    tableName = "storage_metadata",
 )
 data class StorageMetadataEntity(
     /**
@@ -19,34 +19,28 @@ data class StorageMetadataEntity(
      */
     @PrimaryKey
     val contentId: Uuid,
-    
     /**
      * The type of content object this metadata describes.
      */
     val contentType: StorageContentType,
-    
     /**
      * The actual file size in bytes for this content.
      * For media files (images, videos, audio), this is the file size.
      * For text content, this can be the UTF-16 byte count.
      */
     val sizeBytes: Long,
-    
     /**
      * URI or path to the content, for reference.
      */
     val contentUri: String,
-    
     /**
      * When this storage metadata was first recorded.
      */
     val recordedAt: Instant,
-    
     /**
      * When this storage metadata was last updated.
      */
     val lastUpdated: Instant,
-    
     /**
      * Whether this content should be excluded from quota tracking.
      * Content marked as excluded will not count toward storage quotas.
@@ -64,5 +58,5 @@ enum class StorageContentType {
     VOICE_NOTE,
     JOURNAL_METADATA,
     USER_PROFILE,
-    ATTACHMENT
+    ATTACHMENT,
 }

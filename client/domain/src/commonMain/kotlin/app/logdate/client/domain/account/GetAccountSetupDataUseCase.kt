@@ -9,7 +9,7 @@ import io.github.aakira.napier.Napier
 data class AccountSetupData(
     val username: String = "",
     val displayName: String = "",
-    val email: String? = null
+    val email: String? = null,
 )
 
 /**
@@ -17,7 +17,7 @@ data class AccountSetupData(
  * This data is needed between screens in the account creation process.
  */
 class GetAccountSetupDataUseCase(
-    private val keyValueStorage: KeyValueStorage
+    private val keyValueStorage: KeyValueStorage,
 ) {
     companion object {
         private const val KEY_USERNAME = "account_setup_username"
@@ -33,9 +33,9 @@ class GetAccountSetupDataUseCase(
      */
     suspend operator fun invoke(
         action: Action = Action.Get,
-        data: AccountSetupData? = null
-    ): AccountSetupData {
-        return when (action) {
+        data: AccountSetupData? = null,
+    ): AccountSetupData =
+        when (action) {
             Action.Get -> getAccountData()
             is Action.Save -> {
                 if (data != null) {
@@ -48,19 +48,20 @@ class GetAccountSetupDataUseCase(
                 AccountSetupData()
             }
         }
-    }
-    
+
     /**
      * Actions that can be performed on account setup data
      */
     sealed class Action {
         object Get : Action()
+
         object Save : Action()
+
         object Clear : Action()
     }
-    
-    private suspend fun getAccountData(): AccountSetupData {
-        return try {
+
+    private suspend fun getAccountData(): AccountSetupData =
+        try {
             val username = keyValueStorage.getString(KEY_USERNAME) ?: ""
             val displayName = keyValueStorage.getString(KEY_DISPLAY_NAME) ?: ""
             val email = keyValueStorage.getString(KEY_EMAIL)
@@ -68,13 +69,12 @@ class GetAccountSetupDataUseCase(
             AccountSetupData(
                 username = username,
                 displayName = displayName,
-                email = email
+                email = email,
             )
         } catch (e: Exception) {
             Napier.e("Failed to retrieve account setup data", e)
             AccountSetupData()
         }
-    }
 
     private suspend fun saveAccountData(data: AccountSetupData) {
         try {

@@ -70,4 +70,3 @@ data class UserDevice(
      */
     val added: Instant,
 )
-

@@ -15,7 +15,8 @@ enum class LogDateBackupPlanOption(
     STANDARD(
         sku = "logdate_backup_plan_standard",
         title = "Standard",
-        description = "Includes up to 1 TB of storage for text, photo, video, and voice notes.\n" +
+        description =
+            "Includes up to 1 TB of storage for text, photo, video, and voice notes.\n" +
                 "Photos and videos will be stored in original quality.",
         price = "$5/month",
     ),
