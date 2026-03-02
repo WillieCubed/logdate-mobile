@@ -53,13 +53,13 @@ This document defines the systematic approach for organizing and running end-to-
 **How to Run**:
 ```bash
 # Run all client e2e tests
-./gradlew :app:compose-main:androidConnectedCheck
+./gradlew :app:android-main:connectedDebugAndroidTest
 
 # Run specific test class
-./gradlew :app:compose-main:androidConnectedCheck -k "MultiWindowEditorE2ETest"
+./gradlew :app:android-main:connectedDebugAndroidTest -k "MultiWindowEditorE2ETest"
 
 # Run with verbose output
-./gradlew :app:compose-main:androidConnectedCheck -k "MultiWindowEditorE2ETest" --info
+./gradlew :app:android-main:connectedDebugAndroidTest -k "MultiWindowEditorE2ETest" --info
 ```
 
 **When to Create Shell Script**: **Only if** the test needs to verify actual device behavior via adb shell commands that gradle cannot test.
@@ -208,7 +208,7 @@ The `docs/testing/e2e-test-index.md` should document:
 **Commands**:
 ```bash
 # Run via gradle
-./gradlew :app:compose-main:androidConnectedCheck -k "TestClassName"
+./gradlew :app:android-main:connectedDebugAndroidTest -k "TestClassName"
 
 # For actual device behavior verification, see adb shell tests:
 # ./tests/e2e/test-<feature>.sh
@@ -243,7 +243,7 @@ Does the test involve:
 ├─ Gradle instrumented testing (connectedAndroidTest)?
 │  │
 │  └─ Does it need to verify actual device behavior via adb?
-│     ├─ NO → Use ./gradlew :app:compose-main:androidConnectedCheck -k "TestName"
+│     ├─ NO → Use ./gradlew :app:android-main:connectedDebugAndroidTest -k "TestName"
 │     └─ YES → CREATE SCRIPT → ./tests/e2e/test-<feature>.sh
 │         ├─ Script executes adb shell commands
 │         ├─ Script verifies real device behavior

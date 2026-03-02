@@ -54,12 +54,12 @@ fun MyScreenPreview() {
 
 Generate baselines:
 ```bash
-./gradlew :app:compose-main:updateDebugScreenshotTest
+./gradlew :app:android-main:updateDebugScreenshotTest
 ```
 
 Validate:
 ```bash
-./gradlew :app:compose-main:validateDebugScreenshotTest
+./gradlew :app:android-main:validateDebugScreenshotTest
 ```
 
 ## Explanation: Why We Test This Way
@@ -168,10 +168,10 @@ module/src/
 
 ```bash
 # Update baseline screenshots
-./gradlew :app:compose-main:updateDebugScreenshotTest
+./gradlew :app:android-main:updateDebugScreenshotTest
 
 # Validate against baseline
-./gradlew :app:compose-main:validateDebugScreenshotTest
+./gradlew :app:android-main:validateDebugScreenshotTest
 ```
 
 ### Coverage Reports

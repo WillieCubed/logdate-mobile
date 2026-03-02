@@ -17,7 +17,7 @@ Screenshot testing captures the visual appearance of your Compose previews and c
 Screenshot tests are Compose previews marked with `@PreviewTest` annotation. Place them in `src/screenshotTest/kotlin/`:
 
 ```kotlin
-// app/compose-main/src/screenshotTest/kotlin/app/logdate/screenshots/OnboardingScreenshots.kt
+// app/android-main/src/screenshotTest/kotlin/app/logdate/screenshots/OnboardingScreenshots.kt
 package app.logdate.screenshots
 
 import androidx.compose.ui.tooling.preview.Preview
@@ -98,7 +98,7 @@ fun TimelineScreen_Landscape() {
 Organize screenshot tests by feature:
 
 ```
-app/compose-main/src/screenshotTest/kotlin/app/logdate/screenshots/
+app/android-main/src/screenshotTest/kotlin/app/logdate/screenshots/
 ├── EditorScreenshots.kt       # Editor feature screenshots
 ├── OnboardingScreenshots.kt   # Onboarding flow screenshots
 ├── TimelineScreenshots.kt     # Timeline browsing screenshots
@@ -163,9 +163,9 @@ Create or update reference images for the first time or after intentional change
 
 ```bash
 # Update all baselines
-./gradlew :app:compose-main:updateDebugScreenshotTest
+./gradlew :app:android-main:updateDebugScreenshotTest
 
-# This generates images in: app/compose-main/src/screenshotTestDebug/reference/
+# This generates images in: app/android-main/src/screenshotTestDebug/reference/
 ```
 
 **In CI/CD**: Commit baseline images to version control alongside your code.
@@ -176,10 +176,10 @@ Check if current screenshots match baselines:
 
 ```bash
 # Validate all screenshots
-./gradlew :app:compose-main:validateDebugScreenshotTest
+./gradlew :app:android-main:validateDebugScreenshotTest
 
 # Validate specific screenshot (if supported)
-./gradlew :app:compose-main:validateDebugScreenshotTest --tests "OnboardingScreenshots.onboardingStart"
+./gradlew :app:android-main:validateDebugScreenshotTest --tests "OnboardingScreenshots.onboardingStart"
 ```
 
 **In CI/CD**: This command runs automatically on pull requests.
@@ -189,7 +189,7 @@ Check if current screenshots match baselines:
 When validation fails, check the diff:
 
 ```bash
-open app/compose-main/build/outputs/screenshotTest-results/preview/debug/
+open app/android-main/build/outputs/screenshotTest-results/preview/debug/
 ```
 
 Inspect:
@@ -220,12 +220,12 @@ Inspect:
 
 3. Generate baseline:
    ```bash
-   ./gradlew :app:compose-main:updateDebugScreenshotTest
+   ./gradlew :app:android-main:updateDebugScreenshotTest
    ```
 
 4. Commit baseline image to git:
    ```bash
-   git add app/compose-main/src/screenshotTestDebug/reference/
+   git add app/android-main/src/screenshotTestDebug/reference/
    ```
 
 ### During Development
@@ -234,12 +234,12 @@ Inspect:
 
 2. Run validation to check impact:
    ```bash
-   ./gradlew :app:compose-main:validateDebugScreenshotTest
+   ./gradlew :app:android-main:validateDebugScreenshotTest
    ```
 
 3. If changes are intentional, update baseline:
    ```bash
-   ./gradlew :app:compose-main:updateDebugScreenshotTest
+   ./gradlew :app:android-main:updateDebugScreenshotTest
    ```
 
 4. Review and commit the new baseline
@@ -257,7 +257,7 @@ Inspect:
 
 Baseline images live in version control:
 ```
-app/compose-main/src/screenshotTestDebug/reference/
+app/android-main/src/screenshotTestDebug/reference/
 ├── app/logdate/screenshots/
 │   ├── EditorScreenKt/
 │   │   ├── EditorEmpty_light.png
@@ -273,10 +273,10 @@ When a screenshot fails but changes are intentional:
 
 ```bash
 # Update specific screenshot
-./gradlew :app:compose-main:updateDebugScreenshotTest
+./gradlew :app:android-main:updateDebugScreenshotTest
 
 # Commit the new baseline
-git add app/compose-main/src/screenshotTestDebug/reference/
+git add app/android-main/src/screenshotTestDebug/reference/
 git commit -m "refactor(ui): update screenshots for new design"
 ```
 
@@ -287,7 +287,7 @@ When deleting screenshot tests:
 ```bash
 # Remove the @PreviewTest function
 # Remove the reference image
-git rm app/compose-main/src/screenshotTestDebug/reference/path/to/image.png
+git rm app/android-main/src/screenshotTestDebug/reference/path/to/image.png
 ```
 
 ## Advanced Testing
@@ -378,6 +378,7 @@ name: Screenshot Tests
 on:
   pull_request:
     paths:
+      - 'app/android-main/**'
       - 'app/compose-main/**'
       - 'client/feature/**'
 
@@ -387,13 +388,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate Screenshots
-        run: ./gradlew :app:compose-main:validateDebugScreenshotTest
+        run: ./gradlew :app:android-main:validateDebugScreenshotTest
       - name: Upload Results
         if: failure()
         uses: actions/upload-artifact@v3
         with:
           name: screenshot-diffs
-          path: app/compose-main/build/outputs/screenshotTest-results/
+          path: app/android-main/build/outputs/screenshotTest-results/
 ```
 
 ## Troubleshooting
@@ -402,8 +403,8 @@ jobs:
 
 Baseline images missing. Generate them:
 ```bash
-./gradlew :app:compose-main:updateDebugScreenshotTest
-git add app/compose-main/src/screenshotTestDebug/reference/
+./gradlew :app:android-main:updateDebugScreenshotTest
+git add app/android-main/src/screenshotTestDebug/reference/
 ```
 
 ### "Images do not match"
@@ -413,7 +414,7 @@ Visual changes detected. Options:
 1. If changes are unintended: Fix the UI code
 2. If changes are intentional: Update baseline
    ```bash
-   ./gradlew :app:compose-main:updateDebugScreenshotTest
+   ./gradlew :app:android-main:updateDebugScreenshotTest
    ```
 
 ### Screenshot filename confusion

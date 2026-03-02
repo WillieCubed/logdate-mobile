@@ -14,20 +14,20 @@ See [E2E Test Organization Standard](./e2e-test-organization.md) for the complet
 ## Quick Start Commands
 
 ```bash
-# Run all e2e tests
-./gradlew connectedAndroidTest
+# Run all Android app e2e tests
+./gradlew :app:android-main:connectedDebugAndroidTest
 
 # Run all server-side e2e tests
 ./gradlew :server:test -k "E2ETest"
 
 # Run specific e2e test suite
-./gradlew :app:compose-main:androidConnectedCheck -k "TestClassName"
+./gradlew :app:android-main:connectedDebugAndroidTest -k "TestClassName"
 
 # Run with verbose output
-./gradlew connectedAndroidTest --info
+./gradlew :app:android-main:connectedDebugAndroidTest --info
 
 # List available e2e tests without running
-./gradlew --dry-run connectedAndroidTest
+./gradlew --dry-run :app:android-main:connectedDebugAndroidTest
 ```
 
 ## Client-Side E2E Tests (Android/Compose)
@@ -35,7 +35,7 @@ See [E2E Test Organization Standard](./e2e-test-organization.md) for the complet
 Client-side tests verify complete user workflows on the Android app using Espresso, Compose testing, and activity scenarios.
 
 ### Location
-`app/compose-main/src/androidInstrumentedTest/kotlin/app/logdate/client/e2e/`
+`app/android-main/src/androidTest/kotlin/app/logdate/client/e2e/`
 
 ### 1. Multi-Window Editor E2E Tests
 
@@ -62,17 +62,17 @@ Client-side tests verify complete user workflows on the Android app using Espres
 
 ```bash
 # Run all multi-window editor tests
-./gradlew :app:compose-main:androidConnectedCheck -k "MultiWindowEditorE2ETest"
+./gradlew :app:android-main:connectedDebugAndroidTest -k "MultiWindowEditorE2ETest"
 
 # Run specific test
-./gradlew :app:compose-main:androidConnectedCheck -k "testOpenEntryInNewWindow"
+./gradlew :app:android-main:connectedDebugAndroidTest -k "testOpenEntryInNewWindow"
 
 # Run with debugging enabled
-./gradlew :app:compose-main:androidConnectedCheck -k "MultiWindowEditorE2ETest" --debug
+./gradlew :app:android-main:connectedDebugAndroidTest -k "MultiWindowEditorE2ETest" --debug
 
 # Run with connected device (verify with: adb devices)
 adb devices
-./gradlew :app:compose-main:androidConnectedCheck -k "MultiWindowEditorE2ETest"
+./gradlew :app:android-main:connectedDebugAndroidTest -k "MultiWindowEditorE2ETest"
 ```
 
 **ADB Shell Testing**:
@@ -263,7 +263,7 @@ Configuration: `.github/workflows/ci.yml`
 
 ```bash
 # Run with napier debug logging
-./gradlew :app:compose-main:androidConnectedCheck \
+./gradlew :app:android-main:connectedDebugAndroidTest \
   -k "MultiWindowEditorE2ETest" \
   --info
 
@@ -297,7 +297,7 @@ adb shell dumpsys meminfo app.logdate | tail -20
 ### Stop on First Failure
 
 ```bash
-./gradlew :app:compose-main:androidConnectedCheck \
+./gradlew :app:android-main:connectedDebugAndroidTest \
   -k "MultiWindowEditorE2ETest" \
   --no-parallel \
   --fail-fast
@@ -336,7 +336,7 @@ adb shell am start -n "app.logdate/.MainActivity"
 adb shell input keyevent KEYCODE_HOME
 
 # Now run e2e tests
-./gradlew :app:compose-main:androidConnectedCheck -k "MultiWindowEditorE2ETest"
+./gradlew :app:android-main:connectedDebugAndroidTest -k "MultiWindowEditorE2ETest"
 ```
 
 ---
@@ -356,7 +356,7 @@ adb devices  # Should list device
 android.testInstrumentationRunnerArguments.timeout=60000
 
 # Or run with extended timeout
-./gradlew :app:compose-main:androidConnectedCheck \
+./gradlew :app:android-main:connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.timeout=120000
 ```
 
@@ -381,7 +381,7 @@ adb shell pm list packages | grep logdate
 To add a new e2e test:
 
 1. **Create test class** in appropriate directory:
-   - Client: `app/compose-main/src/androidInstrumentedTest/kotlin/app/logdate/client/e2e/`
+   - Client: `app/android-main/src/androidTest/kotlin/app/logdate/client/e2e/`
    - Server: `server/src/test/kotlin/e2e/[category]/`
 
 2. **Name it with E2ETest suffix**: `MyFeatureE2ETest.kt`
