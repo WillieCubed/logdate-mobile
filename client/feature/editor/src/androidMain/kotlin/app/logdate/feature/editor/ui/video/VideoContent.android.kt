@@ -62,19 +62,25 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.video.videoFramePercent
 import io.github.aakira.napier.Napier
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.add_a_video_to_your_entry
+import logdate.client.feature.editor.generated.resources.choose_from_gallery
+import logdate.client.feature.editor.generated.resources.pause_video
+import logdate.client.feature.editor.generated.resources.play_video
+import logdate.client.feature.editor.generated.resources.video_thumbnail
+import org.jetbrains.compose.resources.stringResource
+
 /**
  * Android implementation of video player content.
  * Uses ExoPlayer for production-quality video playback with proper lifecycle management.
  * Shows a thumbnail with play button when paused, transitions to full player on play.
  */
+@Suppress("ktlint:standard:function-naming")
 @OptIn(UnstableApi::class)
 @Composable
 actual fun VideoPlayerContent(
     uri: String,
-    modifier: Modifier
+    modifier: Modifier,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -82,50 +88,54 @@ actual fun VideoPlayerContent(
     var isPlaying by remember { mutableStateOf(false) }
     var showThumbnail by remember { mutableStateOf(true) }
 
-    val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(uri))
-            prepare()
-            playWhenReady = false
-            addListener(object : Player.Listener {
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    when (playbackState) {
-                        Player.STATE_ENDED -> {
-                            seekTo(0)
-                            pause()
-                            isPlaying = false
-                            showThumbnail = true
+    val exoPlayer =
+        remember {
+            ExoPlayer.Builder(context).build().apply {
+                setMediaItem(MediaItem.fromUri(uri))
+                prepare()
+                playWhenReady = false
+                addListener(
+                    object : Player.Listener {
+                        override fun onPlaybackStateChanged(playbackState: Int) {
+                            when (playbackState) {
+                                Player.STATE_ENDED -> {
+                                    seekTo(0)
+                                    pause()
+                                    isPlaying = false
+                                    showThumbnail = true
+                                }
+                                Player.STATE_READY -> {
+                                    if (isPlaying) {
+                                        showThumbnail = false
+                                    }
+                                }
+                            }
                         }
-                        Player.STATE_READY -> {
-                            if (isPlaying) {
+
+                        override fun onIsPlayingChanged(playing: Boolean) {
+                            isPlaying = playing
+                            if (playing) {
                                 showThumbnail = false
                             }
                         }
-                    }
-                }
-
-                override fun onIsPlayingChanged(playing: Boolean) {
-                    isPlaying = playing
-                    if (playing) {
-                        showThumbnail = false
-                    }
-                }
-            })
-        }
-    }
-
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_PAUSE -> {
-                    exoPlayer.pause()
-                }
-                Lifecycle.Event.ON_STOP -> {
-                    exoPlayer.pause()
-                }
-                else -> {}
+                    },
+                )
             }
         }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_PAUSE -> {
+                        exoPlayer.pause()
+                    }
+                    Lifecycle.Event.ON_STOP -> {
+                        exoPlayer.pause()
+                    }
+                    else -> {}
+                }
+            }
         lifecycleOwner.lifecycle.addObserver(observer)
 
         onDispose {
@@ -135,10 +145,11 @@ actual fun VideoPlayerContent(
     }
 
     Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .aspectRatio(16f / 9f)
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .aspectRatio(16f / 9f),
     ) {
         // ExoPlayer view - always present for seamless playback
         AndroidView(
@@ -147,50 +158,55 @@ actual fun VideoPlayerContent(
                     player = exoPlayer
                     useController = false
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                    layoutParams = FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
+                    layoutParams =
+                        FrameLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                        )
                 }
             },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
         )
 
         // Thumbnail overlay - shown when not playing
         if (showThumbnail) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable {
-                        showThumbnail = false
-                        exoPlayer.play()
-                    }
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .clickable {
+                            showThumbnail = false
+                            exoPlayer.play()
+                        },
             ) {
                 AsyncImage(
-                    model = ImageRequest.Builder(LocalPlatformContext.current)
-                        .data(uri)
-                        .crossfade(true)
-                        .videoFramePercent(0.1)
-                        .build(),
+                    model =
+                        ImageRequest
+                            .Builder(LocalPlatformContext.current)
+                            .data(uri)
+                            .crossfade(true)
+                            .videoFramePercent(0.1)
+                            .build(),
                     contentDescription = stringResource(Res.string.video_thumbnail),
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
                 )
 
                 // Play button overlay
                 Surface(
                     shape = CircleShape,
                     color = Color.White.copy(alpha = 0.9f),
-                    modifier = Modifier
-                        .size(64.dp)
-                        .align(Alignment.Center)
+                    modifier =
+                        Modifier
+                            .size(64.dp)
+                            .align(Alignment.Center),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Default.PlayArrow,
                             contentDescription = stringResource(Res.string.play_video),
                             modifier = Modifier.size(36.dp),
-                            tint = Color.Black
+                            tint = Color.Black,
                         )
                     }
                 }
@@ -198,31 +214,32 @@ actual fun VideoPlayerContent(
         } else {
             // Pause button overlay when playing
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable {
-                        if (isPlaying) {
-                            exoPlayer.pause()
-                            showThumbnail = true
-                        } else {
-                            exoPlayer.play()
-                        }
-                    },
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .clickable {
+                            if (isPlaying) {
+                                exoPlayer.pause()
+                                showThumbnail = true
+                            } else {
+                                exoPlayer.play()
+                            }
+                        },
+                contentAlignment = Alignment.Center,
             ) {
                 // Semi-transparent pause indicator (briefly visible on tap)
                 if (!isPlaying) {
                     Surface(
                         shape = CircleShape,
                         color = Color.Black.copy(alpha = 0.5f),
-                        modifier = Modifier.size(64.dp)
+                        modifier = Modifier.size(64.dp),
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.Pause,
                                 contentDescription = stringResource(Res.string.pause_video),
                                 modifier = Modifier.size(36.dp),
-                                tint = Color.White
+                                tint = Color.White,
                             )
                         }
                     }
@@ -236,63 +253,70 @@ actual fun VideoPlayerContent(
  * Android implementation of video picker content.
  * Provides option to select a video from the gallery with proper permission handling.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 actual fun VideoPickerContent(
     onVideoSelected: (uri: String, durationMs: Long) -> Unit,
-    modifier: Modifier
+    modifier: Modifier,
 ) {
     val context = LocalContext.current
 
-    val videoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let {
-            Napier.d("Video selected: $uri")
-            val duration = getVideoDuration(context, uri)
-            onVideoSelected(uri.toString(), duration)
+    val videoPickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetContent(),
+        ) { uri: Uri? ->
+            uri?.let {
+                Napier.d("Video selected: $uri")
+                val duration = getVideoDuration(context, uri)
+                onVideoSelected(uri.toString(), duration)
+            }
         }
-    }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            videoPickerLauncher.launch("video/*")
-        } else {
-            Napier.w("Video permission denied")
+    val permissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission(),
+        ) { isGranted ->
+            if (isGranted) {
+                videoPickerLauncher.launch("video/*")
+            } else {
+                Napier.w("Video permission denied")
+            }
         }
-    }
 
     fun launchVideoPicker() {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_VIDEO
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        }
+        val permission =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                Manifest.permission.READ_MEDIA_VIDEO
+            } else {
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            }
         permissionLauncher.launch(permission)
     }
 
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(200.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .height(200.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
-        )
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+            ),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
         ) {
             Icon(
                 imageVector = Icons.Outlined.VideoLibrary,
                 contentDescription = null,
                 modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -300,13 +324,13 @@ actual fun VideoPickerContent(
             Text(
                 text = stringResource(Res.string.add_a_video_to_your_entry),
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             Spacer(modifier = Modifier.height(20.dp))
 
             OutlinedButton(
-                onClick = { launchVideoPicker() }
+                onClick = { launchVideoPicker() },
             ) {
                 Text(stringResource(Res.string.choose_from_gallery))
             }
@@ -317,8 +341,11 @@ actual fun VideoPickerContent(
 /**
  * Gets the duration of a video in milliseconds using MediaMetadataRetriever.
  */
-private fun getVideoDuration(context: android.content.Context, uri: Uri): Long {
-    return try {
+private fun getVideoDuration(
+    context: android.content.Context,
+    uri: Uri,
+): Long =
+    try {
         val retriever = android.media.MediaMetadataRetriever()
         retriever.setDataSource(context, uri)
         val durationStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
@@ -328,4 +355,3 @@ private fun getVideoDuration(context: android.content.Context, uri: Uri): Long {
         Napier.e("Failed to get video duration", e)
         0L
     }
-}

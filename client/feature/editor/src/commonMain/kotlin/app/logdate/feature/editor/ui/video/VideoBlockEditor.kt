@@ -2,8 +2,8 @@ package app.logdate.feature.editor.ui.video
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -19,9 +19,10 @@ import app.logdate.feature.editor.ui.common.MediaCaptionField
 import app.logdate.feature.editor.ui.editor.VideoBlockUiState
 import app.logdate.feature.editor.ui.formatMediaDuration
 import io.github.aakira.napier.Napier
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.delete_video
+import org.jetbrains.compose.resources.stringResource
+
 /**
  * Editor component for video blocks.
  * Displays either the video with playback controls and caption editing,
@@ -32,12 +33,13 @@ import logdate.client.feature.editor.generated.resources.Res
  * @param onDeleteRequested Callback when the block should be deleted
  * @param modifier Modifier for layout customization
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun VideoBlockEditor(
     block: VideoBlockUiState,
     onBlockUpdated: (VideoBlockUiState) -> Unit,
     onDeleteRequested: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val hasExistingVideo = block.uri != null
 
@@ -48,7 +50,7 @@ fun VideoBlockEditor(
             block = block,
             onBlockUpdated = onBlockUpdated,
             onDeleteRequested = onDeleteRequested,
-            modifier = modifier
+            modifier = modifier,
         )
     } else {
         VideoPickerContent(
@@ -56,7 +58,7 @@ fun VideoBlockEditor(
                 Napier.d("VideoBlockEditor - Video selected: $uri, duration: $durationMs")
                 onBlockUpdated(block.copy(uri = uri, durationMs = durationMs))
             },
-            modifier = modifier
+            modifier = modifier,
         )
     }
 }
@@ -64,46 +66,49 @@ fun VideoBlockEditor(
 /**
  * Displays a video with playback controls and caption editing.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 private fun VideoDisplayContent(
     block: VideoBlockUiState,
     onBlockUpdated: (VideoBlockUiState) -> Unit,
     onDeleteRequested: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(8.dp)
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(8.dp),
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
             VideoPlayerContent(
                 uri = block.uri ?: "",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(240.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(8.dp)),
             )
 
             DeleteMediaButton(
                 onClick = onDeleteRequested,
                 contentDescription = stringResource(Res.string.delete_video),
-                modifier = Modifier.align(Alignment.TopEnd)
+                modifier = Modifier.align(Alignment.TopEnd),
             )
 
             if (block.durationMs > 0) {
                 Surface(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(8.dp),
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(8.dp),
                     shape = RoundedCornerShape(4.dp),
-                    color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.7f)
+                    color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.7f),
                 ) {
                     Text(
                         text = formatDuration(block.durationMs),
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.inverseOnSurface
+                        color = MaterialTheme.colorScheme.inverseOnSurface,
                     )
                 }
             }
@@ -111,7 +116,7 @@ private fun VideoDisplayContent(
 
         MediaCaptionField(
             caption = block.caption,
-            onCaptionChanged = { onBlockUpdated(block.copy(caption = it)) }
+            onCaptionChanged = { onBlockUpdated(block.copy(caption = it)) },
         )
     }
 }
@@ -119,9 +124,7 @@ private fun VideoDisplayContent(
 /**
  * Formats a duration in milliseconds to a MM:SS string.
  */
-private fun formatDuration(durationMs: Long): String {
-    return formatMediaDuration(durationMs, false)
-}
+private fun formatDuration(durationMs: Long): String = formatMediaDuration(durationMs, false)
 
 /**
  * Platform-specific video player content.
@@ -129,10 +132,11 @@ private fun formatDuration(durationMs: Long): String {
  * @param uri The URI of the video to play
  * @param modifier Modifier for layout customization
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 expect fun VideoPlayerContent(
     uri: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 )
 
 /**
@@ -141,8 +145,9 @@ expect fun VideoPlayerContent(
  * @param onVideoSelected Callback when a video is selected, providing URI and duration
  * @param modifier Modifier for layout customization
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 expect fun VideoPickerContent(
     onVideoSelected: (uri: String, durationMs: Long) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 )

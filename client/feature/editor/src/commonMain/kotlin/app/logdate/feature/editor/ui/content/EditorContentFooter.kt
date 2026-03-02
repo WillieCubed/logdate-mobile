@@ -1,5 +1,8 @@
+@file:OptIn(ExperimentalSharedTransitionApi::class)
+
 package app.logdate.feature.editor.ui.content
 
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -30,6 +33,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.editor.ui.LocalAnimatedVisibilityScope
+import app.logdate.feature.editor.ui.LocalSharedTransitionScope
 import app.logdate.feature.editor.ui.editor.BlockType
 import app.logdate.feature.editor.ui.layout.ExpandableContentToolbar
 import app.logdate.feature.editor.ui.layout.OverscrollDetector
@@ -37,158 +42,190 @@ import app.logdate.feature.editor.ui.layout.rememberOverscrollDetector
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.add_audio
+import logdate.client.feature.editor.generated.resources.add_image
+import logdate.client.feature.editor.generated.resources.add_text
+import logdate.client.feature.editor.generated.resources.add_video
+import logdate.client.feature.editor.generated.resources.take_photo
+import org.jetbrains.compose.resources.stringResource
+import kotlin.uuid.Uuid
+
 /**
  * A footer component for the editor content that includes an expandable toolbar
  * which appears when the user overscrolls past the bottom of the content.
  *
- * @param overscrollDetector The overscroll detector that tracks overscroll progress
- * @param onAddBlock Callback when a new block is added
+ * Each add-block button pre-generates a block ID and registers a [sharedBounds]
+ * key matching the future expanded block surface, producing a container-morph transition.
+ *
+ * @param onAddBlock Callback when a new block is added; receives the block type and pre-generated ID
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun EditorContentFooter(
-    onAddBlock: (BlockType) -> Unit,
+    onAddBlock: (BlockType, Uuid) -> Unit,
     scrollState: ScrollableState,
     overscrollDetector: OverscrollDetector = rememberOverscrollDetector(scrollState),
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
-    
+
+    // Pre-generate stable IDs for each block type button
+    val textId = remember { Uuid.random() }
+    val imageId = remember { Uuid.random() }
+    val audioId = remember { Uuid.random() }
+    val videoId = remember { Uuid.random() }
+    val cameraId = remember { Uuid.random() }
+
+    val sts = LocalSharedTransitionScope.current
+    val avs = LocalAnimatedVisibilityScope.current
+
+    // Pre-compute sharedBounds modifiers at composable scope (rememberSharedContentState is @Composable)
+    val textBounds =
+        if (sts != null && avs != null) {
+            with(sts) { Modifier.sharedBounds(rememberSharedContentState("block_surface_$textId"), avs) }
+        } else {
+            Modifier
+        }
+    val imageBounds =
+        if (sts != null && avs != null) {
+            with(sts) { Modifier.sharedBounds(rememberSharedContentState("block_surface_$imageId"), avs) }
+        } else {
+            Modifier
+        }
+    val audioBounds =
+        if (sts != null && avs != null) {
+            with(sts) { Modifier.sharedBounds(rememberSharedContentState("block_surface_$audioId"), avs) }
+        } else {
+            Modifier
+        }
+    val videoBounds =
+        if (sts != null && avs != null) {
+            with(sts) { Modifier.sharedBounds(rememberSharedContentState("block_surface_$videoId"), avs) }
+        } else {
+            Modifier
+        }
+    val cameraBounds =
+        if (sts != null && avs != null) {
+            with(sts) { Modifier.sharedBounds(rememberSharedContentState("block_surface_$cameraId"), avs) }
+        } else {
+            Modifier
+        }
+
     // Monitor overscroll state
     LaunchedEffect(overscrollDetector) {
-        // Set up a way to react to overscroll threshold changes
-        // Note: ideally we would directly observe isPastThreshold state
         if (overscrollDetector.isPastThreshold && !expanded) {
             expanded = true
             Napier.d("Toolbar expanded due to threshold")
         }
     }
-    
+
     // Auto-collapse after a period of inactivity when expanded
     LaunchedEffect(expanded) {
         if (expanded) {
-            // Wait for 5 seconds then collapse
             delay(5000)
             expanded = false
             Napier.d("Toolbar auto-collapsed after timeout")
         }
     }
-    
-    // Create more playful progress animation with bouncier springs
+
     val animatedProgress by animateFloatAsState(
         targetValue = if (expanded) 1f else overscrollDetector.progressFraction,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,    // Medium bouncy for responsiveness
-            stiffness = Spring.StiffnessLow                   // Slow enough to feel playful
-        ),
-        label = "Progress animation"
+        animationSpec =
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow,
+            ),
+        label = "Progress animation",
     )
-    
+
     Column(modifier = modifier.fillMaxWidth()) {
-        // Add some spacing above the toolbar
         Spacer(modifier = Modifier.height(8.dp))
-        
-        // Expandable toolbar
+
         ExpandableContentToolbar(
             progress = animatedProgress,
             expanded = expanded,
         ) {
-            // Toolbar content - block type buttons
             BlockTypeButton(
                 icon = Icons.Rounded.TextFields,
                 contentDescription = stringResource(Res.string.add_text),
+                modifier = textBounds,
                 onClick = {
-                    onAddBlock(BlockType.TEXT)
+                    onAddBlock(BlockType.TEXT, textId)
                     collapseToolbar(coroutineScope, expanded) { expanded = false }
-                }
+                },
             )
-            
+
             BlockTypeButton(
                 icon = Icons.Rounded.Image,
                 contentDescription = stringResource(Res.string.add_image),
-                onClick = {
-                    onAddBlock(BlockType.IMAGE)
-                    collapseToolbar(coroutineScope, expanded) { expanded = false }
-                }
+                modifier = imageBounds,
+                onClick = { onAddBlock(BlockType.IMAGE, imageId) },
             )
-            
+
             BlockTypeButton(
                 icon = Icons.Rounded.AudioFile,
                 contentDescription = stringResource(Res.string.add_audio),
-                onClick = {
-                    onAddBlock(BlockType.AUDIO)
-                    collapseToolbar(coroutineScope, expanded) { expanded = false }
-                }
+                modifier = audioBounds,
+                onClick = { onAddBlock(BlockType.AUDIO, audioId) },
             )
-            
+
             BlockTypeButton(
                 icon = Icons.Rounded.VideoFile,
                 contentDescription = stringResource(Res.string.add_video),
-                onClick = {
-                    onAddBlock(BlockType.VIDEO)
-                    collapseToolbar(coroutineScope, expanded) { expanded = false }
-                }
+                modifier = videoBounds,
+                onClick = { onAddBlock(BlockType.VIDEO, videoId) },
             )
-            
+
             BlockTypeButton(
                 icon = Icons.Rounded.Camera,
                 contentDescription = stringResource(Res.string.take_photo),
-                onClick = {
-                    onAddBlock(BlockType.CAMERA)
-                    collapseToolbar(coroutineScope, expanded) { expanded = false }
-                }
+                modifier = cameraBounds,
+                onClick = { onAddBlock(BlockType.CAMERA, cameraId) },
             )
         }
-        
-        // Bottom spacing to ensure there's room for overscroll
+
         Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
-/**
- * A button that appears in the expandable toolbar.
- */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 private fun BlockTypeButton(
     icon: ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     FilledTonalIconButton(
         onClick = onClick,
-        colors = IconButtonDefaults.filledTonalIconButtonColors(
-            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        ),
-        modifier = modifier
-            .padding(horizontal = 8.dp)
-            .size(40.dp)
+        colors =
+            IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            ),
+        modifier =
+            modifier
+                .padding(horizontal = 8.dp)
+                .size(40.dp),
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = MaterialTheme.colorScheme.onPrimaryContainer
+            tint = MaterialTheme.colorScheme.onPrimaryContainer,
         )
     }
 }
 
-/**
- * Helper function to collapse the toolbar with a short delay
- * Allows animations to complete before collapsing
- */
 private fun collapseToolbar(
     coroutineScope: kotlinx.coroutines.CoroutineScope,
     currentlyExpanded: Boolean,
-    onCollapse: () -> Unit
+    onCollapse: () -> Unit,
 ) {
     if (currentlyExpanded) {
         coroutineScope.launch {
-            // Longer delay to allow for more bouncy animations to complete
-            delay(500) // Extended delay for better playful animation experience
+            delay(500)
             onCollapse()
         }
     }

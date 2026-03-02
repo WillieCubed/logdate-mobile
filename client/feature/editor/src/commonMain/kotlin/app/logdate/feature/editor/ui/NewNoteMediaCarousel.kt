@@ -27,9 +27,10 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.delete
+import org.jetbrains.compose.resources.stringResource
+
 /**
  * A Material 3 carousel that allows the user to view selected media items.
  *
@@ -38,6 +39,7 @@ import logdate.client.feature.editor.generated.resources.Res
  * @param onRemoveItem A callback that is invoked when a media item is deleted
  * @param modifier The modifier to apply to the carousel
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 internal fun NewNoteMediaCarousel(
     mediaItems: List<String>,
@@ -61,6 +63,7 @@ internal fun NewNoteMediaCarousel(
     }
 }
 
+@Suppress("ktlint:standard:function-naming")
 @Composable
 internal fun MediaCarouselItem(
     uri: String,
@@ -69,33 +72,37 @@ internal fun MediaCarouselItem(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.clip(RoundedCornerShape(4.dp))) {
-        val imageRequest = ImageRequest.Builder(LocalPlatformContext.current)
-            .data(uri)
-            .apply {
-                crossfade(true)
+        val imageRequest =
+            ImageRequest
+                .Builder(LocalPlatformContext.current)
+                .data(uri)
+                .apply {
+                    crossfade(true)
 //                    placeholder(R.drawable.ic_image_placeholder)
 //                    error(R.drawable.ic_image_error)
-            }.build()
+                }.build()
         AsyncImage(
             model = imageRequest,
             // TODO: Add image descriptions like "photo of a cat taken on July 4th, 2022"
             contentDescription = null,
             contentScale = ContentScale.FillHeight,
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                .size(120.dp)
-                .clickable(onClick = onClick),
+            modifier =
+                Modifier
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                    .size(120.dp)
+                    .clickable(onClick = onClick),
         )
         IconButton(
             onClick = onDelete,
-            modifier = Modifier
-                .size(32.dp)
-                .align(Alignment.TopEnd)
-                .offset(x = (-4).dp, y = 4.dp)
-                .background(
-                    color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(4.dp)
-                )
+            modifier =
+                Modifier
+                    .size(32.dp)
+                    .align(Alignment.TopEnd)
+                    .offset(x = (-4).dp, y = 4.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(4.dp),
+                    ),
         ) {
             Icon(
                 modifier = Modifier.size(24.dp),

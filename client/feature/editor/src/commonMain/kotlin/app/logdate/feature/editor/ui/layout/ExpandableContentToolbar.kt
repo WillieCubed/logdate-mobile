@@ -31,58 +31,63 @@ import androidx.compose.ui.unit.dp
  * @param modifier Modifier for the toolbar container
  * @param content The content to display in the toolbar
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun ExpandableContentToolbar(
     progress: Float,
     expanded: Boolean,
     modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     // Target height based on progress or fully expanded state
     val targetHeight = if (expanded) 64f else (64f * progress).coerceIn(0f, 64f)
-    
+
     // Animate height with bouncier spring physics when expanding/collapsing
     val height by animateFloatAsState(
         targetValue = targetHeight,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioLowBouncy, // More bounce
-            stiffness = Spring.StiffnessLow             // Slower, more playful movement
-        ),
-        label = "Toolbar height animation"
+        animationSpec =
+            spring(
+                dampingRatio = Spring.DampingRatioLowBouncy, // More bounce
+                stiffness = Spring.StiffnessLow, // Slower, more playful movement
+            ),
+        label = "Toolbar height animation",
     )
-    
+
     // Alpha follows progress directly
     val alpha = progress.coerceIn(0f, 1f)
-    
+
     // Scale follows progress with more exaggerated range for bouncier feel
     val scale = 0.7f + (0.3f * progress.coerceIn(0f, 1f)) // Bigger scale change for more dramatic effect
 
     // Always render the toolbar with current height/alpha
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(height.dp)
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .height(height.dp),
     ) {
         Surface(
             shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.primaryContainer,
             shadowElevation = 2.dp,
-            modifier = Modifier
-                .padding(horizontal = 16.dp)
-                .clip(RoundedCornerShape(28.dp))
-                .alpha(alpha)
-                .scale(scale)
-                .align(Alignment.Center)
+            modifier =
+                Modifier
+                    .padding(horizontal = 16.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .alpha(alpha)
+                    .scale(scale)
+                    .align(Alignment.Center),
         ) {
             Row(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .background(
-                        MaterialTheme.colorScheme.primaryContainer,
-                        RoundedCornerShape(28.dp)
-                    )
+                modifier =
+                    Modifier
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .background(
+                            MaterialTheme.colorScheme.primaryContainer,
+                            RoundedCornerShape(28.dp),
+                        ),
             ) {
                 content()
             }

@@ -5,7 +5,6 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 class SunCalculatorTest {
-
     @Test
     fun calculatesReasonableSunriseForNycSummer() {
         val lat = 40.7128 // NYC
@@ -28,7 +27,7 @@ class SunCalculatorTest {
 
         assertTrue(
             result.sunset > result.sunrise,
-            "Sunset (${result.sunset}) should be after sunrise (${result.sunrise})"
+            "Sunset (${result.sunset}) should be after sunrise (${result.sunrise})",
         )
     }
 
@@ -42,11 +41,11 @@ class SunCalculatorTest {
 
         assertTrue(
             result.solarNoon > result.sunrise,
-            "Solar noon (${result.solarNoon}) should be after sunrise (${result.sunrise})"
+            "Solar noon (${result.solarNoon}) should be after sunrise (${result.sunrise})",
         )
         assertTrue(
             result.solarNoon < result.sunset,
-            "Solar noon (${result.solarNoon}) should be before sunset (${result.sunset})"
+            "Solar noon (${result.solarNoon}) should be before sunset (${result.sunset})",
         )
     }
 
@@ -73,7 +72,7 @@ class SunCalculatorTest {
         // Solar noon should be around 12:00 UTC at 0 longitude
         assertTrue(
             result.solarNoon.hour in 11..13,
-            "Solar noon at equator/prime meridian should be near 12:00, got ${result.solarNoon}"
+            "Solar noon at equator/prime meridian should be near 12:00, got ${result.solarNoon}",
         )
     }
 }

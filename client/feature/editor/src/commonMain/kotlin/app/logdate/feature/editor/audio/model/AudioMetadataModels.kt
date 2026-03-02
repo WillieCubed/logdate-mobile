@@ -5,14 +5,14 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class AudioSegment(
     val timestampMs: Long,
-    val type: SegmentType
+    val type: SegmentType,
 )
 
 @Serializable
 enum class SegmentType {
     SPEECH_ONSET,
     SIGNIFICANT_PAUSE,
-    VOLUME_PEAK
+    VOLUME_PEAK,
 }
 
 @Serializable
@@ -21,13 +21,23 @@ data class AudioPalette(
     val waveformGradientEnd: Long,
     val playedFillColor: Long,
     val accentColor: Long,
-    val immersiveBackground: Long
+    val immersiveBackground: Long,
 )
 
 enum class DaylightPeriod {
-    DAWN, MORNING, MIDDAY, AFTERNOON, GOLDEN_HOUR, EVENING, NIGHT
+    DAWN,
+    MORNING,
+    MIDDAY,
+    AFTERNOON,
+    GOLDEN_HOUR,
+    EVENING,
+    NIGHT,
 }
 
 enum class LocationType {
-    NATURE, URBAN, HOME, TRANSIT, UNKNOWN
+    NATURE,
+    URBAN,
+    HOME,
+    TRANSIT,
+    UNKNOWN,
 }

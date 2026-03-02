@@ -8,6 +8,7 @@ import app.logdate.feature.editor.ui.common.JournalSelectorDropdown
 import app.logdate.shared.model.Journal
 import kotlin.uuid.Uuid
 
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun EditorBottomContent(
     availableJournals: List<Journal>,
@@ -22,7 +23,7 @@ fun EditorBottomContent(
         JournalSelectorDropdown(
             availableJournals = availableJournals,
             selectedJournalIds = selectedJournalIds,
-            onSelectionChanged = onJournalSelectionChanged
+            onSelectionChanged = onJournalSelectionChanged,
         )
     }
 }

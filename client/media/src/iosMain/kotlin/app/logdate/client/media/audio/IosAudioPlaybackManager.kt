@@ -54,11 +54,12 @@ class IosAudioPlaybackManager : AudioPlaybackManager {
             val fileUrl = NSURL.fileURLWithPath(uri)
 
             // Create the audio player
-            val player = AVAudioPlayer(
-                contentsOfURL = fileUrl,
-                fileTypeHint = "m4a",
-                error = null,
-            )
+            val player =
+                AVAudioPlayer(
+                    contentsOfURL = fileUrl,
+                    fileTypeHint = "m4a",
+                    error = null,
+                )
 
             audioPlayer = player
             player.delegate = null
@@ -118,25 +119,26 @@ class IosAudioPlaybackManager : AudioPlaybackManager {
     ) {
         stopProgressUpdates()
 
-        progressUpdateJob = scope.launch {
-            while (isActive && isPlaying) {
-                audioPlayer?.let {
-                    if (it.duration > 0) {
-                        val progress = (it.currentTime / it.duration).toFloat().coerceIn(0f, 1f)
-                        onProgressUpdated(progress)
+        progressUpdateJob =
+            scope.launch {
+                while (isActive && isPlaying) {
+                    audioPlayer?.let {
+                        if (it.duration > 0) {
+                            val progress = (it.currentTime / it.duration).toFloat().coerceIn(0f, 1f)
+                            onProgressUpdated(progress)
 
-                        if (it.currentTime >= it.duration) {
-                            isPlaying = false
-                            onProgressUpdated(1.0f)
-                            onPlaybackCompleted()
-                            stopProgressUpdates()
-                            return@launch
+                            if (it.currentTime >= it.duration) {
+                                isPlaying = false
+                                onProgressUpdated(1.0f)
+                                onPlaybackCompleted()
+                                stopProgressUpdates()
+                                return@launch
+                            }
                         }
                     }
+                    delay(100) // Update every 100ms
                 }
-                delay(100) // Update every 100ms
             }
-        }
     }
 
     private fun stopProgressUpdates() {

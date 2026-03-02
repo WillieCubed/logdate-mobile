@@ -21,8 +21,8 @@ fun rememberAudioRecordingState(
     onStopRecording: () -> Unit = {},
     onPauseRecording: () -> Unit = {},
     onAudioLevelUpdate: (Float) -> Unit = {},
-): AudioRecordingState {
-    return remember {
+): AudioRecordingState =
+    remember {
         AudioRecordingState(
             initialIsRecording = initialIsRecording,
             initialIsPaused = initialIsPaused,
@@ -31,10 +31,9 @@ fun rememberAudioRecordingState(
             onStartRecording = onStartRecording,
             onStopRecording = onStopRecording,
             onPauseRecording = onPauseRecording,
-            onAudioLevelUpdate = onAudioLevelUpdate
+            onAudioLevelUpdate = onAudioLevelUpdate,
         )
     }
-}
 
 /**
  * State holder for audio recording functionality.
@@ -51,19 +50,19 @@ open class AudioRecordingState(
 ) {
     var isRecording by mutableStateOf(initialIsRecording)
         private set
-    
+
     var isPaused by mutableStateOf(initialIsPaused)
         private set
-    
+
     var duration by mutableStateOf(initialDuration)
         private set
-    
+
     var audioLevels by mutableStateOf(initialAudioLevels)
         private set
-    
+
     var transcription by mutableStateOf<String?>(null)
         private set
-    
+
     /**
      * Starts audio recording
      */
@@ -77,7 +76,7 @@ open class AudioRecordingState(
             onStartRecording()
         }
     }
-    
+
     /**
      * Pauses audio recording
      */
@@ -87,7 +86,7 @@ open class AudioRecordingState(
             onPauseRecording()
         }
     }
-    
+
     /**
      * Stops audio recording
      */
@@ -98,30 +97,33 @@ open class AudioRecordingState(
             onStopRecording()
         }
     }
-    
+
     /**
      * Updates the recording duration
      */
     fun updateDuration(newDuration: Duration) {
         duration = newDuration
     }
-    
+
     /**
      * Adds a new audio level to the waveform
      */
-    fun addAudioLevel(level: Float, maxHistory: Int = 50) {
+    fun addAudioLevel(
+        level: Float,
+        maxHistory: Int = 50,
+    ) {
         val normalizedLevel = level.coerceIn(0f, 1f)
         audioLevels = (audioLevels + normalizedLevel).takeLast(maxHistory)
         onAudioLevelUpdate(level)
     }
-    
+
     /**
      * Updates the live transcription text
      */
     fun updateTranscription(text: String?) {
         transcription = text
     }
-    
+
     /**
      * Clears all recording data
      */
@@ -130,7 +132,7 @@ open class AudioRecordingState(
         audioLevels = emptyList()
         transcription = null
     }
-    
+
     /**
      * Resets the state to initial values
      */

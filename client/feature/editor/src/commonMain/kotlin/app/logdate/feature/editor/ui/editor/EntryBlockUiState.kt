@@ -1,8 +1,8 @@
 package app.logdate.feature.editor.ui.editor
 
 import app.logdate.feature.editor.ui.camera.CapturedMediaType
-import app.logdate.shared.model.Location
 import app.logdate.feature.editor.ui.formatMediaDuration
+import app.logdate.shared.model.Location
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -15,6 +15,7 @@ sealed interface EntryBlockUiState {
     val id: Uuid
     val timestamp: Instant
     val location: Location?
+
     fun hasContent(): Boolean
 }
 
@@ -33,7 +34,7 @@ data class TextBlockUiState(
     override val id: Uuid = Uuid.random(),
     override val timestamp: Instant = Clock.System.now(),
     override val location: Location? = null,
-    val content: String = ""
+    val content: String = "",
 ) : EntryBlockUiState {
     override fun hasContent(): Boolean = content.isNotBlank()
 }
@@ -46,7 +47,7 @@ data class ImageBlockUiState(
     override val timestamp: Instant = Clock.System.now(),
     override val location: Location? = null,
     override val uri: String? = null,
-    override val caption: String = ""
+    override val caption: String = "",
 ) : MediaBlockUiState {
     override fun hasContent(): Boolean = uri != null
 }
@@ -70,7 +71,7 @@ data class CameraBlockUiState(
     override val uri: String? = null,
     override val caption: String = "",
     val mediaType: CapturedMediaType = CapturedMediaType.PHOTO,
-    val durationMs: Long = 0
+    val durationMs: Long = 0,
 ) : MediaBlockUiState {
     override fun hasContent(): Boolean = uri != null
 
@@ -100,7 +101,7 @@ data class VideoBlockUiState(
     override val location: Location? = null,
     override val uri: String? = null,
     override val caption: String = "",
-    val durationMs: Long = 0
+    val durationMs: Long = 0,
 ) : MediaBlockUiState {
     override fun hasContent(): Boolean = uri != null
 

@@ -19,46 +19,45 @@ import androidx.compose.ui.unit.dp
 import io.github.aakira.napier.Napier
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.launch
-import platform.Photos.PHPhotoLibrary
-import platform.UIKit.UIApplication
-import platform.UIKit.UIImagePickerController
-import platform.UIKit.UIImagePickerControllerDelegateProtocol
-import platform.UIKit.UIImagePickerControllerSourceType
-import platform.UIKit.UINavigationControllerDelegateProtocol
-import platform.UIKit.UIViewController
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.add_an_image_to_your_entry
+import logdate.client.feature.editor.generated.resources.camera
+import logdate.client.feature.editor.generated.resources.photo_library
+import org.jetbrains.compose.resources.stringResource
+import platform.UIKit.UIImagePickerControllerSourceType
+
 /**
  * iOS implementation of the image picker content.
  * Provides options to select an image from the photo library or take a photo.
  */
+@Suppress("ktlint:standard:function-naming")
 @OptIn(ExperimentalForeignApi::class)
 @Composable
 actual fun ImagePickerContent(
     onImageSelected: (String) -> Unit,
-    modifier: Modifier
+    modifier: Modifier,
 ) {
     val coroutineScope = rememberCoroutineScope()
-    
+
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(16.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
     ) {
         Text(
             text = stringResource(Res.string.add_an_image_to_your_entry),
             style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
         )
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
+            horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
             // Photo Library button
             Button(
@@ -71,11 +70,11 @@ actual fun ImagePickerContent(
                             }
                         }
                     }
-                }
+                },
             ) {
                 Text(stringResource(Res.string.photo_library))
             }
-            
+
             // Camera button
             Button(
                 onClick = {
@@ -87,7 +86,7 @@ actual fun ImagePickerContent(
                             }
                         }
                     }
-                }
+                },
             ) {
                 Text(stringResource(Res.string.camera))
             }
@@ -97,34 +96,35 @@ actual fun ImagePickerContent(
 
 /**
  * Shows the iOS image picker with the specified source type.
- * 
+ *
  * Note: This is a placeholder implementation that would need to be completed
  * with proper interop with UIImagePickerController and its delegate.
- * 
+ *
  * @param sourceType The source type (camera or photo library)
  * @param onImageSelected Callback when an image is selected
  */
 @OptIn(ExperimentalForeignApi::class)
 private fun showImagePicker(
     sourceType: UIImagePickerControllerSourceType,
-    onImageSelected: (String?) -> Unit
+    onImageSelected: (String?) -> Unit,
 ) {
     // In a complete implementation, this would:
     // 1. Check and request permissions if needed
     // 2. Create and configure a UIImagePickerController
     // 3. Set up a delegate to handle the selected image
     // 4. Present the picker from the current view controller
-    
+
     // For now, we're just logging the intent
     Napier.i("iOS would show image picker with source type: $sourceType")
-    
+
     // In a real implementation, we would implement a proper delegate
     // and handle the image selection and saving
-    
+
     // Simulating the callback with null for now
     onImageSelected(null)
-    
+
     // Note: A real implementation would look something like this:
+
     /*
     val rootViewController = UIApplication.sharedApplication.keyWindow?.rootViewController
     val picker = UIImagePickerController().apply {
@@ -136,14 +136,14 @@ private fun showImagePicker(
                 onImageSelected(imageUrl)
                 rootViewController?.dismissViewControllerAnimated(true, null)
             }
-            
+
             override fun imagePickerControllerDidCancel(picker: UIImagePickerController) {
                 onImageSelected(null)
                 rootViewController?.dismissViewControllerAnimated(true, null)
             }
         }
     }
-    
+
     rootViewController?.presentViewController(picker, true, null)
-    */
+     */
 }

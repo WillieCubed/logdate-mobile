@@ -20,34 +20,36 @@ import app.logdate.client.permissions.PermissionManager
 import app.logdate.client.permissions.PermissionStatus
 import app.logdate.client.permissions.PermissionType
 import io.github.aakira.napier.Napier
-import org.koin.compose.koinInject
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.allow_access
+import logdate.client.feature.editor.generated.resources.continue_anyway
+import logdate.client.feature.editor.generated.resources.microphone_access
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
+
 /**
  * Desktop implementation of audio permission wrapper
- * 
+ *
  * This implementation verifies microphone access permission using the PermissionManager.
  * On desktop, this typically checks system permissions rather than app permissions.
  * If permission is needed, it shows a dialog to guide the user.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
-actual fun AudioPermissionWrapper(
-    content: @Composable () -> Unit
-) {
+actual fun AudioPermissionWrapper(content: @Composable () -> Unit) {
     val permissionManager: PermissionManager = koinInject()
-    
+
     var showPermissionDialog by remember { mutableStateOf(false) }
-    var permissionGranted by remember { 
+    var permissionGranted by remember {
         mutableStateOf(permissionManager.isPermissionGranted(PermissionType.MICROPHONE))
     }
-    
+
     // Check permission on first composition
     LaunchedEffect(Unit) {
         try {
             // Check via the permission manager
             permissionGranted = permissionManager.isPermissionGranted(PermissionType.MICROPHONE)
-            
+
             // If not granted, show dialog to request
             if (!permissionGranted) {
                 showPermissionDialog = true
@@ -58,15 +60,15 @@ actual fun AudioPermissionWrapper(
             permissionGranted = true
         }
     }
-    
+
     if (permissionGranted) {
         content()
     }
-    
+
     // Show permission dialog if needed
     if (showPermissionDialog) {
         AlertDialog(
-            onDismissRequest = { 
+            onDismissRequest = {
                 showPermissionDialog = false
                 // On desktop, closing this dialog means continuing without permission
                 // In a real implementation, we would check the result of a system permission request
@@ -77,15 +79,15 @@ actual fun AudioPermissionWrapper(
                 Column {
                     Text(
                         "LogDate needs access to your microphone to record audio notes. " +
-                        "Please grant permission when prompted by your system."
+                            "Please grant permission when prompted by your system.",
                     )
-                    
+
                     Spacer(modifier = Modifier.height(8.dp))
-                    
+
                     Text(
                         "If you don't see a system prompt, you may need to enable microphone " +
-                        "access in your system settings.",
-                        style = MaterialTheme.typography.bodyMedium
+                            "access in your system settings.",
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             },
@@ -97,22 +99,22 @@ actual fun AudioPermissionWrapper(
                             permissionGranted = result.status == PermissionStatus.GRANTED
                         }
                         showPermissionDialog = false
-                    }
+                    },
                 ) {
                     Text(stringResource(Res.string.allow_access))
                 }
             },
             dismissButton = {
                 TextButton(
-                    onClick = { 
+                    onClick = {
                         showPermissionDialog = false
                         // For desktop, we might want to let the user try anyway
                         permissionGranted = true
-                    }
+                    },
                 ) {
                     Text(stringResource(Res.string.continue_anyway))
                 }
-            }
+            },
         )
     }
 }

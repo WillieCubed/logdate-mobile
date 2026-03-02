@@ -20,41 +20,46 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.launch
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.add_an_image_to_your_entry
+import logdate.client.feature.editor.generated.resources.select_image
+import logdate.client.feature.editor.generated.resources.select_image_2
+import org.jetbrains.compose.resources.stringResource
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
 import java.nio.file.Paths
 import javax.swing.SwingUtilities
 import kotlin.io.path.absolutePathString
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
-import logdate.client.feature.editor.generated.resources.Res
+
 /**
  * Desktop implementation of the image picker content.
  * Provides a button to open a file dialog to select an image.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 actual fun ImagePickerContent(
     onImageSelected: (String) -> Unit,
-    modifier: Modifier
+    modifier: Modifier,
 ) {
     val coroutineScope = rememberCoroutineScope()
-    
+
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(16.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
     ) {
         Text(
             text = stringResource(Res.string.add_an_image_to_your_entry),
             style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
         )
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         Button(
             onClick = {
                 coroutineScope.launch {
@@ -67,12 +72,12 @@ actual fun ImagePickerContent(
                     }
                 }
             },
-            modifier = Modifier.fillMaxWidth(0.7f)
+            modifier = Modifier.fillMaxWidth(0.7f),
         ) {
             Icon(
                 imageVector = Icons.Outlined.Image,
                 contentDescription = stringResource(Res.string.select_image),
-                modifier = Modifier.padding(end = 8.dp)
+                modifier = Modifier.padding(end = 8.dp),
             )
             Text(stringResource(Res.string.select_image_2))
         }
@@ -81,38 +86,40 @@ actual fun ImagePickerContent(
 
 /**
  * Opens a native file dialog to select an image file.
- * 
+ *
  * @param callback Callback function that receives the selected file or null if canceled
  */
 private fun openFileDialog(callback: (File?) -> Unit) {
     SwingUtilities.invokeLater {
-        val fileDialog = FileDialog(Frame()).apply {
-            title = "Select an Image"
-            mode = FileDialog.LOAD
-            isMultipleMode = false
-            
-            // Set file filter for images
-            setFilenameFilter { _, name ->
-                name.lowercase().endsWith(".jpg") ||
-                name.lowercase().endsWith(".jpeg") ||
-                name.lowercase().endsWith(".png") ||
-                name.lowercase().endsWith(".gif") ||
-                name.lowercase().endsWith(".bmp") ||
-                name.lowercase().endsWith(".webp")
+        val fileDialog =
+            FileDialog(Frame()).apply {
+                title = "Select an Image"
+                mode = FileDialog.LOAD
+                isMultipleMode = false
+
+                // Set file filter for images
+                setFilenameFilter { _, name ->
+                    name.lowercase().endsWith(".jpg") ||
+                        name.lowercase().endsWith(".jpeg") ||
+                        name.lowercase().endsWith(".png") ||
+                        name.lowercase().endsWith(".gif") ||
+                        name.lowercase().endsWith(".bmp") ||
+                        name.lowercase().endsWith(".webp")
+                }
             }
-        }
-        
+
         fileDialog.isVisible = true
-        
-        val selectedFile = if (fileDialog.file != null) {
-            val directory = fileDialog.directory
-            val filename = fileDialog.file
-            val path = Paths.get(directory, filename)
-            File(path.absolutePathString())
-        } else {
-            null
-        }
-        
+
+        val selectedFile =
+            if (fileDialog.file != null) {
+                val directory = fileDialog.directory
+                val filename = fileDialog.file
+                val path = Paths.get(directory, filename)
+                File(path.absolutePathString())
+            } else {
+                null
+            }
+
         callback(selectedFile)
     }
 }

@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
  * @param cameraType The direction of the camera lens to use.
  * @param modifier A modifier to apply to the layout root.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 expect fun LiveCameraPreview(
     canUseCamera: Boolean,

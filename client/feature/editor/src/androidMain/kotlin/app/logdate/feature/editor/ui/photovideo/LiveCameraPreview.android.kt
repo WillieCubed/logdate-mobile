@@ -1,6 +1,5 @@
 package app.logdate.feature.editor.ui.photovideo
 
-import android.content.Context
 import androidx.camera.compose.CameraXViewfinder
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
@@ -26,14 +25,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.aakira.napier.Napier
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
 import logdate.client.feature.editor.generated.resources.Res
-@Composable
-fun rememberSurfaceRequestState(): MutableState<SurfaceRequest?> {
-    return remember { mutableStateOf<SurfaceRequest?>(null) }
-}
+import logdate.client.feature.editor.generated.resources.camera_permission_not_granted
+import logdate.client.feature.editor.generated.resources.loading_camera
+import org.jetbrains.compose.resources.stringResource
 
+@Composable
+fun rememberSurfaceRequestState(): MutableState<SurfaceRequest?> = remember { mutableStateOf<SurfaceRequest?>(null) }
+
+@Suppress("ktlint:standard:function-naming")
 @Composable
 actual fun LiveCameraPreview(
     canUseCamera: Boolean,
@@ -42,14 +42,15 @@ actual fun LiveCameraPreview(
 ) {
     if (!canUseCamera) {
         Box(
-            modifier = modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center
+            modifier =
+                modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = stringResource(Res.string.camera_permission_not_granted),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         return
@@ -60,22 +61,25 @@ actual fun LiveCameraPreview(
     val surfaceRequestState = rememberSurfaceRequestState()
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
 
-    val cameraSelector = remember(cameraType) {
-        when (cameraType) {
-            CameraType.FRONT -> CameraSelector.DEFAULT_FRONT_CAMERA
-            CameraType.BACK -> CameraSelector.DEFAULT_BACK_CAMERA
-        }
-    }
-
-    val preview = remember {
-        Preview.Builder()
-            .build()
-            .apply {
-                setSurfaceProvider { newSurfaceRequest ->
-                    surfaceRequestState.value = newSurfaceRequest
-                }
+    val cameraSelector =
+        remember(cameraType) {
+            when (cameraType) {
+                CameraType.FRONT -> CameraSelector.DEFAULT_FRONT_CAMERA
+                CameraType.BACK -> CameraSelector.DEFAULT_BACK_CAMERA
             }
-    }
+        }
+
+    val preview =
+        remember {
+            Preview
+                .Builder()
+                .build()
+                .apply {
+                    setSurfaceProvider { newSurfaceRequest ->
+                        surfaceRequestState.value = newSurfaceRequest
+                    }
+                }
+        }
 
     LaunchedEffect(cameraType) {
         try {
@@ -87,7 +91,7 @@ actual fun LiveCameraPreview(
             provider.bindToLifecycle(
                 lifecycleOwner,
                 cameraSelector,
-                preview
+                preview,
             )
 
             Napier.d("LiveCameraPreview: Camera bound successfully with $cameraType")
@@ -108,18 +112,19 @@ actual fun LiveCameraPreview(
         CameraXViewfinder(
             surfaceRequest = surfaceRequest,
             implementationMode = ImplementationMode.EXTERNAL,
-            modifier = modifier
+            modifier = modifier,
         )
     } else {
         Box(
-            modifier = modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center
+            modifier =
+                modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = stringResource(Res.string.loading_camera),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

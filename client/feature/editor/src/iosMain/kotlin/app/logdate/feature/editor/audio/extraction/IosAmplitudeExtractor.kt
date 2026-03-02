@@ -1,6 +1,6 @@
 @file:OptIn(
     kotlinx.cinterop.BetaInteropApi::class,
-    kotlinx.cinterop.ExperimentalForeignApi::class
+    kotlinx.cinterop.ExperimentalForeignApi::class,
 )
 
 package app.logdate.feature.editor.audio.extraction
@@ -24,12 +24,12 @@ import platform.AVFoundation.AVMediaTypeAudio
 import platform.AVFoundation.AVURLAsset
 import platform.AVFoundation.tracksWithMediaType
 import platform.CoreAudioTypes.kAudioFormatLinearPCM
+import platform.CoreFoundation.kCFBooleanFalse
+import platform.CoreFoundation.kCFBooleanTrue
 import platform.CoreMedia.CMBlockBufferCopyDataBytes
 import platform.CoreMedia.CMBlockBufferGetDataLength
 import platform.CoreMedia.CMSampleBufferGetDataBuffer
 import platform.CoreMedia.CMSampleBufferInvalidate
-import platform.CoreFoundation.kCFBooleanFalse
-import platform.CoreFoundation.kCFBooleanTrue
 import platform.Foundation.NSError
 import platform.Foundation.NSURL
 
@@ -37,25 +37,31 @@ import platform.Foundation.NSURL
  * iOS implementation of AmplitudeExtractor using AVAssetReader.
  */
 class IosAmplitudeExtractor : AmplitudeExtractor {
-    override suspend fun extractAmplitudes(uri: String, targetSampleCount: Int): List<Float> =
+    override suspend fun extractAmplitudes(
+        uri: String,
+        targetSampleCount: Int,
+    ): List<Float> =
         withContext(Dispatchers.Default) {
-            val url = if (uri.startsWith("file://")) {
-                NSURL.URLWithString(uri)
-            } else {
-                NSURL.fileURLWithPath(uri)
-            } ?: run {
-                Napier.w { "Unable to resolve audio URL for $uri" }
-                return@withContext emptyList()
-            }
+            val url =
+                if (uri.startsWith("file://")) {
+                    NSURL.URLWithString(uri)
+                } else {
+                    NSURL.fileURLWithPath(uri)
+                } ?: run {
+                    Napier.w { "Unable to resolve audio URL for $uri" }
+                    return@withContext emptyList()
+                }
 
             val asset: AVAsset = AVURLAsset.URLAssetWithURL(url, null)
-            val track = asset.tracksWithMediaType(AVMediaTypeAudio)
-                .filterIsInstance<AVAssetTrack>()
-                .firstOrNull()
-                ?: run {
-                Napier.w { "No audio track found for $uri" }
-                return@withContext emptyList()
-            }
+            val track =
+                asset
+                    .tracksWithMediaType(AVMediaTypeAudio)
+                    .filterIsInstance<AVAssetTrack>()
+                    .firstOrNull()
+                    ?: run {
+                        Napier.w { "No audio track found for $uri" }
+                        return@withContext emptyList()
+                    }
 
             memScoped {
                 val errorPtr = alloc<ObjCObjectVar<NSError?>>()
@@ -66,12 +72,13 @@ class IosAmplitudeExtractor : AmplitudeExtractor {
                     return@withContext emptyList()
                 }
 
-                val outputSettings: Map<Any?, Any?> = mapOf(
-                    AV_FORMAT_ID_KEY to kAudioFormatLinearPCM,
-                    AV_LINEAR_PCM_IS_FLOAT_KEY to kCFBooleanTrue,
-                    AV_LINEAR_PCM_BIT_DEPTH_KEY to 32,
-                    AV_LINEAR_PCM_IS_BIG_ENDIAN_KEY to kCFBooleanFalse
-                )
+                val outputSettings: Map<Any?, Any?> =
+                    mapOf(
+                        AV_FORMAT_ID_KEY to kAudioFormatLinearPCM,
+                        AV_LINEAR_PCM_IS_FLOAT_KEY to kCFBooleanTrue,
+                        AV_LINEAR_PCM_BIT_DEPTH_KEY to 32,
+                        AV_LINEAR_PCM_IS_BIG_ENDIAN_KEY to kCFBooleanFalse,
+                    )
 
                 val output = AVAssetReaderTrackOutput(track, outputSettings)
                 output.alwaysCopiesSampleData = false
@@ -95,7 +102,7 @@ class IosAmplitudeExtractor : AmplitudeExtractor {
                                     blockBuffer,
                                     0uL,
                                     length.toULong(),
-                                    pinned.addressOf(0)
+                                    pinned.addressOf(0),
                                 )
                             }
                             samples.addAll(unpackFloatSamples(buffer))
@@ -118,17 +125,21 @@ class IosAmplitudeExtractor : AmplitudeExtractor {
         val samples = ArrayList<Float>(count)
         var offset = 0
         repeat(count) {
-            val bits = (bytes[offset].toInt() and 0xFF) or
-                ((bytes[offset + 1].toInt() and 0xFF) shl 8) or
-                ((bytes[offset + 2].toInt() and 0xFF) shl 16) or
-                ((bytes[offset + 3].toInt() and 0xFF) shl 24)
+            val bits =
+                (bytes[offset].toInt() and 0xFF) or
+                    ((bytes[offset + 1].toInt() and 0xFF) shl 8) or
+                    ((bytes[offset + 2].toInt() and 0xFF) shl 16) or
+                    ((bytes[offset + 3].toInt() and 0xFF) shl 24)
             samples.add(kotlin.math.abs(Float.fromBits(bits)))
             offset += 4
         }
         return samples
     }
 
-    private fun downsampleToTarget(samples: List<Float>, targetCount: Int): List<Float> {
+    private fun downsampleToTarget(
+        samples: List<Float>,
+        targetCount: Int,
+    ): List<Float> {
         if (samples.isEmpty()) return emptyList()
         val chunkSize = samples.size / targetCount
         if (chunkSize <= 0) return samples

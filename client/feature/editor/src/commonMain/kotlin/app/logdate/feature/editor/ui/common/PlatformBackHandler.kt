@@ -9,8 +9,9 @@ import androidx.compose.runtime.Composable
  * @param enabled Whether the back handler is enabled
  * @param onBack Callback to invoke when back is pressed
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 expect fun PlatformBackHandler(
     enabled: Boolean = true,
-    onBack: () -> Unit
+    onBack: () -> Unit,
 )

@@ -14,5 +14,8 @@ interface AmplitudeExtractor {
      * @param targetSampleCount The desired number of amplitude samples (default: 300)
      * @return List of normalized amplitude values (0.0 to 1.0), or empty list on failure
      */
-    suspend fun extractAmplitudes(uri: String, targetSampleCount: Int = 300): List<Float>
+    suspend fun extractAmplitudes(
+        uri: String,
+        targetSampleCount: Int = 300,
+    ): List<Float>
 }

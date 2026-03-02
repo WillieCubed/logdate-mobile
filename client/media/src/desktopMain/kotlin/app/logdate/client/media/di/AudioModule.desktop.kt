@@ -16,13 +16,14 @@ import org.koin.dsl.module
 /**
  * Desktop implementation of audio module
  */
-actual val audioModule: Module = module {
-    single<AudioStorage> { DesktopAudioStorage() }
-    // Provide the Desktop implementation of AudioRecordingManager as a singleton
-    single<AudioRecordingManager> { DesktopAudioRecordingManager(get()) }
-    single<AudioPlaybackManager> { DesktopAudioPlaybackManager() }
-    single<AudioDurationResolver> { DesktopAudioDurationResolver() }
-    
-    // Provide the Desktop implementation of TranscriptionService
-    factory<TranscriptionService> { DesktopTranscriptionService() }
-}
+actual val audioModule: Module =
+    module {
+        single<AudioStorage> { DesktopAudioStorage() }
+        // Provide the Desktop implementation of AudioRecordingManager as a singleton
+        single<AudioRecordingManager> { DesktopAudioRecordingManager(get()) }
+        single<AudioPlaybackManager> { DesktopAudioPlaybackManager() }
+        single<AudioDurationResolver> { DesktopAudioDurationResolver() }
+
+        // Provide the Desktop implementation of TranscriptionService
+        factory<TranscriptionService> { DesktopTranscriptionService() }
+    }

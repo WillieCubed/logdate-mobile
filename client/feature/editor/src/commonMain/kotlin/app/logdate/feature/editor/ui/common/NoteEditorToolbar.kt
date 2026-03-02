@@ -35,9 +35,17 @@ import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.editor.AutoSaveStatus
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.back
+import logdate.client.feature.editor.generated.resources.changes_saved
+import logdate.client.feature.editor.generated.resources.error_saving
+import logdate.client.feature.editor.generated.resources.load_drafts
+import logdate.client.feature.editor.generated.resources.manage_drafts
+import logdate.client.feature.editor.generated.resources.more_options
+import logdate.client.feature.editor.generated.resources.save_entry
+import logdate.client.feature.editor.generated.resources.saving
+import org.jetbrains.compose.resources.stringResource
+
 /**
  * Top toolbar for the note editor.
  * Provides navigation, saving functionality, and access to additional options.
@@ -48,6 +56,7 @@ import logdate.client.feature.editor.generated.resources.Res
  * @param modifier Modifier for the toolbar
  * @param autoSaveStatus The current auto-save status (optional)
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun NoteEditorToolbar(
     onBack: () -> Unit,
@@ -69,42 +78,43 @@ fun NoteEditorToolbar(
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = stringResource(Res.string.back)
+                contentDescription = stringResource(Res.string.back),
             )
         }
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(
-                Spacing.xs,
-                alignment = Alignment.End,
-            ),
+            horizontalArrangement =
+                Arrangement.spacedBy(
+                    Spacing.xs,
+                    alignment = Alignment.End,
+                ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Use the separate AutoSaveIndicator composable
             if (autoSaveStatus != null) {
                 AutoSaveIndicator(
                     status = autoSaveStatus,
-                    modifier = Modifier.padding(end = Spacing.xs)
+                    modifier = Modifier.padding(end = Spacing.xs),
                 )
             }
-            
+
             // Drafts button
             FilledTonalIconButton(
-                onClick = { onShowDrafts() }
+                onClick = { onShowDrafts() },
             ) {
                 Icon(
                     imageVector = Icons.Default.Drafts,
-                    contentDescription = stringResource(Res.string.load_drafts)
+                    contentDescription = stringResource(Res.string.load_drafts),
                 )
             }
 
             // Save button
             FilledTonalIconButton(
-                onClick = { onSave() }
+                onClick = { onSave() },
             ) {
                 Icon(
                     imageVector = Icons.Default.Save,
-                    contentDescription = stringResource(Res.string.save_entry)
+                    contentDescription = stringResource(Res.string.save_entry),
                 )
             }
 
@@ -112,12 +122,12 @@ fun NoteEditorToolbar(
             FilledTonalIconButton(onClick = { showMenu = true }) {
                 Icon(
                     imageVector = Icons.Default.MoreVert,
-                    contentDescription = stringResource(Res.string.more_options)
+                    contentDescription = stringResource(Res.string.more_options),
                 )
 
                 DropdownMenu(
                     expanded = showMenu,
-                    onDismissRequest = { showMenu = false }
+                    onDismissRequest = { showMenu = false },
                 ) {
                     // Additional menu options can be added here if needed
                     DropdownMenuItem(
@@ -125,7 +135,7 @@ fun NoteEditorToolbar(
                         onClick = {
                             showMenu = false
                             onShowDrafts()
-                        }
+                        },
                     )
                 }
             }
@@ -142,62 +152,63 @@ fun NoteEditorToolbar(
  * @param modifier Modifier for the indicator
  * @param showDuration How long to show the success indicator before fading (in ms)
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun AutoSaveIndicator(
     status: AutoSaveStatus,
     modifier: Modifier = Modifier,
-    showDuration: Long = 1500
+    showDuration: Long = 1500,
 ) {
     Box(
         modifier = modifier,
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         // Show different indicators based on status
         when (status) {
             AutoSaveStatus.SAVED -> {
                 // Create a temporary visibility state that disappears after a delay
                 var visibleState by remember { mutableStateOf(true) }
-                
+
                 // Effect to hide the icon after a brief period
                 LaunchedEffect(status) {
                     delay(showDuration) // Show for the specified duration
                     visibleState = false
                 }
-                
+
                 // Show a subtle green checkmark that fades in and out
                 AnimatedVisibility(
                     visible = visibleState,
                     enter = fadeIn(animationSpec = tween(300)),
-                    exit = fadeOut(animationSpec = tween(500))
+                    exit = fadeOut(animationSpec = tween(500)),
                 ) {
                     Icon(
                         imageVector = Icons.Default.CheckCircle,
                         contentDescription = stringResource(Res.string.changes_saved),
                         tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(16.dp),
                     )
                 }
             }
             AutoSaveStatus.ERROR -> {
                 // Show error indicator with a temporary visibility state
                 var visibleState by remember { mutableStateOf(true) }
-                
+
                 // Effect to hide the error icon after a delay
                 LaunchedEffect(status) {
                     delay(showDuration * 2) // Show errors longer
                     visibleState = false
                 }
-                
+
                 AnimatedVisibility(
                     visible = visibleState,
                     enter = fadeIn(animationSpec = tween(300)),
-                    exit = fadeOut(animationSpec = tween(500))
+                    exit = fadeOut(animationSpec = tween(500)),
                 ) {
                     Icon(
                         imageVector = Icons.Default.ErrorOutline,
                         contentDescription = stringResource(Res.string.error_saving),
                         tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(16.dp),
                     )
                 }
             }
@@ -206,7 +217,7 @@ fun AutoSaveIndicator(
                 Text(
                     text = stringResource(Res.string.saving),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 )
             }
             else -> {

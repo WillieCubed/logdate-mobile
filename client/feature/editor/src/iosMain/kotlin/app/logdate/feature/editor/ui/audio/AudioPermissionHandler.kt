@@ -24,33 +24,34 @@ import app.logdate.client.permissions.PermissionManager
 import app.logdate.client.permissions.PermissionStatus
 import app.logdate.client.permissions.PermissionType
 import kotlinx.coroutines.launch
-import org.koin.compose.koinInject
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.grant_permission
+import logdate.client.feature.editor.generated.resources.logdate_needs_access_to_your_microphone_to_record_audio
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
+
 /**
  * iOS implementation of AudioPermissionWrapper.
- * 
+ *
  * On iOS, microphone access requires user permission.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
-actual fun AudioPermissionWrapper(
-    content: @Composable () -> Unit
-) {
+actual fun AudioPermissionWrapper(content: @Composable () -> Unit) {
     // Get permission manager from Koin
     val permissionManager: PermissionManager = koinInject()
     val coroutineScope = rememberCoroutineScope()
-    
+
     // Track permission state
     var permissionState by remember {
         mutableStateOf(permissionManager.isPermissionGranted(PermissionType.MICROPHONE))
     }
-    
+
     // Check permissions on initial load
     LaunchedEffect(Unit) {
         permissionState = permissionManager.isPermissionGranted(PermissionType.MICROPHONE)
     }
-    
+
     // Request permissions function
     val requestPermissions = {
         coroutineScope.launch {
@@ -59,32 +60,33 @@ actual fun AudioPermissionWrapper(
             }
         }
     }
-    
+
     if (permissionState) {
         // Permissions granted, show content
         content()
     } else {
         // Permissions not granted, show request UI
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+            contentAlignment = Alignment.Center,
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(16.dp),
             ) {
                 Text(
                     text = stringResource(Res.string.logdate_needs_access_to_your_microphone_to_record_audio),
                     style = MaterialTheme.typography.bodyLarge,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 Button(
-                    onClick = { requestPermissions() }
+                    onClick = { requestPermissions() },
                 ) {
                     Text(stringResource(Res.string.grant_permission))
                 }

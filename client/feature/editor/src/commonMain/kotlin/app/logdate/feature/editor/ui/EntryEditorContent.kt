@@ -1,6 +1,6 @@
 @file:OptIn(
     ExperimentalMaterial3Api::class,
-    ExperimentalSharedTransitionApi::class
+    ExperimentalSharedTransitionApi::class,
 )
 
 package app.logdate.feature.editor.ui
@@ -40,6 +40,7 @@ val LocalAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> 
 
 private const val FAB_TO_EDITOR_SHARED_ELEMENT_KEY = "fab_to_editor"
 
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun EntryEditorContent(
     onNavigateBack: () -> Unit,
@@ -50,24 +51,23 @@ fun EntryEditorContent(
     val editorState by viewModel.editorState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val uiState = rememberBlocksUiState(
-        editorState = editorState,
-        onUpdateBlock = viewModel::updateBlock,
-        onFocusBlock = viewModel::setExpandedBlockId,
-        onCreateBlock = viewModel::createNewBlock,
-        onDeleteBlock = viewModel::removeBlock,
-        onUpdateJournalSelection = viewModel::setSelectedJournals,
-    )
+    val uiState =
+        rememberBlocksUiState(
+            editorState = editorState,
+            onUpdateBlock = viewModel::updateBlock,
+            onFocusBlock = viewModel::setExpandedBlockId,
+            onCreateBlock = { type, id -> viewModel.createNewBlock(type, id) },
+            onDeleteBlock = viewModel::removeBlock,
+            onUpdateJournalSelection = viewModel::setSelectedJournals,
+        )
 
     var showExitConfirmation by remember { mutableStateOf(false) }
     var showDraftsDialog by remember { mutableStateOf(false) }
 
-    PlatformBackHandler {
+    // Expanded-block back is handled by MainEditorContent via PlatformPredictiveBackHandler.
+    // This handler only covers the remaining cases: unsaved changes and plain exit.
+    PlatformBackHandler(enabled = editorState.expandedBlockId == null) {
         when {
-            editorState.expandedBlockId != null -> {
-                Napier.d("Back pressed: Dismissing expanded block ${editorState.expandedBlockId}")
-                viewModel.dismissExpandedBlock()
-            }
             !editorState.canExitWithoutSaving -> {
                 Napier.d("Back pressed: Showing exit confirmation")
                 showExitConfirmation = true
@@ -79,10 +79,11 @@ fun EntryEditorContent(
         }
     }
 
-    val autoSaveState = rememberEditorAutoSave(
-        editorState = editorState,
-        onAutoSave = { state -> viewModel.autoSaveEntry(state) }
-    )
+    val autoSaveState =
+        rememberEditorAutoSave(
+            editorState = editorState,
+            onAutoSave = { state -> viewModel.autoSaveEntry(state) },
+        )
 
     LaunchedEffect(editorState.errorMessage) {
         editorState.errorMessage?.let { error ->
@@ -102,7 +103,7 @@ fun EntryEditorContent(
             onConfirm = {
                 showExitConfirmation = false
                 onNavigateBack()
-            }
+            },
         )
     }
 
@@ -139,7 +140,13 @@ fun EntryEditorContent(
         },
         editorContent = {
             Napier.d("EntryEditorScreen: Rendering MainEditorContent with blocks: ${uiState.blocks.size}")
-            MainEditorContent(uiState = uiState)
+            MainEditorContent(
+                uiState = uiState,
+                onDismissExpanded = {
+                    Napier.d("MainEditorContent: Back committed, dismissing expanded block")
+                    viewModel.dismissExpandedBlock()
+                },
+            )
         },
         bottomContent = {
             EditorBottomContent(
@@ -153,7 +160,7 @@ fun EntryEditorContent(
     Box(modifier = Modifier.fillMaxSize()) {
         SnackbarHost(
             hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter)
+            modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
 }

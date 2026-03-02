@@ -1,6 +1,6 @@
 @file:OptIn(
     kotlinx.cinterop.BetaInteropApi::class,
-    kotlinx.cinterop.ExperimentalForeignApi::class
+    kotlinx.cinterop.ExperimentalForeignApi::class,
 )
 
 package app.logdate.feature.editor.audio.storage
@@ -22,11 +22,14 @@ import platform.posix.memcpy
  * iOS implementation of WaveformStorage using the app cache directory.
  */
 class IosWaveformStorage(
-    private val cacheRootPath: String = defaultCachePath()
+    private val cacheRootPath: String = defaultCachePath(),
 ) : WaveformStorage {
     private val fileManager = NSFileManager.defaultManager
 
-    override suspend fun save(audioUri: String, amplitudes: List<Float>) = withContext(Dispatchers.Default) {
+    override suspend fun save(
+        audioUri: String,
+        amplitudes: List<Float>,
+    ) = withContext(Dispatchers.Default) {
         ensureCacheDir()
         val filePath = waveformFilePath(audioUri)
         val data = amplitudesToBytes(amplitudes).toNSData()
@@ -34,20 +37,23 @@ class IosWaveformStorage(
         Unit
     }
 
-    override suspend fun load(audioUri: String): List<Float>? = withContext(Dispatchers.Default) {
-        val filePath = waveformFilePath(audioUri)
-        val data = fileManager.contentsAtPath(filePath) ?: return@withContext null
-        bytesToAmplitudes(data.toByteArray())
-    }
+    override suspend fun load(audioUri: String): List<Float>? =
+        withContext(Dispatchers.Default) {
+            val filePath = waveformFilePath(audioUri)
+            val data = fileManager.contentsAtPath(filePath) ?: return@withContext null
+            bytesToAmplitudes(data.toByteArray())
+        }
 
-    override suspend fun exists(audioUri: String): Boolean = withContext(Dispatchers.Default) {
-        fileManager.fileExistsAtPath(waveformFilePath(audioUri))
-    }
+    override suspend fun exists(audioUri: String): Boolean =
+        withContext(Dispatchers.Default) {
+            fileManager.fileExistsAtPath(waveformFilePath(audioUri))
+        }
 
-    override suspend fun delete(audioUri: String) = withContext(Dispatchers.Default) {
-        fileManager.removeItemAtPath(waveformFilePath(audioUri), error = null)
-        Unit
-    }
+    override suspend fun delete(audioUri: String) =
+        withContext(Dispatchers.Default) {
+            fileManager.removeItemAtPath(waveformFilePath(audioUri), error = null)
+            Unit
+        }
 
     private fun waveformFilePath(audioUri: String): String {
         val hash = audioUri.hashCode().toString(16)
@@ -59,7 +65,7 @@ class IosWaveformStorage(
             cacheRootPath,
             withIntermediateDirectories = true,
             attributes = null,
-            error = null
+            error = null,
         )
     }
 
@@ -81,21 +87,21 @@ class IosWaveformStorage(
         val amplitudes = ArrayList<Float>(count)
         var offset = 0
         repeat(count) {
-            val bits = (bytes[offset].toInt() and 0xFF) or
-                ((bytes[offset + 1].toInt() and 0xFF) shl 8) or
-                ((bytes[offset + 2].toInt() and 0xFF) shl 16) or
-                ((bytes[offset + 3].toInt() and 0xFF) shl 24)
+            val bits =
+                (bytes[offset].toInt() and 0xFF) or
+                    ((bytes[offset + 1].toInt() and 0xFF) shl 8) or
+                    ((bytes[offset + 2].toInt() and 0xFF) shl 16) or
+                    ((bytes[offset + 3].toInt() and 0xFF) shl 24)
             amplitudes.add(Float.fromBits(bits))
             offset += 4
         }
         return amplitudes
     }
 
-    private fun ByteArray.toNSData(): NSData {
-        return usePinned { pinned ->
+    private fun ByteArray.toNSData(): NSData =
+        usePinned { pinned ->
             NSData.create(bytes = pinned.addressOf(0), length = size.toULong())
         }
-    }
 
     private fun NSData.toByteArray(): ByteArray {
         val length = this.length.toInt()
@@ -112,13 +118,14 @@ class IosWaveformStorage(
 
 private fun defaultCachePath(): String {
     val fileManager = NSFileManager.defaultManager
-    val url: NSURL? = fileManager.URLForDirectory(
-        directory = NSCachesDirectory,
-        inDomain = NSUserDomainMask,
-        appropriateForURL = null,
-        create = true,
-        error = null
-    )
+    val url: NSURL? =
+        fileManager.URLForDirectory(
+            directory = NSCachesDirectory,
+            inDomain = NSUserDomainMask,
+            appropriateForURL = null,
+            create = true,
+            error = null,
+        )
     val basePath = requireNotNull(url?.path)
     return "$basePath/waveforms"
 }

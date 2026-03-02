@@ -1,5 +1,8 @@
+@file:OptIn(ExperimentalSharedTransitionApi::class)
+
 package app.logdate.feature.editor.ui.content
 
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,99 +24,159 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import io.github.aakira.napier.Napier
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
+import app.logdate.feature.editor.ui.LocalAnimatedVisibilityScope
+import app.logdate.feature.editor.ui.LocalSharedTransitionScope
+import io.github.aakira.napier.Napier
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.add_photo_from_gallery
+import logdate.client.feature.editor.generated.resources.capture
+import logdate.client.feature.editor.generated.resources.capture_photo_or_video
+import logdate.client.feature.editor.generated.resources.choose_a_photo
+import logdate.client.feature.editor.generated.resources.gallery
+import logdate.client.feature.editor.generated.resources.photo_or_video
+import logdate.client.feature.editor.generated.resources.record_audio
+import logdate.client.feature.editor.generated.resources.start_text_entry
+import logdate.client.feature.editor.generated.resources.write_something
+import org.jetbrains.compose.resources.stringResource
+import kotlin.uuid.Uuid
+
 // Constants for spacing and sizing
 private val spacing = 16.dp
 private val cornerRadius = 16.dp
-private val minHeight = 140.dp
-private val photoMinHeight = 200.dp
 
 /**
  * A component for adding new blocks when the editor is empty.
  *
- * This provides interactive buttons to create a new content block, rendering
- * them in a responsive layout that adapts to the parent component.
+ * Each tile pre-generates a block ID so that [sharedBounds] connects the tile's
+ * bounds to the expanded block surface, producing a container-morph transition.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun EmptyEditorStateContent(
-    onStartTextBlock: () -> Unit,
-    onStartPhotoBlock: () -> Unit,
-    onStartAudioBlock: () -> Unit,
-    onStartCameraBlock: () -> Unit = {},
+    onStartTextBlock: (Uuid) -> Unit,
+    onStartPhotoBlock: (Uuid) -> Unit,
+    onStartAudioBlock: (Uuid) -> Unit,
+    onStartCameraBlock: (Uuid) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Use the entire size of the parent with some padding
+    // Stable IDs pre-generated for each tile; used as the shared element key so
+    // the tile morphs into the expanded block surface on tap.
+    val textId = remember { Uuid.random() }
+    val audioId = remember { Uuid.random() }
+    val cameraId = remember { Uuid.random() }
+    val photoId = remember { Uuid.random() }
+
+    val sts = LocalSharedTransitionScope.current
+    val avs = LocalAnimatedVisibilityScope.current
+
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(spacing),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(spacing),
         verticalArrangement = Arrangement.spacedBy(spacing),
     ) {
-        // Top row with text and audio buttons
+        // Top row: text + audio
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+            modifier = Modifier.fillMaxWidth().weight(1f),
             horizontalArrangement = Arrangement.spacedBy(spacing),
         ) {
-            // Text surface
+            val textModifier =
+                if (sts != null && avs != null) {
+                    with(sts) {
+                        Modifier
+                            .weight(1f)
+                            .fillMaxSize()
+                            .sharedBounds(
+                                rememberSharedContentState("block_surface_$textId"),
+                                animatedVisibilityScope = avs,
+                            )
+                    }
+                } else {
+                    Modifier.weight(1f).fillMaxSize()
+                }
             TextEntrySurface(
-                onClick = onStartTextBlock,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxSize()
+                onClick = { onStartTextBlock(textId) },
+                modifier = textModifier,
             )
 
-            // Audio surface
+            val audioModifier =
+                if (sts != null && avs != null) {
+                    with(sts) {
+                        Modifier
+                            .weight(1f)
+                            .fillMaxSize()
+                            .sharedBounds(
+                                rememberSharedContentState("block_surface_$audioId"),
+                                animatedVisibilityScope = avs,
+                            )
+                    }
+                } else {
+                    Modifier.weight(1f).fillMaxSize()
+                }
             AudioRecordingSurface(
-                onClick = onStartAudioBlock,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxSize()
+                onClick = { onStartAudioBlock(audioId) },
+                modifier = audioModifier,
             )
         }
 
-        // Middle row with camera and photo options
+        // Bottom row: camera + photo gallery
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+            modifier = Modifier.fillMaxWidth().weight(1f),
             horizontalArrangement = Arrangement.spacedBy(spacing),
         ) {
-            // Camera capture surface
+            val cameraModifier =
+                if (sts != null && avs != null) {
+                    with(sts) {
+                        Modifier
+                            .weight(1f)
+                            .fillMaxSize()
+                            .sharedBounds(
+                                rememberSharedContentState("block_surface_$cameraId"),
+                                animatedVisibilityScope = avs,
+                            )
+                    }
+                } else {
+                    Modifier.weight(1f).fillMaxSize()
+                }
             CameraCaptureSurface(
-                onClick = onStartCameraBlock,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxSize()
+                onClick = { onStartCameraBlock(cameraId) },
+                modifier = cameraModifier,
             )
 
-            // Photo gallery surface
+            val photoModifier =
+                if (sts != null && avs != null) {
+                    with(sts) {
+                        Modifier
+                            .weight(1f)
+                            .fillMaxSize()
+                            .sharedBounds(
+                                rememberSharedContentState("block_surface_$photoId"),
+                                animatedVisibilityScope = avs,
+                            )
+                    }
+                } else {
+                    Modifier.weight(1f).fillMaxSize()
+                }
             PhotoSurface(
-                onClick = onStartPhotoBlock,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxSize()
+                onClick = { onStartPhotoBlock(photoId) },
+                modifier = photoModifier,
             )
         }
     }
 }
 
-/**
- * Surface for creating a new text entry
- */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 private fun TextEntrySurface(
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Napier.i("TextEntrySurface: Initializing surface with onClick handler")
     Surface(
@@ -128,37 +190,35 @@ private fun TextEntrySurface(
     ) {
         Box(
             modifier = Modifier.fillMaxSize().padding(16.dp),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Center,
             ) {
                 Icon(
                     imageVector = Icons.Rounded.TextFields,
                     contentDescription = stringResource(Res.string.start_text_entry),
                     modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = MaterialTheme.colorScheme.primary,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = stringResource(Res.string.write_something),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
             }
         }
     }
 }
 
-/**
- * Surface for creating a new audio recording
- */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 private fun AudioRecordingSurface(
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Surface(
         onClick = {
@@ -171,23 +231,23 @@ private fun AudioRecordingSurface(
     ) {
         Box(
             modifier = Modifier.fillMaxSize().padding(16.dp),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Center,
             ) {
                 Surface(
                     shape = RoundedCornerShape(50),
                     color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier.size(48.dp),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Rounded.Mic,
                             contentDescription = stringResource(Res.string.record_audio),
                             tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(24.dp),
                         )
                     }
                 }
@@ -196,20 +256,18 @@ private fun AudioRecordingSurface(
                     text = stringResource(Res.string.record_audio),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
             }
         }
     }
 }
 
-/**
- * Surface for capturing a new photo or video with camera
- */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 private fun CameraCaptureSurface(
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Surface(
         onClick = {
@@ -222,43 +280,41 @@ private fun CameraCaptureSurface(
     ) {
         Box(
             modifier = Modifier.fillMaxSize().padding(16.dp),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Center,
             ) {
                 Icon(
                     imageVector = Icons.Rounded.CameraAlt,
                     contentDescription = stringResource(Res.string.capture_photo_or_video),
                     modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.onTertiaryContainer
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = stringResource(Res.string.capture),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onTertiaryContainer,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
                 Text(
                     text = stringResource(Res.string.photo_or_video),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f),
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
             }
         }
     }
 }
 
-/**
- * Surface for selecting a photo from gallery
- */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 private fun PhotoSurface(
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Surface(
         onClick = {
@@ -271,30 +327,30 @@ private fun PhotoSurface(
     ) {
         Box(
             modifier = Modifier.fillMaxSize().padding(16.dp),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Center,
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Image,
                     contentDescription = stringResource(Res.string.add_photo_from_gallery),
                     modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = stringResource(Res.string.gallery),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
                 Text(
                     text = stringResource(Res.string.choose_a_photo),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
             }
         }

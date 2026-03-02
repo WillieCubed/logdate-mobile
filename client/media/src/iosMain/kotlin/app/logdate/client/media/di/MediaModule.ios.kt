@@ -10,14 +10,15 @@ import org.koin.dsl.module
 /**
  * Module that exposes handles for interacting with OS-specific media library APIs.
  */
-actual val mediaModule: Module = module {
-    // Include the audio module only
-    includes(audioModule)
-    
-    single<MediaManager> { IosMediaManager() }
+actual val mediaModule: Module =
+    module {
+        // Include the audio module only
+        includes(audioModule)
 
-    // Transcription manager for iOS
-    single<TranscriptionManager> { 
-        IosTranscriptionManager(get())
+        single<MediaManager> { IosMediaManager() }
+
+        // Transcription manager for iOS
+        single<TranscriptionManager> {
+            IosTranscriptionManager(get())
+        }
     }
-}

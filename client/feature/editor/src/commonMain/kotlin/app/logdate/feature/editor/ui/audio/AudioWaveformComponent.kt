@@ -26,6 +26,7 @@ private val DEFAULT_WAVEFORM_STROKE_WIDTH = 2.dp
  * A component that renders a waveform visualization of audio data.
  * Always scales to fit its parent container without getting cut off.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun AudioWaveformComponent(
     audioLevels: List<Float>,
@@ -38,43 +39,44 @@ fun AudioWaveformComponent(
 ) {
     val density = LocalDensity.current
     val strokeWidthPx = with(density) { strokeWidth.toPx() }
-    
+
     // Always use fillMaxSize to ensure the waveform scales with its container
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.small)
-            .padding(horizontal = 4.dp) // Reduced padding to avoid edges getting cut off
-            // Apply minimum height constraint
-            .then(Modifier.heightIn(min = minHeight))
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.small)
+                .padding(horizontal = 4.dp) // Reduced padding to avoid edges getting cut off
+                // Apply minimum height constraint
+                .then(Modifier.heightIn(min = minHeight)),
     ) {
         Canvas(
-            modifier = Modifier
-                .fillMaxSize() // Fill the entire container
+            modifier =
+                Modifier
+                    .fillMaxSize(), // Fill the entire container
         ) {
             val canvasWidth = size.width
             val canvasHeight = size.height
             val centerY = canvasHeight / 2f
-            
+
             if (audioLevels.isNotEmpty()) {
-                // Calculate the bar width based on available space and number of bars
-                val effectiveMaxBars = maxBars.coerceAtMost(audioLevels.size)
-                val barWidth = canvasWidth / effectiveMaxBars.coerceAtLeast(1)
-                
+                // Fixed bar width based on maxBars so bars don't spread when count < maxBars
+                val barWidth = canvasWidth / maxBars.coerceAtLeast(1)
+
                 // Ensure bars don't exceed 80% of available height
                 val maxBarHeight = canvasHeight * 0.8f
-                
-                audioLevels.take(effectiveMaxBars).forEachIndexed { index, level ->
+
+                audioLevels.take(maxBars).forEachIndexed { index, level ->
                     val x = index * barWidth + barWidth / 2f
                     // Scale the level to the available height
                     val barHeight = level * maxBarHeight
-                    
+
                     drawLine(
                         color = waveformColor,
                         start = Offset(x, centerY - barHeight / 2f),
                         end = Offset(x, centerY + barHeight / 2f),
                         strokeWidth = strokeWidthPx,
-                        cap = StrokeCap.Round
+                        cap = StrokeCap.Round,
                     )
                 }
             } else {
@@ -84,7 +86,7 @@ fun AudioWaveformComponent(
                     start = Offset(0f, centerY),
                     end = Offset(canvasWidth, centerY),
                     strokeWidth = strokeWidthPx / 2f,
-                    cap = StrokeCap.Round
+                    cap = StrokeCap.Round,
                 )
             }
         }
@@ -102,18 +104,19 @@ data class AudioWaveformState(
     /**
      * Adds a new audio level to the waveform data
      */
-    fun addLevel(level: Float, maxHistory: Int = 50): AudioWaveformState {
+    fun addLevel(
+        level: Float,
+        maxHistory: Int = 50,
+    ): AudioWaveformState {
         val normalizedLevel = (level / maxLevel).coerceIn(0f, 1f)
         val newLevels = (levels + normalizedLevel).takeLast(maxHistory)
         return copy(levels = newLevels)
     }
-    
+
     /**
      * Clears all waveform data
      */
-    fun clear(): AudioWaveformState {
-        return copy(levels = emptyList())
-    }
+    fun clear(): AudioWaveformState = copy(levels = emptyList())
 }
 
 /**
@@ -123,11 +126,10 @@ data class AudioWaveformState(
 fun rememberAudioWaveformState(
     initialLevels: List<Float> = emptyList(),
     isRecording: Boolean = false,
-): AudioWaveformState {
-    return remember {
+): AudioWaveformState =
+    remember {
         AudioWaveformState(
             levels = initialLevels,
-            isRecording = isRecording
+            isRecording = isRecording,
         )
     }
-}

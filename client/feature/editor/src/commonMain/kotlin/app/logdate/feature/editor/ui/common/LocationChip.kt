@@ -23,6 +23,7 @@ import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.location_chip_content_description
 import org.jetbrains.compose.resources.stringResource
 
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun LocationChip(
     location: String,
@@ -30,23 +31,25 @@ fun LocationChip(
     onClick: () -> Unit = {},
 ) {
     Row(
-        modifier = Modifier
-            .clip(MaterialTheme.shapes.large)
-            .background(MaterialTheme.colorScheme.tertiaryContainer)
-            .border(2.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.large)
-            .clickable(onClick = onClick)
-            .padding(
-                horizontal = Spacing.sm,
-                vertical = Spacing.xs
-            ),
+        modifier =
+            Modifier
+                .clip(MaterialTheme.shapes.large)
+                .background(MaterialTheme.colorScheme.tertiaryContainer)
+                .border(2.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.large)
+                .clickable(onClick = onClick)
+                .padding(
+                    horizontal = Spacing.sm,
+                    vertical = Spacing.xs,
+                ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
-        val icon = if (enabled) {
-            Icons.Default.LocationOn
-        } else {
-            Icons.Default.LocationOff
-        }
+        val icon =
+            if (enabled) {
+                Icons.Default.LocationOn
+            } else {
+                Icons.Default.LocationOff
+            }
         Icon(
             imageVector = icon,
             contentDescription = stringResource(Res.string.location_chip_content_description),

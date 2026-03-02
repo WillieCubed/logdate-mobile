@@ -1,10 +1,10 @@
 package app.logdate.feature.editor.audio.color
 
 import app.logdate.feature.editor.audio.model.DaylightPeriod
-import kotlin.time.Instant
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Instant
 
 /**
  * Classifies the time of day into a DaylightPeriod based on sun position.
@@ -20,7 +20,6 @@ import kotlinx.datetime.toLocalDateTime
  * - NIGHT: Dark hours
  */
 class DaylightClassifier {
-
     /**
      * Classifies the recording time into a DaylightPeriod.
      *
@@ -32,7 +31,7 @@ class DaylightClassifier {
     fun classify(
         recordingTime: Instant,
         latitude: Double,
-        longitude: Double
+        longitude: Double,
     ): DaylightPeriod {
         val localDateTime = recordingTime.toLocalDateTime(TimeZone.currentSystemDefault())
         val date = localDateTime.date
@@ -62,7 +61,10 @@ class DaylightClassifier {
         }
     }
 
-    private fun classifyTime(time: LocalTime, sunTimes: SunTimes): DaylightPeriod {
+    private fun classifyTime(
+        time: LocalTime,
+        sunTimes: SunTimes,
+    ): DaylightPeriod {
         val sunriseMinutes = sunTimes.sunrise.toMinuteOfDay()
         val sunsetMinutes = sunTimes.sunset.toMinuteOfDay()
         val noonMinutes = sunTimes.solarNoon.toMinuteOfDay()

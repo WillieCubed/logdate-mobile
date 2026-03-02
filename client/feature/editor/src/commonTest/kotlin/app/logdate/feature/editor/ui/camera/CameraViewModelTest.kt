@@ -17,7 +17,6 @@ import kotlin.test.assertTrue
  * - State copying
  */
 class CameraUiStateTest {
-
     @Test
     fun `initial state has correct defaults`() {
         val state = CameraUiState()
@@ -60,13 +59,14 @@ class CameraUiStateTest {
     @Test
     fun `copy updates fields correctly`() {
         val initial = CameraUiState()
-        val updated = initial.copy(
-            isPreviewActive = true,
-            cameraFacing = CameraFacing.FRONT,
-            captureMode = CaptureMode.VIDEO,
-            isRecording = true,
-            recordingDurationMs = 10000L
-        )
+        val updated =
+            initial.copy(
+                isPreviewActive = true,
+                cameraFacing = CameraFacing.FRONT,
+                captureMode = CaptureMode.VIDEO,
+                isRecording = true,
+                recordingDurationMs = 10000L,
+            )
 
         assertTrue(updated.isPreviewActive)
         assertEquals(CameraFacing.FRONT, updated.cameraFacing)
@@ -78,10 +78,11 @@ class CameraUiStateTest {
     @Test
     fun `copy with captured media updates correctly`() {
         val initial = CameraUiState()
-        val updated = initial.copy(
-            capturedMediaUri = "content://test/photo.jpg",
-            capturedMediaType = CapturedMediaType.PHOTO
-        )
+        val updated =
+            initial.copy(
+                capturedMediaUri = "content://test/photo.jpg",
+                capturedMediaType = CapturedMediaType.PHOTO,
+            )
 
         assertEquals("content://test/photo.jpg", updated.capturedMediaUri)
         assertEquals(CapturedMediaType.PHOTO, updated.capturedMediaType)
@@ -90,12 +91,13 @@ class CameraUiStateTest {
     @Test
     fun `copy with video capture state updates correctly`() {
         val initial = CameraUiState()
-        val updated = initial.copy(
-            captureMode = CaptureMode.VIDEO,
-            isRecording = true,
-            capturedMediaUri = "content://test/video.mp4",
-            capturedMediaType = CapturedMediaType.VIDEO
-        )
+        val updated =
+            initial.copy(
+                captureMode = CaptureMode.VIDEO,
+                isRecording = true,
+                capturedMediaUri = "content://test/video.mp4",
+                capturedMediaType = CapturedMediaType.VIDEO,
+            )
 
         assertEquals(CaptureMode.VIDEO, updated.captureMode)
         assertTrue(updated.isRecording)
@@ -119,7 +121,6 @@ class CameraUiStateTest {
  * This is a test double, not production code.
  */
 class FakeCameraCaptureManager : CameraCaptureManager {
-
     private val _state = MutableStateFlow(CameraCaptureState())
     override val state: StateFlow<CameraCaptureState> = _state
 
@@ -145,10 +146,11 @@ class FakeCameraCaptureManager : CameraCaptureManager {
 
     override suspend fun startPreview(facing: CameraFacing) {
         isPreviewStarted = true
-        _state.value = _state.value.copy(
-            isPreviewActive = true,
-            cameraFacing = facing
-        )
+        _state.value =
+            _state.value.copy(
+                isPreviewActive = true,
+                cameraFacing = facing,
+            )
     }
 
     override suspend fun stopPreview() {
@@ -174,10 +176,11 @@ class FakeCameraCaptureManager : CameraCaptureManager {
 
     override suspend fun switchCamera() {
         switchCameraCalled = true
-        val newFacing = when (_state.value.cameraFacing) {
-            CameraFacing.BACK -> CameraFacing.FRONT
-            CameraFacing.FRONT -> CameraFacing.BACK
-        }
+        val newFacing =
+            when (_state.value.cameraFacing) {
+                CameraFacing.BACK -> CameraFacing.FRONT
+                CameraFacing.FRONT -> CameraFacing.BACK
+            }
         _state.value = _state.value.copy(cameraFacing = newFacing)
     }
 

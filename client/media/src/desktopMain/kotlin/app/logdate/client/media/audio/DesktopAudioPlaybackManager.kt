@@ -40,11 +40,12 @@ class DesktopAudioPlaybackManager : AudioPlaybackManager {
             stopPlayback()
 
             // Parse the URI to get a file
-            val path = when {
-                uri.startsWith("file:///") -> uri.substring(7)
-                uri.startsWith("file:/") -> uri.substring(5)
-                else -> uri
-            }
+            val path =
+                when {
+                    uri.startsWith("file:///") -> uri.substring(7)
+                    uri.startsWith("file:/") -> uri.substring(5)
+                    else -> uri
+                }
 
             val file = File(path)
             if (!file.exists()) {
@@ -135,17 +136,18 @@ class DesktopAudioPlaybackManager : AudioPlaybackManager {
     private fun startProgressUpdates(onProgressUpdated: (Float) -> Unit) {
         stopProgressUpdates()
 
-        progressUpdateJob = scope.launch {
-            while (isActive && isPlaying) {
-                clip?.let {
-                    if (totalFrames > 0) {
-                        val progress = it.framePosition.toFloat() / totalFrames.toFloat()
-                        onProgressUpdated(progress)
+        progressUpdateJob =
+            scope.launch {
+                while (isActive && isPlaying) {
+                    clip?.let {
+                        if (totalFrames > 0) {
+                            val progress = it.framePosition.toFloat() / totalFrames.toFloat()
+                            onProgressUpdated(progress)
+                        }
                     }
+                    delay(100) // Update every 100ms
                 }
-                delay(100) // Update every 100ms
             }
-        }
     }
 
     private fun stopProgressUpdates() {

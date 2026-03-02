@@ -3,8 +3,8 @@ package app.logdate.feature.editor.ui.camera
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -27,9 +27,11 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import io.github.aakira.napier.Napier
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.delete_media
+import logdate.client.feature.editor.generated.resources.play_video
+import org.jetbrains.compose.resources.stringResource
+
 /**
  * Editor component for camera-captured media blocks.
  * Displays either the captured media with caption editing, or the camera capture UI.
@@ -39,12 +41,13 @@ import logdate.client.feature.editor.generated.resources.Res
  * @param onDeleteRequested Callback when the block should be deleted
  * @param modifier Modifier for layout customization
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun CameraBlockEditor(
     block: CameraBlockUiState,
     onBlockUpdated: (CameraBlockUiState) -> Unit,
     onDeleteRequested: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val hasExistingMedia = block.uri != null
 
@@ -55,7 +58,7 @@ fun CameraBlockEditor(
             block = block,
             onBlockUpdated = onBlockUpdated,
             onDeleteRequested = onDeleteRequested,
-            modifier = modifier
+            modifier = modifier,
         )
     } else {
         CameraCaptureContent(
@@ -65,12 +68,12 @@ fun CameraBlockEditor(
                     block.copy(
                         uri = uri,
                         mediaType = mediaType,
-                        durationMs = durationMs
-                    )
+                        durationMs = durationMs,
+                    ),
                 )
             },
             onClose = onDeleteRequested,
-            modifier = modifier
+            modifier = modifier,
         )
     }
 }
@@ -78,54 +81,58 @@ fun CameraBlockEditor(
 /**
  * Displays captured media (photo or video) with caption editing and delete option.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 private fun CapturedMediaContent(
     block: CameraBlockUiState,
     onBlockUpdated: (CameraBlockUiState) -> Unit,
     onDeleteRequested: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(8.dp)
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(8.dp),
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
             when (block.mediaType) {
                 CapturedMediaType.PHOTO -> {
                     AsyncImage(
-                        model = ImageRequest.Builder(LocalPlatformContext.current)
-                            .data(block.uri)
-                            .crossfade(true)
-                            .build(),
+                        model =
+                            ImageRequest
+                                .Builder(LocalPlatformContext.current)
+                                .data(block.uri)
+                                .crossfade(true)
+                                .build(),
                         contentDescription = block.caption.ifBlank { "Captured photo" },
-                        contentScale = ContentScale.FillWidth,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(240.dp)
-                            .clip(RoundedCornerShape(8.dp))
+                        contentScale = ContentScale.Crop,
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(8.dp)),
                     )
                 }
 
                 CapturedMediaType.VIDEO -> {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(240.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center,
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(
                                 imageVector = Icons.Default.PlayArrow,
                                 contentDescription = stringResource(Res.string.play_video),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
                                 text = formatDuration(block.durationMs),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -135,13 +142,13 @@ private fun CapturedMediaContent(
             DeleteMediaButton(
                 onClick = onDeleteRequested,
                 contentDescription = stringResource(Res.string.delete_media),
-                modifier = Modifier.align(Alignment.TopEnd)
+                modifier = Modifier.align(Alignment.TopEnd),
             )
         }
 
         MediaCaptionField(
             caption = block.caption,
-            onCaptionChanged = { onBlockUpdated(block.copy(caption = it)) }
+            onCaptionChanged = { onBlockUpdated(block.copy(caption = it)) },
         )
     }
 }
@@ -149,9 +156,7 @@ private fun CapturedMediaContent(
 /**
  * Formats a duration in milliseconds to a MM:SS string.
  */
-private fun formatDuration(durationMs: Long): String {
-    return formatMediaDuration(durationMs, true)
-}
+private fun formatDuration(durationMs: Long): String = formatMediaDuration(durationMs, true)
 
 /**
  * Platform-specific camera capture content.
@@ -161,9 +166,10 @@ private fun formatDuration(durationMs: Long): String {
  * @param onClose Callback when the user closes the camera without capturing
  * @param modifier Modifier for layout customization
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 expect fun CameraCaptureContent(
     onMediaCaptured: (uri: String, mediaType: CapturedMediaType, durationMs: Long) -> Unit,
     onClose: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 )

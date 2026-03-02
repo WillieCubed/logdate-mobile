@@ -16,22 +16,23 @@ import org.koin.dsl.module
  * Android-specific module for the editor feature.
  * Provides platform-specific implementations.
  */
-actual val platformEditorModule: Module = module {
-    // Provide Android implementation of ImagePickerService
-    single<ImagePickerService> {
-        AndroidImagePickerService(androidContext())
-    }
+actual val platformEditorModule: Module =
+    module {
+        // Provide Android implementation of ImagePickerService
+        single<ImagePickerService> {
+            AndroidImagePickerService(androidContext())
+        }
 
-    // Provide Android implementation of CameraCaptureManager
-    single<CameraCaptureManager> {
-        AndroidCameraCaptureManager(androidContext())
-    }
+        // Provide Android implementation of CameraCaptureManager
+        single<CameraCaptureManager> {
+            AndroidCameraCaptureManager(androidContext())
+        }
 
-    // Audio waveform processing dependencies
-    single<AmplitudeExtractor> {
-        AndroidAmplitudeExtractor(androidContext())
+        // Audio waveform processing dependencies
+        single<AmplitudeExtractor> {
+            AndroidAmplitudeExtractor(androidContext())
+        }
+        single<WaveformStorage> {
+            AndroidWaveformStorage(androidContext())
+        }
     }
-    single<WaveformStorage> {
-        AndroidWaveformStorage(androidContext())
-    }
-}

@@ -17,7 +17,5 @@ import androidx.compose.ui.unit.Dp
  */
 fun Modifier.constrainHeightByWidth(
     width: Dp,
-    maxRatio: Float
-): Modifier {
-    return this.heightIn(max = width / maxRatio)
-}
+    maxRatio: Float,
+): Modifier = this.heightIn(max = width / maxRatio)

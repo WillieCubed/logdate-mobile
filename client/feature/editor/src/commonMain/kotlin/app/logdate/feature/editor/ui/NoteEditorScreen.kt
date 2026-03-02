@@ -1,6 +1,6 @@
 @file:OptIn(
     ExperimentalMaterial3Api::class,
-    ExperimentalFoundationApi::class
+    ExperimentalFoundationApi::class,
 )
 
 package app.logdate.feature.editor.ui
@@ -12,8 +12,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import io.github.aakira.napier.Napier
-import kotlin.uuid.Uuid
 import org.koin.compose.viewmodel.koinViewModel
+import kotlin.uuid.Uuid
 
 /**
  * The main screen for creating a new note or editing an existing entry.
@@ -41,6 +41,7 @@ import org.koin.compose.viewmodel.koinViewModel
  *        Only used when entryId is null. Ignored when editing existing entries.
  * @param viewModel The ViewModel managing editor state and operations. Typically injected via Koin.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun NoteEditorScreen(
     onNavigateBack: () -> Unit,
@@ -71,7 +72,11 @@ fun NoteEditorScreen(
             try {
                 // Handle initial text content if explicitly provided
                 if (!initialTextContent.isNullOrBlank()) {
-                    Napier.d("NoteEditorScreen: Setting initial text content: '${initialTextContent.take(20)}${if (initialTextContent.length > 20) "..." else ""}'")
+                    Napier.d(
+                        "NoteEditorScreen: Setting initial text content: '${initialTextContent.take(
+                            20,
+                        )}${if (initialTextContent.length > 20) "..." else ""}'",
+                    )
                     viewModel.setInitialTextContent(initialTextContent)
                 }
 
@@ -92,6 +97,6 @@ fun NoteEditorScreen(
         onNavigateBack = onNavigateBack,
         onEntrySaved = onEntrySaved,
         modifier = modifier,
-        viewModel = viewModel
+        viewModel = viewModel,
     )
 }

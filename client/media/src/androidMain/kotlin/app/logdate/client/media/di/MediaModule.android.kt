@@ -11,14 +11,15 @@ import org.koin.dsl.module
 
 /**
  * Module that exposes handles for interacting with OS-specific media library APIs.
- * 
+ *
  * Note: We don't include audioModule here anymore to avoid circular dependencies.
  */
-actual val mediaModule: Module = module {
-    // Media manager dependencies
-    single<ContentResolver> { androidContext().contentResolver }
-    single<MediaManager> { AndroidMediaManager(get(), get()) }
-    
-    // Transcription manager
-    single<TranscriptionManager> { AndroidTranscriptionManager(androidContext()) }
-}
+actual val mediaModule: Module =
+    module {
+        // Media manager dependencies
+        single<ContentResolver> { androidContext().contentResolver }
+        single<MediaManager> { AndroidMediaManager(get(), get()) }
+
+        // Transcription manager
+        single<TranscriptionManager> { AndroidTranscriptionManager(androidContext()) }
+    }

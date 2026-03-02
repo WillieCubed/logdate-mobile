@@ -2,7 +2,6 @@ package app.logdate.client.media.audio
 
 import android.app.PendingIntent
 import android.content.Intent
-import app.logdate.client.media.R
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -12,28 +11,31 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import app.logdate.client.media.R
 
 class AudioPlaybackService : MediaSessionService() {
-
     companion object {
         const val CHANNEL_ID = "audio_playback_channel"
         const val NOTIFICATION_ID = 2002
     }
 
     private var mediaSession: MediaSession? = null
+
     override fun onCreate() {
         super.onCreate()
 
-        val player = ExoPlayer.Builder(this)
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(C.USAGE_MEDIA)
-                    .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
-                    .build(),
-                true,
-            )
-            .setHandleAudioBecomingNoisy(true)
-            .build()
+        val player =
+            ExoPlayer
+                .Builder(this)
+                .setAudioAttributes(
+                    AudioAttributes
+                        .Builder()
+                        .setUsage(C.USAGE_MEDIA)
+                        .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
+                        .build(),
+                    true,
+                ).setHandleAudioBecomingNoisy(true)
+                .build()
 
         val sessionActivity = createSessionActivity()
         val sessionBuilder = MediaSession.Builder(this, player)
@@ -42,23 +44,28 @@ class AudioPlaybackService : MediaSessionService() {
         }
         mediaSession = sessionBuilder.build()
 
-        val notificationProvider = DefaultMediaNotificationProvider.Builder(this)
-            .setNotificationId(NOTIFICATION_ID)
-            .setChannelId(CHANNEL_ID)
-            .setChannelName(R.string.audio_playback_channel_name)
-            .build()
+        val notificationProvider =
+            DefaultMediaNotificationProvider
+                .Builder(this)
+                .setNotificationId(NOTIFICATION_ID)
+                .setChannelId(CHANNEL_ID)
+                .setChannelName(R.string.audio_playback_channel_name)
+                .build()
         setMediaNotificationProvider(notificationProvider)
 
         player.addListener(
             object : Player.Listener {
-                override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                override fun onMediaItemTransition(
+                    mediaItem: MediaItem?,
+                    reason: Int,
+                ) {
                     updateSessionActivity(mediaItem?.mediaMetadata)
                 }
 
                 override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
                     updateSessionActivity(mediaMetadata)
                 }
-            }
+            },
         )
     }
 
@@ -100,5 +107,4 @@ class AudioPlaybackService : MediaSessionService() {
         val pendingIntent = createSessionActivity(noteId) ?: return
         mediaSession?.setSessionActivity(pendingIntent)
     }
-
 }

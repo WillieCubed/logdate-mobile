@@ -25,112 +25,117 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.client.permissions.PermissionManager
-import app.logdate.client.permissions.PermissionStatus
 import app.logdate.client.permissions.PermissionType
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.launch
-import org.koin.compose.koinInject
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.allow_microphone_access
+import logdate.client.feature.editor.generated.resources.open_app_settings
+import logdate.client.feature.editor.generated.resources.you_can_record_audio_notes_after_granting_permission
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
+
 /**
  * Wrapper component that handles audio recording permissions for Android.
  * If permissions are not granted, displays a request UI.
  * If permissions are granted, displays the audio editor content.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
-actual fun AudioPermissionWrapper(
-    content: @Composable () -> Unit
-) {
+actual fun AudioPermissionWrapper(content: @Composable () -> Unit) {
     // Get permission manager from Koin
     val permissionManager: PermissionManager = koinInject()
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    
+
     // Track permission state
     var permissionState by remember {
         mutableStateOf(
-            permissionManager.isPermissionGranted(PermissionType.MICROPHONE)
+            permissionManager.isPermissionGranted(PermissionType.MICROPHONE),
         )
     }
-    
+
     var showRationale by remember { mutableStateOf(false) }
-    
+
     // Check permissions on initial load
     LaunchedEffect(Unit) {
         permissionState = permissionManager.isPermissionGranted(PermissionType.MICROPHONE)
-        
-        showRationale = !permissionState && 
+
+        showRationale = !permissionState &&
             permissionManager.shouldShowRationale(PermissionType.MICROPHONE)
-        
+
         Napier.d("Initial microphone permission state: $permissionState")
     }
-    
+
     // Create permission launcher for microphone permission
-    val requestAudioPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        Napier.d("Microphone permission result: $isGranted")
-        permissionState = isGranted
-        if (!isGranted) {
-            showRationale = permissionManager.shouldShowRationale(PermissionType.MICROPHONE)
+    val requestAudioPermissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) { isGranted: Boolean ->
+            Napier.d("Microphone permission result: $isGranted")
+            permissionState = isGranted
+            if (!isGranted) {
+                showRationale = permissionManager.shouldShowRationale(PermissionType.MICROPHONE)
+            }
         }
-    }
-    
+
     // Function to request microphone permission using the Activity launcher
     val requestPermissions = {
         Napier.d("Requesting microphone permission")
         requestAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }
-    
+
     if (permissionState) {
         // Permissions granted, show content
         content()
     } else {
         // Permissions not granted, show request UI
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+            contentAlignment = Alignment.Center,
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(16.dp),
             ) {
                 Text(
-                    text = if (showRationale) 
-                        "Microphone permission is required to record audio notes. Please enable it in app settings." 
-                    else 
-                        "LogDate needs access to your microphone to record audio notes. This permission is only used when you actively choose to record audio.",
+                    text =
+                        if (showRationale) {
+                            "Microphone permission is required to record audio notes. Please enable it in app settings."
+                        } else {
+                            "LogDate needs access to your microphone to record audio notes. This permission is only used when you actively choose to record audio."
+                        },
                     style = MaterialTheme.typography.bodyLarge,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 if (showRationale) {
                     Button(
-                        onClick = { 
+                        onClick = {
                             permissionManager.openAppSettings()
-                        }
+                        },
                     ) {
                         Text(stringResource(Res.string.open_app_settings))
                     }
                 } else {
                     Button(
-                        onClick = { requestPermissions() }
+                        onClick = { requestPermissions() },
                     ) {
                         Text(stringResource(Res.string.allow_microphone_access))
                     }
-                    
+
                     Spacer(modifier = Modifier.height(8.dp))
-                    
+
                     Text(
                         text = stringResource(Res.string.you_can_record_audio_notes_after_granting_permission),
                         style = MaterialTheme.typography.bodySmall,
                         textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                     )
                 }
             }

@@ -22,10 +22,11 @@ import androidx.compose.ui.unit.dp
  * Shared animation spec for morphing icons - defined as a constant to avoid
  * recreating the spec on each recomposition.
  */
-private val MorphAnimationSpec: AnimationSpec<Float> = spring(
-    dampingRatio = Spring.DampingRatioLowBouncy,
-    stiffness = Spring.StiffnessMediumLow
-)
+private val MorphAnimationSpec: AnimationSpec<Float> =
+    spring(
+        dampingRatio = Spring.DampingRatioLowBouncy,
+        stiffness = Spring.StiffnessMediumLow,
+    )
 
 /**
  * A play/pause icon that gracefully morphs between the two states.
@@ -41,12 +42,13 @@ private val MorphAnimationSpec: AnimationSpec<Float> = spring(
  * @param size Size of the icon
  * @param tint Color of the icon
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun MorphingPlayPauseIcon(
     isPlaying: Boolean,
     modifier: Modifier = Modifier,
     size: Dp = 24.dp,
-    tint: Color = Color.White
+    tint: Color = Color.White,
 ) {
     // Wrap the parameter in a State so derivedStateOf can track it
     val isPlayingState = remember { mutableStateOf(isPlaying) }.apply { value = isPlaying }
@@ -60,7 +62,7 @@ fun MorphingPlayPauseIcon(
     val morphProgress by animateFloatAsState(
         targetValue = targetValue,
         animationSpec = MorphAnimationSpec,
-        label = "PlayPauseMorph"
+        label = "PlayPauseMorph",
     )
 
     Canvas(modifier = modifier.size(size)) {
@@ -76,12 +78,13 @@ fun MorphingPlayPauseIcon(
  * @param size Size of the icon
  * @param tint Color of the icon
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun MorphingPlayStopIcon(
     isActive: Boolean,
     modifier: Modifier = Modifier,
     size: Dp = 24.dp,
-    tint: Color = Color.White
+    tint: Color = Color.White,
 ) {
     // Wrap the parameter in a State so derivedStateOf can track it
     val isActiveState = remember { mutableStateOf(isActive) }.apply { value = isActive }
@@ -94,7 +97,7 @@ fun MorphingPlayStopIcon(
     val morphProgress by animateFloatAsState(
         targetValue = targetValue,
         animationSpec = MorphAnimationSpec,
-        label = "PlayStopMorph"
+        label = "PlayStopMorph",
     )
 
     Canvas(modifier = modifier.size(size)) {
@@ -102,7 +105,10 @@ fun MorphingPlayStopIcon(
     }
 }
 
-private fun DrawScope.drawMorphedIcon(progress: Float, tint: Color) {
+private fun DrawScope.drawMorphedIcon(
+    progress: Float,
+    tint: Color,
+) {
     val width = size.width
     val height = size.height
 
@@ -130,59 +136,61 @@ private fun DrawScope.drawMorphedIcon(progress: Float, tint: Color) {
     val rightBarRight = width - padding
 
     // Draw left shape (morphs from left half of triangle to left pause bar)
-    val leftPath = Path().apply {
-        // Top-left corner
-        val topLeftX = lerp(playLeftX, leftBarLeft, progress)
-        val topLeftY = lerp(playTopY, padding, progress)
-        moveTo(topLeftX, topLeftY)
+    val leftPath =
+        Path().apply {
+            // Top-left corner
+            val topLeftX = lerp(playLeftX, leftBarLeft, progress)
+            val topLeftY = lerp(playTopY, padding, progress)
+            moveTo(topLeftX, topLeftY)
 
-        // Top-right corner
-        val topRightX = lerp(playRightX, leftBarRight, progress)
-        val topRightY = lerp(playMidY, padding, progress)
-        lineTo(topRightX, topRightY)
+            // Top-right corner
+            val topRightX = lerp(playRightX, leftBarRight, progress)
+            val topRightY = lerp(playMidY, padding, progress)
+            lineTo(topRightX, topRightY)
 
-        // Bottom-right corner
-        val bottomRightX = lerp(playRightX, leftBarRight, progress)
-        val bottomRightY = lerp(playMidY, height - padding, progress)
-        lineTo(bottomRightX, bottomRightY)
+            // Bottom-right corner
+            val bottomRightX = lerp(playRightX, leftBarRight, progress)
+            val bottomRightY = lerp(playMidY, height - padding, progress)
+            lineTo(bottomRightX, bottomRightY)
 
-        // Bottom-left corner
-        val bottomLeftX = lerp(playLeftX, leftBarLeft, progress)
-        val bottomLeftY = lerp(playBottomY, height - padding, progress)
-        lineTo(bottomLeftX, bottomLeftY)
+            // Bottom-left corner
+            val bottomLeftX = lerp(playLeftX, leftBarLeft, progress)
+            val bottomLeftY = lerp(playBottomY, height - padding, progress)
+            lineTo(bottomLeftX, bottomLeftY)
 
-        close()
-    }
+            close()
+        }
 
     // Draw right shape (morphs from collapsed point to right pause bar)
     // At progress 0, this is a thin sliver at the right point of the triangle
     // At progress 1, this is the full right pause bar
-    val rightPath = Path().apply {
-        // Calculate the squeeze factor - right shape emerges from the right point
-        val squeezeProgress = progress
+    val rightPath =
+        Path().apply {
+            // Calculate the squeeze factor - right shape emerges from the right point
+            val squeezeProgress = progress
 
-        // Top-left of right bar (starts at play triangle tip, ends at bar position)
-        val topLeftX = lerp(playRightX - (barWidth * 0.1f), rightBarLeft, squeezeProgress)
-        val topLeftY = lerp(playMidY - (innerHeight * 0.05f), padding, squeezeProgress)
-        moveTo(topLeftX, topLeftY)
+            // Top-left of right bar (starts at play triangle tip, ends at bar position)
+            val topLeftX = lerp(playRightX - (barWidth * 0.1f), rightBarLeft, squeezeProgress)
+            val topLeftY = lerp(playMidY - (innerHeight * 0.05f), padding, squeezeProgress)
+            moveTo(topLeftX, topLeftY)
 
-        // Top-right of right bar
-        val topRightX = lerp(playRightX, rightBarRight, squeezeProgress)
-        val topRightY = lerp(playMidY - (innerHeight * 0.05f), padding, squeezeProgress)
-        lineTo(topRightX, topRightY)
+            // Top-right of right bar
+            val topRightX = lerp(playRightX, rightBarRight, squeezeProgress)
+            val topRightY = lerp(playMidY - (innerHeight * 0.05f), padding, squeezeProgress)
+            lineTo(topRightX, topRightY)
 
-        // Bottom-right of right bar
-        val bottomRightX = lerp(playRightX, rightBarRight, squeezeProgress)
-        val bottomRightY = lerp(playMidY + (innerHeight * 0.05f), height - padding, squeezeProgress)
-        lineTo(bottomRightX, bottomRightY)
+            // Bottom-right of right bar
+            val bottomRightX = lerp(playRightX, rightBarRight, squeezeProgress)
+            val bottomRightY = lerp(playMidY + (innerHeight * 0.05f), height - padding, squeezeProgress)
+            lineTo(bottomRightX, bottomRightY)
 
-        // Bottom-left of right bar
-        val bottomLeftX = lerp(playRightX - (barWidth * 0.1f), rightBarLeft, squeezeProgress)
-        val bottomLeftY = lerp(playMidY + (innerHeight * 0.05f), height - padding, squeezeProgress)
-        lineTo(bottomLeftX, bottomLeftY)
+            // Bottom-left of right bar
+            val bottomLeftX = lerp(playRightX - (barWidth * 0.1f), rightBarLeft, squeezeProgress)
+            val bottomLeftY = lerp(playMidY + (innerHeight * 0.05f), height - padding, squeezeProgress)
+            lineTo(bottomLeftX, bottomLeftY)
 
-        close()
-    }
+            close()
+        }
 
     // Draw both shapes
     drawPath(leftPath, tint)
@@ -193,7 +201,10 @@ private fun DrawScope.drawMorphedIcon(progress: Float, tint: Color) {
     }
 }
 
-private fun DrawScope.drawPlayToStopMorph(progress: Float, tint: Color) {
+private fun DrawScope.drawPlayToStopMorph(
+    progress: Float,
+    tint: Color,
+) {
     val width = size.width
     val height = size.height
 
@@ -212,29 +223,30 @@ private fun DrawScope.drawPlayToStopMorph(progress: Float, tint: Color) {
     val stopTop = padding
     val stopBottom = height - padding
 
-    val path = Path().apply {
-        // Top-left (for play: top of left edge, for stop: top-left corner)
-        val topLeftX = lerp(playLeftX, stopLeft, progress)
-        val topLeftY = lerp(playTopY, stopTop, progress)
-        moveTo(topLeftX, topLeftY)
+    val path =
+        Path().apply {
+            // Top-left (for play: top of left edge, for stop: top-left corner)
+            val topLeftX = lerp(playLeftX, stopLeft, progress)
+            val topLeftY = lerp(playTopY, stopTop, progress)
+            moveTo(topLeftX, topLeftY)
 
-        // Top-right (for play: tip of triangle, for stop: top-right corner)
-        val topRightX = lerp(playRightX, stopRight, progress)
-        val topRightY = lerp(playMidY, stopTop, progress)
-        lineTo(topRightX, topRightY)
+            // Top-right (for play: tip of triangle, for stop: top-right corner)
+            val topRightX = lerp(playRightX, stopRight, progress)
+            val topRightY = lerp(playMidY, stopTop, progress)
+            lineTo(topRightX, topRightY)
 
-        // Bottom-right (for play: same as top-right (tip), for stop: bottom-right corner)
-        val bottomRightX = lerp(playRightX, stopRight, progress)
-        val bottomRightY = lerp(playMidY, stopBottom, progress)
-        lineTo(bottomRightX, bottomRightY)
+            // Bottom-right (for play: same as top-right (tip), for stop: bottom-right corner)
+            val bottomRightX = lerp(playRightX, stopRight, progress)
+            val bottomRightY = lerp(playMidY, stopBottom, progress)
+            lineTo(bottomRightX, bottomRightY)
 
-        // Bottom-left (for play: bottom of left edge, for stop: bottom-left corner)
-        val bottomLeftX = lerp(playLeftX, stopLeft, progress)
-        val bottomLeftY = lerp(playBottomY, stopBottom, progress)
-        lineTo(bottomLeftX, bottomLeftY)
+            // Bottom-left (for play: bottom of left edge, for stop: bottom-left corner)
+            val bottomLeftX = lerp(playLeftX, stopLeft, progress)
+            val bottomLeftY = lerp(playBottomY, stopBottom, progress)
+            lineTo(bottomLeftX, bottomLeftY)
 
-        close()
-    }
+            close()
+        }
 
     drawPath(path, tint)
 }
@@ -242,6 +254,8 @@ private fun DrawScope.drawPlayToStopMorph(progress: Float, tint: Color) {
 /**
  * Linear interpolation between two float values.
  */
-private fun lerp(start: Float, end: Float, fraction: Float): Float {
-    return start + (end - start) * fraction
-}
+private fun lerp(
+    start: Float,
+    end: Float,
+    fraction: Float,
+): Float = start + (end - start) * fraction

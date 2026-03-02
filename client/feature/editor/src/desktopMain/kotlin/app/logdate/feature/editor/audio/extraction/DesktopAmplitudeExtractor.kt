@@ -13,7 +13,10 @@ import kotlin.math.sqrt
  * Desktop/JVM implementation of AmplitudeExtractor.
  */
 class DesktopAmplitudeExtractor : AmplitudeExtractor {
-    override suspend fun extractAmplitudes(uri: String, targetSampleCount: Int): List<Float> {
+    override suspend fun extractAmplitudes(
+        uri: String,
+        targetSampleCount: Int,
+    ): List<Float> {
         return withContext(Dispatchers.IO) {
             val file = resolveFile(uri) ?: return@withContext emptyList()
             if (!file.exists()) {
@@ -25,11 +28,12 @@ class DesktopAmplitudeExtractor : AmplitudeExtractor {
                 AudioSystem.getAudioInputStream(file).use { input ->
                     val baseFormat = input.format
                     val format = ensurePcmSigned(baseFormat)
-                    val decodedStream = if (format == baseFormat) {
-                        input
-                    } else {
-                        AudioSystem.getAudioInputStream(format, input)
-                    }
+                    val decodedStream =
+                        if (format == baseFormat) {
+                            input
+                        } else {
+                            AudioSystem.getAudioInputStream(format, input)
+                        }
 
                     decodedStream.use { stream ->
                         val bytes = stream.readBytes()
@@ -45,16 +49,15 @@ class DesktopAmplitudeExtractor : AmplitudeExtractor {
         }
     }
 
-    private fun resolveFile(uri: String): File? {
-        return if (uri.startsWith("file://")) {
+    private fun resolveFile(uri: String): File? =
+        if (uri.startsWith("file://")) {
             runCatching { File(java.net.URI(uri)) }.getOrNull()
         } else {
             File(uri)
         }
-    }
 
-    private fun ensurePcmSigned(format: AudioFormat): AudioFormat {
-        return if (format.encoding == AudioFormat.Encoding.PCM_SIGNED) {
+    private fun ensurePcmSigned(format: AudioFormat): AudioFormat =
+        if (format.encoding == AudioFormat.Encoding.PCM_SIGNED) {
             format
         } else {
             AudioFormat(
@@ -64,12 +67,14 @@ class DesktopAmplitudeExtractor : AmplitudeExtractor {
                 format.channels,
                 format.channels * 2,
                 format.sampleRate,
-                false
+                false,
             )
         }
-    }
 
-    private fun extractMonoSamples(bytes: ByteArray, format: AudioFormat): List<Float> {
+    private fun extractMonoSamples(
+        bytes: ByteArray,
+        format: AudioFormat,
+    ): List<Float> {
         val sampleSizeBytes = format.sampleSizeInBits / 8
         val channels = format.channels
         val frameSize = format.frameSize
@@ -98,7 +103,7 @@ class DesktopAmplitudeExtractor : AmplitudeExtractor {
         bytes: ByteArray,
         offset: Int,
         sampleSizeBytes: Int,
-        isBigEndian: Boolean
+        isBigEndian: Boolean,
     ): Int {
         if (sampleSizeBytes == 1) {
             return bytes[offset].toInt()
@@ -115,7 +120,10 @@ class DesktopAmplitudeExtractor : AmplitudeExtractor {
         return (high shl 8) or (low and 0xFF)
     }
 
-    private fun downsampleToTarget(samples: List<Float>, targetCount: Int): List<Float> {
+    private fun downsampleToTarget(
+        samples: List<Float>,
+        targetCount: Int,
+    ): List<Float> {
         if (samples.isEmpty()) return emptyList()
         val chunkSize = samples.size / targetCount
         if (chunkSize <= 0) return samples

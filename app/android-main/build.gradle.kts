@@ -9,12 +9,21 @@ plugins {
 
 extensions.configure<ApplicationExtension> {
     namespace = "app.logdate.client"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
+    compileSdk =
+        libs.versions.android.compileSdk
+            .get()
+            .toInt()
 
     defaultConfig {
         applicationId = "co.reasonabletech.logdate"
-        minSdk = libs.versions.android.minSdk.get().toInt()
-        targetSdk = libs.versions.android.targetSdk.get().toInt()
+        minSdk =
+            libs.versions.android.minSdk
+                .get()
+                .toInt()
+        targetSdk =
+            libs.versions.android.targetSdk
+                .get()
+                .toInt()
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -91,4 +100,6 @@ dependencies {
     screenshotTestImplementation(libs.compose.material3)
     screenshotTestImplementation(libs.compose.runtime)
     screenshotTestImplementation(libs.compose.foundation)
+    screenshotTestImplementation(projects.client.feature.editor)
+    screenshotTestImplementation(projects.client.theme)
 }

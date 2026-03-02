@@ -15,8 +15,14 @@ plugins {
 kotlin {
     android {
         namespace = "app.logdate.client.feature.editor"
-        compileSdk = libs.versions.android.compileSdk.get().toInt()
-        minSdk = libs.versions.android.minSdk.get().toInt()
+        compileSdk =
+            libs.versions.android.compileSdk
+                .get()
+                .toInt()
+        minSdk =
+            libs.versions.android.minSdk
+                .get()
+                .toInt()
         withDeviceTestBuilder {}.configure {
             instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         }
@@ -36,7 +42,7 @@ kotlin {
 
     listOf(
         iosArm64(),
-        iosSimulatorArm64()
+        iosSimulatorArm64(),
     )
 
     jvm("desktop")
@@ -115,10 +121,9 @@ kotlin {
             implementation(libs.androidx.test.ext.junit)
             implementation(libs.androidx.ui.test.junit4)
         }
-
     }
 }
-//dependencies {
+// dependencies {
 //    implementation(project(":core:data"))
 //    implementation(project(":core:ui"))
 //    implementation(project(":core:model"))
@@ -129,12 +134,11 @@ kotlin {
 //    // Compose in logdate.compose build logic
 //    implementation(libs.androidx.navigation.compose)
 //    implementation(libs.androidx.hilt.navigation.compose)
-////    implementation(libs.androidx.compose.material3.carousel)
-////    implementation(libs.androidx.compose.material3)
+// //    implementation(libs.androidx.compose.material3.carousel)
+// //    implementation(libs.androidx.compose.material3)
 //    // TODO: Figure out what dependency is causing this hell
 //    implementation("com.google.j2objc:j2objc-annotations:3.0.0")
-////    api(libs.guava)
-//}
-
+// //    api(libs.guava)
+// }
 
 // TODO: Revisit Android tooling/test runtime dependencies once Compose dependency accessors are migrated.

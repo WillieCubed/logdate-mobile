@@ -17,13 +17,14 @@ import org.koin.dsl.module
 /**
  * Android implementation of audio module
  */
-actual val audioModule: Module = module {
-    single<AudioStorage> { AndroidAudioStorage(androidContext()) }
-    // Provide the Android implementation of AudioRecordingManager as a singleton
-    single<AudioRecordingManager> { AndroidAudioRecordingManager(androidContext(), get()) }
-    single<AudioPlaybackManager> { AndroidAudioPlaybackManager(androidContext()) }
-    single<AudioDurationResolver> { AndroidAudioDurationResolver(androidContext()) }
-    
-    // Provide the Android implementation of TranscriptionService
-    factory<TranscriptionService> { AndroidTranscriptionService(androidContext()) }
-}
+actual val audioModule: Module =
+    module {
+        single<AudioStorage> { AndroidAudioStorage(androidContext()) }
+        // Provide the Android implementation of AudioRecordingManager as a singleton
+        single<AudioRecordingManager> { AndroidAudioRecordingManager(androidContext(), get()) }
+        single<AudioPlaybackManager> { AndroidAudioPlaybackManager(androidContext()) }
+        single<AudioDurationResolver> { AndroidAudioDurationResolver(androidContext()) }
+
+        // Provide the Android implementation of TranscriptionService
+        factory<TranscriptionService> { AndroidTranscriptionService(androidContext()) }
+    }

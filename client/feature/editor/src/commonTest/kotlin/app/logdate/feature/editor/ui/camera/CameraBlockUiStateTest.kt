@@ -1,13 +1,13 @@
 package app.logdate.feature.editor.ui.camera
 
 import app.logdate.feature.editor.ui.editor.CameraBlockUiState
-import kotlin.time.Clock
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
@@ -21,7 +21,6 @@ import kotlin.uuid.Uuid
  * - Media type handling
  */
 class CameraBlockUiStateTest {
-
     @Test
     fun `default state has expected values`() {
         val state = CameraBlockUiState()
@@ -37,11 +36,12 @@ class CameraBlockUiStateTest {
 
     @Test
     fun `state with photo has correct media type`() {
-        val state = CameraBlockUiState(
-            uri = "content://media/photo.jpg",
-            caption = "My photo",
-            mediaType = CapturedMediaType.PHOTO
-        )
+        val state =
+            CameraBlockUiState(
+                uri = "content://media/photo.jpg",
+                caption = "My photo",
+                mediaType = CapturedMediaType.PHOTO,
+            )
 
         assertEquals("content://media/photo.jpg", state.uri)
         assertEquals("My photo", state.caption)
@@ -51,12 +51,13 @@ class CameraBlockUiStateTest {
 
     @Test
     fun `state with video has correct media type and duration`() {
-        val state = CameraBlockUiState(
-            uri = "content://media/video.mp4",
-            caption = "My video",
-            mediaType = CapturedMediaType.VIDEO,
-            durationMs = 15000L
-        )
+        val state =
+            CameraBlockUiState(
+                uri = "content://media/video.mp4",
+                caption = "My video",
+                mediaType = CapturedMediaType.VIDEO,
+                durationMs = 15000L,
+            )
 
         assertEquals("content://media/video.mp4", state.uri)
         assertEquals("My video", state.caption)
@@ -66,19 +67,21 @@ class CameraBlockUiStateTest {
 
     @Test
     fun `formattedDuration returns correct format for seconds only`() {
-        val state = CameraBlockUiState(
-            mediaType = CapturedMediaType.VIDEO,
-            durationMs = 45000L
-        )
+        val state =
+            CameraBlockUiState(
+                mediaType = CapturedMediaType.VIDEO,
+                durationMs = 45000L,
+            )
         assertEquals("00:45", state.formattedDuration)
     }
 
     @Test
     fun `formattedDuration returns correct format for minutes and seconds`() {
-        val state = CameraBlockUiState(
-            mediaType = CapturedMediaType.VIDEO,
-            durationMs = 125000L
-        )
+        val state =
+            CameraBlockUiState(
+                mediaType = CapturedMediaType.VIDEO,
+                durationMs = 125000L,
+            )
         assertEquals("02:05", state.formattedDuration)
     }
 
@@ -108,10 +111,11 @@ class CameraBlockUiStateTest {
 
     @Test
     fun `copy allows changing media type`() {
-        val state = CameraBlockUiState(
-            uri = "content://media/video.mp4",
-            mediaType = CapturedMediaType.VIDEO
-        )
+        val state =
+            CameraBlockUiState(
+                uri = "content://media/video.mp4",
+                mediaType = CapturedMediaType.VIDEO,
+            )
         val copied = state.copy(mediaType = CapturedMediaType.PHOTO)
 
         assertEquals(CapturedMediaType.PHOTO, copied.mediaType)

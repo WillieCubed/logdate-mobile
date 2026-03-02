@@ -10,15 +10,16 @@ import org.koin.dsl.module
 /**
  * Module that exposes handles for interacting with OS-specific media library APIs.
  */
-actual val mediaModule: Module = module {
-    // Include the audio module only
-    includes(audioModule)
-    
-    // Media manager
-    single<MediaManager> { DesktopMediaManager() }
-    
-    // Transcription manager for desktop
-    single<TranscriptionManager> { 
-        DesktopTranscriptionManager(get())
+actual val mediaModule: Module =
+    module {
+        // Include the audio module only
+        includes(audioModule)
+
+        // Media manager
+        single<MediaManager> { DesktopMediaManager() }
+
+        // Transcription manager for desktop
+        single<TranscriptionManager> {
+            DesktopTranscriptionManager(get())
+        }
     }
-}

@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -22,9 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.PlatformDimensions
 import app.logdate.ui.theme.Spacing
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
-import logdate.client.feature.editor.generated.resources.Res
+
 /**
  * A cross-platform immersive editor layout that provides a focused editing experience.
  * This component handles platform-specific screen dimensions and creates a responsive
@@ -72,6 +70,7 @@ import logdate.client.feature.editor.generated.resources.Res
  * )
  * ```
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun ImmersiveEditorLayout(
     isEditorFocused: Boolean,
@@ -84,65 +83,74 @@ fun ImmersiveEditorLayout(
     val screenWidth = PlatformDimensions.getScreenWidth()
 
     // Calculate responsive max width
-    val maxWidth = remember(screenWidth) {
-        when {
-            screenWidth < 600.dp -> screenWidth
-            screenWidth < 900.dp -> 600.dp
-            else -> 800.dp
+    val maxWidth =
+        remember(screenWidth) {
+            when {
+                screenWidth < 600.dp -> screenWidth
+                screenWidth < 900.dp -> 600.dp
+                else -> 800.dp
+            }
         }
-    }
 
     // Full-screen dark background
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.50f))
+        modifier =
+            modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.50f)),
 //            .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
         ) {
             // Transparent app bar region - fixed position
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.statusBars),
-                contentAlignment = Alignment.CenterStart
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .windowInsetsPadding(WindowInsets.statusBars),
+                contentAlignment = Alignment.CenterStart,
             ) {
                 topBarContent()
             }
 
             // Editor container with responsive layout - this responds to IME
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.ime), // Only this area adjusts for IME
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .windowInsetsPadding(WindowInsets.ime),
+                // Only this area adjusts for IME
                 contentAlignment = Alignment.Center,
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .widthIn(max = maxWidth)
-                        .padding(horizontal = Spacing.sm)
-                        .padding(top = Spacing.sm),
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .widthIn(max = maxWidth)
+                            .padding(horizontal = Spacing.sm)
+                            .padding(top = Spacing.sm),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(Spacing.lg)
+                    verticalArrangement = Arrangement.Top,
                 ) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f) // Use weight to fill available space
-                            .heightIn(min = 300.dp), // Keep minimum height as fallback
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .weight(1f) // Use weight to fill available space
+                                .heightIn(min = 300.dp),
+                        // Keep minimum height as fallback
                     ) {
                         editorContent()
                     }
 
                     // Bottom content with proper system insets and spacing from IME
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .windowInsetsPadding(WindowInsets.navigationBars) // Use navigation bar insets for proper system UI avoidance
-                            .padding(bottom = Spacing.md), // Add extra spacing above the system insets to prevent butting against IME
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .windowInsetsPadding(WindowInsets.navigationBars)
+                                .padding(top = Spacing.sm, bottom = Spacing.md),
                     ) {
                         bottomContent()
                     }

@@ -12,27 +12,29 @@ class AndroidAudioDurationResolver(
     private val context: Context,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : AudioDurationResolver {
-    override suspend fun resolveDurationMs(uri: String): Long? = withContext(ioDispatcher) {
-        val retriever = MediaMetadataRetriever()
-        try {
-            val parsedUri = Uri.parse(uri)
-            if (parsedUri.scheme.isNullOrBlank()) {
-                retriever.setDataSource(uri)
-            } else {
-                retriever.setDataSource(context, parsedUri)
-            }
-
-            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                ?.toLongOrNull()
-        } catch (e: Exception) {
-            Napier.e("Failed to resolve audio duration for $uri", e)
-            null
-        } finally {
+    override suspend fun resolveDurationMs(uri: String): Long? =
+        withContext(ioDispatcher) {
+            val retriever = MediaMetadataRetriever()
             try {
-                retriever.release()
+                val parsedUri = Uri.parse(uri)
+                if (parsedUri.scheme.isNullOrBlank()) {
+                    retriever.setDataSource(uri)
+                } else {
+                    retriever.setDataSource(context, parsedUri)
+                }
+
+                retriever
+                    .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                    ?.toLongOrNull()
             } catch (e: Exception) {
-                Napier.e("Failed to release MediaMetadataRetriever", e)
+                Napier.e("Failed to resolve audio duration for $uri", e)
+                null
+            } finally {
+                try {
+                    retriever.release()
+                } catch (e: Exception) {
+                    Napier.e("Failed to release MediaMetadataRetriever", e)
+                }
             }
         }
-    }
 }

@@ -18,6 +18,7 @@ import kotlin.time.Duration
  * A component that displays the current recording time in MM:SS format.
  * Uses a monospace font for consistent digit alignment.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun AudioTimeDisplay(
     recordingDuration: Duration,
@@ -26,19 +27,22 @@ fun AudioTimeDisplay(
 ) {
     Box(
         modifier = modifier.padding(horizontal = 8.dp),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             text = formatMediaDuration(recordingDuration.inWholeMilliseconds, true),
-            style = MaterialTheme.typography.titleLarge.copy(
-                fontSize = 20.sp,
-                fontWeight = if (isRecording) FontWeight.Bold else FontWeight.Medium,
-                fontFamily = FontFamily.Monospace
-            ),
-            color = if (isRecording) 
-                MaterialTheme.colorScheme.primary 
-            else 
-                MaterialTheme.colorScheme.onSurface
+            style =
+                MaterialTheme.typography.titleLarge.copy(
+                    fontSize = 20.sp,
+                    fontWeight = if (isRecording) FontWeight.Bold else FontWeight.Medium,
+                    fontFamily = FontFamily.Monospace,
+                ),
+            color =
+                if (isRecording) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
         )
     }
 }

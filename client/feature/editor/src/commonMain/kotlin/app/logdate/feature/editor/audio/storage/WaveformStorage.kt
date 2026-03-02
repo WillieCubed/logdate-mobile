@@ -14,7 +14,10 @@ interface WaveformStorage {
      * @param audioUri The URI of the audio file (used as key)
      * @param amplitudes Normalized amplitude values (0.0 to 1.0)
      */
-    suspend fun save(audioUri: String, amplitudes: List<Float>)
+    suspend fun save(
+        audioUri: String,
+        amplitudes: List<Float>,
+    )
 
     /**
      * Loads waveform amplitudes for an audio file.

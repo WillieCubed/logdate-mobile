@@ -16,7 +16,5 @@ interface AudioStorage {
      * Creates a recording target path.
      * Implementations should generate a unique filename.
      */
-    suspend fun createRecordingTarget(
-        extension: String = "m4a",
-    ): AudioRecordingTarget
+    suspend fun createRecordingTarget(extension: String = "m4a"): AudioRecordingTarget
 }

@@ -5,17 +5,16 @@ import kotlinx.cinterop.ExperimentalForeignApi
 
 /**
  * iOS implementation of the ImagePickerService.
- * 
+ *
  * This is a placeholder implementation that would interact with
  * UIImagePickerController in a real implementation.
  */
 @OptIn(ExperimentalForeignApi::class)
 class IosImagePickerService : ImagePickerService {
-    
     /**
      * Selects an image from the device's photo library.
      * This is a placeholder implementation.
-     * 
+     *
      * @return Currently returns null as this is a placeholder
      */
     override suspend fun pickImage(): String? {
@@ -24,11 +23,11 @@ class IosImagePickerService : ImagePickerService {
         // with sourceType = .photoLibrary and return the selected image URI
         return null
     }
-    
+
     /**
      * Captures an image using the device's camera.
      * This is a placeholder implementation.
-     * 
+     *
      * @return Currently returns null as this is a placeholder
      */
     override suspend fun captureImage(): String? {

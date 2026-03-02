@@ -2,8 +2,8 @@ package app.logdate.feature.editor.ui.editor
 
 import app.logdate.client.domain.journals.GetCurrentUserJournalsUseCase
 import app.logdate.client.domain.journals.GetDefaultSelectedJournalsUseCase
-import app.logdate.client.domain.location.LogCurrentLocationUseCase
 import app.logdate.client.domain.location.LocationRetryWorker
+import app.logdate.client.domain.location.LogCurrentLocationUseCase
 import app.logdate.client.domain.notes.AddNoteUseCase
 import app.logdate.client.domain.notes.FetchEntryUseCase
 import app.logdate.client.domain.notes.FetchTodayNotesUseCase
@@ -47,7 +47,6 @@ import kotlin.test.assertTrue
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class TextEditingTest {
-
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var testScope: TestScope
     private lateinit var viewModel: EntryEditorViewModel
@@ -65,32 +64,36 @@ class TextEditingTest {
         val locationProvider = FakeClientLocationProvider()
         val activityTimelineRepository = FakeActivityTimelineRepository()
         val locationHistoryRepository = FakeLocationHistoryRepository()
-        val locationRetryWorker = LocationRetryWorker(
-            locationProvider = locationProvider,
-            locationHistoryRepository = locationHistoryRepository,
-            coroutineScope = testScope.backgroundScope
-        )
+        val locationRetryWorker =
+            LocationRetryWorker(
+                locationProvider = locationProvider,
+                locationHistoryRepository = locationHistoryRepository,
+                coroutineScope = testScope.backgroundScope,
+            )
         val logLocationUseCase = LogLocationUseCase(locationProvider, activityTimelineRepository)
-        val logCurrentLocationUseCase = LogCurrentLocationUseCase(
-            locationProvider = locationProvider,
-            locationHistoryRepository = locationHistoryRepository,
-            locationRetryWorker = locationRetryWorker
-        )
+        val logCurrentLocationUseCase =
+            LogCurrentLocationUseCase(
+                locationProvider = locationProvider,
+                locationHistoryRepository = locationHistoryRepository,
+                locationRetryWorker = locationRetryWorker,
+            )
         val mediaManager = FakeMediaManager()
 
         val fetchTodayNotes = FetchTodayNotesUseCase(journalNotesRepository)
         val getCurrentUserJournals = GetCurrentUserJournalsUseCase(journalRepository)
-        val getDefaultSelectedJournals = GetDefaultSelectedJournalsUseCase(
-            journalNotesRepository,
-            journalContentRepository
-        )
-        val addNoteUseCase = AddNoteUseCase(
-            repository = journalNotesRepository,
-            journalContentRepository = journalContentRepository,
-            logLocationUseCase = logLocationUseCase,
-            logCurrentLocationUseCase = logCurrentLocationUseCase,
-            mediaManager = mediaManager
-        )
+        val getDefaultSelectedJournals =
+            GetDefaultSelectedJournalsUseCase(
+                journalNotesRepository,
+                journalContentRepository,
+            )
+        val addNoteUseCase =
+            AddNoteUseCase(
+                repository = journalNotesRepository,
+                journalContentRepository = journalContentRepository,
+                logLocationUseCase = logLocationUseCase,
+                logCurrentLocationUseCase = logCurrentLocationUseCase,
+                mediaManager = mediaManager,
+            )
         val fetchEntryUseCase = FetchEntryUseCase(journalNotesRepository)
         val updateEntryDraft = UpdateEntryDraftUseCase(entryDraftRepository)
         val createEntryDraft = CreateEntryDraftUseCase(entryDraftRepository)
@@ -99,33 +102,36 @@ class TextEditingTest {
         val fetchMostRecentDraft = FetchMostRecentDraftUseCase(entryDraftRepository)
         val getAllDrafts = GetAllDraftsUseCase(entryDraftRepository)
 
-        val autoSaveDelegate = AutoSaveDelegate(
-            scope = testScope.backgroundScope,
-            updateEntryDraft = updateEntryDraft,
-            createEntryDraft = createEntryDraft
-        )
-        val journalSelectionDelegate = JournalSelectionDelegate(
-            scope = testScope.backgroundScope,
-            getDefaultSelectedJournals = getDefaultSelectedJournals
-        )
+        val autoSaveDelegate =
+            AutoSaveDelegate(
+                scope = testScope.backgroundScope,
+                updateEntryDraft = updateEntryDraft,
+                createEntryDraft = createEntryDraft,
+            )
+        val journalSelectionDelegate =
+            JournalSelectionDelegate(
+                scope = testScope.backgroundScope,
+                getDefaultSelectedJournals = getDefaultSelectedJournals,
+            )
 
-        viewModel = EntryEditorViewModel(
-            fetchTodayNotes = fetchTodayNotes,
-            getCurrentUserJournals = getCurrentUserJournals,
-            getDefaultSelectedJournals = getDefaultSelectedJournals,
-            addNoteUseCase = addNoteUseCase,
-            fetchEntryUseCase = fetchEntryUseCase,
-            journalContentRepository = journalContentRepository,
-            updateEntryDraft = updateEntryDraft,
-            createEntryDraft = createEntryDraft,
-            deleteEntryDraft = deleteEntryDraft,
-            fetchEntryDraft = fetchEntryDraft,
-            fetchMostRecentDraft = fetchMostRecentDraft,
-            getAllDrafts = getAllDrafts,
-            mediator = FakeEditorMediator(),
-            autoSaveDelegate = autoSaveDelegate,
-            journalSelectionDelegate = journalSelectionDelegate
-        )
+        viewModel =
+            EntryEditorViewModel(
+                fetchTodayNotes = fetchTodayNotes,
+                getCurrentUserJournals = getCurrentUserJournals,
+                getDefaultSelectedJournals = getDefaultSelectedJournals,
+                addNoteUseCase = addNoteUseCase,
+                fetchEntryUseCase = fetchEntryUseCase,
+                journalContentRepository = journalContentRepository,
+                updateEntryDraft = updateEntryDraft,
+                createEntryDraft = createEntryDraft,
+                deleteEntryDraft = deleteEntryDraft,
+                fetchEntryDraft = fetchEntryDraft,
+                fetchMostRecentDraft = fetchMostRecentDraft,
+                getAllDrafts = getAllDrafts,
+                mediator = FakeEditorMediator(),
+                autoSaveDelegate = autoSaveDelegate,
+                journalSelectionDelegate = journalSelectionDelegate,
+            )
     }
 
     @AfterTest
@@ -134,63 +140,71 @@ class TextEditingTest {
     }
 
     @Test
-    fun testCreateNewTextBlock() = testScope.runTest {
-        val block = viewModel.createNewBlock(BlockType.TEXT)
-        advanceUntilIdle()
+    fun testCreateNewTextBlock() =
+        testScope.runTest {
+            val block = viewModel.createNewBlock(BlockType.TEXT)
+            advanceUntilIdle()
 
-        assertTrue(block is TextBlockUiState)
-        assertEquals("", (block as TextBlockUiState).content)
+            assertTrue(block is TextBlockUiState)
+            assertEquals("", (block as TextBlockUiState).content)
 
-        val state = viewModel.editorState.value
-        assertTrue(state.blocks.any { it.id == block.id })
-        assertFalse(state.isReadOnly(block.id))
-    }
-
-    @Test
-    fun testUpdateTextBlockContent() = testScope.runTest {
-        val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
-        advanceUntilIdle()
-
-        viewModel.updateBlock(block.copy(content = "Hello, world!"))
-        advanceUntilIdle()
-
-        val updatedBlock = viewModel.editorState.value.blocks
-            .first { it.id == block.id } as TextBlockUiState
-
-        assertEquals("Hello, world!", updatedBlock.content)
-        assertTrue(viewModel.editorState.value.isDirty)
-    }
+            val state = viewModel.editorState.value
+            assertTrue(state.blocks.any { it.id == block.id })
+            assertFalse(state.isReadOnly(block.id))
+        }
 
     @Test
-    fun testMultipleBlockEditing() = testScope.runTest {
-        val block1 = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
-        val block2 = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
-        advanceUntilIdle()
+    fun testUpdateTextBlockContent() =
+        testScope.runTest {
+            val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
+            advanceUntilIdle()
 
-        viewModel.updateBlock(block1.copy(content = "First block content"))
-        viewModel.updateBlock(block2.copy(content = "Second block content"))
-        advanceUntilIdle()
+            viewModel.updateBlock(block.copy(content = "Hello, world!"))
+            advanceUntilIdle()
 
-        val currentState = viewModel.editorState.value
-        val updatedBlock1 = currentState.blocks.find { it.id == block1.id } as? TextBlockUiState
-        val updatedBlock2 = currentState.blocks.find { it.id == block2.id } as? TextBlockUiState
+            val updatedBlock =
+                viewModel.editorState.value.blocks
+                    .first { it.id == block.id } as TextBlockUiState
 
-        assertNotNull(updatedBlock1)
-        assertNotNull(updatedBlock2)
-        assertEquals("First block content", updatedBlock1.content)
-        assertEquals("Second block content", updatedBlock2.content)
-        assertTrue(currentState.isDirty)
-    }
+            assertEquals("Hello, world!", updatedBlock.content)
+            assertTrue(viewModel.editorState.value.isDirty)
+        }
 
     @Test
-    fun testEmptyBlockCreation() = testScope.runTest {
-        assertTrue(viewModel.editorState.value.blocks.isEmpty())
+    fun testMultipleBlockEditing() =
+        testScope.runTest {
+            val block1 = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
+            val block2 = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
+            advanceUntilIdle()
 
-        val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
-        advanceUntilIdle()
+            viewModel.updateBlock(block1.copy(content = "First block content"))
+            viewModel.updateBlock(block2.copy(content = "Second block content"))
+            advanceUntilIdle()
 
-        val updatedState = viewModel.editorState.value
-        assertEquals(1, updatedState.blocks.size)
-        assertEquals(block.id, updatedState.blocks.first().id)
-    }
+            val currentState = viewModel.editorState.value
+            val updatedBlock1 = currentState.blocks.find { it.id == block1.id } as? TextBlockUiState
+            val updatedBlock2 = currentState.blocks.find { it.id == block2.id } as? TextBlockUiState
+
+            assertNotNull(updatedBlock1)
+            assertNotNull(updatedBlock2)
+            assertEquals("First block content", updatedBlock1.content)
+            assertEquals("Second block content", updatedBlock2.content)
+            assertTrue(currentState.isDirty)
+        }
+
+    @Test
+    fun testEmptyBlockCreation() =
+        testScope.runTest {
+            assertTrue(
+                viewModel.editorState.value.blocks
+                    .isEmpty(),
+            )
+
+            val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
+            advanceUntilIdle()
+
+            val updatedState = viewModel.editorState.value
+            assertEquals(1, updatedState.blocks.size)
+            assertEquals(block.id, updatedState.blocks.first().id)
+        }
 }

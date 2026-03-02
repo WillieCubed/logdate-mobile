@@ -14,23 +14,27 @@ import org.jetbrains.compose.resources.stringResource
 /**
  * A dialog that informs the user if they have unsaved changes and allows them to dismiss the screen.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 internal fun ConfirmEntryExitDialog(
     onCancel: () -> Unit,
     onConfirm: () -> Unit,
     dialogType: ConfirmDialogType = ConfirmDialogType.EXIT_EDITOR,
 ) {
-    val (title, description) = when (dialogType) {
-        ConfirmDialogType.EXIT_EDITOR -> Pair(
-            stringResource(Res.string.action_note_create_discard_confirmation_title),
-            stringResource(Res.string.action_note_create_discard_confirmation_description)
-        )
-        ConfirmDialogType.DELETE_BLOCK -> Pair(
-            "Delete Block",
-            "Are you sure you want to delete this block? This action cannot be undone."
-        )
-    }
-    
+    val (title, description) =
+        when (dialogType) {
+            ConfirmDialogType.EXIT_EDITOR ->
+                Pair(
+                    stringResource(Res.string.action_note_create_discard_confirmation_title),
+                    stringResource(Res.string.action_note_create_discard_confirmation_description),
+                )
+            ConfirmDialogType.DELETE_BLOCK ->
+                Pair(
+                    "Delete Block",
+                    "Are you sure you want to delete this block? This action cannot be undone.",
+                )
+        }
+
     AlertDialog(
         title = { Text(title) },
         text = { Text(description) },
@@ -42,10 +46,12 @@ internal fun ConfirmEntryExitDialog(
         },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text(when (dialogType) {
-                    ConfirmDialogType.EXIT_EDITOR -> stringResource(Res.string.action_note_create_discard)
-                    ConfirmDialogType.DELETE_BLOCK -> "Delete"
-                })
+                Text(
+                    when (dialogType) {
+                        ConfirmDialogType.EXIT_EDITOR -> stringResource(Res.string.action_note_create_discard)
+                        ConfirmDialogType.DELETE_BLOCK -> "Delete"
+                    },
+                )
             }
         },
     )
@@ -56,5 +62,5 @@ internal fun ConfirmEntryExitDialog(
  */
 enum class ConfirmDialogType {
     EXIT_EDITOR,
-    DELETE_BLOCK
+    DELETE_BLOCK,
 }

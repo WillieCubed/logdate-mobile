@@ -24,9 +24,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.ui.theme.Spacing
 import io.github.aakira.napier.Napier
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.whats_on_your_mind
+import org.jetbrains.compose.resources.stringResource
+
 /**
  * Content component for text blocks in the editor.
  *
@@ -37,6 +38,7 @@ import logdate.client.feature.editor.generated.resources.Res
  * @param readOnly Whether the block is read-only
  * @param modifier Modifier for the component
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun TextBlockContent(
     block: TextBlockUiState,
@@ -50,17 +52,18 @@ fun TextBlockContent(
 
     // The container for the text field
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .clickable(
-                enabled = !readOnly,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) {
-                if (!isExpanded) {
-                    onFocused()
-                }
-            }
+        modifier =
+            modifier
+                .fillMaxSize()
+                .clickable(
+                    enabled = !readOnly,
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) {
+                    if (!isExpanded) {
+                        onFocused()
+                    }
+                },
     ) {
         // The actual text field - use local state with callback
         BasicTextField(
@@ -69,21 +72,24 @@ fun TextBlockContent(
                 // Directly propagate changes to parent
                 onTextChanged(newValue)
             },
-            modifier = Modifier
-                .fillMaxSize()
-                .focusable(enabled = !readOnly)
-                .focusRequester(focusRequester),
-            textStyle = TextStyle(
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = MaterialTheme.typography.bodyLarge.fontSize
-            ),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .focusable(enabled = !readOnly)
+                    .focusRequester(focusRequester),
+            textStyle =
+                TextStyle(
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = MaterialTheme.typography.bodyLarge.fontSize,
+                ),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Sentences,
-                autoCorrectEnabled = true,
-                keyboardType = KeyboardType.Text,
-                imeAction = ImeAction.Default
-            ),
+            keyboardOptions =
+                KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences,
+                    autoCorrectEnabled = true,
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Default,
+                ),
             readOnly = readOnly,
             decorationBox = { innerTextField ->
                 Box(modifier = Modifier.padding(Spacing.md)) {
@@ -91,12 +97,12 @@ fun TextBlockContent(
                         Text(
                             text = stringResource(Res.string.whats_on_your_mind),
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         )
                     }
                     innerTextField()
                 }
-            }
+            },
         )
     }
 

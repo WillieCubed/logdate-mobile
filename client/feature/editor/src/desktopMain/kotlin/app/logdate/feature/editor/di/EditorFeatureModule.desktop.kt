@@ -16,23 +16,24 @@ import java.io.File
  * Desktop-specific module for the editor feature.
  * Provides platform-specific implementations.
  */
-actual val platformEditorModule: Module = module {
-    // Provide Desktop implementation of ImagePickerService
-    factory<ImagePickerService> {
-        DesktopImagePickerService()
-    }
+actual val platformEditorModule: Module =
+    module {
+        // Provide Desktop implementation of ImagePickerService
+        factory<ImagePickerService> {
+            DesktopImagePickerService()
+        }
 
-    // Provide Desktop stub implementation of CameraCaptureManager
-    factory<CameraCaptureManager> {
-        DesktopCameraCaptureManager()
-    }
+        // Provide Desktop stub implementation of CameraCaptureManager
+        factory<CameraCaptureManager> {
+            DesktopCameraCaptureManager()
+        }
 
-    // Audio waveform processing dependencies
-    single<AmplitudeExtractor> {
-        DesktopAmplitudeExtractor()
+        // Audio waveform processing dependencies
+        single<AmplitudeExtractor> {
+            DesktopAmplitudeExtractor()
+        }
+        single<WaveformStorage> {
+            val cacheDir = File(System.getProperty("user.home"), ".logdate/cache").apply { mkdirs() }
+            DesktopWaveformStorage(cacheDir)
+        }
     }
-    single<WaveformStorage> {
-        val cacheDir = File(System.getProperty("user.home"), ".logdate/cache").apply { mkdirs() }
-        DesktopWaveformStorage(cacheDir)
-    }
-}

@@ -9,8 +9,9 @@ import java.nio.ByteOrder
 /**
  * Desktop/JVM implementation of WaveformStorage.
  */
-class DesktopWaveformStorage(private val cacheDir: File) : WaveformStorage {
-
+class DesktopWaveformStorage(
+    private val cacheDir: File,
+) : WaveformStorage {
     private val waveformDir: File
         get() = File(cacheDir, "waveforms").also { it.mkdirs() }
 
@@ -19,7 +20,10 @@ class DesktopWaveformStorage(private val cacheDir: File) : WaveformStorage {
         return File(waveformDir, "$hash.waveform")
     }
 
-    override suspend fun save(audioUri: String, amplitudes: List<Float>) = withContext(Dispatchers.IO) {
+    override suspend fun save(
+        audioUri: String,
+        amplitudes: List<Float>,
+    ) = withContext(Dispatchers.IO) {
         val file = getWaveformFile(audioUri)
 
         val buffer = ByteBuffer.allocate(amplitudes.size * 4).order(ByteOrder.LITTLE_ENDIAN)
@@ -27,25 +31,28 @@ class DesktopWaveformStorage(private val cacheDir: File) : WaveformStorage {
         file.writeBytes(buffer.array())
     }
 
-    override suspend fun load(audioUri: String): List<Float>? = withContext(Dispatchers.IO) {
-        val file = getWaveformFile(audioUri)
-        if (!file.exists()) return@withContext null
+    override suspend fun load(audioUri: String): List<Float>? =
+        withContext(Dispatchers.IO) {
+            val file = getWaveformFile(audioUri)
+            if (!file.exists()) return@withContext null
 
-        val bytes = file.readBytes()
-        val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
-        val amplitudes = mutableListOf<Float>()
-        while (buffer.hasRemaining()) {
-            amplitudes.add(buffer.float)
+            val bytes = file.readBytes()
+            val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+            val amplitudes = mutableListOf<Float>()
+            while (buffer.hasRemaining()) {
+                amplitudes.add(buffer.float)
+            }
+            amplitudes
         }
-        amplitudes
-    }
 
-    override suspend fun exists(audioUri: String): Boolean = withContext(Dispatchers.IO) {
-        getWaveformFile(audioUri).exists()
-    }
+    override suspend fun exists(audioUri: String): Boolean =
+        withContext(Dispatchers.IO) {
+            getWaveformFile(audioUri).exists()
+        }
 
-    override suspend fun delete(audioUri: String) = withContext(Dispatchers.IO) {
-        getWaveformFile(audioUri).delete()
-        Unit
-    }
+    override suspend fun delete(audioUri: String) =
+        withContext(Dispatchers.IO) {
+            getWaveformFile(audioUri).delete()
+            Unit
+        }
 }

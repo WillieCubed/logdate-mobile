@@ -9,9 +9,10 @@ import org.koin.dsl.module
 /**
  * Android implementation of the transcription media module.
  */
-actual val platformTranscriptionMediaModule: Module = module {
-    // Provide Android implementation of TranscriptionManager
-    single<TranscriptionManager> {
-        AndroidTranscriptionManager(androidContext())
+actual val platformTranscriptionMediaModule: Module =
+    module {
+        // Provide Android implementation of TranscriptionManager
+        single<TranscriptionManager> {
+            AndroidTranscriptionManager(androidContext())
+        }
     }
-}

@@ -24,12 +24,13 @@ import java.io.IOException
  * Extension function to start the recording service
  */
 fun Context.startAudioRecordingService(outputFilePath: String? = null) {
-    val intent = Intent(this, AudioRecordingService::class.java).apply {
-        action = AudioRecordingService.SERVICE_ACTION_START
-        if (outputFilePath != null) {
-            putExtra(AudioRecordingService.EXTRA_OUTPUT_PATH, outputFilePath)
+    val intent =
+        Intent(this, AudioRecordingService::class.java).apply {
+            action = AudioRecordingService.SERVICE_ACTION_START
+            if (outputFilePath != null) {
+                putExtra(AudioRecordingService.EXTRA_OUTPUT_PATH, outputFilePath)
+            }
         }
-    }
     startForegroundService(intent)
 }
 
@@ -37,9 +38,10 @@ fun Context.startAudioRecordingService(outputFilePath: String? = null) {
  * Extension function to stop the recording service
  */
 fun Context.stopAudioRecordingService() {
-    val intent = Intent(this, AudioRecordingService::class.java).apply {
-        action = AudioRecordingService.SERVICE_ACTION_STOP
-    }
+    val intent =
+        Intent(this, AudioRecordingService::class.java).apply {
+            action = AudioRecordingService.SERVICE_ACTION_STOP
+        }
     stopService(intent)
 }
 
@@ -50,7 +52,6 @@ fun Context.stopAudioRecordingService() {
  * Provides binding for clients to interact with the recording.
  */
 class AudioRecordingService : Service() {
-
     companion object {
         const val NOTIFICATION_ID = 1001
         const val SERVICE_ACTION_START = "app.logdate.action.START_RECORDING"
@@ -89,7 +90,11 @@ class AudioRecordingService : Service() {
         Napier.d("Audio recording service created")
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int {
         when (intent?.action) {
             SERVICE_ACTION_START -> {
                 Napier.d("Starting audio recording service")
@@ -112,17 +117,15 @@ class AudioRecordingService : Service() {
             }
         }
 
-        // Restart if the service is killed
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
-    override fun onBind(intent: Intent): IBinder {
-        return binder
-    }
+    override fun onBind(intent: Intent): IBinder = binder
 
     override fun onDestroy() {
         Napier.d("Audio recording service destroyed")
         stopRecording()
+        stopForeground(STOP_FOREGROUND_REMOVE)
         serviceScope.cancel() // Cancel all coroutines
         super.onDestroy()
     }
@@ -133,18 +136,18 @@ class AudioRecordingService : Service() {
     private fun startForegroundRecording(outputPath: String?) {
         try {
             val notification = notificationHandler.createRecordingNotification(true, System.currentTimeMillis())
-            
+
             // Start as a foreground service with the microphone type
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(
                     NOTIFICATION_ID,
                     notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
                 )
             } else {
                 startForeground(NOTIFICATION_ID, notification)
             }
-            
+
             startRecording(outputPath)
 
             // Update recording state
@@ -166,15 +169,15 @@ class AudioRecordingService : Service() {
             stopSelf()
         }
     }
-    
+
     /**
      * Pauses the current recording
      */
-    private fun pauseRecording() {
+    internal fun pauseRecording() {
         if (!_recordingState.value.isRecording || isPaused) {
             return
         }
-        
+
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 mediaRecorder?.pause()
@@ -183,27 +186,27 @@ class AudioRecordingService : Service() {
                 Napier.w("Pause recording not supported below Android N")
                 return
             }
-            
+
             // Update notification to show paused state
             notificationHandler.updateRecordingNotification(
                 isRecording = false,
-                startTimeMillis = recordingStartTime
+                startTimeMillis = recordingStartTime,
             )
-            
+
             Napier.d("Recording paused")
         } catch (e: Exception) {
             Napier.e("Error pausing recording", e)
         }
     }
-    
+
     /**
      * Resumes a paused recording
      */
-    private fun resumeRecording() {
+    internal fun resumeRecording() {
         if (!_recordingState.value.isRecording || !isPaused) {
             return
         }
-        
+
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 mediaRecorder?.resume()
@@ -212,13 +215,13 @@ class AudioRecordingService : Service() {
                 Napier.w("Resume recording not supported below Android N")
                 return
             }
-            
+
             // Update notification to show recording state
             notificationHandler.updateRecordingNotification(
                 isRecording = true,
-                startTimeMillis = recordingStartTime
+                startTimeMillis = recordingStartTime,
             )
-            
+
             Napier.d("Recording resumed")
         } catch (e: Exception) {
             Napier.e("Error resuming recording", e)
@@ -231,25 +234,27 @@ class AudioRecordingService : Service() {
     private fun startRecording(outputPath: String?) {
         try {
             // Create output file
-            outputFile = if (outputPath != null) {
-                val file = File(outputPath)
-                file.parentFile?.mkdirs()
-                if (file.exists()) {
-                    file.delete()
+            outputFile =
+                if (outputPath != null) {
+                    val file = File(outputPath)
+                    file.parentFile?.mkdirs()
+                    if (file.exists()) {
+                        file.delete()
+                    }
+                    file
+                } else {
+                    val outputDir = applicationContext.cacheDir
+                    File.createTempFile("audio_recording_", ".m4a", outputDir)
                 }
-                file
-            } else {
-                val outputDir = applicationContext.cacheDir
-                File.createTempFile("audio_recording_", ".m4a", outputDir)
-            }
 
             // Initialize MediaRecorder
-            mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                MediaRecorder(this)
-            } else {
-                @Suppress("DEPRECATION")
-                MediaRecorder()
-            }
+            mediaRecorder =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    MediaRecorder(this)
+                } else {
+                    @Suppress("DEPRECATION")
+                    MediaRecorder()
+                }
 
             mediaRecorder?.apply {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
@@ -269,7 +274,7 @@ class AudioRecordingService : Service() {
                     _recordingState.update {
                         it.copy(
                             isRecording = true,
-                            startTime = recordingStartTime
+                            startTime = recordingStartTime,
                         )
                     }
 
@@ -304,7 +309,7 @@ class AudioRecordingService : Service() {
                     _recordingState.update {
                         it.copy(
                             isRecording = false,
-                            error = "Failed to start recording: ${e.message}"
+                            error = "Failed to start recording: ${e.message}",
                         )
                     }
                 }
@@ -317,7 +322,7 @@ class AudioRecordingService : Service() {
             _recordingState.update {
                 it.copy(
                     isRecording = false,
-                    error = "Error setting up recording: ${e.message}"
+                    error = "Error setting up recording: ${e.message}",
                 )
             }
         }
@@ -344,7 +349,7 @@ class AudioRecordingService : Service() {
             _recordingState.update {
                 it.copy(
                     isRecording = false,
-                    recordedFilePath = outputFile?.absolutePath
+                    recordedFilePath = outputFile?.absolutePath,
                 )
             }
 
@@ -357,7 +362,7 @@ class AudioRecordingService : Service() {
             _recordingState.update {
                 it.copy(
                     isRecording = false,
-                    error = "Error stopping recording: ${e.message}"
+                    error = "Error stopping recording: ${e.message}",
                 )
             }
 
@@ -368,16 +373,12 @@ class AudioRecordingService : Service() {
     /**
      * Gets the recorded file path
      */
-    fun getRecordedFilePath(): String? {
-        return outputFile?.absolutePath
-    }
-    
+    fun getRecordedFilePath(): String? = outputFile?.absolutePath
+
     /**
      * Checks if recording is currently paused
      */
-    fun isRecordingPaused(): Boolean {
-        return isPaused && _recordingState.value.isRecording
-    }
+    fun isRecordingPaused(): Boolean = isPaused && _recordingState.value.isRecording
 }
 
 /**

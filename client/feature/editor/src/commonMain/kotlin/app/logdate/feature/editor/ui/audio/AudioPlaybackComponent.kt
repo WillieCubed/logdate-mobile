@@ -1,7 +1,7 @@
 package app.logdate.feature.editor.ui.audio
 
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,8 +27,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,20 +37,22 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.feature.editor.audio.AudioContextProcessor
 import app.logdate.feature.editor.ui.formatMediaDuration
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.generating_transcription
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
-import logdate.client.feature.editor.generated.resources.Res
+
 /**
  * A component that displays and controls audio playback.
  * Includes a play/pause button, progress slider, and time display.
- * 
+ *
  * This implementation connects to the AudioViewModel to use the platform-specific
  * audio playback implementation instead of simulating playback.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun AudioPlaybackComponent(
     audioUri: String,
@@ -59,7 +61,7 @@ fun AudioPlaybackComponent(
     waveformEnabled: Boolean = true,
     showTranscription: Boolean = false,
     transcriptionText: String? = null,
-    viewModel: AudioViewModel = koinInject()
+    viewModel: AudioViewModel = koinInject(),
 ) {
     val audioContextProcessor: AudioContextProcessor = koinInject()
     val durationResolver: AudioDurationResolver = koinInject()
@@ -74,46 +76,52 @@ fun AudioPlaybackComponent(
     val waveformAmplitudes by produceState(
         initialValue = emptyList<Float>(),
         key1 = audioUri,
-        key2 = resolvedDuration
+        key2 = resolvedDuration,
     ) {
-        value = runCatching {
-            audioContextProcessor.process(
-                audioUri = audioUri,
-                durationMs = resolvedDuration.inWholeMilliseconds,
-                createdAt = Clock.System.now(),
-                latitude = null,
-                longitude = null
-            ).amplitudes
-        }.getOrElse { emptyList() }
+        value =
+            runCatching {
+                audioContextProcessor
+                    .process(
+                        audioUri = audioUri,
+                        durationMs = resolvedDuration.inWholeMilliseconds,
+                        createdAt = Clock.System.now(),
+                        latitude = null,
+                        longitude = null,
+                    ).amplitudes
+            }.getOrElse { emptyList() }
     }
-    
+
     // Create playback state that manages playback
-    val playbackState = remember {
-        // Create the state with a non-circular reference to the seek operation
-        AudioPlaybackState(
-            audioUri = audioUri,
-            initialIsPlaying = initiallyPlaying,
-            initialTotalDuration = Duration.ZERO,
-            onStartPlayback = { viewModel.startPlayback(audioUri) },
-            onStopPlayback = { viewModel.pausePlayback() },
-            onSeek = { duration, totalDuration ->
-                val ratio = if (totalDuration > Duration.ZERO) {
-                    (duration.inWholeMilliseconds.toFloat() / 
-                     totalDuration.inWholeMilliseconds.toFloat()).coerceIn(0f, 1f)
-                } else {
-                    0f
-                }
-                viewModel.seekTo(ratio)
-            }
-        )
-    }
-    
+    val playbackState =
+        remember {
+            // Create the state with a non-circular reference to the seek operation
+            AudioPlaybackState(
+                audioUri = audioUri,
+                initialIsPlaying = initiallyPlaying,
+                initialTotalDuration = Duration.ZERO,
+                onStartPlayback = { viewModel.startPlayback(audioUri) },
+                onStopPlayback = { viewModel.pausePlayback() },
+                onSeek = { duration, totalDuration ->
+                    val ratio =
+                        if (totalDuration > Duration.ZERO) {
+                            (
+                                duration.inWholeMilliseconds.toFloat() /
+                                    totalDuration.inWholeMilliseconds.toFloat()
+                            ).coerceIn(0f, 1f)
+                        } else {
+                            0f
+                        }
+                    viewModel.seekTo(ratio)
+                },
+            )
+        }
+
     // Connect to platform-specific implementation
     LaunchedEffect(audioUri) {
         playbackState.updateLoadingState(true)
-        
+
         playbackState.updateLoadingState(false)
-        
+
         // Start playback if initially playing
         if (initiallyPlaying) {
             playbackState.startPlayback()
@@ -125,7 +133,7 @@ fun AudioPlaybackComponent(
             playbackState.updateTotalDuration(resolvedDuration)
         }
     }
-    
+
     // Observe the view model's playback progress
     LaunchedEffect(uiState) {
         // Update progress state from view model
@@ -138,14 +146,14 @@ fun AudioPlaybackComponent(
             }
         }
     }
-    
+
     // Handle errors from the view model
     LaunchedEffect(uiState.error) {
         if (!uiState.error.isNullOrBlank()) {
             playbackState.setError(true)
         }
     }
-    
+
     // Clean up on disposal
     DisposableEffect(Unit) {
         onDispose {
@@ -154,11 +162,12 @@ fun AudioPlaybackComponent(
             }
         }
     }
-    
+
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(16.dp)
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(16.dp),
     ) {
         // Optional transcription display
         if (showTranscription) {
@@ -166,19 +175,20 @@ fun AudioPlaybackComponent(
                 uiState.transcriptionInProgress -> {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp)
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp),
                     ) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp
+                            strokeWidth = 2.dp,
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = stringResource(Res.string.generating_transcription),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -187,122 +197,132 @@ fun AudioPlaybackComponent(
                         text = transcriptionText ?: uiState.transcription ?: "",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp)
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp),
                     )
                 }
             }
         }
-        
+
         // Audio waveform display if enabled
         if (waveformEnabled) {
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .padding(bottom = 8.dp)
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .padding(bottom = 8.dp),
             ) {
                 AudioWaveformComponent(
                     audioLevels = waveformAmplitudes,
                     waveformColor = MaterialTheme.colorScheme.primary,
                     minHeight = 48.dp,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
 
                 if (playbackState.progressPercentage > 0f) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth(playbackState.progressPercentage)
-                            .height(48.dp)
-                            .align(Alignment.CenterStart)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                        modifier =
+                            Modifier
+                                .fillMaxWidth(playbackState.progressPercentage)
+                                .height(48.dp)
+                                .align(Alignment.CenterStart)
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
                     )
                 }
 
                 Slider(
                     value = playbackState.progressPercentage,
                     onValueChange = { playbackState.seekToPercentage(it) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.Center),
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
-                        inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                    )
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.Center),
+                    colors =
+                        SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+                            inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                        ),
                 )
             }
         }
-        
+
         // Playback controls
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             // Play/pause button
             Surface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .pointerInput(playbackState) {
-                        detectTapGestures {
-                            playbackState.togglePlayback()
-                        }
-                    }
+                modifier =
+                    Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .pointerInput(playbackState) {
+                            detectTapGestures {
+                                playbackState.togglePlayback()
+                            }
+                        },
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     if (playbackState.isLoading || (uiState.currentUri == audioUri && uiState.isPlaying != playbackState.isPlaying)) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
                         )
                     } else {
                         Icon(
-                            imageVector = if (playbackState.isPlaying) 
-                                Icons.Filled.Pause 
-                            else 
-                                Icons.Filled.PlayArrow,
-                            contentDescription = if (playbackState.isPlaying) 
-                                "Pause" 
-                            else 
-                                "Play",
+                            imageVector =
+                                if (playbackState.isPlaying) {
+                                    Icons.Filled.Pause
+                                } else {
+                                    Icons.Filled.PlayArrow
+                                },
+                            contentDescription =
+                                if (playbackState.isPlaying) {
+                                    "Pause"
+                                } else {
+                                    "Play"
+                                },
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(24.dp),
                         )
                     }
                 }
             }
-            
+
             Spacer(modifier = Modifier.width(16.dp))
-            
+
             // Time display
             Text(
                 text = formatMediaDuration(playbackState.progress.inWholeMilliseconds, true),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.width(40.dp)
+                modifier = Modifier.width(40.dp),
             )
-            
+
             if (!waveformEnabled) {
                 // Only show slider if waveform is disabled
                 Slider(
                     value = playbackState.progressPercentage,
                     onValueChange = { playbackState.seekToPercentage(it) },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 )
             } else {
                 Spacer(modifier = Modifier.weight(1f))
             }
-            
+
             // Total duration
             Text(
                 text = formatMediaDuration(playbackState.totalDuration.inWholeMilliseconds, true),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.width(40.dp)
+                modifier = Modifier.width(40.dp),
             )
         }
     }

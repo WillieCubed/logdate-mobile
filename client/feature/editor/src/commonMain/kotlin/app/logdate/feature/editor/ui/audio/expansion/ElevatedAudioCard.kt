@@ -18,6 +18,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Forward10
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Replay10
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,22 +39,19 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Forward10
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Replay10
 import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.feature.editor.audio.model.AudioSegment
 import app.logdate.feature.editor.ui.audio.waveform.BezierAudioWaveform
 import app.logdate.feature.editor.ui.formatMediaDuration
-import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.number
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
+import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.skip_back_10_seconds
+import logdate.client.feature.editor.generated.resources.skip_forward_10_seconds
+import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Instant
+
 /**
  * Second expansion state - elevated card with full controls.
  *
@@ -62,6 +64,7 @@ import logdate.client.feature.editor.generated.resources.Res
  *
  * Long press triggers IMMERSIVE mode.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun ElevatedAudioCard(
     amplitudes: List<Float>,
@@ -84,55 +87,61 @@ fun ElevatedAudioCard(
 ) {
     val elevation by animateFloatAsState(
         targetValue = 24f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "elevation"
+        animationSpec =
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium,
+            ),
+        label = "elevation",
     )
 
-    val backgroundBrush = Brush.verticalGradient(
-        colors = listOf(
-            Color(palette.waveformGradientStart).copy(alpha = 0.15f),
-            Color(palette.waveformGradientEnd).copy(alpha = 0.08f)
+    val backgroundBrush =
+        Brush.verticalGradient(
+            colors =
+                listOf(
+                    Color(palette.waveformGradientStart).copy(alpha = 0.15f),
+                    Color(palette.waveformGradientEnd).copy(alpha = 0.08f),
+                ),
         )
-    )
 
     // Scrim background
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.4f))
-            .pointerInput(Unit) {
-                detectTapGestures { onDismiss() }
-            }
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.4f))
+                .pointerInput(Unit) {
+                    detectTapGestures { onDismiss() }
+                },
     ) {
         Surface(
-            modifier = modifier
-                .align(Alignment.Center)
-                .padding(24.dp)
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onLongPress = { onLongPress() }
-                    )
-                },
+            modifier =
+                modifier
+                    .align(Alignment.Center)
+                    .padding(24.dp)
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onLongPress = { onLongPress() },
+                        )
+                    },
             shape = RoundedCornerShape(24.dp),
             shadowElevation = elevation.dp,
-            tonalElevation = 8.dp
+            tonalElevation = 8.dp,
         ) {
             Box(
-                modifier = Modifier
-                    .background(backgroundBrush)
-                    .padding(24.dp)
+                modifier =
+                    Modifier
+                        .background(backgroundBrush)
+                        .padding(24.dp),
             ) {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     // Time context
                     Text(
                         text = formatDateTime(createdAt),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
 
                     // Large waveform
@@ -146,10 +155,11 @@ fun ElevatedAudioCard(
                         onDragStart = onDragStart,
                         onDragEnd = onDragEnd,
                         onCrossSegment = onCrossSegment,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(120.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(120.dp)
+                                .clip(RoundedCornerShape(12.dp)),
                     )
 
                     // Scrubber slider
@@ -157,27 +167,28 @@ fun ElevatedAudioCard(
                         value = progress,
                         onValueChange = onSeek,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = SliderDefaults.colors(
-                            thumbColor = Color(palette.accentColor),
-                            activeTrackColor = Color(palette.playedFillColor),
-                            inactiveTrackColor = Color(palette.waveformGradientStart).copy(alpha = 0.3f)
-                        )
+                        colors =
+                            SliderDefaults.colors(
+                                thumbColor = Color(palette.accentColor),
+                                activeTrackColor = Color(palette.playedFillColor),
+                                inactiveTrackColor = Color(palette.waveformGradientStart).copy(alpha = 0.3f),
+                            ),
                     )
 
                     // Time display
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
                             text = formatProgress(progress, durationMs),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
                             text = formatMediaDuration(durationMs, false),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
 
@@ -185,13 +196,13 @@ fun ElevatedAudioCard(
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         IconButton(onClick = onSkipBack) {
                             Icon(
                                 imageVector = Icons.Rounded.Replay10,
                                 contentDescription = stringResource(Res.string.skip_back_10_seconds),
-                                tint = Color(palette.accentColor)
+                                tint = Color(palette.accentColor),
                             )
                         }
 
@@ -202,17 +213,17 @@ fun ElevatedAudioCard(
                             onClick = onPlayPause,
                             shape = CircleShape,
                             color = Color(palette.accentColor),
-                            modifier = Modifier.size(64.dp)
+                            modifier = Modifier.size(64.dp),
                         ) {
                             Box(
                                 contentAlignment = Alignment.Center,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxSize(),
                             ) {
                                 Icon(
                                     imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                                     contentDescription = if (isPlaying) "Pause" else "Play",
                                     tint = Color.White,
-                                    modifier = Modifier.size(36.dp)
+                                    modifier = Modifier.size(36.dp),
                                 )
                             }
                         }
@@ -223,7 +234,7 @@ fun ElevatedAudioCard(
                             Icon(
                                 imageVector = Icons.Rounded.Forward10,
                                 contentDescription = stringResource(Res.string.skip_forward_10_seconds),
-                                tint = Color(palette.accentColor)
+                                tint = Color(palette.accentColor),
                             )
                         }
                     }
@@ -233,7 +244,10 @@ fun ElevatedAudioCard(
     }
 }
 
-private fun formatProgress(progress: Float, durationMs: Long): String {
+private fun formatProgress(
+    progress: Float,
+    durationMs: Long,
+): String {
     val currentMs = (progress * durationMs).toLong()
     return formatMediaDuration(currentMs, false)
 }
@@ -241,7 +255,14 @@ private fun formatProgress(progress: Float, durationMs: Long): String {
 private fun formatDateTime(instant: Instant): String {
     val local = instant.toLocalDateTime(TimeZone.currentSystemDefault())
     val months = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-    val hour = if (local.hour == 0) 12 else if (local.hour > 12) local.hour - 12 else local.hour
+    val hour =
+        if (local.hour == 0) {
+            12
+        } else if (local.hour > 12) {
+            local.hour - 12
+        } else {
+            local.hour
+        }
     val amPm = if (local.hour < 12) "AM" else "PM"
     return "${months[local.month.number - 1]} ${local.day}, $hour:${local.minute.toString().padStart(2, '0')} $amPm"
 }

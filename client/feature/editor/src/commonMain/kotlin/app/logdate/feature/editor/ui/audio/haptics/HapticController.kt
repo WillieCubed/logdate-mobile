@@ -43,8 +43,12 @@ interface HapticController {
  */
 object NoOpHapticController : HapticController {
     override fun onDragStart() {}
+
     override fun onDragging() {}
+
     override fun onCrossSegment() {}
+
     override fun onSnapToSegment() {}
+
     override fun onDragEnd() {}
 }

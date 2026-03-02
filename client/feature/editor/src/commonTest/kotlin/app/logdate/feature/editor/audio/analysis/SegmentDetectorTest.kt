@@ -58,11 +58,12 @@ class SegmentDetectorTest {
     @Test
     fun detectsSignificantPause() {
         // Speech, long silence, speech
-        val amplitudes = buildList {
-            repeat(10) { add(0.5f) } // Speech
-            repeat(30) { add(0.05f) } // Long silence (should be detected)
-            repeat(10) { add(0.5f) } // Speech
-        }
+        val amplitudes =
+            buildList {
+                repeat(10) { add(0.5f) } // Speech
+                repeat(30) { add(0.05f) } // Long silence (should be detected)
+                repeat(10) { add(0.5f) } // Speech
+            }
         val result = detector.detectSegments(amplitudes, 5000L)
 
         val pauses = result.filter { it.type == SegmentType.SIGNIFICANT_PAUSE }
@@ -72,11 +73,12 @@ class SegmentDetectorTest {
     @Test
     fun ignoresShortPauses() {
         // Speech, short silence, speech
-        val amplitudes = buildList {
-            repeat(10) { add(0.5f) } // Speech
-            repeat(3) { add(0.05f) } // Short silence (should NOT be detected)
-            repeat(10) { add(0.5f) } // Speech
-        }
+        val amplitudes =
+            buildList {
+                repeat(10) { add(0.5f) } // Speech
+                repeat(3) { add(0.05f) } // Short silence (should NOT be detected)
+                repeat(10) { add(0.5f) } // Speech
+            }
         val result = detector.detectSegments(amplitudes, 2300L)
 
         val pauses = result.filter { it.type == SegmentType.SIGNIFICANT_PAUSE }

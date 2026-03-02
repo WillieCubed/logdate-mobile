@@ -16,12 +16,13 @@ import org.koin.dsl.module
 /**
  * iOS implementation of audio module
  */
-actual val audioModule: Module = module {
-    single<AudioStorage> { IosAudioStorage() }
-    single<AudioRecordingManager> { IosAudioRecordingManager(get()) }
-    single<AudioPlaybackManager> { IosAudioPlaybackManager() }
-    single<AudioDurationResolver> { IosAudioDurationResolver() }
-    
-    // Provide the iOS implementation of TranscriptionService
-    factory<TranscriptionService> { IosTranscriptionService() }
-}
+actual val audioModule: Module =
+    module {
+        single<AudioStorage> { IosAudioStorage() }
+        single<AudioRecordingManager> { IosAudioRecordingManager(get()) }
+        single<AudioPlaybackManager> { IosAudioPlaybackManager() }
+        single<AudioDurationResolver> { IosAudioDurationResolver() }
+
+        // Provide the iOS implementation of TranscriptionService
+        factory<TranscriptionService> { IosTranscriptionService() }
+    }

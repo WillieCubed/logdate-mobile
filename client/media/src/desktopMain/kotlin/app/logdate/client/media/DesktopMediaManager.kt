@@ -1,8 +1,7 @@
 package app.logdate.client.media
 
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.Flow
-import kotlin.time.Instant
+import kotlinx.coroutines.flow.flowOf
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
@@ -12,8 +11,9 @@ import kotlin.io.path.extension
 import kotlin.io.path.name
 import kotlin.io.path.pathString
 import kotlin.streams.asSequence
-import kotlin.uuid.Uuid
 import kotlin.time.Duration
+import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 class DesktopMediaManager : MediaManager {
     override suspend fun getMedia(uri: String): MediaObject {
@@ -21,20 +21,23 @@ class DesktopMediaManager : MediaManager {
         return toMediaObject(path) ?: error("Unsupported or missing media at $uri")
     }
 
-    override suspend fun exists(mediaId: String): Boolean {
-        return Files.exists(resolvePath(mediaId))
-    }
+    override suspend fun exists(mediaId: String): Boolean = Files.exists(resolvePath(mediaId))
 
     override suspend fun getRecentMedia(): Flow<List<MediaObject>> {
-        val media = listMediaObjects()
-            .sortedByDescending { it.timestamp }
-            .take(MAX_RECENT_MEDIA)
+        val media =
+            listMediaObjects()
+                .sortedByDescending { it.timestamp }
+                .take(MAX_RECENT_MEDIA)
         return flowOf(media)
     }
 
-    override suspend fun queryMediaByDate(start: Instant, end: Instant): Flow<List<MediaObject>> {
-        val media = listMediaObjects()
-            .filter { it.timestamp >= start && it.timestamp < end }
+    override suspend fun queryMediaByDate(
+        start: Instant,
+        end: Instant,
+    ): Flow<List<MediaObject>> {
+        val media =
+            listMediaObjects()
+                .filter { it.timestamp >= start && it.timestamp < end }
         return flowOf(media)
     }
 
@@ -44,7 +47,11 @@ class DesktopMediaManager : MediaManager {
         if (source.startsWith(mediaRoot)) {
             return
         }
-        val sanitizedName = source.name.replace("..", "_").replace("/", "_").replace("\\", "_")
+        val sanitizedName =
+            source.name
+                .replace("..", "_")
+                .replace("/", "_")
+                .replace("\\", "_")
         val targetName = "${Uuid.random()}-$sanitizedName"
         val target = mediaRoot.resolve(targetName)
         if (!Files.exists(target)) {
@@ -61,26 +68,29 @@ class DesktopMediaManager : MediaManager {
             fileName = fileName,
             mimeType = mimeType,
             sizeBytes = data.size.toLong(),
-            data = data
+            data = data,
         )
     }
 
     override suspend fun saveMedia(payload: MediaPayload): String {
         val directory = ensureMediaDir()
-        val sanitizedName = payload.fileName.replace("..", "_").replace("/", "_").replace("\\", "_")
+        val sanitizedName =
+            payload.fileName
+                .replace("..", "_")
+                .replace("/", "_")
+                .replace("\\", "_")
         val fileName = "${Uuid.random()}-$sanitizedName"
         val filePath = directory.resolve(fileName)
         Files.write(filePath, payload.data)
         return "file://${filePath.pathString}"
     }
 
-    private fun resolvePath(uri: String): Path {
-        return if (uri.startsWith("file://")) {
+    private fun resolvePath(uri: String): Path =
+        if (uri.startsWith("file://")) {
             Path.of(URI(uri))
         } else {
             Path.of(uri)
         }
-    }
 
     private fun ensureMediaDir(): Path {
         val directory = mediaRoot
@@ -107,26 +117,26 @@ class DesktopMediaManager : MediaManager {
         val timestamp = fileTimeToInstant(lastModified)
 
         return when (extension) {
-            "jpg", "jpeg", "png", "gif", "webp", "heic", "heif" -> MediaObject.Image(
-                uri = "file://${path.pathString}",
-                size = size,
-                name = name,
-                timestamp = timestamp
-            )
-            "mp4", "mov", "m4v" -> MediaObject.Video(
-                name = name,
-                uri = "file://${path.pathString}",
-                size = size,
-                timestamp = timestamp,
-                duration = Duration.ZERO
-            )
+            "jpg", "jpeg", "png", "gif", "webp", "heic", "heif" ->
+                MediaObject.Image(
+                    uri = "file://${path.pathString}",
+                    size = size,
+                    name = name,
+                    timestamp = timestamp,
+                )
+            "mp4", "mov", "m4v" ->
+                MediaObject.Video(
+                    name = name,
+                    uri = "file://${path.pathString}",
+                    size = size,
+                    timestamp = timestamp,
+                    duration = Duration.ZERO,
+                )
             else -> null
         }
     }
 
-    private fun fileTimeToInstant(fileTime: FileTime): Instant {
-        return Instant.fromEpochMilliseconds(fileTime.toMillis())
-    }
+    private fun fileTimeToInstant(fileTime: FileTime): Instant = Instant.fromEpochMilliseconds(fileTime.toMillis())
 
     private fun guessMimeType(fileName: String): String {
         val extension = fileName.substringAfterLast('.', "")

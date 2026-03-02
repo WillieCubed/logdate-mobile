@@ -45,15 +45,17 @@ enum class AudioExpansionState {
      * Shows: edge-to-edge waveform, auto-hiding controls, palette gradient background.
      * Triggered by swipe up from [ELEVATED] or explicit fullscreen action.
      */
-    IMMERSIVE;
+    IMMERSIVE,
 }
 
 /** Whether this state renders inline within the timeline/editor flow. */
 val AudioExpansionState.isInline: Boolean
-    get() = this == AudioExpansionState.COLLAPSED ||
+    get() =
+        this == AudioExpansionState.COLLAPSED ||
             this == AudioExpansionState.SPATIAL_EXPANDED
 
 /** Whether this state renders as a modal overlay above the timeline. */
 val AudioExpansionState.isOverlay: Boolean
-    get() = this == AudioExpansionState.ELEVATED ||
+    get() =
+        this == AudioExpansionState.ELEVATED ||
             this == AudioExpansionState.IMMERSIVE

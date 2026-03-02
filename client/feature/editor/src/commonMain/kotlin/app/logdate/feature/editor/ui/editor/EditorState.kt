@@ -8,7 +8,7 @@ import kotlin.uuid.Uuid
 /**
  * Immutable state class for the editor.
  * This is the single source of truth for all editor state.
- * 
+ *
  * Note: This class is marked as @Stable rather than being a data class
  * to optimize Compose recompositions. Since EditorState maintains its identity
  * while its properties change, @Stable tells Compose it can skip equality checks
@@ -34,9 +34,7 @@ class EditorState(
     /**
      * Checks if a block is read-only
      */
-    fun isReadOnly(blockId: Uuid): Boolean {
-        return readOnlyBlocks[blockId] == true
-    }
+    fun isReadOnly(blockId: Uuid): Boolean = readOnlyBlocks[blockId] == true
 
     /**
      * Returns true if there are no blocks in this state.
@@ -52,7 +50,7 @@ class EditorState(
      * Returns true if the editor state has an error.
      */
     fun hasError(): Boolean = errorMessage != null
-    
+
     /**
      * Returns true if the editor has unsaved changes.
      * Content is considered dirty if:
@@ -61,7 +59,7 @@ class EditorState(
      */
     val isDirty: Boolean
         get() = hasContent() && isModified
-        
+
     /**
      * Returns true if the editor can be safely exited without saving.
      * Safe to exit if:
@@ -70,7 +68,7 @@ class EditorState(
      */
     val canExitWithoutSaving: Boolean
         get() = !hasContent() || !isDirty
-        
+
     /**
      * Creates a copy of the editor state with the specified properties changed.
      * This allows us to maintain the same copy-and-modify pattern as a data class.
@@ -89,9 +87,9 @@ class EditorState(
         errorMessage: String? = this.errorMessage,
         shouldExit: Boolean = this.shouldExit,
         disableEmptyBlockCreation: Boolean = this.disableEmptyBlockCreation,
-        isModified: Boolean = this.isModified
-    ): EditorState {
-        return EditorState(
+        isModified: Boolean = this.isModified,
+    ): EditorState =
+        EditorState(
             blocks = blocks,
             expandedBlockId = expandedBlockId,
             readOnlyBlocks = readOnlyBlocks,
@@ -105,10 +103,9 @@ class EditorState(
             errorMessage = errorMessage,
             shouldExit = shouldExit,
             disableEmptyBlockCreation = disableEmptyBlockCreation,
-            isModified = isModified
+            isModified = isModified,
         )
-    }
-    
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is EditorState) return false
@@ -148,11 +145,9 @@ class EditorState(
         result = 31 * result + isModified.hashCode()
         return result
     }
-    
-    override fun toString(): String {
-        return "EditorState(blocks=${blocks.size}, expandedBlockId=$expandedBlockId, " +
-               "selectedJournalIds=${selectedJournalIds.size}, draftId=$draftId, " +
-               "isDraft=$isDraft, isModified=$isModified)"
-    }
-}
 
+    override fun toString(): String =
+        "EditorState(blocks=${blocks.size}, expandedBlockId=$expandedBlockId, " +
+            "selectedJournalIds=${selectedJournalIds.size}, draftId=$draftId, " +
+            "isDraft=$isDraft, isModified=$isModified)"
+}

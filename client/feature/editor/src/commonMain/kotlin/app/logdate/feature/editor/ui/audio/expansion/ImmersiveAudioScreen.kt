@@ -20,6 +20,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Forward10
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Replay10
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,25 +45,22 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Forward10
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Replay10
 import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.feature.editor.audio.model.AudioSegment
 import app.logdate.feature.editor.audio.model.DaylightPeriod
 import app.logdate.feature.editor.ui.audio.waveform.BezierAudioWaveform
 import app.logdate.feature.editor.ui.formatMediaDuration
 import kotlinx.coroutines.delay
-import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.number
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
+import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.close
+import logdate.client.feature.editor.generated.resources.skip_back_10_seconds
+import logdate.client.feature.editor.generated.resources.skip_forward_10_seconds
+import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Instant
+
 /**
  * Full-screen immersive audio playback experience.
  *
@@ -67,6 +70,7 @@ import logdate.client.feature.editor.generated.resources.Res
  * - Auto-hiding controls (show on tap)
  * - Contextual time-of-day information
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun ImmersiveAudioScreen(
     amplitudes: List<Float>,
@@ -98,61 +102,66 @@ fun ImmersiveAudioScreen(
         }
     }
 
-    val backgroundBrush = Brush.verticalGradient(
-        colors = listOf(
-            Color(palette.immersiveBackground),
-            Color(palette.waveformGradientStart).copy(alpha = 0.8f),
-            Color(palette.immersiveBackground)
+    val backgroundBrush =
+        Brush.verticalGradient(
+            colors =
+                listOf(
+                    Color(palette.immersiveBackground),
+                    Color(palette.waveformGradientStart).copy(alpha = 0.8f),
+                    Color(palette.immersiveBackground),
+                ),
         )
-    )
 
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(backgroundBrush)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null
-            ) {
-                controlsVisible = !controlsVisible
-            }
+        modifier =
+            modifier
+                .fillMaxSize()
+                .background(backgroundBrush)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                ) {
+                    controlsVisible = !controlsVisible
+                },
     ) {
         // Close button (always visible)
         IconButton(
             onClick = onClose,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .statusBarsPadding()
-                .padding(16.dp)
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(16.dp),
         ) {
             Icon(
                 imageVector = Icons.Rounded.Close,
                 contentDescription = stringResource(Res.string.close),
-                tint = Color.White.copy(alpha = 0.8f)
+                tint = Color.White.copy(alpha = 0.8f),
             )
         }
 
         // Main content
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 32.dp)
-                .statusBarsPadding()
-                .navigationBarsPadding(),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 32.dp)
+                    .statusBarsPadding()
+                    .navigationBarsPadding(),
             verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Time context (always visible)
             Text(
                 text = formatDaylightPeriod(daylightPeriod),
                 style = MaterialTheme.typography.labelLarge,
-                color = Color.White.copy(alpha = 0.6f)
+                color = Color.White.copy(alpha = 0.6f),
             )
 
             Text(
                 text = formatDateTime(createdAt),
                 style = MaterialTheme.typography.headlineSmall,
-                color = Color.White
+                color = Color.White,
             )
 
             Spacer(modifier = Modifier.height(48.dp))
@@ -171,10 +180,11 @@ fun ImmersiveAudioScreen(
                 },
                 onDragEnd = onDragEnd,
                 onCrossSegment = onCrossSegment,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(180.dp)
-                    .clip(MaterialTheme.shapes.large)
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                        .clip(MaterialTheme.shapes.large),
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -183,37 +193,38 @@ fun ImmersiveAudioScreen(
             AnimatedVisibility(
                 visible = controlsVisible,
                 enter = fadeIn(),
-                exit = fadeOut()
+                exit = fadeOut(),
             ) {
                 Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     // Scrubber
                     Slider(
                         value = progress,
                         onValueChange = onSeek,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = SliderDefaults.colors(
-                            thumbColor = Color(palette.accentColor),
-                            activeTrackColor = Color(palette.playedFillColor),
-                            inactiveTrackColor = Color.White.copy(alpha = 0.2f)
-                        )
+                        colors =
+                            SliderDefaults.colors(
+                                thumbColor = Color(palette.accentColor),
+                                activeTrackColor = Color(palette.playedFillColor),
+                                inactiveTrackColor = Color.White.copy(alpha = 0.2f),
+                            ),
                     )
 
                     // Time display
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
                             text = formatProgress(progress, durationMs),
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.7f)
+                            color = Color.White.copy(alpha = 0.7f),
                         )
                         Text(
                             text = formatMediaDuration(durationMs, false),
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.7f)
+                            color = Color.White.copy(alpha = 0.7f),
                         )
                     }
 
@@ -222,14 +233,14 @@ fun ImmersiveAudioScreen(
                     // Playback controls
                     Row(
                         horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         IconButton(onClick = onSkipBack) {
                             Icon(
                                 imageVector = Icons.Rounded.Replay10,
                                 contentDescription = stringResource(Res.string.skip_back_10_seconds),
                                 tint = Color.White,
-                                modifier = Modifier.size(32.dp)
+                                modifier = Modifier.size(32.dp),
                             )
                         }
 
@@ -240,17 +251,17 @@ fun ImmersiveAudioScreen(
                             onClick = onPlayPause,
                             shape = CircleShape,
                             color = Color(palette.accentColor),
-                            modifier = Modifier.size(80.dp)
+                            modifier = Modifier.size(80.dp),
                         ) {
                             Box(
                                 contentAlignment = Alignment.Center,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxSize(),
                             ) {
                                 Icon(
                                     imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                                     contentDescription = if (isPlaying) "Pause" else "Play",
                                     tint = Color.White,
-                                    modifier = Modifier.size(48.dp)
+                                    modifier = Modifier.size(48.dp),
                                 )
                             }
                         }
@@ -262,7 +273,7 @@ fun ImmersiveAudioScreen(
                                 imageVector = Icons.Rounded.Forward10,
                                 contentDescription = stringResource(Res.string.skip_forward_10_seconds),
                                 tint = Color.White,
-                                modifier = Modifier.size(32.dp)
+                                modifier = Modifier.size(32.dp),
                             )
                         }
                     }
@@ -272,26 +283,50 @@ fun ImmersiveAudioScreen(
     }
 }
 
-private fun formatProgress(progress: Float, durationMs: Long): String {
+private fun formatProgress(
+    progress: Float,
+    durationMs: Long,
+): String {
     val currentMs = (progress * durationMs).toLong()
     return formatMediaDuration(currentMs, false)
 }
 
 private fun formatDateTime(instant: Instant): String {
     val local = instant.toLocalDateTime(TimeZone.currentSystemDefault())
-    val months = listOf("January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December")
-    val hour = if (local.hour == 0) 12 else if (local.hour > 12) local.hour - 12 else local.hour
+    val months =
+        listOf(
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December",
+        )
+    val hour =
+        if (local.hour == 0) {
+            12
+        } else if (local.hour > 12) {
+            local.hour - 12
+        } else {
+            local.hour
+        }
     val amPm = if (local.hour < 12) "AM" else "PM"
     return "${months[local.month.number - 1]} ${local.day}, ${local.year}\n$hour:${local.minute.toString().padStart(2, '0')} $amPm"
 }
 
-private fun formatDaylightPeriod(period: DaylightPeriod): String = when (period) {
-    DaylightPeriod.DAWN -> "Dawn"
-    DaylightPeriod.MORNING -> "Morning"
-    DaylightPeriod.MIDDAY -> "Midday"
-    DaylightPeriod.AFTERNOON -> "Afternoon"
-    DaylightPeriod.GOLDEN_HOUR -> "Golden Hour"
-    DaylightPeriod.EVENING -> "Evening"
-    DaylightPeriod.NIGHT -> "Night"
-}
+private fun formatDaylightPeriod(period: DaylightPeriod): String =
+    when (period) {
+        DaylightPeriod.DAWN -> "Dawn"
+        DaylightPeriod.MORNING -> "Morning"
+        DaylightPeriod.MIDDAY -> "Midday"
+        DaylightPeriod.AFTERNOON -> "Afternoon"
+        DaylightPeriod.GOLDEN_HOUR -> "Golden Hour"
+        DaylightPeriod.EVENING -> "Evening"
+        DaylightPeriod.NIGHT -> "Night"
+    }

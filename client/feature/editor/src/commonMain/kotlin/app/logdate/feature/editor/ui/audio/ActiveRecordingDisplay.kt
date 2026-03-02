@@ -22,14 +22,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import kotlin.time.Duration
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.finish
+import logdate.client.feature.editor.generated.resources.restart
+import logdate.client.feature.editor.generated.resources.tap_to_start_recording
+import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Duration
+
 /**
  * A component that displays the active recording interface with controls.
  * Matches the design from the provided mockup.
  */
+@Suppress("ktlint:standard:function-naming", "ktlint:standard:max-line-length")
 @Composable
 fun ActiveRecordingDisplay(
     audioLevels: List<Float>,
@@ -42,104 +46,113 @@ fun ActiveRecordingDisplay(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // Text content area
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            shape = RoundedCornerShape(12.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            colors =
+                CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
+            shape = RoundedCornerShape(12.dp),
         ) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
             ) {
                 Text(
-                    text = stringResource(Res.string.public_speaking_sucks_so_much_you_know_i_had_to_give_a_presentation_today_on_the_ethics_of_ai_and_its_already_bad_enough_this_was_a_group_project_but_of_course_one_of_our_team_members_just_didnt),
+                    text = stringResource(Res.string.tap_to_start_recording),
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
-        
+
         // Recording visualization & controls
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            shape = RoundedCornerShape(12.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+            colors =
+                CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
+            shape = RoundedCornerShape(12.dp),
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 // Timer display
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center
+                    horizontalArrangement = Arrangement.Center,
                 ) {
                     Text(
                         text = formatDuration(recordingDuration),
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = Color.Red
+                        style =
+                            MaterialTheme.typography.titleMedium.copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                            ),
+                        color = Color.Red,
                     )
                 }
-                
+
                 // Waveform visualization
                 AudioWaveformComponent(
                     audioLevels = audioLevels,
                     isRecording = !isPaused,
                     waveformColor = Color(0xFF556B2F), // Dark olive green color
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
                 )
-                
+
                 // Control buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                    horizontalArrangement = Arrangement.SpaceEvenly,
                 ) {
                     // Restart button
                     OutlinedButton(
                         onClick = onRestart,
                         modifier = Modifier.weight(1f).padding(end = 4.dp),
-                        shape = RoundedCornerShape(24.dp)
+                        shape = RoundedCornerShape(24.dp),
                     ) {
                         Text(stringResource(Res.string.restart))
                     }
-                    
+
                     // Pause/Resume button
                     OutlinedButton(
                         onClick = onPause,
                         modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
-                        shape = RoundedCornerShape(24.dp)
+                        shape = RoundedCornerShape(24.dp),
                     ) {
                         Text(if (isPaused) "Resume" else "Pause")
                     }
-                    
+
                     // Finish button
                     Button(
                         onClick = onFinish,
                         modifier = Modifier.weight(1f).padding(start = 4.dp),
                         shape = RoundedCornerShape(24.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
                     ) {
                         Text(stringResource(Res.string.finish))
                     }
@@ -157,10 +170,10 @@ private fun formatDuration(duration: Duration): String {
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     val tenths = (duration.inWholeMilliseconds % 1000) / 100
-    
+
     // Format without relying on String.format
     val minutesStr = "$minutes"
     val secondsStr = if (seconds < 10) "0$seconds" else "$seconds"
-    
+
     return "$minutesStr:$secondsStr.$tenths"
 }

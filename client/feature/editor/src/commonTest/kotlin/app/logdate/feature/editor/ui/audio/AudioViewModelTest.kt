@@ -1,16 +1,16 @@
 package app.logdate.feature.editor.ui.audio
 
-import app.logdate.client.media.audio.AudioRecordingManager
 import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioPlaybackMetadata
+import app.logdate.client.media.audio.AudioRecordingManager
 import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -28,7 +28,6 @@ import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AudioViewModelTest {
-
     private val dispatcher = StandardTestDispatcher()
 
     @BeforeTest
@@ -42,86 +41,95 @@ class AudioViewModelTest {
     }
 
     @Test
-    fun startRecordingUpdatesUiState() = runTest(dispatcher) {
-        val recordingManager = FakeAudioRecordingManager(
-            outputUri = "file:///test/audio.m4a",
-            initialDuration = 5.seconds,
-            initialLevel = 0.5f
-        )
-        val viewModel = AudioViewModel(
-            audioRecordingManager = recordingManager,
-            audioPlaybackManager = FakeAudioPlaybackManager(),
-            audioDurationResolver = FakeAudioDurationResolver(),
-            transcriptionService = FakeTranscriptionService()
-        )
+    fun startRecordingUpdatesUiState() =
+        runTest(dispatcher) {
+            val recordingManager =
+                FakeAudioRecordingManager(
+                    outputUri = "file:///test/audio.m4a",
+                    initialDuration = 5.seconds,
+                    initialLevel = 0.5f,
+                )
+            val viewModel =
+                AudioViewModel(
+                    audioRecordingManager = recordingManager,
+                    audioPlaybackManager = FakeAudioPlaybackManager(),
+                    audioDurationResolver = FakeAudioDurationResolver(),
+                    transcriptionService = FakeTranscriptionService(),
+                )
 
-        viewModel.startRecording()
-        advanceUntilIdle()
+            viewModel.startRecording()
+            advanceUntilIdle()
 
-        val state = viewModel.uiState.value
-        assertTrue(state.isRecording, "Should be recording")
-        assertEquals(5.seconds, state.duration, "Should reflect emitted duration")
-        assertTrue(state.audioLevels.isNotEmpty(), "Should collect audio levels")
-    }
-
-    @Test
-    fun stopRecordingStoresRecordedUri() = runTest(dispatcher) {
-        val recordingManager = FakeAudioRecordingManager(
-            outputUri = "file:///test/audio.m4a",
-            initialDuration = 3.seconds,
-            initialLevel = 0.2f
-        )
-        val viewModel = AudioViewModel(
-            audioRecordingManager = recordingManager,
-            audioPlaybackManager = FakeAudioPlaybackManager(),
-            audioDurationResolver = FakeAudioDurationResolver(),
-            transcriptionService = FakeTranscriptionService()
-        )
-
-        viewModel.startRecording()
-        advanceUntilIdle()
-        viewModel.stopRecording()
-        advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertFalse(state.isRecording, "Should stop recording")
-        assertEquals("file:///test/audio.m4a", state.recordedAudioUri, "Should store recorded URI")
-    }
+            val state = viewModel.uiState.value
+            assertTrue(state.isRecording, "Should be recording")
+            assertEquals(5.seconds, state.duration, "Should reflect emitted duration")
+            assertTrue(state.audioLevels.isNotEmpty(), "Should collect audio levels")
+        }
 
     @Test
-    fun transcriptionFlowUpdatesUiState() = runTest(dispatcher) {
-        val recordingManager = FakeAudioRecordingManager(
-            outputUri = "file:///test/audio.m4a",
-            initialDuration = 1.seconds,
-            initialLevel = 0.1f
-        )
-        val viewModel = AudioViewModel(
-            audioRecordingManager = recordingManager,
-            audioPlaybackManager = FakeAudioPlaybackManager(),
-            audioDurationResolver = FakeAudioDurationResolver(),
-            transcriptionService = FakeTranscriptionService()
-        )
+    fun stopRecordingStoresRecordedUri() =
+        runTest(dispatcher) {
+            val recordingManager =
+                FakeAudioRecordingManager(
+                    outputUri = "file:///test/audio.m4a",
+                    initialDuration = 3.seconds,
+                    initialLevel = 0.2f,
+                )
+            val viewModel =
+                AudioViewModel(
+                    audioRecordingManager = recordingManager,
+                    audioPlaybackManager = FakeAudioPlaybackManager(),
+                    audioDurationResolver = FakeAudioDurationResolver(),
+                    transcriptionService = FakeTranscriptionService(),
+                )
 
-        viewModel.startRecording()
-        advanceUntilIdle()
+            viewModel.startRecording()
+            advanceUntilIdle()
+            viewModel.stopRecording()
+            advanceUntilIdle()
 
-        recordingManager.emitTranscription("Hello world")
-        advanceUntilIdle()
+            val state = viewModel.uiState.value
+            assertFalse(state.isRecording, "Should stop recording")
+            assertEquals("file:///test/audio.m4a", state.recordedAudioUri, "Should store recorded URI")
+        }
 
-        val state = viewModel.uiState.value
-        val transcriptionState = state.transcriptionState
-        assertTrue(
-            transcriptionState is AudioUiState.TranscriptionState.Success,
-            "Should update transcription state on new text"
-        )
-        assertEquals("Hello world", (transcriptionState as AudioUiState.TranscriptionState.Success).text)
-    }
+    @Test
+    fun transcriptionFlowUpdatesUiState() =
+        runTest(dispatcher) {
+            val recordingManager =
+                FakeAudioRecordingManager(
+                    outputUri = "file:///test/audio.m4a",
+                    initialDuration = 1.seconds,
+                    initialLevel = 0.1f,
+                )
+            val viewModel =
+                AudioViewModel(
+                    audioRecordingManager = recordingManager,
+                    audioPlaybackManager = FakeAudioPlaybackManager(),
+                    audioDurationResolver = FakeAudioDurationResolver(),
+                    transcriptionService = FakeTranscriptionService(),
+                )
+
+            viewModel.startRecording()
+            advanceUntilIdle()
+
+            recordingManager.emitTranscription("Hello world")
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            val transcriptionState = state.transcriptionState
+            assertTrue(
+                transcriptionState is AudioUiState.TranscriptionState.Success,
+                "Should update transcription state on new text",
+            )
+            assertEquals("Hello world", (transcriptionState as AudioUiState.TranscriptionState.Success).text)
+        }
 }
 
 private class FakeAudioRecordingManager(
     private val outputUri: String,
     initialDuration: Duration,
-    initialLevel: Float
+    initialLevel: Float,
 ) : AudioRecordingManager {
     private val audioLevelFlow = MutableStateFlow(initialLevel)
     private val durationFlow = MutableStateFlow(initialDuration)
@@ -164,7 +172,7 @@ private class FakeAudioPlaybackManager : AudioPlaybackManager {
         uri: String,
         metadata: AudioPlaybackMetadata?,
         onProgressUpdated: (Float) -> Unit,
-        onPlaybackCompleted: () -> Unit
+        onPlaybackCompleted: () -> Unit,
     ) {
         onProgressUpdated(0f)
     }
@@ -191,8 +199,7 @@ private class FakeTranscriptionService : TranscriptionService {
 
     override suspend fun stopLiveTranscription() = Unit
 
-    override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult =
-        TranscriptionResult.Success("Test transcription")
+    override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult = TranscriptionResult.Success("Test transcription")
 
     override fun cancelTranscription() = Unit
 

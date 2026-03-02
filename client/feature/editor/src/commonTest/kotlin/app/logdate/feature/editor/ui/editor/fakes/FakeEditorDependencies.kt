@@ -19,11 +19,11 @@ import app.logdate.feature.editor.ui.editor.mediator.EditorActions
 import app.logdate.feature.editor.ui.editor.mediator.EditorMediator
 import app.logdate.feature.editor.ui.editor.mediator.NewBlockRequest
 import app.logdate.shared.model.ActivityTimelineItem
+import app.logdate.shared.model.AltitudeUnit
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
 import app.logdate.shared.model.Location
 import app.logdate.shared.model.LocationAltitude
-import app.logdate.shared.model.AltitudeUnit
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,17 +44,21 @@ class FakeJournalNotesRepository : JournalNotesRepository {
 
     override fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> = flowOf(emptyList())
 
-    override fun observeNotesInRange(start: Instant, end: Instant): Flow<List<JournalNote>> = notesFlow
+    override fun observeNotesInRange(
+        start: Instant,
+        end: Instant,
+    ): Flow<List<JournalNote>> = notesFlow
 
-    override fun observeNotesPage(pageSize: Int, offset: Int): Flow<List<JournalNote>> = flowOf(emptyList())
+    override fun observeNotesPage(
+        pageSize: Int,
+        offset: Int,
+    ): Flow<List<JournalNote>> = flowOf(emptyList())
 
     override fun observeNotesStream(pageSize: Int): Flow<List<JournalNote>> = flowOf(emptyList())
 
     override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> = notesFlow
 
-    override suspend fun getNoteById(noteId: Uuid): JournalNote? {
-        return notesFlow.value.firstOrNull { it.uid == noteId }
-    }
+    override suspend fun getNoteById(noteId: Uuid): JournalNote? = notesFlow.value.firstOrNull { it.uid == noteId }
 
     override suspend fun create(note: JournalNote): Uuid {
         notesFlow.value = notesFlow.value + note
@@ -69,11 +73,17 @@ class FakeJournalNotesRepository : JournalNotesRepository {
         notesFlow.value = notesFlow.value.filterNot { it.uid == noteId }
     }
 
-    override suspend fun create(note: JournalNote, journalId: Uuid) {
+    override suspend fun create(
+        note: JournalNote,
+        journalId: Uuid,
+    ) {
         create(note)
     }
 
-    override suspend fun removeFromJournal(noteId: Uuid, journalId: Uuid) {
+    override suspend fun removeFromJournal(
+        noteId: Uuid,
+        journalId: Uuid,
+    ) {
         // No-op for tests
     }
 }
@@ -83,15 +93,24 @@ class FakeJournalContentRepository : JournalContentRepository {
 
     override fun observeJournalsForContent(contentId: Uuid): Flow<List<Journal>> = flowOf(emptyList())
 
-    override suspend fun addContentToJournal(contentId: Uuid, journalId: Uuid) {
+    override suspend fun addContentToJournal(
+        contentId: Uuid,
+        journalId: Uuid,
+    ) {
         // No-op for tests
     }
 
-    override suspend fun removeContentFromJournal(contentId: Uuid, journalId: Uuid) {
+    override suspend fun removeContentFromJournal(
+        contentId: Uuid,
+        journalId: Uuid,
+    ) {
         // No-op for tests
     }
 
-    override suspend fun addContentToJournals(contentId: Uuid, journalIds: List<Uuid>) {
+    override suspend fun addContentToJournals(
+        contentId: Uuid,
+        journalIds: List<Uuid>,
+    ) {
         // No-op for tests
     }
 
@@ -105,9 +124,10 @@ class FakeJournalRepository : JournalRepository {
 
     override val allJournalsObserved: Flow<List<Journal>> = journals
 
-    override fun observeJournalById(id: Uuid): Flow<Journal> = flow {
-        journals.value.firstOrNull { it.id == id }?.let { emit(it) }
-    }
+    override fun observeJournalById(id: Uuid): Flow<Journal> =
+        flow {
+            journals.value.firstOrNull { it.id == id }?.let { emit(it) }
+        }
 
     override suspend fun getJournalById(id: Uuid): Journal? = journals.value.firstOrNull { it.id == id }
 
@@ -117,9 +137,10 @@ class FakeJournalRepository : JournalRepository {
     }
 
     override suspend fun update(journal: Journal) {
-        journals.value = journals.value.map { existing ->
-            if (existing.id == journal.id) journal else existing
-        }
+        journals.value =
+            journals.value.map { existing ->
+                if (existing.id == journal.id) journal else existing
+            }
     }
 
     override suspend fun delete(journalId: Uuid) {
@@ -157,24 +178,29 @@ class FakeEntryDraftRepository : EntryDraftRepository {
 
     override suspend fun createDraft(notes: List<JournalNote>): Uuid {
         val now = Clock.System.now()
-        val draft = EntryDraft(
-            id = Uuid.random(),
-            notes = notes,
-            createdAt = now,
-            updatedAt = now
-        )
+        val draft =
+            EntryDraft(
+                id = Uuid.random(),
+                notes = notes,
+                createdAt = now,
+                updatedAt = now,
+            )
         drafts.value = drafts.value + draft
         return draft.id
     }
 
-    override suspend fun updateDraft(uid: Uuid, notes: List<JournalNote>): Uuid {
+    override suspend fun updateDraft(
+        uid: Uuid,
+        notes: List<JournalNote>,
+    ): Uuid {
         val now = Clock.System.now()
         val existing = drafts.value.firstOrNull { it.id == uid }
-        val updated = if (existing != null) {
-            existing.copy(notes = notes, updatedAt = now)
-        } else {
-            EntryDraft(id = uid, notes = notes, createdAt = now, updatedAt = now)
-        }
+        val updated =
+            if (existing != null) {
+                existing.copy(notes = notes, updatedAt = now)
+            } else {
+                EntryDraft(id = uid, notes = notes, createdAt = now, updatedAt = now)
+            }
         drafts.value = drafts.value.filterNot { it.id == uid } + updated
         return uid
     }
@@ -185,14 +211,16 @@ class FakeEntryDraftRepository : EntryDraftRepository {
 }
 
 class FakeClientLocationProvider : ClientLocationProvider {
-    private val defaultLocation = Location(
-        latitude = 0.0,
-        longitude = 0.0,
-        altitude = LocationAltitude(0.0, AltitudeUnit.METERS)
-    )
-    private val locationFlow = MutableSharedFlow<Location>(replay = 1).apply {
-        tryEmit(defaultLocation)
-    }
+    private val defaultLocation =
+        Location(
+            latitude = 0.0,
+            longitude = 0.0,
+            altitude = LocationAltitude(0.0, AltitudeUnit.METERS),
+        )
+    private val locationFlow =
+        MutableSharedFlow<Location>(replay = 1).apply {
+            tryEmit(defaultLocation)
+        }
 
     override val currentLocation: SharedFlow<Location> = locationFlow
 
@@ -206,9 +234,10 @@ class FakeClientLocationProvider : ClientLocationProvider {
 class FakeActivityTimelineRepository : ActivityTimelineRepository {
     override val allItemsObserved: Flow<List<ActivityTimelineItem>> = flowOf(emptyList())
 
-    override fun observeModelById(id: Uuid): Flow<ActivityTimelineItem> = flow {
-        // No items to emit in tests
-    }
+    override fun observeModelById(id: Uuid): Flow<ActivityTimelineItem> =
+        flow {
+            // No items to emit in tests
+        }
 
     override suspend fun addActivity(item: ActivityTimelineItem) {
         // No-op for tests
@@ -232,7 +261,10 @@ class FakeLocationHistoryRepository : LocationHistoryRepository {
 
     override suspend fun getRecentLocationHistory(limit: Int): List<LocationHistoryItem> = emptyList()
 
-    override suspend fun getLocationHistoryBetween(startTime: Instant, endTime: Instant): List<LocationHistoryItem> = emptyList()
+    override suspend fun getLocationHistoryBetween(
+        startTime: Instant,
+        endTime: Instant,
+    ): List<LocationHistoryItem> = emptyList()
 
     override suspend fun getLastLocation(): LocationHistoryItem? = null
 
@@ -243,50 +275,54 @@ class FakeLocationHistoryRepository : LocationHistoryRepository {
         userId: String,
         deviceId: String,
         confidence: Float,
-        isGenuine: Boolean
+        isGenuine: Boolean,
     ): Result<Unit> = Result.success(Unit)
 
-    override suspend fun deleteLocationEntry(userId: String, deviceId: String, timestamp: Instant): Result<Unit> =
-        Result.success(Unit)
+    override suspend fun deleteLocationEntry(
+        userId: String,
+        deviceId: String,
+        timestamp: Instant,
+    ): Result<Unit> = Result.success(Unit)
 
-    override suspend fun deleteLocationsBetween(startTime: Instant, endTime: Instant): Result<Unit> =
-        Result.success(Unit)
+    override suspend fun deleteLocationsBetween(
+        startTime: Instant,
+        endTime: Instant,
+    ): Result<Unit> = Result.success(Unit)
 
     override suspend fun getLocationCount(): Int = 0
 }
 
 class FakeMediaManager : MediaManager {
-    override suspend fun getMedia(uri: String): MediaObject {
-        return MediaObject.Image(
+    override suspend fun getMedia(uri: String): MediaObject =
+        MediaObject.Image(
             uri = uri,
             size = 0,
             name = "media",
-            timestamp = Clock.System.now()
+            timestamp = Clock.System.now(),
         )
-    }
 
     override suspend fun exists(mediaId: String): Boolean = false
 
     override suspend fun getRecentMedia(): Flow<List<MediaObject>> = flowOf(emptyList())
 
-    override suspend fun queryMediaByDate(start: Instant, end: Instant): Flow<List<MediaObject>> = flowOf(emptyList())
+    override suspend fun queryMediaByDate(
+        start: Instant,
+        end: Instant,
+    ): Flow<List<MediaObject>> = flowOf(emptyList())
 
     override suspend fun addToDefaultCollection(uri: String) {
         // No-op for tests
     }
 
-    override suspend fun readMedia(uri: String): MediaPayload {
-        return MediaPayload(
+    override suspend fun readMedia(uri: String): MediaPayload =
+        MediaPayload(
             fileName = "media.bin",
             mimeType = "application/octet-stream",
             sizeBytes = 0,
-            data = ByteArray(0)
+            data = ByteArray(0),
         )
-    }
 
-    override suspend fun saveMedia(payload: MediaPayload): String {
-        return "file:///tmp/${payload.fileName}"
-    }
+    override suspend fun saveMedia(payload: MediaPayload): String = "file:///tmp/${payload.fileName}"
 }
 
 class FakeEditorMediator : EditorMediator {

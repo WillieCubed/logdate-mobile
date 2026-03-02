@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -26,16 +29,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
 import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.feature.editor.audio.model.AudioSegment
 import app.logdate.feature.editor.ui.audio.waveform.BezierAudioWaveform
 import app.logdate.feature.editor.ui.formatMediaDuration
-import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Instant
 
 /**
  * First expansion state for audio entries.
@@ -45,6 +45,7 @@ import kotlinx.datetime.toLocalDateTime
  *
  * Tap expands to ELEVATED state, tap outside collapses.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun SpatialExpandedAudioBlock(
     amplitudes: List<Float>,
@@ -59,33 +60,37 @@ fun SpatialExpandedAudioBlock(
     onSeek: (Float) -> Unit = {},
     onExpand: () -> Unit = {},
 ) {
-    val backgroundBrush = Brush.verticalGradient(
-        colors = listOf(
-            Color(palette.waveformGradientStart).copy(alpha = 0.1f),
-            Color(palette.waveformGradientEnd).copy(alpha = 0.05f)
+    val backgroundBrush =
+        Brush.verticalGradient(
+            colors =
+                listOf(
+                    Color(palette.waveformGradientStart).copy(alpha = 0.1f),
+                    Color(palette.waveformGradientEnd).copy(alpha = 0.05f),
+                ),
         )
-    )
 
     Surface(
-        modifier = modifier
-            .animateContentSize(
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow
-                )
-            )
-            .clickable { onExpand() },
+        modifier =
+            modifier
+                .animateContentSize(
+                    animationSpec =
+                        spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessLow,
+                        ),
+                ).clickable { onExpand() },
         shape = RoundedCornerShape(16.dp),
         shadowElevation = 4.dp,
-        tonalElevation = 2.dp
+        tonalElevation = 2.dp,
     ) {
         Box(
-            modifier = Modifier
-                .background(backgroundBrush)
-                .padding(16.dp)
+            modifier =
+                Modifier
+                    .background(backgroundBrush)
+                    .padding(16.dp),
         ) {
             Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 // Waveform
                 BezierAudioWaveform(
@@ -95,17 +100,18 @@ fun SpatialExpandedAudioBlock(
                     segments = segments,
                     durationMs = durationMs,
                     onSeek = onSeek,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(80.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(80.dp)
+                            .clip(RoundedCornerShape(8.dp)),
                 )
 
                 // Controls row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     // Play/pause button
                     IconButton(onClick = onPlayPause) {
@@ -113,23 +119,23 @@ fun SpatialExpandedAudioBlock(
                             imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                             contentDescription = if (isPlaying) "Pause" else "Play",
                             tint = Color(palette.accentColor),
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(32.dp),
                         )
                     }
 
                     // Duration and time info
                     Column(
-                        horizontalAlignment = Alignment.End
+                        horizontalAlignment = Alignment.End,
                     ) {
                         Text(
                             text = formatMediaDuration(durationMs, false),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
                             text = formatTime(createdAt),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -140,7 +146,14 @@ fun SpatialExpandedAudioBlock(
 
 private fun formatTime(instant: Instant): String {
     val local = instant.toLocalDateTime(TimeZone.currentSystemDefault())
-    val hour = if (local.hour == 0) 12 else if (local.hour > 12) local.hour - 12 else local.hour
+    val hour =
+        if (local.hour == 0) {
+            12
+        } else if (local.hour > 12) {
+            local.hour - 12
+        } else {
+            local.hour
+        }
     val amPm = if (local.hour < 12) "AM" else "PM"
     return "$hour:${local.minute.toString().padStart(2, '0')} $amPm"
 }

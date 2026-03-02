@@ -18,25 +18,31 @@ import kotlin.math.sqrt
  * Decodes audio files and computes RMS amplitude for each chunk, then
  * downsamples to the target sample count for waveform visualization.
  */
-class AndroidAmplitudeExtractor(private val context: Context) : AmplitudeExtractor {
-
-    override suspend fun extractAmplitudes(uri: String, targetSampleCount: Int): List<Float> =
+class AndroidAmplitudeExtractor(
+    private val context: Context,
+) : AmplitudeExtractor {
+    override suspend fun extractAmplitudes(
+        uri: String,
+        targetSampleCount: Int,
+    ): List<Float> =
         withContext(Dispatchers.Default) {
             val extractor = MediaExtractor()
             try {
                 extractor.setDataSource(context, Uri.parse(uri), null)
 
-                val audioTrackIndex = findAudioTrack(extractor) ?: run {
-                    Napier.w { "No audio track found in $uri" }
-                    return@withContext emptyList()
-                }
+                val audioTrackIndex =
+                    findAudioTrack(extractor) ?: run {
+                        Napier.w { "No audio track found in $uri" }
+                        return@withContext emptyList()
+                    }
                 extractor.selectTrack(audioTrackIndex)
 
                 val format = extractor.getTrackFormat(audioTrackIndex)
-                val mimeType = format.getString(MediaFormat.KEY_MIME) ?: run {
-                    Napier.w { "No MIME type found for audio track" }
-                    return@withContext emptyList()
-                }
+                val mimeType =
+                    format.getString(MediaFormat.KEY_MIME) ?: run {
+                        Napier.w { "No MIME type found for audio track" }
+                        return@withContext emptyList()
+                    }
 
                 val decoder = MediaCodec.createDecoderByType(mimeType)
                 decoder.configure(format, null, null, 0)
@@ -70,7 +76,7 @@ class AndroidAmplitudeExtractor(private val context: Context) : AmplitudeExtract
     private fun decodeAndExtractAmplitudes(
         extractor: MediaExtractor,
         decoder: MediaCodec,
-        targetSampleCount: Int
+        targetSampleCount: Int,
     ): List<Float> {
         val bufferInfo = MediaCodec.BufferInfo()
         var sawInputEOS = false
@@ -89,7 +95,7 @@ class AndroidAmplitudeExtractor(private val context: Context) : AmplitudeExtract
                             0,
                             0,
                             0,
-                            MediaCodec.BUFFER_FLAG_END_OF_STREAM
+                            MediaCodec.BUFFER_FLAG_END_OF_STREAM,
                         )
                         sawInputEOS = true
                     } else {
@@ -98,7 +104,7 @@ class AndroidAmplitudeExtractor(private val context: Context) : AmplitudeExtract
                             0,
                             sampleSize,
                             extractor.sampleTime,
-                            0
+                            0,
                         )
                         extractor.advance()
                     }
@@ -125,7 +131,7 @@ class AndroidAmplitudeExtractor(private val context: Context) : AmplitudeExtract
     private fun extractSamplesFromBuffer(
         buffer: ByteBuffer,
         size: Int,
-        samples: MutableList<Short>
+        samples: MutableList<Short>,
     ) {
         buffer.position(0)
         val shortBuffer = buffer.asShortBuffer()
@@ -135,7 +141,10 @@ class AndroidAmplitudeExtractor(private val context: Context) : AmplitudeExtract
         }
     }
 
-    private fun downsampleToTarget(samples: List<Short>, targetCount: Int): List<Float> {
+    private fun downsampleToTarget(
+        samples: List<Short>,
+        targetCount: Int,
+    ): List<Float> {
         if (samples.isEmpty()) return emptyList()
 
         val chunkSize = samples.size / targetCount

@@ -19,9 +19,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import app.logdate.ui.theme.Spacing
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.cancel
+import logdate.client.feature.editor.generated.resources.discard
+import logdate.client.feature.editor.generated.resources.save_draft
+import logdate.client.feature.editor.generated.resources.unsaved_changes
+import logdate.client.feature.editor.generated.resources.would_you_like_to_save_your_changes_as_a_draft
+import logdate.client.feature.editor.generated.resources.you_have_unsaved_changes_that_will_be_lost_if_you_exit_now
+import org.jetbrains.compose.resources.stringResource
+
 /**
  * Confirmation dialog that appears when a user tries to exit the editor with unsaved changes.
  * Provides options to cancel, save as draft, or exit without saving.
@@ -31,59 +37,60 @@ import logdate.client.feature.editor.generated.resources.Res
  * @param onDiscardAndExit Called when the user wants to exit without saving
  * @param modifier Optional modifier for the dialog layout
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun ExitConfirmationDialog(
     onDismiss: () -> Unit,
     onSaveAsDraft: () -> Unit,
     onDiscardAndExit: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
                 text = stringResource(Res.string.unsaved_changes),
-                style = MaterialTheme.typography.headlineSmall
+                style = MaterialTheme.typography.headlineSmall,
             )
         },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(Spacing.md)
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
                 Text(
                     text = stringResource(Res.string.you_have_unsaved_changes_that_will_be_lost_if_you_exit_now),
                     textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.bodyLarge,
                 )
-                
+
                 Spacer(modifier = Modifier.height(Spacing.md))
-                
+
                 Text(
                     text = stringResource(Res.string.would_you_like_to_save_your_changes_as_a_draft),
                     textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.bodyLarge,
                 )
             }
         },
         confirmButton = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.End)
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.End),
             ) {
                 // Cancel button - continue editing
                 TextButton(onClick = onDismiss) {
                     Text(stringResource(Res.string.cancel))
                 }
-                
+
                 Spacer(modifier = Modifier.width(Spacing.sm))
-                
+
                 // Discard button - exit without saving
                 OutlinedButton(onClick = onDiscardAndExit) {
                     Text(stringResource(Res.string.discard))
                 }
-                
+
                 // Save as draft button - primary action
                 FilledTonalButton(onClick = onSaveAsDraft) {
                     Text(stringResource(Res.string.save_draft))
@@ -92,6 +99,6 @@ fun ExitConfirmationDialog(
         },
         // No dismiss button needed since we have a custom button layout
         dismissButton = null,
-        modifier = modifier.padding(Spacing.md)
+        modifier = modifier.padding(Spacing.md),
     )
 }

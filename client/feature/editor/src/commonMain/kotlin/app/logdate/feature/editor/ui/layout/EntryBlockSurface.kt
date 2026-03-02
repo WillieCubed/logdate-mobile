@@ -14,19 +14,20 @@ import app.logdate.feature.editor.ui.common.CardSurface
  * @param modifier Modifier for customizing the surface
  * @param content The content to display inside the surface
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun EntryBlockSurface(
     isExpanded: Boolean,
     isSelected: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     CardSurface(
         isFocused = isExpanded,
         isSelected = isSelected,
         onClick = onClick,
         modifier = modifier,
-        content = content
+        content = content,
     )
 }

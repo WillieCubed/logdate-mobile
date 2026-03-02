@@ -37,9 +37,8 @@ import kotlin.coroutines.resume
  * Android implementation of [CameraCaptureManager] using CameraX.
  */
 class AndroidCameraCaptureManager(
-    private val context: Context
+    private val context: Context,
 ) : CameraCaptureManager {
-
     private val _state = MutableStateFlow(CameraCaptureState())
     override val state: StateFlow<CameraCaptureState> = _state.asStateFlow()
 
@@ -70,22 +69,29 @@ class AndroidCameraCaptureManager(
             val provider = ProcessCameraProvider.awaitInstance(context)
             cameraProvider = provider
 
-            val cameraSelector = when (facing) {
-                CameraFacing.FRONT -> CameraSelector.DEFAULT_FRONT_CAMERA
-                CameraFacing.BACK -> CameraSelector.DEFAULT_BACK_CAMERA
-            }
+            val cameraSelector =
+                when (facing) {
+                    CameraFacing.FRONT -> CameraSelector.DEFAULT_FRONT_CAMERA
+                    CameraFacing.BACK -> CameraSelector.DEFAULT_BACK_CAMERA
+                }
 
-            preview = Preview.Builder()
-                .setPreviewStabilizationEnabled(true)
-                .build()
+            preview =
+                Preview
+                    .Builder()
+                    .setPreviewStabilizationEnabled(true)
+                    .build()
 
-            imageCapture = ImageCapture.Builder()
-                .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-                .build()
+            imageCapture =
+                ImageCapture
+                    .Builder()
+                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                    .build()
 
-            val recorder = Recorder.Builder()
-                .setQualitySelector(QualitySelector.from(Quality.HIGHEST))
-                .build()
+            val recorder =
+                Recorder
+                    .Builder()
+                    .setQualitySelector(QualitySelector.from(Quality.HIGHEST))
+                    .build()
             videoCapture = VideoCapture.withOutput(recorder)
 
             val owner = lifecycleOwner
@@ -96,7 +102,7 @@ class AndroidCameraCaptureManager(
                     cameraSelector,
                     preview,
                     imageCapture,
-                    videoCapture
+                    videoCapture,
                 )
             }
 
@@ -104,7 +110,7 @@ class AndroidCameraCaptureManager(
                 it.copy(
                     isPreviewActive = true,
                     cameraFacing = facing,
-                    error = null
+                    error = null,
                 )
             }
 
@@ -114,7 +120,7 @@ class AndroidCameraCaptureManager(
             _state.update {
                 it.copy(
                     isPreviewActive = false,
-                    error = CameraCaptureError.Unknown(e.message ?: "Unknown error")
+                    error = CameraCaptureError.Unknown(e.message ?: "Unknown error"),
                 )
             }
         }
@@ -129,7 +135,7 @@ class AndroidCameraCaptureManager(
                 it.copy(
                     isPreviewActive = false,
                     isRecording = false,
-                    recordingDurationMs = 0L
+                    recordingDurationMs = 0L,
                 )
             }
             Napier.d("Camera preview stopped")
@@ -138,63 +144,69 @@ class AndroidCameraCaptureManager(
         }
     }
 
-    override suspend fun capturePhoto(): String? = withContext(Dispatchers.Main) {
-        val capture = imageCapture ?: run {
-            Napier.e("ImageCapture is not initialized")
-            _state.update { it.copy(error = CameraCaptureError.CaptureFailed) }
-            return@withContext null
-        }
+    override suspend fun capturePhoto(): String? =
+        withContext(Dispatchers.Main) {
+            val capture =
+                imageCapture ?: run {
+                    Napier.e("ImageCapture is not initialized")
+                    _state.update { it.copy(error = CameraCaptureError.CaptureFailed) }
+                    return@withContext null
+                }
 
-        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val fileName = "LOGDATE_${timeStamp}.jpg"
+            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+            val fileName = "LOGDATE_$timeStamp.jpg"
 
-        val contentValues = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-            put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/LogDate")
+            val contentValues =
+                ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/LogDate")
+                    }
+                }
+
+            val outputOptions =
+                ImageCapture.OutputFileOptions
+                    .Builder(
+                        context.contentResolver,
+                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                        contentValues,
+                    ).build()
+
+            return@withContext suspendCancellableCoroutine { continuation ->
+                capture.takePicture(
+                    outputOptions,
+                    mainExecutor,
+                    object : ImageCapture.OnImageSavedCallback {
+                        override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                            val uri = output.savedUri?.toString()
+                            Napier.d("Photo captured: $uri")
+                            _state.update {
+                                it.copy(
+                                    lastCapturedUri = uri,
+                                    error = null,
+                                )
+                            }
+                            continuation.resume(uri)
+                        }
+
+                        override fun onError(exception: ImageCaptureException) {
+                            Napier.e("Photo capture failed", exception)
+                            _state.update { it.copy(error = CameraCaptureError.CaptureFailed) }
+                            continuation.resume(null)
+                        }
+                    },
+                )
             }
         }
 
-        val outputOptions = ImageCapture.OutputFileOptions.Builder(
-            context.contentResolver,
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-            contentValues
-        ).build()
-
-        return@withContext suspendCancellableCoroutine { continuation ->
-            capture.takePicture(
-                outputOptions,
-                mainExecutor,
-                object : ImageCapture.OnImageSavedCallback {
-                    override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                        val uri = output.savedUri?.toString()
-                        Napier.d("Photo captured: $uri")
-                        _state.update {
-                            it.copy(
-                                lastCapturedUri = uri,
-                                error = null
-                            )
-                        }
-                        continuation.resume(uri)
-                    }
-
-                    override fun onError(exception: ImageCaptureException) {
-                        Napier.e("Photo capture failed", exception)
-                        _state.update { it.copy(error = CameraCaptureError.CaptureFailed) }
-                        continuation.resume(null)
-                    }
-                }
-            )
-        }
-    }
-
     override suspend fun startVideoRecording() {
-        val capture = videoCapture ?: run {
-            Napier.e("VideoCapture is not initialized")
-            _state.update { it.copy(error = CameraCaptureError.RecordingFailed) }
-            return
-        }
+        val capture =
+            videoCapture ?: run {
+                Napier.e("VideoCapture is not initialized")
+                _state.update { it.copy(error = CameraCaptureError.RecordingFailed) }
+                return
+            }
 
         if (currentRecording != null) {
             Napier.w("Recording already in progress")
@@ -202,63 +214,69 @@ class AndroidCameraCaptureManager(
         }
 
         val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val fileName = "LOGDATE_${timeStamp}.mp4"
+        val fileName = "LOGDATE_$timeStamp.mp4"
 
-        val contentValues = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-            put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.MediaColumns.RELATIVE_PATH, "Movies/LogDate")
+        val contentValues =
+            ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Movies/LogDate")
+                }
             }
-        }
 
-        val outputOptions = MediaStoreOutputOptions.Builder(
-            context.contentResolver,
-            MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-        ).setContentValues(contentValues).build()
+        val outputOptions =
+            MediaStoreOutputOptions
+                .Builder(
+                    context.contentResolver,
+                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                ).setContentValues(contentValues)
+                .build()
 
         try {
-            currentRecording = capture.output
-                .prepareRecording(context, outputOptions)
-                .withAudioEnabled()
-                .start(mainExecutor) { event ->
-                    when (event) {
-                        is VideoRecordEvent.Start -> {
-                            Napier.d("Video recording started")
-                            _state.update {
-                                it.copy(
-                                    isRecording = true,
-                                    recordingDurationMs = 0L,
-                                    error = null
-                                )
+            currentRecording =
+                capture.output
+                    .prepareRecording(context, outputOptions)
+                    .withAudioEnabled()
+                    .start(mainExecutor) { event ->
+                        when (event) {
+                            is VideoRecordEvent.Start -> {
+                                Napier.d("Video recording started")
+                                _state.update {
+                                    it.copy(
+                                        isRecording = true,
+                                        recordingDurationMs = 0L,
+                                        error = null,
+                                    )
+                                }
                             }
-                        }
 
-                        is VideoRecordEvent.Status -> {
-                            _state.update {
-                                it.copy(recordingDurationMs = event.recordingStats.recordedDurationNanos / 1_000_000)
+                            is VideoRecordEvent.Status -> {
+                                _state.update {
+                                    it.copy(recordingDurationMs = event.recordingStats.recordedDurationNanos / 1_000_000)
+                                }
                             }
-                        }
 
-                        is VideoRecordEvent.Finalize -> {
-                            val uri = if (!event.hasError()) {
-                                event.outputResults.outputUri.toString()
-                            } else {
-                                Napier.e("Video recording failed with error: ${event.error}")
-                                null
+                            is VideoRecordEvent.Finalize -> {
+                                val uri =
+                                    if (!event.hasError()) {
+                                        event.outputResults.outputUri.toString()
+                                    } else {
+                                        Napier.e("Video recording failed with error: ${event.error}")
+                                        null
+                                    }
+                                _state.update {
+                                    it.copy(
+                                        isRecording = false,
+                                        lastCapturedUri = uri,
+                                        error = if (event.hasError()) CameraCaptureError.RecordingFailed else null,
+                                    )
+                                }
+                                currentRecording = null
+                                Napier.d("Video recording finalized: $uri")
                             }
-                            _state.update {
-                                it.copy(
-                                    isRecording = false,
-                                    lastCapturedUri = uri,
-                                    error = if (event.hasError()) CameraCaptureError.RecordingFailed else null
-                                )
-                            }
-                            currentRecording = null
-                            Napier.d("Video recording finalized: $uri")
                         }
                     }
-                }
         } catch (e: SecurityException) {
             Napier.e("Audio permission required for video recording", e)
             _state.update { it.copy(error = CameraCaptureError.PermissionDenied) }
@@ -269,10 +287,11 @@ class AndroidCameraCaptureManager(
     }
 
     override suspend fun stopVideoRecording(): String? {
-        val recording = currentRecording ?: run {
-            Napier.w("No recording in progress")
-            return null
-        }
+        val recording =
+            currentRecording ?: run {
+                Napier.w("No recording in progress")
+                return null
+            }
 
         recording.stop()
 
@@ -297,10 +316,11 @@ class AndroidCameraCaptureManager(
     }
 
     override suspend fun switchCamera() {
-        val newFacing = when (_state.value.cameraFacing) {
-            CameraFacing.FRONT -> CameraFacing.BACK
-            CameraFacing.BACK -> CameraFacing.FRONT
-        }
+        val newFacing =
+            when (_state.value.cameraFacing) {
+                CameraFacing.FRONT -> CameraFacing.BACK
+                CameraFacing.BACK -> CameraFacing.FRONT
+            }
 
         if (_state.value.isRecording) {
             Napier.w("Cannot switch camera while recording")

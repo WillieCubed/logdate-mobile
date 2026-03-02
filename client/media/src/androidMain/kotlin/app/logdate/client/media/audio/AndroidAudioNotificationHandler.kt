@@ -41,15 +41,16 @@ class AndroidAudioNotificationHandler(
      * Creates notification channel for Android O+
      */
     private fun createNotificationChannel() {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            context.getString(R.string.audio_recording_channel_name),
-            NotificationManager.IMPORTANCE_LOW
-        ).apply {
-            description = context.getString(R.string.audio_recording_notification_text)
-            setSound(null, null)
-            enableVibration(false)
-        }
+        val channel =
+            NotificationChannel(
+                CHANNEL_ID,
+                context.getString(R.string.audio_recording_channel_name),
+                NotificationManager.IMPORTANCE_LOW,
+            ).apply {
+                description = context.getString(R.string.audio_recording_notification_text)
+                setSound(null, null)
+                enableVibration(false)
+            }
         notificationManager.createNotificationChannel(channel)
         Napier.d("Created notification channel for audio recording")
     }
@@ -58,9 +59,10 @@ class AndroidAudioNotificationHandler(
      * Creates a PendingIntent for notification actions
      */
     private fun createActionIntent(action: String): PendingIntent {
-        val intent = Intent(context, AudioRecordingService::class.java).apply {
-            this.action = action
-        }
+        val intent =
+            Intent(context, AudioRecordingService::class.java).apply {
+                this.action = action
+            }
 
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
@@ -72,8 +74,15 @@ class AndroidAudioNotificationHandler(
      */
     private fun createMainActivityIntent(): PendingIntent {
         val packageName = context.packageName
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
-        launchIntent?.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        val launchIntent =
+            context.packageManager.getLaunchIntentForPackage(packageName)
+                ?: return PendingIntent.getActivity(
+                    context,
+                    0,
+                    Intent(),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+        launchIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
 
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
@@ -87,31 +96,35 @@ class AndroidAudioNotificationHandler(
         isRecording: Boolean = true,
         startTimeMillis: Long = Clock.System.now().toEpochMilliseconds(),
     ): Notification {
-        val titleRes = if (isRecording) {
-            R.string.audio_recording_notification_title
-        } else {
-            R.string.audio_recording_notification_title_paused
-        }
-        val textRes = if (isRecording) {
-            R.string.audio_recording_notification_text
-        } else {
-            R.string.audio_recording_notification_text_paused
-        }
+        val titleRes =
+            if (isRecording) {
+                R.string.audio_recording_notification_title
+            } else {
+                R.string.audio_recording_notification_title_paused
+            }
+        val textRes =
+            if (isRecording) {
+                R.string.audio_recording_notification_text
+            } else {
+                R.string.audio_recording_notification_text_paused
+            }
 
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(context.applicationInfo.icon)
-            .setContentTitle(context.getString(titleRes))
-            .setContentText(context.getString(textRes))
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setUsesChronometer(true)
-            .setWhen(startTimeMillis)
-            .setContentIntent(createMainActivityIntent())
-            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .setSilent(true)
+        val builder =
+            NotificationCompat
+                .Builder(context, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification_recording)
+                .setContentTitle(context.getString(titleRes))
+                .setContentText(context.getString(textRes))
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setCategory(NotificationCompat.CATEGORY_SERVICE)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setUsesChronometer(true)
+                .setWhen(startTimeMillis)
+                .setContentIntent(createMainActivityIntent())
+                .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+                .setSilent(true)
 
         // Add action buttons based on current state
         if (isRecording) {
@@ -119,22 +132,22 @@ class AndroidAudioNotificationHandler(
             builder.addAction(
                 android.R.drawable.ic_media_pause,
                 context.getString(R.string.audio_recording_action_pause),
-                createActionIntent(ACTION_PAUSE)
+                createActionIntent(ACTION_PAUSE),
             )
         } else {
             // Add resume button when paused
             builder.addAction(
                 android.R.drawable.ic_media_play,
                 context.getString(R.string.audio_recording_action_resume),
-                createActionIntent(ACTION_RESUME)
+                createActionIntent(ACTION_RESUME),
             )
         }
 
         // Always add stop button
         builder.addAction(
-            android.R.drawable.ic_delete,  // Using an alternative icon as a fallback
+            android.R.drawable.ic_delete, // Using an alternative icon as a fallback
             context.getString(R.string.audio_recording_action_stop),
-            createActionIntent(ACTION_STOP)
+            createActionIntent(ACTION_STOP),
         )
 
         return builder.build()
@@ -177,7 +190,10 @@ class AndroidAudioNotificationHandler(
     /**
      * Updates notification to reflect current recording state
      */
-    fun updateRecordingNotification(isRecording: Boolean, startTimeMillis: Long) {
+    fun updateRecordingNotification(
+        isRecording: Boolean,
+        startTimeMillis: Long,
+    ) {
         try {
             val notification = createRecordingNotification(isRecording, startTimeMillis)
             notificationManager.notify(NOTIFICATION_ID, notification)

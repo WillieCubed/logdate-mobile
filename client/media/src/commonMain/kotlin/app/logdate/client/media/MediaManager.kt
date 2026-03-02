@@ -1,8 +1,8 @@
 package app.logdate.client.media
 
 import kotlinx.coroutines.flow.Flow
-import kotlin.time.Instant
 import kotlin.time.Duration
+import kotlin.time.Instant
 
 interface MediaManager {
     /**
@@ -30,7 +30,10 @@ interface MediaManager {
      * @param start The start timestamp (inclusive)
      * @param end The end timestamp (exclusive)
      */
-    suspend fun queryMediaByDate(start: Instant, end: Instant): Flow<List<MediaObject>>
+    suspend fun queryMediaByDate(
+        start: Instant,
+        end: Instant,
+    ): Flow<List<MediaObject>>
 
     /**
      * Adds the media object with the given [uri] to the default collection.
@@ -62,11 +65,12 @@ data class MediaPayload(
     val fileName: String,
     val mimeType: String,
     val sizeBytes: Long,
-    val data: ByteArray
+    val data: ByteArray,
 )
 
 sealed interface MediaObject {
     // TODO: Support multiplatform URI
+
     /**
      * The URI of this media object.
      */

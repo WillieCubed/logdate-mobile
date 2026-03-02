@@ -69,38 +69,41 @@ class AudioContextProcessor(
         createdAt: Instant,
         latitude: Double?,
         longitude: Double?,
-    ): AudioContext = withContext(coroutineContext) {
-        Napier.d { "Processing audio context for $audioUri" }
+    ): AudioContext =
+        withContext(coroutineContext) {
+            Napier.d { "Processing audio context for $audioUri" }
 
-        // Load or extract amplitudes
-        val amplitudes = loadOrExtractAmplitudes(audioUri)
+            // Load or extract amplitudes
+            val amplitudes = loadOrExtractAmplitudes(audioUri)
 
-        // Detect segments
-        val segments = if (amplitudes.isNotEmpty() && durationMs > 0) {
-            segmentDetector.detectSegments(amplitudes, durationMs)
-        } else {
-            emptyList()
+            // Detect segments
+            val segments =
+                if (amplitudes.isNotEmpty() && durationMs > 0) {
+                    segmentDetector.detectSegments(amplitudes, durationMs)
+                } else {
+                    emptyList()
+                }
+
+            // Classify daylight period
+            val daylightPeriod =
+                if (latitude != null && longitude != null) {
+                    daylightClassifier.classify(createdAt, latitude, longitude)
+                } else {
+                    daylightClassifier.classifyWithoutLocation(createdAt)
+                }
+
+            // Generate palette
+            val palette = paletteGenerator.generate(daylightPeriod)
+
+            Napier.d { "Audio context processed: ${amplitudes.size} amplitudes, ${segments.size} segments, $daylightPeriod" }
+
+            AudioContext(
+                amplitudes = amplitudes,
+                segments = segments,
+                daylightPeriod = daylightPeriod,
+                palette = palette,
+            )
         }
-
-        // Classify daylight period
-        val daylightPeriod = if (latitude != null && longitude != null) {
-            daylightClassifier.classify(createdAt, latitude, longitude)
-        } else {
-            daylightClassifier.classifyWithoutLocation(createdAt)
-        }
-
-        // Generate palette
-        val palette = paletteGenerator.generate(daylightPeriod)
-
-        Napier.d { "Audio context processed: ${amplitudes.size} amplitudes, ${segments.size} segments, $daylightPeriod" }
-
-        AudioContext(
-            amplitudes = amplitudes,
-            segments = segments,
-            daylightPeriod = daylightPeriod,
-            palette = palette,
-        )
-    }
 
     /**
      * Loads cached amplitudes or extracts them from the audio file.

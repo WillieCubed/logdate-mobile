@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.tooling.preview.Preview
 
+@Suppress("ktlint:standard:function-naming")
 @Composable
 internal actual fun VisualNoteEditor(cameraEnabled: Boolean) {
     val canUseCamera by remember {
@@ -17,6 +18,7 @@ internal actual fun VisualNoteEditor(cameraEnabled: Boolean) {
     }
 }
 
+@Suppress("ktlint:standard:function-naming")
 @Preview
 @Composable
 private fun VisualNoteEditorPreview() {

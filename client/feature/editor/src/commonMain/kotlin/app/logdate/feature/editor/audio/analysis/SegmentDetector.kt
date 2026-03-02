@@ -16,7 +16,7 @@ import app.logdate.feature.editor.audio.model.SegmentType
 class SegmentDetector(
     private val silenceThreshold: Float = 0.1f,
     private val peakThreshold: Float = 0.7f,
-    private val minPauseDurationMs: Long = 500L
+    private val minPauseDurationMs: Long = 500L,
 ) {
     /**
      * Detects segments in the given amplitude data.
@@ -25,7 +25,10 @@ class SegmentDetector(
      * @param durationMs Total duration of the audio in milliseconds
      * @return List of detected segments, sorted by timestamp
      */
-    fun detectSegments(amplitudes: List<Float>, durationMs: Long): List<AudioSegment> {
+    fun detectSegments(
+        amplitudes: List<Float>,
+        durationMs: Long,
+    ): List<AudioSegment> {
         if (amplitudes.isEmpty() || durationMs <= 0) return emptyList()
 
         val segments = mutableListOf<AudioSegment>()
@@ -41,7 +44,7 @@ class SegmentDetector(
     private fun detectSpeechOnsets(
         amplitudes: List<Float>,
         msPerSample: Float,
-        segments: MutableList<AudioSegment>
+        segments: MutableList<AudioSegment>,
     ) {
         var inSilence = true
         for (i in amplitudes.indices) {
@@ -50,8 +53,8 @@ class SegmentDetector(
                 segments.add(
                     AudioSegment(
                         timestampMs = (i * msPerSample).toLong(),
-                        type = SegmentType.SPEECH_ONSET
-                    )
+                        type = SegmentType.SPEECH_ONSET,
+                    ),
                 )
                 inSilence = false
             } else if (!inSilence && level < silenceThreshold) {
@@ -63,7 +66,7 @@ class SegmentDetector(
     private fun detectSignificantPauses(
         amplitudes: List<Float>,
         msPerSample: Float,
-        segments: MutableList<AudioSegment>
+        segments: MutableList<AudioSegment>,
     ) {
         var silenceStartIndex: Int? = null
 
@@ -81,8 +84,8 @@ class SegmentDetector(
                         segments.add(
                             AudioSegment(
                                 timestampMs = (midpoint * msPerSample).toLong(),
-                                type = SegmentType.SIGNIFICANT_PAUSE
-                            )
+                                type = SegmentType.SIGNIFICANT_PAUSE,
+                            ),
                         )
                     }
                 }
@@ -94,7 +97,7 @@ class SegmentDetector(
     private fun detectVolumePeaks(
         amplitudes: List<Float>,
         msPerSample: Float,
-        segments: MutableList<AudioSegment>
+        segments: MutableList<AudioSegment>,
     ) {
         for (i in 1 until amplitudes.size - 1) {
             val prev = amplitudes[i - 1]
@@ -106,8 +109,8 @@ class SegmentDetector(
                 segments.add(
                     AudioSegment(
                         timestampMs = (i * msPerSample).toLong(),
-                        type = SegmentType.VOLUME_PEAK
-                    )
+                        type = SegmentType.VOLUME_PEAK,
+                    ),
                 )
             }
         }

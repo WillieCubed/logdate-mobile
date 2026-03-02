@@ -15,38 +15,41 @@ import kotlin.time.Clock
  * This mapper converts notes from the domain layer to the UI representation
  * needed for the editor.
  */
-fun JournalNote.toDomainBlock(): EntryBlockUiState {
-    return when (this) {
-        is JournalNote.Text -> TextBlockUiState(
-            id = uid,
-            timestamp = creationTimestamp,
-            location = null, // We don't have location data from notes
-            content = content
-        )
+fun JournalNote.toDomainBlock(): EntryBlockUiState =
+    when (this) {
+        is JournalNote.Text ->
+            TextBlockUiState(
+                id = uid,
+                timestamp = creationTimestamp,
+                location = null, // We don't have location data from notes
+                content = content,
+            )
 
-        is JournalNote.Image -> ImageBlockUiState(
-            id = uid,
-            timestamp = creationTimestamp,
-            location = null,
-            uri = mediaRef
-        )
+        is JournalNote.Image ->
+            ImageBlockUiState(
+                id = uid,
+                timestamp = creationTimestamp,
+                location = null,
+                uri = mediaRef,
+            )
 
-        is JournalNote.Video -> VideoBlockUiState(
-            id = uid,
-            timestamp = creationTimestamp,
-            location = null,
-            uri = mediaRef
-        )
+        is JournalNote.Video ->
+            VideoBlockUiState(
+                id = uid,
+                timestamp = creationTimestamp,
+                location = null,
+                uri = mediaRef,
+            )
 
-        is JournalNote.Audio -> AudioBlockUiState(
-            id = uid,
-            timestamp = creationTimestamp,
-            location = null,
-            uri = mediaRef,
-            duration = durationMs
-        )
+        is JournalNote.Audio ->
+            AudioBlockUiState(
+                id = uid,
+                timestamp = creationTimestamp,
+                location = null,
+                uri = mediaRef,
+                duration = durationMs,
+            )
     }
-}
 
 /**
  * Maps an EntryBlockData UI model to a JournalNote domain model.
@@ -54,7 +57,7 @@ fun JournalNote.toDomainBlock(): EntryBlockUiState {
  */
 fun EntryBlockUiState.toJournalNote(): JournalNote? {
     val now = Clock.System.now()
-    
+
     return when (this) {
         is TextBlockUiState -> {
             if (!hasContent()) return null
@@ -62,49 +65,51 @@ fun EntryBlockUiState.toJournalNote(): JournalNote? {
                 uid = id,
                 creationTimestamp = timestamp,
                 lastUpdated = now,
-                content = content
+                content = content,
             )
         }
-        
+
         is ImageBlockUiState -> {
             if (!hasContent()) return null
             JournalNote.Image(
                 uid = id,
                 creationTimestamp = timestamp,
                 lastUpdated = now,
-                mediaRef = uri ?: return null
+                mediaRef = uri ?: return null,
             )
         }
-        
+
         is CameraBlockUiState -> {
             if (!hasContent()) return null
             val mediaRef = uri ?: return null
             when (mediaType) {
-                CapturedMediaType.PHOTO -> JournalNote.Image(
-                    uid = id,
-                    creationTimestamp = timestamp,
-                    lastUpdated = now,
-                    mediaRef = mediaRef
-                )
-                CapturedMediaType.VIDEO -> JournalNote.Video(
-                    uid = id,
-                    creationTimestamp = timestamp,
-                    lastUpdated = now,
-                    mediaRef = mediaRef
-                )
+                CapturedMediaType.PHOTO ->
+                    JournalNote.Image(
+                        uid = id,
+                        creationTimestamp = timestamp,
+                        lastUpdated = now,
+                        mediaRef = mediaRef,
+                    )
+                CapturedMediaType.VIDEO ->
+                    JournalNote.Video(
+                        uid = id,
+                        creationTimestamp = timestamp,
+                        lastUpdated = now,
+                        mediaRef = mediaRef,
+                    )
             }
         }
-        
+
         is VideoBlockUiState -> {
             if (!hasContent()) return null
             JournalNote.Video(
                 uid = id,
                 creationTimestamp = timestamp,
                 lastUpdated = now,
-                mediaRef = uri ?: return null
+                mediaRef = uri ?: return null,
             )
         }
-        
+
         is AudioBlockUiState -> {
             if (!hasContent()) return null
             JournalNote.Audio(
@@ -112,7 +117,7 @@ fun EntryBlockUiState.toJournalNote(): JournalNote? {
                 creationTimestamp = timestamp,
                 lastUpdated = now,
                 mediaRef = uri ?: return null,
-                durationMs = duration
+                durationMs = duration,
             )
         }
     }

@@ -14,9 +14,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.add_a_caption
+import org.jetbrains.compose.resources.stringResource
+
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun DeleteMediaButton(
     onClick: () -> Unit,
@@ -25,21 +27,23 @@ fun DeleteMediaButton(
 ) {
     IconButton(
         onClick = onClick,
-        modifier = modifier
-            .padding(8.dp)
-            .background(
-                color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.7f),
-                shape = RoundedCornerShape(4.dp)
-            )
+        modifier =
+            modifier
+                .padding(8.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.7f),
+                    shape = RoundedCornerShape(4.dp),
+                ),
     ) {
         Icon(
             imageVector = Icons.Default.Delete,
             contentDescription = contentDescription,
-            tint = MaterialTheme.colorScheme.inverseOnSurface
+            tint = MaterialTheme.colorScheme.inverseOnSurface,
         )
     }
 }
 
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun MediaCaptionField(
     caption: String,
@@ -50,10 +54,11 @@ fun MediaCaptionField(
         value = caption,
         onValueChange = onCaptionChanged,
         placeholder = { Text(stringResource(Res.string.add_a_caption)) },
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
         textStyle = MaterialTheme.typography.bodyMedium,
-        maxLines = 3
+        maxLines = 3,
     )
 }

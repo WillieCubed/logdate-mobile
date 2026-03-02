@@ -15,15 +15,15 @@ import androidx.core.content.getSystemService
  * rich haptic primitives, falling back to basic vibration on older devices.
  */
 class AndroidHapticController(
-    private val context: Context
+    private val context: Context,
 ) : HapticController {
-
-    private val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        context.getSystemService<VibratorManager>()?.defaultVibrator
-    } else {
-        @Suppress("DEPRECATION")
-        context.getSystemService<Vibrator>()
-    }
+    private val vibrator: Vibrator? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            context.getSystemService<VibratorManager>()?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService<Vibrator>()
+        }
 
     private var lastDragHaptic = 0L
     private val dragHapticThrottleMs = 50L

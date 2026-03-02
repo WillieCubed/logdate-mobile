@@ -19,12 +19,13 @@ import kotlin.uuid.Uuid
 @Stable
 class BlocksUiState(
     val blocks: List<EntryBlockUiState> = listOf(),
+    val expandedBlockId: Uuid? = null,
     val availableJournals: List<Journal>,
     val selectedJournalIds: List<Uuid>,
     val onBlockFocused: (Uuid) -> Unit,
     val onJournalSelectionChanged: (List<Uuid>) -> Unit,
     val onUpdateBlock: (EntryBlockUiState) -> Unit,
-    val onCreateBlock: (BlockType) -> EntryBlockUiState,
+    val onCreateBlock: (BlockType, Uuid) -> EntryBlockUiState,
     val onDeleteBlock: (Uuid) -> Unit,
 ) {
     val hasContent get() = blocks.any { it.hasContent() }
@@ -35,7 +36,7 @@ fun rememberBlocksUiState(
     editorState: EditorState,
     onUpdateBlock: (EntryBlockUiState) -> Unit,
     onFocusBlock: (Uuid) -> Unit,
-    onCreateBlock: (BlockType) -> EntryBlockUiState,
+    onCreateBlock: (BlockType, Uuid) -> EntryBlockUiState,
     onDeleteBlock: (Uuid) -> Unit,
     onUpdateJournalSelection: (List<Uuid>) -> Unit,
 ): BlocksUiState {
@@ -46,6 +47,7 @@ fun rememberBlocksUiState(
     return remember(editorState, hasContent) {
         BlocksUiState(
             blocks = editorState.blocks,
+            expandedBlockId = editorState.expandedBlockId,
             availableJournals = editorState.availableJournals,
             selectedJournalIds = editorState.selectedJournalIds,
             onBlockFocused = onFocusBlock,
@@ -54,9 +56,9 @@ fun rememberBlocksUiState(
                 Napier.d("Updating block: ${block.id}")
                 onUpdateBlock(block)
             },
-            onCreateBlock = { blockType ->
-                Napier.i("BlocksUiState: Creating block of type $blockType")
-                onCreateBlock(blockType)
+            onCreateBlock = { blockType, id ->
+                Napier.i("BlocksUiState: Creating block of type $blockType with id $id")
+                onCreateBlock(blockType, id)
             },
             onDeleteBlock = { blockId ->
                 Napier.d("Deleting block: $blockId")

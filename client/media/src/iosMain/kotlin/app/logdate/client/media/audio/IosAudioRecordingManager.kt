@@ -1,6 +1,6 @@
 @file:OptIn(
     kotlinx.cinterop.BetaInteropApi::class,
-    kotlinx.cinterop.ExperimentalForeignApi::class
+    kotlinx.cinterop.ExperimentalForeignApi::class,
 )
 
 package app.logdate.client.media.audio
@@ -81,11 +81,12 @@ class IosAudioRecordingManager(
             recordingURL?.let { url ->
                 memScoped {
                     val errorPtr = alloc<ObjCObjectVar<NSError?>>()
-                    recorder = AVAudioRecorder(
-                        uRL = url,
-                        settings = settings,
-                        error = errorPtr.ptr
-                    )
+                    recorder =
+                        AVAudioRecorder(
+                            uRL = url,
+                            settings = settings,
+                            error = errorPtr.ptr,
+                        )
                     recorderError = errorPtr.value
                 }
             }

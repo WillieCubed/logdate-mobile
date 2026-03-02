@@ -41,13 +41,21 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.ui.common.SwipeToAction
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
-import kotlin.uuid.Uuid
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.close
+import logdate.client.feature.editor.generated.resources.delete
+import logdate.client.feature.editor.generated.resources.delete_all_drafts
+import logdate.client.feature.editor.generated.resources.loading_drafts
+import logdate.client.feature.editor.generated.resources.no_drafts_found
+import logdate.client.feature.editor.generated.resources.previous_drafts
+import logdate.client.feature.editor.generated.resources.start_writing_to_create_your_first_draft
+import org.jetbrains.compose.resources.stringResource
+import kotlin.uuid.Uuid
+
 /**
  * Material You style dialog for viewing and managing previous drafts.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun DraftsListDialog(
     drafts: List<EntryDraft>,
@@ -56,66 +64,69 @@ fun DraftsListDialog(
     onDraftSelected: (EntryDraft) -> Unit,
     onDraftDeleted: (Uuid) -> Unit,
     onDeleteAllDrafts: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     BasicAlertDialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false
-        ),
-        modifier = modifier
+        properties =
+            DialogProperties(
+                usePlatformDefaultWidth = false,
+            ),
+        modifier = modifier,
     ) {
         Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .height(520.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth(0.92f)
+                    .height(520.dp),
             shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = 6.dp
+            tonalElevation = 6.dp,
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp)
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
             ) {
                 // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = stringResource(Res.string.previous_drafts),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
-                    
+
                     Row {
                         // Only show delete all button if there are drafts to delete
                         if (drafts.isNotEmpty() && !isLoading) {
                             IconButton(
                                 onClick = onDeleteAllDrafts,
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(24.dp),
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Delete,
                                     contentDescription = stringResource(Res.string.delete_all_drafts),
-                                    tint = MaterialTheme.colorScheme.error
+                                    tint = MaterialTheme.colorScheme.error,
                                 )
                             }
-                            
+
                             Spacer(modifier = Modifier.width(8.dp))
                         }
-                        
+
                         IconButton(
                             onClick = onDismiss,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(24.dp),
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = stringResource(Res.string.close),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -128,22 +139,22 @@ fun DraftsListDialog(
                     isLoading -> {
                         Box(
                             modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                            contentAlignment = Alignment.Center,
                         ) {
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
+                                verticalArrangement = Arrangement.Center,
                             ) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(32.dp),
                                     color = MaterialTheme.colorScheme.primary,
-                                    strokeWidth = 3.dp
+                                    strokeWidth = 3.dp,
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text(
                                     text = stringResource(Res.string.loading_drafts),
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
@@ -161,17 +172,17 @@ fun DraftsListDialog(
                         ) {
                             LazyColumn(
                                 modifier = Modifier.padding(Spacing.md),
-                                verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+                                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
                             ) {
                                 items(
                                     items = drafts.sortedByDescending { it.updatedAt },
-                                    key = { it.id }
+                                    key = { it.id },
                                 ) { draft ->
                                     SwipeToDeleteDraftItem(
                                         draft = draft,
                                         onDraftSelected = { onDraftSelected(draft) },
                                         onDraftDeleted = { onDraftDeleted(draft.id) },
-                                        modifier = Modifier.fillMaxWidth()
+                                        modifier = Modifier.fillMaxWidth(),
                                     )
                                 }
                             }
@@ -187,44 +198,46 @@ fun DraftsListDialog(
  * Empty state displayed when no drafts are available.
  * Shows a message with an icon encouraging the user to start writing.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 private fun DraftsEmptyState() {
     Box(
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
         ) {
             Icon(
                 imageVector = Icons.Default.Schedule,
                 contentDescription = null,
                 modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = stringResource(Res.string.no_drafts_found),
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = stringResource(Res.string.start_writing_to_create_your_first_draft),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             )
         }
     }
 }
 
+@Suppress("ktlint:standard:function-naming")
 @Composable
 private fun SwipeToDeleteDraftItem(
     draft: EntryDraft,
     onDraftSelected: () -> Unit,
     onDraftDeleted: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     // Use our reusable SwipeToAction component
     SwipeToAction(
@@ -232,86 +245,90 @@ private fun SwipeToDeleteDraftItem(
         actionLabel = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+                horizontalArrangement = Arrangement.Center,
             ) {
                 Icon(
                     imageVector = Icons.Default.Delete,
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(16.dp),
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = stringResource(Res.string.delete),
-                    style = MaterialTheme.typography.labelMedium
+                    style = MaterialTheme.typography.labelMedium,
                 )
             }
         },
         content = {
             // Make the content clickable independently of the swipe action
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable { onDraftSelected() }
-                    .padding(Spacing.md)
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .clickable { onDraftSelected() }
+                        .padding(Spacing.md),
             ) {
                 DraftListItemContent(
                     draft = draft,
-                    modifier = Modifier
+                    modifier = Modifier,
                 )
             }
         },
-        modifier = modifier
-            .height(80.dp),
+        modifier =
+            modifier
+                .height(80.dp),
         contentShape = MaterialTheme.shapes.extraLarge,
         actionShape = MaterialTheme.shapes.extraLarge,
-        spacing = Spacing.sm
+        spacing = Spacing.sm,
     )
 }
 
+@Suppress("ktlint:standard:function-naming")
 @Composable
 private fun DraftListItemContent(
     draft: EntryDraft,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth(),
     ) {
         // Draft preview
-        val previewText = draft.notes.firstOrNull()?.let { note ->
-            when (note) {
-                is JournalNote.Text -> note.content
-                is JournalNote.Image -> "📷 Image"
-                is JournalNote.Video -> "🎥 Video"
-                is JournalNote.Audio -> "🎵 Audio"
-            }
-        } ?: "Empty draft"
+        val previewText =
+            draft.notes.firstOrNull()?.let { note ->
+                when (note) {
+                    is JournalNote.Text -> note.content
+                    is JournalNote.Image -> "📷 Image"
+                    is JournalNote.Video -> "🎥 Video"
+                    is JournalNote.Audio -> "🎵 Audio"
+                }
+            } ?: "Empty draft"
 
         Text(
             text = previewText,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 2,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
         )
 
         Spacer(modifier = Modifier.height(4.dp))
 
         // Timestamp and note count
         Row(
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = draft.updatedAt.toReadableDateTimeShort(),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            
+
             if (draft.notes.size > 1) {
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "• ${draft.notes.size} items",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

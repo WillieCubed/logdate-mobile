@@ -1,6 +1,6 @@
 @file:OptIn(
     kotlinx.cinterop.BetaInteropApi::class,
-    kotlinx.cinterop.ExperimentalForeignApi::class
+    kotlinx.cinterop.ExperimentalForeignApi::class,
 )
 
 package app.logdate.client.media.audio.iosbackground
@@ -39,20 +39,22 @@ class IosAudioSessionController {
 
         try {
             // Set category to allow simultaneous recording and playback
-            val categoryOptions = AVAudioSessionCategoryOptionDefaultToSpeaker or
-                AVAudioSessionCategoryOptionAllowBluetooth or
-                AVAudioSessionCategoryOptionAllowBluetoothA2DP or
-                AVAudioSessionCategoryOptionDuckOthers
+            val categoryOptions =
+                AVAudioSessionCategoryOptionDefaultToSpeaker or
+                    AVAudioSessionCategoryOptionAllowBluetooth or
+                    AVAudioSessionCategoryOptionAllowBluetoothA2DP or
+                    AVAudioSessionCategoryOptionDuckOthers
 
-            val categoryError = memScoped {
-                val errorPtr = alloc<ObjCObjectVar<NSError?>>()
-                audioSession.setCategory(
-                    AVAudioSessionCategoryPlayAndRecord,
-                    withOptions = categoryOptions,
-                    error = errorPtr.ptr
-                )
-                errorPtr.value
-            }
+            val categoryError =
+                memScoped {
+                    val errorPtr = alloc<ObjCObjectVar<NSError?>>()
+                    audioSession.setCategory(
+                        AVAudioSessionCategoryPlayAndRecord,
+                        withOptions = categoryOptions,
+                        error = errorPtr.ptr,
+                    )
+                    errorPtr.value
+                }
 
             if (categoryError != null) {
                 Napier.e("Failed to set audio session category: ${categoryError.localizedDescription}")
@@ -60,11 +62,12 @@ class IosAudioSessionController {
             }
 
             // Set mode to default
-            val modeError = memScoped {
-                val errorPtr = alloc<ObjCObjectVar<NSError?>>()
-                audioSession.setMode(AVAudioSessionModeDefault, error = errorPtr.ptr)
-                errorPtr.value
-            }
+            val modeError =
+                memScoped {
+                    val errorPtr = alloc<ObjCObjectVar<NSError?>>()
+                    audioSession.setMode(AVAudioSessionModeDefault, error = errorPtr.ptr)
+                    errorPtr.value
+                }
 
             if (modeError != null) {
                 Napier.e("Failed to set audio session mode: ${modeError.localizedDescription}")
@@ -90,19 +93,21 @@ class IosAudioSessionController {
     private fun setupBackgroundRecordingCapabilities() {
         try {
             // Required to continue audio recording in the background
-            val options = AVAudioSessionCategoryOptionAllowBluetooth or
-                AVAudioSessionCategoryOptionMixWithOthers or
-                AVAudioSessionCategoryOptionDefaultToSpeaker
+            val options =
+                AVAudioSessionCategoryOptionAllowBluetooth or
+                    AVAudioSessionCategoryOptionMixWithOthers or
+                    AVAudioSessionCategoryOptionDefaultToSpeaker
 
-            val sessionError = memScoped {
-                val errorPtr = alloc<ObjCObjectVar<NSError?>>()
-                audioSession.setCategory(
-                    AVAudioSessionCategoryPlayAndRecord,
-                    withOptions = options,
-                    error = errorPtr.ptr
-                )
-                errorPtr.value
-            }
+            val sessionError =
+                memScoped {
+                    val errorPtr = alloc<ObjCObjectVar<NSError?>>()
+                    audioSession.setCategory(
+                        AVAudioSessionCategoryPlayAndRecord,
+                        withOptions = options,
+                        error = errorPtr.ptr,
+                    )
+                    errorPtr.value
+                }
 
             if (sessionError != null) {
                 Napier.e("Failed to set background audio options: ${sessionError.localizedDescription}")

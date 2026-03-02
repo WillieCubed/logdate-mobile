@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.sp
  * A component that displays a live audio preview with noticeably larger text than a normal text editor.
  * This provides visual feedback during audio recording sessions.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun AudioPreviewComponent(
     previewText: String,
@@ -24,24 +25,28 @@ fun AudioPreviewComponent(
     isRecording: Boolean = false,
 ) {
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             text = previewText,
-            style = MaterialTheme.typography.headlineMedium.copy(
-                fontSize = 24.sp,
-                fontWeight = if (isRecording) FontWeight.Bold else FontWeight.Medium,
-                lineHeight = 32.sp
-            ),
-            color = if (isRecording) 
-                MaterialTheme.colorScheme.primary 
-            else 
-                MaterialTheme.colorScheme.onSurface,
+            style =
+                MaterialTheme.typography.headlineMedium.copy(
+                    fontSize = 24.sp,
+                    fontWeight = if (isRecording) FontWeight.Bold else FontWeight.Medium,
+                    lineHeight = 32.sp,
+                ),
+            color =
+                if (isRecording) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
             textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }

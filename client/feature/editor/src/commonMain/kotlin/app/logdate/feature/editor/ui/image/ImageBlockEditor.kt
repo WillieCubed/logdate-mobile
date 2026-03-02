@@ -2,8 +2,8 @@ package app.logdate.feature.editor.ui.image
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -23,36 +23,38 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import io.github.aakira.napier.Napier
-import org.koin.compose.viewmodel.koinViewModel
-import org.jetbrains.compose.resources.stringResource
-import logdate.client.feature.editor.generated.resources.*
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.delete_image
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
+
 /**
  * A component that handles image display and editing within the editor.
- * 
+ *
  * This component renders an image with optional caption and provides controls
  * for editing or deleting the image.
- * 
+ *
  * @param block The image block state
  * @param onBlockUpdated Callback when the block is updated
  * @param onDeleteRequested Callback when the block should be deleted
  * @param modifier Modifier for layout customization
  * @param viewModel The view model for handling image picking logic
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun ImageBlockEditor(
     block: ImageBlockUiState,
     onBlockUpdated: (ImageBlockUiState) -> Unit,
     onDeleteRequested: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: ImageBlockViewModel = koinViewModel()
+    viewModel: ImageBlockViewModel = koinViewModel(),
 ) {
     // Determine if we have an existing image
     val hasExistingImage = block.uri != null
-    
+
     // Get the state from the view model
     val uiState by viewModel.uiState.collectAsState()
-    
+
     // When the view model provides a selected image URI, update the block
     LaunchedEffect(uiState.selectedImageUri) {
         uiState.selectedImageUri?.let { uri ->
@@ -63,43 +65,45 @@ fun ImageBlockEditor(
             }
         }
     }
-    
+
     // Debug logging
     Napier.d("ImageBlockEditor - hasExistingImage: $hasExistingImage, URI: ${block.uri}")
-    
+
     // Show either the existing image with caption or the image picker UI
     if (hasExistingImage) {
         // Show the image with caption field
         Column(
-            modifier = modifier.fillMaxWidth().padding(8.dp)
+            modifier = modifier.fillMaxSize().padding(8.dp),
         ) {
             // Image display
             Box(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().weight(1f),
             ) {
                 AsyncImage(
-                    model = ImageRequest.Builder(LocalPlatformContext.current)
-                        .data(block.uri)
-                        .crossfade(true)
-                        .build(),
+                    model =
+                        ImageRequest
+                            .Builder(LocalPlatformContext.current)
+                            .data(block.uri)
+                            .crossfade(true)
+                            .build(),
                     contentDescription = block.caption.ifBlank { "Image" },
-                    contentScale = ContentScale.FillWidth,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(240.dp) // Fixed height for consistent UI
-                        .clip(RoundedCornerShape(8.dp))
+                    contentScale = ContentScale.Crop,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(8.dp)),
                 )
-                
+
                 DeleteMediaButton(
                     onClick = onDeleteRequested,
                     contentDescription = stringResource(Res.string.delete_image),
-                    modifier = Modifier.align(Alignment.TopEnd)
+                    modifier = Modifier.align(Alignment.TopEnd),
                 )
             }
 
             MediaCaptionField(
                 caption = block.caption,
-                onCaptionChanged = { onBlockUpdated(block.copy(caption = it)) }
+                onCaptionChanged = { onBlockUpdated(block.copy(caption = it)) },
             )
         }
     } else {
@@ -108,7 +112,7 @@ fun ImageBlockEditor(
             onImageSelected = { uri ->
                 onBlockUpdated(block.copy(uri = uri))
             },
-            modifier = modifier.fillMaxWidth().padding(8.dp)
+            modifier = modifier.fillMaxWidth().padding(8.dp),
         )
     }
 }
@@ -117,8 +121,9 @@ fun ImageBlockEditor(
  * The content shown when no image has been selected yet.
  * This is a platform-specific implementation that should be defined in each platform.
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 expect fun ImagePickerContent(
     onImageSelected: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 )

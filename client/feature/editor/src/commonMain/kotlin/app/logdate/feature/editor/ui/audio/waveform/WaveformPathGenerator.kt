@@ -10,7 +10,6 @@ import androidx.compose.ui.graphics.Path
  * for audio visualization with smooth transitions between samples.
  */
 object WaveformPathGenerator {
-
     /**
      * Generates a closed path representing the waveform.
      *
@@ -24,7 +23,7 @@ object WaveformPathGenerator {
         amplitudes: List<Float>,
         width: Float,
         height: Float,
-        smoothing: Float = 0.2f
+        smoothing: Float = 0.2f,
     ): Path {
         if (amplitudes.isEmpty()) return Path()
 
@@ -32,16 +31,19 @@ object WaveformPathGenerator {
         val maxAmplitude = height * 0.4f // Leave some padding
 
         // Generate upper curve points
-        val upperPoints = amplitudes.mapIndexed { index, amplitude ->
-            val x = (index.toFloat() / (amplitudes.size - 1).coerceAtLeast(1)) * width
-            val y = centerY - (amplitude * maxAmplitude)
-            Offset(x, y)
-        }
+        val upperPoints =
+            amplitudes.mapIndexed { index, amplitude ->
+                val x = (index.toFloat() / (amplitudes.size - 1).coerceAtLeast(1)) * width
+                val y = centerY - (amplitude * maxAmplitude)
+                Offset(x, y)
+            }
 
         // Generate lower curve points (mirrored)
-        val lowerPoints = upperPoints.map { point ->
-            Offset(point.x, centerY + (centerY - point.y))
-        }.reversed()
+        val lowerPoints =
+            upperPoints
+                .map { point ->
+                    Offset(point.x, centerY + (centerY - point.y))
+                }.reversed()
 
         return Path().apply {
             // Start at center left
@@ -66,7 +68,10 @@ object WaveformPathGenerator {
     /**
      * Draws a smooth bezier curve through the given points.
      */
-    private fun Path.drawSmoothCurve(points: List<Offset>, smoothing: Float) {
+    private fun Path.drawSmoothCurve(
+        points: List<Offset>,
+        smoothing: Float,
+    ) {
         if (points.size < 2) return
 
         for (i in 0 until points.size - 1) {

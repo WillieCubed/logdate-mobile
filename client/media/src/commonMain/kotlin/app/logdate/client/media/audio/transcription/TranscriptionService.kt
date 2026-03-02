@@ -1,6 +1,5 @@
 package app.logdate.client.media.audio.transcription
 
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 
 /**
@@ -15,12 +14,17 @@ sealed class TranscriptionResult {
     /**
      * Transcription is complete with text result
      */
-    data class Success(val text: String) : TranscriptionResult()
+    data class Success(
+        val text: String,
+    ) : TranscriptionResult()
 
     /**
      * Transcription failed with error
      */
-    data class Error(val message: String, val exception: Throwable? = null) : TranscriptionResult()
+    data class Error(
+        val message: String,
+        val exception: Throwable? = null,
+    ) : TranscriptionResult()
 }
 
 /**
@@ -77,7 +81,7 @@ interface TranscriptionService {
      * Whether this service supports file transcription
      */
     val supportsFileTranscription: Boolean
-    
+
     /**
      * Releases resources when the service is no longer needed
      */
@@ -92,13 +96,13 @@ data class TranscriptionOptions(
     val enablePunctuation: Boolean = true,
     val enableInterimResults: Boolean = true,
     val enableWordTimestamps: Boolean = false,
-    val modelQuality: ModelQuality = ModelQuality.STANDARD
+    val modelQuality: ModelQuality = ModelQuality.STANDARD,
 )
 
 /**
  * Quality levels for transcription models
  */
 enum class ModelQuality {
-    STANDARD,   // Standard quality, faster processing
-    ENHANCED    // Enhanced quality, slower processing
+    STANDARD, // Standard quality, faster processing
+    ENHANCED, // Enhanced quality, slower processing
 }

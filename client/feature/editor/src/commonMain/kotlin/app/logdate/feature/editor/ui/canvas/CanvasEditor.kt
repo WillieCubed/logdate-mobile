@@ -8,7 +8,10 @@ import androidx.compose.runtime.remember
  * A canvas editor that allows for the manipulation of objects on a canvas.
  */
 interface CanvasEditor {
-    fun updatePosition(objectId: String, position: Position)
+    fun updatePosition(
+        objectId: String,
+        position: Position,
+    )
 }
 
 interface CanvasObject {
@@ -25,15 +28,16 @@ data class Position(
 class CanvasState(
     val objects: List<CanvasObject>,
 ) : CanvasEditor {
-    override fun updatePosition(objectId: String, position: Position) {
-
+    override fun updatePosition(
+        objectId: String,
+        position: Position,
+    ) {
     }
 }
 
 // TODO: Implement Instagram Stories-like canvas editor
 @Composable
-fun rememberCanvasState(): CanvasState {
-    return remember {
+fun rememberCanvasState(): CanvasState =
+    remember {
         CanvasState(emptyList())
     }
-}

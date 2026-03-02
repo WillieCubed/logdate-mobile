@@ -33,7 +33,7 @@ class JournalSelectionDelegate(
             }
         }
     }
-    
+
     /**
      * Sets the journals that this entry is associated with.
      *
@@ -42,24 +42,25 @@ class JournalSelectionDelegate(
      */
     fun setSelectedJournals(
         journalIds: List<Uuid>,
-        currentState: MutableStateFlow<EditorState>
+        currentState: MutableStateFlow<EditorState>,
     ) {
         currentState.update { it.copy(selectedJournalIds = journalIds) }
     }
-    
+
     /**
      * Updates the state with default journals if the selection is empty.
      */
     private fun MutableStateFlow<EditorState>.updateIfEmpty(defaultJournals: List<Uuid>) {
-        this.value = this.value.let { currentState ->
-            if (currentState.selectedJournalIds.isEmpty()) {
-                currentState.copy(selectedJournalIds = defaultJournals)
-            } else {
-                currentState
+        this.value =
+            this.value.let { currentState ->
+                if (currentState.selectedJournalIds.isEmpty()) {
+                    currentState.copy(selectedJournalIds = defaultJournals)
+                } else {
+                    currentState
+                }
             }
-        }
     }
-    
+
     /**
      * Updates the state with the given transformer.
      */

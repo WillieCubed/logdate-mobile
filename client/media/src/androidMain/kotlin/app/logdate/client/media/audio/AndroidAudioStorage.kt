@@ -14,23 +14,23 @@ class AndroidAudioStorage(
     private val context: Context,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : AudioStorage {
-    override suspend fun createRecordingTarget(
-        extension: String,
-    ): AudioRecordingTarget = withContext(ioDispatcher) {
-        val safeExtension = extension.trimStart('.').ifBlank { "m4a" }
-        val directory = File(context.filesDir, "audio_notes").apply {
-            if (!exists()) {
-                mkdirs()
+    override suspend fun createRecordingTarget(extension: String): AudioRecordingTarget =
+        withContext(ioDispatcher) {
+            val safeExtension = extension.trimStart('.').ifBlank { "m4a" }
+            val directory =
+                File(context.filesDir, "audio_notes").apply {
+                    if (!exists()) {
+                        mkdirs()
+                    }
+                }
+
+            val baseName = "recording_${Uuid.random()}"
+            val targetFile = File(directory, "$baseName.$safeExtension")
+
+            if (targetFile.exists()) {
+                targetFile.delete()
             }
+
+            AudioRecordingTarget(path = targetFile.absolutePath)
         }
-
-        val baseName = "recording_${Uuid.random()}"
-        val targetFile = File(directory, "$baseName.$safeExtension")
-
-        if (targetFile.exists()) {
-            targetFile.delete()
-        }
-
-        AudioRecordingTarget(path = targetFile.absolutePath)
-    }
 }

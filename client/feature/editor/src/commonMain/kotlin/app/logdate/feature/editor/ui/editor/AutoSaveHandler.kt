@@ -15,10 +15,10 @@ import kotlin.time.Clock
  * Status of the autosave operation.
  */
 enum class AutoSaveStatus {
-    IDLE,      // No autosave in progress
-    SAVING,    // Currently saving content
-    SAVED,     // Content was successfully saved
-    ERROR      // Error occurred during saving
+    IDLE, // No autosave in progress
+    SAVING, // Currently saving content
+    SAVED, // Content was successfully saved
+    ERROR, // Error occurred during saving
 }
 
 /**
@@ -28,7 +28,7 @@ data class AutoSaveState(
     val status: AutoSaveStatus = AutoSaveStatus.IDLE,
     val lastSavedTimestamp: Long? = null,
     val error: Throwable? = null,
-    val saveAttempts: Int = 0
+    val saveAttempts: Int = 0,
 )
 
 /**
@@ -54,7 +54,7 @@ fun <T> rememberAutoSaveHandler(
     backupIntervalMs: Long = 30000,
     indicatorDisplayMs: Long = 2000,
     maxRetryAttempts: Int = 3,
-    enabled: Boolean = true
+    enabled: Boolean = true,
 ): AutoSaveState {
     // Auto-save state tracking
     var lastSavedContentHash by remember { mutableStateOf("") }
@@ -89,26 +89,26 @@ fun <T> rememberAutoSaveHandler(
     LaunchedEffect(currentContentHash, enabled) {
         // Skip if disabled or no meaningful changes
         if (!enabled || !hasContentChanged(content, lastSavedContentHash)) return@LaunchedEffect
-        
+
         // Store the content hash at the beginning of the delay
         val hashAtStart = currentContentHash
-        
+
         // Wait for user to pause typing/editing
         delay(debounceMs)
-        
+
         // After the delay, check if content is still the same as when we started waiting
         // and we're not already saving
         if (hashAtStart == currentContentHash && status != AutoSaveStatus.SAVING) {
             status = AutoSaveStatus.SAVING
             saveAttempts = 0
-            
+
             try {
                 onSave(content)
                 lastSavedContentHash = currentContentHash
                 lastSavedTimestamp = Clock.System.now().toEpochMilliseconds()
                 status = AutoSaveStatus.SAVED
                 saveError = null
-                
+
                 // The status will be automatically reset to IDLE after a brief period
                 // by the status reset effect (we don't do it here to avoid coupling)
             } catch (e: Throwable) {
@@ -116,7 +116,7 @@ fun <T> rememberAutoSaveHandler(
                 saveAttempts++
                 saveError = e
                 status = AutoSaveStatus.ERROR
-                
+
                 // Retry logic with exponential backoff up to max attempts
                 if (saveAttempts < maxRetryAttempts) {
                     delay(1000L * saveAttempts) // 1s, 2s, 3s delays
@@ -135,27 +135,27 @@ fun <T> rememberAutoSaveHandler(
     LaunchedEffect(enabled) {
         // Skip the entire effect if not enabled
         if (!enabled) return@LaunchedEffect
-        
+
         while (true) {
             delay(backupIntervalMs)
-            
+
             // Only save if:
             // 1. We're not already saving
             // 2. There are meaningful changes since last save
             // 3. Autosave is enabled
-            if (status != AutoSaveStatus.SAVING && 
-                hasContentChanged(content, lastSavedContentHash) && 
+            if (status != AutoSaveStatus.SAVING &&
+                hasContentChanged(content, lastSavedContentHash) &&
                 enabled
             ) {
                 status = AutoSaveStatus.SAVING
-                
+
                 try {
                     onSave(content)
                     lastSavedContentHash = currentContentHash
                     lastSavedTimestamp = Clock.System.now().toEpochMilliseconds()
                     status = AutoSaveStatus.SAVED
                     saveError = null
-                    
+
                     // Show "Saved" indicator briefly before returning to idle
                     delay(indicatorDisplayMs)
                     status = AutoSaveStatus.IDLE
@@ -163,7 +163,7 @@ fun <T> rememberAutoSaveHandler(
                     Napier.e("Backup auto-save failed: ${e.message}", e)
                     status = AutoSaveStatus.ERROR
                     saveError = e
-                    
+
                     // Show error indicator briefly before returning to idle
                     delay(indicatorDisplayMs)
                     status = AutoSaveStatus.IDLE
@@ -176,14 +176,14 @@ fun <T> rememberAutoSaveHandler(
         status = status,
         lastSavedTimestamp = lastSavedTimestamp,
         error = saveError,
-        saveAttempts = saveAttempts
+        saveAttempts = saveAttempts,
     )
 }
 
 /**
  * A simplified composable that handles auto-saving specifically for EditorState.
  * This version is compatible with the existing EntryEditorViewModel.autoSaveEntry method.
- * 
+ *
  * @param editorState The editor state to monitor for changes
  * @param onAutoSave Callback to execute when content should be saved
  * @param debounceMs Time in milliseconds to wait after changes before saving
@@ -197,34 +197,34 @@ fun rememberEditorAutoSave(
     onAutoSave: (EditorState) -> Unit,
     debounceMs: Long = 2000,
     backupIntervalMs: Long = 30000,
-    enabled: Boolean = true
+    enabled: Boolean = true,
 ): AutoSaveState {
     // Create an autosave state handler with EditorState-specific behavior
     return rememberAutoSaveHandler(
         content = editorState,
         onSave = { onAutoSave(it) },
-        hasContentChanged = { state, lastHash -> 
+        hasContentChanged = { state, lastHash ->
             // Check if the content has meaningful changes that need to be saved
             val hasContent = state.hasContent()
             val isDirty = state.isDirty
             val isNewOrChanged = lastHash.isEmpty() || lastHash != getBlocksHash(state.blocks)
-            
+
             Napier.i("AutoSave check: hasContent=$hasContent, isDirty=$isDirty, isNewOrChanged=$isNewOrChanged")
-            
+
             // Content has changed if it has content, is marked as dirty, and has different hash
             hasContent && isDirty && isNewOrChanged
         },
         debounceMs = debounceMs,
         backupIntervalMs = backupIntervalMs,
-        enabled = enabled
+        enabled = enabled,
     )
 }
 
 /**
  * Helper function to create a consistent hash from blocks for comparison
  */
-private fun getBlocksHash(blocks: List<EntryBlockUiState>): String {
-    return blocks.joinToString("|") { block ->
+private fun getBlocksHash(blocks: List<EntryBlockUiState>): String =
+    blocks.joinToString("|") { block ->
         when (block) {
             is TextBlockUiState -> "text:${block.id}:${block.content}"
             is ImageBlockUiState -> "image:${block.id}:${block.uri ?: ""}"
@@ -233,4 +233,3 @@ private fun getBlocksHash(blocks: List<EntryBlockUiState>): String {
             is CameraBlockUiState -> "camera:${block.id}:${block.uri ?: ""}"
         }
     }
-}

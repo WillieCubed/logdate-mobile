@@ -67,7 +67,7 @@ data class CameraCaptureState(
     val isRecording: Boolean = false,
     val recordingDurationMs: Long = 0L,
     val lastCapturedUri: String? = null,
-    val error: CameraCaptureError? = null
+    val error: CameraCaptureError? = null,
 )
 
 /**
@@ -75,7 +75,7 @@ data class CameraCaptureState(
  */
 enum class CameraFacing {
     FRONT,
-    BACK
+    BACK,
 }
 
 /**
@@ -83,7 +83,7 @@ enum class CameraFacing {
  */
 enum class CaptureMode {
     PHOTO,
-    VIDEO
+    VIDEO,
 }
 
 /**
@@ -91,7 +91,7 @@ enum class CaptureMode {
  */
 enum class CapturedMediaType {
     PHOTO,
-    VIDEO
+    VIDEO,
 }
 
 /**
@@ -99,8 +99,14 @@ enum class CapturedMediaType {
  */
 sealed class CameraCaptureError {
     data object CameraNotAvailable : CameraCaptureError()
+
     data object PermissionDenied : CameraCaptureError()
+
     data object CaptureFailed : CameraCaptureError()
+
     data object RecordingFailed : CameraCaptureError()
-    data class Unknown(val message: String) : CameraCaptureError()
+
+    data class Unknown(
+        val message: String,
+    ) : CameraCaptureError()
 }

@@ -1,13 +1,13 @@
 package app.logdate.feature.editor.ui.video
 
 import app.logdate.feature.editor.ui.editor.VideoBlockUiState
-import kotlin.time.Clock
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
@@ -20,7 +20,6 @@ import kotlin.uuid.Uuid
  * - Content detection for saving
  */
 class VideoBlockUiStateTest {
-
     @Test
     fun `default state has expected values`() {
         val state = VideoBlockUiState()
@@ -35,11 +34,12 @@ class VideoBlockUiStateTest {
 
     @Test
     fun `state with video content has correct values`() {
-        val state = VideoBlockUiState(
-            uri = "content://media/video.mp4",
-            caption = "My vacation video",
-            durationMs = 120000L
-        )
+        val state =
+            VideoBlockUiState(
+                uri = "content://media/video.mp4",
+                caption = "My vacation video",
+                durationMs = 120000L,
+            )
 
         assertEquals("content://media/video.mp4", state.uri)
         assertEquals("My vacation video", state.caption)
@@ -124,10 +124,11 @@ class VideoBlockUiStateTest {
 
     @Test
     fun `video with empty uri and non-empty caption still has no content`() {
-        val state = VideoBlockUiState(
-            uri = null,
-            caption = "This is a description without a video"
-        )
+        val state =
+            VideoBlockUiState(
+                uri = null,
+                caption = "This is a description without a video",
+            )
 
         assertFalse(state.hasContent())
     }

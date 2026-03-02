@@ -6,8 +6,8 @@ import app.logdate.feature.editor.audio.storage.IosWaveformStorage
 import app.logdate.feature.editor.audio.storage.WaveformStorage
 import app.logdate.feature.editor.ui.camera.CameraCaptureManager
 import app.logdate.feature.editor.ui.camera.IosCameraCaptureManager
-import app.logdate.feature.editor.ui.image.IosImagePickerService
 import app.logdate.feature.editor.ui.image.ImagePickerService
+import app.logdate.feature.editor.ui.image.IosImagePickerService
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -15,22 +15,23 @@ import org.koin.dsl.module
  * iOS-specific module for the editor feature.
  * Provides platform-specific implementations.
  */
-actual val platformEditorModule: Module = module {
-    // Provide iOS implementation of ImagePickerService
-    factory<ImagePickerService> {
-        IosImagePickerService()
-    }
+actual val platformEditorModule: Module =
+    module {
+        // Provide iOS implementation of ImagePickerService
+        factory<ImagePickerService> {
+            IosImagePickerService()
+        }
 
-    // Provide iOS stub implementation of CameraCaptureManager
-    factory<CameraCaptureManager> {
-        IosCameraCaptureManager()
-    }
+        // Provide iOS stub implementation of CameraCaptureManager
+        factory<CameraCaptureManager> {
+            IosCameraCaptureManager()
+        }
 
-    // Audio waveform processing dependencies
-    single<AmplitudeExtractor> {
-        IosAmplitudeExtractor()
+        // Audio waveform processing dependencies
+        single<AmplitudeExtractor> {
+            IosAmplitudeExtractor()
+        }
+        single<WaveformStorage> {
+            IosWaveformStorage()
+        }
     }
-    single<WaveformStorage> {
-        IosWaveformStorage()
-    }
-}

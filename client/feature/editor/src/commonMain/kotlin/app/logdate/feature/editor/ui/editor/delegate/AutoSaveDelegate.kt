@@ -2,7 +2,6 @@ package app.logdate.feature.editor.ui.editor.delegate
 
 import app.logdate.client.domain.notes.drafts.CreateEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.UpdateEntryDraftUseCase
-import app.logdate.client.repository.journals.JournalNote
 import app.logdate.feature.editor.ui.editor.EditorState
 import app.logdate.feature.editor.ui.mapper.toJournalNote
 import io.github.aakira.napier.Napier
@@ -28,37 +27,39 @@ class AutoSaveDelegate(
      */
     fun autoSaveEntry(
         state: EditorState,
-        onDraftCreated: (Uuid) -> Unit
+        onDraftCreated: (Uuid) -> Unit,
     ) {
         scope.launch {
             try {
                 // Convert UI blocks to domain notes, filtering out read-only blocks
-                val notes = state.blocks.mapNotNull { block ->
-                    // Skip read-only blocks and empty blocks
-                    if (!block.hasContent() || state.isReadOnly(block.id)) return@mapNotNull null
-                    
-                    // Convert blocks to notes using the mapper
-                    block.toJournalNote()
-                }
-                
+                val notes =
+                    state.blocks.mapNotNull { block ->
+                        // Skip read-only blocks and empty blocks
+                        if (!block.hasContent() || state.isReadOnly(block.id)) return@mapNotNull null
+
+                        // Convert blocks to notes using the mapper
+                        block.toJournalNote()
+                    }
+
                 // Don't save empty drafts
                 if (notes.isEmpty()) {
                     Napier.d("Skip autosave: no editable content")
                     return@launch
                 }
-                
+
                 // Save to draft repository
                 val currentDraftId = state.draftId
-                val draftId = if (currentDraftId != null) {
-                    updateEntryDraft(currentDraftId, notes)
-                    currentDraftId
-                } else {
-                    val newDraftId = createEntryDraft(notes)
-                    // Notify the caller of the new draft ID
-                    onDraftCreated(newDraftId)
-                    newDraftId
-                }
-                
+                val draftId =
+                    if (currentDraftId != null) {
+                        updateEntryDraft(currentDraftId, notes)
+                        currentDraftId
+                    } else {
+                        val newDraftId = createEntryDraft(notes)
+                        // Notify the caller of the new draft ID
+                        onDraftCreated(newDraftId)
+                        newDraftId
+                    }
+
                 Napier.d("Auto-saved draft: $draftId with ${notes.size} notes")
             } catch (e: Exception) {
                 Napier.e("Failed to auto-save draft: ${e.message}", e)

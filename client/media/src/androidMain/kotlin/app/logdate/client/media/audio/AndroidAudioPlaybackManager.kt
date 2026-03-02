@@ -3,10 +3,9 @@ package app.logdate.client.media.audio
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.Bundle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -29,17 +28,18 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class AndroidAudioPlaybackManager(
     private val context: Context,
-) : AudioPlaybackManager, AudioPlaybackStatusProvider {
-
+) : AudioPlaybackManager,
+    AudioPlaybackStatusProvider {
     override val playbackStatus: StateFlow<AudioPlaybackStatus>
         get() = _playbackStatus
 
     private val _playbackStatus = MutableStateFlow(AudioPlaybackStatus())
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val mainExecutor: Executor = Executor { runnable ->
-        mainHandler.post(runnable)
-    }
+    private val mainExecutor: Executor =
+        Executor { runnable ->
+            mainHandler.post(runnable)
+        }
 
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var controller: MediaController? = null
@@ -55,13 +55,18 @@ class AndroidAudioPlaybackManager(
     ) {
         this.onProgressUpdated = onProgressUpdated
         this.onPlaybackCompleted = onPlaybackCompleted
-        startPlaybackService()
+        // startService (not startForegroundService) ensures MediaSessionService.onStartCommand
+        // fires so its MediaNotificationManager gets a valid startId. Without this, the service
+        // is only bound via BIND_AUTO_CREATE and stops itself ~1s after the controller connects.
+        context.startService(Intent(context, AudioPlaybackService::class.java))
         withController { player ->
-            val mediaItem = MediaItem.Builder()
-                .setUri(uri)
-                .setMediaId(metadata?.noteId?.toString() ?: uri)
-                .setMediaMetadata(buildMediaMetadata(metadata))
-                .build()
+            val mediaItem =
+                MediaItem
+                    .Builder()
+                    .setUri(uri)
+                    .setMediaId(metadata?.noteId?.toString() ?: uri)
+                    .setMediaMetadata(buildMediaMetadata(metadata))
+                    .build()
             player.setMediaItem(mediaItem)
             player.prepare()
             player.play()
@@ -125,61 +130,55 @@ class AndroidAudioPlaybackManager(
     }
 
     private fun buildControllerFuture(): ListenableFuture<MediaController> {
-        val token = SessionToken(
-            context,
-            ComponentName(context, AudioPlaybackService::class.java),
-        )
+        val token =
+            SessionToken(
+                context,
+                ComponentName(context, AudioPlaybackService::class.java),
+            )
         return MediaController.Builder(context, token).buildAsync()
     }
 
-    private fun startPlaybackService() {
-        val intent = Intent(context, AudioPlaybackService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent)
-        } else {
-            context.startService(intent)
-        }
-    }
-
-    private val playerListener = object : Player.Listener {
-        override fun onIsPlayingChanged(isPlaying: Boolean) {
-            if (isPlaying) {
-                startProgressTracking()
-            } else {
-                stopProgressTracking()
+    private val playerListener =
+        object : Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (isPlaying) {
+                    startProgressTracking()
+                } else {
+                    stopProgressTracking()
+                }
+                controller?.let { updateStatus(it) }
             }
-            controller?.let { updateStatus(it) }
-        }
 
-        override fun onPlaybackStateChanged(playbackState: Int) {
-            val player = controller ?: return
-            if (playbackState == Player.STATE_ENDED) {
-                onProgressUpdated?.invoke(1f)
-                onPlaybackCompleted?.invoke()
-                updateStatus(player, completed = true)
-                stopProgressTracking()
-                return
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                val player = controller ?: return
+                if (playbackState == Player.STATE_ENDED) {
+                    onProgressUpdated?.invoke(1f)
+                    onPlaybackCompleted?.invoke()
+                    updateStatus(player, completed = true)
+                    stopProgressTracking()
+                    return
+                }
+                updateStatus(player)
             }
-            updateStatus(player)
         }
-    }
 
     private fun startProgressTracking() {
         stopProgressTracking()
-        progressJob = scope.launch {
-            while (isActive) {
-                controller?.let { player ->
-                    val durationMs = player.duration
-                    if (durationMs > 0) {
-                        val progress = player.currentPosition.toFloat() / durationMs.toFloat()
-                        val normalized = progress.coerceIn(0f, 1f)
-                        onProgressUpdated?.invoke(normalized)
-                        _playbackStatus.value = _playbackStatus.value.copy(progress = normalized)
+        progressJob =
+            scope.launch {
+                while (isActive) {
+                    controller?.let { player ->
+                        val durationMs = player.duration
+                        if (durationMs > 0) {
+                            val progress = player.currentPosition.toFloat() / durationMs.toFloat()
+                            val normalized = progress.coerceIn(0f, 1f)
+                            onProgressUpdated?.invoke(normalized)
+                            _playbackStatus.value = _playbackStatus.value.copy(progress = normalized)
+                        }
                     }
+                    delay(100)
                 }
-                delay(100)
             }
-        }
     }
 
     private fun stopProgressTracking() {
@@ -194,17 +193,19 @@ class AndroidAudioPlaybackManager(
     ) {
         val durationMs = player.duration
         val duration = if (durationMs > 0) durationMs.milliseconds else Duration.ZERO
-        val progress = when {
-            resetProgress -> 0f
-            completed -> 1f
-            durationMs > 0 -> (player.currentPosition.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
-            else -> 0f
-        }
-        _playbackStatus.value = AudioPlaybackStatus(
-            isPlaying = player.isPlaying,
-            progress = progress,
-            duration = duration,
-        )
+        val progress =
+            when {
+                resetProgress -> 0f
+                completed -> 1f
+                durationMs > 0 -> (player.currentPosition.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+                else -> 0f
+            }
+        _playbackStatus.value =
+            AudioPlaybackStatus(
+                isPlaying = player.isPlaying,
+                progress = progress,
+                duration = duration,
+            )
     }
 
     /**
@@ -213,7 +214,8 @@ class AndroidAudioPlaybackManager(
     private fun buildMediaMetadata(metadata: AudioPlaybackMetadata?): MediaMetadata {
         val extras = Bundle()
         metadata?.noteId?.let { extras.putString(EXTRA_NOTE_ID, it.toString()) }
-        return MediaMetadata.Builder()
+        return MediaMetadata
+            .Builder()
             .setTitle(metadata?.title ?: "Voice Note")
             .setSubtitle(metadata?.subtitle)
             .setExtras(extras.takeIf { !it.isEmpty })

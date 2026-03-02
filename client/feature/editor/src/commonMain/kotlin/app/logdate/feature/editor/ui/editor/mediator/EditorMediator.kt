@@ -15,19 +15,19 @@ import kotlin.uuid.Uuid
 interface EditorMediator {
     /** Current state of the editor actions */
     val editorActions: StateFlow<EditorActions>
-    
+
     /** Notifies that a block was selected */
     fun onBlockSelected(blockId: Uuid)
-    
+
     /** Notifies that a new block type was requested */
     fun onNewBlockRequested(blockType: BlockType)
-    
+
     /** Notifies that block content was updated */
     fun onBlockUpdated(block: EntryBlockUiState)
-    
+
     /** Notifies that a save was requested */
     fun onSaveRequested()
-    
+
     /** Notifies that a draft should be loaded */
     fun onLoadDraftRequested(draftId: Uuid)
 }
@@ -41,45 +41,45 @@ interface EditorMediator {
 class EditorMediatorImpl : EditorMediator {
     private val _editorActions = MutableStateFlow(EditorActions())
     override val editorActions = _editorActions.asStateFlow()
-    
+
     override fun onBlockSelected(blockId: Uuid) {
         _editorActions.update { it.copy(selectedBlockId = blockId) }
     }
-    
+
     override fun onNewBlockRequested(blockType: BlockType) {
-        _editorActions.update { 
+        _editorActions.update {
             it.copy(
                 newBlockRequest = NewBlockRequest(blockType),
                 // Reset any previous errors
-                error = null
+                error = null,
             )
         }
     }
-    
+
     override fun onBlockUpdated(block: EntryBlockUiState) {
-        _editorActions.update { 
+        _editorActions.update {
             it.copy(
                 updatedBlock = block,
                 // Reset any previous errors
-                error = null
+                error = null,
             )
         }
     }
-    
+
     override fun onSaveRequested() {
         _editorActions.update { it.copy(saveRequested = true) }
     }
-    
+
     override fun onLoadDraftRequested(draftId: Uuid) {
-        _editorActions.update { 
+        _editorActions.update {
             it.copy(
                 draftToLoad = draftId,
                 // Reset any previous errors
-                error = null
+                error = null,
             )
         }
     }
-    
+
     /**
      * Call this after handling an action to reset its state,
      * preventing multiple reactions to the same action.
@@ -95,7 +95,7 @@ class EditorMediatorImpl : EditorMediator {
             }
         }
     }
-    
+
     /**
      * Report an error that occurred during processing.
      */
@@ -113,14 +113,14 @@ data class EditorActions(
     val updatedBlock: EntryBlockUiState? = null,
     val saveRequested: Boolean = false,
     val draftToLoad: Uuid? = null,
-    val error: String? = null
+    val error: String? = null,
 )
 
 /**
  * Request to create a new block of a specific type.
  */
 data class NewBlockRequest(
-    val blockType: BlockType
+    val blockType: BlockType,
 )
 
 /**
@@ -131,5 +131,5 @@ enum class EditorActionType {
     NEW_BLOCK,
     BLOCK_UPDATED,
     SAVE,
-    LOAD_DRAFT
+    LOAD_DRAFT,
 }

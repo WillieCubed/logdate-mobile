@@ -2,6 +2,7 @@ package app.logdate.feature.editor.audio.color
 
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
+import kotlinx.datetime.number
 import kotlin.math.PI
 import kotlin.math.acos
 import kotlin.math.asin
@@ -9,7 +10,6 @@ import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.sin
 import kotlin.math.tan
-import kotlinx.datetime.number
 
 /**
  * Sunrise, sunset, and solar noon times for a given date and location.
@@ -17,7 +17,7 @@ import kotlinx.datetime.number
 data class SunTimes(
     val sunrise: LocalTime,
     val sunset: LocalTime,
-    val solarNoon: LocalTime
+    val solarNoon: LocalTime,
 )
 
 /**
@@ -37,7 +37,11 @@ object SunCalculator {
      * @param date The date for which to calculate sun times
      * @return SunTimes containing sunrise, sunset, and solar noon
      */
-    fun calculate(latitude: Double, longitude: Double, date: LocalDate): SunTimes {
+    fun calculate(
+        latitude: Double,
+        longitude: Double,
+        date: LocalDate,
+    ): SunTimes {
         val julianDay = calculateJulianDay(date.year, date.month.number, date.day)
         val julianCentury = (julianDay - 2451545.0) / 36525.0
 
@@ -45,30 +49,37 @@ object SunCalculator {
         val geomMeanAnomSun = 357.52911 + julianCentury * (35999.05029 - 0.0001537 * julianCentury)
         val eccentEarthOrbit = 0.016708634 - julianCentury * (0.000042037 + 0.0000001267 * julianCentury)
 
-        val sunEqOfCtr = sin(geomMeanAnomSun.toRadians()) * (1.914602 - julianCentury * (0.004817 + 0.000014 * julianCentury)) +
-            sin((2 * geomMeanAnomSun).toRadians()) * (0.019993 - 0.000101 * julianCentury) +
-            sin((3 * geomMeanAnomSun).toRadians()) * 0.000289
+        val sunEqOfCtr =
+            sin(geomMeanAnomSun.toRadians()) * (1.914602 - julianCentury * (0.004817 + 0.000014 * julianCentury)) +
+                sin((2 * geomMeanAnomSun).toRadians()) * (0.019993 - 0.000101 * julianCentury) +
+                sin((3 * geomMeanAnomSun).toRadians()) * 0.000289
 
         val sunTrueLong = geomMeanLongSun + sunEqOfCtr
         val sunAppLong = sunTrueLong - 0.00569 - 0.00478 * sin((125.04 - 1934.136 * julianCentury).toRadians())
 
-        val meanObliqEcliptic = 23 + (26 + ((21.448 - julianCentury * (46.815 + julianCentury * (0.00059 - julianCentury * 0.001813)))) / 60) / 60
+        val meanObliqEcliptic =
+            23 + (26 + ((21.448 - julianCentury * (46.815 + julianCentury * (0.00059 - julianCentury * 0.001813)))) / 60) / 60
         val obliqCorr = meanObliqEcliptic + 0.00256 * cos((125.04 - 1934.136 * julianCentury).toRadians())
 
         val sunDeclin = asin(sin(obliqCorr.toRadians()) * sin(sunAppLong.toRadians())).toDegrees()
 
         val varY = tan((obliqCorr / 2).toRadians()).let { it * it }
 
-        val eqOfTime = 4 * (varY * sin(2 * geomMeanLongSun.toRadians()) -
-            2 * eccentEarthOrbit * sin(geomMeanAnomSun.toRadians()) +
-            4 * eccentEarthOrbit * varY * sin(geomMeanAnomSun.toRadians()) * cos(2 * geomMeanLongSun.toRadians()) -
-            0.5 * varY * varY * sin(4 * geomMeanLongSun.toRadians()) -
-            1.25 * eccentEarthOrbit * eccentEarthOrbit * sin(2 * geomMeanAnomSun.toRadians())).toDegrees()
+        val eqOfTime =
+            4 *
+                (
+                    varY * sin(2 * geomMeanLongSun.toRadians()) -
+                        2 * eccentEarthOrbit * sin(geomMeanAnomSun.toRadians()) +
+                        4 * eccentEarthOrbit * varY * sin(geomMeanAnomSun.toRadians()) * cos(2 * geomMeanLongSun.toRadians()) -
+                        0.5 * varY * varY * sin(4 * geomMeanLongSun.toRadians()) -
+                        1.25 * eccentEarthOrbit * eccentEarthOrbit * sin(2 * geomMeanAnomSun.toRadians())
+                ).toDegrees()
 
-        val haSunrise = acos(
-            (cos(ZENITH.toRadians()) / (cos(latitude.toRadians()) * cos(sunDeclin.toRadians()))) -
-                tan(latitude.toRadians()) * tan(sunDeclin.toRadians())
-        ).toDegrees()
+        val haSunrise =
+            acos(
+                (cos(ZENITH.toRadians()) / (cos(latitude.toRadians()) * cos(sunDeclin.toRadians()))) -
+                    tan(latitude.toRadians()) * tan(sunDeclin.toRadians()),
+            ).toDegrees()
 
         val solarNoonMinutes = 720 - 4 * longitude - eqOfTime
         val sunriseMinutes = solarNoonMinutes - haSunrise * 4
@@ -77,11 +88,15 @@ object SunCalculator {
         return SunTimes(
             sunrise = minutesToLocalTime(sunriseMinutes),
             sunset = minutesToLocalTime(sunsetMinutes),
-            solarNoon = minutesToLocalTime(solarNoonMinutes)
+            solarNoon = minutesToLocalTime(solarNoonMinutes),
         )
     }
 
-    private fun calculateJulianDay(year: Int, month: Int, day: Int): Double {
+    private fun calculateJulianDay(
+        year: Int,
+        month: Int,
+        day: Int,
+    ): Double {
         var y = year
         var m = month
         if (m <= 2) {
@@ -101,5 +116,6 @@ object SunCalculator {
     }
 
     private fun Double.toRadians() = this * PI / 180
+
     private fun Double.toDegrees() = this * 180 / PI
 }

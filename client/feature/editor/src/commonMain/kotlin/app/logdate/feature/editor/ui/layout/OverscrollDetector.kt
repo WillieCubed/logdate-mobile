@@ -37,49 +37,56 @@ class OverscrollDetector(
         get() = (overscrollAmount / maxOverscroll).coerceIn(0f, 1f)
 
     // Nested scroll connection to intercept scroll events
-    val nestedScrollConnection = object : NestedScrollConnection {
-        override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-            // Only interested in downward scroll (positive y) for bottom overscroll
-            return Offset.Zero
-        }
+    val nestedScrollConnection =
+        object : NestedScrollConnection {
+            override fun onPreScroll(
+                available: Offset,
+                source: NestedScrollSource,
+            ): Offset {
+                // Only interested in downward scroll (positive y) for bottom overscroll
+                return Offset.Zero
+            }
 
-        override fun onPostScroll(
-            consumed: Offset,
-            available: Offset,
-            source: NestedScrollSource,
-        ): Offset {
-            // If there's unconsumed downward scroll and we're at the bottom of the list
-            if (available.y > 0) {
-                val newOverscroll = (overscrollAmount + available.y).coerceIn(0f, maxOverscroll)
-                if (newOverscroll != overscrollAmount) {
-                    overscrollAmount = newOverscroll
-                    onOverscroll(overscrollAmount)
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource,
+            ): Offset {
+                // If there's unconsumed downward scroll and we're at the bottom of the list
+                if (available.y > 0) {
+                    val newOverscroll = (overscrollAmount + available.y).coerceIn(0f, maxOverscroll)
+                    if (newOverscroll != overscrollAmount) {
+                        overscrollAmount = newOverscroll
+                        onOverscroll(overscrollAmount)
+                    }
+                    // Consume the available scroll
+                    return Offset(0f, available.y)
                 }
-                // Consume the available scroll
-                return Offset(0f, available.y)
+                return Offset.Zero
             }
-            return Offset.Zero
-        }
 
-        override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-            // Release overscroll when flinging
-            if (overscrollAmount > 0) {
-                onOverscrollReleased(overscrollAmount, overscrollThreshold)
-                // Reset after notifying
-                overscrollAmount = 0f
+            override suspend fun onPostFling(
+                consumed: Velocity,
+                available: Velocity,
+            ): Velocity {
+                // Release overscroll when flinging
+                if (overscrollAmount > 0) {
+                    onOverscrollReleased(overscrollAmount, overscrollThreshold)
+                    // Reset after notifying
+                    overscrollAmount = 0f
+                }
+                return Velocity.Zero
             }
-            return Velocity.Zero
-        }
 
-        // Handle when the user stops dragging
-        override suspend fun onPreFling(available: Velocity): Velocity {
-            if (overscrollAmount > 0) {
-                onOverscrollReleased(overscrollAmount, overscrollThreshold)
-                // Don't reset yet as we want the animation to run
+            // Handle when the user stops dragging
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (overscrollAmount > 0) {
+                    onOverscrollReleased(overscrollAmount, overscrollThreshold)
+                    // Don't reset yet as we want the animation to run
+                }
+                return Velocity.Zero
             }
-            return Velocity.Zero
         }
-    }
 
     // Reset the overscroll amount
     fun reset() {
@@ -124,7 +131,7 @@ fun rememberOverscrollDetector(
                 }
             },
             overscrollThreshold = overscrollThreshold,
-            maxOverscroll = maxOverscroll
+            maxOverscroll = maxOverscroll,
         )
     }
 }
@@ -132,6 +139,4 @@ fun rememberOverscrollDetector(
 /**
  * Modifier extension to apply the overscroll detector.
  */
-fun Modifier.overscrollDetector(detector: OverscrollDetector): Modifier {
-    return this.nestedScroll(detector.nestedScrollConnection)
-}
+fun Modifier.overscrollDetector(detector: OverscrollDetector): Modifier = this.nestedScroll(detector.nestedScrollConnection)

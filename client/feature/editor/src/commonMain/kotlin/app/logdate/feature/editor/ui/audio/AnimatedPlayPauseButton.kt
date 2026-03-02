@@ -43,6 +43,7 @@ import app.logdate.feature.editor.ui.editor.RecordingState
  * @param iconSize Size of the icon in dp
  * @param colors Button colors configuration, defaults based on current state
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun AnimatedPlayPauseButton(
     playbackState: PlaybackState,
@@ -50,64 +51,73 @@ fun AnimatedPlayPauseButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     iconSize: Dp = 24.dp,
-    colors: IconButtonColors = when {
-        recordingState == RecordingState.RECORDING -> IconButtonDefaults.filledIconButtonColors(
-            containerColor = MaterialTheme.colorScheme.error,
-            contentColor = MaterialTheme.colorScheme.onError
-        )
-        recordingState == RecordingState.PROCESSING -> IconButtonDefaults.filledIconButtonColors(
-            containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
-            contentColor = MaterialTheme.colorScheme.onError
-        )
-        playbackState == PlaybackState.PLAYING -> IconButtonDefaults.filledIconButtonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary
-        )
-        else -> IconButtonDefaults.filledIconButtonColors(
-            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
-            contentColor = MaterialTheme.colorScheme.onPrimary
-        )
-    }
+    colors: IconButtonColors =
+        when {
+            recordingState == RecordingState.RECORDING ->
+                IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                )
+            recordingState == RecordingState.PROCESSING ->
+                IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                    contentColor = MaterialTheme.colorScheme.onError,
+                )
+            playbackState == PlaybackState.PLAYING ->
+                IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                )
+            else ->
+                IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                )
+        },
 ) {
     // Determine if the button is in an active state (playing or recording)
-    val isActive = playbackState == PlaybackState.PLAYING ||
-                  recordingState == RecordingState.RECORDING
+    val isActive =
+        playbackState == PlaybackState.PLAYING ||
+            recordingState == RecordingState.RECORDING
 
     // Animate corner radius based on active state
     // Circle when inactive, rounded square when active
     val cornerRadius by animateFloatAsState(
         targetValue = if (isActive) 12f else 50f, // 50% = circle, 12 = rounded square
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "ButtonCornerRadiusAnimation"
+        animationSpec =
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow,
+            ),
+        label = "ButtonCornerRadiusAnimation",
     )
 
     // Create the shape with animated corner radius
     val shape = RoundedCornerShape(cornerRadius.dp)
 
     // Determine content description for accessibility
-    val description = when {
-        recordingState == RecordingState.RECORDING -> "Stop Recording"
-        recordingState == RecordingState.PAUSED -> "Resume Recording"
-        recordingState == RecordingState.INACTIVE && playbackState == PlaybackState.STOPPED -> "Start Recording"
-        playbackState == PlaybackState.PLAYING -> "Pause"
-        else -> "Play"
-    }
+    val description =
+        when {
+            recordingState == RecordingState.RECORDING -> "Stop Recording"
+            recordingState == RecordingState.PAUSED -> "Resume Recording"
+            recordingState == RecordingState.INACTIVE && playbackState == PlaybackState.STOPPED -> "Start Recording"
+            playbackState == PlaybackState.PLAYING -> "Pause"
+            else -> "Play"
+        }
 
     FilledIconButton(
         onClick = onClick,
         modifier = modifier.semantics { contentDescription = description },
         shape = shape,
-        colors = colors
+        colors = colors,
     ) {
         // Get content color for morphing icons
-        val contentColor = when {
-            recordingState == RecordingState.RECORDING -> MaterialTheme.colorScheme.onError
-            recordingState == RecordingState.PROCESSING -> MaterialTheme.colorScheme.onError
-            else -> MaterialTheme.colorScheme.onPrimary
-        }
+        val contentColor =
+            when {
+                recordingState == RecordingState.RECORDING -> MaterialTheme.colorScheme.onError
+                recordingState == RecordingState.PROCESSING -> MaterialTheme.colorScheme.onError
+                else -> MaterialTheme.colorScheme.onPrimary
+            }
 
         // Use morphing icons for play/pause/stop transitions
         // Use AnimatedContent only for mic icon (recording start state)
@@ -117,26 +127,26 @@ fun AnimatedPlayPauseButton(
                 MorphingPlayStopIcon(
                     isActive = true,
                     size = iconSize,
-                    tint = contentColor
+                    tint = contentColor,
                 )
             }
             // Mic states: use AnimatedContent for mic icon
             recordingState == RecordingState.PAUSED ||
-            (recordingState == RecordingState.INACTIVE && playbackState == PlaybackState.STOPPED) -> {
+                (recordingState == RecordingState.INACTIVE && playbackState == PlaybackState.STOPPED) -> {
                 AnimatedContent(
                     targetState = recordingState,
                     transitionSpec = {
                         fadeIn(spring(stiffness = Spring.StiffnessLow)) +
-                        scaleIn(initialScale = 0.8f, animationSpec = spring(stiffness = Spring.StiffnessLow)) togetherWith
-                        fadeOut(spring(stiffness = Spring.StiffnessLow)) +
-                        scaleOut(targetScale = 0.8f, animationSpec = spring(stiffness = Spring.StiffnessLow))
+                            scaleIn(initialScale = 0.8f, animationSpec = spring(stiffness = Spring.StiffnessLow)) togetherWith
+                            fadeOut(spring(stiffness = Spring.StiffnessLow)) +
+                            scaleOut(targetScale = 0.8f, animationSpec = spring(stiffness = Spring.StiffnessLow))
                     },
-                    label = "MicIconAnimation"
+                    label = "MicIconAnimation",
                 ) { _ ->
                     Icon(
                         imageVector = Icons.Rounded.Mic,
                         contentDescription = null, // Handled by button semantics
-                        modifier = Modifier.size(iconSize)
+                        modifier = Modifier.size(iconSize),
                     )
                 }
             }
@@ -145,7 +155,7 @@ fun AnimatedPlayPauseButton(
                 MorphingPlayPauseIcon(
                     isPlaying = playbackState == PlaybackState.PLAYING,
                     size = iconSize,
-                    tint = contentColor
+                    tint = contentColor,
                 )
             }
         }
@@ -169,25 +179,28 @@ fun AnimatedPlayPauseButton(
  * @param iconSize Size of the icon in dp
  * @param colors Button colors configuration, defaults to filled button with primary color
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun AnimatedPlayPauseButton(
     isPlaying: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     iconSize: Dp = 24.dp,
-    colors: IconButtonColors = IconButtonDefaults.filledIconButtonColors(
-        containerColor = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary
-    )
+    colors: IconButtonColors =
+        IconButtonDefaults.filledIconButtonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+        ),
 ) {
     // Animate corner radius based on playing state
     val cornerRadius by animateFloatAsState(
         targetValue = if (isPlaying) 12f else 50f, // 50% = circle, 12 = rounded square
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "ButtonCornerRadiusAnimation"
+        animationSpec =
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow,
+            ),
+        label = "ButtonCornerRadiusAnimation",
     )
 
     val shape = RoundedCornerShape(cornerRadius.dp)
@@ -197,12 +210,12 @@ fun AnimatedPlayPauseButton(
         onClick = onClick,
         modifier = modifier.semantics { contentDescription = description },
         shape = shape,
-        colors = colors
+        colors = colors,
     ) {
         MorphingPlayPauseIcon(
             isPlaying = isPlaying,
             size = iconSize,
-            tint = MaterialTheme.colorScheme.onPrimary
+            tint = MaterialTheme.colorScheme.onPrimary,
         )
     }
 }

@@ -15,9 +15,8 @@ import kotlinx.coroutines.launch
  * Handles photo and video capture, camera switching, and state management.
  */
 class CameraViewModel(
-    private val cameraCaptureManager: CameraCaptureManager
+    private val cameraCaptureManager: CameraCaptureManager,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(CameraUiState())
     val uiState: StateFlow<CameraUiState> = _uiState.asStateFlow()
 
@@ -32,7 +31,7 @@ class CameraViewModel(
                         isRecording = captureState.isRecording,
                         recordingDurationMs = captureState.recordingDurationMs,
                         capturedMediaUri = captureState.lastCapturedUri,
-                        error = captureState.error?.toErrorMessage()
+                        error = captureState.error?.toErrorMessage(),
                     )
                 }
             }
@@ -107,7 +106,7 @@ class CameraViewModel(
             it.copy(
                 isCapturing = false,
                 capturedMediaUri = uri,
-                capturedMediaType = if (uri != null) CapturedMediaType.PHOTO else null
+                capturedMediaType = if (uri != null) CapturedMediaType.PHOTO else null,
             )
         }
 
@@ -128,7 +127,7 @@ class CameraViewModel(
             _uiState.update {
                 it.copy(
                     capturedMediaUri = uri,
-                    capturedMediaType = if (uri != null) CapturedMediaType.VIDEO else null
+                    capturedMediaType = if (uri != null) CapturedMediaType.VIDEO else null,
                 )
             }
         } else {
@@ -145,7 +144,7 @@ class CameraViewModel(
             it.copy(
                 capturedMediaUri = null,
                 capturedMediaType = null,
-                error = null
+                error = null,
             )
         }
     }
@@ -176,7 +175,7 @@ data class CameraUiState(
     val recordingDurationMs: Long = 0L,
     val capturedMediaUri: String? = null,
     val capturedMediaType: CapturedMediaType? = null,
-    val error: String? = null
+    val error: String? = null,
 ) {
     /**
      * Returns a formatted duration string for video recording (MM:SS).
@@ -190,10 +189,11 @@ data class CameraUiState(
 /**
  * Converts a [CameraCaptureError] to a user-friendly error message.
  */
-private fun CameraCaptureError.toErrorMessage(): String = when (this) {
-    is CameraCaptureError.CameraNotAvailable -> "Camera is not available"
-    is CameraCaptureError.PermissionDenied -> "Camera permission denied"
-    is CameraCaptureError.CaptureFailed -> "Failed to capture photo"
-    is CameraCaptureError.RecordingFailed -> "Failed to record video"
-    is CameraCaptureError.Unknown -> message
-}
+private fun CameraCaptureError.toErrorMessage(): String =
+    when (this) {
+        is CameraCaptureError.CameraNotAvailable -> "Camera is not available"
+        is CameraCaptureError.PermissionDenied -> "Camera permission denied"
+        is CameraCaptureError.CaptureFailed -> "Failed to capture photo"
+        is CameraCaptureError.RecordingFailed -> "Failed to record video"
+        is CameraCaptureError.Unknown -> message
+    }

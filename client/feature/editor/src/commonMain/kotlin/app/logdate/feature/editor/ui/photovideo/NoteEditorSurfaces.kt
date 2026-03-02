@@ -20,14 +20,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
-import androidx.compose.ui.tooling.preview.Preview
-
 
 /**
  * A wrapper container for a note editor
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 internal fun NoteEditorSurface(
     isExpanded: Boolean,
@@ -37,16 +37,17 @@ internal fun NoteEditorSurface(
 ) {
     Surface(
         onClick = onClick,
-        modifier = modifier
-            .animateContentSize()
-            .widthIn(max = 600.dp)
-            .heightIn(
-                min = if (isExpanded) 240.dp else 80.dp,
-                max = if (isExpanded) Int.MAX_VALUE.dp else 240.dp, // TODO: Use factor of screen size for max expanded height
-            ),
+        modifier =
+            modifier
+                .animateContentSize()
+                .widthIn(max = 600.dp)
+                .heightIn(
+                    min = if (isExpanded) 240.dp else 80.dp,
+                    max = if (isExpanded) Int.MAX_VALUE.dp else 240.dp, // TODO: Use factor of screen size for max expanded height
+                ),
         color = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = MaterialTheme.shapes.medium
+        shape = MaterialTheme.shapes.medium,
     ) {
         children()
     }
@@ -57,6 +58,7 @@ internal fun NoteEditorSurface(
  *
  * Should be wrapped in a [NoteEditorSurface].
  */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 internal fun TextNoteEditor(
     textFieldState: TextFieldState,
@@ -64,15 +66,17 @@ internal fun TextNoteEditor(
     enabled: Boolean = true,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val keyboardOptions = remember {
-        KeyboardOptions(
-            capitalization = KeyboardCapitalization.Sentences,
-            autoCorrectEnabled = true,
-        )
-    }
+    val keyboardOptions =
+        remember {
+            KeyboardOptions(
+                capitalization = KeyboardCapitalization.Sentences,
+                autoCorrectEnabled = true,
+            )
+        }
     Box(
-        modifier = modifier
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+        modifier =
+            modifier
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
     ) {
         if (textFieldState.text.isEmpty()) {
             Text(
@@ -82,9 +86,10 @@ internal fun TextNoteEditor(
             )
         }
         BasicTextField(
-            modifier = Modifier
-                .padding(Spacing.lg)
-                .fillMaxSize(),
+            modifier =
+                Modifier
+                    .padding(Spacing.lg)
+                    .fillMaxSize(),
             enabled = enabled,
             state = textFieldState,
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
@@ -98,15 +103,15 @@ internal fun TextNoteEditor(
     }
 }
 
-
+@Suppress("ktlint:standard:function-naming")
 @Preview
 @Composable
 private fun TextNoteEditorPreview() {
     NoteEditorSurface(
-        true
+        true,
     ) {
         TextNoteEditor(
-            textFieldState = TextFieldState()
+            textFieldState = TextFieldState(),
         )
     }
 }

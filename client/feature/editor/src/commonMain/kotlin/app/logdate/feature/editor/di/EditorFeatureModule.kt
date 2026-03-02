@@ -42,59 +42,59 @@ import org.koin.dsl.module
  * separation of concerns. FetchEntryUseCase in particular demonstrates this pattern by accessing
  * entries through domain layer abstractions rather than data layer DAOs.
  */
-val editorFeatureModule: Module = module {
-    includes(domainModule)
-    includes(platformEditorModule)
-    includes(audioModule)
-    
-    // AudioRecordingManager is provided by client.media audioModule at the app level.
-    // AudioPlaybackManager is provided by the app-level audioModule.
-    // ImagePickerService is provided by platformEditorModule.
-    
-    // Provide mediator as a singleton to ensure consistent state across components
-    singleOf(::EditorMediatorImpl) bind EditorMediator::class
-    
-    // Provide delegates as factories (new instance created each time)
-    factoryOf(::AutoSaveDelegate)
-    factoryOf(::JournalSelectionDelegate)
+val editorFeatureModule: Module =
+    module {
+        includes(domainModule)
+        includes(platformEditorModule)
+        includes(audioModule)
 
-    
-    // Audio ViewModel is now provided by the audioModule()
-    
-    // Image block view model
-    viewModel {
-        ImageBlockViewModel(
-            imagePickerService = get()
-        )
-    }
+        // AudioRecordingManager is provided by client.media audioModule at the app level.
+        // AudioPlaybackManager is provided by the app-level audioModule.
+        // ImagePickerService is provided by platformEditorModule.
 
-    // Camera view model
-    viewModel {
-        CameraViewModel(
-            cameraCaptureManager = get()
-        )
-    }
+        // Provide mediator as a singleton to ensure consistent state across components
+        singleOf(::EditorMediatorImpl) bind EditorMediator::class
 
-    viewModel {
-        // Provide all required dependencies for fully functional entry editor
-        EntryEditorViewModel(
-            fetchTodayNotes = get(),
-            getCurrentUserJournals = get(),
-            getDefaultSelectedJournals = get(),
-            addNoteUseCase = get(),
-            fetchEntryUseCase = get(),
-            journalContentRepository = get(),
+        // Provide delegates as factories (new instance created each time)
+        factoryOf(::AutoSaveDelegate)
+        factoryOf(::JournalSelectionDelegate)
+
+        // Audio ViewModel is now provided by the audioModule()
+
+        // Image block view model
+        viewModel {
+            ImageBlockViewModel(
+                imagePickerService = get(),
+            )
+        }
+
+        // Camera view model
+        viewModel {
+            CameraViewModel(
+                cameraCaptureManager = get(),
+            )
+        }
+
+        viewModel {
+            // Provide all required dependencies for fully functional entry editor
+            EntryEditorViewModel(
+                fetchTodayNotes = get(),
+                getCurrentUserJournals = get(),
+                getDefaultSelectedJournals = get(),
+                addNoteUseCase = get(),
+                fetchEntryUseCase = get(),
+                journalContentRepository = get(),
 //            observeLocation = get(),
-            updateEntryDraft = get(),
-            createEntryDraft = get(),
-            deleteEntryDraft = get(),
-            fetchEntryDraft = get(),
-            fetchMostRecentDraft = get(),
-            getAllDrafts = get(),
-            // Add mediator and delegates
-            mediator = get(),
-            autoSaveDelegate = get(),
-            journalSelectionDelegate = get()
-        )
+                updateEntryDraft = get(),
+                createEntryDraft = get(),
+                deleteEntryDraft = get(),
+                fetchEntryDraft = get(),
+                fetchMostRecentDraft = get(),
+                getAllDrafts = get(),
+                // Add mediator and delegates
+                mediator = get(),
+                autoSaveDelegate = get(),
+                journalSelectionDelegate = get(),
+            )
+        }
     }
-}
