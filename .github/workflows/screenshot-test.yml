@@ -4,6 +4,7 @@ on:
   pull_request:
     branches: [main, develop]
     paths:
+      - 'app/android-main/**'
       - 'app/compose-main/**'
       - 'client/feature/**'
       - 'client/ui/**'
@@ -29,12 +30,12 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Validate Screenshots
-        run: ./gradlew :app:compose-main:validateDebugScreenshotTest
+        run: ./gradlew :app:android-main:validateDebugScreenshotTest
 
       - name: Upload Screenshot Report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: screenshot-report
-          path: app/compose-main/build/reports/screenshotTest/
+          path: app/android-main/build/reports/screenshotTest/
           retention-days: 14

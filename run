@@ -39,7 +39,7 @@ run|run:server|Run server locally|./gradlew :server:run
 run|run:wear|Install and run on connected Wear device|./gradlew :app:wear:installDebug
 
 test|test|Run all unit tests|./gradlew test
-test|test:android|Run Android unit tests|./gradlew :app:compose-main:allTests
+test|test:android|Run Android unit tests|./gradlew :app:android-main:testDebugUnitTest
 test|test:server|Run server tests|./gradlew :server:test
 test|test:coverage|Generate test coverage report|./gradlew koverHtmlReport
 test|test:verify|Verify coverage meets threshold|./gradlew koverVerify

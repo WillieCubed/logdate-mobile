@@ -3,7 +3,6 @@ package app.logdate.di
 import app.logdate.client.data.di.appDataModule
 import app.logdate.client.device.di.deviceModule
 import app.logdate.client.domain.di.accountDomainModule
-import app.logdate.client.domain.di.desktopHealthConnectModule
 import app.logdate.client.domain.di.domainModule
 import app.logdate.client.domain.di.locationDomainModule
 import app.logdate.client.domain.di.quotaDomainModule

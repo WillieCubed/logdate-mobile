@@ -279,7 +279,7 @@ sealed class RouteClassification {
  * displayed in the navigation system. It implements a hierarchical classification
  * algorithm that considers route types, context, and screen size capabilities.
  */
-internal object RouteConfig {
+object RouteConfig {
     /**
      * Classifies a route based on its NavKey and context using type-safe route matching.
      * 

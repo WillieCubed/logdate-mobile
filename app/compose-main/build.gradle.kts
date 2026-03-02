@@ -3,7 +3,6 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -12,7 +11,6 @@ plugins {
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.dokka)
     alias(libs.plugins.kotlinx.serialization)
-    alias(libs.plugins.screenshot)
 }
 
 kotlin {
@@ -112,42 +110,6 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
         }
-
-        findByName("androidUnitTest")?.dependencies {
-            implementation(libs.kotlin.test)
-            implementation(libs.kotlin.test.junit)
-            implementation(libs.mockk)
-        }
-        findByName("androidHostTest")?.dependencies {
-            implementation(libs.kotlin.test)
-            implementation(libs.kotlin.test.junit)
-            implementation(libs.mockk)
-        }
-
-        findByName("androidInstrumentedTest")?.apply {
-            kotlin.srcDir("src/androidInstrumentedTest/kotlin")
-            dependencies {
-                implementation(projects.client.permissions)
-                implementation(projects.client.repository)
-                implementation(libs.kotlin.test.junit)
-                implementation(libs.androidx.test.core)
-                implementation(libs.androidx.test.runner)
-                implementation(libs.androidx.test.ext.junit)
-                implementation(libs.androidx.ui.test.junit4)
-            }
-        }
-        findByName("androidDeviceTest")?.apply {
-            kotlin.srcDir("src/androidInstrumentedTest/kotlin")
-            dependencies {
-                implementation(projects.client.permissions)
-                implementation(projects.client.repository)
-                implementation(libs.kotlin.test.junit)
-                implementation(libs.androidx.test.core)
-                implementation(libs.androidx.test.runner)
-                implementation(libs.androidx.test.ext.junit)
-                implementation(libs.androidx.ui.test.junit4)
-            }
-        }
     }
 }
 
@@ -167,54 +129,10 @@ addToFirstExistingConfiguration(
     "androidDebugImplementation"
 )
 
-// Screenshot testing
-addToFirstExistingConfiguration(
-    libs.androidx.ui.tooling,
-    "screenshotTestImplementation",
-    "androidScreenshotTestImplementation"
-)
-addToFirstExistingConfiguration(
-    libs.screenshot.validation.api,
-    "screenshotTestImplementation",
-    "androidScreenshotTestImplementation"
-)
-
 compose.resources {
     publicResClass = true
     generateResClass = always
     packageOfResClass = "logdate.app.composemain.generated.resources"
-}
-addToFirstExistingConfiguration(
-    libs.compose.material3,
-    "screenshotTestImplementation",
-    "androidScreenshotTestImplementation"
-)
-addToFirstExistingConfiguration(
-    libs.compose.runtime,
-    "screenshotTestImplementation",
-    "androidScreenshotTestImplementation"
-)
-addToFirstExistingConfiguration(
-    libs.compose.foundation,
-    "screenshotTestImplementation",
-    "androidScreenshotTestImplementation"
-)
-addToFirstExistingConfiguration(
-    libs.androidx.ui.test.manifest,
-    "debugImplementation",
-    "androidDebugImplementation"
-)
-
-// Workaround for Google Compose Screenshot Testing + KMP compatibility issue.
-// The screenshot plugin doesn't properly set moduleName for KMP projects, causing
-// "Required value was null" errors during compilation. Explicitly setting the module
-// name resolves this. See: https://issuetracker.google.com/issues/402137754
-tasks.withType<KotlinCompile>().configureEach {
-    if (name.contains("ScreenshotTest", ignoreCase = true)) {
-        compilerOptions {
-            moduleName.set("compose-main-screenshottest")
-        }
-    }
 }
 
 compose.desktop {
@@ -231,19 +149,19 @@ compose.desktop {
             windows {
                 console = true
                 perUserInstall = true
-                iconFile.set(project.file("app/compose-main/src/commonMain/composeResources/drawable/ic_launcher_google_play.png"))
+                iconFile.set(project.file("src/commonMain/composeResources/drawable/ic_launcher_google_play.png"))
             }
 
             macOS {
                 bundleID = "app.logdate"
                 dockName = "LogDate"
                 appCategory = "public.app-category.lifestyle"
-                iconFile.set(project.file("app/compose-main/src/commonMain/composeResources/drawable/ic_launcher_google_play.png"))
+                iconFile.set(project.file("src/commonMain/composeResources/drawable/ic_launcher_google_play.png"))
             }
 
             linux {
                 debMaintainer = "contact@logdate.app"
-                iconFile.set(project.file("app/compose-main/src/commonMain/composeResources/drawable/ic_launcher_google_play.png"))
+                iconFile.set(project.file("src/commonMain/composeResources/drawable/ic_launcher_google_play.png"))
 
                 modules("jdk.security.auth") // Needed for FileKit
             }
