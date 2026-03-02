@@ -186,7 +186,7 @@ private fun DisplayNameSetupContent(
             enabled = isValid && displayName.isNotBlank(),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(stringResource(Res.string.continue))
+            Text(stringResource(Res.string.`continue`))
         }
     }
 }

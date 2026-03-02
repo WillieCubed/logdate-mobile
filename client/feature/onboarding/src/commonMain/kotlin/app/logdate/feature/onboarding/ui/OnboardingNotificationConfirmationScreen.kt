@@ -193,7 +193,7 @@ private fun ActionsContainer(
             modifier = Modifier.fillMaxWidth(),
             onClick = onNext,
         ) {
-            Text(text = stringResource(Res.string.continue))
+            Text(text = stringResource(Res.string.`continue`))
         }
     }
 }

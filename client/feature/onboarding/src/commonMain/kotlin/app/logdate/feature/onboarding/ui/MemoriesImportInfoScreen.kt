@@ -86,7 +86,7 @@ fun MemoriesImportInfoScreen(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth(),
             ) {
-                Text(stringResource(Res.string.continue))
+                Text(stringResource(Res.string.`continue`))
             }
         }
     }

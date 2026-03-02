@@ -125,7 +125,7 @@ fun DisplayNameSelectionScreen(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = uiState.canContinueFromDisplayName
             ) {
-                Text(stringResource(Res.string.continue))
+                Text(stringResource(Res.string.`continue`))
             }
             
             TextButton(

@@ -127,7 +127,7 @@ fun OnboardingOverviewScreen(
                         Button(
                             onClick = onNext,
                         ) {
-                            Text(text = stringResource(Res.string.continue))
+                            Text(text = stringResource(Res.string.`continue`))
                         }
                     }
                 }

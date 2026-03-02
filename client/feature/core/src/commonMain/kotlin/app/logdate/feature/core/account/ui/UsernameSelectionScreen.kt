@@ -161,7 +161,7 @@ fun UsernameSelectionScreen(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = uiState.canContinueFromUsername
             ) {
-                Text(stringResource(Res.string.continue))
+                Text(stringResource(Res.string.`continue`))
             }
             
             TextButton(

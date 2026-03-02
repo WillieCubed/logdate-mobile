@@ -103,7 +103,7 @@ fun CloudAccountIntroScreen(
                 onClick = onContinue,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(stringResource(Res.string.continue))
+                Text(stringResource(Res.string.`continue`))
             }
             
             if (isFromOnboarding) {

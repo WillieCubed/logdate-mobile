@@ -166,7 +166,7 @@ private fun IntroContent(
             onClick = onContinue,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(stringResource(Res.string.continue))
+            Text(stringResource(Res.string.`continue`))
         }
         
         Spacer(modifier = Modifier.height(8.dp))
@@ -252,7 +252,7 @@ private fun UsernameSelectionContent(
             enabled = canProceed,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(stringResource(Res.string.continue))
+            Text(stringResource(Res.string.`continue`))
         }
     }
 }
@@ -306,7 +306,7 @@ private fun DisplayNameSelectionContent(
             enabled = canProceed,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(stringResource(Res.string.continue))
+            Text(stringResource(Res.string.`continue`))
         }
     }
 }

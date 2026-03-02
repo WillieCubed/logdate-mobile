@@ -289,7 +289,7 @@ private fun UsernameSetupContent(
             enabled = isValid && username.isNotBlank() && usernameAvailability == UsernameAvailability.Available,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(stringResource(Res.string.continue))
+            Text(stringResource(Res.string.`continue`))
         }
     }
 }

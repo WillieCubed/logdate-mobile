@@ -318,7 +318,7 @@ private fun NameStep(
             enabled = canContinue,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(stringResource(Res.string.continue))
+            Text(stringResource(Res.string.`continue`))
         }
         
         TextButton(

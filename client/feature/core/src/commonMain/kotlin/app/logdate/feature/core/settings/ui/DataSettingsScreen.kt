@@ -352,7 +352,7 @@ private fun DataSettingsContent(
                                                 if (restoreInProgress) {
                                                     stringResource(Res.string.importing)
                                                 } else {
-                                                    stringResource(Res.string.import)
+                                                    stringResource(Res.string.`import`)
                                                 }
                                             )
                                         }

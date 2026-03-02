@@ -130,7 +130,7 @@ private fun RecoveryPhraseDisplayContent(
             enabled = userConfirmed,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(stringResource(Res.string.continue))
+            Text(stringResource(Res.string.`continue`))
         }
     }
 }
