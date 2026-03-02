@@ -17,6 +17,9 @@ kotlin {
         namespace = "app.logdate.client.feature.rewind"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
+        androidResources {
+            enable = true
+        }
 
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
