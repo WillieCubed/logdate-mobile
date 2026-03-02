@@ -87,10 +87,15 @@ Never claim success with unresolved errors. Never lie by omission. Always check 
 
 ### Commit Messages Describe User Impact
 
-Write `feat` commits as if consumed by the general public. The test: "Can I do something different because of this?" Focus on behavior, not implementation. Capitalize proper nouns (API, Kotlin, Android, Compose, Gradle, etc.).
+Commits are changelog entries. Think in terms of features, not layers. Scope to the feature the user interacts with, not the internal module that happens to contain the code. Generic scopes like "client" or "domain" are not valid — pick the specific feature scope.
+
+- `feat` and `fix` are reserved for changes that affect end-user behavior. If the user wouldn't notice the difference, use `refactor`, `chore`, or `docs` instead.
+- Write `feat` commits as if consumed by the general public. The test: "Can I do something different because of this?"
+- Focus on behavior, not implementation. Capitalize proper nouns (API, Kotlin, Android, Compose, Gradle, etc.).
 
 **Good**: `feat(editor): add voice recording playback controls`
 **Bad**: `feat(editor): implement MediaPlayer service layer with coroutine scope`
+**Bad**: `fix(infra): enable Android resources for KMP modules` (use `chore` — build config, not user-facing)
 
 ### Minimal, Focused Changes
 

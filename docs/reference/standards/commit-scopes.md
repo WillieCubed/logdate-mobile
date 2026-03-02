@@ -38,7 +38,6 @@ These are the main scopes for user-facing features. **Prefer these scopes** for 
 | `client/database/` | `database` |
 | `client/datastore/` | `datastore` |
 | `client/device/` | `device` |
-| `client/domain/` | `domain` |
 | `client/health-connect/` | `health-connect` |
 | `client/intelligence/` | `intelligence` |
 | `client/location/` | `location` |
@@ -84,10 +83,7 @@ git commit -m "refactor(onboarding): simplify permission request flow"
 # Client libraries (for infrastructure/data layer changes)
 git commit -m "feat(sync): implement conflict resolution for notes"
 git commit -m "fix(database): handle migration edge case"
-git commit -m "refactor(domain): extract validation use cases"
-
-# Multiple client modules
-git commit -m "refactor(client): update coroutine scope handling"
+git commit -m "refactor(data): extract validation use cases"
 
 # Cross-cutting
 git commit -m "chore(infra): update gradle wrapper version"

@@ -24,7 +24,6 @@ data
 database
 datastore
 device
-domain
 health-connect
 intelligence
 location
@@ -48,4 +47,3 @@ ios
 android
 desktop
 platform
-client
