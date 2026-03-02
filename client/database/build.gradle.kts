@@ -18,7 +18,9 @@ kotlin {
         namespace = "app.logdate.client.database"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
-        
+        withDeviceTestBuilder {}.configure {
+            instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        }
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
@@ -52,6 +54,14 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.room.testing)
+        }
+        findByName("androidDeviceTest")?.dependencies {
+            implementation(libs.kotlin.test.junit)
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.room.testing)
+            implementation(libs.androidx.test.core)
+            implementation(libs.androidx.test.runner)
+            implementation(libs.androidx.test.ext.junit)
         }
     }
 }

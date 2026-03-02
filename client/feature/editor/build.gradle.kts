@@ -17,9 +17,17 @@ kotlin {
         namespace = "app.logdate.client.feature.editor"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
-        
+        withDeviceTestBuilder {}.configure {
+            instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        }
         androidResources {
             enable = true
+        }
+        optimization {
+            consumerKeepRules.apply {
+                publish = true
+                file("proguard-rules.pro")
+            }
         }
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
@@ -99,6 +107,13 @@ kotlin {
             implementation(libs.coil.video)
             // Permissions
             implementation(libs.accompanist.permissions)
+        }
+        findByName("androidDeviceTest")?.dependencies {
+            implementation(libs.kotlin.test.junit)
+            implementation(libs.androidx.test.core)
+            implementation(libs.androidx.test.runner)
+            implementation(libs.androidx.test.ext.junit)
+            implementation(libs.androidx.ui.test.junit4)
         }
 
     }

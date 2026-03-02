@@ -75,7 +75,7 @@ class DesktopRestoreLauncher : RestoreLauncher, KoinComponent {
         Napier.i("Desktop: Restore cancelled")
     }
 
-    private fun restoreFromZip(file: File): RestoreSummary {
+    private suspend fun restoreFromZip(file: File): RestoreSummary {
         ZipFile(file).use { zipFile ->
             val structure = ExportFileStructure()
             val bundle = RestoreBundle(
@@ -87,8 +87,10 @@ class DesktopRestoreLauncher : RestoreLauncher, KoinComponent {
                 mediaManifestJson = readOptionalEntry(zipFile, structure.mediaManifestFile)
             )
 
-            val mediaImporter = MediaImporter { exportPath ->
-                importMedia(zipFile, exportPath)
+            val mediaImporter = object : MediaImporter {
+                override suspend fun importMedia(exportPath: String): String? {
+                    return importMedia(zipFile, exportPath)
+                }
             }
 
             val result = restoreUserDataUseCase.restore(bundle, RestoreOptions(), mediaImporter)
@@ -107,7 +109,7 @@ class DesktopRestoreLauncher : RestoreLauncher, KoinComponent {
         }
     }
 
-    private fun restoreFromDirectory(directory: File): RestoreSummary {
+    private suspend fun restoreFromDirectory(directory: File): RestoreSummary {
         val structure = ExportFileStructure()
         val bundle = RestoreBundle(
             metadataJson = readRequiredFile(directory, structure.metadataFile),
@@ -118,8 +120,10 @@ class DesktopRestoreLauncher : RestoreLauncher, KoinComponent {
             mediaManifestJson = readOptionalFile(directory, structure.mediaManifestFile)
         )
 
-        val mediaImporter = MediaImporter { exportPath ->
-            importMedia(directory, exportPath)
+        val mediaImporter = object : MediaImporter {
+            override suspend fun importMedia(exportPath: String): String? {
+                return importMedia(directory, exportPath)
+            }
         }
 
         val result = restoreUserDataUseCase.restore(bundle, RestoreOptions(), mediaImporter)

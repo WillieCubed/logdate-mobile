@@ -15,7 +15,12 @@ kotlin {
         namespace = "app.logdate.client.health"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
-
+        optimization {
+            consumerKeepRules.apply {
+                publish = true
+                file("proguard-rules.pro")
+            }
+        }
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }

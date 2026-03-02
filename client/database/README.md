@@ -173,7 +173,7 @@ The database module includes comprehensive testing across different test source 
 - **Type Converter Tests**: Test data conversion logic
 - **Limitations**: Cannot test actual DAO operations (requires platform-specific SQLite instances)
 
-#### AndroidInstrumentedTest (`src/androidInstrumentedTest/`)
+#### AndroidDeviceTest (`src/androidDeviceTest/`)
 - **DAO Integration Tests**: Full CRUD operations with real Room database instances
 - **Migration Integration Tests**: Data integrity verification across database versions
 - **Database Performance Tests**: Query performance and optimization validation

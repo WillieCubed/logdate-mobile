@@ -16,6 +16,10 @@ kotlin {
         namespace = "app.logdate.client.device"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
+        withHostTestBuilder {}
+        withDeviceTestBuilder {}.configure {
+            instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        }
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
@@ -64,6 +68,18 @@ kotlin {
         }
         desktopTest.dependencies {
             implementation(libs.mockk)
+        }
+        findByName("androidHostTest")?.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlin.test.junit)
+            implementation(libs.kotlinx.coroutines.test)
+        }
+        findByName("androidDeviceTest")?.dependencies {
+            implementation(libs.kotlin.test.junit)
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.androidx.test.core)
+            implementation(libs.androidx.test.runner)
+            implementation(libs.androidx.test.ext.junit)
         }
     }
 }

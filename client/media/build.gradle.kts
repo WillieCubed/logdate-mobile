@@ -17,7 +17,12 @@ kotlin {
         androidResources {
             enable = true
         }
-
+        optimization {
+            consumerKeepRules.apply {
+                publish = true
+                file("proguard-rules.pro")
+            }
+        }
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }

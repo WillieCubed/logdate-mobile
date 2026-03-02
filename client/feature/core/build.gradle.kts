@@ -21,7 +21,12 @@ kotlin {
             enable = true
             noCompress += listOf("cvr")
         }
-
+        optimization {
+            consumerKeepRules.apply {
+                publish = true
+                file("proguard-rules.pro")
+            }
+        }
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
@@ -106,6 +111,10 @@ kotlin {
             implementation(libs.accompanist.permissions)
             // WorkManager for background export tasks
             implementation(libs.androidx.work.runtime)
+        }
+
+        desktopMain.dependencies {
+            implementation(projects.client.media)
         }
     }
 }
