@@ -1,23 +1,28 @@
 package app.logdate.feature.editor.ui.image
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.common.DeleteMediaButton
-import app.logdate.feature.editor.ui.common.MediaCaptionField
+import app.logdate.feature.editor.ui.common.OverlayCaptionField
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
+import app.logdate.ui.content.ImageScrimOverlay
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
@@ -71,39 +76,50 @@ fun ImageBlockEditor(
 
     // Show either the existing image with caption or the image picker UI
     if (hasExistingImage) {
-        // Show the image with caption field
-        Column(
-            modifier = modifier.fillMaxSize().padding(8.dp),
-        ) {
-            // Image display
-            Box(
-                modifier = Modifier.fillMaxWidth().weight(1f),
+        val hasCaption = block.caption.isNotBlank()
+        var showCaption by remember { mutableStateOf(hasCaption) }
+        Box(modifier = modifier.fillMaxSize()) {
+            AsyncImage(
+                model =
+                    ImageRequest
+                        .Builder(LocalPlatformContext.current)
+                        .data(block.uri)
+                        .crossfade(true)
+                        .build(),
+                contentDescription = block.caption.ifBlank { "Image" },
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+
+            Box(modifier = Modifier.fillMaxSize().clickable { showCaption = !showCaption })
+
+            AnimatedVisibility(
+                visible = showCaption || hasCaption,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.align(Alignment.BottomCenter),
             ) {
-                AsyncImage(
-                    model =
-                        ImageRequest
-                            .Builder(LocalPlatformContext.current)
-                            .data(block.uri)
-                            .crossfade(true)
-                            .build(),
-                    contentDescription = block.caption.ifBlank { "Image" },
-                    contentScale = ContentScale.Crop,
+                Box(
                     modifier =
                         Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(8.dp)),
-                )
-
-                DeleteMediaButton(
-                    onClick = onDeleteRequested,
-                    contentDescription = stringResource(Res.string.delete_image),
-                    modifier = Modifier.align(Alignment.TopEnd),
-                )
+                            .fillMaxWidth(),
+                ) {
+                    ImageScrimOverlay(bottomAlpha = 0.6f)
+                    Box(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    ) {
+                        OverlayCaptionField(
+                            caption = block.caption,
+                            onCaptionChanged = { onBlockUpdated(block.copy(caption = it)) },
+                        )
+                    }
+                }
             }
 
-            MediaCaptionField(
-                caption = block.caption,
-                onCaptionChanged = { onBlockUpdated(block.copy(caption = it)) },
+            DeleteMediaButton(
+                onClick = onDeleteRequested,
+                contentDescription = stringResource(Res.string.delete_image),
+                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
             )
         }
     } else {
@@ -112,7 +128,7 @@ fun ImageBlockEditor(
             onImageSelected = { uri ->
                 onBlockUpdated(block.copy(uri = uri))
             },
-            modifier = modifier.fillMaxWidth().padding(8.dp),
+            modifier = modifier.fillMaxSize(),
         )
     }
 }
