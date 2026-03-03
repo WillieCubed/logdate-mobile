@@ -1,4 +1,4 @@
-@file:Suppress("ktlint:standard:function-naming")
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
 
 package app.logdate.ui.timeline
 
@@ -15,7 +15,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)

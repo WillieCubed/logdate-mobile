@@ -1,4 +1,4 @@
-@file:Suppress("ktlint:standard:function-naming")
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
 
 package app.logdate.ui.common
 
@@ -21,7 +21,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
 /**

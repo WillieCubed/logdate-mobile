@@ -128,7 +128,7 @@ class InMemoryLocalHealthDataSource : LocalHealthDataSource {
         date: LocalDate,
         timeZone: TimeZone,
     ): DayBounds {
-        val key = "$date_${timeZone.id}"
+        val key = "${date}_${timeZone.id}"
         return dayBoundsMap[key] ?: throw IllegalStateException("No day bounds available for $date in $timeZone")
     }
 
@@ -138,7 +138,7 @@ class InMemoryLocalHealthDataSource : LocalHealthDataSource {
         timeZone: TimeZone,
     ): Boolean =
         try {
-            val key = "$date_${timeZone.id}"
+            val key = "${date}_${timeZone.id}"
             dayBoundsMap[key] = bounds
             true
         } catch (e: Exception) {

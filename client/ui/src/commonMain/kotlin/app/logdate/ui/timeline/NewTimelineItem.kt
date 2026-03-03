@@ -1,4 +1,4 @@
-@file:Suppress("ktlint:standard:function-naming")
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
 
 package app.logdate.ui.timeline
 
@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.conditional
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.asTime
-import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
 import kotlin.time.Instant
