@@ -3,9 +3,6 @@
 package app.logdate.feature.onboarding.ui
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -48,27 +45,33 @@ fun RecoveryPhraseEntryScreen(
             style = MaterialTheme.typography.bodyMedium,
         )
 
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Column(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            itemsIndexed(phraseWords) { index, word ->
-                OutlinedTextField(
-                    value = word,
-                    onValueChange = { newValue ->
-                        phraseWords =
-                            phraseWords.toMutableList().apply {
-                                this[index] = newValue.lowercase().trim()
-                            }
-                        errorMessageRes = null
-                    },
-                    label = { Text((index + 1).toString()) },
-                    singleLine = true,
-                    enabled = !isRecovering,
+            phraseWords.chunked(2).forEachIndexed { rowIndex, rowWords ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth(),
-                )
+                ) {
+                    rowWords.forEachIndexed { colIndex, word ->
+                        val index = rowIndex * 2 + colIndex
+                        OutlinedTextField(
+                            value = word,
+                            onValueChange = { newValue ->
+                                phraseWords =
+                                    phraseWords.toMutableList().apply {
+                                        this[index] = newValue.lowercase().trim()
+                                    }
+                                errorMessageRes = null
+                            },
+                            label = { Text((index + 1).toString()) },
+                            singleLine = true,
+                            enabled = !isRecovering,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
             }
         }
 

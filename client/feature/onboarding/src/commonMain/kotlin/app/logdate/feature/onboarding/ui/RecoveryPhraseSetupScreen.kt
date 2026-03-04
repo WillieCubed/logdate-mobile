@@ -3,8 +3,6 @@
 package app.logdate.feature.onboarding.ui
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -73,11 +71,11 @@ private fun RecoveryPhraseDisplayContent(
                 ),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            LazyColumn(
+            Column(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                itemsIndexed(words) { index, word ->
+                words.forEachIndexed { index, word ->
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
