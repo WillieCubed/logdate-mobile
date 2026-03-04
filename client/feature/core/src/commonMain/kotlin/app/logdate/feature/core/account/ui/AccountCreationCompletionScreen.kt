@@ -23,6 +23,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.account_created
+import logdate.client.feature.core.generated.resources.get_started
+import logdate.client.feature.core.generated.resources.your_logdate_cloud_account_has_been_successfully_created
 import org.jetbrains.compose.resources.stringResource
 
 /**

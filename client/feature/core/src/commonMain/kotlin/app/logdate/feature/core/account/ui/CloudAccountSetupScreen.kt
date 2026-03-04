@@ -35,6 +35,29 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.account_created_signed_in_as
+import logdate.client.feature.core.generated.resources.back
+import logdate.client.feature.core.generated.resources.bio_optional
+import logdate.client.feature.core.generated.resources.check_availability
+import logdate.client.feature.core.generated.resources.choose_a_username_2
+import logdate.client.feature.core.generated.resources.complete_your_profile
+import logdate.client.feature.core.generated.resources.`continue`
+import logdate.client.feature.core.generated.resources.create_a_cloud_account
+import logdate.client.feature.core.generated.resources.create_a_passkey_to_securely_sign_in_to_your_account_across_all_your_devices
+import logdate.client.feature.core.generated.resources.create_an_account_to_sync_your_journals_across_devices_and_unlock_additional_features
+import logdate.client.feature.core.generated.resources.create_passkey
+import logdate.client.feature.core.generated.resources.creating_your_passkey
+import logdate.client.feature.core.generated.resources.display_name
+import logdate.client.feature.core.generated.resources.error_checking_availability
+import logdate.client.feature.core.generated.resources.get_started
+import logdate.client.feature.core.generated.resources.passkey_created_successfully
+import logdate.client.feature.core.generated.resources.secure_your_account
+import logdate.client.feature.core.generated.resources.skip_for_now
+import logdate.client.feature.core.generated.resources.this_will_be_your_unique_identifier_on_logdate_cloud
+import logdate.client.feature.core.generated.resources.username
+import logdate.client.feature.core.generated.resources.username_is_already_taken
+import logdate.client.feature.core.generated.resources.username_is_available
+import logdate.client.feature.core.generated.resources.welcome_to_logdate_cloud
 import org.jetbrains.compose.resources.stringResource
 
 /**

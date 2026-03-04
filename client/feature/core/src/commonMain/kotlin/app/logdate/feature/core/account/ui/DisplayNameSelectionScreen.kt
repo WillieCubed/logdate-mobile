@@ -33,6 +33,11 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.back
+import logdate.client.feature.core.generated.resources.`continue`
+import logdate.client.feature.core.generated.resources.display_name
+import logdate.client.feature.core.generated.resources.this_is_how_youll_appear_to_others_you_can_change_this_anytime
+import logdate.client.feature.core.generated.resources.your_display_name
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 

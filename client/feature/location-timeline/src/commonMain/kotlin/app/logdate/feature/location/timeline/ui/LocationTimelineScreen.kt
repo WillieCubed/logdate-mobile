@@ -61,7 +61,7 @@ fun LocationTimelineScreen(
 }
 
 @Composable
-private fun LocationTimelineContent(
+fun LocationTimelineContent(
     uiState: LocationTimelineUiState,
     onDeleteLocation: (String) -> Unit,
     modifier: Modifier = Modifier,

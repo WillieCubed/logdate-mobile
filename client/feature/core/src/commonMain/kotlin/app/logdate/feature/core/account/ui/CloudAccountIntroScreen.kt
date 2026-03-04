@@ -27,6 +27,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.`continue`
+import logdate.client.feature.core.generated.resources.logdate_cloud
+import logdate.client.feature.core.generated.resources.not_now
+import logdate.client.feature.core.generated.resources.securely_sync_your_journals_notes_and_memories_across_all_your_devices
+import logdate.client.feature.core.generated.resources.skip_for_now_2
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 

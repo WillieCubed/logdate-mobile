@@ -120,7 +120,7 @@ fun PersonalIntroScreen(
 }
 
 @Composable
-private fun PersonalIntroContent(
+fun PersonalIntroContent(
     uiState: PersonalIntroUiState,
     onNameChanged: (String) -> Unit,
     onBioChanged: (String) -> Unit,

@@ -76,7 +76,7 @@ fun OnboardingNotificationScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun OnboardingNotificationContent(
+fun OnboardingNotificationContent(
     onBack: () -> Unit,
     useCompactLayout: Boolean,
     onEnableNotifications: () -> Unit,

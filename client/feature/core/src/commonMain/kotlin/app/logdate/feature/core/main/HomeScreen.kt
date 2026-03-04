@@ -62,6 +62,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.plus
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.create_new_entry
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid

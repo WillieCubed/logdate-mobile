@@ -64,7 +64,7 @@ fun OnboardingCompletionScreen(
 }
 
 @Composable
-private fun OnboardingCompletionContent(
+fun OnboardingCompletionContent(
     shouldShowFinish: Boolean,
     onContinue: () -> Unit,
     onFinish: () -> Unit,

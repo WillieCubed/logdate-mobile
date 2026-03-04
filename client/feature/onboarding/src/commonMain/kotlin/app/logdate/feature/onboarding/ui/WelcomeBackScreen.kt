@@ -53,7 +53,7 @@ fun WelcomeBackScreen(
 }
 
 @Composable
-private fun WelcomeBackScreenContent(name: String) {
+fun WelcomeBackScreenContent(name: String) {
     Column(
         verticalArrangement = Arrangement.spacedBy(Spacing.xl, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,

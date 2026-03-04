@@ -23,6 +23,23 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.about_passkeys
+import logdate.client.feature.core.generated.resources.almost_ready
+import logdate.client.feature.core.generated.resources.bio_optional
+import logdate.client.feature.core.generated.resources.create_account_with_passkey
+import logdate.client.feature.core.generated.resources.creating_account
+import logdate.client.feature.core.generated.resources.dismiss
+import logdate.client.feature.core.generated.resources.display_name
+import logdate.client.feature.core.generated.resources.go_back
+import logdate.client.feature.core.generated.resources.passkeys_not_supported
+import logdate.client.feature.core.generated.resources.review_your_details_and_create_your_secure_passkey_to_complete_your_logdate_cloud_account
+import logdate.client.feature.core.generated.resources.share_something_about_yourself_with_the_logdate_community
+import logdate.client.feature.core.generated.resources.tell_others_about_yourself
+import logdate.client.feature.core.generated.resources.text_3_of_3
+import logdate.client.feature.core.generated.resources.unique_address_username
+import logdate.client.feature.core.generated.resources.username
+import logdate.client.feature.core.generated.resources.your_device_doesnt_support_passkeys_please_use_a_device_with_biometric_authentication_or_a_security_key
+import logdate.client.feature.core.generated.resources.your_logdate_cloud_account
 import org.jetbrains.compose.resources.stringResource
 
 @Composable

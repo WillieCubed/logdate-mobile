@@ -33,6 +33,20 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.account_recovery
+import logdate.client.feature.core.generated.resources.at
+import logdate.client.feature.core.generated.resources.coming_soon_account_recovery_features_are_being_developed
+import logdate.client.feature.core.generated.resources.double_click_to_use_a_custom_server
+import logdate.client.feature.core.generated.resources.got_it
+import logdate.client.feature.core.generated.resources.logdate_cloud
+import logdate.client.feature.core.generated.resources.privacy_policy
+import logdate.client.feature.core.generated.resources.sign_in_to_logdate_cloud
+import logdate.client.feature.core.generated.resources.sign_in_with_passkey
+import logdate.client.feature.core.generated.resources.signing_in
+import logdate.client.feature.core.generated.resources.terms_of_service
+import logdate.client.feature.core.generated.resources.text_4
+import logdate.client.feature.core.generated.resources.username
+import logdate.client.feature.core.generated.resources.your_username_2
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -90,7 +104,7 @@ fun CloudAccountSignInScreen(
 }
 
 @Composable
-private fun CloudAccountSignInContent(
+fun CloudAccountSignInContent(
     username: String,
     onUsernameChange: (String) -> Unit,
     serverDomain: String,

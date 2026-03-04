@@ -39,6 +39,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.back
+import logdate.client.feature.core.generated.resources.create_a_passkey
+import logdate.client.feature.core.generated.resources.create_passkey
+import logdate.client.feature.core.generated.resources.creating_your_logdate_cloud_account
+import logdate.client.feature.core.generated.resources.creating_your_passkey
+import logdate.client.feature.core.generated.resources.passkeys_are_a_secure_way_to_sign_in_without_passwords
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 

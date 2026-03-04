@@ -68,6 +68,18 @@ import app.logdate.util.formatDateLocalized
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.account_information
+import logdate.client.feature.core.generated.resources.authentication
+import logdate.client.feature.core.generated.resources.back
+import logdate.client.feature.core.generated.resources.cancel
+import logdate.client.feature.core.generated.resources.display_name
+import logdate.client.feature.core.generated.resources.edit_display_name
+import logdate.client.feature.core.generated.resources.personal_information
+import logdate.client.feature.core.generated.resources.profile
+import logdate.client.feature.core.generated.resources.profile_photo
+import logdate.client.feature.core.generated.resources.refresh_profile
+import logdate.client.feature.core.generated.resources.save
+import logdate.client.feature.core.generated.resources.username_handle
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -124,7 +136,7 @@ fun ProfileScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ProfileScreenContent(
+fun ProfileScreenContent(
     uiState: ProfileUiState,
     onBack: () -> Unit,
     onStartEditingDisplayName: () -> Unit,
@@ -487,7 +499,7 @@ private fun ProfileInfoItem(
 
 @Preview
 @Composable
-private fun ProfileScreenContentPreview() {
+fun ProfileScreenContentPreview() {
     ProfileScreenContent(
         uiState =
             ProfileUiState(

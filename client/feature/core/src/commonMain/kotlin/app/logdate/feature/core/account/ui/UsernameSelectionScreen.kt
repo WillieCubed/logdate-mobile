@@ -35,6 +35,14 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.back
+import logdate.client.feature.core.generated.resources.check_availability
+import logdate.client.feature.core.generated.resources.choose_a_username
+import logdate.client.feature.core.generated.resources.`continue`
+import logdate.client.feature.core.generated.resources.this_username_will_identify_you_on_logdate_cloud_you_can_change_it_later
+import logdate.client.feature.core.generated.resources.username
+import logdate.client.feature.core.generated.resources.username_is_already_taken
+import logdate.client.feature.core.generated.resources.username_is_available_3
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 

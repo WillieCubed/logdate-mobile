@@ -51,6 +51,19 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.about_passkeys
+import logdate.client.feature.core.generated.resources.create_account
+import logdate.client.feature.core.generated.resources.dismiss
+import logdate.client.feature.core.generated.resources.dont_have_an_account
+import logdate.client.feature.core.generated.resources.go_back
+import logdate.client.feature.core.generated.resources.passkeys_not_supported
+import logdate.client.feature.core.generated.resources.providing_your_username_helps_find_your_passkey_faster
+import logdate.client.feature.core.generated.resources.sign_in
+import logdate.client.feature.core.generated.resources.sign_in_to_your_logdate_cloud_account_using_your_passkey
+import logdate.client.feature.core.generated.resources.sign_in_without_username
+import logdate.client.feature.core.generated.resources.username_optional
+import logdate.client.feature.core.generated.resources.welcome_back
+import logdate.client.feature.core.generated.resources.your_device_doesnt_support_passkeys_please_use_a_device_with_biometric_authentication_or_a_security_key
 import org.jetbrains.compose.resources.stringResource
 
 @Composable

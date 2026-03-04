@@ -21,6 +21,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.connect_your_account_to_sync_your_journals_access_them_from_anywhere_and_unlock_powerful_cloud_features
+import logdate.client.feature.core.generated.resources.create_new_account
+import logdate.client.feature.core.generated.resources.logdate_cloud
+import logdate.client.feature.core.generated.resources.sign_in_to_logdate_cloud
+import logdate.client.feature.core.generated.resources.skip_for_now
+import logdate.client.feature.core.generated.resources.welcome_to_logdate_cloud
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -39,7 +45,7 @@ fun CloudAccountWelcomeScreen(
 }
 
 @Composable
-private fun CloudAccountWelcomeContent(
+fun CloudAccountWelcomeContent(
     onContinue: () -> Unit,
     onSignIn: () -> Unit,
     onSkip: () -> Unit,

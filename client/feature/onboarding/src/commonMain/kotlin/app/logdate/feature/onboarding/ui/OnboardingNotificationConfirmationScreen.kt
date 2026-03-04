@@ -50,7 +50,7 @@ fun OnboardingNotificationConfirmationScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun OnboardingNotificationConfirmationContent(
+fun OnboardingNotificationConfirmationContent(
     onBack: () -> Unit,
     onNext: () -> Unit,
     useCompactLayout: Boolean,

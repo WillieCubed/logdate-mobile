@@ -25,6 +25,24 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.at
+import logdate.client.feature.core.generated.resources.at_logdate_app
+import logdate.client.feature.core.generated.resources.choose_your_username
+import logdate.client.feature.core.generated.resources.connected_to_the_fediverse
+import logdate.client.feature.core.generated.resources.`continue`
+import logdate.client.feature.core.generated.resources.error_checking_username
+import logdate.client.feature.core.generated.resources.go_back
+import logdate.client.feature.core.generated.resources.logdate_uses_activitypub_the_same_technology_that_powers_mastodon_pixelfed_and_other_social_networks_this_means_you_can_interact_with_a_global_community_while_keeping_control_of_your_data
+import logdate.client.feature.core.generated.resources.text_2_of_3
+import logdate.client.feature.core.generated.resources.unique_address_username
+import logdate.client.feature.core.generated.resources.username
+import logdate.client.feature.core.generated.resources.username_available
+import logdate.client.feature.core.generated.resources.username_is_already_taken
+import logdate.client.feature.core.generated.resources.username_is_available_2
+import logdate.client.feature.core.generated.resources.username_taken
+import logdate.client.feature.core.generated.resources.username_tips
+import logdate.client.feature.core.generated.resources.your_unique_address_on_the_logdate_network_this_is_how_others_will_find_and_mention_you
+import logdate.client.feature.core.generated.resources.your_username
 import org.jetbrains.compose.resources.stringResource
 
 @Composable

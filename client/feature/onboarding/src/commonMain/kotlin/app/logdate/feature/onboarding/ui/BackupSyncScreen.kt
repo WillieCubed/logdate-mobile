@@ -46,7 +46,7 @@ fun BackupSyncScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun BackupSyncScreenContent(
+fun BackupSyncScreenContent(
     useCompactLayout: Boolean,
     onBack: () -> Unit,
     onPlanSelected: (option: LogDateBackupPlanOption) -> Unit,

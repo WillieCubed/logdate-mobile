@@ -240,7 +240,7 @@ private fun NoteViewerToolbar(onGoBack: () -> Unit) {
  * Note body content for non-audio presentations.
  */
 @Composable
-private fun NoteViewerContent(
+fun NoteViewerContent(
     shared: NoteViewerShared,
     content: @Composable () -> Unit,
 ) {
