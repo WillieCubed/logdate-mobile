@@ -1,11 +1,14 @@
+@file:OptIn(ExperimentalMaterial3AdaptiveApi::class)
+
 package app.logdate.navigation.routes
 
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.core.profile.ui.ProfileScreen
 import app.logdate.feature.core.settings.ui.AccountSettingsScreen
 import app.logdate.feature.core.settings.ui.AdvancedSettingsScreen
-import app.logdate.feature.core.settings.ui.BirthdaySettingsScreen
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsScreen
 import app.logdate.feature.core.settings.ui.DataSettingsScreen
 import app.logdate.feature.core.settings.ui.LocationSettingsScreen
@@ -13,10 +16,8 @@ import app.logdate.feature.core.settings.ui.PrivacySettingsScreen
 import app.logdate.feature.core.settings.ui.SettingsOverviewScreen
 import app.logdate.feature.core.settings.ui.devices.DevicesScreen
 import app.logdate.navigation.MainAppNavigator
-import app.logdate.navigation.routes.ProfileRoute
 import app.logdate.navigation.routes.core.AccountSettingsRoute
 import app.logdate.navigation.routes.core.AdvancedSettingsRoute
-import app.logdate.navigation.routes.core.BirthdaySettingsRoute
 import app.logdate.navigation.routes.core.DangerZoneSettingsRoute
 import app.logdate.navigation.routes.core.DataSettingsRoute
 import app.logdate.navigation.routes.core.DevicesSettingsRoute
@@ -24,7 +25,7 @@ import app.logdate.navigation.routes.core.LocationSettingsRoute
 import app.logdate.navigation.routes.core.OnboardingStart
 import app.logdate.navigation.routes.core.PrivacySettingsRoute
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
-import app.logdate.navigation.routes.routeEntry
+import app.logdate.navigation.scenes.SettingsEmptyDetailPane
 
 /**
  * Resets the app by safely clearing the back stack and navigating to the onboarding start screen.
@@ -42,8 +43,6 @@ fun MainAppNavigator.resetApp() {
 
 /**
  * Extension function to open the main settings overview screen.
- *
- * This provides a consistent way to navigate to the settings screen from anywhere in the app.
  */
 fun MainAppNavigator.openSettings() {
     backStack.add(SettingsOverviewRoute)
@@ -61,13 +60,6 @@ fun MainAppNavigator.openAccountSettings() {
  */
 fun MainAppNavigator.openProfile() {
     backStack.add(ProfileRoute)
-}
-
-/**
- * Opens the full-screen birthday selector screen.
- */
-fun MainAppNavigator.openBirthdaySettings() {
-    backStack.add(BirthdaySettingsRoute)
 }
 
 /**
@@ -115,18 +107,10 @@ fun MainAppNavigator.openAdvancedSettings() {
 /**
  * Provides the navigation routes for app settings-related screens.
  *
- * @param onBack Callback to handle back navigation
- * @param onAppReset Callback to reset the app. This should clear the back stack and navigate to the onboarding start screen.
- * @param onNavigateToCloudAccountCreation Callback to navigate to cloud account creation screen
- * @param onNavigateToProfile Callback to navigate to profile screen
- * @param onNavigateToAccount Callback to navigate to account settings
- * @param onNavigateToPrivacy Callback to navigate to privacy settings
- * @param onNavigateToData Callback to navigate to data settings
- * @param onNavigateToDevices Callback to navigate to devices settings
- * @param onNavigateToDangerZone Callback to navigate to danger zone settings
- * @param onNavigateToLocation Callback to navigate to location settings
- * @param onNavigateToBirthdaySettings Callback to navigate to the birthday settings screen
- * @param onNavigateToAdvanced Callback to navigate to advanced settings
+ * Uses Navigation3's [ListDetailSceneStrategy] for adaptive list-detail layouts.
+ * The settings overview is the list pane, and all detail screens are detail panes.
+ * On tablets (≥600dp), both panes are shown side-by-side. On phones, detail screens
+ * are shown fullscreen with a back button.
  */
 fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onBack: () -> Unit,
@@ -139,11 +123,15 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onNavigateToDevices: () -> Unit,
     onNavigateToDangerZone: () -> Unit,
     onNavigateToLocation: () -> Unit,
-    onNavigateToBirthdaySettings: () -> Unit,
     onNavigateToAdvanced: () -> Unit,
 ) {
-    // Main settings overview screen
-    routeEntry<SettingsOverviewRoute> { _ ->
+    // Main settings overview screen (list pane)
+    routeEntry<SettingsOverviewRoute>(
+        metadata =
+            ListDetailSceneStrategy.listPane(
+                detailPlaceholder = { SettingsEmptyDetailPane() },
+            ),
+    ) { _ ->
         SettingsOverviewScreen(
             onBack = onBack,
             onNavigateToProfile = onNavigateToProfile,
@@ -157,68 +145,74 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
         )
     }
 
-    // Profile screen with Material 3 Expressive design
+    // Profile screen (navigates away from settings context, no pane metadata)
     routeEntry<ProfileRoute> { _ ->
         ProfileScreen(
             onBack = onBack,
         )
     }
 
-    // Connected devices screen
-    routeEntry<DevicesSettingsRoute> { _ ->
+    // Account management settings screen (detail pane)
+    routeEntry<AccountSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        AccountSettingsScreen(
+            onBack = onBack,
+            onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
+        )
+    }
+
+    // Connected devices screen (detail pane)
+    routeEntry<DevicesSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
         DevicesScreen(
             onBackClick = onBack,
         )
     }
 
-    // Account management settings screen
-    routeEntry<AccountSettingsRoute> { _ ->
-        AccountSettingsScreen(
-            onBack = onBack,
-            onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
-            onNavigateToBirthdaySettings = onNavigateToBirthdaySettings,
-        )
-    }
-
-    // Birthday settings screen
-    routeEntry<BirthdaySettingsRoute> { _ ->
-        BirthdaySettingsScreen(
-            onBack = onBack,
-        )
-    }
-
-    // Privacy and security settings screen
-    routeEntry<PrivacySettingsRoute> { _ ->
+    // Privacy and security settings screen (detail pane)
+    routeEntry<PrivacySettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
         PrivacySettingsScreen(
             onBack = onBack,
             onNavigateToLocationSettings = onNavigateToLocation,
         )
     }
 
-    // Data and storage settings screen
-    routeEntry<DataSettingsRoute> { _ ->
+    // Data and storage settings screen (detail pane)
+    routeEntry<DataSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
         DataSettingsScreen(
             onBack = onBack,
         )
     }
 
-    // Danger zone settings screen with destructive actions
-    routeEntry<DangerZoneSettingsRoute> { _ ->
+    // Danger zone settings screen with destructive actions (detail pane)
+    routeEntry<DangerZoneSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
         DangerZoneSettingsScreen(
             onBack = onBack,
             onAppReset = onAppReset,
         )
     }
 
-    // Location settings screen
-    routeEntry<LocationSettingsRoute> { _ ->
+    // Location settings screen (detail pane)
+    routeEntry<LocationSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
         LocationSettingsScreen(
             onBack = onBack,
         )
     }
 
-    // Advanced settings screen
-    routeEntry<AdvancedSettingsRoute> { _ ->
+    // Advanced settings screen (detail pane)
+    routeEntry<AdvancedSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
         AdvancedSettingsScreen(
             onBack = onBack,
         )

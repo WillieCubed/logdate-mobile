@@ -38,6 +38,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.quota_usage_block
+import logdate.client.feature.core.generated.resources.total_usage
 import org.jetbrains.compose.resources.stringResource
 
 @Composable

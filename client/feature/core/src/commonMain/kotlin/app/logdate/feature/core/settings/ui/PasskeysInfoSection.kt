@@ -32,6 +32,14 @@ import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.MaterialContainerScope
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.create_a_passkey_2
+import logdate.client.feature.core.generated.resources.create_passkey
+import logdate.client.feature.core.generated.resources.delete
+import logdate.client.feature.core.generated.resources.learn_more
+import logdate.client.feature.core.generated.resources.passkeys
+import logdate.client.feature.core.generated.resources.passkeys_are_a_quick_and_secure_way_to_sign_into_your_logdate_account
+import logdate.client.feature.core.generated.resources.with_passkeys_you_dont_need_to_remember_your_password_instead_use_your_fingerprint_face_or_screen_lock_to_sign_in
+import logdate.client.feature.core.generated.resources.your_passkeys
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
 import kotlin.time.Instant

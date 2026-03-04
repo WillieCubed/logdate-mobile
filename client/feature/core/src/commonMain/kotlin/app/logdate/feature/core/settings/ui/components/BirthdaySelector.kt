@@ -23,6 +23,9 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.birthday
+import logdate.client.feature.core.generated.resources.cancel
+import logdate.client.feature.core.generated.resources.confirm
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
 import kotlin.time.Instant

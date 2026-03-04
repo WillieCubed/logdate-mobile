@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -43,6 +44,15 @@ import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.back
+import logdate.client.feature.core.generated.resources.location_services
+import logdate.client.feature.core.generated.resources.location_settings
+import logdate.client.feature.core.generated.resources.location_timeline
+import logdate.client.feature.core.generated.resources.text_15_min
+import logdate.client.feature.core.generated.resources.text_30_min
+import logdate.client.feature.core.generated.resources.text_60_min
+import logdate.client.feature.core.generated.resources.tracking_interval
+import logdate.client.feature.core.generated.resources.view_timeline
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -61,12 +71,9 @@ fun LocationSettingsScreen(
     onBack: () -> Unit,
     viewModel: LocationSettingsViewModel = koinViewModel(),
     modifier: Modifier = Modifier,
-    isPotentialDetailPane: Boolean? = null,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showLocationTimeline by remember { mutableStateOf(false) }
-    val layoutInfo = LocalSettingsLayoutInfo.current
-    val resolvedIsDetailPane = isPotentialDetailPane ?: layoutInfo.isDetailPane
 
     LocationSettingsContent(
         settings = uiState.settings,
@@ -76,7 +83,6 @@ fun LocationSettingsScreen(
         onToggleTimelineTracking = viewModel::toggleTimelineTracking,
         onUpdateTrackingInterval = viewModel::updateTrackingInterval,
         onShowLocationTimeline = { showLocationTimeline = true },
-        isPotentialDetailPane = resolvedIsDetailPane,
         modifier = modifier.applyScreenStyles(),
     )
 
@@ -89,7 +95,7 @@ fun LocationSettingsScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LocationSettingsContent(
+fun LocationSettingsContent(
     settings: LocationTrackingSettings,
     onBack: () -> Unit,
     onToggleBackgroundTracking: (Boolean) -> Unit,
@@ -97,7 +103,6 @@ private fun LocationSettingsContent(
     onToggleTimelineTracking: (Boolean) -> Unit,
     onUpdateTrackingInterval: (Long) -> Unit,
     onShowLocationTimeline: () -> Unit,
-    isPotentialDetailPane: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
@@ -107,19 +112,17 @@ private fun LocationSettingsContent(
             modifier
                 .applyScreenStyles()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            // Only show top bar with back button in single-pane mode
-            if (!isPotentialDetailPane) {
-                TopAppBar(
-                    title = { Text(stringResource(Res.string.location_settings)) },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
-                        }
-                    },
-                    scrollBehavior = scrollBehavior,
-                )
-            }
+            TopAppBar(
+                title = { Text(stringResource(Res.string.location_settings)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
+                    }
+                },
+                scrollBehavior = scrollBehavior,
+            )
         },
     ) { paddingValues ->
         DefaultSettingsContentContainer {
@@ -128,16 +131,6 @@ private fun LocationSettingsContent(
                 contentPadding = paddingValues,
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                // Section title for two-pane mode
-                if (isPotentialDetailPane) {
-                    item {
-                        Text(
-                            text = stringResource(Res.string.location_settings),
-                            style = MaterialTheme.typography.headlineSmall,
-                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
-                        )
-                    }
-                }
                 // Location Services Section
                 item {
                     Column(

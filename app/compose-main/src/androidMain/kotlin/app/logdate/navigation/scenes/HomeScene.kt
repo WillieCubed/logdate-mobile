@@ -131,7 +131,6 @@ import app.logdate.navigation.routes.PasskeyCreationRoute
 import app.logdate.navigation.routes.UsernameSelectionRoute
 import app.logdate.navigation.routes.core.AccountSettingsRoute
 import app.logdate.navigation.routes.core.AdvancedSettingsRoute
-import app.logdate.navigation.routes.core.BirthdaySettingsRoute
 import app.logdate.navigation.routes.core.DangerZoneSettingsRoute
 import app.logdate.navigation.routes.core.DataSettingsRoute
 import app.logdate.navigation.routes.core.DevicesSettingsRoute
@@ -345,7 +344,6 @@ object RouteConfig {
             DataSettingsRoute::class,
             DevicesSettingsRoute::class,
             DangerZoneSettingsRoute::class,
-            BirthdaySettingsRoute::class,
             LocationSettingsRoute::class,
             AdvancedSettingsRoute::class,
             -> return RouteClassification.Excluded

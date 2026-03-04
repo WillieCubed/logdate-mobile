@@ -13,34 +13,22 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.Celebration
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -49,83 +37,63 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import app.logdate.feature.core.settings.ui.BirthdayUpdateState
-import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
-import io.github.aakira.napier.Napier
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.cancel
+import logdate.client.feature.core.generated.resources.save
+import logdate.client.feature.core.generated.resources.this_helps_us_personalize_your_experience
+import logdate.client.feature.core.generated.resources.when_were_you_born
 import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.floor
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 
 /**
- * A full-screen birthday selection screen with Material You styling.
+ * A dialog for selecting the user's birthday with a date picker.
  *
- * @param onBack Callback for when the user navigates back
- * @param viewModel The settings view model
+ * @param initialBirthday The current birthday value
+ * @param onDismiss Callback when the dialog is dismissed
+ * @param onSave Callback when the user saves their birthday
+ * @param birthdayUpdateState The current state of the birthday update operation
+ * @param onResetBirthdayUpdateState Callback to reset the birthday update state
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BirthdaySettingsScreen(
-    onBack: () -> Unit,
-    viewModel: AccountSettingsViewModel = koinViewModel(),
+fun BirthdayPickerDialog(
+    initialBirthday: Instant,
+    onDismiss: () -> Unit,
+    onSave: (Instant) -> Unit,
+    birthdayUpdateState: BirthdayUpdateState,
+    onResetBirthdayUpdateState: () -> Unit,
 ) {
-    // Observe birthday update state to know when save completes
-    val birthdayUpdateState by viewModel.birthdayUpdateState.collectAsState()
-
-    // Navigate back after successful save
-    LaunchedEffect(birthdayUpdateState) {
-        when (birthdayUpdateState) {
-            is BirthdayUpdateState.Success -> {
-                Napier.d("Birthday saved successfully, navigating back")
-                viewModel.resetBirthdayUpdateState()
-                onBack()
-            }
-            is BirthdayUpdateState.Error -> {
-                val errorMsg = (birthdayUpdateState as BirthdayUpdateState.Error).message
-                Napier.e("Failed to save birthday: $errorMsg")
-            }
-            else -> { /* Idle or Updating - do nothing */ }
-        }
-    }
-
-    // Get initial birthday from userData just once
-    val initialBirthday =
+    val resolvedInitial =
         remember {
-            val currentBirthday = viewModel.state.value.userData.birthday
-            if (currentBirthday == Instant.DISTANT_PAST) {
-                // Approximately 20 years in days (365.25 days/year * 20 years)
+            if (initialBirthday == Instant.DISTANT_PAST) {
                 Clock.System.now().minus(7305.days)
             } else {
-                currentBirthday
+                initialBirthday
             }
         }
 
-    // Setup date picker with the initial date
     val datePickerState =
         rememberDatePickerState(
-            initialSelectedDateMillis = initialBirthday.toEpochMilliseconds(),
+            initialSelectedDateMillis = resolvedInitial.toEpochMilliseconds(),
         )
 
-    // Track if the birthday has been changed from its initial value
     val hasChanges by remember(datePickerState.selectedDateMillis) {
         derivedStateOf {
             val selectedInstant =
                 datePickerState.selectedDateMillis?.let {
                     Instant.fromEpochMilliseconds(it)
                 }
-            selectedInstant != initialBirthday && selectedInstant != null
+            selectedInstant != resolvedInitial && selectedInstant != null
         }
     }
 
-    // Calculate and format the user's age
     val selectedBirthday by remember(datePickerState.selectedDateMillis) {
         derivedStateOf {
             datePickerState.selectedDateMillis?.let { millis ->
@@ -146,216 +114,109 @@ fun BirthdaySettingsScreen(
         }
     }
 
-    // Handle save action when changes are made
-    val onSave = {
-        // Always save the selected birthday when saving, regardless of changes
-        datePickerState.selectedDateMillis?.let { millis ->
-            val birthdayInstant = Instant.fromEpochMilliseconds(millis)
-            Napier.d("BirthdayScreen: Save clicked with date $birthdayInstant")
-            // Update the birthday - LaunchedEffect will handle navigation when save completes
-            viewModel.updateBirthday(birthdayInstant)
-        } ?: run {
-            Napier.w("BirthdayScreen: Save clicked but no date selected")
-            // If no date selected, just go back
-            onBack()
-        }
-    }
-
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-
-    Scaffold(
-        modifier =
-            Modifier
-                .applyScreenStyles()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(Res.string.birthday)) },
-                navigationIcon = {
-                    IconButton(onClick = onSave) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.save_and_go_back))
-                    }
-                },
-                actions = {
-                    // Only show save button if changes have been made
-                    if (hasChanges) {
-                        IconButton(onClick = onSave) {
-                            Icon(Icons.Default.Check, contentDescription = stringResource(Res.string.save))
-                        }
-                    }
-                },
-                scrollBehavior = scrollBehavior,
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Cake,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(32.dp),
             )
         },
-    ) { paddingValues ->
-        Surface(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-            color = MaterialTheme.colorScheme.background,
-        ) {
+        title = {
+            Text(
+                text = stringResource(Res.string.when_were_you_born),
+                textAlign = TextAlign.Center,
+            )
+        },
+        text = {
             Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = Spacing.md),
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
-                // Title with fun icon
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(top = Spacing.lg),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Cake,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(32.dp),
-                    )
-                    Spacer(modifier = Modifier.size(Spacing.sm))
-                    Text(
-                        text = stringResource(Res.string.when_were_you_born),
-                        style = MaterialTheme.typography.headlineMedium,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-
                 Text(
                     text = stringResource(Res.string.this_helps_us_personalize_your_experience),
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
-                // Date picker with Material You styling - using weight(1f) to fill available space
-                Card(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .weight(1f) // This makes the card take up all available space
-                            .padding(vertical = Spacing.md),
-                    colors =
-                        CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                        ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        DatePicker(
-                            state = datePickerState,
-                            modifier =
-                                Modifier
-                                    .fillMaxSize() // Fill the entire Card
-                                    .padding(Spacing.md),
-                            title = null, // Remove title as we have our own
-                        )
-                    }
-                }
+                DatePicker(
+                    state = datePickerState,
+                    title = null,
+                    modifier = Modifier.fillMaxWidth(),
+                )
 
-                // Age message with animation and celebration icon
                 AnimatedVisibility(
                     visible = ageMessage.isNotEmpty(),
                     enter = fadeIn() + expandVertically(),
                     exit = fadeOut() + shrinkVertically(),
                 ) {
-                    Card(
+                    Row(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = Spacing.md),
-                        colors =
-                            CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            ),
+                                .padding(vertical = Spacing.sm),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Row(
+                        Box(
                             modifier =
                                 Modifier
-                                    .fillMaxWidth()
-                                    .padding(Spacing.md),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            Brush.linearGradient(
-                                                listOf(
-                                                    MaterialTheme.colorScheme.primary,
-                                                    MaterialTheme.colorScheme.tertiary,
-                                                ),
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(
+                                                MaterialTheme.colorScheme.primary,
+                                                MaterialTheme.colorScheme.tertiary,
                                             ),
                                         ),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Celebration,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(24.dp),
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.size(Spacing.md))
-
-                            Text(
-                                text = ageMessage,
-                                style =
-                                    MaterialTheme.typography.titleLarge.copy(
-                                        fontWeight = FontWeight.Bold,
                                     ),
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Celebration,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp),
                             )
                         }
-                    }
-                }
 
-                // Small spacing before save button
-                Spacer(modifier = Modifier.height(Spacing.lg))
+                        Spacer(modifier = Modifier.size(Spacing.md))
 
-                // Save button
-                FilledTonalButton(
-                    onClick = onSave,
-                    enabled = hasChanges,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = Spacing.xl)
-                            .height(56.dp),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = null,
-                        )
-                        Spacer(modifier = Modifier.size(8.dp))
                         Text(
-                            "Save Birthday",
-                            style = MaterialTheme.typography.titleMedium,
+                            text = ageMessage,
+                            style =
+                                MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                ),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
                         )
                     }
                 }
             }
-        }
-    }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        onSave(Instant.fromEpochMilliseconds(millis))
+                    }
+                },
+                enabled = hasChanges,
+            ) {
+                Text(stringResource(Res.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(Res.string.cancel))
+            }
+        },
+    )
 }
 
 /**
- * Calculate age in years from a birthday Instant
+ * Calculate age in years from a birthday Instant.
  */
 private fun calculateAge(birthday: Instant): Int {
     val now = Clock.System.now()
@@ -364,11 +225,11 @@ private fun calculateAge(birthday: Instant): Int {
 }
 
 /**
- * Format an age message based on the age
+ * Format an age message based on the age.
  */
 private fun formatAgeMessage(age: Int): String =
     when {
-        age < 0 -> "" // Future date, don't show message
+        age < 0 -> ""
         age == 0 -> "You're less than a year old!"
         age < 3 -> "You're $age ${if (age == 1) "year" else "years"} old! Just getting started!"
         age < 13 -> "You're $age years old! So young and bright!"

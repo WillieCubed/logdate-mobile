@@ -5,6 +5,7 @@ package app.logdate.feature.core.settings.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -43,8 +44,18 @@ import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.action_reset_app
+import logdate.client.feature.core.generated.resources.back
+import logdate.client.feature.core.generated.resources.before_you_reset
+import logdate.client.feature.core.generated.resources.cancel
+import logdate.client.feature.core.generated.resources.clear_all_data
+import logdate.client.feature.core.generated.resources.clear_all_data_2
+import logdate.client.feature.core.generated.resources.clear_all_your_data_while_keeping_your_account
+import logdate.client.feature.core.generated.resources.clear_data
+import logdate.client.feature.core.generated.resources.danger_zone
+import logdate.client.feature.core.generated.resources.reset_actions
 import logdate.client.feature.core.generated.resources.settings_reset_app_description
 import logdate.client.feature.core.generated.resources.settings_reset_app_title
+import logdate.client.feature.core.generated.resources.yes_clear_all_data
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -63,26 +74,20 @@ fun DangerZoneSettingsScreen(
     onBack: () -> Unit,
     onAppReset: () -> Unit,
     viewModel: DangerZoneSettingsViewModel = koinViewModel(),
-    isPotentialDetailPane: Boolean? = null,
 ) {
-    val layoutInfo = LocalSettingsLayoutInfo.current
-    val resolvedIsDetailPane = isPotentialDetailPane ?: layoutInfo.isDetailPane
-
     DangerZoneSettingsContent(
         onBack = onBack,
         onAppReset = { viewModel.resetApp { onAppReset() } },
         onClearData = { viewModel.clearLocalData() },
-        isPotentialDetailPane = resolvedIsDetailPane,
     )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DangerZoneSettingsContent(
+fun DangerZoneSettingsContent(
     onBack: () -> Unit,
     onAppReset: () -> Unit,
     onClearData: () -> Unit,
-    isPotentialDetailPane: Boolean = false,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     var showResetDialog by remember { mutableStateOf(false) }
@@ -93,25 +98,23 @@ private fun DangerZoneSettingsContent(
             Modifier
                 .applyScreenStyles()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            // Only show top bar with back button in single-pane mode
-            if (!isPotentialDetailPane) {
-                TopAppBar(
-                    title = { Text(stringResource(Res.string.danger_zone)) },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
-                        }
-                    },
-                    scrollBehavior = scrollBehavior,
-                    colors =
-                        TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.15f),
-                            titleContentColor = MaterialTheme.colorScheme.error,
-                            navigationIconContentColor = MaterialTheme.colorScheme.error,
-                        ),
-                )
-            }
+            TopAppBar(
+                title = { Text(stringResource(Res.string.danger_zone)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
+                    }
+                },
+                scrollBehavior = scrollBehavior,
+                colors =
+                    TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.15f),
+                        titleContentColor = MaterialTheme.colorScheme.error,
+                        navigationIconContentColor = MaterialTheme.colorScheme.error,
+                    ),
+            )
         },
     ) { paddingValues ->
         DefaultSettingsContentContainer {
@@ -120,17 +123,6 @@ private fun DangerZoneSettingsContent(
                 contentPadding = paddingValues,
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                // Section title for two-pane mode
-                if (isPotentialDetailPane) {
-                    item {
-                        Text(
-                            text = stringResource(Res.string.danger_zone),
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
-                        )
-                    }
-                }
                 item {
                     Column(
                         modifier = Modifier.padding(horizontal = Spacing.lg),

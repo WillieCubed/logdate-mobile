@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -49,6 +50,17 @@ import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.advanced
+import logdate.client.feature.core.generated.resources.back
+import logdate.client.feature.core.generated.resources.https_your_server_example_com
+import logdate.client.feature.core.generated.resources.localhost_8765
+import logdate.client.feature.core.generated.resources.server_address
+import logdate.client.feature.core.generated.resources.server_configuration
+import logdate.client.feature.core.generated.resources.server_url
+import logdate.client.feature.core.generated.resources.switching_servers_keeps_your_local_data_intact_data_is_stored_separately_per_server_and_will_not_automatically_sync_between_different_servers
+import logdate.client.feature.core.generated.resources.test_connection_before_saving
+import logdate.client.feature.core.generated.resources.testing_connection
+import logdate.client.feature.core.generated.resources.you_are_using_a_non_production_server_your_data_will_not_sync_with_logdate_cloud
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -61,16 +73,12 @@ import org.koin.compose.viewmodel.koinViewModel
  *
  * @param onBack Callback for when the user presses the back button
  * @param viewModel ViewModel for the settings
- * @param isPotentialDetailPane Whether this screen might be displayed as a detail pane
  */
 @Composable
 fun AdvancedSettingsScreen(
     onBack: () -> Unit,
     viewModel: AdvancedSettingsViewModel = koinViewModel(),
-    isPotentialDetailPane: Boolean? = null,
 ) {
-    val layoutInfo = LocalSettingsLayoutInfo.current
-    val resolvedIsDetailPane = isPotentialDetailPane ?: layoutInfo.isDetailPane
     val serverSelectionState by viewModel.serverSelectionState.collectAsState()
 
     AdvancedSettingsContent(
@@ -80,20 +88,18 @@ fun AdvancedSettingsScreen(
         onUpdateLocalAddress = viewModel::updateLocalServerAddress,
         onUpdateCustomUrl = viewModel::updateCustomServerUrl,
         onValidateAndSave = viewModel::validateAndSaveServer,
-        isPotentialDetailPane = resolvedIsDetailPane,
     )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AdvancedSettingsContent(
+fun AdvancedSettingsContent(
     onBack: () -> Unit,
     serverSelectionState: ServerSelectionState,
     onSelectPreset: (ServerPreset) -> Unit,
     onUpdateLocalAddress: (String) -> Unit,
     onUpdateCustomUrl: (String) -> Unit,
     onValidateAndSave: () -> Unit,
-    isPotentialDetailPane: Boolean = false,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
@@ -102,18 +108,17 @@ private fun AdvancedSettingsContent(
             Modifier
                 .applyScreenStyles()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            if (!isPotentialDetailPane) {
-                TopAppBar(
-                    title = { Text(stringResource(Res.string.advanced)) },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
-                        }
-                    },
-                    scrollBehavior = scrollBehavior,
-                )
-            }
+            TopAppBar(
+                title = { Text(stringResource(Res.string.advanced)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
+                    }
+                },
+                scrollBehavior = scrollBehavior,
+            )
         },
     ) { paddingValues ->
         DefaultSettingsContentContainer {
@@ -122,16 +127,6 @@ private fun AdvancedSettingsContent(
                 contentPadding = paddingValues,
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                if (isPotentialDetailPane) {
-                    item {
-                        Text(
-                            text = stringResource(Res.string.advanced),
-                            style = MaterialTheme.typography.headlineSmall,
-                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
-                        )
-                    }
-                }
-
                 item {
                     ServerSelectionSection(
                         serverSelectionState = serverSelectionState,
@@ -434,7 +429,6 @@ private fun AdvancedSettingsScreenPreview() {
         onUpdateLocalAddress = {},
         onUpdateCustomUrl = {},
         onValidateAndSave = {},
-        isPotentialDetailPane = false,
     )
 }
 
@@ -452,7 +446,6 @@ private fun AdvancedSettingsScreenLocalSelectedPreview() {
         onUpdateLocalAddress = {},
         onUpdateCustomUrl = {},
         onValidateAndSave = {},
-        isPotentialDetailPane = false,
     )
 }
 
@@ -470,6 +463,5 @@ private fun AdvancedSettingsScreenValidatingPreview() {
         onUpdateLocalAddress = {},
         onUpdateCustomUrl = {},
         onValidateAndSave = {},
-        isPotentialDetailPane = false,
     )
 }

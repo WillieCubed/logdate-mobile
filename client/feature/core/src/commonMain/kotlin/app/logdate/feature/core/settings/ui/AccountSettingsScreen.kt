@@ -5,6 +5,7 @@ package app.logdate.feature.core.settings.ui
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,7 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.tooling.preview.Preview
-import app.logdate.feature.core.settings.ui.LocalSettingsLayoutInfo
 import app.logdate.feature.core.settings.ui.components.formatDateLocalized
 import app.logdate.shared.model.user.UserData
 import app.logdate.ui.common.DefaultSettingsContentContainer
@@ -46,6 +46,19 @@ import app.logdate.ui.theme.Spacing
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.account_actions
+import logdate.client.feature.core.generated.resources.account_and_profile
+import logdate.client.feature.core.generated.resources.back
+import logdate.client.feature.core.generated.resources.birthday
+import logdate.client.feature.core.generated.resources.cancel
+import logdate.client.feature.core.generated.resources.display_name
+import logdate.client.feature.core.generated.resources.personal_information
+import logdate.client.feature.core.generated.resources.profile_information
+import logdate.client.feature.core.generated.resources.sign_out
+import logdate.client.feature.core.generated.resources.sign_out_2
+import logdate.client.feature.core.generated.resources.sign_out_of_your_logdate_cloud_account_on_this_device
+import logdate.client.feature.core.generated.resources.username
+import logdate.client.feature.core.generated.resources.youll_need_to_sign_in_again_to_sync_data_on_this_device
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Clock
@@ -60,24 +73,18 @@ import kotlin.time.Instant
  *
  * @param onBack Callback for when the user presses the back button
  * @param onNavigateToCloudAccountCreation Callback for creating a cloud account
- * @param onNavigateToBirthdaySettings Callback for navigating to the full-screen birthday selector
- * @param viewModel ViewModel for the settings
  */
 @Composable
 fun AccountSettingsScreen(
     onBack: () -> Unit,
     onNavigateToCloudAccountCreation: () -> Unit,
-    onNavigateToBirthdaySettings: () -> Unit,
     accountViewModel: AccountSettingsViewModel = koinViewModel(),
     privacyViewModel: PrivacySettingsViewModel = koinViewModel(),
-    isPotentialDetailPane: Boolean? = null,
 ) {
     val accountState by accountViewModel.state.collectAsState()
     val birthdayUpdateState by accountViewModel.birthdayUpdateState.collectAsState()
     val profileUpdateState by accountViewModel.profileUpdateState.collectAsState()
     val privacyState by privacyViewModel.state.collectAsState()
-    val layoutInfo = LocalSettingsLayoutInfo.current
-    val resolvedIsDetailPane = isPotentialDetailPane ?: layoutInfo.isDetailPane
     val isAuthenticated = accountState.isAuthenticated
     val onCreatePasskey =
         if (isAuthenticated) {
@@ -89,7 +96,8 @@ fun AccountSettingsScreen(
     AccountSettingsContent(
         onBack = onBack,
         onCreatePasskey = onCreatePasskey,
-        onNavigateToBirthdaySettings = onNavigateToBirthdaySettings,
+        onUpdateBirthday = accountViewModel::updateBirthday,
+        onResetBirthdayUpdateState = accountViewModel::resetBirthdayUpdateState,
         userProfile = accountState.currentAccount.toUserProfile(),
         passkeys = privacyState.passkeys,
         userData = accountState.userData,
@@ -99,16 +107,16 @@ fun AccountSettingsScreen(
         onSignOut = accountViewModel::signOut,
         birthdayUpdateState = birthdayUpdateState,
         profileUpdateState = profileUpdateState,
-        isPotentialDetailPane = resolvedIsDetailPane,
     )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AccountSettingsContent(
+fun AccountSettingsContent(
     onBack: () -> Unit,
     onCreatePasskey: () -> Unit,
-    onNavigateToBirthdaySettings: () -> Unit,
+    onUpdateBirthday: (kotlin.time.Instant) -> Unit,
+    onResetBirthdayUpdateState: () -> Unit,
     userProfile: UserProfile,
     passkeys: List<PasskeyInfo>,
     userData: UserData,
@@ -118,11 +126,11 @@ private fun AccountSettingsContent(
     onSignOut: () -> Unit,
     birthdayUpdateState: BirthdayUpdateState,
     profileUpdateState: ProfileUpdateState,
-    isPotentialDetailPane: Boolean = false,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val snackbarHostState = remember { SnackbarHostState() }
     var showSignOutDialog by remember { mutableStateOf(false) }
+    var showBirthdayDialog by remember { mutableStateOf(false) }
 
     // State for profile edit fields
     var displayName by remember { mutableStateOf(userProfile.name) }
@@ -160,19 +168,17 @@ private fun AccountSettingsContent(
             Modifier
                 .applyScreenStyles()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            // Only show top bar with back button in single-pane mode
-            if (!isPotentialDetailPane) {
-                TopAppBar(
-                    title = { Text(stringResource(Res.string.account_and_profile)) },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
-                        }
-                    },
-                    scrollBehavior = scrollBehavior,
-                )
-            }
+            TopAppBar(
+                title = { Text(stringResource(Res.string.account_and_profile)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
+                    }
+                },
+                scrollBehavior = scrollBehavior,
+            )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { paddingValues ->
@@ -182,17 +188,6 @@ private fun AccountSettingsContent(
                 contentPadding = paddingValues,
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                // Section title for two-pane mode
-                if (isPotentialDetailPane) {
-                    item {
-                        Text(
-                            text = stringResource(Res.string.account_and_profile),
-                            style = MaterialTheme.typography.headlineSmall,
-                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
-                        )
-                    }
-                }
-
                 // Profile edit section
                 item {
                     Column(
@@ -280,7 +275,7 @@ private fun AccountSettingsContent(
                                             contentDescription = null,
                                         )
                                     },
-                                    modifier = Modifier.clickable { onNavigateToBirthdaySettings() },
+                                    modifier = Modifier.clickable { showBirthdayDialog = true },
                                 )
                             }
                         }
@@ -323,6 +318,19 @@ private fun AccountSettingsContent(
         }
     }
 
+    if (showBirthdayDialog) {
+        BirthdayPickerDialog(
+            initialBirthday = userData.birthday,
+            onDismiss = { showBirthdayDialog = false },
+            onSave = { birthday ->
+                onUpdateBirthday(birthday)
+                showBirthdayDialog = false
+            },
+            birthdayUpdateState = birthdayUpdateState,
+            onResetBirthdayUpdateState = onResetBirthdayUpdateState,
+        )
+    }
+
     if (showSignOutDialog) {
         AlertDialog(
             onDismissRequest = { showSignOutDialog = false },
@@ -353,7 +361,8 @@ private fun AccountSettingsScreenPreview() {
     AccountSettingsContent(
         onBack = {},
         onCreatePasskey = {},
-        onNavigateToBirthdaySettings = {},
+        onUpdateBirthday = {},
+        onResetBirthdayUpdateState = {},
         userProfile =
             UserProfile(
                 name = "John Doe",

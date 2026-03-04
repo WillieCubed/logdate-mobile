@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.action_reset_app
+import logdate.client.feature.core.generated.resources.cancel
 import org.jetbrains.compose.resources.stringResource
 
 /**

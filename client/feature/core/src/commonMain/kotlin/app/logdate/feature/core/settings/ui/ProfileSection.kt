@@ -39,6 +39,18 @@ import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.cancel
+import logdate.client.feature.core.generated.resources.display_name
+import logdate.client.feature.core.generated.resources.edit_profile
+import logdate.client.feature.core.generated.resources.edit_profile_2
+import logdate.client.feature.core.generated.resources.go_to_account_settings
+import logdate.client.feature.core.generated.resources.manage_your_display_name_and_username
+import logdate.client.feature.core.generated.resources.profile
+import logdate.client.feature.core.generated.resources.profile_username_hint
+import logdate.client.feature.core.generated.resources.save
+import logdate.client.feature.core.generated.resources.username
+import logdate.client.feature.core.generated.resources.username_2
+import logdate.client.feature.core.generated.resources.your_full_name
 import org.jetbrains.compose.resources.stringResource
 
 data class UserProfile(

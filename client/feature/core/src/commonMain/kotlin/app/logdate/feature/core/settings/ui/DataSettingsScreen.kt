@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -36,7 +37,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.tooling.preview.Preview
-import app.logdate.feature.core.settings.ui.LocalSettingsLayoutInfo
 import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
@@ -44,8 +44,52 @@ import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import kotlinx.coroutines.launch
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.audit_and_repair_local_links_and_sync_metadata
+import logdate.client.feature.core.generated.resources.automatically_sync_your_data_in_the_background
+import logdate.client.feature.core.generated.resources.back
+import logdate.client.feature.core.generated.resources.background_sync
+import logdate.client.feature.core.generated.resources.cancel
+import logdate.client.feature.core.generated.resources.check
+import logdate.client.feature.core.generated.resources.checking
+import logdate.client.feature.core.generated.resources.clear
+import logdate.client.feature.core.generated.resources.cloud_sync
+import logdate.client.feature.core.generated.resources.conflict_entity_with_id
+import logdate.client.feature.core.generated.resources.conflicts_need_review
+import logdate.client.feature.core.generated.resources.data_and_storage
+import logdate.client.feature.core.generated.resources.data_management
+import logdate.client.feature.core.generated.resources.detected_timestamp
+import logdate.client.feature.core.generated.resources.export
+import logdate.client.feature.core.generated.resources.exported_label
+import logdate.client.feature.core.generated.resources.`import`
+import logdate.client.feature.core.generated.resources.import_backup
+import logdate.client.feature.core.generated.resources.importing
+import logdate.client.feature.core.generated.resources.integrity_check
+import logdate.client.feature.core.generated.resources.journals_count_with_comma
+import logdate.client.feature.core.generated.resources.last_check_issue_count
+import logdate.client.feature.core.generated.resources.last_export_path
+import logdate.client.feature.core.generated.resources.loading
+import logdate.client.feature.core.generated.resources.loading_conflicts
+import logdate.client.feature.core.generated.resources.media_count
+import logdate.client.feature.core.generated.resources.no_conflicts_waiting
+import logdate.client.feature.core.generated.resources.notes_count_with_comma
+import logdate.client.feature.core.generated.resources.queued_conflicts
+import logdate.client.feature.core.generated.resources.refresh
+import logdate.client.feature.core.generated.resources.repair
+import logdate.client.feature.core.generated.resources.repairing
+import logdate.client.feature.core.generated.resources.restore_entries_from_a_logdate_export_archive
+import logdate.client.feature.core.generated.resources.restoring_backup
+import logdate.client.feature.core.generated.resources.separator_pipe
 import logdate.client.feature.core.generated.resources.settings_export_entries_description
 import logdate.client.feature.core.generated.resources.settings_export_entries_label
+import logdate.client.feature.core.generated.resources.showing_three_of_conflicts
+import logdate.client.feature.core.generated.resources.sign_in_required
+import logdate.client.feature.core.generated.resources.sign_in_to_your_logdate_cloud_account_to_enable_sync
+import logdate.client.feature.core.generated.resources.sync_conflicts
+import logdate.client.feature.core.generated.resources.sync_now
+import logdate.client.feature.core.generated.resources.sync_status
+import logdate.client.feature.core.generated.resources.syncing
+import logdate.client.feature.core.generated.resources.waiting_for_backup_selection
+import logdate.client.feature.core.generated.resources.warnings_count
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Instant
@@ -64,11 +108,8 @@ import kotlin.time.Instant
 fun DataSettingsScreen(
     onBack: () -> Unit,
     viewModel: DataSettingsViewModel = koinViewModel(),
-    isPotentialDetailPane: Boolean? = null,
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val layoutInfo = LocalSettingsLayoutInfo.current
-    val resolvedIsDetailPane = isPotentialDetailPane ?: layoutInfo.isDetailPane
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -130,7 +171,6 @@ fun DataSettingsScreen(
         onClearConflicts = viewModel::clearConflicts,
         onRefreshConflicts = { viewModel.refreshConflicts(force = true) },
         snackbarHostState = snackbarHostState,
-        isPotentialDetailPane = resolvedIsDetailPane,
         syncStatus = uiState.syncStatus,
         isAuthenticated = uiState.isAuthenticated,
         onSyncNow = viewModel::syncNow,
@@ -141,7 +181,7 @@ fun DataSettingsScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DataSettingsContent(
+fun DataSettingsContent(
     onBack: () -> Unit,
     quotaUsage: StorageQuotaUi,
     onExportContent: () -> Unit,
@@ -156,7 +196,6 @@ private fun DataSettingsContent(
     onClearConflicts: () -> Unit,
     onRefreshConflicts: () -> Unit,
     snackbarHostState: SnackbarHostState,
-    isPotentialDetailPane: Boolean = false,
     syncStatus: app.logdate.client.sync.SyncStatus? = null,
     isAuthenticated: Boolean = false,
     onSyncNow: () -> Unit = {},
@@ -170,19 +209,17 @@ private fun DataSettingsContent(
             Modifier
                 .applyScreenStyles()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            // Only show top bar with back button in single-pane mode
-            if (!isPotentialDetailPane) {
-                TopAppBar(
-                    title = { Text(stringResource(Res.string.data_and_storage)) },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
-                        }
-                    },
-                    scrollBehavior = scrollBehavior,
-                )
-            }
+            TopAppBar(
+                title = { Text(stringResource(Res.string.data_and_storage)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
+                    }
+                },
+                scrollBehavior = scrollBehavior,
+            )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { paddingValues ->
@@ -192,16 +229,6 @@ private fun DataSettingsContent(
                 contentPadding = paddingValues,
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                // Section title for two-pane mode
-                if (isPotentialDetailPane) {
-                    item {
-                        Text(
-                            text = stringResource(Res.string.data_and_storage),
-                            style = MaterialTheme.typography.headlineSmall,
-                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
-                        )
-                    }
-                }
                 // Storage quota section
                 item {
                     QuotaUsageBlock(

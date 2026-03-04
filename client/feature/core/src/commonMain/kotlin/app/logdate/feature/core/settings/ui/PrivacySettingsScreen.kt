@@ -5,6 +5,7 @@ package app.logdate.feature.core.settings.ui
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -43,6 +44,18 @@ import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.app_security
+import logdate.client.feature.core.generated.resources.back
+import logdate.client.feature.core.generated.resources.cancel
+import logdate.client.feature.core.generated.resources.location_privacy
+import logdate.client.feature.core.generated.resources.location_settings
+import logdate.client.feature.core.generated.resources.manage_location_tracking_and_privacy_preferences
+import logdate.client.feature.core.generated.resources.navigate_to_location_settings
+import logdate.client.feature.core.generated.resources.operation_passkey
+import logdate.client.feature.core.generated.resources.privacy_and_security
+import logdate.client.feature.core.generated.resources.remove
+import logdate.client.feature.core.generated.resources.remove_passkey
+import logdate.client.feature.core.generated.resources.remove_passkey_from_device
 import logdate.client.feature.core.generated.resources.settings_biometric_description
 import logdate.client.feature.core.generated.resources.settings_biometric_label
 import org.jetbrains.compose.resources.stringResource
@@ -64,13 +77,9 @@ fun PrivacySettingsScreen(
     onBack: () -> Unit,
     onNavigateToLocationSettings: () -> Unit = {},
     viewModel: PrivacySettingsViewModel = koinViewModel(),
-    isPotentialDetailPane: Boolean? = null,
 ) {
     val state by viewModel.state.collectAsState()
     val revocationState by viewModel.passkeyRevocationState.collectAsState()
-    val layoutInfo = LocalSettingsLayoutInfo.current
-    val resolvedIsDetailPane = isPotentialDetailPane ?: layoutInfo.isDetailPane
-
     val creationState by viewModel.passkeyCreationState.collectAsState()
 
     PrivacySettingsContent(
@@ -84,7 +93,6 @@ fun PrivacySettingsScreen(
         onNavigateToLocationSettings = onNavigateToLocationSettings,
         revocationState = revocationState,
         creationState = creationState,
-        isPotentialDetailPane = resolvedIsDetailPane,
     )
 }
 
@@ -171,7 +179,7 @@ private fun PasskeyOperationLoadingDialog(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PrivacySettingsContent(
+fun PrivacySettingsContent(
     onBack: () -> Unit,
     onSetBiometricsEnabled: (enabled: Boolean) -> Unit,
     isBiometricsEnabled: Boolean,
@@ -182,7 +190,6 @@ private fun PrivacySettingsContent(
     onNavigateToLocationSettings: () -> Unit = {},
     revocationState: PasskeyRevocationState = PasskeyRevocationState.Idle,
     creationState: PasskeyCreationState = PasskeyCreationState.Idle,
-    isPotentialDetailPane: Boolean = false,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -241,19 +248,17 @@ private fun PrivacySettingsContent(
             Modifier
                 .applyScreenStyles()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            // Only show top bar with back button in single-pane mode
-            if (!isPotentialDetailPane) {
-                TopAppBar(
-                    title = { Text(stringResource(Res.string.privacy_and_security)) },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
-                        }
-                    },
-                    scrollBehavior = scrollBehavior,
-                )
-            }
+            TopAppBar(
+                title = { Text(stringResource(Res.string.privacy_and_security)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
+                    }
+                },
+                scrollBehavior = scrollBehavior,
+            )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { paddingValues ->
@@ -263,17 +268,6 @@ private fun PrivacySettingsContent(
                 contentPadding = paddingValues,
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                // Section title for two-pane mode
-                if (isPotentialDetailPane) {
-                    item {
-                        Text(
-                            text = stringResource(Res.string.privacy_and_security),
-                            style = MaterialTheme.typography.headlineSmall,
-                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
-                        )
-                    }
-                }
-
                 // App Security section
                 item {
                     Column(

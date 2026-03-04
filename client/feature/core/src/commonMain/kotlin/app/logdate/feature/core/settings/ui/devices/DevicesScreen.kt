@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -47,6 +48,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.app_version_label
+import logdate.client.feature.core.generated.resources.are_you_sure_you_want_to_reset_this_devices_id_this_is_primarily_used_for_privacy_purposes_and_will_generate_a_new_unique_identifier_for_this_device_this_wont_affect_your_data_but_may_require_re_syncing_with_logdate_cloud
+import logdate.client.feature.core.generated.resources.back
+import logdate.client.feature.core.generated.resources.cancel
+import logdate.client.feature.core.generated.resources.device_name
+import logdate.client.feature.core.generated.resources.devices
+import logdate.client.feature.core.generated.resources.enter_a_new_name_for_this_device
+import logdate.client.feature.core.generated.resources.last_active_label
+import logdate.client.feature.core.generated.resources.loading_devices
+import logdate.client.feature.core.generated.resources.platform_label
+import logdate.client.feature.core.generated.resources.remove
+import logdate.client.feature.core.generated.resources.remove_device
+import logdate.client.feature.core.generated.resources.remove_device_2
+import logdate.client.feature.core.generated.resources.remove_device_confirmation
+import logdate.client.feature.core.generated.resources.rename
+import logdate.client.feature.core.generated.resources.rename_device
+import logdate.client.feature.core.generated.resources.rename_device_2
+import logdate.client.feature.core.generated.resources.reset
+import logdate.client.feature.core.generated.resources.reset_device_id
+import logdate.client.feature.core.generated.resources.this_device
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 
@@ -104,6 +125,7 @@ fun DevicesScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(Res.string.devices)) },

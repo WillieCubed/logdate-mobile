@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalSharedTransitionApi::class)
+@file:OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3AdaptiveApi::class)
 
 package app.logdate.navigation
 
@@ -21,7 +21,7 @@ package app.logdate.navigation
  *
  * This navigation root integrates with:
  * - **HomeSceneStrategy**: Adaptive layouts for main app content
- * - **SettingsSceneStrategy**: Specialized layouts for settings flows
+ * - **ListDetailSceneStrategy**: Specialized layouts for settings flows
  * - **MainAppNavigator**: Centralized navigation state management
  * - **Entry Providers**: Route definitions and content mapping
  *
@@ -54,6 +54,8 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
@@ -100,7 +102,6 @@ import app.logdate.navigation.routes.journalRoutes
 import app.logdate.navigation.routes.onboarding
 import app.logdate.navigation.routes.openAccountSettings
 import app.logdate.navigation.routes.openAdvancedSettings
-import app.logdate.navigation.routes.openBirthdaySettings
 import app.logdate.navigation.routes.openDangerZoneSettings
 import app.logdate.navigation.routes.openDataSettings
 import app.logdate.navigation.routes.openDevicesSettings
@@ -121,7 +122,6 @@ import app.logdate.navigation.routes.searchRoutes
 import app.logdate.navigation.routes.timelineRoutes
 import app.logdate.navigation.scenes.HomeSceneStrategy
 import app.logdate.navigation.scenes.HomeTab
-import app.logdate.navigation.scenes.SettingsSceneStrategy
 import io.github.aakira.napier.Napier
 import kotlin.reflect.KClass
 
@@ -322,7 +322,7 @@ private fun createPredictiveBackTransitionSpec(): AnimatedContentTransitionScope
  *
  * The scene strategy uses a chain-of-responsibility pattern:
  * ```
- * SettingsSceneStrategy → HomeSceneStrategy → NavDisplay Default
+ * ListDetailSceneStrategy → HomeSceneStrategy → NavDisplay Default
  * ```
  *
  * Each strategy in the chain gets to examine the navigation entries and either:
@@ -331,7 +331,7 @@ private fun createPredictiveBackTransitionSpec(): AnimatedContentTransitionScope
  *
  * ## Strategy Responsibilities
  *
- * 1. **SettingsSceneStrategy**: Handles all settings-related routes
+ * 1. **ListDetailSceneStrategy**: Handles all settings-related routes
  *    - Account settings, privacy settings, data settings, etc.
  *    - Creates scenes with settings-specific navigation patterns
  *    - Supports both fullscreen and modal presentation styles
@@ -393,17 +393,17 @@ private fun createSceneStrategy(
             )
         }
 
-    val settingsStrategy = remember { SettingsSceneStrategy<NavKey>() }
+    val listDetailStrategy = rememberListDetailSceneStrategy<NavKey>()
 
-    return remember(homeStrategy, settingsStrategy) {
+    return remember(homeStrategy, listDetailStrategy) {
         object : SceneStrategy<NavKey> {
             override fun SceneStrategyScope<NavKey>.calculateScene(entries: List<NavEntry<NavKey>>): Scene<NavKey>? {
-                // Strategy chain execution: Settings → Home → NavDisplay Default
-                val settingsScene =
-                    with(settingsStrategy) {
+                // Strategy chain execution: ListDetail (settings) → Home → NavDisplay Default
+                val listDetailScene =
+                    with(listDetailStrategy) {
                         this@calculateScene.calculateScene(entries)
                     }
-                return settingsScene ?: with(homeStrategy) {
+                return listDetailScene ?: with(homeStrategy) {
                     this@calculateScene.calculateScene(entries)
                 }
             }
@@ -426,7 +426,7 @@ private fun createSceneStrategy(
  *
  * The navigation root integrates with:
  * - **HomeSceneStrategy**: Adaptive layouts for main app content
- * - **SettingsSceneStrategy**: Specialized layouts for settings flows
+ * - **ListDetailSceneStrategy**: Specialized layouts for settings flows
  * - **MainAppNavigator**: Centralized navigation state management
  * - **Entry Providers**: Route definitions and content mapping
  *
@@ -570,7 +570,6 @@ fun MainNavigationRoot(mainAppNavigator: MainAppNavigator) {
                             onNavigateToDevices = mainAppNavigator::openDevicesSettings,
                             onNavigateToDangerZone = mainAppNavigator::openDangerZoneSettings,
                             onNavigateToLocation = mainAppNavigator::openLocationSettings,
-                            onNavigateToBirthdaySettings = mainAppNavigator::openBirthdaySettings,
                             onNavigateToAdvanced = mainAppNavigator::openAdvancedSettings,
                         )
                         cloudAccountSetup(
