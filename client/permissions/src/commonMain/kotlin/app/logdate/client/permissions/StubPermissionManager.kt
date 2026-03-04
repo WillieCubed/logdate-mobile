@@ -72,6 +72,11 @@ open class StubPermissionManager(
         Napier.d("Stub permission manager attempted to open app settings")
     }
 
+    override fun openPermissionSettings() {
+        // No-op in stub implementation
+        Napier.d("Stub permission manager attempted to open permission settings")
+    }
+
     override fun shouldShowRationale(type: PermissionType): Boolean {
         // Return true if permission is denied and not in overrides
         // (simulating a first-time denial where rationale should be shown)

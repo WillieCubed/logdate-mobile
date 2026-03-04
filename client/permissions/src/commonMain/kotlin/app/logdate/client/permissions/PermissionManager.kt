@@ -92,6 +92,12 @@ interface PermissionManager {
     fun openAppSettings()
 
     /**
+     * Opens the app permissions screen directly, bypassing the top-level app info page.
+     * Falls back to [openAppSettings] on platforms where this is unavailable.
+     */
+    fun openPermissionSettings()
+
+    /**
      * Checks if rationale should be shown for a permission
      *
      * @param type The permission type

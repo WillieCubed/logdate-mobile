@@ -166,6 +166,20 @@ class AndroidPermissionManager(
         }
     }
 
+    override fun openPermissionSettings() {
+        try {
+            val intent =
+                Intent(Settings.ACTION_MANAGE_APP_PERMISSIONS).apply {
+                    putExtra(Intent.EXTRA_PACKAGE_NAME, context.packageName)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Napier.w("ACTION_MANAGE_APP_PERMISSIONS unavailable, falling back to app settings", e)
+            openAppSettings()
+        }
+    }
+
     override fun shouldShowRationale(type: PermissionType): Boolean {
         // This can only be determined from an Activity context
         // We'll always return false here

@@ -103,6 +103,11 @@ class IosPermissionManager : PermissionManager {
         Napier.d("iOS would open app settings")
     }
 
+    override fun openPermissionSettings() {
+        // iOS has no separate permissions screen; fall back to app settings
+        openAppSettings()
+    }
+
     override fun shouldShowRationale(type: PermissionType): Boolean {
         // iOS doesn't have the concept of permission rationale like Android
         return false
