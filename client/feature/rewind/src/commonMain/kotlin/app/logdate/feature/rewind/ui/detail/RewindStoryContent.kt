@@ -16,7 +16,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -30,6 +29,7 @@ import app.logdate.feature.rewind.ui.RewindPanelUiState
 import app.logdate.feature.rewind.ui.SubtitledRewindPanelUiState
 import app.logdate.feature.rewind.ui.TextNoteRewindPanelUiState
 import app.logdate.feature.rewind.ui.TransitionRewindPanelUiState
+import app.logdate.ui.content.ImageScrimOverlay
 import coil3.compose.AsyncImage
 import logdate.client.feature.rewind.generated.resources.*
 import logdate.client.feature.rewind.generated.resources.Res
@@ -180,20 +180,7 @@ private fun BasicTextPanel(
             )
 
             // Gradient overlay for text readability
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors =
-                                    listOf(
-                                        Color.Black.copy(alpha = 0.3f),
-                                        Color.Black.copy(alpha = 0.6f),
-                                    ),
-                            ),
-                        ),
-            )
+            ImageScrimOverlay(topAlpha = 0.3f, bottomAlpha = 0.6f)
         } else {
             Box(
                 modifier =
@@ -256,20 +243,7 @@ private fun SubtitledPanel(
             )
 
             // Gradient overlay
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors =
-                                    listOf(
-                                        Color.Black.copy(alpha = 0.2f),
-                                        Color.Black.copy(alpha = 0.7f),
-                                    ),
-                            ),
-                        ),
-            )
+            ImageScrimOverlay(topAlpha = 0.2f, bottomAlpha = 0.7f)
         } else {
             Box(
                 modifier =
@@ -353,20 +327,7 @@ private fun StatisticPanel(
             )
 
             // Gradient overlay
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors =
-                                    listOf(
-                                        Color.Black.copy(alpha = 0.3f),
-                                        Color.Black.copy(alpha = 0.6f),
-                                    ),
-                            ),
-                        ),
-            )
+            ImageScrimOverlay(topAlpha = 0.3f, bottomAlpha = 0.6f)
         } else {
             Box(
                 modifier =

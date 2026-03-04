@@ -19,6 +19,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.content.ImageScrimOverlay
 import coil3.compose.AsyncImage
 
 /**
@@ -64,20 +65,7 @@ fun NarrativeContextPanel(
             )
 
             // Gradient overlay for text readability
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors =
-                                    listOf(
-                                        Color.Black.copy(alpha = 0.5f),
-                                        Color.Black.copy(alpha = 0.7f),
-                                    ),
-                            ),
-                        ),
-            )
+            ImageScrimOverlay(topAlpha = 0.5f, bottomAlpha = 0.7f)
         } else {
             // Subtle gradient background when no image
             Box(

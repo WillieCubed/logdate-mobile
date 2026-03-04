@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.content.ImageScrimOverlay
 import coil3.compose.AsyncImage
 
 /**
@@ -67,20 +68,7 @@ fun TextNotePanel(
             )
 
             // Gradient overlay for text readability
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors =
-                                    listOf(
-                                        Color.Black.copy(alpha = 0.4f),
-                                        Color.Black.copy(alpha = 0.7f),
-                                    ),
-                            ),
-                        ),
-            )
+            ImageScrimOverlay(topAlpha = 0.4f, bottomAlpha = 0.7f)
         } else {
             // Apply a gradient to the solid color background for visual interest
             Box(
