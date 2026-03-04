@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# validate-commit-message.sh - Validates a commit message.
+#
+# Usage:
+#   validate-commit-message.sh --file <path> [--context <context>]
+#   validate-commit-message.sh --message "<text>" [--context <context>]
+#
+# Contexts:
+#   commit-msg (default)  - includes warning output for imperative mood
+#   pre-push              - hard checks only
+#   checklist             - hard checks only
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "$REPO_ROOT/scripts/validation/hook-common.sh"
+
+context="commit-msg"
+message=""
+message_file=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --context)
+            context="${2:-}"
+            shift 2
+            ;;
+        --message)
+            message="${2:-}"
+            shift 2
+            ;;
+        --file)
+            message_file="${2:-}"
+            shift 2
+            ;;
+        *)
+            echo "ERROR: Unknown argument: $1" >&2
+            exit 1
+            ;;
+    esac
+done
+
+if [[ -n "$message" && -n "$message_file" ]]; then
+    echo "ERROR: Use either --message or --file, not both." >&2
+    exit 1
+fi
+
+if [[ -z "$message" && -z "$message_file" ]]; then
+    echo "ERROR: Must provide --message or --file." >&2
+    exit 1
+fi
+
+if [[ -n "$message_file" ]]; then
+    if [[ ! -f "$message_file" ]]; then
+        echo "ERROR: Commit message file not found: $message_file" >&2
+        exit 1
+    fi
+    message="$(cat "$message_file")"
+fi
+
+if [[ -z "$message" ]]; then
+    echo "ERROR: Commit message is empty." >&2
+    exit 1
+fi
+
+title="$(echo "$message" | head -n 1)"
+errors=()
+
+# Skip merge/fixup/squash commits.
+if [[ "$title" =~ ^Merge ]] || [[ "$title" =~ ^fixup! ]] || [[ "$title" =~ ^squash! ]]; then
+    exit 0
+fi
+
+if ! echo "$title" | grep -qE "^($VALID_TYPES)(\(.+\))?!?: .+"; then
+    errors+=("FORMAT: Commit title must follow: type(scope): description")
+    errors+=("  Valid types: feat, fix, refactor, docs, style, test, chore, perf")
+fi
+
+title_len=${#title}
+if [[ $title_len -gt 72 ]]; then
+    errors+=("LENGTH: Title is $title_len chars (max 72).")
+fi
+
+if echo "$title" | grep -qE "^($VALID_TYPES)\((.+)\)"; then
+    scope="$(echo "$title" | sed -E "s/^($VALID_TYPES)\(([^)]+)\).*/\2/")"
+    if ! scope_output="$("$REPO_ROOT/scripts/validation/validate-commit-scope.sh" "$scope" 2>&1)"; then
+        if [[ "$context" == "commit-msg" && -n "$scope_output" ]]; then
+            echo "$scope_output"
+        fi
+        errors+=("SCOPE: Invalid scope '$scope'.")
+    fi
+fi
+
+if echo "$message" | grep -qiE "phase[[:space:]]+[0-9]"; then
+    errors+=("PHASE: Phase numbers are forbidden in commit messages.")
+fi
+
+if [[ "$context" == "commit-msg" ]]; then
+    desc="$(echo "$title" | sed -E "s/^($VALID_TYPES)(\([^)]+\))?!?: //")"
+    if echo "$desc" | grep -qE "^(Added|Fixed|Updated|Removed|Changed|Implemented|Created|Deleted|Moved|Renamed) "; then
+        first_word="$(echo "$desc" | awk '{print $1}')"
+        imperative="$(echo "$first_word" | sed -E 's/ed$//; s/d$//')"
+        imperative_cap="$(echo "$imperative" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')"
+        rest="$(echo "$desc" | sed "s/^$first_word //")"
+        echo ""
+        echo "WARNING: Use imperative mood in commit title."
+        echo "  Instead of: \"$desc\""
+        echo "  Try: \"$imperative_cap $rest\""
+        echo ""
+    fi
+fi
+
+if [[ ${#errors[@]} -gt 0 ]]; then
+    err=""
+    for err in "${errors[@]}"; do
+        echo "$err"
+    done
+    exit 1
+fi
+
+exit 0

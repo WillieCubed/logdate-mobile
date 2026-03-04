@@ -9,6 +9,8 @@
 
 set -euo pipefail
 
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+source "$REPO_ROOT/scripts/validation/hook-common.sh"
 input="$(cat)"
 
 # Extract the bash command
@@ -47,14 +49,15 @@ fi
 # If we still can't extract a message (heredoc, etc.), skip message checks
 # and let the commit-msg git hook handle it
 if [[ -n "$commit_msg" ]]; then
-    # Check for phase numbers
-    if echo "$commit_msg" | grep -qiE "phase[[:space:]]+[0-9]"; then
-        errors+=("Phase numbers are FORBIDDEN in commit messages. Describe WHAT changed, not which phase.")
+    if ! validator_output="$("$REPO_ROOT/scripts/validation/validate-commit-message.sh" --message "$commit_msg" --context checklist 2>&1)"; then
+        while IFS= read -r line; do
+            [[ -n "$line" ]] && errors+=("$line")
+        done <<< "$validator_output"
     fi
 
     # Check proper noun capitalization
     title="$(echo "$commit_msg" | head -1)"
-    desc="$(echo "$title" | sed -E "s/^(feat|fix|refactor|docs|style|test|chore|perf)(\([^)]+\))?!?: //")"
+    desc="$(echo "$title" | sed -E "s/^($VALID_TYPES)(\([^)]+\))?!?: //")"
     lowercase_violations=""
     for term in "api" "cli" "sdk" "jwt" "oauth" "url" "html" "css" "ssr" "ssg"; do
         upper="$(echo "$term" | tr '[:lower:]' '[:upper:]')"

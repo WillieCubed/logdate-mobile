@@ -3,12 +3,14 @@
 #
 # Checks:
 # 1. Sensitive file guard (reject secrets, keystores, credentials)
-# 2. Kotlin lint via ktlint on affected modules
+# 2. Sensitive content scan in staged additions
+# 3. Kotlin lint via ktlint on affected modules
 
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
+source "$REPO_ROOT/scripts/validation/hook-common.sh"
 
 errors=()
 
@@ -47,6 +49,14 @@ for pattern in "${sensitive_patterns[@]}"; do
 done
 
 if [[ ${#sensitive_found[@]} -gt 0 ]]; then
+    sensitive_found_sorted="$(printf '%s\n' "${sensitive_found[@]}" | uniq_non_empty_lines)"
+    sensitive_found=()
+    while IFS= read -r f; do
+        [[ -n "$f" ]] && sensitive_found+=("$f")
+    done <<< "$sensitive_found_sorted"
+fi
+
+if [[ ${#sensitive_found[@]} -gt 0 ]]; then
     errors+=("SENSITIVE FILES: The following files may contain secrets and should not be committed:")
     for f in "${sensitive_found[@]}"; do
         errors+=("  - $f")
@@ -55,88 +65,74 @@ if [[ ${#sensitive_found[@]} -gt 0 ]]; then
 fi
 
 # ============================================================================
-# 2. Kotlin lint (ktlint) on affected modules
+# 2. Sensitive content scan in staged additions
+# ============================================================================
+
+secret_line_patterns=(
+    'AKIA[0-9A-Z]{16}'
+    '-----BEGIN (RSA|EC|DSA|OPENSSH|PGP) PRIVATE KEY-----'
+    '(api[_-]?key|secret|token|password)[[:space:]]*[:=][[:space:]]*["'"'"'][^"'"'"']{8,}["'"'"']'
+)
+
+secret_hits=()
+while IFS= read -r file; do
+    [[ -z "$file" ]] && continue
+    if echo "$file" | grep -qE '(^|/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|Cargo\.lock)$'; then
+        continue
+    fi
+
+    added_lines="$(git diff --cached --no-color -U0 -- "$file" | grep -E '^\+[^+]' | sed 's/^+//' || true)"
+    [[ -z "$added_lines" ]] && continue
+
+    for pattern in "${secret_line_patterns[@]}"; do
+        if echo "$added_lines" | grep -qiE "$pattern"; then
+            secret_hits+=("$file")
+            break
+        fi
+    done
+done <<< "$staged_files"
+
+if [[ ${#secret_hits[@]} -gt 0 ]]; then
+    secret_hits_sorted="$(printf '%s\n' "${secret_hits[@]}" | uniq_non_empty_lines)"
+    errors+=("SENSITIVE CONTENT: Potential secrets found in staged additions:")
+    while IFS= read -r f; do
+        [[ -n "$f" ]] && errors+=("  - $f")
+    done <<< "$secret_hits_sorted"
+fi
+
+# ============================================================================
+# 3. Kotlin lint (ktlint) on affected modules
 # ============================================================================
 
 # Collect Kotlin/KTS files
 kt_files="$(echo "$staged_files" | grep -E '\.(kt|kts)$' || true)"
 
 if [[ -n "$kt_files" ]]; then
-    # Resolve affected Gradle modules from file paths
+    resolved_modules="$(modules_from_files "$kt_files")"
     modules=()
-    seen_modules=()
-
-    while IFS= read -r file; do
-        # Walk up from file to find the nearest build.gradle.kts
-        dir="$(dirname "$file")"
-        while [[ "$dir" != "." && "$dir" != "/" ]]; do
-            if [[ -f "$dir/build.gradle.kts" ]]; then
-                # Convert directory path to Gradle module path
-                # e.g., client/feature/timeline -> :client:feature:timeline
-                module=":$(echo "$dir" | tr '/' ':')"
-
-                # Deduplicate
-                already_seen=false
-                for seen in "${seen_modules[@]+"${seen_modules[@]}"}"; do
-                    if [[ "$seen" == "$module" ]]; then
-                        already_seen=true
-                        break
-                    fi
-                done
-
-                if [[ "$already_seen" == "false" ]]; then
-                    modules+=("$module")
-                    seen_modules+=("$module")
-                fi
-                break
-            fi
-            dir="$(dirname "$dir")"
-        done
-    done <<< "$kt_files"
+    while IFS= read -r module; do
+        [[ -n "$module" ]] && modules+=("$module")
+    done <<< "$resolved_modules"
 
     if [[ ${#modules[@]} -gt 0 ]]; then
-        # Build ktlintCheck tasks for affected modules, skipping modules without ktlint
         ktlint_tasks=()
-        ktlint_modules=()
-        missing_ktlint_modules=()
+        mod=""
         for mod in "${modules[@]}"; do
-            if ./gradlew "${mod}:tasks" --all --quiet 2>/dev/null | grep -q "ktlintCheck"; then
-                ktlint_tasks+=("${mod}:ktlintCheck")
-                ktlint_modules+=("$mod")
-            else
-                missing_ktlint_modules+=("$mod")
-            fi
+            ktlint_tasks+=("${mod}:ktlintCheck")
         done
 
-        if [[ ${#missing_ktlint_modules[@]} -gt 0 ]]; then
-            echo "Warning: skipping ktlint for modules without ktlintCheck: ${missing_ktlint_modules[*]}"
-        fi
-
         if [[ ${#ktlint_tasks[@]} -gt 0 ]]; then
-            echo "Running ktlint on affected modules: ${ktlint_modules[*]}"
+            echo "Running ktlint on affected modules: ${modules[*]}"
             if ! ./gradlew "${ktlint_tasks[@]}" --quiet 2>&1; then
                 errors+=("KTLINT: Kotlin lint check failed. Run './gradlew ktlintFormat' to auto-fix.")
+                errors+=("  If a module is missing ktlintCheck, run: ./scripts/verify-ktlint-task-coverage.sh")
             fi
         fi
     fi
 fi
 
-# ============================================================================
-# Report errors
-# ============================================================================
-
 if [[ ${#errors[@]} -gt 0 ]]; then
-    echo ""
-    echo "=========================================="
-    echo "  PRE-COMMIT VALIDATION FAILED"
-    echo "=========================================="
-    echo ""
-    for err in "${errors[@]}"; do
-        echo "  $err"
-    done
-    echo ""
-    echo "=========================================="
-    echo ""
+    print_error_report "PRE-COMMIT VALIDATION FAILED"
     exit 1
 fi
 

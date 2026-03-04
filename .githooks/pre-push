@@ -10,144 +10,87 @@ set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
+source "$REPO_ROOT/scripts/validation/hook-common.sh"
 
 errors=()
+local_shas=""
 
 # Read stdin for push info (local_ref local_sha remote_ref remote_sha)
 while read -r local_ref local_sha remote_ref remote_sha; do
     # Skip delete pushes
-    if [[ "$local_sha" == "0000000000000000000000000000000000000000" ]]; then
+    if [[ "$local_sha" == "$ZERO_SHA" ]]; then
         continue
     fi
 
-    # Determine range of commits being pushed
-    if [[ "$remote_sha" == "0000000000000000000000000000000000000000" ]]; then
-        # New branch - check all commits
-        range="$local_sha"
-        commits="$(git log "$range" --not --remotes --format='%H' 2>/dev/null || echo "$local_sha")"
-    else
-        range="$remote_sha..$local_sha"
-        commits="$(git log "$range" --format='%H' 2>/dev/null)"
-    fi
-
-    if [[ -z "$commits" ]]; then
-        continue
-    fi
-
-    # ========================================================================
-    # 1. Re-validate commit messages
-    # ========================================================================
-
-    VALID_TYPES="feat|fix|refactor|docs|style|test|chore|perf"
-
-    while IFS= read -r sha; do
-        title="$(git log -1 --format='%s' "$sha")"
-
-        # Skip merge commits
-        if [[ "$title" =~ ^Merge ]]; then
-            continue
-        fi
-
-        if ! echo "$title" | grep -qE "^($VALID_TYPES)(\(.+\))?!?: .+"; then
-            errors+=("COMMIT MSG: Invalid format in $sha")
-            errors+=("  Title: $title")
-            errors+=("  Expected: type(scope): description")
-        fi
-
-        # Check scope if present
-        if echo "$title" | grep -qE "^($VALID_TYPES)\((.+)\)"; then
-            scope="$(echo "$title" | sed -E "s/^($VALID_TYPES)\(([^)]+)\).*/\2/")"
-            if ! "$REPO_ROOT/scripts/validation/validate-commit-scope.sh" "$scope" > /dev/null 2>&1; then
-                errors+=("COMMIT MSG: Invalid scope '$scope' in $sha")
-            fi
-        fi
-
-        # Phase number check
-        msg="$(git log -1 --format='%B' "$sha")"
-        if echo "$msg" | grep -qiE "phase[[:space:]]+[0-9]"; then
-            errors+=("COMMIT MSG: Phase numbers found in $sha")
-        fi
-    done <<< "$commits"
-
-    # ========================================================================
-    # 2. Full compile check
-    # ========================================================================
-
-    echo "Running compile check..."
-    if ! ./gradlew :app:android-main:assembleDebug --quiet 2>&1; then
-        errors+=("COMPILE: Android app failed to compile. Fix build errors before pushing.")
-    fi
-
-    # ========================================================================
-    # 3. Tests for affected modules
-    # ========================================================================
-
-    # Collect all changed files across all commits being pushed
-    if [[ "$remote_sha" == "0000000000000000000000000000000000000000" ]]; then
-        changed_files="$(git diff --name-only --diff-filter=ACMR HEAD~"$(echo "$commits" | wc -l | tr -d ' ')"..HEAD 2>/dev/null || git diff --name-only --diff-filter=ACMR HEAD)"
-    else
-        changed_files="$(git diff --name-only --diff-filter=ACMR "$remote_sha..$local_sha")"
-    fi
-
-    kt_files="$(echo "$changed_files" | grep -E '\.(kt|kts)$' || true)"
-
-    if [[ -n "$kt_files" ]]; then
-        modules=()
-        seen_modules=()
-
-        while IFS= read -r file; do
-            dir="$(dirname "$file")"
-            while [[ "$dir" != "." && "$dir" != "/" ]]; do
-                if [[ -f "$dir/build.gradle.kts" ]]; then
-                    module=":$(echo "$dir" | tr '/' ':')"
-                    already_seen=false
-                    for seen in "${seen_modules[@]+"${seen_modules[@]}"}"; do
-                        if [[ "$seen" == "$module" ]]; then
-                            already_seen=true
-                            break
-                        fi
-                    done
-                    if [[ "$already_seen" == "false" ]]; then
-                        modules+=("$module")
-                        seen_modules+=("$module")
-                    fi
-                    break
-                fi
-                dir="$(dirname "$dir")"
-            done
-        done <<< "$kt_files"
-
-        if [[ ${#modules[@]} -gt 0 ]]; then
-            test_tasks=()
-            for mod in "${modules[@]}"; do
-                test_tasks+=("${mod}:test")
-            done
-
-            echo "Running tests for affected modules: ${modules[*]}"
-            if ! ./gradlew "${test_tasks[@]}" --quiet 2>&1; then
-                errors+=("TESTS: Tests failed for affected modules. Fix test failures before pushing.")
-            fi
-        fi
-    fi
+    local_shas="${local_shas}${local_sha}"$'\n'
 done
 
+if [[ -z "$local_shas" ]]; then
+    exit 0
+fi
+
+commits="$(collect_unpushed_commits "$local_shas")"
+
+if [[ -z "$commits" ]]; then
+    exit 0
+fi
+
 # ============================================================================
-# Report errors
+# 1. Re-validate commit messages
 # ============================================================================
 
+while IFS= read -r sha; do
+    [[ -z "$sha" ]] && continue
+    msg="$(git log -1 --format='%B' "$sha")"
+    if ! output="$("$REPO_ROOT/scripts/validation/validate-commit-message.sh" --message "$msg" --context pre-push 2>&1)"; then
+        errors+=("COMMIT MSG: $sha failed validation.")
+        if [[ -n "$output" ]]; then
+            while IFS= read -r line; do
+                [[ -n "$line" ]] && errors+=("  $line")
+            done <<< "$output"
+        fi
+    fi
+done <<< "$commits"
+
+# ============================================================================
+# 2. Full compile check
+# ============================================================================
+
+echo "Running compile check..."
+if ! ./gradlew :app:android-main:assembleDebug --quiet 2>&1; then
+    errors+=("COMPILE: Android app failed to compile. Fix build errors before pushing.")
+fi
+
+# ============================================================================
+# 3. Tests for affected modules
+# ============================================================================
+
+changed_files="$(collect_changed_files_from_commits "$commits")"
+kt_files="$(echo "$changed_files" | grep -E '\.(kt|kts)$' || true)"
+
+if [[ -n "$kt_files" ]]; then
+    resolved_modules="$(modules_from_files "$kt_files")"
+    modules=()
+    while IFS= read -r module; do
+        [[ -n "$module" ]] && modules+=("$module")
+    done <<< "$resolved_modules"
+
+    if [[ ${#modules[@]} -gt 0 ]]; then
+        test_tasks=()
+        mod=""
+        for mod in "${modules[@]}"; do
+            test_tasks+=("${mod}:test")
+        done
+
+        echo "Running tests for affected modules: ${modules[*]}"
+        if ! ./gradlew "${test_tasks[@]}" --quiet 2>&1; then
+            errors+=("TESTS: Tests failed for affected modules. Fix test failures before pushing.")
+        fi
+    fi
+fi
+
 if [[ ${#errors[@]} -gt 0 ]]; then
-    echo ""
-    echo "=========================================="
-    echo "  PRE-PUSH VALIDATION FAILED"
-    echo "=========================================="
-    echo ""
-    for err in "${errors[@]}"; do
-        echo "  $err"
-    done
-    echo ""
-    echo "  Fix these issues before pushing."
-    echo "=========================================="
-    echo ""
+    print_error_report "PRE-PUSH VALIDATION FAILED" "Fix these issues before pushing."
     exit 1
 fi
 
