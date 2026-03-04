@@ -36,6 +36,10 @@ extensions.configure<ApplicationExtension> {
         }
     }
 
+    androidResources {
+        noCompress += listOf("cvr")
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -61,12 +65,22 @@ extensions.configure<ApplicationExtension> {
     }
 
     experimentalProperties["android.experimental.enableScreenshotTest"] = true
+
+    testOptions {
+        unitTests.all {
+            it.maxHeapSize = "4g"
+        }
+    }
 }
 
 kotlin {
     compilerOptions {
         freeCompilerArgs.add("-opt-in=kotlin.uuid.ExperimentalUuidApi")
     }
+}
+
+tasks.withType<Test> {
+    maxHeapSize = "4g"
 }
 
 dependencies {
@@ -98,8 +112,25 @@ dependencies {
     screenshotTestImplementation(libs.androidx.ui.tooling)
     screenshotTestImplementation(libs.screenshot.validation.api)
     screenshotTestImplementation(libs.compose.material3)
+    screenshotTestImplementation(libs.compose.material.icons.extended)
+    screenshotTestImplementation(libs.compose.components.resources)
     screenshotTestImplementation(libs.compose.runtime)
     screenshotTestImplementation(libs.compose.foundation)
     screenshotTestImplementation(projects.client.feature.editor)
+    screenshotTestImplementation(projects.client.feature.core)
+    screenshotTestImplementation(projects.client.feature.onboarding)
+    screenshotTestImplementation(projects.client.feature.journal)
+    screenshotTestImplementation(projects.client.feature.rewind)
+    screenshotTestImplementation(projects.client.feature.timeline)
+    screenshotTestImplementation(projects.client.feature.locationTimeline)
+    screenshotTestImplementation(projects.client.feature.search)
+    screenshotTestImplementation(projects.client.permissions)
+    screenshotTestImplementation(projects.client.domain)
+    screenshotTestImplementation(projects.client.location)
+    screenshotTestImplementation(projects.client.repository)
+    screenshotTestImplementation(projects.client.ui)
+    screenshotTestImplementation(projects.client.billing)
     screenshotTestImplementation(projects.client.theme)
+    screenshotTestImplementation(projects.shared.model)
+    screenshotTestImplementation(libs.kotlinx.datetime)
 }

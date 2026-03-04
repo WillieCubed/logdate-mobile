@@ -6,15 +6,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import app.logdate.feature.core.account.navigation.cloudAccountSetupRoute
-import app.logdate.feature.core.account.navigation.navigateToCloudAccountSetup
 import app.logdate.feature.core.main.homeGraph
 import app.logdate.feature.core.main.navigateHome
 import app.logdate.feature.core.navigation.BaseRoute
 import app.logdate.feature.core.navigation.landingDestination
-import app.logdate.feature.core.profile.navigation.navigateToProfile
 import app.logdate.feature.core.profile.navigation.profileRoute
-import app.logdate.feature.core.settings.navigation.navigateToSettings
-import app.logdate.feature.core.settings.navigation.settingsDestination
 import app.logdate.feature.editor.ui.EntryEditorContent
 import app.logdate.feature.journals.navigation.journalDetailsRoute
 import app.logdate.feature.journals.navigation.journalSettingsRoute
@@ -26,7 +22,6 @@ import app.logdate.feature.journals.navigation.navigateToNoteDetail
 import app.logdate.feature.journals.navigation.newJournalRoute
 import app.logdate.feature.journals.navigation.noteDetailRoute
 import app.logdate.feature.onboarding.navigation.onboardingGraph
-import app.logdate.feature.onboarding.navigation.startOnboarding
 import app.logdate.feature.rewind.navigation.navigateToRewind
 import app.logdate.feature.rewind.navigation.rewindRoutes
 
@@ -65,7 +60,7 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
             onOpenRewind = {
                 navController.navigateToRewind(it)
             },
-            onOpenSettings = navController::navigateToSettings,
+            onOpenSettings = { /* Settings handled by Navigation 3 on Android */ },
             onBrowseJournals = navController::navigateToJournalsOverview,
         )
         journalsOverviewRoute(
@@ -115,19 +110,7 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
                 navController.popBackStack()
             },
         )
-        settingsDestination(
-            onGoBack = {
-                navController.popBackStack()
-            },
-            onAppReset = navController::startOnboarding,
-            onNavigateToCloudAccountCreation = {
-                navController.navigateToCloudAccountSetup()
-            },
-            onNavigateToProfile = {
-                navController.navigateToProfile()
-            },
-            navController = navController,
-        )
+        // Settings destination handled by Navigation 3 on Android
 
         profileRoute(
             onGoBack = { navController.popBackStack() },
