@@ -167,17 +167,9 @@ class AndroidPermissionManager(
     }
 
     override fun openPermissionSettings() {
-        try {
-            val intent =
-                Intent(Settings.ACTION_MANAGE_APP_PERMISSIONS).apply {
-                    putExtra(Intent.EXTRA_PACKAGE_NAME, context.packageName)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-            context.startActivity(intent)
-        } catch (e: Exception) {
-            Napier.w("ACTION_MANAGE_APP_PERMISSIONS unavailable, falling back to app settings", e)
-            openAppSettings()
-        }
+        // No public API exists for opening the per-app permissions screen directly.
+        // Fall back to the app details settings screen which includes permissions.
+        openAppSettings()
     }
 
     override fun shouldShowRationale(type: PermissionType): Boolean {
