@@ -33,6 +33,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.logdate.client.permissions.PermissionManager
+import app.logdate.client.permissions.PermissionType
 import app.logdate.feature.editor.ui.permissions.PermissionRequestContent
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.launch
@@ -43,6 +45,7 @@ import logdate.client.feature.editor.generated.resources.choose_from_gallery
 import logdate.client.feature.editor.generated.resources.gallery
 import logdate.client.feature.editor.generated.resources.take_a_photo
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -59,7 +62,9 @@ actual fun ImagePickerContent(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val permissionManager: PermissionManager = koinInject()
     val showPermissionDialog = remember { mutableStateOf(false) }
+    val isPermanentlyDenied = remember { mutableStateOf(false) }
     val requestedPermission = remember { mutableStateOf("") }
 
     // Remember the photo URI for camera captures
@@ -150,7 +155,13 @@ actual fun ImagePickerContent(
                     }
                 }
             } else {
-                // Show permission request explanation
+                val permissionType =
+                    when (requestedPermission.value) {
+                        Manifest.permission.CAMERA -> PermissionType.CAMERA
+                        else -> PermissionType.STORAGE
+                    }
+                val canAskAgain = permissionManager.shouldShowRationale(permissionType)
+                isPermanentlyDenied.value = !canAskAgain
                 showPermissionDialog.value = true
             }
         }
@@ -254,12 +265,17 @@ actual fun ImagePickerContent(
         PermissionRequestContent(
             permission = requestedPermission.value,
             onRequestPermission = {
-                permissionLauncher.launch(requestedPermission.value)
                 showPermissionDialog.value = false
+                if (isPermanentlyDenied.value) {
+                    permissionManager.openPermissionSettings()
+                } else {
+                    permissionLauncher.launch(requestedPermission.value)
+                }
             },
             onDismiss = {
                 showPermissionDialog.value = false
             },
+            isPermanentlyDenied = isPermanentlyDenied.value,
         )
     }
 }

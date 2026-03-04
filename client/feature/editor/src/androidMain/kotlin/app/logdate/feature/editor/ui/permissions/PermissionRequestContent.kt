@@ -22,6 +22,10 @@ import androidx.compose.ui.window.Dialog
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.grant_permission
 import logdate.client.feature.editor.generated.resources.not_now
+import logdate.client.feature.editor.generated.resources.open_app_settings
+import logdate.client.feature.editor.generated.resources.permission_permanently_denied_camera
+import logdate.client.feature.editor.generated.resources.permission_permanently_denied_gallery
+import logdate.client.feature.editor.generated.resources.permission_permanently_denied_microphone
 import logdate.client.feature.editor.generated.resources.permission_required
 import org.jetbrains.compose.resources.stringResource
 
@@ -29,8 +33,9 @@ import org.jetbrains.compose.resources.stringResource
  * A reusable component for requesting permissions with explanation.
  *
  * @param permission The permission being requested
- * @param onRequestPermission Callback when user wants to grant permission
+ * @param onRequestPermission Callback when user wants to grant permission (or open settings if permanently denied)
  * @param onDismiss Callback when user dismisses the request
+ * @param isPermanentlyDenied Whether the permission has been permanently denied ("Don't ask again")
  */
 @Suppress("ktlint:standard:function-naming")
 @Composable
@@ -38,6 +43,7 @@ fun PermissionRequestContent(
     permission: String,
     onRequestPermission: () -> Unit,
     onDismiss: () -> Unit,
+    isPermanentlyDenied: Boolean = false,
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -63,8 +69,22 @@ fun PermissionRequestContent(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                val explanationText =
+                    if (isPermanentlyDenied) {
+                        when (permission) {
+                            Manifest.permission.CAMERA -> stringResource(Res.string.permission_permanently_denied_camera)
+                            Manifest.permission.READ_EXTERNAL_STORAGE,
+                            "android.permission.READ_MEDIA_IMAGES",
+                            -> stringResource(Res.string.permission_permanently_denied_gallery)
+                            Manifest.permission.RECORD_AUDIO -> stringResource(Res.string.permission_permanently_denied_microphone)
+                            else -> stringResource(Res.string.permission_permanently_denied_gallery)
+                        }
+                    } else {
+                        getPermissionExplanation(permission)
+                    }
+
                 Text(
-                    text = getPermissionExplanation(permission),
+                    text = explanationText,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -77,7 +97,12 @@ fun PermissionRequestContent(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(
-                        text = stringResource(Res.string.grant_permission),
+                        text =
+                            if (isPermanentlyDenied) {
+                                stringResource(Res.string.open_app_settings)
+                            } else {
+                                stringResource(Res.string.grant_permission)
+                            },
                         style = MaterialTheme.typography.labelLarge,
                     )
                 }

@@ -88,10 +88,8 @@ fun ImageBlockEditor(
                         .build(),
                 contentDescription = block.caption.ifBlank { "Image" },
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().clickable { showCaption = !showCaption },
             )
-
-            Box(modifier = Modifier.fillMaxSize().clickable { showCaption = !showCaption })
 
             AnimatedVisibility(
                 visible = showCaption || hasCaption,

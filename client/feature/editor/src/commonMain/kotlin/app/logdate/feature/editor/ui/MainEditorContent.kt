@@ -155,20 +155,27 @@ fun MainEditorContent(
                         }
 
                         is EditorDisplay.Expanded -> {
+                            // Read the live block from uiState rather than the
+                            // transition's target snapshot so that edits (typing)
+                            // are reflected immediately without waiting for the
+                            // SeekableTransitionState to update.
+                            val liveBlock =
+                                uiState.blocks.find { it.id == target.block.id }
+                                    ?: target.block
                             with(sts) {
                                 Surface(
                                     modifier =
                                         Modifier
                                             .fillMaxSize()
                                             .sharedBounds(
-                                                rememberSharedContentState("block_surface_${target.block.id}"),
+                                                rememberSharedContentState("block_surface_${liveBlock.id}"),
                                                 animatedVisibilityScope = avs,
                                             ),
                                     color = MaterialTheme.colorScheme.surfaceContainer,
                                     shape = MaterialTheme.shapes.medium,
                                 ) {
                                     BlockContentInner(
-                                        block = target.block,
+                                        block = liveBlock,
                                         onBlockFocused = uiState.onBlockFocused,
                                         onBlockUpdated = uiState.onUpdateBlock,
                                         onBlockDeleted = uiState.onDeleteBlock,
