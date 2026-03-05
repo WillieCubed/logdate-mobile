@@ -67,9 +67,10 @@ assert_contains "WARNING: Use imperative mood in commit title." "$warning_output
 
 # hook-common module resolution
 source "$COMMON"
-resolved="$(modules_from_files $'client/feature/timeline/src/main/kotlin/Foo.kt\nclient/feature/timeline/src/main/kotlin/Bar.kt\nclient/repository/src/commonMain/kotlin/Baz.kt')"
+resolved="$(modules_from_files $'client/feature/timeline/src/main/kotlin/Foo.kt\nclient/feature/timeline/src/main/kotlin/Bar.kt\nclient/repository/src/commonMain/kotlin/Baz.kt\nclient/datastore/src/commonMain/kotlin/Qux.kt')"
 assert_contains "^:client:feature:timeline$" "$resolved"
 assert_contains "^:client:repository$" "$resolved"
+assert_contains "^:client:logdate-datastore$" "$resolved"
 
 fetch_calls_total=0
 fetch_module_tasks() {

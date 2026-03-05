@@ -8,9 +8,57 @@ MODULE_TASKS_CACHE_KEYS=()
 MODULE_TASKS_CACHE_VALUES=()
 RESOLVED_TEST_TASKS=()
 UNRESOLVED_TEST_MODULES=()
+PROJECT_DIR_OVERRIDE_PATHS=()
+PROJECT_DIR_OVERRIDE_MODULES=()
+PROJECT_DIR_OVERRIDES_LOADED=0
 
 uniq_non_empty_lines() {
     awk 'NF && !seen[$0]++'
+}
+
+load_project_dir_overrides() {
+    local repo_root=""
+    local settings_file=""
+    local line=""
+    local module=""
+    local path=""
+
+    if [[ "$PROJECT_DIR_OVERRIDES_LOADED" -eq 1 ]]; then
+        return 0
+    fi
+
+    PROJECT_DIR_OVERRIDE_PATHS=()
+    PROJECT_DIR_OVERRIDE_MODULES=()
+
+    repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+    settings_file="$repo_root/settings.gradle.kts"
+
+    if [[ -f "$settings_file" ]]; then
+        while IFS= read -r line; do
+            module="${line%%|*}"
+            path="${line#*|}"
+            PROJECT_DIR_OVERRIDE_PATHS+=("${path%/}")
+            PROJECT_DIR_OVERRIDE_MODULES+=("$module")
+        done < <(sed -nE 's@^[[:space:]]*project\("(:[^"]+)"\)\.projectDir[[:space:]]*=[[:space:]]*file\("([^"]+)"\)[[:space:]]*$@\1|\2@p' "$settings_file")
+    fi
+
+    PROJECT_DIR_OVERRIDES_LOADED=1
+}
+
+module_name_from_dir() {
+    local dir="$1"
+    local idx=""
+
+    load_project_dir_overrides
+
+    for idx in "${!PROJECT_DIR_OVERRIDE_PATHS[@]}"; do
+        if [[ "${PROJECT_DIR_OVERRIDE_PATHS[$idx]}" == "${dir%/}" ]]; then
+            printf '%s\n' "${PROJECT_DIR_OVERRIDE_MODULES[$idx]}"
+            return 0
+        fi
+    done
+
+    printf ':%s\n' "$(echo "$dir" | tr '/' ':')"
 }
 
 modules_from_files() {
@@ -25,7 +73,7 @@ modules_from_files() {
         dir="$(dirname "$file")"
         while [[ "$dir" != "." && "$dir" != "/" ]]; do
             if [[ -f "$dir/build.gradle.kts" ]]; then
-                module=":$(echo "$dir" | tr '/' ':')"
+                module="$(module_name_from_dir "$dir")"
                 modules="${modules}${module}"$'\n'
                 break
             fi
@@ -109,7 +157,15 @@ resolve_test_task_for_module() {
 
     case "$coverage_mode" in
         balanced)
-            candidate_tasks=("test" "testDebugUnitTest" "jvmTest" "allTests")
+            candidate_tasks=(
+                "test"
+                "testDebugUnitTest"
+                "jvmTest"
+                "desktopTest"
+                "testAndroidHostTest"
+                "testAndroid"
+                "allTests"
+            )
             ;;
         *)
             return 1
