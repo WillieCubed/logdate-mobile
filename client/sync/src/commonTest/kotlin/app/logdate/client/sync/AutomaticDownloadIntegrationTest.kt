@@ -32,6 +32,7 @@ import app.logdate.client.sync.test.fakeAccountRepository
 import app.logdate.client.sync.test.fakeCloudApiClient
 import app.logdate.client.sync.test.fakeSessionStorage
 import app.logdate.client.sync.test.fakeSyncMetadataService
+import app.logdate.client.sync.test.lastWriteWinsResolver
 import app.logdate.client.sync.test.testSyncTransactionManager
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.flow.first

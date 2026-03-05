@@ -16,7 +16,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
-import java.io.IOException
 import javax.crypto.Cipher
 import javax.crypto.Mac
 import javax.crypto.SecretKeyFactory
@@ -76,13 +75,14 @@ class BackupIntegrityTest {
             // In this test environment, generateRandomBytes is deterministic (sequential)
             val deterministicIv = ByteArray(12) { it.toByte() }
 
-            val decryptedSource =
-                cryptoManager.decryptSource(
-                    fileSystem.source(backupPath),
-                    masterKey,
-                    deterministicIv,
-                )
-            val decryptedData = decryptedSource.buffer().readUtf8()
+            val decryptedData =
+                cryptoManager
+                    .decryptSource(
+                        fileSystem.source(backupPath),
+                        masterKey,
+                        deterministicIv,
+                    ).buffer()
+                    .use { source -> source.readUtf8() }
 
             assertEquals("Decrypted plaintext must match the original secret", secretData, decryptedData)
 
@@ -93,15 +93,15 @@ class BackupIntegrityTest {
             fileSystem.write(backupPath) { write(fileBytes) }
 
             try {
-                val corruptedSource =
-                    cryptoManager.decryptSource(
+                cryptoManager
+                    .decryptSource(
                         fileSystem.source(backupPath),
                         masterKey,
                         deterministicIv,
-                    )
-                corruptedSource.buffer().readUtf8()
+                    ).buffer()
+                    .use { source -> source.readUtf8() }
                 fail("Decryption should have failed due to bit-level corruption (GCM tag mismatch)")
-            } catch (e: IOException) {
+            } catch (_: Exception) {
                 // Expected - Authenticated encryption detected the tampering
             }
         }

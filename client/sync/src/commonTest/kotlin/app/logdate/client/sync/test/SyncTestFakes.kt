@@ -520,7 +520,10 @@ class FakeSyncMetadataService : SyncMetadataService {
         operation: PendingOperation,
     ) {
         pendingUploads.getOrPut(entityType) { mutableMapOf() }[entityId] = operation
-        retryCounts.getOrPut(entityType) { mutableMapOf() }.putIfAbsent(entityId, 0)
+        val counts = retryCounts.getOrPut(entityType) { mutableMapOf() }
+        if (counts[entityId] == null) {
+            counts[entityId] = 0
+        }
         updatePendingCount()
     }
 

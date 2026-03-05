@@ -2,6 +2,7 @@ package app.logdate.server.e2e.auth
 
 import app.logdate.server.module
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText

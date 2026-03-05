@@ -13,12 +13,11 @@ import app.logdate.server.sync.GcsMediaStorage
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.sync.SyncRepository
 import app.logdate.util.UuidSerializer
-import io.ktor.serialization.kotlinx.json.json
+import com.google.api.client.json.Json
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.application.install
 import io.ktor.server.application.log
-import io.ktor.server.application.monitor
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
@@ -67,7 +66,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     }
 
     var maintenanceJob: Job? = null
-    monitor.subscribe(ApplicationStopped) {
+    environment.monitor.subscribe(ApplicationStopped) {
         maintenanceJob?.cancel()
         try {
             org.koin.core.context

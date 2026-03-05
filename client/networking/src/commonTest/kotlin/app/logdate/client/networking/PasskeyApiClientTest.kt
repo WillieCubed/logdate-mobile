@@ -6,6 +6,10 @@ import app.logdate.shared.model.BeginAuthenticationRequest
 import app.logdate.shared.model.CompleteAccountCreationRequest
 import app.logdate.shared.model.CompleteAuthenticationRequest
 import app.logdate.shared.model.LogDateAccount
+import app.logdate.shared.model.PasskeyAssertionAuthenticatorResponse
+import app.logdate.shared.model.PasskeyAssertionResponse
+import app.logdate.shared.model.PasskeyAuthenticatorResponse
+import app.logdate.shared.model.PasskeyCredentialResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond

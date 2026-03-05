@@ -20,6 +20,7 @@ import app.logdate.client.sync.test.fakeJournalNotesRepository
 import app.logdate.client.sync.test.fakeJournalRepository
 import app.logdate.client.sync.test.fakeSessionStorage
 import app.logdate.client.sync.test.fakeSyncMetadataService
+import app.logdate.client.sync.test.lastWriteWinsResolver
 import app.logdate.client.sync.test.testSyncTransactionManager
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.flow.first

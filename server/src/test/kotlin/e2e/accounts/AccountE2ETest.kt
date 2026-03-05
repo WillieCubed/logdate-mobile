@@ -1,7 +1,10 @@
 package app.logdate.server.e2e.accounts
 
 import app.logdate.server.module
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText

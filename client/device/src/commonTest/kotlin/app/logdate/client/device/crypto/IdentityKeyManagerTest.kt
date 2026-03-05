@@ -175,12 +175,8 @@ class FakeCryptoManager : CryptoManager {
     }
 
     override suspend fun deriveMasterKey(phrase: List<String>): ByteArray {
-        val combined = phrase.joinToString(",")
-        val hash =
-            java.security.MessageDigest
-                .getInstance("SHA-256")
-                .digest(combined.toByteArray())
-        return hash.copyOfRange(0, 32)
+        val combined = phrase.joinToString(",").encodeToByteArray()
+        return pseudoHash(combined, 32)
     }
 
     override fun validateRecoveryPhrase(phrase: List<String>): Boolean = phrase.size == 12
@@ -206,11 +202,7 @@ class FakeCryptoManager : CryptoManager {
     override fun hmacSha256(
         key: ByteArray,
         data: ByteArray,
-    ): ByteArray {
-        val mac = javax.crypto.Mac.getInstance("HmacSHA256")
-        mac.init(javax.crypto.spec.SecretKeySpec(key, "HmacSHA256"))
-        return mac.doFinal(data)
-    }
+    ): ByteArray = pseudoHash(key + data, 32)
 
     override fun aesGcmEncrypt(
         key: ByteArray,
@@ -225,4 +217,22 @@ class FakeCryptoManager : CryptoManager {
         aad: ByteArray,
         ciphertext: ByteArray,
     ): ByteArray = throw UnsupportedOperationException("AES-GCM decryption is not needed for this test.")
+
+    private fun pseudoHash(
+        input: ByteArray,
+        outputSize: Int,
+    ): ByteArray {
+        val out = ByteArray(outputSize)
+        var state = 0x85EBCA6B.toInt()
+        var index = 0
+        while (index < outputSize) {
+            for (byte in input) {
+                state = state xor byte.toInt()
+                state = state * 1103515245 + 12345
+            }
+            out[index] = (state ushr ((index % 4) * 8)).toByte()
+            index++
+        }
+        return out
+    }
 }

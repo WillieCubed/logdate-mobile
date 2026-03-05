@@ -7,6 +7,7 @@ import app.logdate.client.sync.cloud.DefaultCloudJournalDataSource
 import app.logdate.client.sync.cloud.DefaultCloudMediaDataSource
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
+import app.logdate.client.sync.test.FakeCloudApiClient
 import app.logdate.client.sync.test.InMemoryMediaSyncRefStore
 import app.logdate.client.sync.test.InMemorySyncConflictStore
 import app.logdate.client.sync.test.InMemorySyncDeadLetterStore
@@ -18,6 +19,7 @@ import app.logdate.client.sync.test.fakeJournalNotesRepository
 import app.logdate.client.sync.test.fakeJournalRepository
 import app.logdate.client.sync.test.fakeSessionStorage
 import app.logdate.client.sync.test.fakeSyncMetadataService
+import app.logdate.client.sync.test.lastWriteWinsResolver
 import app.logdate.client.sync.test.testSyncTransactionManager
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest

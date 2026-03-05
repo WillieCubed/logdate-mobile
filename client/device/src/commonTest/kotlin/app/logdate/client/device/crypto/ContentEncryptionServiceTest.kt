@@ -1,6 +1,7 @@
 package app.logdate.client.device.crypto
 
 import kotlinx.coroutines.test.runTest
+import kotlin.experimental.xor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -63,7 +64,7 @@ class ContentEncryptionServiceTest {
             val envelope = service.encryptContent(contentId, plaintext)
 
             // Flip a bit in ciphertext
-            val tamperedBytes = envelope.ciphertext.toByteArray()
+            val tamperedBytes = envelope.ciphertext.encodeToByteArray()
             if (tamperedBytes.isNotEmpty()) {
                 tamperedBytes[0] = (tamperedBytes[0].toInt() xor 1).toByte()
             }
@@ -102,12 +103,8 @@ class TestCryptoManager : CryptoManager {
     override suspend fun generateRecoveryPhrase(): List<String> = (1..12).map { "test$it" }
 
     override suspend fun deriveMasterKey(phrase: List<String>): ByteArray {
-        val combined = phrase.joinToString("")
-        val hash =
-            java.security.MessageDigest
-                .getInstance("SHA-256")
-                .digest(combined.toByteArray())
-        return hash.copyOfRange(0, 32)
+        val combined = phrase.joinToString("").encodeToByteArray()
+        return pseudoHash(combined, 32)
     }
 
     override fun validateRecoveryPhrase(phrase: List<String>): Boolean = phrase.size == 12
@@ -128,16 +125,12 @@ class TestCryptoManager : CryptoManager {
         TODO("Not needed for tests")
     }
 
-    override fun generateRandomBytes(size: Int): ByteArray = ByteArray(size) { Math.random().toInt().toByte() }
+    override fun generateRandomBytes(size: Int): ByteArray = ByteArray(size) { (it * 31 + 17).toByte() }
 
     override fun hmacSha256(
         key: ByteArray,
         data: ByteArray,
-    ): ByteArray {
-        val mac = javax.crypto.Mac.getInstance("HmacSHA256")
-        mac.init(javax.crypto.spec.SecretKeySpec(key, "HmacSHA256"))
-        return mac.doFinal(data)
-    }
+    ): ByteArray = pseudoHash(key + data, 32)
 
     override fun aesGcmEncrypt(
         key: ByteArray,
@@ -145,17 +138,10 @@ class TestCryptoManager : CryptoManager {
         aad: ByteArray,
         plaintext: ByteArray,
     ): ByteArray {
-        require(key.size == 32) { "Key must be 32 bytes" }
-        require(iv.size == 12) { "IV must be 12 bytes" }
-
-        val secretKey = javax.crypto.spec.SecretKeySpec(key, "AES")
-        val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
-        val gcmSpec = javax.crypto.spec.GCMParameterSpec(128, iv)
-
-        cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, secretKey, gcmSpec)
-        cipher.updateAAD(aad)
-
-        return cipher.doFinal(plaintext)
+        val keystream = pseudoHash(key + iv + aad, plaintext.size)
+        val ciphertext = ByteArray(plaintext.size) { plaintext[it].xor(keystream[it]) }
+        val tag = pseudoHash(key + iv + aad + ciphertext, 16)
+        return ciphertext + tag
     }
 
     override fun aesGcmDecrypt(
@@ -164,16 +150,33 @@ class TestCryptoManager : CryptoManager {
         aad: ByteArray,
         ciphertext: ByteArray,
     ): ByteArray {
-        require(key.size == 32) { "Key must be 32 bytes" }
-        require(iv.size == 12) { "IV must be 12 bytes" }
+        require(ciphertext.size >= 16) { "Ciphertext too short" }
+        val payloadSize = ciphertext.size - 16
+        val payload = ciphertext.copyOfRange(0, payloadSize)
+        val actualTag = ciphertext.copyOfRange(payloadSize, ciphertext.size)
+        val expectedTag = pseudoHash(key + iv + aad + payload, 16)
+        if (!actualTag.contentEquals(expectedTag)) {
+            throw IllegalArgumentException("Authentication failed")
+        }
+        val keystream = pseudoHash(key + iv + aad, payload.size)
+        return ByteArray(payload.size) { payload[it].xor(keystream[it]) }
+    }
 
-        val secretKey = javax.crypto.spec.SecretKeySpec(key, "AES")
-        val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
-        val gcmSpec = javax.crypto.spec.GCMParameterSpec(128, iv)
-
-        cipher.init(javax.crypto.Cipher.DECRYPT_MODE, secretKey, gcmSpec)
-        cipher.updateAAD(aad)
-
-        return cipher.doFinal(ciphertext)
+    private fun pseudoHash(
+        input: ByteArray,
+        outputSize: Int,
+    ): ByteArray {
+        val out = ByteArray(outputSize)
+        var state = 0x9E3779B9.toInt()
+        var index = 0
+        while (index < outputSize) {
+            for (byte in input) {
+                state = state xor byte.toInt()
+                state = state * 1664525 + 1013904223
+            }
+            out[index] = (state ushr ((index % 4) * 8)).toByte()
+            index++
+        }
+        return out
     }
 }
