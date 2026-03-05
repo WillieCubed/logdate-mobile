@@ -76,15 +76,23 @@ if [[ -n "$kt_files" ]]; then
     done <<< "$resolved_modules"
 
     if [[ ${#modules[@]} -gt 0 ]]; then
-        test_tasks=()
-        mod=""
-        for mod in "${modules[@]}"; do
-            test_tasks+=("${mod}:test")
-        done
+        resolve_test_tasks_for_modules "balanced" "${modules[@]}"
 
-        echo "Running tests for affected modules: ${modules[*]}"
-        if ! ./gradlew "${test_tasks[@]}" --quiet 2>&1; then
-            errors+=("TESTS: Tests failed for affected modules. Fix test failures before pushing.")
+        if [[ ${#UNRESOLVED_TEST_MODULES[@]} -gt 0 ]]; then
+            errors+=("TESTS: Unable to resolve test task for affected modules.")
+            for mod in "${UNRESOLVED_TEST_MODULES[@]}"; do
+                errors+=("  ${mod} (run './gradlew ${mod}:tasks --all' and add task mapping in hook-common.sh)")
+            done
+        elif [[ ${#RESOLVED_TEST_TASKS[@]} -gt 0 ]]; then
+            echo "Running tests for affected modules: ${modules[*]}"
+            echo "Resolved test tasks:"
+            for mod in "${RESOLVED_TEST_TASKS[@]}"; do
+                echo "  $mod"
+            done
+
+            if ! ./gradlew "${RESOLVED_TEST_TASKS[@]}" --quiet 2>&1; then
+                errors+=("TESTS: Tests failed for affected modules. Fix test failures before pushing.")
+            fi
         fi
     fi
 fi

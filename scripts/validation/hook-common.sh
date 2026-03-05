@@ -4,6 +4,11 @@
 ZERO_SHA="0000000000000000000000000000000000000000"
 VALID_TYPES="feat|fix|refactor|docs|style|test|chore|perf"
 
+MODULE_TASKS_CACHE_KEYS=()
+MODULE_TASKS_CACHE_VALUES=()
+RESOLVED_TEST_TASKS=()
+UNRESOLVED_TEST_MODULES=()
+
 uniq_non_empty_lines() {
     awk 'NF && !seen[$0]++'
 }
@@ -63,6 +68,82 @@ collect_changed_files_from_commits() {
     done <<< "$commits"
 
     echo "$changed" | uniq_non_empty_lines
+}
+
+fetch_module_tasks() {
+    local module="$1"
+    ./gradlew "${module}:tasks" --all --quiet 2>/dev/null || true
+}
+
+module_tasks_cache_get_or_load() {
+    local module="$1"
+    local idx=""
+    local fetched_tasks=""
+
+    for idx in "${!MODULE_TASKS_CACHE_KEYS[@]}"; do
+        if [[ "${MODULE_TASKS_CACHE_KEYS[$idx]}" == "$module" ]]; then
+            printf '%s\n' "${MODULE_TASKS_CACHE_VALUES[$idx]}"
+            return 0
+        fi
+    done
+
+    fetched_tasks="$(fetch_module_tasks "$module")"
+    MODULE_TASKS_CACHE_KEYS+=("$module")
+    MODULE_TASKS_CACHE_VALUES+=("$fetched_tasks")
+    printf '%s\n' "$fetched_tasks"
+}
+
+module_has_task() {
+    local tasks_output="$1"
+    local task_name="$2"
+
+    echo "$tasks_output" | grep -Eq "^[[:space:]]*${task_name}([[:space:]-]|$)"
+}
+
+resolve_test_task_for_module() {
+    local module="$1"
+    local coverage_mode="${2:-balanced}"
+    local module_tasks=""
+    local task=""
+    local -a candidate_tasks=()
+
+    case "$coverage_mode" in
+        balanced)
+            candidate_tasks=("test" "testDebugUnitTest" "jvmTest" "allTests")
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+
+    module_tasks="$(module_tasks_cache_get_or_load "$module")"
+    for task in "${candidate_tasks[@]}"; do
+        if module_has_task "$module_tasks" "$task"; then
+            printf '%s:%s\n' "$module" "$task"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+resolve_test_tasks_for_modules() {
+    local coverage_mode="$1"
+    shift
+    local module=""
+    local resolved_task=""
+
+    RESOLVED_TEST_TASKS=()
+    UNRESOLVED_TEST_MODULES=()
+
+    for module in "$@"; do
+        [[ -z "$module" ]] && continue
+        if resolved_task="$(resolve_test_task_for_module "$module" "$coverage_mode")"; then
+            RESOLVED_TEST_TASKS+=("$resolved_task")
+        else
+            UNRESOLVED_TEST_MODULES+=("$module")
+        fi
+    done
 }
 
 print_error_report() {

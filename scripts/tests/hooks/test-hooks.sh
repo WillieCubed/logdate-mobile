@@ -11,6 +11,16 @@ COMMON="$REPO_ROOT/scripts/validation/hook-common.sh"
 
 pass_count=0
 
+assert_equals() {
+    local expected="$1"
+    local actual="$2"
+    if [[ "$expected" != "$actual" ]]; then
+        echo "FAIL: expected '$expected', got '$actual'"
+        exit 1
+    fi
+    pass_count=$((pass_count + 1))
+}
+
 assert_exit() {
     local expected="$1"
     shift
@@ -60,5 +70,79 @@ source "$COMMON"
 resolved="$(modules_from_files $'client/feature/timeline/src/main/kotlin/Foo.kt\nclient/feature/timeline/src/main/kotlin/Bar.kt\nclient/repository/src/commonMain/kotlin/Baz.kt')"
 assert_contains "^:client:feature:timeline$" "$resolved"
 assert_contains "^:client:repository$" "$resolved"
+
+fetch_calls_total=0
+fetch_module_tasks() {
+    local module="$1"
+    fetch_calls_total=$((fetch_calls_total + 1))
+
+    case "$module" in
+        :app:android-main)
+            cat <<'EOF'
+Verification tasks
+------------------
+test - Runs the tests.
+testDebugUnitTest - Runs debug unit tests.
+EOF
+            ;;
+        :client:permissions)
+            cat <<'EOF'
+Verification tasks
+------------------
+jvmTest - Runs JVM tests.
+allTests - Runs tests for all targets.
+EOF
+            ;;
+        :client:feature:timeline)
+            cat <<'EOF'
+Verification tasks
+------------------
+allTests - Runs tests for all targets.
+EOF
+            ;;
+        *)
+            cat <<'EOF'
+Verification tasks
+------------------
+check - Runs all checks.
+EOF
+            ;;
+    esac
+}
+
+MODULE_TASKS_CACHE_KEYS=()
+MODULE_TASKS_CACHE_VALUES=()
+resolved_test_task="$(resolve_test_task_for_module ":app:android-main" "balanced")"
+assert_equals ":app:android-main:test" "$resolved_test_task"
+
+resolved_test_task="$(resolve_test_task_for_module ":client:permissions" "balanced")"
+assert_equals ":client:permissions:jvmTest" "$resolved_test_task"
+
+resolved_test_task="$(resolve_test_task_for_module ":client:feature:timeline" "balanced")"
+assert_equals ":client:feature:timeline:allTests" "$resolved_test_task"
+
+# Same module should only be fetched once due to cache.
+fetch_calls_before_cached_lookup="$fetch_calls_total"
+resolved_test_task="$(resolve_test_task_for_module ":client:permissions" "balanced")"
+assert_equals ":client:permissions:jvmTest" "$resolved_test_task"
+assert_equals "$fetch_calls_before_cached_lookup" "$fetch_calls_total"
+
+if resolve_test_task_for_module ":unknown:module" "balanced" >/dev/null 2>&1; then
+    echo "FAIL: expected unknown module to fail test task resolution"
+    exit 1
+fi
+pass_count=$((pass_count + 1))
+
+MODULE_TASKS_CACHE_KEYS=()
+MODULE_TASKS_CACHE_VALUES=()
+resolve_test_tasks_for_modules "balanced" \
+    ":app:android-main" \
+    ":client:permissions" \
+    ":unknown:module"
+resolved_list="$(printf '%s\n' "${RESOLVED_TEST_TASKS[@]}")"
+unresolved_list="$(printf '%s\n' "${UNRESOLVED_TEST_MODULES[@]}")"
+assert_contains "^:app:android-main:test$" "$resolved_list"
+assert_contains "^:client:permissions:jvmTest$" "$resolved_list"
+assert_contains "^:unknown:module$" "$unresolved_list"
 
 echo "Hook regression tests passed ($pass_count assertions)."
