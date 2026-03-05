@@ -71,7 +71,7 @@ if [[ "$title" =~ ^Merge ]] || [[ "$title" =~ ^fixup! ]] || [[ "$title" =~ ^squa
     exit 0
 fi
 
-if ! echo "$title" | grep -qE "^($VALID_TYPES)(\(.+\))?!?: .+"; then
+if ! echo "$title" | grep -qE "^($VALID_TYPES)(\([^)]+\))?!?: .+"; then
     errors+=("FORMAT: Commit title must follow: type(scope): description")
     errors+=("  Valid types: feat, fix, refactor, docs, style, test, chore, perf")
 fi
@@ -81,8 +81,8 @@ if [[ $title_len -gt 72 ]]; then
     errors+=("LENGTH: Title is $title_len chars (max 72).")
 fi
 
-if echo "$title" | grep -qE "^($VALID_TYPES)\((.+)\)"; then
-    scope="$(echo "$title" | sed -E "s/^($VALID_TYPES)\(([^)]+)\).*/\2/")"
+if echo "$title" | grep -qE "^($VALID_TYPES)\([^)]+\)!?: .+"; then
+    scope="$(echo "$title" | sed -E "s/^($VALID_TYPES)\(([^)]+)\)!?: .*/\2/")"
     if ! scope_output="$("$REPO_ROOT/scripts/validation/validate-commit-scope.sh" "$scope" 2>&1)"; then
         if [[ "$context" == "commit-msg" && -n "$scope_output" ]]; then
             echo "$scope_output"

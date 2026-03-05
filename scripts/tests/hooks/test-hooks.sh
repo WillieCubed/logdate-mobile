@@ -38,8 +38,9 @@ assert_contains() {
 
 # validate-commit-message hard checks
 assert_exit 0 "$VALIDATOR" --message "chore: update docs" --context checklist
+assert_exit 1 "$VALIDATOR" --message "feat(bad-scope): add playback controls" --context checklist
 assert_exit 1 "$VALIDATOR" --message "invalid title" --context checklist
-assert_exit 1 "$VALIDATOR" --message "fix: this title is intentionally made very long so it exceeds seventy two characters for validator checks" --context checklist
+assert_exit 1 "$VALIDATOR" --message "fix(timeline): this title is intentionally made very long so it exceeds seventy two characters for validator checks" --context checklist
 assert_exit 1 "$VALIDATOR" --message $'feat(editor): update logic\n\nphase 2 rollout' --context checklist
 
 # validate-commit-message warning behavior (imperative mood warning in commit-msg context)
