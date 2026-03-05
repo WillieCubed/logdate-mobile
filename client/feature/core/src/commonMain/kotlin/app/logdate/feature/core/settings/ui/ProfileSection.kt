@@ -98,7 +98,7 @@ fun ProfileSection(
         if (!profile.isAuthenticated && isPreview) {
             // Show sign-in CTA when not authenticated in preview mode
             SurfaceItem(
-                color = MaterialTheme.colorScheme.surfaceVariant,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 modifier =
                     Modifier
                         .clickable { onNavigateToAccount?.invoke() }
@@ -138,7 +138,7 @@ fun ProfileSection(
                 }
 
             SurfaceItem(
-                color = MaterialTheme.colorScheme.surfaceVariant,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 modifier = itemModifier,
             ) {
                 Row(
