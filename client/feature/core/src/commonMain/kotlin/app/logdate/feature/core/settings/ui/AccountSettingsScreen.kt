@@ -5,6 +5,7 @@ package app.logdate.feature.core.settings.ui
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -19,6 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -51,9 +53,13 @@ import logdate.client.feature.core.generated.resources.account_and_profile
 import logdate.client.feature.core.generated.resources.back
 import logdate.client.feature.core.generated.resources.birthday
 import logdate.client.feature.core.generated.resources.cancel
+import logdate.client.feature.core.generated.resources.create_account
 import logdate.client.feature.core.generated.resources.display_name
+import logdate.client.feature.core.generated.resources.not_signed_in_to_logdate_cloud
 import logdate.client.feature.core.generated.resources.personal_information
 import logdate.client.feature.core.generated.resources.profile_information
+import logdate.client.feature.core.generated.resources.sign_in
+import logdate.client.feature.core.generated.resources.sign_in_to_set_display_name
 import logdate.client.feature.core.generated.resources.sign_out
 import logdate.client.feature.core.generated.resources.sign_out_2
 import logdate.client.feature.core.generated.resources.sign_out_of_your_logdate_cloud_account_on_this_device
@@ -73,11 +79,13 @@ import kotlin.time.Instant
  *
  * @param onBack Callback for when the user presses the back button
  * @param onNavigateToCloudAccountCreation Callback for creating a cloud account
+ * @param onNavigateToSignIn Callback for signing in to LogDate Cloud
  */
 @Composable
 fun AccountSettingsScreen(
     onBack: () -> Unit,
     onNavigateToCloudAccountCreation: () -> Unit,
+    onNavigateToSignIn: () -> Unit = {},
     accountViewModel: AccountSettingsViewModel = koinViewModel(),
     privacyViewModel: PrivacySettingsViewModel = koinViewModel(),
 ) {
@@ -107,6 +115,8 @@ fun AccountSettingsScreen(
         onSignOut = accountViewModel::signOut,
         birthdayUpdateState = birthdayUpdateState,
         profileUpdateState = profileUpdateState,
+        onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
+        onNavigateToSignIn = onNavigateToSignIn,
     )
 }
 
@@ -126,6 +136,8 @@ fun AccountSettingsContent(
     onSignOut: () -> Unit,
     birthdayUpdateState: BirthdayUpdateState,
     profileUpdateState: ProfileUpdateState,
+    onNavigateToCloudAccountCreation: () -> Unit = {},
+    onNavigateToSignIn: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -189,42 +201,96 @@ fun AccountSettingsContent(
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
                 // Profile edit section
-                item {
-                    Column(
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                    ) {
-                        Text(
-                            text = stringResource(Res.string.profile_information),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-
-                        TextField(
-                            value = displayName,
-                            onValueChange = { displayName = it },
-                            label = { Text(stringResource(Res.string.display_name)) },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-
-                        TextField(
-                            value = username,
-                            onValueChange = { username = it },
-                            label = { Text(stringResource(Res.string.username)) },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-
-                        Button(
-                            onClick = { onUpdateProfile(displayName, username) },
-                            enabled = profileUpdateState != ProfileUpdateState.Updating,
-                            modifier = Modifier.fillMaxWidth(),
+                if (isAuthenticated) {
+                    item {
+                        Column(
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.md),
                         ) {
                             Text(
-                                if (profileUpdateState == ProfileUpdateState.Updating) {
-                                    "Updating..."
-                                } else {
-                                    "Update Profile"
-                                },
+                                text = stringResource(Res.string.profile_information),
+                                style = MaterialTheme.typography.titleMedium,
                             )
+
+                            TextField(
+                                value = displayName,
+                                onValueChange = { displayName = it },
+                                label = { Text(stringResource(Res.string.display_name)) },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+
+                            TextField(
+                                value = username,
+                                onValueChange = { username = it },
+                                label = { Text(stringResource(Res.string.username)) },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+
+                            Button(
+                                onClick = { onUpdateProfile(displayName, username) },
+                                enabled = profileUpdateState != ProfileUpdateState.Updating,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(
+                                    if (profileUpdateState == ProfileUpdateState.Updating) {
+                                        "Updating..."
+                                    } else {
+                                        "Update Profile"
+                                    },
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    item {
+                        Column(
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        ) {
+                            Text(
+                                text = stringResource(Res.string.profile_information),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+
+                            MaterialContainer {
+                                Column(
+                                    modifier = Modifier.padding(Spacing.md),
+                                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                                ) {
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                                    ) {
+                                        Text(
+                                            text = stringResource(Res.string.not_signed_in_to_logdate_cloud),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                        Text(
+                                            text = stringResource(Res.string.sign_in_to_set_display_name),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        Button(
+                                            onClick = onNavigateToCloudAccountCreation,
+                                            modifier = Modifier.weight(1f),
+                                        ) {
+                                            Text(stringResource(Res.string.create_account))
+                                        }
+                                        OutlinedButton(
+                                            onClick = onNavigateToSignIn,
+                                            modifier = Modifier.weight(1f),
+                                        ) {
+                                            Text(stringResource(Res.string.sign_in))
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }

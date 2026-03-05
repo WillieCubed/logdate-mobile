@@ -102,11 +102,13 @@ import kotlin.time.Instant
  * - Small screens: Standard screen with back navigation
  *
  * @param onBack Callback for when the user presses the back button
+ * @param onNavigateToSignIn Callback for navigating to sign-in when user taps sign-in CTA
  * @param viewModel ViewModel for the settings
  */
 @Composable
 fun DataSettingsScreen(
     onBack: () -> Unit,
+    onNavigateToSignIn: () -> Unit = {},
     viewModel: DataSettingsViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -176,6 +178,7 @@ fun DataSettingsScreen(
         onSyncNow = viewModel::syncNow,
         isBackgroundSyncEnabled = uiState.isBackgroundSyncEnabled,
         onBackgroundSyncEnabledChange = viewModel::setBackgroundSyncEnabled,
+        onNavigateToSignIn = onNavigateToSignIn,
     )
 }
 
@@ -201,6 +204,7 @@ fun DataSettingsContent(
     onSyncNow: () -> Unit = {},
     isBackgroundSyncEnabled: Boolean = true,
     onBackgroundSyncEnabledChange: (Boolean) -> Unit = {},
+    onNavigateToSignIn: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
@@ -229,12 +233,14 @@ fun DataSettingsContent(
                 contentPadding = paddingValues,
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                // Storage quota section
-                item {
-                    QuotaUsageBlock(
-                        quotaUsage = quotaUsage,
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    )
+                // Storage quota section (only show when authenticated)
+                if (isAuthenticated) {
+                    item {
+                        QuotaUsageBlock(
+                            quotaUsage = quotaUsage,
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        )
+                    }
                 }
 
                 // Data export/import section
@@ -476,114 +482,116 @@ fun DataSettingsContent(
                     }
                 }
 
-                // Sync conflict queue
-                item {
-                    Column(
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    ) {
-                        Text(
-                            text = stringResource(Res.string.sync_conflicts),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        MaterialContainer {
-                            Column {
-                                val conflictCount = conflictsState.conflicts.size
-                                ListItem(
-                                    headlineContent = { Text(stringResource(Res.string.queued_conflicts)) },
-                                    supportingContent = {
-                                        Column {
-                                            Text(
-                                                text =
-                                                    if (conflictsState.isLoading) {
-                                                        stringResource(Res.string.loading_conflicts)
-                                                    } else if (conflictCount == 0) {
-                                                        stringResource(Res.string.no_conflicts_waiting)
-                                                    } else {
-                                                        stringResource(
-                                                            Res.string.conflicts_need_review,
-                                                            conflictCount,
-                                                            if (conflictCount == 1) "" else "s",
-                                                        )
-                                                    },
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                            conflictsState.errorMessage?.let { message ->
-                                                Spacer(modifier = Modifier.height(Spacing.xs))
-                                                Text(
-                                                    text = message,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.error,
-                                                )
-                                            }
-                                        }
-                                    },
-                                    trailingContent = {
-                                        Row {
-                                            TextButton(onClick = onRefreshConflicts) {
-                                                Text(stringResource(Res.string.refresh))
-                                            }
-                                            TextButton(
-                                                onClick = onClearConflicts,
-                                                enabled = conflictCount > 0,
-                                            ) {
-                                                Text(stringResource(Res.string.clear))
-                                            }
-                                        }
-                                    },
-                                )
-
-                                conflictsState.conflicts.take(3).forEach { conflict ->
-                                    HorizontalDivider(
-                                        modifier = Modifier.padding(horizontal = Spacing.md),
-                                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                                    )
+                // Sync conflict queue (only show when authenticated)
+                if (isAuthenticated) {
+                    item {
+                        Column(
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        ) {
+                            Text(
+                                text = stringResource(Res.string.sync_conflicts),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            MaterialContainer {
+                                Column {
+                                    val conflictCount = conflictsState.conflicts.size
                                     ListItem(
-                                        headlineContent = {
-                                            Text(
-                                                stringResource(
-                                                    Res.string.conflict_entity_with_id,
-                                                    conflict.entityType,
-                                                    conflict.entityId,
-                                                ),
-                                            )
-                                        },
+                                        headlineContent = { Text(stringResource(Res.string.queued_conflicts)) },
                                         supportingContent = {
                                             Column {
                                                 Text(
-                                                    text = conflict.reason,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                )
-                                                val timestamp = Instant.fromEpochMilliseconds(conflict.detectedAt)
-                                                Text(
                                                     text =
-                                                        stringResource(
-                                                            Res.string.detected_timestamp,
-                                                            timestamp.toReadableDateTimeShort(),
-                                                        ),
-                                                    style = MaterialTheme.typography.bodySmall,
+                                                        if (conflictsState.isLoading) {
+                                                            stringResource(Res.string.loading_conflicts)
+                                                        } else if (conflictCount == 0) {
+                                                            stringResource(Res.string.no_conflicts_waiting)
+                                                        } else {
+                                                            stringResource(
+                                                                Res.string.conflicts_need_review,
+                                                                conflictCount,
+                                                                if (conflictCount == 1) "" else "s",
+                                                            )
+                                                        },
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 )
+                                                conflictsState.errorMessage?.let { message ->
+                                                    Spacer(modifier = Modifier.height(Spacing.xs))
+                                                    Text(
+                                                        text = message,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.error,
+                                                    )
+                                                }
+                                            }
+                                        },
+                                        trailingContent = {
+                                            Row {
+                                                TextButton(onClick = onRefreshConflicts) {
+                                                    Text(stringResource(Res.string.refresh))
+                                                }
+                                                TextButton(
+                                                    onClick = onClearConflicts,
+                                                    enabled = conflictCount > 0,
+                                                ) {
+                                                    Text(stringResource(Res.string.clear))
+                                                }
                                             }
                                         },
                                     )
-                                }
-                                if (conflictCount > 3) {
-                                    HorizontalDivider(
-                                        modifier = Modifier.padding(horizontal = Spacing.md),
-                                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                                    )
-                                    Text(
-                                        text =
-                                            stringResource(
-                                                Res.string.showing_three_of_conflicts,
-                                                conflictCount,
-                                            ),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(Spacing.md),
-                                    )
+
+                                    conflictsState.conflicts.take(3).forEach { conflict ->
+                                        HorizontalDivider(
+                                            modifier = Modifier.padding(horizontal = Spacing.md),
+                                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                        )
+                                        ListItem(
+                                            headlineContent = {
+                                                Text(
+                                                    stringResource(
+                                                        Res.string.conflict_entity_with_id,
+                                                        conflict.entityType,
+                                                        conflict.entityId,
+                                                    ),
+                                                )
+                                            },
+                                            supportingContent = {
+                                                Column {
+                                                    Text(
+                                                        text = conflict.reason,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    )
+                                                    val timestamp = Instant.fromEpochMilliseconds(conflict.detectedAt)
+                                                    Text(
+                                                        text =
+                                                            stringResource(
+                                                                Res.string.detected_timestamp,
+                                                                timestamp.toReadableDateTimeShort(),
+                                                            ),
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    )
+                                                }
+                                            },
+                                        )
+                                    }
+                                    if (conflictCount > 3) {
+                                        HorizontalDivider(
+                                            modifier = Modifier.padding(horizontal = Spacing.md),
+                                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                        )
+                                        Text(
+                                            text =
+                                                stringResource(
+                                                    Res.string.showing_three_of_conflicts,
+                                                    conflictCount,
+                                                ),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(Spacing.md),
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -598,6 +606,7 @@ fun DataSettingsContent(
                         onSyncNow = onSyncNow,
                         isBackgroundSyncEnabled = isBackgroundSyncEnabled,
                         onBackgroundSyncEnabledChange = onBackgroundSyncEnabledChange,
+                        onNavigateToSignIn = onNavigateToSignIn,
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }
@@ -613,6 +622,7 @@ private fun SyncSettingsSection(
     onSyncNow: () -> Unit,
     isBackgroundSyncEnabled: Boolean,
     onBackgroundSyncEnabledChange: (Boolean) -> Unit,
+    onNavigateToSignIn: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -633,6 +643,11 @@ private fun SyncSettingsSection(
                             text = stringResource(Res.string.sign_in_to_your_logdate_cloud_account_to_enable_sync),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    },
+                    trailingContent = {
+                        Button(onClick = onNavigateToSignIn) {
+                            Text(stringResource(Res.string.sign_in))
+                        }
                     },
                 )
             } else {

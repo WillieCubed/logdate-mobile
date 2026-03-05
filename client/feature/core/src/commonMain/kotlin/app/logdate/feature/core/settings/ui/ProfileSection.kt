@@ -19,6 +19,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -48,6 +49,7 @@ import logdate.client.feature.core.generated.resources.manage_your_display_name_
 import logdate.client.feature.core.generated.resources.profile
 import logdate.client.feature.core.generated.resources.profile_username_hint
 import logdate.client.feature.core.generated.resources.save
+import logdate.client.feature.core.generated.resources.sign_in_to_logdate_cloud_settings_summary
 import logdate.client.feature.core.generated.resources.username
 import logdate.client.feature.core.generated.resources.username_2
 import logdate.client.feature.core.generated.resources.your_full_name
@@ -93,75 +95,110 @@ fun ProfileSection(
         }
 
         // Profile Info Display
-        val navigateAction = onNavigateToProfile ?: onNavigateToAccount
-        val itemModifier =
-            if (isPreview && navigateAction != null) {
-                Modifier.clickable { navigateAction() }
-            } else {
-                Modifier
-            }
-
-        SurfaceItem(
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            modifier = itemModifier,
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+        if (!profile.isAuthenticated && isPreview) {
+            // Show sign-in CTA when not authenticated in preview mode
+            SurfaceItem(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier =
+                    Modifier
+                        .clickable { onNavigateToAccount?.invoke() }
+                        .fillMaxWidth(),
             ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-                    ) {
+                ListItem(
+                    headlineContent = { Text(stringResource(Res.string.go_to_account_settings)) },
+                    supportingContent = {
                         Text(
-                            text = profile.name.ifEmpty { "No display name set" },
-                            style = MaterialTheme.typography.titleMedium,
-                            color =
-                                if (profile.name.isNotEmpty()) {
-                                    MaterialTheme.colorScheme.onSurface
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
+                            text = stringResource(Res.string.sign_in_to_logdate_cloud_settings_summary),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Text(
-                            text = if (profile.username.isNotEmpty()) "@${profile.username}" else "No username set",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color =
-                                if (profile.username.isNotEmpty()) {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                },
-                        )
-                    }
-                }
-
-                if (isPreview && navigateAction != null) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                        contentDescription = stringResource(Res.string.go_to_account_settings),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else if (profile.isEditable) {
-                    IconButton(
-                        onClick = { showEditDialog = true },
-                    ) {
+                    },
+                    leadingContent = {
                         Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = stringResource(Res.string.edit_profile),
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    },
+                    trailingContent = {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                            contentDescription = stringResource(Res.string.go_to_account_settings),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
+                )
+            }
+        } else {
+            val navigateAction = onNavigateToProfile ?: onNavigateToAccount
+            val itemModifier =
+                if (isPreview && navigateAction != null) {
+                    Modifier.clickable { navigateAction() }
+                } else {
+                    Modifier
+                }
+
+            SurfaceItem(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = itemModifier,
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                        ) {
+                            Text(
+                                text = profile.name.ifEmpty { "No display name set" },
+                                style = MaterialTheme.typography.titleMedium,
+                                color =
+                                    if (profile.name.isNotEmpty()) {
+                                        MaterialTheme.colorScheme.onSurface
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                            )
+                            Text(
+                                text = if (profile.username.isNotEmpty()) "@${profile.username}" else "No username set",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color =
+                                    if (profile.username.isNotEmpty()) {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    },
+                            )
+                        }
+                    }
+
+                    if (isPreview && navigateAction != null) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                            contentDescription = stringResource(Res.string.go_to_account_settings),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else if (profile.isEditable) {
+                        IconButton(
+                            onClick = { showEditDialog = true },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = stringResource(Res.string.edit_profile),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }

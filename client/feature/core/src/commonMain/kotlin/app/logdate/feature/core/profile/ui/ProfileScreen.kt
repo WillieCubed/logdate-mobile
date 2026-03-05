@@ -74,6 +74,7 @@ import logdate.client.feature.core.generated.resources.back
 import logdate.client.feature.core.generated.resources.cancel
 import logdate.client.feature.core.generated.resources.display_name
 import logdate.client.feature.core.generated.resources.edit_display_name
+import logdate.client.feature.core.generated.resources.no_display_name
 import logdate.client.feature.core.generated.resources.personal_information
 import logdate.client.feature.core.generated.resources.profile
 import logdate.client.feature.core.generated.resources.profile_photo
@@ -317,12 +318,22 @@ private fun ProfileHeader(
                     horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     Text(
-                        text = profile.displayName,
+                        text =
+                            if (profile.displayName.isEmpty() && !profile.isAuthenticated) {
+                                stringResource(Res.string.no_display_name)
+                            } else {
+                                profile.displayName
+                            },
                         style =
                             MaterialTheme.typography.headlineLarge.copy(
                                 fontWeight = FontWeight.Bold,
                             ),
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color =
+                            if (profile.displayName.isEmpty() && !profile.isAuthenticated) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         modifier =
@@ -335,16 +346,18 @@ private fun ProfileHeader(
                             ),
                     )
 
-                    IconButton(
-                        onClick = onStartEditingDisplayName,
-                        modifier = Modifier.size(32.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = stringResource(Res.string.edit_display_name),
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
+                    if (profile.isAuthenticated) {
+                        IconButton(
+                            onClick = onStartEditingDisplayName,
+                            modifier = Modifier.size(32.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = stringResource(Res.string.edit_display_name),
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
                     }
                 }
             }

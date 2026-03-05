@@ -247,4 +247,9 @@
     <string name="showing_three_of_conflicts">Showing 3 of %1$d conflicts</string>
     <string name="username_handle">@%1$s</string>
     <string name="warnings_count">Warnings: %1$d</string>
+    <string name="sign_in_to_enable_cloud_backup">Sign in to enable cloud backup and sync.</string>
+    <string name="not_signed_in_to_logdate_cloud">Not signed in to LogDate Cloud</string>
+    <string name="sign_in_to_set_display_name">Sign in to set your display name and username, and sync your journal across devices.</string>
+    <string name="sign_in_to_logdate_cloud_settings_summary">Sync, backup, and access your journal anywhere</string>
+    <string name="no_display_name">No display name</string>
 </resources>
