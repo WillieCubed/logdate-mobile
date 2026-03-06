@@ -154,12 +154,6 @@ class ProfileViewModel(
                         editState = ProfileEditState.None,
                         updateState = ProfileUpdateState.Success,
                     )
-
-                // Clear success state after a brief moment
-                kotlinx.coroutines.delay(2000)
-                if (_uiState.value.updateState is ProfileUpdateState.Success) {
-                    _uiState.value = _uiState.value.copy(updateState = ProfileUpdateState.Idle)
-                }
             } catch (e: Exception) {
                 Napier.e("Unexpected error saving display name", e)
                 _uiState.value =

@@ -10,6 +10,7 @@ import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.shared.model.LogDateAccount
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -82,6 +83,7 @@ class CloudAccountOnboardingViewModel(
         if (username.isNotBlank() && username.length >= 3) {
             usernameCheckJob =
                 viewModelScope.launch {
+                    delay(300)
                     checkUsernameAvailability(username)
                 }
         } else {
@@ -145,7 +147,7 @@ class CloudAccountOnboardingViewModel(
     }
 
     fun goToSignIn() {
-        _uiState.value = _uiState.value.copy(currentStep = OnboardingStep.SignIn)
+        _uiState.value = _uiState.value.copy(currentStep = OnboardingStep.SignIn, errorMessage = null)
     }
 
     fun signInWithPasskey(

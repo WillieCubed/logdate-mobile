@@ -47,11 +47,20 @@ import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.app_security
 import logdate.client.feature.core.generated.resources.back
 import logdate.client.feature.core.generated.resources.cancel
+import logdate.client.feature.core.generated.resources.confirm
+import logdate.client.feature.core.generated.resources.disable_biometric_lock_message
+import logdate.client.feature.core.generated.resources.disable_biometric_lock_title
 import logdate.client.feature.core.generated.resources.location_privacy
 import logdate.client.feature.core.generated.resources.location_settings
 import logdate.client.feature.core.generated.resources.manage_location_tracking_and_privacy_preferences
 import logdate.client.feature.core.generated.resources.navigate_to_location_settings
 import logdate.client.feature.core.generated.resources.operation_passkey
+import logdate.client.feature.core.generated.resources.passkey_created_successfully_2
+import logdate.client.feature.core.generated.resources.passkey_operation_creating
+import logdate.client.feature.core.generated.resources.passkey_operation_creating_message
+import logdate.client.feature.core.generated.resources.passkey_operation_removing
+import logdate.client.feature.core.generated.resources.passkey_operation_removing_message
+import logdate.client.feature.core.generated.resources.passkey_removed_successfully
 import logdate.client.feature.core.generated.resources.privacy_and_security
 import logdate.client.feature.core.generated.resources.remove
 import logdate.client.feature.core.generated.resources.remove_passkey
@@ -194,15 +203,19 @@ fun PrivacySettingsContent(
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val snackbarHostState = remember { SnackbarHostState() }
     var passkeyToDelete by remember { mutableStateOf<PasskeyInfo?>(null) }
+    var showDisableBiometricsDialog by remember { mutableStateOf(false) }
+
+    val passkeyRemovedMessage = stringResource(Res.string.passkey_removed_successfully)
+    val passkeyCreatedMessage = stringResource(Res.string.passkey_created_successfully_2)
 
     // Show feedback for passkey operations
     LaunchedEffect(revocationState) {
         when (revocationState) {
             is PasskeyRevocationState.Success -> {
-                snackbarHostState.showSnackbar("Passkey successfully removed")
+                snackbarHostState.showSnackbar(passkeyRemovedMessage)
             }
             is PasskeyRevocationState.Error -> {
-                snackbarHostState.showSnackbar("Failed to remove passkey: ${revocationState.message}")
+                snackbarHostState.showSnackbar(revocationState.message)
             }
             else -> { /* No action needed */ }
         }
@@ -211,10 +224,10 @@ fun PrivacySettingsContent(
     LaunchedEffect(creationState) {
         when (creationState) {
             is PasskeyCreationState.Success -> {
-                snackbarHostState.showSnackbar("Passkey successfully created")
+                snackbarHostState.showSnackbar(passkeyCreatedMessage)
             }
             is PasskeyCreationState.Error -> {
-                snackbarHostState.showSnackbar("Failed to create passkey: ${creationState.message}")
+                snackbarHostState.showSnackbar(creationState.message)
             }
             else -> { /* No action needed */ }
         }
@@ -232,14 +245,14 @@ fun PrivacySettingsContent(
 
     // Loading dialogs for passkey operations
     PasskeyOperationLoadingDialog(
-        operation = "Removing",
-        message = "Please wait while we remove your passkey",
+        operation = stringResource(Res.string.passkey_operation_removing),
+        message = stringResource(Res.string.passkey_operation_removing_message),
         isLoading = revocationState == PasskeyRevocationState.Revoking,
     )
 
     PasskeyOperationLoadingDialog(
-        operation = "Creating",
-        message = "Please wait while we create your passkey",
+        operation = stringResource(Res.string.passkey_operation_creating),
+        message = stringResource(Res.string.passkey_operation_creating_message),
         isLoading = creationState == PasskeyCreationState.Creating,
     )
 
@@ -287,7 +300,13 @@ fun PrivacySettingsContent(
                                     trailingContent = {
                                         Switch(
                                             checked = isBiometricsEnabled,
-                                            onCheckedChange = onSetBiometricsEnabled,
+                                            onCheckedChange = { enabled ->
+                                                if (enabled) {
+                                                    onSetBiometricsEnabled(true)
+                                                } else {
+                                                    showDisableBiometricsDialog = true
+                                                }
+                                            },
                                         )
                                     },
                                 )
@@ -350,6 +369,29 @@ fun PrivacySettingsContent(
                 }
             }
         }
+    }
+
+    if (showDisableBiometricsDialog) {
+        AlertDialog(
+            onDismissRequest = { showDisableBiometricsDialog = false },
+            title = { Text(stringResource(Res.string.disable_biometric_lock_title)) },
+            text = { Text(stringResource(Res.string.disable_biometric_lock_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onSetBiometricsEnabled(false)
+                        showDisableBiometricsDialog = false
+                    },
+                ) {
+                    Text(stringResource(Res.string.confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDisableBiometricsDialog = false }) {
+                    Text(stringResource(Res.string.cancel))
+                }
+            },
+        )
     }
 }
 

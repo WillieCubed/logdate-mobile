@@ -54,18 +54,25 @@ import logdate.client.feature.core.generated.resources.account_actions
 import logdate.client.feature.core.generated.resources.account_and_profile
 import logdate.client.feature.core.generated.resources.back
 import logdate.client.feature.core.generated.resources.birthday
+import logdate.client.feature.core.generated.resources.birthday_update_failed
+import logdate.client.feature.core.generated.resources.birthday_updated
 import logdate.client.feature.core.generated.resources.cancel
 import logdate.client.feature.core.generated.resources.create_account
 import logdate.client.feature.core.generated.resources.display_name
 import logdate.client.feature.core.generated.resources.not_signed_in_to_logdate_cloud
 import logdate.client.feature.core.generated.resources.personal_information
 import logdate.client.feature.core.generated.resources.profile_information
+import logdate.client.feature.core.generated.resources.profile_update_failed
+import logdate.client.feature.core.generated.resources.profile_updated_successfully
+import logdate.client.feature.core.generated.resources.set_your_birthday
 import logdate.client.feature.core.generated.resources.sign_in
 import logdate.client.feature.core.generated.resources.sign_in_to_set_display_name
 import logdate.client.feature.core.generated.resources.sign_out
 import logdate.client.feature.core.generated.resources.sign_out_2
 import logdate.client.feature.core.generated.resources.sign_out_failed
 import logdate.client.feature.core.generated.resources.sign_out_of_your_logdate_cloud_account_on_this_device
+import logdate.client.feature.core.generated.resources.update_profile
+import logdate.client.feature.core.generated.resources.updating
 import logdate.client.feature.core.generated.resources.username
 import logdate.client.feature.core.generated.resources.youll_need_to_sign_in_again_to_sync_data_on_this_device
 import org.jetbrains.compose.resources.stringResource
@@ -150,17 +157,19 @@ fun AccountSettingsContent(
     // State for profile edit fields
     var displayName by remember { mutableStateOf(userProfile.name) }
     var username by remember { mutableStateOf(userProfile.username) }
+    val birthdayUpdatedMessage = stringResource(Res.string.birthday_updated)
+    val birthdayUpdateFailedMessage = stringResource(Res.string.birthday_update_failed)
+    val profileUpdatedMessage = stringResource(Res.string.profile_updated_successfully)
+    val profileUpdateFailedMessage = stringResource(Res.string.profile_update_failed)
 
     // Handle birthday update state changes
     LaunchedEffect(birthdayUpdateState) {
         when (birthdayUpdateState) {
             is BirthdayUpdateState.Success -> {
-                snackbarHostState.showSnackbar("Birthday updated successfully")
+                snackbarHostState.showSnackbar(birthdayUpdatedMessage)
             }
             is BirthdayUpdateState.Error -> {
-                snackbarHostState.showSnackbar(
-                    "Failed to update birthday: ${birthdayUpdateState.message}",
-                )
+                snackbarHostState.showSnackbar(birthdayUpdateFailedMessage)
             }
             else -> { /* No action needed */ }
         }
@@ -169,10 +178,10 @@ fun AccountSettingsContent(
     LaunchedEffect(profileUpdateState) {
         when (profileUpdateState) {
             is ProfileUpdateState.Success -> {
-                snackbarHostState.showSnackbar("Profile updated successfully")
+                snackbarHostState.showSnackbar(profileUpdatedMessage)
             }
             is ProfileUpdateState.Error -> {
-                snackbarHostState.showSnackbar("Profile update failed: ${profileUpdateState.message}")
+                snackbarHostState.showSnackbar(profileUpdateFailedMessage)
             }
             else -> { /* No action needed */ }
         }
@@ -236,9 +245,9 @@ fun AccountSettingsContent(
                             ) {
                                 Text(
                                     if (profileUpdateState == ProfileUpdateState.Updating) {
-                                        "Updating..."
+                                        stringResource(Res.string.updating)
                                     } else {
-                                        "Update Profile"
+                                        stringResource(Res.string.update_profile)
                                     },
                                 )
                             }
@@ -328,7 +337,7 @@ fun AccountSettingsContent(
                                     supportingContent = {
                                         val formattedBirthday =
                                             if (userData.birthday == Instant.DISTANT_PAST) {
-                                                "Set your birthday!"
+                                                stringResource(Res.string.set_your_birthday)
                                             } else {
                                                 val localDate =
                                                     userData.birthday

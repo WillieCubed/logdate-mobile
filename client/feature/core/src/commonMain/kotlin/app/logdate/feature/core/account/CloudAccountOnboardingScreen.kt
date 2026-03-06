@@ -37,6 +37,7 @@ fun CloudAccountOnboardingScreen(
                 onContinue = viewModel::goToNextStep,
                 onSignIn = viewModel::goToSignIn,
                 onSkip = viewModel::skipOnboarding,
+                isPasskeySupported = uiState.isPasskeySupported,
                 modifier = modifier,
             )
         }

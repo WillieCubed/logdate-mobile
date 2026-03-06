@@ -48,6 +48,7 @@ import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.action_reset_app
 import logdate.client.feature.core.generated.resources.back
 import logdate.client.feature.core.generated.resources.before_you_reset
+import logdate.client.feature.core.generated.resources.before_you_reset_description
 import logdate.client.feature.core.generated.resources.clear_all_data
 import logdate.client.feature.core.generated.resources.clear_all_your_data_while_keeping_your_account
 import logdate.client.feature.core.generated.resources.clear_data
@@ -147,10 +148,7 @@ fun DangerZoneSettingsContent(
                                         Text(stringResource(Res.string.before_you_reset))
                                     },
                                     supportingContent = {
-                                        Text(
-                                            "Export and verify a backup from Data & Storage. " +
-                                                "Without a backup, encrypted local data may be unrecoverable.",
-                                        )
+                                        Text(stringResource(Res.string.before_you_reset_description))
                                     },
                                     leadingContent = {
                                         Icon(

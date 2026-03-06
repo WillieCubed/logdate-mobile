@@ -78,6 +78,7 @@ import logdate.client.feature.core.generated.resources.no_display_name
 import logdate.client.feature.core.generated.resources.personal_information
 import logdate.client.feature.core.generated.resources.profile
 import logdate.client.feature.core.generated.resources.profile_photo
+import logdate.client.feature.core.generated.resources.profile_updated_successfully
 import logdate.client.feature.core.generated.resources.refresh_profile
 import logdate.client.feature.core.generated.resources.save
 import logdate.client.feature.core.generated.resources.username_handle
@@ -107,6 +108,7 @@ fun ProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val profileUpdatedMessage = stringResource(Res.string.profile_updated_successfully)
 
     // Handle error messages
     LaunchedEffect(uiState.errorMessage) {
@@ -116,10 +118,11 @@ fun ProfileScreen(
         }
     }
 
-    // Handle update success
+    // Handle update success — snackbar auto-dismisses, then reset state
     LaunchedEffect(uiState.updateState) {
         if (uiState.updateState is ProfileUpdateState.Success) {
-            snackbarHostState.showSnackbar("Profile updated successfully")
+            snackbarHostState.showSnackbar(profileUpdatedMessage)
+            viewModel.clearUpdateState()
         }
     }
 
@@ -346,18 +349,16 @@ private fun ProfileHeader(
                             ),
                     )
 
-                    if (profile.isAuthenticated) {
-                        IconButton(
-                            onClick = onStartEditingDisplayName,
-                            modifier = Modifier.size(32.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = stringResource(Res.string.edit_display_name),
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        }
+                    IconButton(
+                        onClick = onStartEditingDisplayName,
+                        modifier = Modifier.size(32.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = stringResource(Res.string.edit_display_name),
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
                     }
                 }
             }
