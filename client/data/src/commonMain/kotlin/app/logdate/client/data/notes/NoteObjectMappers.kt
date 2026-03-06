@@ -7,7 +7,6 @@ import app.logdate.client.database.entities.VideoNoteEntity
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
-import io.github.aakira.napier.Napier
 import kotlin.uuid.Uuid
 
 /**
@@ -120,26 +119,16 @@ fun JournalNote.Video.toEntity() =
         placeId = location?.place?.id,
     )
 
-fun AudioNoteEntity.toModel(): JournalNote.Audio {
-    val result =
-        JournalNote.Audio(
-            uid = uid,
-            mediaRef = contentUri,
-            durationMs = durationMs,
-            creationTimestamp = created,
-            lastUpdated = lastUpdated,
-            syncVersion = syncVersion,
-            location = mapLocation(latitude, longitude, altitude, locationAccuracy, placeId),
-        )
-
-    // Add debug logging for audio note conversion
-    Napier.d(
-        tag = "NoteObjectMappers",
-        message = "CONVERTING AUDIO NOTE: Entity with UID $uid and URI $contentUri created at $created converted to model",
+fun AudioNoteEntity.toModel(): JournalNote.Audio =
+    JournalNote.Audio(
+        uid = uid,
+        mediaRef = contentUri,
+        durationMs = durationMs,
+        creationTimestamp = created,
+        lastUpdated = lastUpdated,
+        syncVersion = syncVersion,
+        location = mapLocation(latitude, longitude, altitude, locationAccuracy, placeId),
     )
-
-    return result
-}
 
 fun JournalNote.Audio.toEntity() =
     AudioNoteEntity(
