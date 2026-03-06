@@ -13,9 +13,10 @@ import java.util.zip.ZipInputStream
  * On first use, extracts the model from the app's assets into internal storage.
  * Subsequent calls return the cached model path.
  *
- * The model is expected to be bundled as a zip file in `assets/model-en-us.zip`.
- * For Play Store builds, the model may come via Play Asset Delivery; this manager
- * falls back to the bundled assets variant for debug builds and non-GMS devices.
+ * The model is bundled as a zip file in assets (downloaded at build time by the
+ * `app.logdate.vosk-model` Gradle plugin). The zip contains a single top-level
+ * directory which is stripped during extraction so model files land directly in
+ * the target directory.
  */
 class VoskModelManager(
     private val context: Context,
@@ -69,13 +70,42 @@ class VoskModelManager(
         targetDir: File,
     ) {
         ZipInputStream(inputStream).use { zip ->
+            // Vosk model zips contain a single top-level directory (e.g. "vosk-model-small-en-us-0.15/").
+            // Strip it so model files land directly in targetDir.
+            var topLevelPrefix: String? = null
+
             var entry = zip.nextEntry
             while (entry != null) {
-                val file = File(targetDir, entry.name)
+                val entryName = entry.name
+
+                // Detect the top-level directory from the first entry
+                if (topLevelPrefix == null) {
+                    val slashIndex = entryName.indexOf('/')
+                    if (slashIndex > 0) {
+                        topLevelPrefix = entryName.substring(0, slashIndex + 1)
+                    }
+                }
+
+                // Strip the top-level prefix from entry paths
+                val relativePath =
+                    if (topLevelPrefix != null && entryName.startsWith(topLevelPrefix)) {
+                        entryName.removePrefix(topLevelPrefix)
+                    } else {
+                        entryName
+                    }
+
+                // Skip the top-level directory entry itself
+                if (relativePath.isEmpty()) {
+                    zip.closeEntry()
+                    entry = zip.nextEntry
+                    continue
+                }
+
+                val file = File(targetDir, relativePath)
 
                 // Prevent zip path traversal
                 if (!file.canonicalPath.startsWith(targetDir.canonicalPath)) {
-                    throw SecurityException("Zip entry outside target dir: ${entry.name}")
+                    throw SecurityException("Zip entry outside target dir: $entryName")
                 }
 
                 if (entry.isDirectory) {
@@ -94,7 +124,7 @@ class VoskModelManager(
 
     companion object {
         private const val MODEL_DIR_NAME = "vosk-model"
-        private const val MODEL_ASSET_NAME = "model-en-us.zip"
+        private const val MODEL_ASSET_NAME = "vosk-model-small-en-us.zip"
         private const val BUFFER_SIZE = 8192
     }
 }

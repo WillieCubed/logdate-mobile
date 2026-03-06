@@ -52,6 +52,9 @@ extensions.configure<ApplicationExtension> {
             pickFirsts += "META-INF/NOTICE.txt"
             pickFirsts += "META-INF/INDEX.LIST"
         }
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 
     compileOptions {
