@@ -1,39 +1,49 @@
 package app.logdate.feature.editor.ui.audio
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.finish
+import logdate.client.feature.editor.generated.resources.listening
 import logdate.client.feature.editor.generated.resources.restart
-import logdate.client.feature.editor.generated.resources.tap_to_start_recording
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration
 
 /**
  * A component that displays the active recording interface with controls.
- * Matches the design from the provided mockup.
+ *
+ * Layout (top to bottom):
+ * 1. Scrollable transcription text area (takes remaining space)
+ * 2. Recording info bar (red dot + timer + compact waveform)
+ * 3. Control buttons (Restart, Pause, Finish)
  */
-@Suppress("ktlint:standard:function-naming", "ktlint:standard:max-line-length")
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun ActiveRecordingDisplay(
     audioLevels: List<Float>,
@@ -42,62 +52,77 @@ fun ActiveRecordingDisplay(
     onPause: () -> Unit,
     onFinish: () -> Unit,
     modifier: Modifier = Modifier,
+    transcriptionText: String? = null,
     isPaused: Boolean = false,
 ) {
     Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier,
     ) {
-        // Text content area
-        Card(
+        // 1. Transcription text area (scrollable, takes remaining space)
+        val scrollState = rememberScrollState()
+        LaunchedEffect(transcriptionText) {
+            scrollState.animateScrollTo(scrollState.maxValue)
+        }
+        Surface(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .weight(1f),
-            colors =
-                CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                ),
+                    .weight(1f)
+                    .padding(8.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
             shape = RoundedCornerShape(12.dp),
         ) {
             Box(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .padding(16.dp),
+                        .padding(16.dp)
+                        .verticalScroll(scrollState),
             ) {
                 Text(
-                    text = stringResource(Res.string.tap_to_start_recording),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text =
+                        transcriptionText.takeUnless { it.isNullOrBlank() }
+                            ?: stringResource(Res.string.listening),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color =
+                        if (transcriptionText.isNullOrBlank()) {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
                 )
             }
         }
 
-        // Recording visualization & controls
-        Card(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-            colors =
-                CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                ),
-            shape = RoundedCornerShape(12.dp),
+        // 2. Recording info bar (red dot + timer + compact waveform)
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
         ) {
             Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                // Timer display
+                // Timer with recording indicator
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
+                    if (!isPaused) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .size(10.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.error),
+                        )
+                    }
                     Text(
                         text = formatDuration(recordingDuration),
                         style =
@@ -105,48 +130,47 @@ fun ActiveRecordingDisplay(
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
                             ),
-                        color = Color.Red,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(start = 8.dp),
                     )
                 }
 
-                // Waveform visualization
+                // Compact waveform
                 AudioWaveformComponent(
                     audioLevels = audioLevels,
                     isRecording = !isPaused,
-                    waveformColor = Color(0xFF556B2F), // Dark olive green color
+                    waveformColor = MaterialTheme.colorScheme.primary,
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp),
+                            .height(48.dp),
+                    minHeight = 48.dp,
                 )
 
-                // Control buttons
+                // 3. Control buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    // Restart button
                     OutlinedButton(
                         onClick = onRestart,
-                        modifier = Modifier.weight(1f).padding(end = 4.dp),
+                        modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(24.dp),
                     ) {
                         Text(stringResource(Res.string.restart))
                     }
 
-                    // Pause/Resume button
                     OutlinedButton(
                         onClick = onPause,
-                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
+                        modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(24.dp),
                     ) {
                         Text(if (isPaused) "Resume" else "Pause")
                     }
 
-                    // Finish button
                     Button(
                         onClick = onFinish,
-                        modifier = Modifier.weight(1f).padding(start = 4.dp),
+                        modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(24.dp),
                         colors =
                             ButtonDefaults.buttonColors(
@@ -171,7 +195,6 @@ private fun formatDuration(duration: Duration): String {
     val seconds = totalSeconds % 60
     val tenths = (duration.inWholeMilliseconds % 1000) / 100
 
-    // Format without relying on String.format
     val minutesStr = "$minutes"
     val secondsStr = if (seconds < 10) "0$seconds" else "$seconds"
 

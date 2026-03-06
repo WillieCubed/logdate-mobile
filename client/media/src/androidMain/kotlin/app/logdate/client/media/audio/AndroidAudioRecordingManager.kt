@@ -122,12 +122,11 @@ class AndroidAudioRecordingManager(
             // recordingActive will be set true via onServiceConnected → service state flow
             bindToService()
 
-            // Start transcription if service is available
+            // Start live transcription in parallel with recording.
+            // VoskTranscriptionService uses AudioRecord (no audio focus) so music keeps playing.
             transcriptionService?.let { service ->
                 if (service.supportsLiveTranscription) {
-                    scope.launch {
-                        service.startLiveTranscription()
-                    }
+                    scope.launch { service.startLiveTranscription() }
                 }
             }
 
@@ -213,7 +212,11 @@ class AndroidAudioRecordingManager(
         if (!recordingActive) return false
         return try {
             service.pauseRecording()
-            service.isRecordingPaused()
+            val paused = service.isRecordingPaused()
+            if (paused) {
+                transcriptionService?.stopLiveTranscription()
+            }
+            paused
         } catch (e: Exception) {
             Napier.e("Error pausing recording", e)
             false
@@ -229,11 +232,24 @@ class AndroidAudioRecordingManager(
         if (!recordingActive) return false
         return try {
             service.resumeRecording()
-            !service.isRecordingPaused()
+            val resumed = !service.isRecordingPaused()
+            if (resumed) {
+                transcriptionService?.let { svc ->
+                    if (svc.supportsLiveTranscription) {
+                        scope.launch { svc.startLiveTranscription() }
+                    }
+                }
+            }
+            resumed
         } catch (e: Exception) {
             Napier.e("Error resuming recording", e)
             false
         }
+    }
+
+    override suspend fun resetTranscription() {
+        transcriptionService?.resetTranscription()
+        transcriptionFlow.value = null
     }
 
     override fun getAudioLevelFlow(): Flow<Float> = audioLevelFlow

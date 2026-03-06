@@ -178,6 +178,8 @@ private class FakeTranscriptionService : TranscriptionService {
 
     override val supportsFileTranscription: Boolean = true
 
+    override suspend fun resetTranscription() = Unit
+
     override fun release() = Unit
 }
 

@@ -41,6 +41,12 @@ interface AudioRecordingManager {
     fun setTranscriptionService(service: TranscriptionService)
 
     /**
+     * Resets accumulated transcription text. Used when restarting a recording.
+     * Default implementation is a no-op.
+     */
+    suspend fun resetTranscription() {}
+
+    /**
      * Releases resources when recording is no longer needed
      */
     fun release()

@@ -83,6 +83,12 @@ interface TranscriptionService {
     val supportsFileTranscription: Boolean
 
     /**
+     * Resets accumulated transcription text and restarts recognition if active.
+     * Used when the user wants to start a fresh recording.
+     */
+    suspend fun resetTranscription()
+
+    /**
      * Releases resources when the service is no longer needed
      */
     fun release()

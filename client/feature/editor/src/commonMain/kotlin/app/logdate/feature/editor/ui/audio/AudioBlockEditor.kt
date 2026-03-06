@@ -13,7 +13,6 @@ import app.logdate.client.media.audio.AudioPlaybackMetadata
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.editor.RecordingState
 import app.logdate.util.formatDateLocalized
-import io.github.aakira.napier.Napier
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.viewmodel.koinViewModel
@@ -54,11 +53,6 @@ fun AudioBlockEditor(
             else -> RecordingState.INACTIVE
         }
 
-    // Debug logging to see what's happening
-    Napier.d(
-        "AudioBlockEditor - hasExistingAudio: $hasExistingAudio, isRecording: $isRecording, URI: ${block.uri}, recordingState: $recordingState",
-    )
-
     val audioLevels = audioUiState.audioLevels
 
     val playbackMetadata =
@@ -73,7 +67,6 @@ fun AudioBlockEditor(
 
     // Function to handle saving a recorded audio file
     val handleSaveRecording = { uri: String ->
-        Napier.d("Audio recording saved: $uri")
         onBlockUpdated(
             block.copy(
                 uri = uri,
@@ -117,6 +110,17 @@ fun AudioBlockEditor(
                         audioViewModel.seekTo(position)
                     },
                     onDeleteClicked = onDeleteRequested,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else if (isRecording) {
+                ActiveRecordingDisplay(
+                    audioLevels = audioLevels,
+                    recordingDuration = audioUiState.duration,
+                    transcriptionText = audioUiState.transcription,
+                    isPaused = audioUiState.isPaused,
+                    onRestart = { audioViewModel.restartRecording() },
+                    onPause = { audioViewModel.toggleRecordingPause() },
+                    onFinish = { audioViewModel.stopRecording() },
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {

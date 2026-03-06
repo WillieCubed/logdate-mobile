@@ -43,6 +43,10 @@ class AndroidTranscriptionService(
     private var currentLanguage = "en-US"
     private var isListening = false
 
+    // Accumulated transcription: finalized segments joined together
+    private val accumulatedSegments = mutableListOf<String>()
+    private var currentPartial: String = ""
+
     init {
         if (SpeechRecognizer.isRecognitionAvailable(context)) {
             createSpeechRecognizer()
@@ -119,9 +123,13 @@ class AndroidTranscriptionService(
             override fun onResults(results: Bundle?) {
                 val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 if (!matches.isNullOrEmpty()) {
-                    val transcribedText = matches[0] // Get the most likely result
+                    val finalizedText = matches[0]
+                    if (finalizedText.isNotBlank()) {
+                        accumulatedSegments.add(finalizedText)
+                    }
+                    currentPartial = ""
                     scope.launch {
-                        _transcriptionFlow.emit(TranscriptionResult.Success(transcribedText))
+                        _transcriptionFlow.emit(TranscriptionResult.Success(buildAccumulatedText()))
                     }
 
                     // Auto-restart listening if we're in continuous mode
@@ -134,9 +142,9 @@ class AndroidTranscriptionService(
             override fun onPartialResults(partialResults: Bundle?) {
                 val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 if (!matches.isNullOrEmpty()) {
-                    val partialText = matches[0] // Get the most likely result
+                    currentPartial = matches[0] ?: ""
                     scope.launch {
-                        _transcriptionFlow.emit(TranscriptionResult.Success(partialText))
+                        _transcriptionFlow.emit(TranscriptionResult.Success(buildAccumulatedText()))
                     }
                 }
             }
@@ -221,9 +229,31 @@ class AndroidTranscriptionService(
     override val supportsFileTranscription: Boolean
         get() = false
 
+    override suspend fun resetTranscription() {
+        accumulatedSegments.clear()
+        currentPartial = ""
+        _transcriptionFlow.emit(TranscriptionResult.InProgress)
+        // If actively listening, restart recognition for a clean slate
+        if (isListening) {
+            speechRecognizer?.cancel()
+            startListening()
+        }
+    }
+
     override fun release() {
         isListening = false
+        accumulatedSegments.clear()
+        currentPartial = ""
         speechRecognizer?.destroy()
         speechRecognizer = null
+    }
+
+    private fun buildAccumulatedText(): String {
+        val base = accumulatedSegments.joinToString(" ")
+        return if (currentPartial.isNotBlank()) {
+            if (base.isNotBlank()) "$base $currentPartial" else currentPartial
+        } else {
+            base
+        }
     }
 }

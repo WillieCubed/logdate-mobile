@@ -177,6 +177,25 @@ class AudioViewModel(
     }
 
     /**
+     * Restarts the recording from scratch, clearing accumulated transcription.
+     */
+    fun restartRecording() {
+        viewModelScope.launch {
+            stopRecordingInternal()
+            audioRecordingManager.resetTranscription()
+            _uiState.update {
+                it.copy(
+                    transcriptionState = AudioUiState.TranscriptionState.NotRequested,
+                    audioLevels = emptyList(),
+                    duration = Duration.ZERO,
+                    recordedAudioUri = null,
+                )
+            }
+            startRecording()
+        }
+    }
+
+    /**
      * Toggles recording between recording and paused states.
      */
     fun toggleRecordingPause() {

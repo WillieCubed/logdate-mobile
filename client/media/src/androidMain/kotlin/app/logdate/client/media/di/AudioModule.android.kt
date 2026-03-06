@@ -8,8 +8,8 @@ import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioRecordingManager
 import app.logdate.client.media.audio.AudioStorage
-import app.logdate.client.media.audio.transcription.AndroidTranscriptionService
 import app.logdate.client.media.audio.transcription.TranscriptionService
+import app.logdate.client.media.audio.transcription.VoskTranscriptionService
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -25,6 +25,6 @@ actual val audioModule: Module =
         single<AudioPlaybackManager> { AndroidAudioPlaybackManager(androidContext()) }
         single<AudioDurationResolver> { AndroidAudioDurationResolver(androidContext()) }
 
-        // Provide the Android implementation of TranscriptionService
-        factory<TranscriptionService> { AndroidTranscriptionService(androidContext()) }
+        // Provide Vosk-based transcription (on-device, no audio focus required)
+        factory<TranscriptionService> { VoskTranscriptionService(androidContext()) }
     }

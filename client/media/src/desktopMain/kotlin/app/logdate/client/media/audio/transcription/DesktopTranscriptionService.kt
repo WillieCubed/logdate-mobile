@@ -122,6 +122,10 @@ class DesktopTranscriptionService : TranscriptionService {
 
     override val supportsFileTranscription: Boolean = true
 
+    override suspend fun resetTranscription() {
+        _transcriptionFlow.emit(TranscriptionResult.InProgress)
+    }
+
     override fun release() {
         isRecognizing = false
     }
