@@ -1,12 +1,19 @@
 package app.logdate.server.di
 
+import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountRepository
+import app.logdate.server.auth.AuthMetricsRegistry
+import app.logdate.server.auth.GoogleIdTokenVerifier
+import app.logdate.server.auth.HttpGoogleIdTokenVerifier
+import app.logdate.server.auth.InMemoryAccountIdentityRepository
 import app.logdate.server.auth.InMemoryAccountRepository
 import app.logdate.server.auth.InMemorySessionManager
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.auth.SessionManager
+import app.logdate.server.database.AccountIdentitiesTable
+import app.logdate.server.database.AccountLinkEventsTable
 import app.logdate.server.database.DatabaseConfig
-import app.logdate.server.database.DatabaseWebAuthnPasskeyService
+import app.logdate.server.database.PostgreSQLAccountIdentityRepository
 import app.logdate.server.database.PostgreSQLAccountRepository
 import app.logdate.server.database.PostgreSQLPasskeyRepository
 import app.logdate.server.database.PostgreSQLSessionManager
@@ -40,6 +47,8 @@ fun initializeDatabase(): Boolean =
                 JournalSyncTable,
                 AssociationSyncTable,
                 MediaSyncTable,
+                AccountIdentitiesTable,
+                AccountLinkEventsTable,
             )
         }
         Napier.i("Database repositories initialized successfully")
@@ -58,6 +67,14 @@ fun serverModule(isDatabaseAvailable: Boolean) =
             if (isDatabaseAvailable) PostgreSQLAccountRepository() else InMemoryAccountRepository()
         }
 
+        single<AccountIdentityRepository> {
+            if (isDatabaseAvailable) {
+                PostgreSQLAccountIdentityRepository()
+            } else {
+                InMemoryAccountIdentityRepository()
+            }
+        }
+
         single<PasskeyRepository> {
             if (isDatabaseAvailable) PostgreSQLPasskeyRepository() else InMemoryPasskeyRepository()
         }
@@ -66,13 +83,21 @@ fun serverModule(isDatabaseAvailable: Boolean) =
             if (isDatabaseAvailable) PostgreSQLSessionManager() else InMemorySessionManager()
         }
 
-        single { WebAuthnPasskeyService() }
+        single {
+            WebAuthnPasskeyService(
+                passkeyRepository = get(),
+                relyingPartyId = System.getenv("WEBAUTHN_RP_ID") ?: "logdate.app",
+                relyingPartyName = System.getenv("WEBAUTHN_RP_NAME") ?: "LogDate",
+                origin = System.getenv("WEBAUTHN_ORIGIN") ?: "https://app.logdate.com",
+            )
+        }
 
         single<SyncRepository> {
             if (isDatabaseAvailable) DbSyncRepository() else InMemorySyncRepository()
         }
 
         single { SyncMetricsRegistry() }
+        single { AuthMetricsRegistry() }
 
         single {
             JwtTokenService(
@@ -80,11 +105,13 @@ fun serverModule(isDatabaseAvailable: Boolean) =
             )
         }
 
-        single {
-            if (isDatabaseAvailable) {
-                DatabaseWebAuthnPasskeyService(get())
-            } else {
-                null
-            }
+        single<GoogleIdTokenVerifier> {
+            val allowedClientIds =
+                (System.getenv("GOOGLE_OIDC_CLIENT_IDS") ?: "")
+                    .split(",")
+                    .map { it.trim() }
+                    .filter { it.isNotBlank() }
+                    .toSet()
+            HttpGoogleIdTokenVerifier(allowedClientIds = allowedClientIds)
         }
     }

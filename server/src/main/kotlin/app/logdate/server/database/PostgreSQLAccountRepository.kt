@@ -6,6 +6,7 @@ import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
@@ -32,6 +33,7 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[username] = account.username
                     it[displayName] = account.displayName
                     it[email] = account.email
+                    it[emailVerified] = account.emailVerified
                     it[bio] = account.bio
                     it[lastSignInAt] = account.lastSignInAt
                     it[isActive] = account.isActive
@@ -45,6 +47,7 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[username] = account.username
                     it[displayName] = account.displayName
                     it[email] = account.email
+                    it[emailVerified] = account.emailVerified
                     it[bio] = account.bio
                     it[createdAt] = account.createdAt
                     it[lastSignInAt] = account.lastSignInAt
@@ -80,6 +83,16 @@ class PostgreSQLAccountRepository : AccountRepository {
                 .where { AccountsTable.email eq email }
                 .singleOrNull()
                 ?.toAccount()
+        }
+
+    override suspend fun findByVerifiedEmail(email: String): List<Account> =
+        transaction {
+            AccountsTable
+                .selectAll()
+                .where {
+                    (AccountsTable.email eq email) and
+                        (AccountsTable.emailVerified eq true)
+                }.map { it.toAccount() }
         }
 
     override suspend fun usernameExists(username: String): Boolean =
@@ -145,6 +158,7 @@ class PostgreSQLAccountRepository : AccountRepository {
             username = this[AccountsTable.username],
             displayName = this[AccountsTable.displayName],
             email = this[AccountsTable.email],
+            emailVerified = this[AccountsTable.emailVerified],
             bio = this[AccountsTable.bio],
             createdAt = this[AccountsTable.createdAt],
             lastSignInAt = this[AccountsTable.lastSignInAt],

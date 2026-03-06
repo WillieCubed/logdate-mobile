@@ -2,7 +2,7 @@
 
 **Authoritative reference for all environment variables used by the LogDate server.**
 
-> Last updated: 2026-01-27
+> Last updated: 2026-03-05
 
 ---
 
@@ -118,6 +118,48 @@ These can be used instead of `DATABASE_URL`:
   - Must be at least 32 characters for security
   - Store securely, never commit to version control
   - Rotate periodically in production
+
+### `GOOGLE_OIDC_CLIENT_IDS`
+- **Description**: Comma-separated Google OAuth client IDs accepted for ID token verification
+- **Type**: String (CSV)
+- **Default**: None
+- **Example**: `GOOGLE_OIDC_CLIENT_IDS=123.apps.googleusercontent.com,456.apps.googleusercontent.com`
+- **Required**: Yes (if Google sign-in is enabled)
+- **Security**:
+  - Keep aligned with released mobile/web client IDs only
+  - Rotate/remove deprecated client IDs promptly
+  - Prefer storing in secret manager for production deployments
+
+### `WEBAUTHN_RP_ID`
+- **Description**: WebAuthn relying party ID used for passkey ceremonies
+- **Type**: String
+- **Default**: `logdate.app`
+- **Example**: `WEBAUTHN_RP_ID=app.logdate.com`
+- **Required**: Yes (for production passkeys)
+
+### `WEBAUTHN_RP_NAME`
+- **Description**: Display name presented as relying party name in passkey prompts
+- **Type**: String
+- **Default**: `LogDate`
+- **Example**: `WEBAUTHN_RP_NAME=LogDate Cloud`
+- **Required**: No
+
+### `WEBAUTHN_ORIGIN`
+- **Description**: Expected WebAuthn origin for registration/authentication responses
+- **Type**: String (HTTPS origin)
+- **Default**: `https://app.logdate.com`
+- **Example**: `WEBAUTHN_ORIGIN=https://app.logdate.com`
+- **Required**: Yes (for production passkeys)
+
+### `WEBAUTHN_STRICT_VERIFICATION`
+- **Description**: Enables strict WebAuthn4J cryptographic verification for passkeys
+- **Type**: Boolean
+- **Default**: `false`
+- **Example**: `WEBAUTHN_STRICT_VERIFICATION=true`
+- **Required**: **Yes for production**
+- **Notes**:
+  - Strict mode requires valid Base64URL WebAuthn payloads from clients
+  - Keep disabled only for local/test environments
 
 ---
 

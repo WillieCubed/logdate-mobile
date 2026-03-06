@@ -1,19 +1,22 @@
 package app.logdate.server
 
 import app.logdate.SERVER_PORT
+import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountRepository
+import app.logdate.server.auth.AuthMetricsRegistry
+import app.logdate.server.auth.GoogleIdTokenVerifier
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.di.initializeDatabase
 import app.logdate.server.di.serverModule
 import app.logdate.server.passkeys.WebAuthnPasskeyService
-import app.logdate.server.routes.accountRoutes
+import app.logdate.server.routes.authV1Routes
 import app.logdate.server.routes.syncRoutes
 import app.logdate.server.sync.GcsMediaStorage
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.sync.SyncRepository
 import app.logdate.util.UuidSerializer
-import com.google.api.client.json.Json
+import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.application.install
@@ -66,7 +69,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     }
 
     var maintenanceJob: Job? = null
-    environment.monitor.subscribe(ApplicationStopped) {
+    monitor.subscribe(ApplicationStopped) {
         maintenanceJob?.cancel()
         try {
             org.koin.core.context
@@ -78,8 +81,11 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
 
     val syncRepository: SyncRepository by inject()
     val syncMetrics: SyncMetricsRegistry by inject()
+    val authMetrics: AuthMetricsRegistry by inject()
     val tokenService: JwtTokenService by inject()
     val accountRepository: AccountRepository by inject()
+    val accountIdentityRepository: AccountIdentityRepository by inject()
+    val googleIdTokenVerifier: GoogleIdTokenVerifier by inject()
     val sessionManager: SessionManager by inject()
     val webAuthnService: WebAuthnPasskeyService by inject()
 
@@ -134,11 +140,14 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
 
         route("/api/v1") {
             val mediaStorage = GcsMediaStorage.fromEnvironment()
-            accountRoutes(
+            authV1Routes(
                 accountRepository = accountRepository,
+                identityRepository = accountIdentityRepository,
                 sessionManager = sessionManager,
                 webAuthnService = webAuthnService,
                 tokenService = tokenService,
+                googleIdTokenVerifier = googleIdTokenVerifier,
+                metrics = authMetrics,
             )
             syncRoutes(syncRepository, tokenService, mediaStorage, syncMetrics)
         }

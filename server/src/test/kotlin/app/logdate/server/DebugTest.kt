@@ -16,7 +16,7 @@ class DebugTest {
         testApplication {
             application { module() }
 
-            val response = client.get("/api/v1/accounts/username/testuser/available")
+            val response = client.get("/api/v1/auth/signup/username/testuser/available")
 
             println("Status: ${response.status}")
             println("Body: ${response.bodyAsText()}")
@@ -40,7 +40,7 @@ class DebugTest {
         testApplication {
             application { module() }
 
-            val response = client.get("/api/v1/accounts/username/invalid!/available")
+            val response = client.get("/api/v1/auth/signup/username/invalid!/available")
 
             println("Status: ${response.status}")
             println("Body: ${response.bodyAsText()}")

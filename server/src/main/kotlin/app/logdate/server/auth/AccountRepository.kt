@@ -15,6 +15,8 @@ interface AccountRepository {
 
     suspend fun findByEmail(email: String): Account?
 
+    suspend fun findByVerifiedEmail(email: String): List<Account>
+
     suspend fun usernameExists(username: String): Boolean
 
     suspend fun emailExists(email: String): Boolean
@@ -64,6 +66,9 @@ class InMemoryAccountRepository : AccountRepository {
         val accountId = emailIndex[email] ?: return null
         return accounts[accountId]
     }
+
+    override suspend fun findByVerifiedEmail(email: String): List<Account> =
+        accounts.values.filter { it.email?.equals(email, ignoreCase = true) == true && it.emailVerified && it.isActive }
 
     override suspend fun usernameExists(username: String): Boolean = usernameIndex.containsKey(username)
 

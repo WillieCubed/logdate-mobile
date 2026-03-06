@@ -15,21 +15,20 @@ This document defines the systematic approach for organizing and running end-to-
 - Pure gradle execution
 
 **Examples**:
-- `AccountE2ETest` - Account creation, auth flows
-- `AuthenticationFlowsE2ETest` - Passkey authentication
-- `EdgeCasesE2ETest` - Error handling edge cases
-- `BasicEndpointCoverageE2ETest` - API endpoint coverage
+- `AuthV1E2ETest` - Auth v1 signup/signin flows
+- `BasicEndpointCoverageE2ETest` - API endpoint smoke coverage
+- `SyncE2ETest` - Backup/sync server behavior
 
 **How to Run**:
 ```bash
 # Run all server e2e tests
-./gradlew :server:test -k "E2ETest"
+./gradlew :server:test --tests "app.logdate.server.e2e.*"
 
 # Run specific test class
-./gradlew :server:test -k "AccountE2ETest"
+./gradlew :server:test --tests "app.logdate.server.e2e.auth.AuthV1E2ETest"
 
 # Run specific test method
-./gradlew :server:test --tests "app.logdate.server.e2e.accounts.AccountE2ETest.username*"
+./gradlew :server:test --tests "app.logdate.server.e2e.auth.AuthV1E2ETest.username availability endpoint works"
 ```
 
 **When to Create Shell Script**: **NEVER** - These don't need shell scripts. Pure gradle.

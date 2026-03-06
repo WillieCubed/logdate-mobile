@@ -18,6 +18,7 @@ data class Account(
     val username: String,
     val displayName: String,
     val email: String? = null,
+    val emailVerified: Boolean = false,
     val bio: String? = null,
     val createdAt: Instant,
     val lastSignInAt: Instant? = null,

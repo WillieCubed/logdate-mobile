@@ -73,6 +73,8 @@ Server Module
 ### Configuration
 
 See **[Environment Variables Documentation](docs/environment-variables.md)** for complete configuration reference.
+See **[Auth V1 API](docs/auth-v1-api.md)** for the launch authentication contract.
+See **[Audit Schema](docs/audit-schema.md)** for centralized audit categories and keys.
 
 **Quick start:**
 1. Copy `../local.properties.example` to `../local.properties`

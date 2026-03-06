@@ -19,7 +19,7 @@ LogDate Cloud uses JSON Web Tokens (JWT) for session management and API authenti
 ### 2. Refresh Tokens
 - **Purpose**: Obtain new access tokens
 - **Lifetime**: 30 days (2,592,000 seconds)
-- **Usage**: POST to `/api/v1/accounts/refresh` endpoint
+- **Usage**: POST to `/api/v1/auth/token/refresh` endpoint
 - **Claims**:
   - `sub`: Account ID
   - `type`: "refresh"
@@ -53,7 +53,7 @@ LogDate Cloud uses JSON Web Tokens (JWT) for session management and API authenti
 
 ### Token Refresh
 ```http
-POST /api/v1/accounts/refresh
+POST /api/v1/auth/token/refresh
 Content-Type: application/json
 
 {
@@ -73,7 +73,7 @@ Content-Type: application/json
 
 ### Protected Endpoint Example
 ```http
-GET /api/v1/accounts/me
+GET /api/v1/auth/me
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 

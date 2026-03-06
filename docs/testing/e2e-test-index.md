@@ -18,7 +18,7 @@ See [E2E Test Organization Standard](./e2e-test-organization.md) for the complet
 ./gradlew :app:android-main:connectedDebugAndroidTest
 
 # Run all server-side e2e tests
-./gradlew :server:test -k "E2ETest"
+./gradlew :server:test --tests "app.logdate.server.e2e.*"
 
 # Run specific e2e test suite
 ./gradlew :app:android-main:connectedDebugAndroidTest -k "TestClassName"
@@ -120,55 +120,35 @@ Server-side tests verify API endpoints and backend functionality using Ktor's te
 ### Location
 `server/src/test/kotlin/e2e/`
 
-### 1. Account E2E Tests
+### 1. Auth V1 E2E Tests
 
-**File**: `accounts/AccountE2ETest.kt`
+**File**: `auth/AuthV1E2ETest.kt`
 
-**Scenario**: Account creation, authentication, and management
-
-```bash
-./gradlew :server:test -k "AccountE2ETest"
-./gradlew :server:test -k "accountCreationBegin"
-```
-
-### 2. Authentication Flow E2E Tests
-
-**File**: `auth/AuthenticationFlowsE2ETest.kt`
-
-**Scenario**: User authentication workflows including passkey registration
+**Scenario**: Auth v1 passkey/google signup and signin behavior
 
 ```bash
-./gradlew :server:test -k "AuthenticationFlowsE2ETest"
+./gradlew :server:test --tests "app.logdate.server.e2e.auth.AuthV1E2ETest"
+./tests/e2e/test-accounts-e2e.sh
 ```
 
-### 3. Basic Endpoint Coverage E2E Tests
+### 2. Basic Endpoint Coverage E2E Tests
 
 **File**: `basic-coverage/BasicEndpointCoverageE2ETest.kt`
 
-**Scenario**: Coverage of all API endpoints
+**Scenario**: Coverage smoke tests for auth and sync APIs
 
 ```bash
-./gradlew :server:test -k "BasicEndpointCoverageE2ETest"
+./gradlew :server:test --tests "app.logdate.server.e2e.basic.BasicEndpointCoverageE2ETest"
 ```
 
-### 4. Edge Cases E2E Tests
-
-**File**: `edge/EdgeCasesE2ETest.kt`
-
-**Scenario**: Error handling and edge case scenarios
-
-```bash
-./gradlew :server:test -k "EdgeCasesE2ETest"
-```
-
-### 5. Sync E2E Tests
+### 3. Sync E2E Tests
 
 **File**: `sync/SyncE2ETest.kt`
 
 **Scenario**: Multi-device sync flow, conflict detection, and media download
 
 ```bash
-./gradlew :server:test -k "SyncE2ETest"
+./gradlew :server:test --tests "app.logdate.server.e2e.sync.SyncE2ETest"
 ./tests/e2e/test-sync-e2e.sh
 ```
 
@@ -179,10 +159,8 @@ Server-side tests verify API endpoints and backend functionality using Ktor's te
 | Test Name | Type | Location | Shell Script |
 |-----------|------|----------|--------------|
 | MultiWindowEditorE2ETest | Client Gradle | `app/.../e2e/` | ✅ `test-multi-window-editor.sh` |
-| AccountE2ETest | Pure Server | `server/.../accounts/` | ❌ None |
-| AuthenticationFlowsE2ETest | Pure Server | `server/.../auth/` | ❌ None |
+| AuthV1E2ETest | Pure Server | `server/.../auth/` | ✅ `test-accounts-e2e.sh` |
 | BasicEndpointCoverageE2ETest | Pure Server | `server/.../basic-coverage/` | ❌ None |
-| EdgeCasesE2ETest | Pure Server | `server/.../edge/` | ❌ None |
 | SyncE2ETest | Pure Server | `server/.../sync/` | ✅ `test-sync-e2e.sh` |
 
 **Legend**:
@@ -198,26 +176,26 @@ Server-side tests verify API endpoints and backend functionality using Ktor's te
 
 ```bash
 # All e2e tests (client + server)
-./gradlew connectedAndroidTest :server:test -k "E2ETest"
+./gradlew connectedAndroidTest :server:test --tests "app.logdate.server.e2e.*"
 
 # Client only
 ./gradlew connectedAndroidTest
 
 # Server only
-./gradlew :server:test -k "E2ETest"
+./gradlew :server:test --tests "app.logdate.server.e2e.*"
 ```
 
 ### Run by Category
 
 ```bash
 # All multi-window tests
-./gradlew connectedAndroidTest -k "MultiWindow"
+./gradlew connectedAndroidTest --tests "*MultiWindow*"
 
 # All account tests
-./gradlew :server:test -k "Account"
+./gradlew :server:test --tests "app.logdate.server.e2e.auth.AuthV1E2ETest"
 
 # All authentication tests
-./gradlew :server:test -k "Authentication"
+./gradlew :server:test --tests "app.logdate.server.e2e.auth.*"
 ```
 
 ### Run with Reports

@@ -152,7 +152,16 @@ class InMemoryPasskeyRepository : PasskeyRepository {
         newSignCount: Long,
     ): Boolean {
         val passkey = passkeys[credentialId] ?: return false
-        passkeys[credentialId] = passkey.copy(signCount = newSignCount)
+        passkeys[credentialId] =
+            passkey.copy(
+                signCount = newSignCount,
+                info =
+                    passkey.info.copy(
+                        lastUsedAt =
+                            kotlin.time.Clock.System
+                                .now(),
+                    ),
+            )
         return true
     }
 

@@ -14,6 +14,7 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
+import java.util.Base64
 import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -33,7 +34,7 @@ class PostgreSQLPasskeyRepository : PasskeyRepository {
                     it[id] = info.id.toJavaUUID()
                     it[accountId] = userId.toJavaUUID()
                     it[PasskeysTable.credentialId] = credentialId
-                    it[PasskeysTable.publicKey] = publicKey.toString() // Convert to string for text storage
+                    it[PasskeysTable.publicKey] = encodeByteArray(publicKey)
                     it[PasskeysTable.signCount] = signCount
                     it[nickname] = info.nickname
                     it[deviceType] = info.deviceType
@@ -59,7 +60,7 @@ class PostgreSQLPasskeyRepository : PasskeyRepository {
                     val storedData =
                         StoredPasskeyData(
                             credentialId = row[PasskeysTable.credentialId],
-                            publicKey = row[PasskeysTable.publicKey].toByteArray(), // Convert back to bytes
+                            publicKey = decodeByteArray(row[PasskeysTable.publicKey]),
                             signCount = row[PasskeysTable.signCount],
                             info = row.toPasskeyInfo(),
                             userId = userId,
@@ -223,4 +224,9 @@ class PostgreSQLPasskeyRepository : PasskeyRepository {
             lastUsedAt = this[PasskeysTable.lastUsedAt]?.toKotlinInstant(),
             isActive = this[PasskeysTable.isActive],
         )
+
+    private fun encodeByteArray(bytes: ByteArray): String = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+
+    private fun decodeByteArray(value: String): ByteArray =
+        runCatching { Base64.getUrlDecoder().decode(value) }.getOrElse { value.toByteArray() }
 }

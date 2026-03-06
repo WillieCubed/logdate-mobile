@@ -49,7 +49,7 @@ class ApplicationTest {
             }
 
             // Test that API routes are properly mounted
-            client.get("/api/v1/accounts/username/testuser/available").apply {
+            client.get("/api/v1/auth/signup/username/testuser/available").apply {
                 assertEquals(HttpStatusCode.OK, status)
                 val responseBody = bodyAsText()
                 assertTrue(responseBody.contains("success"))

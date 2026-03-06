@@ -8,37 +8,49 @@ import app.logdate.shared.model.PasskeyInfo
 import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.PasskeyRegistrationResponse
 import app.logdate.shared.model.PasskeyUser
+import com.webauthn4j.WebAuthnManager
+import com.webauthn4j.authenticator.AuthenticatorImpl
+import com.webauthn4j.converter.AttestedCredentialDataConverter
+import com.webauthn4j.converter.exception.DataConversionException
+import com.webauthn4j.converter.util.ObjectConverter
+import com.webauthn4j.data.AuthenticationParameters
+import com.webauthn4j.data.AuthenticationRequest
+import com.webauthn4j.data.RegistrationParameters
+import com.webauthn4j.data.RegistrationRequest
+import com.webauthn4j.data.attestation.statement.NoneAttestationStatement
+import com.webauthn4j.data.client.Origin
+import com.webauthn4j.data.client.challenge.DefaultChallenge
+import com.webauthn4j.server.ServerProperty
+import kotlinx.coroutines.runBlocking
 import java.security.SecureRandom
 import java.util.Base64
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
- * Simplified WebAuthn passkey service for development and initial implementation.
+ * WebAuthn passkey service with optional strict cryptographic verification.
  *
- * This implementation provides basic passkey functionality with simplified verification
- * suitable for development environments. For production, this would be enhanced with
- * full WebAuthn4j cryptographic verification.
+ * Strict mode (`WEBAUTHN_STRICT_VERIFICATION=true`) uses WebAuthn4J verification.
+ * Non-strict mode keeps a lightweight fallback for local/dev tests.
  */
 @OptIn(ExperimentalUuidApi::class)
 class WebAuthnPasskeyService(
+    private val passkeyRepository: PasskeyRepository = InMemoryPasskeyRepository(),
     val relyingPartyId: String = "logdate.app",
     private val relyingPartyName: String = "LogDate",
     private val origin: String = "https://app.logdate.com",
+    private val strictVerificationEnabled: Boolean = readBooleanEnv("WEBAUTHN_STRICT_VERIFICATION", false),
 ) {
     private val secureRandom = SecureRandom()
+    private val challenges = ConcurrentHashMap<String, PasskeyChallenge>()
 
-    // In-memory storage for demo purposes - in production this would be a database
-    private val challenges = mutableMapOf<String, PasskeyChallenge>()
-    private val passkeys = mutableMapOf<Uuid, MutableList<StoredPasskey>>()
-
-    data class StoredPasskey(
-        val credentialId: String,
-        val publicKey: String,
-        val signCount: Long,
-        val info: PasskeyInfo,
-    )
+    private val objectConverter = ObjectConverter()
+    private val webAuthnManager = WebAuthnManager.createNonStrictWebAuthnManager(objectConverter)
+    private val attestedCredentialDataConverter = AttestedCredentialDataConverter(objectConverter)
 
     data class RegistrationResult(
         val success: Boolean,
@@ -54,9 +66,6 @@ class WebAuthnPasskeyService(
         val error: String? = null,
     )
 
-    /**
-     * Generate WebAuthn registration options for account creation.
-     */
     fun generateRegistrationOptions(
         userId: Uuid,
         username: String,
@@ -64,14 +73,14 @@ class WebAuthnPasskeyService(
         excludeCredentials: List<String> = emptyList(),
     ): PasskeyRegistrationOptions {
         val challenge = generateChallenge()
+        val expiresAt = Clock.System.now() + 5.minutes
 
-        // Store challenge for later verification
         challenges[challenge] =
             PasskeyChallenge(
                 challenge = challenge,
                 userId = userId,
                 type = "registration",
-                expiresAt = (Clock.System.now().plus(kotlin.time.Duration.parse("PT5M"))).toString(),
+                expiresAt = expiresAt.toString(),
                 isUsed = false,
             )
 
@@ -83,27 +92,25 @@ class WebAuthnPasskeyService(
                     name = username,
                     displayName = displayName,
                 ),
-            excludeCredentials = excludeCredentials,
+            excludeCredentials = excludeCredentials.ifEmpty { getUserCredentials(userId) },
             timeout = 300_000L,
         )
     }
 
-    /**
-     * Generate WebAuthn authentication options for login.
-     */
     fun generateAuthenticationOptions(
         userId: Uuid? = null,
         allowedCredentials: List<String> = emptyList(),
     ): PasskeyAuthenticationOptions {
         val challenge = generateChallenge()
+        val challengeUserId = userId ?: Uuid.random()
+        val expiresAt = Clock.System.now() + 5.minutes
 
-        // Store challenge for later verification
         challenges[challenge] =
             PasskeyChallenge(
                 challenge = challenge,
-                userId = userId ?: Uuid.random(),
+                userId = challengeUserId,
                 type = "authentication",
-                expiresAt = (Clock.System.now().plus(kotlin.time.Duration.parse("PT5M"))).toString(),
+                expiresAt = expiresAt.toString(),
                 isUsed = false,
             )
 
@@ -121,55 +128,75 @@ class WebAuthnPasskeyService(
         )
     }
 
-    /**
-     * Verify a WebAuthn registration response.
-     * Simplified implementation for development.
-     */
     fun verifyRegistration(
+        userId: Uuid,
+        challenge: String,
+        registrationResponse: PasskeyRegistrationResponse,
+    ): RegistrationResult =
+        if (strictVerificationEnabled) {
+            verifyRegistrationStrict(userId, challenge, registrationResponse)
+        } else {
+            verifyRegistrationSimplified(userId, challenge, registrationResponse)
+        }
+
+    fun verifyAuthentication(
+        challenge: String,
+        authenticationResponse: PasskeyAuthenticationResponse,
+    ): AuthenticationResult =
+        if (strictVerificationEnabled) {
+            verifyAuthenticationStrict(challenge, authenticationResponse)
+        } else {
+            verifyAuthenticationSimplified(challenge, authenticationResponse)
+        }
+
+    fun getPasskeysForUser(userId: Uuid): List<PasskeyInfo> = runBlocking { passkeyRepository.getPasskeysForUser(userId) }
+
+    fun deletePasskey(
+        credentialId: String,
+        userId: Uuid,
+    ): Boolean = runBlocking { passkeyRepository.deactivatePasskey(credentialId, userId) }
+
+    fun getUserCredentials(userId: Uuid): List<String> = runBlocking { passkeyRepository.getCredentialIdsForUser(userId) }
+
+    private fun verifyRegistrationSimplified(
         userId: Uuid,
         challenge: String,
         registrationResponse: PasskeyRegistrationResponse,
     ): RegistrationResult {
         return try {
-            // Validate challenge
             val challengeData =
-                challenges[challenge]
-                    ?: return RegistrationResult(success = false, error = "Invalid challenge")
-
-            if (challengeData.isUsed) {
-                return RegistrationResult(success = false, error = "Challenge already used")
-            }
-
-            if (challengeData.userId != userId) {
-                return RegistrationResult(success = false, error = "User ID mismatch")
-            }
-
-            // Mark challenge as used
+                validateChallenge(
+                    challenge = challenge,
+                    expectedType = "registration",
+                    expectedUserId = userId,
+                ) ?: return RegistrationResult(success = false, error = "Invalid challenge")
             challenges[challenge] = challengeData.copy(isUsed = true)
 
-            // Create passkey info
-            val credentialId = registrationResponse.id
+            val credentialId = normalizeCredentialId(registrationResponse.id) ?: registrationResponse.id
             val passkey =
                 PasskeyInfo(
                     id = Uuid.random(),
                     credentialId = credentialId,
-                    nickname = "Passkey",
+                    nickname = relyingPartyName,
                     deviceType = "platform",
                     createdAt = Clock.System.now().toKotlinInstant(),
                     lastUsedAt = null,
                     isActive = true,
                 )
 
-            // Store the passkey
-            val storedPasskey =
-                StoredPasskey(
-                    credentialId = credentialId,
-                    publicKey = registrationResponse.response.attestationObject, // Simplified
-                    signCount = 0,
-                    info = passkey,
-                )
-
-            passkeys.computeIfAbsent(userId) { mutableListOf() }.add(storedPasskey)
+            val stored =
+                runBlocking {
+                    passkeyRepository.storePasskey(
+                        userId = userId,
+                        credentialId = credentialId,
+                        publicKey = registrationResponse.response.attestationObject.toByteArray(),
+                        signCount = 0L,
+                        info = passkey,
+                    )
+                }
+            if (!stored) {
+                return RegistrationResult(success = false, error = "Failed to store passkey")
+            }
 
             RegistrationResult(success = true, credentialId = credentialId, passkey = passkey)
         } catch (e: Exception) {
@@ -177,81 +204,239 @@ class WebAuthnPasskeyService(
         }
     }
 
-    /**
-     * Verify a WebAuthn authentication response.
-     * Simplified implementation for development.
-     */
-    fun verifyAuthentication(
+    private fun verifyRegistrationStrict(
+        userId: Uuid,
+        challenge: String,
+        registrationResponse: PasskeyRegistrationResponse,
+    ): RegistrationResult {
+        return try {
+            val challengeData =
+                validateChallenge(
+                    challenge = challenge,
+                    expectedType = "registration",
+                    expectedUserId = userId,
+                ) ?: return RegistrationResult(success = false, error = "Invalid challenge")
+            challenges[challenge] = challengeData.copy(isUsed = true)
+
+            val challengeBytes =
+                decodeBase64Url(challenge)
+                    ?: return RegistrationResult(success = false, error = "Challenge is not valid base64url")
+            val attestationObjectBytes =
+                decodeBase64Url(registrationResponse.response.attestationObject)
+                    ?: return RegistrationResult(success = false, error = "Attestation object is not valid base64url")
+            val clientDataJsonBytes =
+                decodeBase64Url(registrationResponse.response.clientDataJSON)
+                    ?: return RegistrationResult(success = false, error = "Client data is not valid base64url")
+
+            val serverProperty =
+                ServerProperty
+                    .builder()
+                    .origin(Origin(origin))
+                    .rpId(relyingPartyId)
+                    .challenge(DefaultChallenge(challengeBytes))
+                    .build()
+
+            val registrationRequest = RegistrationRequest(attestationObjectBytes, clientDataJsonBytes)
+            val registrationParameters = RegistrationParameters(serverProperty, true, true)
+            val registrationData = webAuthnManager.verify(registrationRequest, registrationParameters)
+            val attestationObject =
+                registrationData.attestationObject
+                    ?: return RegistrationResult(success = false, error = "Attestation object is missing")
+            val authenticatorData =
+                attestationObject.authenticatorData
+                    ?: return RegistrationResult(success = false, error = "Authenticator data is missing")
+
+            val attestedCredentialData =
+                authenticatorData.attestedCredentialData
+                    ?: return RegistrationResult(success = false, error = "Attested credential data is missing")
+
+            val canonicalCredentialId = encodeBase64Url(attestedCredentialData.credentialId)
+            val normalizedCredentialId = normalizeCredentialId(registrationResponse.id)
+            if (normalizedCredentialId != null && normalizedCredentialId != canonicalCredentialId) {
+                return RegistrationResult(success = false, error = "Credential ID mismatch")
+            }
+
+            val passkey =
+                PasskeyInfo(
+                    id = Uuid.random(),
+                    credentialId = canonicalCredentialId,
+                    nickname = relyingPartyName,
+                    deviceType = "platform",
+                    createdAt = Clock.System.now().toKotlinInstant(),
+                    lastUsedAt = null,
+                    isActive = true,
+                )
+
+            val stored =
+                runBlocking {
+                    passkeyRepository.storePasskey(
+                        userId = userId,
+                        credentialId = canonicalCredentialId,
+                        publicKey = attestedCredentialDataConverter.convert(attestedCredentialData),
+                        signCount = authenticatorData.signCount,
+                        info = passkey,
+                    )
+                }
+            if (!stored) {
+                return RegistrationResult(success = false, error = "Failed to store passkey")
+            }
+
+            RegistrationResult(success = true, credentialId = canonicalCredentialId, passkey = passkey)
+        } catch (e: DataConversionException) {
+            RegistrationResult(success = false, error = "Registration data conversion failed")
+        } catch (e: Exception) {
+            RegistrationResult(success = false, error = "Registration verification failed: ${e.message}")
+        }
+    }
+
+    private fun verifyAuthenticationSimplified(
         challenge: String,
         authenticationResponse: PasskeyAuthenticationResponse,
     ): AuthenticationResult {
         return try {
-            // Validate challenge
             val challengeData =
-                challenges[challenge]
-                    ?: return AuthenticationResult(success = false, error = "Invalid challenge")
-
-            if (challengeData.isUsed) {
-                return AuthenticationResult(success = false, error = "Challenge already used")
-            }
-
-            // Mark challenge as used
+                validateChallenge(
+                    challenge = challenge,
+                    expectedType = "authentication",
+                    expectedUserId = null,
+                ) ?: return AuthenticationResult(success = false, error = "Invalid challenge")
             challenges[challenge] = challengeData.copy(isUsed = true)
 
-            // Find stored passkey by credential ID
-            val (userId, storedPasskey) =
-                findPasskeyByCredentialId(authenticationResponse.id)
+            val (userId, storedData) =
+                findStoredPasskey(authenticationResponse.id)
                     ?: return AuthenticationResult(success = false, error = "Credential not found")
 
-            // Update last used time
-            val updatedPasskey =
-                storedPasskey.copy(
-                    info = storedPasskey.info.copy(lastUsedAt = Clock.System.now().toKotlinInstant()),
-                )
-
-            // Update stored passkey
-            passkeys[userId]?.let { userPasskeys ->
-                val index = userPasskeys.indexOfFirst { it.credentialId == authenticationResponse.id }
-                if (index >= 0) {
-                    userPasskeys[index] = updatedPasskey
-                }
+            runBlocking {
+                passkeyRepository.updateSignCount(storedData.credentialId, storedData.signCount + 1L)
             }
 
-            AuthenticationResult(success = true, userId = userId, credentialId = authenticationResponse.id)
+            AuthenticationResult(success = true, userId = userId, credentialId = storedData.credentialId)
         } catch (e: Exception) {
             AuthenticationResult(success = false, error = "Authentication verification failed: ${e.message}")
         }
     }
 
-    /**
-     * Get all passkeys for a user.
-     */
-    fun getPasskeysForUser(userId: Uuid): List<PasskeyInfo> = passkeys[userId]?.map { it.info }?.filter { it.isActive } ?: emptyList()
+    private fun verifyAuthenticationStrict(
+        challenge: String,
+        authenticationResponse: PasskeyAuthenticationResponse,
+    ): AuthenticationResult {
+        return try {
+            val challengeData =
+                validateChallenge(
+                    challenge = challenge,
+                    expectedType = "authentication",
+                    expectedUserId = null,
+                ) ?: return AuthenticationResult(success = false, error = "Invalid challenge")
+            challenges[challenge] = challengeData.copy(isUsed = true)
 
-    /**
-     * Delete a passkey for a user.
-     */
-    fun deletePasskey(
-        credentialId: String,
-        userId: Uuid,
-    ): Boolean {
-        val userPasskeys = passkeys[userId] ?: return false
+            val credentialIdBytes =
+                decodeBase64Url(authenticationResponse.id)
+                    ?: return AuthenticationResult(success = false, error = "Credential ID is not valid base64url")
+            val canonicalCredentialId = encodeBase64Url(credentialIdBytes)
+            val (userId, storedData) =
+                findStoredPasskey(canonicalCredentialId)
+                    ?: return AuthenticationResult(success = false, error = "Credential not found")
 
-        val index = userPasskeys.indexOfFirst { it.credentialId == credentialId }
-        return if (index >= 0) {
-            val passkey = userPasskeys[index]
-            userPasskeys[index] = passkey.copy(info = passkey.info.copy(isActive = false))
-            true
-        } else {
-            false
+            val attestedCredentialData = attestedCredentialDataConverter.convert(storedData.publicKey)
+            val authenticator =
+                AuthenticatorImpl(
+                    attestedCredentialData,
+                    NoneAttestationStatement(),
+                    storedData.signCount,
+                )
+
+            val authenticatorDataBytes =
+                decodeBase64Url(authenticationResponse.response.authenticatorData)
+                    ?: return AuthenticationResult(success = false, error = "Authenticator data is not valid base64url")
+            val clientDataJsonBytes =
+                decodeBase64Url(authenticationResponse.response.clientDataJSON)
+                    ?: return AuthenticationResult(success = false, error = "Client data is not valid base64url")
+            val signatureBytes =
+                decodeBase64Url(authenticationResponse.response.signature)
+                    ?: return AuthenticationResult(success = false, error = "Signature is not valid base64url")
+            val userHandleBytes = authenticationResponse.response.userHandle?.let { decodeBase64Url(it) }
+
+            val authenticationRequest =
+                if (userHandleBytes != null) {
+                    AuthenticationRequest(
+                        credentialIdBytes,
+                        userHandleBytes,
+                        authenticatorDataBytes,
+                        clientDataJsonBytes,
+                        signatureBytes,
+                    )
+                } else {
+                    AuthenticationRequest(
+                        credentialIdBytes,
+                        authenticatorDataBytes,
+                        clientDataJsonBytes,
+                        signatureBytes,
+                    )
+                }
+
+            val challengeBytes =
+                decodeBase64Url(challenge)
+                    ?: return AuthenticationResult(success = false, error = "Challenge is not valid base64url")
+            val serverProperty =
+                ServerProperty
+                    .builder()
+                    .origin(Origin(origin))
+                    .rpId(relyingPartyId)
+                    .challenge(DefaultChallenge(challengeBytes))
+                    .build()
+
+            val authenticationParameters =
+                AuthenticationParameters(
+                    serverProperty,
+                    authenticator,
+                    listOf(credentialIdBytes),
+                    true,
+                    true,
+                )
+
+            val authenticationData = webAuthnManager.verify(authenticationRequest, authenticationParameters)
+            val newSignCount = authenticationData.authenticatorData?.signCount ?: storedData.signCount
+            runBlocking {
+                passkeyRepository.updateSignCount(canonicalCredentialId, newSignCount)
+            }
+
+            AuthenticationResult(success = true, userId = userId, credentialId = canonicalCredentialId)
+        } catch (e: DataConversionException) {
+            AuthenticationResult(success = false, error = "Authentication data conversion failed")
+        } catch (e: Exception) {
+            AuthenticationResult(success = false, error = "Authentication verification failed: ${e.message}")
         }
     }
 
-    /**
-     * Get credential IDs for a user.
-     */
-    fun getUserCredentials(userId: Uuid): List<String> =
-        passkeys[userId]?.filter { it.info.isActive }?.map { it.credentialId } ?: emptyList()
+    private fun validateChallenge(
+        challenge: String,
+        expectedType: String,
+        expectedUserId: Uuid?,
+    ): PasskeyChallenge? {
+        val challengeData = challenges[challenge] ?: return null
+        if (challengeData.isUsed) {
+            return null
+        }
+        if (challengeData.type != expectedType) {
+            return null
+        }
+        if (expectedUserId != null && challengeData.userId != expectedUserId) {
+            return null
+        }
+        val expiresAt = runCatching { Instant.parse(challengeData.expiresAt) }.getOrNull()
+        if (expiresAt == null || Clock.System.now() > expiresAt) {
+            return null
+        }
+        return challengeData
+    }
+
+    private fun findStoredPasskey(credentialId: String): Pair<Uuid, StoredPasskeyData>? {
+        val normalized = normalizeCredentialId(credentialId)
+        return runBlocking {
+            passkeyRepository.getPasskeyByCredentialId(credentialId)
+                ?: (normalized?.takeIf { it != credentialId }?.let { passkeyRepository.getPasskeyByCredentialId(it) })
+        }
+    }
 
     private fun generateChallenge(): String {
         val challengeBytes = ByteArray(32)
@@ -259,14 +444,19 @@ class WebAuthnPasskeyService(
         return Base64.getUrlEncoder().withoutPadding().encodeToString(challengeBytes)
     }
 
-    private fun findPasskeyByCredentialId(credentialId: String): Pair<Uuid, StoredPasskey>? {
-        for ((userId, userPasskeys) in passkeys) {
-            for (passkey in userPasskeys) {
-                if (passkey.credentialId == credentialId && passkey.info.isActive) {
-                    return userId to passkey
-                }
-            }
-        }
-        return null
-    }
+    private fun decodeBase64Url(value: String): ByteArray? = runCatching { Base64.getUrlDecoder().decode(value) }.getOrNull()
+
+    private fun encodeBase64Url(value: ByteArray): String = Base64.getUrlEncoder().withoutPadding().encodeToString(value)
+
+    private fun normalizeCredentialId(value: String): String? = decodeBase64Url(value)?.let { encodeBase64Url(it) }
+}
+
+private fun readBooleanEnv(
+    name: String,
+    defaultValue: Boolean,
+): Boolean {
+    val raw = System.getenv(name) ?: return defaultValue
+    return raw.equals("true", ignoreCase = true) ||
+        raw.equals("yes", ignoreCase = true) ||
+        raw == "1"
 }

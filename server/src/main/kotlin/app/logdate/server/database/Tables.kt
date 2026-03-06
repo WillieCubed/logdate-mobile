@@ -15,11 +15,42 @@ object AccountsTable : Table("accounts") {
     val username = varchar("username", 50).uniqueIndex()
     val displayName = varchar("display_name", 100)
     val email = varchar("email", 255).nullable()
+    val emailVerified = bool("email_verified").default(false)
     val bio = text("bio").nullable()
     val createdAt = timestamp("created_at")
     val lastSignInAt = timestamp("last_sign_in_at").nullable()
     val isActive = bool("is_active").default(true)
     val preferences = text("preferences").default("{}")
+
+    override val primaryKey = PrimaryKey(id)
+}
+
+@OptIn(ExperimentalUuidApi::class)
+object AccountIdentitiesTable : Table("account_identities") {
+    val id = uuid("id").autoGenerate()
+    val accountId = uuid("account_id").references(AccountsTable.id)
+    val provider = varchar("provider", 32)
+    val providerSubject = varchar("provider_subject", 255)
+    val email = varchar("email", 255).nullable()
+    val emailVerified = bool("email_verified").default(false)
+    val createdAt = timestamp("created_at")
+    val lastSignInAt = timestamp("last_sign_in_at").nullable()
+    val metadataJson = text("metadata_json").default("{}")
+
+    override val primaryKey = PrimaryKey(id)
+}
+
+@OptIn(ExperimentalUuidApi::class)
+object AccountLinkEventsTable : Table("account_link_events") {
+    val id = uuid("id").autoGenerate()
+    val accountId = uuid("account_id").references(AccountsTable.id)
+    val provider = varchar("provider", 32)
+    val providerSubject = varchar("provider_subject", 255)
+    val reason = varchar("reason", 64)
+    val ipHash = varchar("ip_hash", 128).nullable()
+    val userAgentHash = varchar("user_agent_hash", 128).nullable()
+    val createdAt = timestamp("created_at")
+    val metadataJson = text("metadata_json").default("{}")
 
     override val primaryKey = PrimaryKey(id)
 }
