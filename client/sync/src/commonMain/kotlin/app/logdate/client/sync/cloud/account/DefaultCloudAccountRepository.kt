@@ -8,7 +8,6 @@ import app.logdate.shared.model.BeginAccountCreationResult
 import app.logdate.shared.model.CloudAccount
 import app.logdate.shared.model.CloudAccountRepository
 import app.logdate.shared.model.DeviceInfo
-import app.logdate.shared.model.DeviceType
 import app.logdate.shared.model.PasskeyCredential
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
@@ -18,6 +17,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.io.encoding.Base64
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -29,12 +29,10 @@ import kotlin.uuid.Uuid
  *
  * @param apiClient The client for LogDate Cloud API communication.
  * @param secureStorage The storage for secure data like tokens.
- * @param platformInfoProvider Provider for platform-specific device information.
  */
 class DefaultCloudAccountRepository(
     private val apiClient: CloudApiClient,
     private val secureStorage: KeyValueStorage,
-    private val platformInfoProvider: PlatformInfoProvider,
     private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.IO),
 ) : CloudAccountRepository {
     private val accountFlow = MutableStateFlow<CloudAccount?>(null)
@@ -86,7 +84,11 @@ class DefaultCloudAccountRepository(
                 val userId = Uuid.parse(userIdString)
                 val createdAt = Instant.parse(createdAtString)
                 val updatedAt = Instant.parse(updatedAtString)
-                val passkeyIds = passkeyIdsString?.split(",") ?: emptyList()
+                val passkeyIds =
+                    passkeyIdsString
+                        ?.split(",")
+                        ?.mapNotNull { runCatching { Uuid.parse(it) }.getOrNull() }
+                        ?: emptyList()
 
                 // Convert String IDs to UUIDs
                 val account =
@@ -97,7 +99,7 @@ class DefaultCloudAccountRepository(
                         userId = userId,
                         createdAt = createdAt,
                         updatedAt = updatedAt,
-                        passkeyCredentialIds = passkeyIds.map { Uuid.parse(it) },
+                        passkeyCredentialIds = passkeyIds,
                     )
 
                 accountFlow.value = account
@@ -136,21 +138,15 @@ class DefaultCloudAccountRepository(
      * @param deviceInfo Optional device information.
      * @return A session token and challenge for passkey creation.
      */
+    @Suppress("UNUSED_PARAMETER")
     override suspend fun beginAccountCreation(
         username: String,
         displayName: String,
         deviceInfo: DeviceInfo?,
     ): Result<BeginAccountCreationResult> =
         try {
-            val deviceInfoDto =
-                deviceInfo?.let {
-                    app.logdate.shared.model.DeviceInfoDto(
-                        platform = it.platform,
-                        deviceName = it.deviceName,
-                        deviceType = it.deviceType.name,
-                    )
-                } ?: createDefaultDeviceInfo()
-
+            // Device metadata is currently not part of the auth v1 begin-signup contract.
+            // Keep the parameter for domain interface compatibility until the API adds support.
             val request =
                 app.logdate.shared.model.BeginAccountCreationRequest(
                     username = username,
@@ -161,12 +157,13 @@ class DefaultCloudAccountRepository(
             val result = apiClient.beginAccountCreation(request)
 
             result.map { response ->
+                val registrationUserId = decodeWebAuthnUserId(response.data.registrationOptions.user.id) ?: Uuid.random()
                 BeginAccountCreationResult(
                     sessionToken = response.data.sessionToken,
                     challenge = response.data.registrationOptions.challenge,
-                    rpId = response.data.registrationOptions.user.id,
-                    rpName = response.data.registrationOptions.user.name,
-                    userId = Uuid.parse(response.data.registrationOptions.user.id),
+                    rpId = "logdate.app",
+                    rpName = "LogDate",
+                    userId = registrationUserId,
                     username = response.data.registrationOptions.user.name,
                     displayName = response.data.registrationOptions.user.displayName,
                     timeout = response.data.registrationOptions.timeout,
@@ -219,13 +216,16 @@ class DefaultCloudAccountRepository(
                     // Create the account and credentials
                     val account =
                         CloudAccount(
-                            id = Uuid.parse(accountDto.username), // Generate a UUID from the username
+                            id = accountDto.id,
                             username = accountDto.username,
                             displayName = accountDto.displayName,
-                            userId = Uuid.parse(accountDto.username), // Using username as user ID for simplicity
+                            userId = accountDto.id,
                             createdAt = accountDto.createdAt,
                             updatedAt = accountDto.updatedAt,
-                            passkeyCredentialIds = accountDto.passkeyCredentialIds.map { Uuid.parse(it) },
+                            passkeyCredentialIds =
+                                accountDto.passkeyCredentialIds.mapNotNull {
+                                    runCatching { Uuid.parse(it) }.getOrNull()
+                                },
                         )
 
                     val credentials =
@@ -385,30 +385,16 @@ class DefaultCloudAccountRepository(
                 secureStorage.putString(StorageKeys.USER_ID, account.userId.toString())
                 secureStorage.putString(StorageKeys.CREATED_AT, account.createdAt.toString())
                 secureStorage.putString(StorageKeys.UPDATED_AT, account.updatedAt.toString())
-                secureStorage.putString(StorageKeys.PASSKEY_IDS, account.passkeyCredentialIds.joinToString(",") { it.toString() })
+                secureStorage.putString(
+                    StorageKeys.PASSKEY_IDS,
+                    account.passkeyCredentialIds.joinToString(",") { it.toString() },
+                )
             }.join() // Wait for the storage operations to complete
     }
 
-    /**
-     * Creates default device information from platform info.
-     */
-    private fun createDefaultDeviceInfo(): app.logdate.shared.model.DeviceInfoDto {
-        val platformInfo = platformInfoProvider.getPlatformInfo()
-        return app.logdate.shared.model.DeviceInfoDto(
-            platform = platformInfo.platform,
-            deviceName = platformInfo.deviceName,
-            deviceType = mapDeviceType(platformInfo.deviceType).name,
-        )
-    }
-
-    /**
-     * Maps platform-specific device type to domain model device type.
-     */
-    private fun mapDeviceType(platformType: String): DeviceType =
-        when (platformType.lowercase()) {
-            "phone" -> DeviceType.MOBILE
-            "tablet" -> DeviceType.TABLET
-            "desktop" -> DeviceType.DESKTOP
-            else -> DeviceType.UNKNOWN
-        }
+    private fun decodeWebAuthnUserId(encodedUserId: String): Uuid? =
+        runCatching {
+            val raw = Base64.decode(encodedUserId)
+            Uuid.parse(raw.decodeToString())
+        }.getOrNull()
 }

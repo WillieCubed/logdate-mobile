@@ -1,14 +1,16 @@
 package app.logdate.client.sync.cloud
 
-import app.logdate.shared.model.AccountInfoResponse
+import app.logdate.shared.model.AccountTokens
 import app.logdate.shared.model.ApiErrorResponse
+import app.logdate.shared.model.BeginAccountCreationData
 import app.logdate.shared.model.BeginAccountCreationRequest
 import app.logdate.shared.model.BeginAccountCreationResponse
+import app.logdate.shared.model.CompleteAccountCreationData
 import app.logdate.shared.model.CompleteAccountCreationRequest
 import app.logdate.shared.model.CompleteAccountCreationResponse
 import app.logdate.shared.model.LogDateAccount
+import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.RefreshTokenRequest
-import app.logdate.shared.model.RefreshTokenResponse
 import app.logdate.shared.model.UsernameAvailabilityResponse
 import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
@@ -20,6 +22,9 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import kotlinx.serialization.Serializable
+import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /**
  * Implementation of [CloudApiClient] for communicating with the LogDate Cloud API.
@@ -43,7 +48,7 @@ class LogDateCloudApiClient(
      */
     override suspend fun checkUsernameAvailability(username: String): Result<CheckUsernameAvailabilityResponse> =
         try {
-            val response = httpClient.get("$baseUrl/accounts/username/$username/available")
+            val response = httpClient.get("$baseUrl/auth/signup/username/$username/available")
 
             when (response.status) {
                 HttpStatusCode.OK -> {
@@ -85,16 +90,31 @@ class LogDateCloudApiClient(
     override suspend fun beginAccountCreation(request: BeginAccountCreationRequest): Result<BeginAccountCreationResponse> =
         try {
             val response =
-                httpClient.post("$baseUrl/accounts/create/begin") {
+                httpClient.post("$baseUrl/auth/signup/passkey/begin") {
                     contentType(ContentType.Application.Json)
-                    setBody(request)
+                    setBody(
+                        SignupPasskeyBeginRequestDto(
+                            username = request.username,
+                            displayName = request.displayName,
+                            bio = request.bio,
+                        ),
+                    )
                 }
 
             when (response.status) {
                 HttpStatusCode.OK -> {
-                    val responseBody = response.body<BeginAccountCreationResponse>()
+                    val responseBody = response.body<SignupPasskeyBeginResponseDto>()
                     if (responseBody.success) {
-                        Result.success(responseBody)
+                        Result.success(
+                            BeginAccountCreationResponse(
+                                success = true,
+                                data =
+                                    BeginAccountCreationData(
+                                        sessionToken = responseBody.data.sessionToken,
+                                        registrationOptions = responseBody.data.registrationOptions,
+                                    ),
+                            ),
+                        )
                     } else {
                         handleApiError(response)
                     }
@@ -125,16 +145,25 @@ class LogDateCloudApiClient(
     override suspend fun completeAccountCreation(request: CompleteAccountCreationRequest): Result<CompleteAccountCreationResponse> =
         try {
             val response =
-                httpClient.post("$baseUrl/accounts/create/complete") {
+                httpClient.post("$baseUrl/auth/signup/passkey/complete") {
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
 
             when (response.status) {
-                HttpStatusCode.Created -> {
-                    val responseBody = response.body<CompleteAccountCreationResponse>()
+                HttpStatusCode.OK, HttpStatusCode.Created -> {
+                    val responseBody = response.body<AuthResponseDto>()
                     if (responseBody.success) {
-                        Result.success(responseBody)
+                        Result.success(
+                            CompleteAccountCreationResponse(
+                                success = true,
+                                data =
+                                    CompleteAccountCreationData(
+                                        account = responseBody.data.account.toLogDateAccount(),
+                                        tokens = responseBody.data.tokens,
+                                    ),
+                            ),
+                        )
                     } else {
                         handleApiError(response)
                     }
@@ -162,14 +191,14 @@ class LogDateCloudApiClient(
     override suspend fun refreshAccessToken(refreshToken: String): Result<String> =
         try {
             val response =
-                httpClient.post("$baseUrl/accounts/refresh") {
+                httpClient.post("$baseUrl/auth/token/refresh") {
                     contentType(ContentType.Application.Json)
                     setBody(RefreshTokenRequest(refreshToken))
                 }
 
             when (response.status) {
                 HttpStatusCode.OK -> {
-                    val responseBody = response.body<RefreshTokenResponse>()
+                    val responseBody = response.body<RefreshTokenResponseV1Dto>()
                     if (responseBody.success) {
                         Result.success(responseBody.data.accessToken)
                     } else {
@@ -201,7 +230,7 @@ class LogDateCloudApiClient(
             Napier.d("Getting account info with token: ${accessToken.take(5)}...")
 
             val response =
-                httpClient.get("$baseUrl/accounts/me") {
+                httpClient.get("$baseUrl/auth/me") {
                     // Add Authorization header with Bearer token scheme
                     headers.append("Authorization", "Bearer $accessToken")
                 }
@@ -211,11 +240,11 @@ class LogDateCloudApiClient(
             when (response.status) {
                 HttpStatusCode.OK -> {
                     try {
-                        val responseBody = response.body<AccountInfoResponse>()
+                        val responseBody = response.body<AuthResponseDto>()
                         Napier.d("Parsed response body with success=${responseBody.success}")
 
                         if (responseBody.success) {
-                            Result.success(responseBody.data)
+                            Result.success(responseBody.data.account.toLogDateAccount())
                         } else {
                             handleApiError(response)
                         }
@@ -652,3 +681,67 @@ class LogDateCloudApiClient(
 
     // No custom HttpClient needed as we use the app's shared httpClient
 }
+
+@Serializable
+private data class SignupPasskeyBeginRequestDto(
+    val username: String,
+    val displayName: String,
+    val bio: String? = null,
+)
+
+@Serializable
+private data class SignupPasskeyBeginResponseDto(
+    val success: Boolean,
+    val data: SignupPasskeyBeginDataDto,
+)
+
+@Serializable
+private data class SignupPasskeyBeginDataDto(
+    val sessionToken: String,
+    val registrationOptions: PasskeyRegistrationOptions,
+)
+
+@Serializable
+private data class AuthResponseDto(
+    val success: Boolean,
+    val data: AuthResponseDataDto,
+)
+
+@Serializable
+private data class AuthResponseDataDto(
+    val account: AuthAccountDto,
+    val tokens: AccountTokens,
+)
+
+@Serializable
+private data class AuthAccountDto(
+    val id: String,
+    val username: String,
+    val displayName: String,
+    val bio: String? = null,
+    val passkeyCredentialIds: List<String> = emptyList(),
+    val createdAt: String,
+    val updatedAt: String,
+)
+
+@Serializable
+private data class RefreshTokenResponseV1Dto(
+    val success: Boolean,
+    val data: RefreshTokenDataV1Dto,
+)
+
+@Serializable
+private data class RefreshTokenDataV1Dto(
+    val accessToken: String,
+)
+
+private fun AuthAccountDto.toLogDateAccount(): LogDateAccount =
+    LogDateAccount(
+        id = Uuid.parse(id),
+        username = username,
+        displayName = displayName,
+        bio = bio,
+        passkeyCredentialIds = passkeyCredentialIds,
+        createdAt = Instant.parse(createdAt),
+        updatedAt = Instant.parse(updatedAt),
+    )

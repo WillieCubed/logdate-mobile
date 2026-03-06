@@ -82,6 +82,7 @@ import logdate.client.feature.core.generated.resources.separator_pipe
 import logdate.client.feature.core.generated.resources.settings_export_entries_description
 import logdate.client.feature.core.generated.resources.settings_export_entries_label
 import logdate.client.feature.core.generated.resources.showing_three_of_conflicts
+import logdate.client.feature.core.generated.resources.sign_in
 import logdate.client.feature.core.generated.resources.sign_in_required
 import logdate.client.feature.core.generated.resources.sign_in_to_your_logdate_cloud_account_to_enable_sync
 import logdate.client.feature.core.generated.resources.sync_conflicts

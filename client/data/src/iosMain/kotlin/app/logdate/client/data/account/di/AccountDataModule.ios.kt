@@ -2,8 +2,6 @@ package app.logdate.client.data.account.di
 
 import app.logdate.client.data.account.passkey.IosPasskeyManager
 import app.logdate.client.domain.account.passkey.PasskeyManager
-import app.logdate.client.sync.cloud.account.IosPlatformInfoProvider
-import app.logdate.client.sync.cloud.account.PlatformInfoProvider
 import org.koin.dsl.module
 
 /**
@@ -14,13 +12,6 @@ import org.koin.dsl.module
  */
 val iosAccountDataModule =
     module {
-        // Platform info provider
-        single<PlatformInfoProvider> {
-            IosPlatformInfoProvider(
-                appInfoProvider = get(),
-            )
-        }
-
         // Passkey manager
         single<PasskeyManager> {
             IosPasskeyManager()
