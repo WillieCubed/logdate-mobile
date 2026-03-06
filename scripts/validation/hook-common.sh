@@ -70,6 +70,10 @@ modules_from_files() {
 
     while IFS= read -r file; do
         [[ -z "$file" ]] && continue
+        # Skip files in included builds (e.g. build-logic/) — they are not subprojects
+        case "$file" in
+            build-logic/*) continue ;;
+        esac
         dir="$(dirname "$file")"
         while [[ "$dir" != "." && "$dir" != "/" ]]; do
             if [[ -f "$dir/build.gradle.kts" ]]; then

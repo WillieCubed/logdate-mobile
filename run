@@ -60,6 +60,7 @@ setup|setup:hooks|Configure git hooks for commit validation|./scripts/setup-hook
 
 utils|clean|Clean all build outputs|./gradlew clean
 utils|deps:update|Check for dependency updates|./gradlew dependencyUpdates
+utils|deps:add|Add a Gradle dependency to the version catalog|./scripts/add-dep.sh
 utils|gradle:stop|Stop Gradle daemon|./gradlew --stop
 '
 

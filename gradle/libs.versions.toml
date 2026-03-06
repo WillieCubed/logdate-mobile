@@ -118,6 +118,8 @@ kotlinxUuid = "0.0.15"
 okio = "3.16.4"
 
 
+voskAndroid = "0.3.47"
+
 [libraries]
 filekit-compose = { module = "io.github.vinceglb:filekit-compose", version.ref = "filekitCompose" }
 screenshot-validation-api = { group = "com.android.tools.screenshot", name = "screenshot-validation-api", version.ref = "screenshot" }
@@ -335,6 +337,8 @@ horologist-compose-tools = { group = "com.google.android.horologist", name = "ho
 horologist-tiles = { group = "com.google.android.horologist", name = "horologist-tiles", version.ref = "horologistTiles" }
 androidx-watchface-complications-data-source-ktx = { group = "androidx.wear.watchface", name = "watchface-complications-data-source-ktx", version.ref = "watchfaceComplicationsDataSourceKtx" }
 androidx-ui-android = { group = "androidx.compose.ui", name = "ui-android", version.ref = "uiAndroid" }
+
+vosk-android = { module = "com.alphacephei:vosk-android", version.ref = "voskAndroid" }
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
