@@ -45,13 +45,26 @@ import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.back
+import logdate.client.feature.core.generated.resources.location_data_privacy_note
+import logdate.client.feature.core.generated.resources.location_data_stored_on_device
+import logdate.client.feature.core.generated.resources.location_enable_background_tracking
+import logdate.client.feature.core.generated.resources.location_enable_background_tracking_description
 import logdate.client.feature.core.generated.resources.location_services
 import logdate.client.feature.core.generated.resources.location_settings
 import logdate.client.feature.core.generated.resources.location_timeline
+import logdate.client.feature.core.generated.resources.location_timeline_description
+import logdate.client.feature.core.generated.resources.location_track_journal_entries
+import logdate.client.feature.core.generated.resources.location_track_journal_entries_description
+import logdate.client.feature.core.generated.resources.location_track_timeline_review
+import logdate.client.feature.core.generated.resources.location_track_timeline_review_description
+import logdate.client.feature.core.generated.resources.location_tracking_battery_note
+import logdate.client.feature.core.generated.resources.location_update_frequency
+import logdate.client.feature.core.generated.resources.text_120_min
 import logdate.client.feature.core.generated.resources.text_15_min
 import logdate.client.feature.core.generated.resources.text_30_min
 import logdate.client.feature.core.generated.resources.text_60_min
 import logdate.client.feature.core.generated.resources.tracking_interval
+import logdate.client.feature.core.generated.resources.view_location_timeline
 import logdate.client.feature.core.generated.resources.view_timeline
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -148,20 +161,20 @@ fun LocationSettingsContent(
 
                         MaterialContainer {
                             ToggleSettingsItem(
-                                title = "Enable Background Location Tracking",
-                                description = "Allow the app to track your location in the background for better context and features.",
+                                title = stringResource(Res.string.location_enable_background_tracking),
+                                description = stringResource(Res.string.location_enable_background_tracking_description),
                                 checked = settings.backgroundTrackingEnabled,
                                 onCheckedChange = onToggleBackgroundTracking,
                             )
                             ToggleSettingsItem(
-                                title = "Track Location for Journal Entries",
-                                description = "Automatically attach your location to new journal entries.",
+                                title = stringResource(Res.string.location_track_journal_entries),
+                                description = stringResource(Res.string.location_track_journal_entries_description),
                                 checked = settings.autoTrackForJournalEntries,
                                 onCheckedChange = onToggleJournalTracking,
                             )
                             ToggleSettingsItem(
-                                title = "Track Location for Timeline Review",
-                                description = "Record location when viewing your timeline to improve context.",
+                                title = stringResource(Res.string.location_track_timeline_review),
+                                description = stringResource(Res.string.location_track_timeline_review_description),
                                 checked = settings.autoTrackForTimelineReview,
                                 onCheckedChange = onToggleTimelineTracking,
                             )
@@ -192,7 +205,7 @@ fun LocationSettingsContent(
                                         verticalArrangement = Arrangement.spacedBy(Spacing.md),
                                     ) {
                                         Text(
-                                            text = "Update Frequency: ${settings.trackingIntervalMinutes} minutes",
+                                            text = stringResource(Res.string.location_update_frequency, settings.trackingIntervalMinutes),
                                             style = MaterialTheme.typography.bodyLarge,
                                         )
 
@@ -227,13 +240,13 @@ fun LocationSettingsContent(
                                             Text(stringResource(Res.string.text_30_min), style = MaterialTheme.typography.labelMedium)
                                             Text(stringResource(Res.string.text_60_min), style = MaterialTheme.typography.labelMedium)
                                             Text(
-                                                "120 min",
+                                                stringResource(Res.string.text_120_min),
                                                 style = MaterialTheme.typography.labelMedium,
                                             )
                                         }
 
                                         Text(
-                                            "Note: More frequent updates use more battery. The minimum interval is 15 minutes due to system limitations.",
+                                            stringResource(Res.string.location_tracking_battery_note),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
@@ -278,12 +291,12 @@ fun LocationSettingsContent(
 
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        "View Location Timeline",
+                                        stringResource(Res.string.view_location_timeline),
                                         style = MaterialTheme.typography.titleSmall,
                                     )
 
                                     Text(
-                                        "See your location history and current location",
+                                        stringResource(Res.string.location_timeline_description),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -320,13 +333,13 @@ private fun LocationSettingsNotes() {
                 )
 
                 Text(
-                    "Location data is stored on your device",
+                    stringResource(Res.string.location_data_stored_on_device),
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                 )
             }
 
             Text(
-                "Your location data is only stored locally on your device. If you enable cloud sync, your location data will be encrypted before being sent to the cloud.",
+                stringResource(Res.string.location_data_privacy_note),
                 style = MaterialTheme.typography.bodyMedium,
             )
         }

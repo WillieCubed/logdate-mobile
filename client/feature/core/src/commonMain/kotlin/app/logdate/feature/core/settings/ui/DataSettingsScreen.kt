@@ -70,9 +70,12 @@ import logdate.client.feature.core.generated.resources.importing
 import logdate.client.feature.core.generated.resources.integrity_check
 import logdate.client.feature.core.generated.resources.journals_count_with_comma
 import logdate.client.feature.core.generated.resources.last_check_issue_count
+import logdate.client.feature.core.generated.resources.last_sync_failed
+import logdate.client.feature.core.generated.resources.last_synced_time
 import logdate.client.feature.core.generated.resources.loading
 import logdate.client.feature.core.generated.resources.loading_conflicts
 import logdate.client.feature.core.generated.resources.media_count
+import logdate.client.feature.core.generated.resources.never_synced
 import logdate.client.feature.core.generated.resources.no_conflicts_waiting
 import logdate.client.feature.core.generated.resources.notes_count_with_comma
 import logdate.client.feature.core.generated.resources.queued_conflicts
@@ -663,11 +666,14 @@ private fun SyncSettingsSection(
                                 } else {
                                     val statusText =
                                         if (status.hasErrors) {
-                                            "Last sync failed: ${status.lastError?.message ?: "Unknown error"}"
+                                            stringResource(Res.string.last_sync_failed)
                                         } else {
                                             status.lastSyncTime?.let {
-                                                "Last synced: ${it.toReadableDateTimeShort()}"
-                                            } ?: "Never synced"
+                                                stringResource(
+                                                    Res.string.last_synced_time,
+                                                    it.toReadableDateTimeShort(),
+                                                )
+                                            } ?: stringResource(Res.string.never_synced)
                                         }
                                     Text(
                                         text = statusText,

@@ -24,6 +24,7 @@ import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.connect_your_account_to_sync_your_journals_access_them_from_anywhere_and_unlock_powerful_cloud_features
 import logdate.client.feature.core.generated.resources.create_new_account
 import logdate.client.feature.core.generated.resources.logdate_cloud
+import logdate.client.feature.core.generated.resources.passkey_not_supported_banner
 import logdate.client.feature.core.generated.resources.sign_in_to_logdate_cloud
 import logdate.client.feature.core.generated.resources.skip_for_now
 import logdate.client.feature.core.generated.resources.welcome_to_logdate_cloud
@@ -34,12 +35,14 @@ fun CloudAccountWelcomeScreen(
     onContinue: () -> Unit,
     onSignIn: () -> Unit,
     onSkip: () -> Unit,
+    isPasskeySupported: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     CloudAccountWelcomeContent(
         onContinue = onContinue,
         onSignIn = onSignIn,
         onSkip = onSkip,
+        isPasskeySupported = isPasskeySupported,
         modifier = modifier,
     )
 }
@@ -49,6 +52,7 @@ fun CloudAccountWelcomeContent(
     onContinue: () -> Unit,
     onSignIn: () -> Unit,
     onSkip: () -> Unit,
+    isPasskeySupported: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -145,9 +149,27 @@ fun CloudAccountWelcomeContent(
         Column(
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
+            if (!isPasskeySupported) {
+                Card(
+                    colors =
+                        CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                        ),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = stringResource(Res.string.passkey_not_supported_banner),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.padding(Spacing.md),
+                    )
+                }
+            }
+
             Button(
                 onClick = onContinue,
                 modifier = Modifier.fillMaxWidth(),
+                enabled = isPasskeySupported,
             ) {
                 Text(stringResource(Res.string.create_new_account))
             }
