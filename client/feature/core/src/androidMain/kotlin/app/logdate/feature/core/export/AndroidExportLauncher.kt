@@ -13,6 +13,9 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.number
 import kotlinx.datetime.toLocalDateTime
@@ -30,6 +33,10 @@ class AndroidExportLauncher(
     private var completionCallback: ((String?) -> Unit)? = null
     private var currentWorkId: UUID? = null
     private var workInfoObserver: Observer<List<WorkInfo>>? = null
+    private var pendingExportOptions: ExportOptions = ExportOptions()
+
+    private val _exportProgress = MutableStateFlow(ExportProgressInfo())
+    override val exportProgress: StateFlow<ExportProgressInfo> = _exportProgress.asStateFlow()
 
     // This will be created and registered by the activity when this class is instantiated
     private var createDocumentLauncher: ActivityResultLauncher<Intent>? = null
@@ -54,7 +61,8 @@ class AndroidExportLauncher(
                 .removeObserver(workInfoObserver!!)
         }
 
-        // Create new observer
+        // Create new observer — handles terminal states only (completion callback).
+        // Progress is pushed directly by the worker via ExportLauncher.updateProgress().
         workInfoObserver =
             Observer { workInfoList ->
                 if (workInfoList.isEmpty()) return@Observer
@@ -63,6 +71,7 @@ class AndroidExportLauncher(
 
                 when (workInfo.state) {
                     WorkInfo.State.SUCCEEDED -> {
+                        _exportProgress.value = ExportProgressInfo()
                         val filePath = workInfo.outputData.getString(ExportWorker.FILE_PATH_KEY)
                         if (filePath != null) {
                             Napier.i("Export completed: $filePath")
@@ -73,12 +82,11 @@ class AndroidExportLauncher(
                         }
                     }
                     WorkInfo.State.FAILED, WorkInfo.State.CANCELLED -> {
+                        _exportProgress.value = ExportProgressInfo()
                         Napier.i("Export failed or was cancelled")
                         completionCallback?.invoke(null)
                     }
-                    else -> {
-                        // Still in progress, do nothing
-                    }
+                    else -> Unit
                 }
             }
 
@@ -91,11 +99,17 @@ class AndroidExportLauncher(
         }
     }
 
+    override fun updateProgress(info: ExportProgressInfo) {
+        Napier.d("Export progress: ${info.progressPercent}% - ${info.message}")
+        _exportProgress.value = info
+    }
+
     override fun setExportCompletionCallback(callback: (String?) -> Unit) {
         completionCallback = callback
     }
 
-    override fun startExport() {
+    override fun startExport(options: ExportOptions) {
+        pendingExportOptions = options
         // Generate default filename with timestamp
         val timestamp =
             Clock.System
@@ -150,6 +164,9 @@ class AndroidExportLauncher(
         // Cancel the work if it's running
         WorkManager.getInstance(context).cancelUniqueWork(ExportWorker.WORK_NAME)
 
+        // Reset progress
+        _exportProgress.value = ExportProgressInfo()
+
         // Notify the callback
         completionCallback?.invoke(null)
 
@@ -185,18 +202,43 @@ class AndroidExportLauncher(
     }
 
     /**
+     * Converts an [ExportDateRange] to a string key for WorkManager input data.
+     */
+    private fun ExportDateRange.toKey(): String =
+        when (this) {
+            is ExportDateRange.AllTime -> "all_time"
+            is ExportDateRange.Last30Days -> "last_30_days"
+            is ExportDateRange.Last90Days -> "last_90_days"
+            is ExportDateRange.LastYear -> "last_year"
+            is ExportDateRange.Custom -> "all_time" // Custom ranges resolved at call site
+        }
+
+    /**
      * Starts the export worker with the provided URI
      */
     private fun startExportWorker(uri: Uri?) {
-        val inputData =
-            if (uri != null) {
-                Data
-                    .Builder()
-                    .putString(ExportWorker.DESTINATION_URI_KEY, uri.toString())
-                    .build()
-            } else {
-                Data.Builder().build()
-            }
+        Napier.i("Starting export worker")
+        _exportProgress.value =
+            ExportProgressInfo(
+                isActive = true,
+                progressPercent = 0,
+                message = "Preparing export…",
+            )
+
+        val dataBuilder =
+            Data
+                .Builder()
+                .putBoolean(ExportWorker.INCLUDE_JOURNALS_KEY, pendingExportOptions.includeJournals)
+                .putBoolean(ExportWorker.INCLUDE_NOTES_KEY, pendingExportOptions.includeNotes)
+                .putBoolean(ExportWorker.INCLUDE_DRAFTS_KEY, pendingExportOptions.includeDrafts)
+                .putBoolean(ExportWorker.INCLUDE_MEDIA_KEY, pendingExportOptions.includeMedia)
+                .putString(ExportWorker.DATE_RANGE_KEY, pendingExportOptions.dateRange.toKey())
+
+        if (uri != null) {
+            dataBuilder.putString(ExportWorker.DESTINATION_URI_KEY, uri.toString())
+        }
+
+        val inputData = dataBuilder.build()
 
         val workRequest =
             OneTimeWorkRequestBuilder<ExportWorker>()
@@ -209,7 +251,7 @@ class AndroidExportLauncher(
             .getInstance(context)
             .enqueueUniqueWork(
                 ExportWorker.WORK_NAME,
-                ExistingWorkPolicy.REPLACE, // Replace any existing export work
+                ExistingWorkPolicy.REPLACE,
                 workRequest,
             )
 

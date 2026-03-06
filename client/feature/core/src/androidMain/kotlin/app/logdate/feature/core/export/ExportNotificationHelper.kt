@@ -16,7 +16,7 @@ class ExportNotificationHelper(
     private val workId: java.util.UUID,
 ) {
     companion object {
-        private const val CHANNEL_ID = "export_channel"
+        private const val CHANNEL_ID = "export_progress_channel"
         private const val NOTIFICATION_ID = 1001
     }
 
@@ -45,6 +45,7 @@ class ExportNotificationHelper(
                 .setProgress(100, progress, progress == 0)
                 .setOngoing(true)
                 .setSilent(true)
+                .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
                 .addAction(
                     android.R.drawable.ic_delete,
                     context.getString(R.string.notification_action_cancel),
@@ -98,7 +99,7 @@ class ExportNotificationHelper(
             NotificationChannel(
                 CHANNEL_ID,
                 context.getString(R.string.export_channel_name),
-                NotificationManager.IMPORTANCE_LOW,
+                NotificationManager.IMPORTANCE_DEFAULT,
             ).apply {
                 description = context.getString(R.string.export_channel_description)
                 setSound(null, null)

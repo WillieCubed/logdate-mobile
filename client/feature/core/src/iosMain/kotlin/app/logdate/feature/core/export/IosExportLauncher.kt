@@ -13,6 +13,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
@@ -48,12 +51,19 @@ class IosExportLauncher(
     private var currentExportJob: Job? = null
     private var completionCallback: ((String?) -> Unit)? = null
 
+    private val _exportProgress = MutableStateFlow(ExportProgressInfo())
+    override val exportProgress: StateFlow<ExportProgressInfo> = _exportProgress.asStateFlow()
+
+    override fun updateProgress(info: ExportProgressInfo) {
+        _exportProgress.value = info
+    }
+
     override fun setExportCompletionCallback(callback: (String?) -> Unit) {
         completionCallback = callback
     }
 
     @OptIn(ExperimentalForeignApi::class)
-    override fun startExport() {
+    override fun startExport(options: ExportOptions) {
         // Cancel any ongoing export job
         currentExportJob?.cancel()
 
@@ -63,9 +73,24 @@ class IosExportLauncher(
                 try {
                     Napier.i("iOS: Starting export process")
 
+                    // Resolve date range cutoff
+                    val dateRangeCutoff =
+                        when (options.dateRange) {
+                            is ExportDateRange.AllTime -> null
+                            is ExportDateRange.Last30Days -> ExportUserDataUseCase.resolveDateRangeCutoff("last_30_days")
+                            is ExportDateRange.Last90Days -> ExportUserDataUseCase.resolveDateRangeCutoff("last_90_days")
+                            is ExportDateRange.LastYear -> ExportUserDataUseCase.resolveDateRangeCutoff("last_year")
+                            is ExportDateRange.Custom -> options.dateRange.start
+                        }
+
                     exportUserDataUseCase
-                        .exportUserData()
-                        .catch { exception ->
+                        .exportUserData(
+                            includeJournals = options.includeJournals,
+                            includeNotes = options.includeNotes,
+                            includeDrafts = options.includeDrafts,
+                            includeMedia = options.includeMedia,
+                            dateRangeCutoff = dateRangeCutoff,
+                        ).catch { exception ->
                             Napier.e("iOS: Export failed", exception)
                             showAlert(
                                 title = "Export Failed",

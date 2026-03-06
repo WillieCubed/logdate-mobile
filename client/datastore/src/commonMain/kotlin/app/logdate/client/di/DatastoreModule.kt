@@ -30,15 +30,11 @@ val commonDatastoreModule =
         }
 
         // Create namespaced key-value stores for different parts of the app
-        factory(named("deviceKeyValueStorage")) {
-            // Same implementation but with a qualified DataStore instance
-            // to isolate device-specific data
+        factory<KeyValueStorage>(named("deviceKeyValueStorage")) {
             DataStoreKeyValueStorage(get(named("mainDataStore")))
         }
 
-        factory(named("userKeyValueStorage")) {
-            // Same implementation but with a qualified DataStore instance
-            // to isolate user-specific data
+        factory<KeyValueStorage>(named("userKeyValueStorage")) {
             DataStoreKeyValueStorage(get(named("mainDataStore")))
         }
 

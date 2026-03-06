@@ -8,6 +8,7 @@ import app.logdate.feature.core.BiometricGatekeeper
 import app.logdate.feature.core.IosBiometricGatekeeper
 import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
 import app.logdate.feature.core.export.ExportLauncher
+import app.logdate.feature.core.export.ExportViewModel
 import app.logdate.feature.core.export.IosExportLauncher
 import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.feature.core.profile.ui.ProfileViewModel
@@ -86,9 +87,9 @@ actual val coreFeatureModule: Module =
                 get(),
                 get(),
                 get(),
-                get(),
             )
         }
+        viewModel { ExportViewModel(get(), get()) }
         viewModel { AdvancedSettingsViewModel(get(), get()) }
         viewModel {
             DangerZoneSettingsViewModel(
@@ -99,7 +100,7 @@ actual val coreFeatureModule: Module =
             )
         }
         viewModel { HomeViewModel(get(), get(), get(), get()) }
-        viewModel { CloudAccountOnboardingViewModel(get(), get(), get()) }
+        viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get()) }
         // TODO(ios): Wire location settings UX and platform permissions; keep settings storage available for now.
         viewModel { LocationSettingsViewModel(get()) }
         viewModel { ProfileViewModel(get(), get(), get(), get()) }

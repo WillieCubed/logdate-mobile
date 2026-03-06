@@ -6,6 +6,7 @@ import app.logdate.client.domain.di.healthDomainModule
 import app.logdate.client.domain.di.locationDomainModule
 import app.logdate.client.domain.entities.ExtractPeopleUseCase
 import app.logdate.client.domain.export.ExportUserDataUseCase
+import app.logdate.client.domain.export.GetExportCountsUseCase
 import app.logdate.client.domain.journals.DeleteJournalUseCase
 import app.logdate.client.domain.journals.GetCurrentUserJournalsUseCase
 import app.logdate.client.domain.journals.GetDefaultSelectedJournalsUseCase
@@ -63,6 +64,7 @@ val domainModule: Module =
 
         // Export
         factory { ExportUserDataUseCase(get(), get(), get(), get(), get(), get()) }
+        factory { GetExportCountsUseCase(get(), get(), get()) }
         factory { RestoreUserDataUseCase(get(), get(), get()) }
 
         // Notes

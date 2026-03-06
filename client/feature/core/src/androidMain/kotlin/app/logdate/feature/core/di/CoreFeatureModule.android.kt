@@ -11,6 +11,8 @@ import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
 import app.logdate.feature.core.account.ui.SaveAccountSetupDataUseCase
 import app.logdate.feature.core.export.AndroidExportLauncher
 import app.logdate.feature.core.export.ExportLauncher
+import app.logdate.feature.core.export.ExportViewModel
+import app.logdate.feature.core.export.ExportWorker
 import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.feature.core.profile.ui.ProfileViewModel
 import app.logdate.feature.core.restore.AndroidRestoreLauncher
@@ -22,6 +24,7 @@ import app.logdate.feature.core.settings.ui.DataSettingsViewModel
 import app.logdate.feature.core.settings.ui.LocationSettingsViewModel
 import app.logdate.feature.core.settings.ui.PrivacySettingsViewModel
 import org.koin.android.ext.koin.androidContext
+import org.koin.androidx.workmanager.dsl.workerOf
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.factoryOf
 import org.koin.core.module.dsl.viewModel
@@ -39,18 +42,19 @@ actual val coreFeatureModule: Module =
         includes(locationSettingsModule)
 
         // TODO: Refactor to separate auth module
-        single<BiometricGatekeeper> { AndroidBiometricGatekeeper() }
         single { AndroidBiometricGatekeeper() }
+        single<BiometricGatekeeper> { get<AndroidBiometricGatekeeper>() }
 
         // Export functionality with activity provider for file picker
         // We use lazy provider for current activity that will be set by the MainActivity
         single { ActivityProvider() }
 
-        // Create AndroidExportLauncher and expose it both as itself and as ExportLauncher interface
-        single<ExportLauncher> { AndroidExportLauncher(androidContext()) }
+        // Single instance exposed as both concrete type and interface
         single { AndroidExportLauncher(androidContext()) }
-        single<RestoreLauncher> { AndroidRestoreLauncher(androidContext()) }
+        single<ExportLauncher> { get<AndroidExportLauncher>() }
+        workerOf(::ExportWorker)
         single { AndroidRestoreLauncher(androidContext()) }
+        single<RestoreLauncher> { get<AndroidRestoreLauncher>() }
 
         // Account setup helpers
         factoryOf(::SaveAccountSetupDataUseCase)
@@ -84,9 +88,9 @@ actual val coreFeatureModule: Module =
                 get(),
                 get(),
                 get(),
-                get(),
             )
         }
+        viewModel { ExportViewModel(get(), get()) }
         viewModel { AdvancedSettingsViewModel(get(), get()) }
         viewModel {
             DangerZoneSettingsViewModel(
@@ -97,7 +101,7 @@ actual val coreFeatureModule: Module =
             )
         }
         viewModel { HomeViewModel(get(), get(), get(), get()) }
-        viewModel { CloudAccountOnboardingViewModel(get(), get(), get()) }
+        viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get()) }
         viewModel { LocationSettingsViewModel(get()) }
         viewModel { ProfileViewModel(get(), get(), get(), get()) }
     }

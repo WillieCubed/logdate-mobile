@@ -117,6 +117,7 @@ kotlin {
             implementation(libs.accompanist.permissions)
             // WorkManager for background export tasks
             implementation(libs.androidx.work.runtime)
+            implementation(libs.koin.androidx.workmanager)
         }
 
         desktopMain.dependencies {

@@ -20,6 +20,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
 
 /**
  * Use case for exporting all user data to JSON format according to the LogDate export specification.
@@ -39,36 +40,80 @@ class ExportUserDataUseCase(
         }
 
     /**
-     * Exports all user data as a Flow that emits progress updates.
+     * Exports user data as a Flow that emits progress updates.
      *
+     * @param includeJournals Whether to include journals in the export
+     * @param includeNotes Whether to include notes in the export
+     * @param includeDrafts Whether to include drafts in the export
+     * @param includeMedia Whether to include media files in the export
+     * @param dateRangeCutoff Optional cutoff instant — notes and drafts created before this are excluded.
+     *                        Journals are always fully included when [includeJournals] is true.
      * @return Flow of ExportProgress containing current status and completion percentage
      */
-    fun exportUserData(): Flow<ExportProgress> =
+    fun exportUserData(
+        includeJournals: Boolean = true,
+        includeNotes: Boolean = true,
+        includeDrafts: Boolean = true,
+        includeMedia: Boolean = true,
+        dateRangeCutoff: kotlin.time.Instant? = null,
+    ): Flow<ExportProgress> =
         flow {
             emit(ExportProgress.Starting)
 
             try {
-                // Gather all journals
+                // Gather journals (always fully exported if included — they're containers, not time-bound)
                 emit(ExportProgress.InProgress(0.1f, "Collecting journals..."))
-                val journals = journalRepository.allJournalsObserved.first()
+                val journals =
+                    if (includeJournals) {
+                        journalRepository.allJournalsObserved.first()
+                    } else {
+                        emptyList()
+                    }
 
-                // Gather all notes
+                // Gather notes, filtered by date range if specified
                 emit(ExportProgress.InProgress(0.3f, "Collecting notes..."))
-                val notes = journalNotesRepository.allNotesObserved.first()
+                val notes =
+                    if (includeNotes) {
+                        val allNotes = journalNotesRepository.allNotesObserved.first()
+                        if (dateRangeCutoff != null) {
+                            allNotes.filter { it.creationTimestamp >= dateRangeCutoff }
+                        } else {
+                            allNotes
+                        }
+                    } else {
+                        emptyList()
+                    }
 
-                // Specifically gather all audio notes for media export
-                val audioNotes = getAllAudioNotesUseCase().first()
+                // Gather audio notes for media export
+                val audioNotes =
+                    if (includeMedia && includeNotes) {
+                        val allAudio = getAllAudioNotesUseCase().first()
+                        if (dateRangeCutoff != null) {
+                            allAudio.filter { it.creationTimestamp >= dateRangeCutoff }
+                        } else {
+                            allAudio
+                        }
+                    } else {
+                        emptyList()
+                    }
 
-                // Gather all drafts
+                // Gather drafts, filtered by date range if specified
                 emit(ExportProgress.InProgress(0.5f, "Collecting drafts..."))
-                val drafts = journalRepository.getAllDrafts()
+                val drafts =
+                    if (includeDrafts) {
+                        val allDrafts = journalRepository.getAllDrafts()
+                        if (dateRangeCutoff != null) {
+                            allDrafts.filter { it.createdAt >= dateRangeCutoff }
+                        } else {
+                            allDrafts
+                        }
+                    } else {
+                        emptyList()
+                    }
 
                 // Get app info and user ID
                 val appInfo = appInfoProvider.getAppInfo()
-                // Device ID will be our user ID if not signed in
                 val userId = deviceIdProvider.getDeviceId().value.toString()
-
-                // Get device ID
                 val deviceId = deviceIdProvider.getDeviceId().value.toString()
 
                 // Create export data structure
@@ -115,26 +160,38 @@ class ExportUserDataUseCase(
 
                 val exportDrafts = drafts.map { it.toExportDraft() }
                 val exportRelations =
-                    journals.flatMap { journal ->
-                        journalNotesRepository.observeNotesInJournal(journal.id).first().map { note ->
-                            ExportJournalNoteRelation(
-                                journalId = journal.id.toString(),
-                                noteId = note.uid.toString(),
-                                addedAt = note.creationTimestamp,
-                            )
+                    if (includeJournals && includeNotes) {
+                        journals.flatMap { journal ->
+                            journalNotesRepository
+                                .observeNotesInJournal(journal.id)
+                                .first()
+                                .filter { note -> dateRangeCutoff == null || note.creationTimestamp >= dateRangeCutoff }
+                                .map { note ->
+                                    ExportJournalNoteRelation(
+                                        journalId = journal.id.toString(),
+                                        noteId = note.uid.toString(),
+                                        addedAt = note.creationTimestamp,
+                                    )
+                                }
                         }
+                    } else {
+                        emptyList()
                     }
 
                 // Calculate actual stats
-                val mediaFiles = getMediaFilesToExport(exportNotes, exportDrafts, audioNotes)
-                val mediaCount = mediaFiles.size
+                val mediaFiles =
+                    if (includeMedia) {
+                        getMediaFilesToExport(exportNotes, exportDrafts, audioNotes)
+                    } else {
+                        emptyList()
+                    }
 
                 val stats =
                     ExportStats(
                         journalCount = journals.size,
                         noteCount = notes.size,
                         draftCount = exportDrafts.size,
-                        mediaCount = mediaCount,
+                        mediaCount = mediaFiles.size,
                     )
 
                 val exportMetadata =
@@ -172,6 +229,22 @@ class ExportUserDataUseCase(
                 emit(ExportProgress.Failed(exception.message ?: "Unknown error occurred"))
             }
         }
+
+    /**
+     * Resolves an [ExportDateRange] to a cutoff [Instant], or null for [ExportDateRange.AllTime].
+     */
+    companion object {
+        fun resolveDateRangeCutoff(dateRange: String): kotlin.time.Instant? {
+            val now = Clock.System.now()
+            return when (dateRange) {
+                "all_time" -> null
+                "last_30_days" -> now - 30.days
+                "last_90_days" -> now - 90.days
+                "last_year" -> now - 365.days
+                else -> null
+            }
+        }
+    }
 
     /**
      * Creates a standardized media path for export according to the specification.

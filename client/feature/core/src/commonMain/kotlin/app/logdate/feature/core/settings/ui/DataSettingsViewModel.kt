@@ -11,7 +11,6 @@ import app.logdate.client.domain.quota.ObserveCloudQuotaUseCase
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.conflict.SyncConflictRecord
 import app.logdate.client.sync.conflict.SyncConflictStore
-import app.logdate.feature.core.export.ExportLauncher
 import app.logdate.feature.core.restore.RestoreLauncher
 import app.logdate.feature.core.restore.RestoreOutcome
 import app.logdate.feature.core.restore.RestoreSummary
@@ -33,7 +32,6 @@ import kotlin.time.Instant
 
 data class DataSettingsState(
     val quotaState: CloudStorageQuota,
-    val exportState: ExportState,
     val restoreState: RestoreState,
     val integrityState: IntegrityState,
     val conflictsState: ConflictsState,
@@ -41,25 +39,6 @@ data class DataSettingsState(
     val isAuthenticated: Boolean,
     val isBackgroundSyncEnabled: Boolean,
 )
-
-private data class DataSettingsSourceState(
-    val quotaState: CloudStorageQuota?,
-    val exportState: ExportState,
-    val restoreState: RestoreState,
-    val integrityState: IntegrityState,
-    val conflictsState: ConflictsState,
-)
-
-sealed class ExportState {
-    data object Idle : ExportState()
-
-    data object Selecting : ExportState()
-
-    data class Selected(
-        val path: String,
-        val showSnackbar: Boolean = true,
-    ) : ExportState()
-}
 
 sealed class RestoreState {
     data object Idle : RestoreState()
@@ -96,7 +75,6 @@ data class ConflictsState(
 
 class DataSettingsViewModel(
     observeCloudQuotaUseCase: ObserveCloudQuotaUseCase,
-    private val exportLauncher: ExportLauncher,
     private val restoreLauncher: RestoreLauncher,
     private val syncManager: SyncManager,
     private val sessionStorage: SessionStorage,
@@ -104,9 +82,6 @@ class DataSettingsViewModel(
     private val dataIntegrityService: DataIntegrityService,
     private val conflictStore: SyncConflictStore,
 ) : ViewModel() {
-    private val _exportState = MutableStateFlow<ExportState>(ExportState.Idle)
-    val exportState: StateFlow<ExportState> = _exportState.asStateFlow()
-
     private val _restoreState = MutableStateFlow<RestoreState>(RestoreState.Idle)
     val restoreState: StateFlow<RestoreState> = _restoreState.asStateFlow()
 
@@ -132,19 +107,19 @@ class DataSettingsViewModel(
     private val sourceStateFlow =
         combine(
             quotaFlow,
-            _exportState,
             _restoreState,
             _integrityState,
-        ) { quotaState, exportState, restoreState, integrityState ->
-            DataSettingsSourceState(
-                quotaState = quotaState,
-                exportState = exportState,
+            _conflictsState,
+        ) { quotaState, restoreState, integrityState, conflictsState ->
+            DataSettingsState(
+                quotaState = quotaState.orDefault(),
                 restoreState = restoreState,
                 integrityState = integrityState,
-                conflictsState = ConflictsState(),
+                conflictsState = conflictsState,
+                syncStatus = null,
+                isAuthenticated = false,
+                isBackgroundSyncEnabled = true,
             )
-        }.combine(_conflictsState) { sourceState, conflictsState ->
-            sourceState.copy(conflictsState = conflictsState)
         }
 
     val uiState: StateFlow<DataSettingsState> =
@@ -154,12 +129,7 @@ class DataSettingsViewModel(
             sessionFlow,
             backgroundSyncEnabledFlow,
         ) { sourceState, syncStatus, session, backgroundSyncEnabled ->
-            DataSettingsState(
-                quotaState = sourceState.quotaState.orDefault(),
-                exportState = sourceState.exportState,
-                restoreState = sourceState.restoreState,
-                integrityState = sourceState.integrityState,
-                conflictsState = sourceState.conflictsState,
+            sourceState.copy(
                 syncStatus = syncStatus,
                 isAuthenticated = session != null,
                 isBackgroundSyncEnabled = backgroundSyncEnabled,
@@ -169,7 +139,6 @@ class DataSettingsViewModel(
             SharingStarted.WhileSubscribed(5000),
             DataSettingsState(
                 quotaState = (null as CloudStorageQuota?).orDefault(),
-                exportState = ExportState.Idle,
                 restoreState = RestoreState.Idle,
                 integrityState = IntegrityState(),
                 conflictsState = ConflictsState(),
@@ -180,14 +149,6 @@ class DataSettingsViewModel(
         )
 
     init {
-        exportLauncher.setExportCompletionCallback { path ->
-            if (path == null) {
-                _exportState.update { ExportState.Idle }
-            } else {
-                _exportState.update { ExportState.Selected(path, true) }
-            }
-        }
-
         restoreLauncher.setRestoreCompletionCallback { outcome ->
             when (outcome) {
                 is RestoreOutcome.Started -> _restoreState.update { RestoreState.Restoring }
@@ -204,26 +165,6 @@ class DataSettingsViewModel(
         }
 
         startConflictPolling()
-    }
-
-    fun exportContent() {
-        _exportState.update { ExportState.Selecting }
-        exportLauncher.startExport()
-    }
-
-    fun cancelExport() {
-        exportLauncher.cancelExport()
-        _exportState.update { ExportState.Idle }
-    }
-
-    fun markExportSnackbarShown() {
-        _exportState.update {
-            if (it is ExportState.Selected) {
-                it.copy(showSnackbar = false)
-            } else {
-                it
-            }
-        }
     }
 
     fun restoreContent() {

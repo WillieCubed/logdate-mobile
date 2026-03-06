@@ -37,6 +37,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.tooling.preview.Preview
+import app.logdate.feature.core.export.ExportBottomSheet
+import app.logdate.feature.core.export.ExportOptions
+import app.logdate.feature.core.export.ExportState
+import app.logdate.feature.core.export.ExportViewModel
 import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
@@ -66,7 +70,6 @@ import logdate.client.feature.core.generated.resources.importing
 import logdate.client.feature.core.generated.resources.integrity_check
 import logdate.client.feature.core.generated.resources.journals_count_with_comma
 import logdate.client.feature.core.generated.resources.last_check_issue_count
-import logdate.client.feature.core.generated.resources.last_export_path
 import logdate.client.feature.core.generated.resources.loading
 import logdate.client.feature.core.generated.resources.loading_conflicts
 import logdate.client.feature.core.generated.resources.media_count
@@ -110,25 +113,15 @@ import kotlin.time.Instant
 fun DataSettingsScreen(
     onBack: () -> Unit,
     onNavigateToSignIn: () -> Unit = {},
+    onShareFile: (String) -> Unit = {},
     viewModel: DataSettingsViewModel = koinViewModel(),
+    exportViewModel: ExportViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val exportState by exportViewModel.exportState.collectAsState()
+    val isExportSheetVisible by exportViewModel.isSheetVisible.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-
-    // Show a snackbar when export is complete
-    LaunchedEffect(uiState.exportState) {
-        if (uiState.exportState is ExportState.Selected) {
-            val state = uiState.exportState as ExportState.Selected
-            if (state.showSnackbar) {
-                scope.launch {
-                    snackbarHostState.showSnackbar("Export completed successfully")
-                    // Mark the snackbar as shown to prevent showing it again on recomposition
-                    viewModel.markExportSnackbarShown()
-                }
-            }
-        }
-    }
 
     LaunchedEffect(uiState.restoreState) {
         when (val state = uiState.restoreState) {
@@ -162,8 +155,15 @@ fun DataSettingsScreen(
     DataSettingsContent(
         onBack = onBack,
         quotaUsage = uiState.quotaState.toStorageQuotaUi(),
-        onExportContent = viewModel::exportContent,
-        exportState = uiState.exportState,
+        exportState = exportState,
+        isExportSheetVisible = isExportSheetVisible,
+        onShowExportOptions = exportViewModel::showExportOptions,
+        onUpdateExportOptions = exportViewModel::updateExportOptions,
+        onConfirmExport = exportViewModel::confirmExport,
+        onCancelExport = exportViewModel::cancelExport,
+        onRetryExport = exportViewModel::retryExport,
+        onDismissExport = exportViewModel::dismissSheet,
+        onShareExport = { path -> onShareFile(path) },
         onRestoreContent = viewModel::restoreContent,
         onCancelRestore = viewModel::cancelRestore,
         restoreState = uiState.restoreState,
@@ -188,8 +188,15 @@ fun DataSettingsScreen(
 fun DataSettingsContent(
     onBack: () -> Unit,
     quotaUsage: StorageQuotaUi,
-    onExportContent: () -> Unit,
     exportState: ExportState,
+    isExportSheetVisible: Boolean = exportState !is ExportState.Idle,
+    onShowExportOptions: () -> Unit,
+    onUpdateExportOptions: (ExportOptions) -> Unit,
+    onConfirmExport: () -> Unit,
+    onCancelExport: () -> Unit,
+    onRetryExport: () -> Unit,
+    onDismissExport: () -> Unit,
+    onShareExport: (String) -> Unit,
     onRestoreContent: () -> Unit,
     onCancelRestore: () -> Unit,
     restoreState: RestoreState,
@@ -228,6 +235,19 @@ fun DataSettingsContent(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { paddingValues ->
+        // Export bottom sheet — visibility is independent of export state
+        if (isExportSheetVisible) {
+            ExportBottomSheet(
+                exportState = exportState,
+                onOptionsChanged = onUpdateExportOptions,
+                onConfirm = onConfirmExport,
+                onCancel = onCancelExport,
+                onRetry = onRetryExport,
+                onDismiss = onDismissExport,
+                onShare = onShareExport,
+            )
+        }
+
         DefaultSettingsContentContainer {
             LazyColumn(
                 modifier = Modifier.fillMaxWidth(),
@@ -259,30 +279,10 @@ fun DataSettingsContent(
                                 ListItem(
                                     headlineContent = { Text(stringResource(Res.string.settings_export_entries_label)) },
                                     supportingContent = {
-                                        Column {
-                                            Text(stringResource(Res.string.settings_export_entries_description))
-
-                                            // Show export location if available
-                                            if (exportState is ExportState.Selected) {
-                                                val path = exportState.path
-                                                Spacer(modifier = Modifier.height(Spacing.xs))
-                                                Text(
-                                                    text =
-                                                        stringResource(
-                                                            Res.string.last_export_path,
-                                                            path,
-                                                        ),
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                )
-                                            }
-                                        }
+                                        Text(stringResource(Res.string.settings_export_entries_description))
                                     },
                                     trailingContent = {
-                                        Button(
-                                            onClick = onExportContent,
-                                            enabled = exportState != ExportState.Selecting,
-                                        ) {
+                                        Button(onClick = onShowExportOptions) {
                                             Text(stringResource(Res.string.export))
                                         }
                                     },
@@ -715,15 +715,21 @@ private fun DataSettingsScreenPreview() {
         onBack = {},
         quotaUsage =
             StorageQuotaUi(
-                totalBytes = 100_000_000_000L, // 100GB default
+                totalBytes = 100_000_000_000L,
                 usedBytes = 0L,
                 usagePercentage = 0f,
                 formattedTotal = "100 GB",
                 formattedUsed = "0 B",
                 categories = emptyList(),
             ),
-        onExportContent = {},
         exportState = ExportState.Idle,
+        onShowExportOptions = {},
+        onUpdateExportOptions = {},
+        onConfirmExport = {},
+        onCancelExport = {},
+        onRetryExport = {},
+        onDismissExport = {},
+        onShareExport = {},
         onRestoreContent = {},
         onCancelRestore = {},
         restoreState = RestoreState.Idle,
