@@ -6,7 +6,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+
+private const val PRIVACY_POLICY_URL = "https://logdate.app/privacy"
+private const val TERMS_OF_SERVICE_URL = "https://logdate.app/terms"
 
 @Composable
 fun CloudAccountOnboardingScreen(
@@ -16,6 +20,7 @@ fun CloudAccountOnboardingScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val uriHandler = LocalUriHandler.current
 
     // Handle completion
     LaunchedEffect(uiState.isAccountCreated, uiState.isSignedIn, uiState.isSkipped) {
@@ -39,11 +44,13 @@ fun CloudAccountOnboardingScreen(
         OnboardingStep.SignIn -> {
             CloudAccountSignInScreen(
                 onSignIn = viewModel::signInWithPasskey,
-                onAccountRecovery = { /* TODO: Implement recovery */ },
-                onPrivacyPolicy = { /* TODO: Implement privacy policy */ },
-                onTermsOfService = { /* TODO: Implement terms */ },
+                onAccountRecovery = { /* Account recovery not yet available */ },
+                onPrivacyPolicy = { uriHandler.openUri(PRIVACY_POLICY_URL) },
+                onTermsOfService = { uriHandler.openUri(TERMS_OF_SERVICE_URL) },
                 onBack = viewModel::goToPreviousStep,
                 isSigningIn = uiState.isSigningIn,
+                errorMessage = uiState.errorMessage,
+                onClearError = viewModel::clearError,
                 modifier = modifier,
             )
         }

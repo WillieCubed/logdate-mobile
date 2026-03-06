@@ -1,5 +1,6 @@
 package app.logdate.client.domain.di
 
+import app.logdate.client.domain.account.AuthenticateWithPasskeyUseCase
 import app.logdate.client.domain.account.CheckUsernameAvailabilityUseCase
 import app.logdate.client.domain.account.CreatePasskeyAccountUseCase
 import app.logdate.client.domain.account.CreatePasskeyUseCase
@@ -27,6 +28,7 @@ val accountDomainModule: Module =
         factory { GetAccountSetupDataUseCase(get()) }
         factory { CreateRemoteAccountUseCase(get()) }
         factory { CheckUsernameAvailabilityUseCase(get()) }
+        factory { AuthenticateWithPasskeyUseCase(get()) }
 
         // User ID - depends on account
         factory { GetUserIdUseCase(get(), get()) }

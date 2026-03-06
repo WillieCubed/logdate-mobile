@@ -71,6 +71,7 @@ kotlin {
             implementation(projects.client.device)
             implementation(projects.client.intelligence)
             implementation(projects.client.domain)
+            implementation(projects.client.repository)
             implementation(projects.client.location)
             implementation(projects.client.media)
             implementation(projects.client.sync)

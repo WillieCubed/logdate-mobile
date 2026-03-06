@@ -5,6 +5,7 @@ import androidx.navigation3.runtime.NavKey
 import app.logdate.client.domain.account.CheckUsernameAvailabilityUseCase
 import app.logdate.client.domain.account.CreatePasskeyAccountUseCase
 import app.logdate.client.domain.account.CreateRemoteAccountUseCase
+import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.feature.core.account.ui.CloudAccountSetupScreen
 import app.logdate.feature.core.account.ui.CloudAccountSetupViewModel
 import app.logdate.navigation.routes.routeEntry
@@ -44,6 +45,7 @@ fun EntryProviderScope<NavKey>.consolidatedCloudAccountSetup(
         val checkUsernameAvailabilityUseCase = koinInject<CheckUsernameAvailabilityUseCase>()
         val createPasskeyAccountUseCase = koinInject<CreatePasskeyAccountUseCase>()
         val createRemoteAccountUseCase = koinInject<CreateRemoteAccountUseCase>()
+        val profileRepository = koinInject<ProfileRepository>()
 
         // Create the consolidated ViewModel
         val viewModel =
@@ -51,6 +53,7 @@ fun EntryProviderScope<NavKey>.consolidatedCloudAccountSetup(
                 checkUsernameAvailabilityUseCase = checkUsernameAvailabilityUseCase,
                 createPasskeyAccountUseCase = createPasskeyAccountUseCase,
                 createRemoteAccountUseCase = createRemoteAccountUseCase,
+                profileRepository = profileRepository,
             )
 
         // Display the consolidated screen

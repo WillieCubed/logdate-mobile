@@ -36,6 +36,7 @@ import logdate.client.feature.core.generated.resources.review_your_details_and_c
 import logdate.client.feature.core.generated.resources.share_something_about_yourself_with_the_logdate_community
 import logdate.client.feature.core.generated.resources.tell_others_about_yourself
 import logdate.client.feature.core.generated.resources.text_3_of_3
+import logdate.client.feature.core.generated.resources.try_again
 import logdate.client.feature.core.generated.resources.unique_address_username
 import logdate.client.feature.core.generated.resources.username
 import logdate.client.feature.core.generated.resources.your_device_doesnt_support_passkeys_please_use_a_device_with_biometric_authentication_or_a_security_key
@@ -353,6 +354,8 @@ fun PasskeyAccountCreationFinalContent(
                 )
                 Spacer(modifier = Modifier.width(Spacing.sm))
                 Text(stringResource(Res.string.creating_account))
+            } else if (errorMessage != null) {
+                Text(stringResource(Res.string.try_again))
             } else {
                 Icon(
                     imageVector = Icons.Default.Key,

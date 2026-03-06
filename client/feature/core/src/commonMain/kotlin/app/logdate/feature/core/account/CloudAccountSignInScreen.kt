@@ -45,6 +45,7 @@ import logdate.client.feature.core.generated.resources.sign_in_with_passkey
 import logdate.client.feature.core.generated.resources.signing_in
 import logdate.client.feature.core.generated.resources.terms_of_service
 import logdate.client.feature.core.generated.resources.text_4
+import logdate.client.feature.core.generated.resources.try_again
 import logdate.client.feature.core.generated.resources.username
 import logdate.client.feature.core.generated.resources.your_username_2
 import org.jetbrains.compose.resources.stringResource
@@ -57,6 +58,8 @@ fun CloudAccountSignInScreen(
     onTermsOfService: () -> Unit,
     onBack: () -> Unit,
     isSigningIn: Boolean = false,
+    errorMessage: String? = null,
+    onClearError: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var username by remember { mutableStateOf("") }
@@ -92,13 +95,17 @@ fun CloudAccountSignInScreen(
         onServerDomainDoubleClick = { isServerEditable = true },
         onServerFocusLost = { isServerEditable = false },
         serverFocusRequester = serverFocusRequester,
-        onSignIn = { onSignIn(username, serverDomain) },
+        onSignIn = {
+            onClearError()
+            onSignIn(username, serverDomain)
+        },
         onAccountRecovery = { showRecoveryPopup = true },
         onPrivacyPolicy = onPrivacyPolicy,
         onTermsOfService = onTermsOfService,
         showRecoveryPopup = showRecoveryPopup,
         onDismissRecoveryPopup = { showRecoveryPopup = false },
         isSigningIn = isSigningIn,
+        errorMessage = errorMessage,
         modifier = modifier,
     )
 }
@@ -120,6 +127,7 @@ fun CloudAccountSignInContent(
     showRecoveryPopup: Boolean,
     onDismissRecoveryPopup: () -> Unit,
     isSigningIn: Boolean = false,
+    errorMessage: String? = null,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -187,6 +195,28 @@ fun CloudAccountSignInContent(
                         serverFocusRequester = serverFocusRequester,
                     )
 
+                    if (errorMessage != null) {
+                        Card(
+                            colors =
+                                CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                ),
+                            border = null,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(Spacing.md),
+                                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                            ) {
+                                Text(
+                                    text = errorMessage,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                )
+                            }
+                        }
+                    }
+
                     Button(
                         onClick = onSignIn,
                         modifier = Modifier.fillMaxWidth(),
@@ -204,6 +234,8 @@ fun CloudAccountSignInContent(
                                 )
                                 Text(stringResource(Res.string.signing_in))
                             }
+                        } else if (errorMessage != null) {
+                            Text(stringResource(Res.string.try_again))
                         } else {
                             Text(stringResource(Res.string.sign_in_with_passkey))
                         }

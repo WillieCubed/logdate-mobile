@@ -2,10 +2,13 @@ package app.logdate.feature.core.account
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.domain.account.AuthenticateWithPasskeyUseCase
 import app.logdate.client.domain.account.CheckUsernameAvailabilityUseCase
 import app.logdate.client.domain.account.CreatePasskeyAccountUseCase
 import app.logdate.client.permissions.PasskeyManager
+import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.shared.model.LogDateAccount
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,7 +18,9 @@ import kotlinx.coroutines.launch
 class CloudAccountOnboardingViewModel(
     private val createPasskeyAccountUseCase: CreatePasskeyAccountUseCase,
     private val checkUsernameAvailabilityUseCase: CheckUsernameAvailabilityUseCase,
+    private val authenticateWithPasskeyUseCase: AuthenticateWithPasskeyUseCase,
     private val passkeyManager: PasskeyManager,
+    private val profileRepository: ProfileRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(CloudAccountOnboardingUiState())
     val uiState: StateFlow<CloudAccountOnboardingUiState> = _uiState.asStateFlow()
@@ -115,6 +120,7 @@ class CloudAccountOnboardingViewModel(
 
             when (result) {
                 is CreatePasskeyAccountUseCase.Result.Success -> {
+                    syncDisplayNameToLocalProfile(result.account.displayName)
                     _uiState.value =
                         currentState.copy(
                             isCreatingAccount = false,
@@ -153,38 +159,27 @@ class CloudAccountOnboardingViewModel(
             )
 
         viewModelScope.launch {
-            try {
-                // TODO: Get authentication options from server first
-                // For now, we'll simulate the passkey authentication flow
+            val usernameParam = username.takeIf { it.isNotBlank() }
+            val result = authenticateWithPasskeyUseCase(usernameParam)
 
-                // Check passkey capabilities first
-                val capabilities = passkeyManager.getCapabilities()
-                if (!capabilities.isSupported) {
+            when (result) {
+                is AuthenticateWithPasskeyUseCase.Result.Success -> {
+                    syncDisplayNameToLocalProfile(result.account.displayName)
                     _uiState.value =
                         _uiState.value.copy(
                             isSigningIn = false,
-                            errorMessage = "Passkeys are not supported on this device",
+                            isSignedIn = true,
+                            createdAccount = result.account,
+                            currentStep = OnboardingStep.Complete,
                         )
-                    return@launch
                 }
-
-                // TODO: Replace with actual authentication options from server
-                // This would typically involve calling the LogDate server with username/serverUrl
-                // to get the challenge and allowCredentials
-
-                // Simulate successful authentication for now
-                _uiState.value =
-                    _uiState.value.copy(
-                        isSigningIn = false,
-                        isSignedIn = true,
-                        currentStep = OnboardingStep.Complete,
-                    )
-            } catch (e: Exception) {
-                _uiState.value =
-                    _uiState.value.copy(
-                        isSigningIn = false,
-                        errorMessage = "Sign-in failed: ${e.message}",
-                    )
+                is AuthenticateWithPasskeyUseCase.Result.Error -> {
+                    _uiState.value =
+                        _uiState.value.copy(
+                            isSigningIn = false,
+                            errorMessage = mapAuthErrorToMessage(result.error),
+                        )
+                }
             }
         }
     }
@@ -281,6 +276,32 @@ class CloudAccountOnboardingViewModel(
 
         return isValid
     }
+
+    private suspend fun syncDisplayNameToLocalProfile(displayName: String) {
+        if (displayName.isNotBlank()) {
+            profileRepository.updateDisplayName(displayName).onFailure { e ->
+                Napier.e("Failed to sync display name to local profile", e)
+            }
+        }
+    }
+
+    private fun mapAuthErrorToMessage(error: AuthenticateWithPasskeyUseCase.AuthenticationError): String =
+        when (error) {
+            AuthenticateWithPasskeyUseCase.AuthenticationError.PasskeyNotSupported ->
+                "Passkeys are not supported on this device."
+            AuthenticateWithPasskeyUseCase.AuthenticationError.PasskeyCancelled ->
+                "Authentication was cancelled. Please try again."
+            AuthenticateWithPasskeyUseCase.AuthenticationError.PasskeyFailed ->
+                "Failed to authenticate with passkey. Please try again."
+            AuthenticateWithPasskeyUseCase.AuthenticationError.NoCredentialsFound ->
+                "No passkey found for this account. Please check your username or create a new account."
+            AuthenticateWithPasskeyUseCase.AuthenticationError.AccountNotFound ->
+                "Account not found. Please check your username or create a new account."
+            AuthenticateWithPasskeyUseCase.AuthenticationError.NetworkError ->
+                "Network error. Please check your connection and try again."
+            is AuthenticateWithPasskeyUseCase.AuthenticationError.Unknown ->
+                "An unexpected error occurred: ${error.message}"
+        }
 
     private fun mapErrorToMessage(error: CreatePasskeyAccountUseCase.CreateAccountError): String =
         when (error) {

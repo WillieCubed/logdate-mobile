@@ -3,6 +3,7 @@ package app.logdate.feature.core.account.ui
 import app.logdate.client.domain.account.CheckUsernameAvailabilityUseCase
 import app.logdate.client.domain.account.CreatePasskeyAccountUseCase
 import app.logdate.client.domain.account.CreateRemoteAccountUseCase
+import app.logdate.client.repository.profile.ProfileRepository
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +22,7 @@ class CloudAccountSetupViewModel(
     private val checkUsernameAvailabilityUseCase: CheckUsernameAvailabilityUseCase,
     private val createPasskeyAccountUseCase: CreatePasskeyAccountUseCase,
     private val createRemoteAccountUseCase: CreateRemoteAccountUseCase,
+    private val profileRepository: ProfileRepository,
     private val coroutineContext: CoroutineContext = Dispatchers.Main,
 ) {
     private val _uiState = MutableStateFlow(CloudAccountSetupState())
@@ -218,6 +220,7 @@ class CloudAccountSetupViewModel(
 
                 when (result) {
                     is CreateRemoteAccountUseCase.Result.Success -> {
+                        syncDisplayNameToLocalProfile(state.displayName)
                         _uiState.update {
                             it.copy(
                                 isCreatingAccount = false,
@@ -255,6 +258,14 @@ class CloudAccountSetupViewModel(
                         errorMessage = "Failed to create account. Please try again.",
                     )
                 }
+            }
+        }
+    }
+
+    private suspend fun syncDisplayNameToLocalProfile(displayName: String) {
+        if (displayName.isNotBlank()) {
+            profileRepository.updateDisplayName(displayName).onFailure { e ->
+                Napier.e("Failed to sync display name to local profile", e)
             }
         }
     }
