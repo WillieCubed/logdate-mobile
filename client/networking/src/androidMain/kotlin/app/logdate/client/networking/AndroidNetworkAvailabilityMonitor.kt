@@ -41,11 +41,22 @@ class AndroidNetworkAvailabilityMonitor(
                     networkState.emit(newState)
                 }
             }
+
+            override fun onLost(network: Network) {
+                super.onLost(network)
+                applicationScope.launch {
+                    val newState = NetworkState.NotConnected(Clock.System.now())
+                    networkState.emit(newState)
+                }
+            }
         }
 
     override fun isNetworkAvailable(): Boolean {
-        // TODO: Figure out whether this is the right API to be using
-        return connectivityManager?.activeNetwork != null
+        val manager = connectivityManager ?: return false
+        val activeNetwork = manager.activeNetwork ?: return false
+        val capabilities = manager.getNetworkCapabilities(activeNetwork) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
     /**

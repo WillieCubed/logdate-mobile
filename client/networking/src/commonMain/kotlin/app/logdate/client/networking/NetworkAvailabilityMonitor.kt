@@ -8,7 +8,7 @@ interface NetworkAvailabilityMonitor {
     /**
      * Subscribes an observer to the network state.
      *
-     * @return A [SharedFlow] that is updated whenever
+     * @return A [SharedFlow] updated whenever network connectivity changes.
      */
     fun observeNetwork(): SharedFlow<NetworkState>
 }
