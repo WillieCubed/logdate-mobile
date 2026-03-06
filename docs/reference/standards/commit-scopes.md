@@ -10,7 +10,10 @@ These are the main scopes for user-facing features. **Prefer these scopes** for 
 
 | Directory | Scope |
 |-----------|-------|
-| `client/feature/core/` | `core` |
+| `client/feature/core/` (account) | `account` |
+| `client/feature/core/` (export) | `export` |
+| `client/feature/core/` (profile) | `profile` |
+| `client/feature/core/` (settings) | `settings` |
 | `client/feature/editor/` | `editor` |
 | `client/feature/journal/` | `journal` |
 | `client/feature/location-timeline/` | `location-timeline` |

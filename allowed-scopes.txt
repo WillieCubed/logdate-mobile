@@ -1,48 +1,52 @@
 # LogDate Commit Scopes
 # Authoritative machine-readable list. Human docs: docs/reference/standards/commit-scopes.md
 # Lines starting with # and blank lines are ignored.
+# Format: scope  # description
 
 # Feature scopes (primary - prefer these for user-facing changes)
-core
-editor
-journal
-location-timeline
-onboarding
-rewind
-search
-timeline
+account  # Cloud account creation, sign-in, sign-out, onboarding flows
+editor  # Journal entry editor, text/media input, voice recording
+export  # Data export options, progress, and results
+profile  # User profile display, editing, avatar
+settings  # App settings screens (data, privacy, danger zone, devices)
+journal  # Journal list, journal detail, journal management
+location-timeline  # Location history visualization and map views
+onboarding  # First-run experience and app introduction
+rewind  # Year-in-review and memory highlights
+search  # Search across journals and entries
+timeline  # Main timeline feed of entries
 
 # App scopes
-wear
-server
+wear  # Wear OS companion app
+server  # Backend server (Ktor, routes, database, auth)
 
 # Client library scopes
-auth
-billing
-data
-database
-datastore
-device
-health-connect
-intelligence
-location
-media
-networking
-permissions
-sensor
-sharing
-sync
-theme
-ui
-util
+auth  # Authentication primitives and token management
+billing  # In-app purchases and subscription logic
+data  # Repository layer and data access abstractions
+database  # Room/SQLite schema, DAOs, migrations
+datastore  # Preferences and key-value storage
+device  # Device info, ID management, platform detection
+health-connect  # Health Connect integration
+intelligence  # On-device ML, smart suggestions, AI features
+location  # Location tracking, geofencing, permissions
+media  # Photo/video/audio capture, processing, storage
+networking  # HTTP clients, API communication, network monitoring
+permissions  # Runtime permission requests and state
+sensor  # Device sensor data collection
+sharing  # Content sharing and ActivityPub federation
+sync  # Cloud sync engine, conflict resolution, background sync
+theme  # Design tokens, color schemes, typography
+ui  # Shared UI components, common composables, design system
+util  # General-purpose utilities and extensions
 
 # Shared module scopes
-activitypub
+activitypub  # ActivityPub protocol implementation
 
 # Cross-cutting scopes
-infra
-build
-ios
-android
-desktop
-platform
+infra  # CI/CD, Gradle config, Terraform, build scripts
+build  # Build system changes (plugins, dependencies, versions)
+ios  # iOS-specific platform code
+android  # Android-specific platform code
+desktop  # Desktop-specific platform code
+platform  # Cross-platform expect/actual declarations

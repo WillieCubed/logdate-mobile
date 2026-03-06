@@ -26,8 +26,8 @@ fi
 
 allowed_scopes=()
 while IFS= read -r line; do
-    # Skip comments and blank lines
-    line="$(echo "$line" | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')"
+    # Strip inline comments, then leading/trailing whitespace
+    line="$(echo "$line" | sed 's/#.*//' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')"
     [[ -z "$line" || "$line" == \#* ]] && continue
     allowed_scopes+=("$line")
 done < "$SCOPES_FILE"
