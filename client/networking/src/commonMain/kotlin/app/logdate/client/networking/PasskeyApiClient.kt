@@ -2,22 +2,20 @@ package app.logdate.client.networking
 
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.AccountInfoResponse
+import app.logdate.shared.model.AccountTokens
 import app.logdate.shared.model.ApiErrorResponse
 import app.logdate.shared.model.BeginAccountCreationData
 import app.logdate.shared.model.BeginAccountCreationRequest
-import app.logdate.shared.model.BeginAccountCreationResponse
 import app.logdate.shared.model.BeginAuthenticationData
 import app.logdate.shared.model.BeginAuthenticationRequest
-import app.logdate.shared.model.BeginAuthenticationResponse
 import app.logdate.shared.model.CompleteAccountCreationData
 import app.logdate.shared.model.CompleteAccountCreationRequest
-import app.logdate.shared.model.CompleteAccountCreationResponse
 import app.logdate.shared.model.CompleteAuthenticationData
 import app.logdate.shared.model.CompleteAuthenticationRequest
-import app.logdate.shared.model.CompleteAuthenticationResponse
 import app.logdate.shared.model.LogDateAccount
+import app.logdate.shared.model.PasskeyAllowCredential
+import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.RefreshTokenRequest
-import app.logdate.shared.model.RefreshTokenResponse
 import app.logdate.shared.model.UpdateAccountProfileRequest
 import app.logdate.shared.model.UsernameAvailabilityData
 import app.logdate.shared.model.UsernameAvailabilityResponse
@@ -34,8 +32,10 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import kotlinx.coroutines.flow.first
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -70,7 +70,7 @@ interface PasskeyApiClientContract {
 }
 
 /**
- * API client for passkey-based account creation and authentication.
+ * API client for auth v1 passkey-based account creation and authentication.
  */
 class PasskeyApiClient(
     private val httpClient: HttpClient,
@@ -86,18 +86,15 @@ class PasskeyApiClient(
         },
 ) : PasskeyApiClientContract {
     companion object {
-        private const val ACCOUNTS_PATH = "/accounts"
+        private const val AUTH_PATH = "/auth"
     }
 
     private suspend fun getBaseUrl(): String = configRepository.apiBaseUrl.first()
 
-    /**
-     * Check if a username is available for registration
-     */
     override suspend fun checkUsernameAvailability(username: String): Result<UsernameAvailabilityData> =
         try {
             val baseUrl = getBaseUrl()
-            val response = httpClient.get("$baseUrl$ACCOUNTS_PATH/username/$username/available")
+            val response = httpClient.get("$baseUrl$AUTH_PATH/signup/username/$username/available")
 
             if (response.status.value in 200..299) {
                 val apiResponse = json.decodeFromString<UsernameAvailabilityResponse>(response.bodyAsText())
@@ -111,21 +108,29 @@ class PasskeyApiClient(
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to check username availability", e))
         }
 
-    /**
-     * Begin the account creation process
-     */
     override suspend fun beginAccountCreation(request: BeginAccountCreationRequest): Result<BeginAccountCreationData> =
         try {
             val baseUrl = getBaseUrl()
             val response =
-                httpClient.post("$baseUrl$ACCOUNTS_PATH/create/begin") {
+                httpClient.post("$baseUrl$AUTH_PATH/signup/passkey/begin") {
                     contentType(ContentType.Application.Json)
-                    setBody(json.encodeToString(BeginAccountCreationRequest.serializer(), request))
+                    setBody(
+                        SignupPasskeyBeginRequestDto(
+                            username = request.username,
+                            displayName = request.displayName,
+                            bio = request.bio,
+                        ),
+                    )
                 }
 
             if (response.status.value in 200..299) {
-                val apiResponse = json.decodeFromString<BeginAccountCreationResponse>(response.bodyAsText())
-                Result.success(apiResponse.data)
+                val apiResponse = json.decodeFromString<SignupPasskeyBeginResponseDto>(response.bodyAsText())
+                Result.success(
+                    BeginAccountCreationData(
+                        sessionToken = apiResponse.data.sessionToken,
+                        registrationOptions = apiResponse.data.registrationOptions,
+                    ),
+                )
             } else {
                 val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
@@ -135,21 +140,23 @@ class PasskeyApiClient(
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to begin account creation", e))
         }
 
-    /**
-     * Complete the account creation process with passkey credential
-     */
     override suspend fun completeAccountCreation(request: CompleteAccountCreationRequest): Result<CompleteAccountCreationData> =
         try {
             val baseUrl = getBaseUrl()
             val response =
-                httpClient.post("$baseUrl$ACCOUNTS_PATH/create/complete") {
+                httpClient.post("$baseUrl$AUTH_PATH/signup/passkey/complete") {
                     contentType(ContentType.Application.Json)
-                    setBody(json.encodeToString(CompleteAccountCreationRequest.serializer(), request))
+                    setBody(request)
                 }
 
             if (response.status.value in 200..299) {
-                val apiResponse = json.decodeFromString<CompleteAccountCreationResponse>(response.bodyAsText())
-                Result.success(apiResponse.data)
+                val apiResponse = json.decodeFromString<AuthResponseDto>(response.bodyAsText())
+                Result.success(
+                    CompleteAccountCreationData(
+                        account = apiResponse.data.account.toLogDateAccount(),
+                        tokens = apiResponse.data.tokens,
+                    ),
+                )
             } else {
                 val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
@@ -159,21 +166,26 @@ class PasskeyApiClient(
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to complete account creation", e))
         }
 
-    /**
-     * Begin the authentication process
-     */
     override suspend fun beginAuthentication(request: BeginAuthenticationRequest): Result<BeginAuthenticationData> =
         try {
             val baseUrl = getBaseUrl()
             val response =
-                httpClient.post("$baseUrl$ACCOUNTS_PATH/authenticate/begin") {
+                httpClient.post("$baseUrl$AUTH_PATH/signin/passkey/begin") {
                     contentType(ContentType.Application.Json)
-                    setBody(json.encodeToString(BeginAuthenticationRequest.serializer(), request))
+                    setBody(request)
                 }
 
             if (response.status.value in 200..299) {
-                val apiResponse = json.decodeFromString<BeginAuthenticationResponse>(response.bodyAsText())
-                Result.success(apiResponse.data)
+                val apiResponse = json.decodeFromString<SigninPasskeyBeginResponseDto>(response.bodyAsText())
+                Result.success(
+                    BeginAuthenticationData(
+                        challenge = apiResponse.data.challenge,
+                        rpId = apiResponse.data.rpId,
+                        allowCredentials = apiResponse.data.allowCredentials,
+                        timeout = apiResponse.data.timeout,
+                        userVerification = apiResponse.data.userVerification,
+                    ),
+                )
             } else {
                 val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
@@ -183,21 +195,23 @@ class PasskeyApiClient(
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to begin authentication", e))
         }
 
-    /**
-     * Complete the authentication process with passkey assertion
-     */
     override suspend fun completeAuthentication(request: CompleteAuthenticationRequest): Result<CompleteAuthenticationData> =
         try {
             val baseUrl = getBaseUrl()
             val response =
-                httpClient.post("$baseUrl$ACCOUNTS_PATH/authenticate/complete") {
+                httpClient.post("$baseUrl$AUTH_PATH/signin/passkey/complete") {
                     contentType(ContentType.Application.Json)
-                    setBody(json.encodeToString(CompleteAuthenticationRequest.serializer(), request))
+                    setBody(request)
                 }
 
             if (response.status.value in 200..299) {
-                val apiResponse = json.decodeFromString<CompleteAuthenticationResponse>(response.bodyAsText())
-                Result.success(apiResponse.data)
+                val apiResponse = json.decodeFromString<AuthResponseDto>(response.bodyAsText())
+                Result.success(
+                    CompleteAuthenticationData(
+                        account = apiResponse.data.account.toLogDateAccount(),
+                        tokens = apiResponse.data.tokens,
+                    ),
+                )
             } else {
                 val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
@@ -207,20 +221,17 @@ class PasskeyApiClient(
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to complete authentication", e))
         }
 
-    /**
-     * Get current account information (requires authentication)
-     */
     override suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount> =
         try {
             val baseUrl = getBaseUrl()
             val response =
-                httpClient.get("$baseUrl$ACCOUNTS_PATH/me") {
+                httpClient.get("$baseUrl$AUTH_PATH/me") {
                     header("Authorization", "Bearer $accessToken")
                 }
 
             if (response.status.value in 200..299) {
-                val accountResponse = json.decodeFromString<AccountInfoResponse>(response.bodyAsText())
-                Result.success(accountResponse.data)
+                val authResponse = json.decodeFromString<AuthResponseDto>(response.bodyAsText())
+                Result.success(authResponse.data.account.toLogDateAccount())
             } else {
                 val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
@@ -230,9 +241,6 @@ class PasskeyApiClient(
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to get account info", e))
         }
 
-    /**
-     * Update account profile information (requires authentication)
-     */
     override suspend fun updateAccountProfile(
         accessToken: String,
         displayName: String?,
@@ -241,17 +249,12 @@ class PasskeyApiClient(
     ): Result<LogDateAccount> =
         try {
             val baseUrl = getBaseUrl()
-            val updateRequest =
-                UpdateAccountProfileRequest(
-                    displayName = displayName,
-                    username = username,
-                    bio = bio,
-                )
+            val updateRequest = UpdateAccountProfileRequest(displayName = displayName, username = username, bio = bio)
             val response =
-                httpClient.put("$baseUrl$ACCOUNTS_PATH/me") {
+                httpClient.put("$baseUrl$AUTH_PATH/me") {
                     contentType(ContentType.Application.Json)
                     header("Authorization", "Bearer $accessToken")
-                    setBody(json.encodeToString(UpdateAccountProfileRequest.serializer(), updateRequest))
+                    setBody(updateRequest)
                 }
 
             if (response.status.value in 200..299) {
@@ -266,20 +269,17 @@ class PasskeyApiClient(
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to update account profile", e))
         }
 
-    /**
-     * Refresh access token using refresh token
-     */
     override suspend fun refreshToken(refreshToken: String): Result<String> =
         try {
             val baseUrl = getBaseUrl()
             val response =
-                httpClient.post("$baseUrl$ACCOUNTS_PATH/refresh") {
+                httpClient.post("$baseUrl$AUTH_PATH/token/refresh") {
                     contentType(ContentType.Application.Json)
-                    setBody(json.encodeToString(RefreshTokenRequest.serializer(), RefreshTokenRequest(refreshToken)))
+                    setBody(RefreshTokenRequest(refreshToken))
                 }
 
             if (response.status.value in 200..299) {
-                val tokenResponse = json.decodeFromString<RefreshTokenResponse>(response.bodyAsText())
+                val tokenResponse = json.decodeFromString<RefreshTokenResponseV1Dto>(response.bodyAsText())
                 Result.success(tokenResponse.data.accessToken)
             } else {
                 val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
@@ -290,9 +290,6 @@ class PasskeyApiClient(
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to refresh token", e))
         }
 
-    /**
-     * Delete a specific passkey credential (requires authentication)
-     */
     override suspend fun deletePasskey(
         accessToken: String,
         credentialId: String,
@@ -300,7 +297,7 @@ class PasskeyApiClient(
         try {
             val baseUrl = getBaseUrl()
             val response =
-                httpClient.delete("$baseUrl$ACCOUNTS_PATH/me/passkeys/$credentialId") {
+                httpClient.delete("$baseUrl$AUTH_PATH/me/passkeys/$credentialId") {
                     header("Authorization", "Bearer $accessToken")
                 }
 
@@ -317,7 +314,7 @@ class PasskeyApiClient(
 }
 
 /**
- * Exception thrown when passkey API operations fail
+ * Exception thrown when passkey API operations fail.
  */
 class PasskeyApiException(
     val errorCode: String,
@@ -326,7 +323,7 @@ class PasskeyApiException(
 ) : Exception(message, cause)
 
 /**
- * Common API error codes
+ * Common API error codes.
  */
 object PasskeyApiErrorCodes {
     const val USERNAME_TAKEN = "USERNAME_TAKEN"
@@ -341,3 +338,82 @@ object PasskeyApiErrorCodes {
     const val PASSKEY_NOT_FOUND = "PASSKEY_NOT_FOUND"
     const val PASSKEY_DELETION_FAILED = "PASSKEY_DELETION_FAILED"
 }
+
+@Serializable
+private data class SignupPasskeyBeginRequestDto(
+    val username: String,
+    val displayName: String,
+    val bio: String? = null,
+)
+
+@Serializable
+private data class SignupPasskeyBeginResponseDto(
+    val success: Boolean,
+    val data: SignupPasskeyBeginDataDto,
+)
+
+@Serializable
+private data class SignupPasskeyBeginDataDto(
+    val sessionToken: String,
+    val registrationOptions: PasskeyRegistrationOptions,
+)
+
+@Serializable
+private data class SigninPasskeyBeginResponseDto(
+    val success: Boolean,
+    val data: SigninPasskeyBeginDataDto,
+)
+
+@Serializable
+private data class SigninPasskeyBeginDataDto(
+    val challenge: String,
+    val rpId: String,
+    val allowCredentials: List<PasskeyAllowCredential>,
+    val timeout: Long,
+    val userVerification: String,
+)
+
+@Serializable
+private data class AuthResponseDto(
+    val success: Boolean,
+    val data: AuthResponseDataDto,
+)
+
+@Serializable
+private data class AuthResponseDataDto(
+    val account: AuthAccountDto,
+    val tokens: AccountTokens,
+)
+
+@Serializable
+private data class AuthAccountDto(
+    val id: String,
+    val username: String,
+    val displayName: String,
+    val bio: String? = null,
+    val passkeyCredentialIds: List<String> = emptyList(),
+    val createdAt: String,
+    val updatedAt: String,
+)
+
+@Serializable
+private data class RefreshTokenResponseV1Dto(
+    val success: Boolean,
+    val data: RefreshTokenDataV1Dto,
+)
+
+@Serializable
+private data class RefreshTokenDataV1Dto(
+    val accessToken: String,
+)
+
+private fun AuthAccountDto.toLogDateAccount(): LogDateAccount =
+    LogDateAccount(
+        id = Uuid.parse(id),
+        username = username,
+        displayName = displayName,
+        bio = bio,
+        passkeyCredentialIds = passkeyCredentialIds,
+        createdAt = Instant.parse(createdAt),
+        updatedAt = Instant.parse(updatedAt),
+    )
