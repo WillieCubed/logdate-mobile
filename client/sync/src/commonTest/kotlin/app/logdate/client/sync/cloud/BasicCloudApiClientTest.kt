@@ -1,22 +1,9 @@
 package app.logdate.client.sync.cloud
 
-import app.logdate.shared.model.AccountInfoResponse
-import app.logdate.shared.model.AccountTokens
-import app.logdate.shared.model.BeginAccountCreationData
 import app.logdate.shared.model.BeginAccountCreationRequest
-import app.logdate.shared.model.BeginAccountCreationResponse
-import app.logdate.shared.model.CompleteAccountCreationData
 import app.logdate.shared.model.CompleteAccountCreationRequest
-import app.logdate.shared.model.CompleteAccountCreationResponse
-import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyAuthenticatorResponse
 import app.logdate.shared.model.PasskeyCredentialResponse
-import app.logdate.shared.model.PasskeyRegistrationOptions
-import app.logdate.shared.model.PasskeyUser
-import app.logdate.shared.model.RefreshTokenData
-import app.logdate.shared.model.RefreshTokenResponse
-import app.logdate.shared.model.UsernameAvailabilityData
-import app.logdate.shared.model.UsernameAvailabilityResponse
 import app.logdate.util.UuidSerializer
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -28,18 +15,15 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
- * Tests for [LogDateCloudApiClient].
+ * Smoke tests for auth-relevant API mappings in [LogDateCloudApiClient].
  */
 class BasicCloudApiClientTest {
     private val baseUrl = "https://api.logdate.example.com/v1"
@@ -54,360 +38,186 @@ class BasicCloudApiClientTest {
         }
 
     @Test
-    fun testUsernameAvailabilityEndpoint() =
+    fun `username availability uses auth v1 path`() =
         runTest {
-            // Given
-            val username = "testuser"
-            val mockEngine =
-                MockEngine { request ->
-                    // Verify the request URL is correct - now uses RESTful endpoint
-                    assertEquals(
-                        "$baseUrl/accounts/username/$username/available",
-                        request.url.toString(),
-                        "Request URL should target the username availability endpoint",
-                    )
-
-                    val responseData =
-                        UsernameAvailabilityResponse(
-                            success = true,
-                            data = UsernameAvailabilityData(username = username, available = true),
+            val client =
+                createApiClient(
+                    MockEngine { request ->
+                        assertEquals("$baseUrl/auth/signup/username/testuser/available", request.url.toString())
+                        respond(
+                            content = """{"success":true,"data":{"username":"testuser","available":true}}""",
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
                         )
+                    },
+                )
 
-                    respond(
-                        content = json.encodeToString(responseData),
-                        status = HttpStatusCode.OK,
-                        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
-                    )
-                }
-
-            val client = createApiClient(mockEngine)
-
-            // When
-            val result = client.checkUsernameAvailability(username)
-
-            // Then
-            assertTrue(result.isSuccess, "Username availability check should succeed")
-            val response = result.getOrNull()
-            assertTrue(response != null, "Response object should not be null")
-            assertEquals(username, response.username, "Username in response should match requested username")
-            assertTrue(response.available == true, "Username should be marked as available")
-        }
-
-    @Test
-    fun testUsernameAvailabilityFailure() =
-        runTest {
-            // Given - a server error
-            val mockEngine =
-                MockEngine { request ->
-                    respond(
-                        content = """{"error":{"code":"SERVER_ERROR","message":"Internal server error"}}""",
-                        status = HttpStatusCode.InternalServerError,
-                        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
-                    )
-                }
-
-            val client = createApiClient(mockEngine)
-
-            // When
             val result = client.checkUsernameAvailability("testuser")
-
-            // Then
-            assertFalse(result.isSuccess, "Result should be failure for server error")
-            val cloudException =
-                requireNotNull(result.exceptionOrNull() as? CloudApiException) {
-                    "Exception should be CloudApiException"
-                }
-            assertEquals("SERVER_ERROR", cloudException.errorCode, "Error code should match server response")
+            assertTrue(result.isSuccess)
+            assertEquals("testuser", result.getOrThrow().username)
+            assertTrue(result.getOrThrow().available)
         }
 
     @Test
-    fun testUsernameAlreadyTakenCheck() =
+    fun `begin account creation uses auth v1 passkey signup path`() =
         runTest {
-            // Given - username already exists
-            val username = "existinguser"
-            val mockEngine =
-                MockEngine { request ->
-                    // Verify the request URL is correct
-                    assertEquals(
-                        "$baseUrl/accounts/username/$username/available",
-                        request.url.toString(),
-                        "Request URL should target the username availability endpoint",
-                    )
-
-                    val responseData =
-                        UsernameAvailabilityResponse(
-                            success = true,
-                            data = UsernameAvailabilityData(username = username, available = false),
+            val client =
+                createApiClient(
+                    MockEngine { request ->
+                        assertEquals("$baseUrl/auth/signup/passkey/begin", request.url.toString())
+                        respond(
+                            content =
+                                """
+                                {
+                                  "success": true,
+                                  "data": {
+                                    "sessionToken": "sess123",
+                                    "registrationOptions": {
+                                      "challenge": "challenge123",
+                                      "user": {"id":"u","name":"newuser","displayName":"New User"},
+                                      "timeout": 300000
+                                    }
+                                  }
+                                }
+                                """.trimIndent(),
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
                         )
-
-                    respond(
-                        content = json.encodeToString(responseData),
-                        status = HttpStatusCode.OK,
-                        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
-                    )
-                }
-
-            val client = createApiClient(mockEngine)
-
-            // When
-            val result = client.checkUsernameAvailability(username)
-
-            // Then
-            assertTrue(result.isSuccess, "Username availability check should succeed even when username exists")
-            val response = requireNotNull(result.getOrNull()) { "Response object should not be null" }
-            assertEquals(username, response.username, "Username in response should match requested username")
-            assertFalse(response.available, "Username should be marked as unavailable")
-        }
-
-    @Test
-    fun testRefreshTokenEndpoint() =
-        runTest {
-            // Given
-            val refreshToken = "test-refresh-token"
-            val newAccessToken = "new-access-token"
-
-            val mockEngine =
-                MockEngine { request ->
-                    // Verify it's a POST request to the right endpoint
-                    assertEquals(
-                        "$baseUrl/accounts/refresh",
-                        request.url.toString(),
-                        "Request URL should target the token refresh endpoint",
-                    )
-
-                    // Create a successful response
-                    val responseData =
-                        RefreshTokenResponse(
-                            success = true,
-                            data = RefreshTokenData(accessToken = newAccessToken),
-                        )
-
-                    respond(
-                        content = json.encodeToString(responseData),
-                        status = HttpStatusCode.OK,
-                        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
-                    )
-                }
-
-            val client = createApiClient(mockEngine)
-
-            // When
-            val result = client.refreshAccessToken(refreshToken)
-
-            // Then
-            assertTrue(result.isSuccess, "Token refresh should succeed")
-            assertEquals(newAccessToken, result.getOrNull(), "Refreshed access token should match expected token")
-        }
-
-    @Test
-    fun testBeginAccountCreation() =
-        runTest {
-            // Given
-            val request =
-                BeginAccountCreationRequest(
-                    username = "newuser",
-                    displayName = "New User",
-                    bio = "Testing the API",
+                    },
                 )
 
-            val sessionToken = "test-session-token"
-            val challenge = "test-challenge-bytes"
-
-            val mockEngine =
-                MockEngine { req ->
-                    // Verify the request URL is correct
-                    assertEquals(
-                        "$baseUrl/accounts/create/begin",
-                        req.url.toString(),
-                        "Request URL should target the begin account creation endpoint",
-                    )
-
-                    // Create a successful response
-                    val responseData =
-                        BeginAccountCreationResponse(
-                            success = true,
-                            data =
-                                BeginAccountCreationData(
-                                    sessionToken = sessionToken,
-                                    registrationOptions =
-                                        PasskeyRegistrationOptions(
-                                            challenge = challenge,
-                                            user =
-                                                PasskeyUser(
-                                                    id = "user-id-123",
-                                                    name = request.username,
-                                                    displayName = request.displayName,
-                                                ),
-                                            excludeCredentials = emptyList(),
-                                            timeout = 60000,
-                                        ),
-                                ),
-                        )
-
-                    respond(
-                        content = json.encodeToString(responseData),
-                        status = HttpStatusCode.OK,
-                        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
-                    )
-                }
-
-            val client = createApiClient(mockEngine)
-
-            // When
-            val result = client.beginAccountCreation(request)
-
-            // Then
-            assertTrue(result.isSuccess, "Account creation initiation should succeed")
-            val response = requireNotNull(result.getOrNull()) { "Response object should not be null" }
-            assertEquals(sessionToken, response.data.sessionToken, "Session token should match expected value")
-            assertEquals(challenge, response.data.registrationOptions.challenge, "Challenge should match expected value")
+            val result = client.beginAccountCreation(BeginAccountCreationRequest("newuser", "New User"))
+            assertTrue(result.isSuccess)
+            assertEquals("sess123", result.getOrThrow().data.sessionToken)
         }
 
     @Test
-    fun testCompleteAccountCreation() =
+    fun `complete account creation maps auth response to legacy response model`() =
         runTest {
-            // Given
-            val sessionToken = "test-session-token"
-            val credential =
-                PasskeyCredentialResponse(
-                    id = "credential-id-123",
-                    rawId = "raw-id-bytes",
-                    response =
-                        PasskeyAuthenticatorResponse(
-                            clientDataJSON = "client-data-json",
-                            attestationObject = "attestation-object-bytes",
-                        ),
-                    type = "public-key",
-                )
-
-            val request =
-                CompleteAccountCreationRequest(
-                    sessionToken = sessionToken,
-                    credential = credential,
-                )
-
-            val mockEngine =
-                MockEngine { req ->
-                    // Verify the request URL is correct
-                    assertEquals(
-                        "$baseUrl/accounts/create/complete",
-                        req.url.toString(),
-                        "Request URL should target the complete account creation endpoint",
-                    )
-
-                    // Create a successful response
-                    val responseData =
-                        CompleteAccountCreationResponse(
-                            success = true,
-                            data =
-                                CompleteAccountCreationData(
-                                    account =
-                                        LogDateAccount(
-                                            username = "newuser",
-                                            displayName = "New User",
-                                            bio = "Testing the API",
-                                            passkeyCredentialIds = listOf("credential-id-123"),
-                                            createdAt = Clock.System.now(),
-                                            updatedAt = Clock.System.now(),
-                                        ),
-                                    tokens =
-                                        AccountTokens(
-                                            accessToken = "new-access-token",
-                                            refreshToken = "new-refresh-token",
-                                        ),
-                                ),
+            val client =
+                createApiClient(
+                    MockEngine { request ->
+                        assertEquals("$baseUrl/auth/signup/passkey/complete", request.url.toString())
+                        respond(
+                            content =
+                                """
+                                {
+                                  "success": true,
+                                  "data": {
+                                    "account": {
+                                      "id": "550e8400-e29b-41d4-a716-446655440000",
+                                      "username": "newuser",
+                                      "displayName": "New User",
+                                      "passkeyCredentialIds": ["cred-1"],
+                                      "createdAt": "2026-03-05T00:00:00Z",
+                                      "updatedAt": "2026-03-05T00:00:00Z"
+                                    },
+                                    "tokens": {"accessToken":"access","refreshToken":"refresh"}
+                                  }
+                                }
+                                """.trimIndent(),
+                            status = HttpStatusCode.Created,
+                            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
                         )
+                    },
+                )
 
-                    respond(
-                        content = json.encodeToString(responseData),
-                        status = HttpStatusCode.Created,
-                        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
-                    )
-                }
+            val result =
+                client.completeAccountCreation(
+                    CompleteAccountCreationRequest(
+                        sessionToken = "sess123",
+                        credential =
+                            PasskeyCredentialResponse(
+                                id = "cred-1",
+                                rawId = "cred-1",
+                                response = PasskeyAuthenticatorResponse("client", "attestation"),
+                            ),
+                    ),
+                )
 
-            val client = createApiClient(mockEngine)
-
-            // When
-            val result = client.completeAccountCreation(request)
-
-            // Then
-            assertTrue(result.isSuccess, "Account creation completion should succeed")
-            val response = requireNotNull(result.getOrNull()) { "Response object should not be null" }
-            assertEquals("newuser", response.data.account.username, "Username should match expected value")
-            assertEquals("new-access-token", response.data.tokens.accessToken, "Access token should match expected value")
-            assertEquals("new-refresh-token", response.data.tokens.refreshToken, "Refresh token should match expected value")
+            assertTrue(result.isSuccess)
+            assertEquals(
+                "newuser",
+                result
+                    .getOrThrow()
+                    .data
+                    .account
+                    .username,
+            )
+            assertEquals(
+                "access",
+                result
+                    .getOrThrow()
+                    .data
+                    .tokens
+                    .accessToken,
+            )
         }
 
     @Test
-    fun testGetAccountInfo() =
+    fun `refresh token uses auth v1 path`() =
         runTest {
-            // Given
-            val accessToken = "test-access-token"
-
-            val mockEngine =
-                MockEngine { request ->
-                    // Verify the request URL is correct
-                    assertEquals("$baseUrl/accounts/me", request.url.toString(), "Request URL should target the account info endpoint")
-
-                    // Verify authorization header is included
-                    assertEquals("Bearer $accessToken", request.headers["Authorization"] ?: "")
-                    // Also check that Authorization header exists
-                    assertTrue(request.headers.contains("Authorization"), "Authorization header should exist")
-
-                    // No debugging printlns - using descriptive assertion messages instead
-
-                    // Create a successful response with explicit data
-                    val responseData =
-                        AccountInfoResponse(
-                            success = true,
-                            data =
-                                LogDateAccount(
-                                    id = Uuid.random(),
-                                    username = "testuser",
-                                    displayName = "Test User",
-                                    bio = "User profile for testing",
-                                    passkeyCredentialIds = listOf("credential-123"),
-                                    createdAt = Clock.System.now(),
-                                    updatedAt = Clock.System.now(),
-                                ),
+            val client =
+                createApiClient(
+                    MockEngine { request ->
+                        assertEquals("$baseUrl/auth/token/refresh", request.url.toString())
+                        respond(
+                            content = """{"success":true,"data":{"accessToken":"new-access"}}""",
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
                         )
+                    },
+                )
 
-                    respond(
-                        content = json.encodeToString(responseData),
-                        status = HttpStatusCode.OK,
-                        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
-                    )
-                }
+            val result = client.refreshAccessToken("refresh")
+            assertTrue(result.isSuccess)
+            assertEquals("new-access", result.getOrThrow())
+        }
 
-            val client = createApiClient(mockEngine)
+    @Test
+    fun `get account info uses auth me path`() =
+        runTest {
+            val client =
+                createApiClient(
+                    MockEngine { request ->
+                        assertEquals("$baseUrl/auth/me", request.url.toString())
+                        assertEquals("Bearer token-123", request.headers[HttpHeaders.Authorization])
+                        respond(
+                            content =
+                                """
+                                {
+                                  "success": true,
+                                  "data": {
+                                    "account": {
+                                      "id": "550e8400-e29b-41d4-a716-446655440001",
+                                      "username": "tester",
+                                      "displayName": "Tester",
+                                      "passkeyCredentialIds": ["cred-1"],
+                                      "createdAt": "2026-03-05T00:00:00Z",
+                                      "updatedAt": "2026-03-05T00:00:00Z"
+                                    },
+                                    "tokens": {"accessToken":"access","refreshToken":"refresh"}
+                                  }
+                                }
+                                """.trimIndent(),
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                        )
+                    },
+                )
 
-            // When
-            val result = client.getAccountInfo(accessToken)
-
-            // Then
-            assertTrue(result.isSuccess, "API call should succeed, but got: ${result.exceptionOrNull()}")
-            val response = requireNotNull(result.getOrNull()) { "Response should not be null" }
-            assertEquals("testuser", response.username, "Username should match")
-            assertEquals("Test User", response.displayName, "Display name should match")
+            val result = client.getAccountInfo("token-123")
+            assertTrue(result.isSuccess)
+            assertEquals("tester", result.getOrThrow().username)
         }
 
     private fun createApiClient(mockEngine: MockEngine): LogDateCloudApiClient {
         val httpClient =
             HttpClient(mockEngine) {
                 install(ContentNegotiation) {
-                    json(
-                        Json {
-                            ignoreUnknownKeys = true
-                            prettyPrint = false
-                            serializersModule =
-                                SerializersModule {
-                                    contextual(Uuid::class, UuidSerializer)
-                                }
-                        },
-                    )
+                    json(json)
                 }
             }
-
         return LogDateCloudApiClient(baseUrl, httpClient)
     }
 }

@@ -4,8 +4,6 @@ import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.sync.cloud.CloudApiClient
 import app.logdate.client.sync.cloud.LogDateCloudApiClient
 import app.logdate.client.sync.cloud.account.DefaultCloudAccountRepository
-import app.logdate.client.sync.cloud.account.DesktopPlatformInfoProvider
-import app.logdate.client.sync.cloud.account.PlatformInfoProvider
 import app.logdate.shared.model.CloudAccountRepository
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -23,19 +21,11 @@ actual val cloudAccountModule: Module =
             )
         }
 
-        // Desktop-specific platform info provider
-        single<PlatformInfoProvider> {
-            DesktopPlatformInfoProvider(
-                appInfoProvider = get(),
-            )
-        }
-
         // Cloud account repository
         single<CloudAccountRepository> {
             DefaultCloudAccountRepository(
                 apiClient = get(),
                 secureStorage = get<KeyValueStorage>(),
-                platformInfoProvider = get(),
             )
         }
     }

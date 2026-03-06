@@ -11,6 +11,8 @@ import app.logdate.shared.model.Journal
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -282,9 +284,7 @@ private class TestJournalRepositoryWithSyncTriggers(
 
     override val allJournalsObserved: Flow<List<Journal>> = journalsStateFlow.asStateFlow()
 
-    override fun observeJournalById(id: Uuid): Flow<Journal> {
-        TODO("Not needed for sync trigger tests")
-    }
+    override fun observeJournalById(id: Uuid): Flow<Journal> = journalsStateFlow.map { list -> list.find { it.id == id } }.filterNotNull()
 
     override suspend fun getJournalById(id: Uuid): Journal? = journals.find { it.id == id }
 

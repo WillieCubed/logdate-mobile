@@ -3,11 +3,8 @@ package app.logdate.client.sync.cloud.di
 import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.sync.cloud.CloudApiClient
 import app.logdate.client.sync.cloud.LogDateCloudApiClient
-import app.logdate.client.sync.cloud.account.AndroidPlatformInfoProvider
 import app.logdate.client.sync.cloud.account.DefaultCloudAccountRepository
-import app.logdate.client.sync.cloud.account.PlatformInfoProvider
 import app.logdate.shared.model.CloudAccountRepository
-import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -24,20 +21,11 @@ actual val cloudAccountModule: Module =
             )
         }
 
-        // Platform info provider
-        single<PlatformInfoProvider> {
-            AndroidPlatformInfoProvider(
-                context = androidContext(),
-                appInfoProvider = get(),
-            )
-        }
-
         // Cloud account repository
         single<CloudAccountRepository> {
             DefaultCloudAccountRepository(
                 apiClient = get(),
                 secureStorage = get<KeyValueStorage>(),
-                platformInfoProvider = get(),
             )
         }
     }
