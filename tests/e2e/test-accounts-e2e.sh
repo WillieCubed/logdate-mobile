@@ -44,7 +44,7 @@ echo -e "${BLUE}║${NC} Account Management E2E Tests"
 echo -e "${BLUE}╚═══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-CMD="./gradlew :server:test -k \"AccountE2ETest\""
+CMD="./gradlew :server:test --tests \"app.logdate.server.e2e.auth.AuthV1E2ETest\""
 [ "$VERBOSE" = true ] && CMD="$CMD --info"
 
 echo -e "${GREEN}Running:${NC} $CMD"

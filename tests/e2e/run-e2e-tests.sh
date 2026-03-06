@@ -10,7 +10,7 @@
 #
 # Examples:
 #   ./tests/e2e/run-e2e-tests.sh multi-window              # Run multi-window editor tests
-#   ./tests/e2e/run-e2e-tests.sh accounts                  # Run account tests
+#   ./tests/e2e/run-e2e-tests.sh accounts                  # Run auth v1 tests
 #   ./tests/e2e/run-e2e-tests.sh all                       # Run all e2e tests
 #   ./tests/e2e/run-e2e-tests.sh multi-window --debug      # Run with verbose output
 #   ./tests/e2e/run-e2e-tests.sh multi-window --verify-adb # Verify adb before running
@@ -131,10 +131,10 @@ run_test() {
             ;;
 
         accounts)
-            print_banner "Account Tests"
-            print_info "Running account e2e tests..."
+            print_banner "Auth V1 Tests"
+            print_info "Running auth v1 e2e tests..."
 
-            local cmd="./gradlew :server:test -k \"AccountE2ETest\""
+            local cmd="./gradlew :server:test --tests \"app.logdate.server.e2e.auth.AuthV1E2ETest\""
 
             if [ "$VERBOSE" = true ] || [ "$ENABLE_DEBUG" = true ]; then
                 cmd="$cmd --info"
@@ -148,7 +148,7 @@ run_test() {
             print_banner "Authentication Tests"
             print_info "Running authentication flow e2e tests..."
 
-            local cmd="./gradlew :server:test -k \"AuthenticationFlowsE2ETest\""
+            local cmd="./gradlew :server:test --tests \"app.logdate.server.e2e.auth.AuthV1E2ETest\""
 
             if [ "$VERBOSE" = true ] || [ "$ENABLE_DEBUG" = true ]; then
                 cmd="$cmd --info"
@@ -169,7 +169,7 @@ run_test() {
 
             # Run server tests
             print_info "Running server e2e tests..."
-            ./gradlew :server:test -k "E2ETest" $([ "$VERBOSE" = true ] && echo "--info" || echo "")
+            ./gradlew :server:test --tests "app.logdate.server.e2e.*" $([ "$VERBOSE" = true ] && echo "--info" || echo "")
             print_success "Server tests completed"
 
             # Run client tests
@@ -187,7 +187,7 @@ run_test() {
             echo "  - multi-window    : Multi-window editor tests (requires API 24+)"
             echo ""
             echo "Server-side tests (Ktor):"
-            echo "  - accounts        : Account management e2e tests"
+            echo "  - accounts        : Auth v1 e2e tests"
             echo "  - auth            : Authentication flow e2e tests"
             echo ""
             echo "Combined:"

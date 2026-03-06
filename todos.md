@@ -3,11 +3,11 @@
 ## High Priority
 
 ### Server Infrastructure  
-- [ ] **Restore Full Route Implementations** 
-  - [ ] Restore `AuthRoutes.kt` with proper authentication flows and JWT validation
-  - [ ] Restore `PasskeyRoutes.kt` with complete passkey endpoint implementations
-  - [ ] Restore `AccountRoutes.kt` with full account management and session handling
-  - [ ] Replace stub routes with actual business logic from backup files
+- [ ] **Harden Auth V1 for Production**
+  - [x] Add explicit rate limiting to `/api/v1/auth/signup/*` and `/api/v1/auth/signin/*`
+  - [ ] Replace simplified WebAuthn verification with full cryptographic verification
+  - [x] Add structured audit logs for Google linking and passkey operations
+  - [ ] Add observability dashboards for auth error rates and token refresh failures
 
 - [ ] **Enhance Server Security**
   - [ ] Implement real WebAuthn verification (restore WebAuthn4J integration)
