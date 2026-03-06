@@ -10,7 +10,7 @@ import app.logdate.feature.core.settings.ui.BirthdayUpdateState
 import app.logdate.feature.core.settings.ui.ConflictsState
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsContent
 import app.logdate.feature.core.settings.ui.DataSettingsContent
-import app.logdate.feature.core.settings.ui.ExportState
+import app.logdate.feature.core.export.ExportState
 import app.logdate.feature.core.settings.ui.IntegrityState
 import app.logdate.feature.core.settings.ui.LocationSettingsContent
 import app.logdate.feature.core.settings.ui.PrivacySettingsContent
@@ -171,8 +171,14 @@ fun DataSettings() {
         DataSettingsContent(
             onBack = {},
             quotaUsage = sampleQuota,
-            onExportContent = {},
             exportState = ExportState.Idle,
+            onShowExportOptions = {},
+            onUpdateExportOptions = {},
+            onConfirmExport = {},
+            onCancelExport = {},
+            onRetryExport = {},
+            onDismissExport = {},
+            onShareExport = {},
             onRestoreContent = {},
             onCancelRestore = {},
             restoreState = RestoreState.Idle,

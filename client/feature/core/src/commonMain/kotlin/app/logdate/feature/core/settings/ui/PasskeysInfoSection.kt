@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.MaterialContainer
@@ -43,6 +44,8 @@ import logdate.client.feature.core.generated.resources.your_passkeys
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
 import kotlin.time.Instant
+
+private const val PASSKEYS_HELP_URL = "https://logdate.app/help/passkeys"
 
 /**
  * UI-facing metadata for a passkey credential.
@@ -119,11 +122,15 @@ fun PasskeysInfoSection(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Text(
-                            text = stringResource(Res.string.learn_more),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
+                        val uriHandler = LocalUriHandler.current
+                        TextButton(
+                            onClick = { uriHandler.openUri(PASSKEYS_HELP_URL) },
+                        ) {
+                            Text(
+                                text = stringResource(Res.string.learn_more),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
                     }
                 }
             } else {

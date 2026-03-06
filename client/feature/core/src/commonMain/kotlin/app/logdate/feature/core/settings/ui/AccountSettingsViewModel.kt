@@ -158,7 +158,13 @@ class AccountSettingsViewModel(
         _birthdayUpdateState.value = BirthdayUpdateState.Idle
     }
 
-    fun signOut() {
+    /**
+     * Signs out the user. On success, [state]`.isAuthenticated` will become `false`
+     * through the reactive session flow, which the UI observes.
+     *
+     * @param onError Called with an error message if sign-out fails.
+     */
+    fun signOut(onError: (String) -> Unit = {}) {
         viewModelScope.launch {
             try {
                 Napier.i("Signing out user")
@@ -167,6 +173,7 @@ class AccountSettingsViewModel(
                 Napier.i("Session cleared successfully")
             } catch (e: Exception) {
                 Napier.e("Failed to sign out", e)
+                onError(e.message ?: "Failed to sign out")
             }
         }
     }

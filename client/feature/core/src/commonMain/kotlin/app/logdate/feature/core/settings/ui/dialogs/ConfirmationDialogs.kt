@@ -27,6 +27,10 @@ import androidx.compose.ui.unit.dp
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.action_reset_app
 import logdate.client.feature.core.generated.resources.cancel
+import logdate.client.feature.core.generated.resources.clear_all_data_2
+import logdate.client.feature.core.generated.resources.clear_data_acknowledgement
+import logdate.client.feature.core.generated.resources.clear_data_warning_message
+import logdate.client.feature.core.generated.resources.yes_clear_all_data
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -54,6 +58,26 @@ fun ResetAppConfirmationDialog(
         confirmButtonText = stringResource(Res.string.action_reset_app),
         icon = Icons.Default.WarningAmber,
         acknowledgementLabel = "I understand that resetting may permanently remove encrypted local data.",
+    )
+}
+
+/**
+ * Dialog for confirming clearing all local data.
+ * Uses acknowledgement checkbox like [ResetAppConfirmationDialog] for consistency.
+ */
+@Composable
+fun ClearDataConfirmationDialog(
+    onDismissRequest: () -> Unit,
+    onConfirmation: () -> Unit,
+) {
+    DangerConfirmationDialog(
+        onDismissRequest = onDismissRequest,
+        onConfirmation = onConfirmation,
+        title = stringResource(Res.string.clear_all_data_2),
+        message = stringResource(Res.string.clear_data_warning_message),
+        confirmButtonText = stringResource(Res.string.yes_clear_all_data),
+        icon = Icons.Default.WarningAmber,
+        acknowledgementLabel = stringResource(Res.string.clear_data_acknowledgement),
     )
 }
 

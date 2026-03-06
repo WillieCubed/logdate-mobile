@@ -18,10 +18,17 @@ class DangerZoneSettingsViewModel(
     private val passkeyAccountRepository: PasskeyAccountRepository,
     private val userStateRepository: UserStateRepository,
 ) : ViewModel() {
-    fun clearLocalData(onComplete: (() -> Unit)? = null) {
+    fun clearLocalData(
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {},
+    ) {
         viewModelScope.launch {
-            clearLocalDataInternal()
-            onComplete?.invoke()
+            val result = clearLocalDataInternal()
+            if (result.isSuccess) {
+                onSuccess()
+            } else {
+                onError(result.exceptionOrNull()?.message ?: "Unknown error")
+            }
         }
     }
 
@@ -44,7 +51,7 @@ class DangerZoneSettingsViewModel(
         }
     }
 
-    private suspend fun clearLocalDataInternal() {
+    private suspend fun clearLocalDataInternal(): Result<Unit> {
         val result =
             runCatching {
                 withContext(Dispatchers.Default) {
@@ -57,5 +64,6 @@ class DangerZoneSettingsViewModel(
         } else {
             Napier.i("Local database tables cleared")
         }
+        return result
     }
 }

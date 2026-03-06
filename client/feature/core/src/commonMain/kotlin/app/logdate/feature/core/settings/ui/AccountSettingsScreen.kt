@@ -35,6 +35,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -45,6 +46,7 @@ import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
+import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.core.generated.resources.Res
@@ -62,6 +64,7 @@ import logdate.client.feature.core.generated.resources.sign_in
 import logdate.client.feature.core.generated.resources.sign_in_to_set_display_name
 import logdate.client.feature.core.generated.resources.sign_out
 import logdate.client.feature.core.generated.resources.sign_out_2
+import logdate.client.feature.core.generated.resources.sign_out_failed
 import logdate.client.feature.core.generated.resources.sign_out_of_your_logdate_cloud_account_on_this_device
 import logdate.client.feature.core.generated.resources.username
 import logdate.client.feature.core.generated.resources.youll_need_to_sign_in_again_to_sync_data_on_this_device
@@ -112,7 +115,7 @@ fun AccountSettingsScreen(
         isAuthenticated = isAuthenticated,
         onUpdateProfile = accountViewModel::updateProfile,
         onRevokePasskey = { passkey -> privacyViewModel.revokePasskey(passkey.id) },
-        onSignOut = accountViewModel::signOut,
+        onSignOut = { onError -> accountViewModel.signOut(onError) },
         birthdayUpdateState = birthdayUpdateState,
         profileUpdateState = profileUpdateState,
         onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
@@ -133,7 +136,7 @@ fun AccountSettingsContent(
     isAuthenticated: Boolean,
     onUpdateProfile: (displayName: String, username: String) -> Unit,
     onRevokePasskey: (PasskeyInfo) -> Unit,
-    onSignOut: () -> Unit,
+    onSignOut: (onError: (String) -> Unit) -> Unit,
     birthdayUpdateState: BirthdayUpdateState,
     profileUpdateState: ProfileUpdateState,
     onNavigateToCloudAccountCreation: () -> Unit = {},
@@ -398,6 +401,8 @@ fun AccountSettingsContent(
     }
 
     if (showSignOutDialog) {
+        val scope = rememberCoroutineScope()
+        val signOutFailedMessage = stringResource(Res.string.sign_out_failed)
         AlertDialog(
             onDismissRequest = { showSignOutDialog = false },
             title = { Text(stringResource(Res.string.sign_out_2)) },
@@ -405,7 +410,11 @@ fun AccountSettingsContent(
             confirmButton = {
                 Button(
                     onClick = {
-                        onSignOut()
+                        onSignOut { _ ->
+                            scope.launch {
+                                snackbarHostState.showSnackbar(signOutFailedMessage)
+                            }
+                        }
                         showSignOutDialog = false
                     },
                 ) {
@@ -454,7 +463,7 @@ private fun AccountSettingsScreenPreview() {
         isAuthenticated = true,
         onUpdateProfile = { _, _ -> },
         onRevokePasskey = {},
-        onSignOut = {},
+        onSignOut = { _ -> },
         birthdayUpdateState = BirthdayUpdateState.Idle,
         profileUpdateState = ProfileUpdateState.Idle,
     )

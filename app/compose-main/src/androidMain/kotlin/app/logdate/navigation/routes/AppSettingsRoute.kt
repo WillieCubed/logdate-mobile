@@ -2,8 +2,11 @@
 
 package app.logdate.navigation.routes
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.core.profile.ui.ProfileScreen
@@ -26,6 +29,7 @@ import app.logdate.navigation.routes.core.OnboardingStart
 import app.logdate.navigation.routes.core.PrivacySettingsRoute
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
 import app.logdate.navigation.scenes.SettingsEmptyDetailPane
+import io.github.aakira.napier.Napier
 
 /**
  * Resets the app by safely clearing the back stack and navigating to the onboarding start screen.
@@ -185,8 +189,23 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     routeEntry<DataSettingsRoute>(
         metadata = ListDetailSceneStrategy.detailPane(),
     ) { _ ->
+        val context = LocalContext.current
         DataSettingsScreen(
             onBack = onBack,
+            onShareFile = { path ->
+                try {
+                    val uri = Uri.parse(path)
+                    val shareIntent =
+                        Intent(Intent.ACTION_SEND).apply {
+                            type = "application/zip"
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                    context.startActivity(Intent.createChooser(shareIntent, null))
+                } catch (e: Exception) {
+                    Napier.e("Failed to share export file", e)
+                }
+            },
         )
     }
 

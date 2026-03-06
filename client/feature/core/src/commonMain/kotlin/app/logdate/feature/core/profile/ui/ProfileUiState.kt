@@ -87,7 +87,7 @@ fun createProfileDisplayModel(
 ): ProfileDisplayModel =
     ProfileDisplayModel(
         // Local profile data (always available)
-        displayName = localProfile.displayName.ifEmpty { "Your name" },
+        displayName = localProfile.displayName.ifEmpty { account?.displayName ?: "" },
         birthday = localProfile.birthday ?: userData?.birthday?.takeIf { it != Instant.DISTANT_PAST },
         hasProfilePhoto = !localProfile.profilePhotoUri.isNullOrEmpty(),
         profileCreatedAt = localProfile.createdAt,

@@ -29,13 +29,14 @@ fun CloudStorageQuota?.orDefault(): CloudStorageQuota =
 fun LogDateAccount.toUserProfile(): UserProfile =
     UserProfile(
         name = displayName.ifEmpty { "No display name" },
-        username = username.ifEmpty { "no_username" },
+        username = username.ifEmpty { "" },
         isEditable = username.isNotEmpty(),
         isAuthenticated = username.isNotEmpty() && passkeyCredentialIds.isNotEmpty(),
     )
 
 fun LogDateAccount.toPasskeyInfoList(): List<PasskeyInfo> =
     if (username.isNotEmpty()) {
+        // TODO: fetch real passkey metadata (nicknames, device info) from API
         passkeyCredentialIds
             .mapIndexed { index, credentialId ->
                 PasskeyInfo(
@@ -44,16 +45,6 @@ fun LogDateAccount.toPasskeyInfoList(): List<PasskeyInfo> =
                     device = "This Device",
                     createdAt = createdAt.toString(),
                     lastUsed = updatedAt,
-                )
-            }.ifEmpty {
-                listOf(
-                    PasskeyInfo(
-                        id = "current",
-                        name = "Current Passkey",
-                        device = "This Device",
-                        createdAt = createdAt.toString(),
-                        lastUsed = updatedAt,
-                    ),
                 )
             }
     } else {
