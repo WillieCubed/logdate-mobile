@@ -8,7 +8,9 @@ import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioRecordingManager
 import app.logdate.client.media.audio.AudioStorage
+import app.logdate.client.media.audio.transcription.SherpaOnnxRecognizerProvider
 import app.logdate.client.media.audio.transcription.SherpaOnnxTranscriptionService
+import app.logdate.client.media.audio.transcription.TranscriptAccumulator
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
@@ -25,6 +27,9 @@ actual val audioModule: Module =
         single<AudioPlaybackManager> { AndroidAudioPlaybackManager(androidContext()) }
         single<AudioDurationResolver> { AndroidAudioDurationResolver(androidContext()) }
 
+        // Provide Sherpa-ONNX recognizer + punctuation model lifecycle as a singleton
+        single { SherpaOnnxRecognizerProvider(androidContext()) }
+        single { TranscriptAccumulator() }
         // Provide Sherpa-ONNX-based transcription (on-device, no audio focus required)
-        single<TranscriptionService> { SherpaOnnxTranscriptionService(androidContext()) }
+        single<TranscriptionService> { SherpaOnnxTranscriptionService(androidContext(), get(), get(), get()) }
     }
