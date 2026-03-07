@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.editor.ui.video
 
 import android.Manifest
@@ -45,6 +47,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -82,6 +85,13 @@ actual fun VideoPlayerContent(
     uri: String,
     modifier: Modifier,
 ) {
+    if (LocalInspectionMode.current) {
+        PreviewVideoPlayerContent(
+            modifier = modifier,
+        )
+        return
+    }
+
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -259,6 +269,11 @@ actual fun VideoPickerContent(
     onVideoSelected: (uri: String, durationMs: Long) -> Unit,
     modifier: Modifier,
 ) {
+    if (LocalInspectionMode.current) {
+        VideoPickerPreviewContent(modifier = modifier)
+        return
+    }
+
     val context = LocalContext.current
 
     val videoPickerLauncher =
@@ -293,6 +308,25 @@ actual fun VideoPickerContent(
         permissionLauncher.launch(permission)
     }
 
+    VideoPickerCard(
+        onChooseFromGallery = { launchVideoPicker() },
+        modifier = modifier,
+    )
+}
+
+@Composable
+fun VideoPickerPreviewContent(modifier: Modifier = Modifier) {
+    VideoPickerCard(
+        onChooseFromGallery = {},
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun VideoPickerCard(
+    onChooseFromGallery: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Card(
         modifier =
             modifier
@@ -330,9 +364,45 @@ actual fun VideoPickerContent(
             Spacer(modifier = Modifier.height(20.dp))
 
             OutlinedButton(
-                onClick = { launchVideoPicker() },
+                onClick = onChooseFromGallery,
             ) {
                 Text(stringResource(Res.string.choose_from_gallery))
+            }
+        }
+    }
+}
+
+@Composable
+private fun PreviewVideoPlayerContent(modifier: Modifier = Modifier) {
+    Box(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .aspectRatio(16f / 9f),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        )
+
+        Surface(
+            shape = CircleShape,
+            color = Color.White.copy(alpha = 0.9f),
+            modifier =
+                Modifier
+                    .size(64.dp)
+                    .align(Alignment.Center),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = stringResource(Res.string.play_video),
+                    modifier = Modifier.size(36.dp),
+                    tint = Color.Black,
+                )
             }
         }
     }

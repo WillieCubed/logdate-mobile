@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.editor.ui.camera
 
 import android.Manifest
@@ -67,6 +69,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -95,6 +98,17 @@ import org.koin.compose.viewmodel.koinViewModel
  * Android implementation of the camera capture content.
  * Shows an inline camera with controls for capturing photos/videos.
  */
+sealed interface CameraCapturePreviewState {
+    data object PermissionRequired : CameraCapturePreviewState
+
+    data object LiveCapture : CameraCapturePreviewState
+
+    data class Review(
+        val uri: String,
+        val mediaType: CapturedMediaType,
+    ) : CameraCapturePreviewState
+}
+
 @Suppress("ktlint:standard:function-naming")
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -103,6 +117,14 @@ actual fun CameraCaptureContent(
     onClose: () -> Unit,
     modifier: Modifier,
 ) {
+    if (LocalInspectionMode.current) {
+        CameraCapturePreviewContent(
+            state = CameraCapturePreviewState.LiveCapture,
+            modifier = modifier,
+        )
+        return
+    }
+
     val viewModel: CameraViewModel = koinViewModel()
     val uiState by viewModel.uiState.collectAsState()
 
@@ -155,6 +177,34 @@ actual fun CameraCaptureContent(
     }
 }
 
+@Composable
+fun CameraCapturePreviewContent(
+    state: CameraCapturePreviewState,
+    modifier: Modifier = Modifier,
+) {
+    when (state) {
+        CameraCapturePreviewState.PermissionRequired ->
+            CameraPermissionRequest(
+                onRequestPermission = {},
+                modifier = modifier,
+            )
+
+        CameraCapturePreviewState.LiveCapture ->
+            PreviewInlineCameraCapture(
+                modifier = modifier,
+            )
+
+        is CameraCapturePreviewState.Review ->
+            MediaReviewContent(
+                uri = state.uri,
+                mediaType = state.mediaType,
+                onRetake = {},
+                onUse = {},
+                modifier = modifier,
+            )
+    }
+}
+
 /**
  * Displays a request UI when camera permissions are not granted.
  */
@@ -191,6 +241,92 @@ private fun CameraPermissionRequest(
                     text = stringResource(Res.string.tap_to_enable_camera),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PreviewInlineCameraCapture(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = Color.Black,
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF101318)),
+            )
+
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 18.dp)
+                        .align(Alignment.TopCenter),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f),
+                ) {
+                    IconButton(onClick = {}) {
+                        Icon(
+                            imageVector = Icons.Default.Cameraswitch,
+                            contentDescription = stringResource(Res.string.switch_camera),
+                        )
+                    }
+                }
+
+                SingleChoiceSegmentedButtonRow {
+                    SegmentedButton(
+                        selected = true,
+                        onClick = {},
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    ) {
+                        Text(stringResource(Res.string.photo))
+                    }
+                    SegmentedButton(
+                        selected = false,
+                        onClick = {},
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    ) {
+                        Text(stringResource(Res.string.video))
+                    }
+                }
+            }
+
+            Column(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f),
+                    modifier = Modifier.size(84.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.CameraAlt,
+                            contentDescription = stringResource(Res.string.photo),
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(36.dp),
+                        )
+                    }
+                }
+
+                Text(
+                    text = stringResource(Res.string.loading_camera),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.8f),
                 )
             }
         }
