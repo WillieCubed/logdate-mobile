@@ -8,6 +8,9 @@ package app.logdate.feature.editor.ui
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -20,6 +23,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +36,7 @@ import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.feature.editor.ui.editor.rememberEditorAutoSave
 import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
 import app.logdate.feature.editor.ui.state.rememberBlocksUiState
+import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
@@ -63,6 +68,20 @@ fun EntryEditorContent(
 
     // Immersive chrome follows the currently expanded block only.
     val isImmersiveBlockActive = editorState.isImmersiveBlockActive()
+
+    // Single float that drives all immersive chrome interpolation (0 = fully immersive, 1 = normal).
+    // During a predictive back gesture it's scrubbed in real-time via snapTo; on non-gesture
+    // transitions (capture completed, hardware back) it animates with tween(300).
+    val scope = rememberCoroutineScope()
+    val chromeProgress = remember { Animatable(if (isImmersiveBlockActive) 0f else 1f) }
+
+    LaunchedEffect(isImmersiveBlockActive) {
+        if (isImmersiveBlockActive) {
+            chromeProgress.snapTo(0f)
+        } else {
+            chromeProgress.animateTo(1f, tween(300, easing = FastOutSlowInEasing))
+        }
+    }
 
     var showExitConfirmation by remember { mutableStateOf(false) }
     var showDraftsDialog by remember { mutableStateOf(false) }
@@ -138,6 +157,7 @@ fun EntryEditorContent(
         modifier = modifier,
         isEditorFocused = editorState.expandedBlockId != null,
         isImmersiveBlockActive = isImmersiveBlockActive,
+        immersiveExitProgress = chromeProgress.value,
         topBarContent = {
             NoteEditorToolbar(
                 onBack = handleEditorBack,
@@ -153,6 +173,15 @@ fun EntryEditorContent(
                 shouldReturnToPickerOnBack = shouldReturnToPickerOnBack,
                 onDismissExpanded = {
                     viewModel.dismissExpandedBlockOrClearSingleEmpty()
+                },
+                onBackProgress = { p ->
+                    if (isImmersiveBlockActive) scope.launch { chromeProgress.snapTo(p) }
+                },
+                onBackCommit = {
+                    if (isImmersiveBlockActive) scope.launch { chromeProgress.animateTo(1f, tween(300, easing = FastOutSlowInEasing)) }
+                },
+                onBackCancel = {
+                    if (isImmersiveBlockActive) scope.launch { chromeProgress.animateTo(0f, tween(300, easing = FastOutSlowInEasing)) }
                 },
             )
         },

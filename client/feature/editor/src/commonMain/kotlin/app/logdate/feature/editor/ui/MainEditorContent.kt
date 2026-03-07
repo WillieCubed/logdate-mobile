@@ -78,6 +78,9 @@ fun MainEditorContent(
     onDismissExpanded: () -> Unit,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
+    onBackProgress: (Float) -> Unit = {},
+    onBackCommit: () -> Unit = {},
+    onBackCancel: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
 
@@ -130,10 +133,14 @@ fun MainEditorContent(
 
     PlatformPredictiveBackHandler(
         enabled = displayState is EditorDisplay.Expanded,
-        onProgress = { fraction -> seekFlow.value = fraction },
+        onProgress = { fraction ->
+            seekFlow.value = fraction
+            onBackProgress(fraction)
+        },
         onBack = {
             scope.launch {
                 seekFlow.value = null
+                onBackCommit() // start chrome return concurrently with the block animation
                 transitionState.animateTo(backTarget)
                 onDismissExpanded()
             }
@@ -142,6 +149,7 @@ fun MainEditorContent(
             // currentState is the state we were animating from (Expanded), safe without !!
             scope.launch {
                 seekFlow.value = null
+                onBackCancel() // start chrome return concurrently with the block snap-back
                 transitionState.animateTo(transitionState.currentState)
             }
         },

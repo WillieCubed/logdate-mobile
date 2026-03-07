@@ -85,7 +85,7 @@ fun NoteEditorToolbar(
 
         AnimatedVisibility(
             visible = actionsVisible,
-            enter = fadeIn(tween(200)),
+            enter = fadeIn(tween(300)),
             exit = fadeOut(tween(200)),
         ) {
             Row(
