@@ -170,8 +170,8 @@ class SpeechModelPlugin : Plugin<Project> {
                 assetName = "sherpa-onnx-stt-en.zip",
                 excludePatterns = listOf(
                     // Keep only int8 quantized models; skip fp32 variants to save ~250MB
+                    // Note: decoder has no int8 variant, so keep the fp32 decoder (2MB)
                     "encoder-epoch-99-avg-1-chunk-16-left-128.onnx",
-                    "decoder-epoch-99-avg-1-chunk-16-left-128.onnx",
                     "joiner-epoch-99-avg-1-chunk-16-left-128.onnx",
                     ".wav",
                     ".sh",
