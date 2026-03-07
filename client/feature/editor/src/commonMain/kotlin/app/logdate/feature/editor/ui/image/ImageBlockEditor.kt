@@ -27,7 +27,6 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
-import io.github.aakira.napier.Napier
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.delete_image
 import org.jetbrains.compose.resources.stringResource
@@ -64,15 +63,11 @@ fun ImageBlockEditor(
     LaunchedEffect(uiState.selectedImageUri) {
         uiState.selectedImageUri?.let { uri ->
             if (block.uri == null) {
-                Napier.d("ImageBlockEditor - Setting image URI from view model: $uri")
                 onBlockUpdated(block.copy(uri = uri))
                 viewModel.clearSelectedImage() // Clear to avoid duplicate updates
             }
         }
     }
-
-    // Debug logging
-    Napier.d("ImageBlockEditor - hasExistingImage: $hasExistingImage, URI: ${block.uri}")
 
     // Show either the existing image with caption or the image picker UI
     if (hasExistingImage) {

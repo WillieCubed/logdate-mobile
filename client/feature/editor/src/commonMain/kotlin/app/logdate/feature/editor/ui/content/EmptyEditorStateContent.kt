@@ -32,7 +32,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.LocalAnimatedVisibilityScope
 import app.logdate.feature.editor.ui.LocalSharedTransitionScope
-import io.github.aakira.napier.Napier
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.add_photo_from_gallery
 import logdate.client.feature.editor.generated.resources.capture
@@ -178,12 +177,8 @@ private fun TextEntrySurface(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Napier.i("TextEntrySurface: Initializing surface with onClick handler")
     Surface(
-        onClick = {
-            Napier.i("TextEntrySurface: onClick triggered")
-            onClick()
-        },
+        onClick = onClick,
         modifier = modifier,
         shape = RoundedCornerShape(cornerRadius),
         color = MaterialTheme.colorScheme.surface,
@@ -221,10 +216,7 @@ private fun AudioRecordingSurface(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        onClick = {
-            Napier.i("AudioRecordingSurface: onClick triggered")
-            onClick()
-        },
+        onClick = onClick,
         modifier = modifier.testTag("editor_start_audio_block"),
         shape = RoundedCornerShape(cornerRadius),
         color = MaterialTheme.colorScheme.secondaryContainer,
@@ -270,10 +262,7 @@ private fun CameraCaptureSurface(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        onClick = {
-            Napier.i("CameraCaptureSurface: onClick triggered")
-            onClick()
-        },
+        onClick = onClick,
         modifier = modifier,
         shape = RoundedCornerShape(cornerRadius),
         color = MaterialTheme.colorScheme.tertiaryContainer,
@@ -317,10 +306,7 @@ private fun PhotoSurface(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        onClick = {
-            Napier.i("PhotoSurface: onClick triggered")
-            onClick()
-        },
+        onClick = onClick,
         modifier = modifier,
         shape = RoundedCornerShape(cornerRadius),
         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),

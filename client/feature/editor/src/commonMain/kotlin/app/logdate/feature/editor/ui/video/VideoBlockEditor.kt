@@ -18,7 +18,6 @@ import app.logdate.feature.editor.ui.common.DeleteMediaButton
 import app.logdate.feature.editor.ui.common.MediaCaptionField
 import app.logdate.feature.editor.ui.editor.VideoBlockUiState
 import app.logdate.feature.editor.ui.formatMediaDuration
-import io.github.aakira.napier.Napier
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.delete_video
 import org.jetbrains.compose.resources.stringResource
@@ -43,8 +42,6 @@ fun VideoBlockEditor(
 ) {
     val hasExistingVideo = block.uri != null
 
-    Napier.d("VideoBlockEditor - hasExistingVideo: $hasExistingVideo, URI: ${block.uri}")
-
     if (hasExistingVideo) {
         VideoDisplayContent(
             block = block,
@@ -55,7 +52,6 @@ fun VideoBlockEditor(
     } else {
         VideoPickerContent(
             onVideoSelected = { uri, durationMs ->
-                Napier.d("VideoBlockEditor - Video selected: $uri, duration: $durationMs")
                 onBlockUpdated(block.copy(uri = uri, durationMs = durationMs))
             },
             modifier = modifier,

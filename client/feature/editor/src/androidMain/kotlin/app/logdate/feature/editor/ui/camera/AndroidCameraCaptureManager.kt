@@ -108,7 +108,6 @@ class AndroidCameraCaptureManager(
                 .setAutoCancelDuration(3, TimeUnit.SECONDS)
                 .build()
         cam.cameraControl.startFocusAndMetering(action)
-        Napier.d("Tap-to-focus at ($x, $y)")
     }
 
     override suspend fun startPreview(facing: CameraFacing) {
@@ -173,8 +172,6 @@ class AndroidCameraCaptureManager(
                     error = null,
                 )
             }
-
-            Napier.d("Camera preview started with facing: $facing")
         } catch (e: Exception) {
             Napier.e("Failed to start camera preview", e)
             _state.update {
@@ -200,7 +197,6 @@ class AndroidCameraCaptureManager(
                     recordingDurationMs = 0L,
                 )
             }
-            Napier.d("Camera preview stopped")
         } catch (e: Exception) {
             Napier.e("Error stopping camera preview", e)
         }
@@ -242,7 +238,7 @@ class AndroidCameraCaptureManager(
                     object : ImageCapture.OnImageSavedCallback {
                         override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                             val uri = output.savedUri?.toString()
-                            Napier.d("Photo captured: $uri")
+
                             _state.update {
                                 it.copy(
                                     lastCapturedUri = uri,
@@ -306,7 +302,6 @@ class AndroidCameraCaptureManager(
                     .start(mainExecutor) { event ->
                         when (event) {
                             is VideoRecordEvent.Start -> {
-                                Napier.d("Video recording started")
                                 _state.update {
                                     it.copy(
                                         isRecording = true,
@@ -340,7 +335,6 @@ class AndroidCameraCaptureManager(
                                 currentRecording = null
                                 recordingDeferred?.complete(uri)
                                 recordingDeferred = null
-                                Napier.d("Video recording finalized: $uri")
                             }
                         }
                     }
@@ -393,7 +387,6 @@ class AndroidCameraCaptureManager(
 
     override fun setCaptureMode(mode: CaptureMode) {
         _state.update { it.copy(captureMode = mode) }
-        Napier.d("Capture mode set to: $mode")
     }
 
     override fun clearCapturedUri() {
@@ -414,6 +407,5 @@ class AndroidCameraCaptureManager(
         videoCapture = null
         lifecycleOwner = null
         _state.update { CameraCaptureState() }
-        Napier.d("Camera resources released")
     }
 }

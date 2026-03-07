@@ -32,7 +32,6 @@ import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.feature.editor.ui.editor.rememberEditorAutoSave
 import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
 import app.logdate.feature.editor.ui.state.rememberBlocksUiState
-import io.github.aakira.napier.Napier
 import org.koin.compose.viewmodel.koinViewModel
 
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
@@ -68,21 +67,17 @@ fun EntryEditorContent(
     val handleEditorBack: () -> Unit = {
         when {
             editorState.expandedBlockId != null -> {
-                Napier.d("Back pressed: Dismissing expanded block")
                 viewModel.dismissExpandedBlockOrClearSingleEmpty()
                 Unit
             }
             shouldReturnToPickerOnBack -> {
-                Napier.d("Back pressed: Returning to content-type picker")
                 viewModel.clearSingleEmptyBlock()
                 Unit
             }
             !editorState.canExitWithoutSaving -> {
-                Napier.d("Back pressed: Showing exit confirmation")
                 showExitConfirmation = true
             }
             else -> {
-                Napier.d("Back pressed: Exiting editor")
                 onNavigateBack()
             }
         }
@@ -148,12 +143,10 @@ fun EntryEditorContent(
             )
         },
         editorContent = {
-            Napier.d("EntryEditorScreen: Rendering MainEditorContent with blocks: ${uiState.blocks.size}")
             MainEditorContent(
                 uiState = uiState,
                 shouldReturnToPickerOnBack = shouldReturnToPickerOnBack,
                 onDismissExpanded = {
-                    Napier.d("MainEditorContent: Back committed, dismissing expanded block")
                     viewModel.dismissExpandedBlockOrClearSingleEmpty()
                 },
             )

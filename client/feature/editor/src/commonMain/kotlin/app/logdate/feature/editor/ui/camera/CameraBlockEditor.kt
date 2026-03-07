@@ -26,7 +26,6 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
-import io.github.aakira.napier.Napier
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.delete_media
 import logdate.client.feature.editor.generated.resources.play_video
@@ -51,14 +50,11 @@ fun CameraBlockEditor(
 ) {
     val hasExistingMedia = block.uri != null
 
-    Napier.d("CameraBlockEditor - hasExistingMedia: $hasExistingMedia, URI: ${block.uri}, mediaType: ${block.mediaType}")
-
     if (hasExistingMedia) {
         CapturedMediaContent(
             block = block,
             onBlockUpdated = onBlockUpdated,
             onDiscardMedia = {
-                Napier.d("CameraBlockEditor - Discarding captured media, returning to camera")
                 onBlockUpdated(
                     block.copy(
                         uri = null,
@@ -72,7 +68,6 @@ fun CameraBlockEditor(
     } else {
         CameraCaptureContent(
             onMediaCaptured = { uri, mediaType, durationMs ->
-                Napier.d("CameraBlockEditor - Media captured: $uri, type: $mediaType")
                 onBlockUpdated(
                     block.copy(
                         uri = uri,

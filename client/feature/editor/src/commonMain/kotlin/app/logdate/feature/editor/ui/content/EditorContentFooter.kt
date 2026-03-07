@@ -39,7 +39,6 @@ import app.logdate.feature.editor.ui.editor.BlockType
 import app.logdate.feature.editor.ui.layout.ExpandableContentToolbar
 import app.logdate.feature.editor.ui.layout.OverscrollDetector
 import app.logdate.feature.editor.ui.layout.rememberOverscrollDetector
-import io.github.aakira.napier.Napier
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import logdate.client.feature.editor.generated.resources.Res
@@ -117,7 +116,6 @@ fun EditorContentFooter(
     LaunchedEffect(overscrollDetector) {
         if (overscrollDetector.isPastThreshold && !expanded) {
             expanded = true
-            Napier.d("Toolbar expanded due to threshold")
         }
     }
 
@@ -126,7 +124,6 @@ fun EditorContentFooter(
         if (expanded) {
             delay(5000)
             expanded = false
-            Napier.d("Toolbar auto-collapsed after timeout")
         }
     }
 

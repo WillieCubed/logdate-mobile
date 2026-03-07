@@ -75,7 +75,6 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
-import io.github.aakira.napier.Napier
 import kotlinx.coroutines.delay
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.captured_photo
@@ -118,14 +117,6 @@ actual fun CameraCaptureContent(
 
     val hasPermissions = cameraPermissions.allPermissionsGranted
 
-    LaunchedEffect(cameraPermissions.permissions) {
-        Napier.d(
-            "Camera permissions state: ${cameraPermissions.permissions.map {
-                "${it.permission}: ${it.status}"
-            }}",
-        )
-    }
-
     // Track review state locally — media is only committed on "Use"
     var pendingReview by remember { mutableStateOf<PendingReview?>(null) }
 
@@ -133,7 +124,6 @@ actual fun CameraCaptureContent(
         uiState.capturedMediaUri?.let { uri ->
             val mediaType = uiState.capturedMediaType ?: CapturedMediaType.PHOTO
             val duration = if (mediaType == CapturedMediaType.VIDEO) uiState.recordingDurationMs else 0L
-            Napier.d("CameraCaptureContent - Captured media: $uri, type: $mediaType, duration: $duration")
             pendingReview = PendingReview(uri, mediaType, duration)
             viewModel.clearCapturedMedia()
         }

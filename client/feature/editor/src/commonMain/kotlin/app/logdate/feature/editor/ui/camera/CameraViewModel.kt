@@ -53,7 +53,6 @@ class CameraViewModel(
         previewJob?.cancel()
         previewJob =
             viewModelScope.launch {
-                Napier.d("CameraViewModel: Starting preview")
                 // Stop first in case previous session left the camera bound
                 cameraCaptureManager.stopPreview()
                 cameraCaptureManager.startPreview()
@@ -73,7 +72,6 @@ class CameraViewModel(
         previewJob?.cancel()
         previewJob =
             viewModelScope.launch {
-                Napier.d("CameraViewModel: Stopping preview")
                 cameraCaptureManager.stopPreview()
             }
     }
@@ -85,7 +83,6 @@ class CameraViewModel(
         previewJob?.cancel()
         previewJob =
             viewModelScope.launch {
-                Napier.d("CameraViewModel: Switching camera")
                 cameraCaptureManager.switchCamera()
             }
     }
@@ -94,7 +91,6 @@ class CameraViewModel(
      * Sets the capture mode to photo or video.
      */
     fun setCaptureMode(mode: CaptureMode) {
-        Napier.d("CameraViewModel: Setting capture mode to $mode")
         cameraCaptureManager.setCaptureMode(mode)
     }
 
@@ -114,7 +110,6 @@ class CameraViewModel(
      * Captures a photo.
      */
     private suspend fun capturePhoto() {
-        Napier.d("CameraViewModel: Capturing photo")
         _uiState.update { it.copy(isCapturing = true) }
 
         val uri = cameraCaptureManager.capturePhoto()
@@ -127,9 +122,7 @@ class CameraViewModel(
             )
         }
 
-        if (uri != null) {
-            Napier.d("CameraViewModel: Photo captured at $uri")
-        } else {
+        if (uri == null) {
             Napier.e("CameraViewModel: Photo capture failed")
         }
     }
@@ -139,7 +132,6 @@ class CameraViewModel(
      */
     private suspend fun toggleVideoRecording() {
         if (_uiState.value.isRecording) {
-            Napier.d("CameraViewModel: Stopping video recording")
             val uri = cameraCaptureManager.stopVideoRecording()
             _uiState.update {
                 it.copy(
@@ -148,7 +140,6 @@ class CameraViewModel(
                 )
             }
         } else {
-            Napier.d("CameraViewModel: Starting video recording")
             cameraCaptureManager.startVideoRecording()
         }
     }
@@ -179,7 +170,6 @@ class CameraViewModel(
     override fun onCleared() {
         super.onCleared()
         cameraCaptureManager.release()
-        Napier.d("CameraViewModel: Released camera resources")
     }
 }
 

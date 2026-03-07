@@ -9,7 +9,6 @@ import app.logdate.feature.editor.ui.editor.BlockType
 import app.logdate.feature.editor.ui.editor.EditorState
 import app.logdate.feature.editor.ui.editor.EntryBlockUiState
 import app.logdate.shared.model.Journal
-import io.github.aakira.napier.Napier
 import kotlin.uuid.Uuid
 
 /**
@@ -52,18 +51,9 @@ fun rememberBlocksUiState(
             selectedJournalIds = editorState.selectedJournalIds,
             onBlockFocused = onFocusBlock,
             onJournalSelectionChanged = onUpdateJournalSelection,
-            onUpdateBlock = { block ->
-                Napier.d("Updating block: ${block.id}")
-                onUpdateBlock(block)
-            },
-            onCreateBlock = { blockType, id ->
-                Napier.i("BlocksUiState: Creating block of type $blockType with id $id")
-                onCreateBlock(blockType, id)
-            },
-            onDeleteBlock = { blockId ->
-                Napier.d("Deleting block: $blockId")
-                onDeleteBlock(blockId)
-            },
+            onUpdateBlock = onUpdateBlock,
+            onCreateBlock = onCreateBlock,
+            onDeleteBlock = onDeleteBlock,
         )
     }
 }

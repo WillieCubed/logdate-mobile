@@ -138,7 +138,6 @@ class EntryEditorViewModel(
             recentDraftFlow,
             allDraftsFlow,
         ) { currentState, notes, journals, recentDraft, allDrafts ->
-            Napier.d("EntryEditorViewModel: Rebuilding state, current blocks: ${currentState.blocks.size}")
             // Convert today's notes to UI blocks
             val todayBlocks = notes.map { it.toDomainBlock() }
 
@@ -175,7 +174,6 @@ class EntryEditorViewModel(
                     isLoadingDrafts = false,
                     isLoading = false,
                 )
-            Napier.d("EntryEditorViewModel: New state created, blocks: ${newState.blocks.size}, hasContent: ${newState.hasContent()}")
             newState
         }.stateIn(
             viewModelScope,
@@ -266,7 +264,6 @@ class EntryEditorViewModel(
         type: BlockType,
         id: Uuid = Uuid.random(),
     ): EntryBlockUiState {
-        Napier.i("EntryEditorViewModel: Creating new block of type $type with id $id")
         // Create a new block based on the specified type
         // Using null for location instead of real location data
         val location = null // Location functionality disabled
@@ -310,17 +307,13 @@ class EntryEditorViewModel(
                     )
             }
 
-        // Add the new block to the state; media blocks immediately fill the editor
         mutableEditorState.update { currentState ->
-            Napier.i("EntryEditorViewModel: Adding new block to state, current blocks: ${currentState.blocks.size}")
             currentState.copy(
                 blocks = currentState.blocks + newBlock,
                 expandedBlockId = if (type != BlockType.TEXT) newBlock.id else currentState.expandedBlockId,
                 isModified = true,
             )
         }
-        Napier.i("EntryEditorViewModel: Block added, returning: ${newBlock.id}")
-
         return newBlock
     }
 
@@ -328,36 +321,20 @@ class EntryEditorViewModel(
      * Updates an existing block in the editor.
      */
     fun updateBlock(updatedBlock: EntryBlockUiState) {
-        Napier.d("Updating block: ${updatedBlock.id}, content length: ${(updatedBlock as? TextBlockUiState)?.content?.length}")
-
         mutableEditorState.update { currentState ->
-            // Only update if the block is not read-only
             if (currentState.isReadOnly(updatedBlock.id)) {
-                Napier.d("Block is read-only, not updating: ${updatedBlock.id}")
                 currentState
             } else {
-                // Find the existing block to check for actual changes
                 val existingBlock = currentState.blocks.find { it.id == updatedBlock.id }
                 val hasContentChanged = existingBlock != updatedBlock
 
-                // Log the content change for debugging
-                if (existingBlock is TextBlockUiState && updatedBlock is TextBlockUiState) {
-                    Napier.d("Text changed: '${existingBlock.content}' -> '${updatedBlock.content}'")
-                }
-
-                // Create a modified copy with the updated block and set isDirty to true
-                val updatedState =
-                    currentState.copy(
-                        blocks =
-                            currentState.blocks.map {
-                                if (it.id == updatedBlock.id) updatedBlock else it
-                            },
-                        // Only mark as modified if there was an actual content change
-                        isModified = hasContentChanged || currentState.isModified,
-                    )
-
-                Napier.d("State updated, block count: ${updatedState.blocks.size}, isModified: ${updatedState.isModified}")
-                updatedState
+                currentState.copy(
+                    blocks =
+                        currentState.blocks.map {
+                            if (it.id == updatedBlock.id) updatedBlock else it
+                        },
+                    isModified = hasContentChanged || currentState.isModified,
+                )
             }
         }
     }
@@ -367,7 +344,6 @@ class EntryEditorViewModel(
      * Also clears the expanded block ID if the deleted block was currently expanded.
      */
     fun removeBlock(blockId: Uuid) {
-        Napier.d("Removing block: $blockId")
         mutableEditorState.update { currentState ->
             val shouldClearExpanded = currentState.expandedBlockId == blockId
             val filteredBlocks = currentState.blocks.filterNot { it.id == blockId }
@@ -454,8 +430,6 @@ class EntryEditorViewModel(
                     }
 
                 if (notes.isEmpty()) {
-                    Napier.d("Skip save: no content")
-                    // Signal to UI that we're done
                     mutableEditorState.update { it.copy(shouldExit = true) }
                     return@launch
                 }
@@ -473,10 +447,7 @@ class EntryEditorViewModel(
                 val draftId = state.draftId
                 if (draftId != null) {
                     deleteEntryDraft(draftId)
-                    Napier.d("Deleted draft after saving: $draftId")
                 }
-
-                Napier.i("Saved ${notes.size} notes to repository")
 
                 // Signal to UI that we're done and should exit
                 mutableEditorState.update { it.copy(shouldExit = true) }
@@ -504,11 +475,8 @@ class EntryEditorViewModel(
     fun clearSingleEmptyBlock(): Boolean {
         val currentState = mutableEditorState.value
         if (!currentState.shouldReturnToPickerOnBack()) {
-            Napier.d("clearSingleEmptyBlock skipped: editor does not qualify for picker reset")
             return false
         }
-
-        Napier.d("Clearing single empty block and returning to picker")
         mutableEditorState.update {
             it.copy(
                 blocks = emptyList(),
@@ -528,11 +496,9 @@ class EntryEditorViewModel(
     fun dismissExpandedBlock(): Boolean {
         val currentExpandedId = mutableEditorState.value.expandedBlockId
         return if (currentExpandedId != null) {
-            Napier.d("Dismissing expanded block: $currentExpandedId")
             setExpandedBlockId(null)
             true
         } else {
-            Napier.w("dismissExpandedBlock called but no block is expanded")
             false
         }
     }
@@ -575,7 +541,6 @@ class EntryEditorViewModel(
                                         errorMessage = null,
                                     )
                                 }
-                                Napier.d("Loaded draft: ${draft.id} with ${draft.notes.size} notes")
                             },
                             onFailure = { e ->
                                 Napier.e("Failed to load draft: ${e.message}", e)
@@ -601,7 +566,6 @@ class EntryEditorViewModel(
         viewModelScope.launch {
             try {
                 deleteEntryDraft(draftId)
-                Napier.d("Deleted draft: $draftId")
             } catch (e: Exception) {
                 Napier.e("Failed to delete draft: ${e.message}", e)
                 mutableEditorState.update {
@@ -621,7 +585,6 @@ class EntryEditorViewModel(
                 currentDrafts.forEach { draft ->
                     deleteEntryDraft(draft.id)
                 }
-                Napier.d("Deleted all ${currentDrafts.size} drafts")
             } catch (e: Exception) {
                 Napier.e("Failed to delete all drafts: ${e.message}", e)
                 mutableEditorState.update {
@@ -649,8 +612,6 @@ class EntryEditorViewModel(
                     // Create a new text block with the initial content
                     val textBlock = createNewBlock(BlockType.TEXT) as TextBlockUiState
                     updateBlock(textBlock.copy(content = content))
-
-                    Napier.d("Added initial text content block")
                 }
             } catch (e: Exception) {
                 Napier.e("Failed to set initial text content: ${e.message}", e)
@@ -711,8 +672,6 @@ class EntryEditorViewModel(
                         }
                     }
                 }
-
-                Napier.d("Added ${attachmentUris.size} initial attachments")
             } catch (e: Exception) {
                 Napier.e("Failed to add initial attachments: ${e.message}", e)
             }
@@ -734,7 +693,6 @@ class EntryEditorViewModel(
     ) {
         viewModelScope.launch {
             try {
-                Napier.d("EntryEditorViewModel: Loading existing entry: $entryId")
                 mutableEditorState.update { it.copy(isLoading = true) }
 
                 // Fetch the entry
@@ -768,8 +726,6 @@ class EntryEditorViewModel(
                 if (journalId != null) {
                     setSelectedJournals(listOf(journalId))
                 }
-
-                Napier.i("EntryEditorViewModel: Loaded existing entry: $entryId")
             } catch (e: Exception) {
                 Napier.e("EntryEditorViewModel: Failed to load existing entry: $entryId", e)
                 mutableEditorState.update {

@@ -42,7 +42,6 @@ import app.logdate.feature.editor.ui.state.BlocksUiState
 import app.logdate.feature.editor.ui.text.TextBlockContent
 import app.logdate.feature.editor.ui.video.VideoBlockEditor
 import app.logdate.ui.utils.scrollToEnd
-import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -247,7 +246,6 @@ private fun BlockContentInner(
     onBlockDeleted: (Uuid) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Napier.d("BlockContentInner: rendering block ${block.id} (${block::class.simpleName})")
     when (block) {
         is TextBlockUiState ->
             TextBlockContent(
