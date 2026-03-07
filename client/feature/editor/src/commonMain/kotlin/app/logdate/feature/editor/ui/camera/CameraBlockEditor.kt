@@ -25,7 +25,6 @@ import app.logdate.feature.editor.ui.formatMediaDuration
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
-import coil3.request.crossfade
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.delete_media
 import logdate.client.feature.editor.generated.resources.play_video
@@ -107,7 +106,6 @@ private fun CapturedMediaContent(
                             ImageRequest
                                 .Builder(LocalPlatformContext.current)
                                 .data(block.uri)
-                                .crossfade(true)
                                 .build(),
                         contentDescription = block.caption.ifBlank { "Captured photo" },
                         contentScale = ContentScale.Crop,

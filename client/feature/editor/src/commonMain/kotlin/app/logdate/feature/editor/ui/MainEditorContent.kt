@@ -3,11 +3,14 @@
 package app.logdate.feature.editor.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.SeekableTransitionState
 import androidx.compose.animation.core.rememberTransition
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +33,7 @@ import app.logdate.feature.editor.ui.camera.CameraBlockEditor
 import app.logdate.feature.editor.ui.common.PlatformPredictiveBackHandler
 import app.logdate.feature.editor.ui.content.EditorContentFooter
 import app.logdate.feature.editor.ui.content.EmptyEditorStateContent
+import app.logdate.feature.editor.ui.content.matchingPickerTileIdsFor
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.editor.BlockType
 import app.logdate.feature.editor.ui.editor.CameraBlockUiState
@@ -106,6 +110,14 @@ fun MainEditorContent(
         } else {
             EditorDisplay.List
         }
+    val pickerTileIds =
+        remember(expandedBlock, shouldReturnToPickerOnBack) {
+            if (shouldReturnToPickerOnBack) {
+                matchingPickerTileIdsFor(expandedBlock)
+            } else {
+                matchingPickerTileIdsFor(null)
+            }
+        }
 
     // Single flow for seek progress — ensures seeks are processed sequentially via collectLatest,
     // dropping intermediate values if a new one arrives before the previous seekTo completes.
@@ -142,6 +154,11 @@ fun MainEditorContent(
         CompositionLocalProvider(LocalSharedTransitionScope provides sts) {
             transition.AnimatedContent(
                 contentKey = { it::class },
+                // The shared container morph is the semantic transition here.
+                // Disabling shell-level fades keeps predictive back purely spatial.
+                transitionSpec = {
+                    EnterTransition.None togetherWith ExitTransition.None
+                },
             ) { target ->
                 val avs = this
                 CompositionLocalProvider(LocalAnimatedVisibilityScope provides avs) {
@@ -152,6 +169,10 @@ fun MainEditorContent(
                                 onStartPhotoBlock = { id -> uiState.onCreateBlock(BlockType.IMAGE, id) },
                                 onStartAudioBlock = { id -> uiState.onCreateBlock(BlockType.AUDIO, id) },
                                 onStartCameraBlock = { id -> uiState.onCreateBlock(BlockType.CAMERA, id) },
+                                textTileId = pickerTileIds.textId,
+                                photoTileId = pickerTileIds.photoId,
+                                audioTileId = pickerTileIds.audioId,
+                                cameraTileId = pickerTileIds.cameraId,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }

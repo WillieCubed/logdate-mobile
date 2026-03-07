@@ -151,6 +151,14 @@ class EditorStateTest {
     }
 
     @Test
+    fun testSingleEmptyVideoBlockDoesNotReturnToPickerOnBack() {
+        val emptyBlock = VideoBlockUiState()
+        val state = EditorState(blocks = listOf(emptyBlock))
+
+        assertFalse(state.shouldReturnToPickerOnBack())
+    }
+
+    @Test
     fun testMixOfEmptyAndContentBlocks() {
         // Create blocks with and without content
         val emptyBlock = TextBlockUiState(content = "")

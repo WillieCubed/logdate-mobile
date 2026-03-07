@@ -216,7 +216,6 @@ class TextEditingTest {
                     BlockType.AUDIO,
                     BlockType.IMAGE,
                     BlockType.CAMERA,
-                    BlockType.VIDEO,
                 )
 
             emptyTypes.forEach { type ->
@@ -260,5 +259,18 @@ class TextEditingTest {
             )
             assertFalse(viewModel.editorState.value.shouldReturnToPickerOnBack())
             assertEquals(null, viewModel.editorState.value.expandedBlockId)
+        }
+
+    @Test
+    fun testSingleEmptyVideoBlockDoesNotClearToPicker() =
+        testScope.runTest {
+            viewModel.createNewBlock(BlockType.VIDEO)
+            advanceUntilIdle()
+
+            val cleared = viewModel.clearSingleEmptyBlock()
+            advanceUntilIdle()
+
+            assertFalse(cleared)
+            assertEquals(1, viewModel.editorState.value.blocks.size)
         }
 }

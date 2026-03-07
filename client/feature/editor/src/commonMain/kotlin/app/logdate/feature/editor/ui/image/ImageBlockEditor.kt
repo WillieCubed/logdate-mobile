@@ -26,7 +26,6 @@ import app.logdate.ui.content.ImageScrimOverlay
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
-import coil3.request.crossfade
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.delete_image
 import org.jetbrains.compose.resources.stringResource
@@ -79,7 +78,6 @@ fun ImageBlockEditor(
                     ImageRequest
                         .Builder(LocalPlatformContext.current)
                         .data(block.uri)
-                        .crossfade(true)
                         .build(),
                 contentDescription = block.caption.ifBlank { "Image" },
                 contentScale = ContentScale.Crop,

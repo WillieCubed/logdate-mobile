@@ -55,7 +55,10 @@ class EditorState(
      * Returns true when back should restore the empty content-type picker instead of
      * exiting or leaving a single empty block stranded in the editor.
      */
-    fun shouldReturnToPickerOnBack(): Boolean = blocks.size == 1 && !blocks.single().hasContent()
+    fun shouldReturnToPickerOnBack(): Boolean {
+        val block = blocks.singleOrNull() ?: return false
+        return !block.hasContent() && block.supportsPickerReturnTransition()
+    }
 
     /**
      * Returns true if the editor has unsaved changes.
@@ -157,3 +160,13 @@ class EditorState(
             "selectedJournalIds=${selectedJournalIds.size}, draftId=$draftId, " +
             "isDraft=$isDraft, isModified=$isModified)"
 }
+
+private fun EntryBlockUiState.supportsPickerReturnTransition(): Boolean =
+    when (this) {
+        is TextBlockUiState,
+        is ImageBlockUiState,
+        is AudioBlockUiState,
+        is CameraBlockUiState,
+        -> true
+        is VideoBlockUiState -> false
+    }

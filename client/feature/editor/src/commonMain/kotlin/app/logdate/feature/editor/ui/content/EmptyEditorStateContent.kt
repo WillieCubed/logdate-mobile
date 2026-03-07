@@ -32,6 +32,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.LocalAnimatedVisibilityScope
 import app.logdate.feature.editor.ui.LocalSharedTransitionScope
+import app.logdate.feature.editor.ui.editor.AudioBlockUiState
+import app.logdate.feature.editor.ui.editor.CameraBlockUiState
+import app.logdate.feature.editor.ui.editor.EntryBlockUiState
+import app.logdate.feature.editor.ui.editor.ImageBlockUiState
+import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.add_photo_from_gallery
 import logdate.client.feature.editor.generated.resources.capture
@@ -49,6 +54,22 @@ import kotlin.uuid.Uuid
 private val spacing = 16.dp
 private val cornerRadius = 16.dp
 
+internal data class EmptyEditorPickerTileIds(
+    val textId: Uuid? = null,
+    val audioId: Uuid? = null,
+    val cameraId: Uuid? = null,
+    val photoId: Uuid? = null,
+)
+
+internal fun matchingPickerTileIdsFor(block: EntryBlockUiState?): EmptyEditorPickerTileIds =
+    when (block) {
+        is TextBlockUiState -> EmptyEditorPickerTileIds(textId = block.id)
+        is AudioBlockUiState -> EmptyEditorPickerTileIds(audioId = block.id)
+        is CameraBlockUiState -> EmptyEditorPickerTileIds(cameraId = block.id)
+        is ImageBlockUiState -> EmptyEditorPickerTileIds(photoId = block.id)
+        else -> EmptyEditorPickerTileIds()
+    }
+
 /**
  * A component for adding new blocks when the editor is empty.
  *
@@ -62,14 +83,18 @@ fun EmptyEditorStateContent(
     onStartPhotoBlock: (Uuid) -> Unit,
     onStartAudioBlock: (Uuid) -> Unit,
     onStartCameraBlock: (Uuid) -> Unit,
+    textTileId: Uuid? = null,
+    photoTileId: Uuid? = null,
+    audioTileId: Uuid? = null,
+    cameraTileId: Uuid? = null,
     modifier: Modifier = Modifier,
 ) {
     // Stable IDs pre-generated for each tile; used as the shared element key so
     // the tile morphs into the expanded block surface on tap.
-    val textId = remember { Uuid.random() }
-    val audioId = remember { Uuid.random() }
-    val cameraId = remember { Uuid.random() }
-    val photoId = remember { Uuid.random() }
+    val textId = remember(textTileId) { textTileId ?: Uuid.random() }
+    val audioId = remember(audioTileId) { audioTileId ?: Uuid.random() }
+    val cameraId = remember(cameraTileId) { cameraTileId ?: Uuid.random() }
+    val photoId = remember(photoTileId) { photoTileId ?: Uuid.random() }
 
     val sts = LocalSharedTransitionScope.current
     val avs = LocalAnimatedVisibilityScope.current
