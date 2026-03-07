@@ -57,10 +57,14 @@ Client-side tests verify complete user workflows on the Android app using Espres
 - Connected Android device or emulator with API 24+ (Android N+)
 - Device must support multi-window mode (most modern devices do)
 - Recommended: Pixel 4 or Pixel Tablet emulator for full multi-window features
+- When both a phone and emulator are connected, target the emulator explicitly with `ANDROID_SERIAL=emulator-5554` or `adb -s emulator-5554 ...`
 
 **Commands**:
 
 ```bash
+# Prefer the emulator when multiple Android targets are attached
+export ANDROID_SERIAL=emulator-5554
+
 # Run all multi-window editor tests
 ./gradlew :app:android-main:connectedDebugAndroidTest -k "MultiWindowEditorE2ETest"
 
@@ -70,8 +74,8 @@ Client-side tests verify complete user workflows on the Android app using Espres
 # Run with debugging enabled
 ./gradlew :app:android-main:connectedDebugAndroidTest -k "MultiWindowEditorE2ETest" --debug
 
-# Run with connected device (verify with: adb devices)
-adb devices
+# Verify the emulator target
+adb -s emulator-5554 devices
 ./gradlew :app:android-main:connectedDebugAndroidTest -k "MultiWindowEditorE2ETest"
 ```
 

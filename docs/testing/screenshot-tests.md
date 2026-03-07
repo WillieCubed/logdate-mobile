@@ -157,6 +157,13 @@ Skip screenshots for:
 
 ## Running Screenshot Tests
 
+Screenshot tests are host-side preview tests and do not use a connected Android device. For any Android runtime verification you do alongside screenshot work, target the emulator explicitly instead of relying on whichever device is attached:
+
+```bash
+export ANDROID_SERIAL=emulator-5554
+adb -s emulator-5554 devices
+```
+
 ### Generate Baseline Images
 
 Create or update reference images for the first time or after intentional changes:

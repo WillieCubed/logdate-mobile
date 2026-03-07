@@ -4,6 +4,17 @@ This document defines the systematic approach for organizing and running end-to-
 
 ## Test Categories
 
+## Android Device Targeting Standard
+
+When both a physical Android phone and an emulator are connected, all Android runtime verification in this repo should target the emulator explicitly:
+
+```bash
+export ANDROID_SERIAL=emulator-5554
+adb -s emulator-5554 devices
+```
+
+Use `ANDROID_SERIAL=emulator-5554` for Gradle instrumented tests and `adb -s emulator-5554 ...` for direct shell/logcat workflows.
+
 ### 1. Pure Server Tests (Gradle testApplication)
 
 **Definition**: Tests that verify backend API logic without device interaction.
@@ -52,13 +63,13 @@ This document defines the systematic approach for organizing and running end-to-
 **How to Run**:
 ```bash
 # Run all client e2e tests
-./gradlew :app:android-main:connectedDebugAndroidTest
+ANDROID_SERIAL=emulator-5554 ./gradlew :app:android-main:connectedDebugAndroidTest
 
 # Run specific test class
-./gradlew :app:android-main:connectedDebugAndroidTest -k "MultiWindowEditorE2ETest"
+ANDROID_SERIAL=emulator-5554 ./gradlew :app:android-main:connectedDebugAndroidTest -k "MultiWindowEditorE2ETest"
 
 # Run with verbose output
-./gradlew :app:android-main:connectedDebugAndroidTest -k "MultiWindowEditorE2ETest" --info
+ANDROID_SERIAL=emulator-5554 ./gradlew :app:android-main:connectedDebugAndroidTest -k "MultiWindowEditorE2ETest" --info
 ```
 
 **When to Create Shell Script**: **Only if** the test needs to verify actual device behavior via adb shell commands that gradle cannot test.
