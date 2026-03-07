@@ -4,10 +4,16 @@ import android.content.ContentValues
 import android.content.Context
 import android.os.Build
 import android.provider.MediaStore
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.MeteringPointFactory
 import androidx.camera.core.Preview
+import androidx.camera.core.SurfaceRequest
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.lifecycle.awaitInstance
 import androidx.camera.video.MediaStoreOutputOptions
@@ -20,6 +26,7 @@ import androidx.camera.video.VideoRecordEvent
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +38,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executor
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 
 /**
@@ -42,14 +50,25 @@ class AndroidCameraCaptureManager(
     private val _state = MutableStateFlow(CameraCaptureState())
     override val state: StateFlow<CameraCaptureState> = _state.asStateFlow()
 
+    private val _surfaceRequest = MutableStateFlow<SurfaceRequest?>(null)
+
+    /**
+     * Observable surface request for binding to a [CameraXViewfinder].
+     * Emits a new [SurfaceRequest] each time the preview is started or the camera is switched.
+     */
+    val surfaceRequest: StateFlow<SurfaceRequest?> = _surfaceRequest.asStateFlow()
+
     private var cameraProvider: ProcessCameraProvider? = null
     private var preview: Preview? = null
     private var imageCapture: ImageCapture? = null
     private var videoCapture: VideoCapture<Recorder>? = null
     private var currentRecording: Recording? = null
     private var lifecycleOwner: LifecycleOwner? = null
+    private var camera: Camera? = null
+    private var recordingDeferred: CompletableDeferred<String?>? = null
 
     private val mainExecutor: Executor = ContextCompat.getMainExecutor(context)
+    private val timestampFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
 
     /**
      * Sets the lifecycle owner for camera binding.
@@ -60,9 +79,37 @@ class AndroidCameraCaptureManager(
     }
 
     /**
-     * Gets the preview use case for binding to a viewfinder.
+     * Sets the camera zoom ratio.
+     * @param ratio Zoom ratio where 1.0 is no zoom. Clamped to the camera's supported range.
      */
-    fun getPreview(): Preview? = preview
+    fun setZoomRatio(ratio: Float) {
+        val cam = camera ?: return
+        val zoomState = cam.cameraInfo.zoomState.value ?: return
+        val clamped = ratio.coerceIn(zoomState.minZoomRatio, zoomState.maxZoomRatio)
+        cam.cameraControl.setZoomRatio(clamped)
+    }
+
+    /**
+     * Triggers tap-to-focus at the given point.
+     * @param meteringPointFactory Factory from the viewfinder for coordinate mapping.
+     * @param x Normalized x coordinate (0..1) or pixel coordinate depending on factory.
+     * @param y Normalized y coordinate (0..1) or pixel coordinate depending on factory.
+     */
+    fun tapToFocus(
+        meteringPointFactory: MeteringPointFactory,
+        x: Float,
+        y: Float,
+    ) {
+        val cam = camera ?: return
+        val point = meteringPointFactory.createPoint(x, y)
+        val action =
+            FocusMeteringAction
+                .Builder(point)
+                .setAutoCancelDuration(3, TimeUnit.SECONDS)
+                .build()
+        cam.cameraControl.startFocusAndMetering(action)
+        Napier.d("Tap-to-focus at ($x, $y)")
+    }
 
     override suspend fun startPreview(facing: CameraFacing) {
         try {
@@ -75,16 +122,28 @@ class AndroidCameraCaptureManager(
                     CameraFacing.BACK -> CameraSelector.DEFAULT_BACK_CAMERA
                 }
 
+            val resolutionSelector =
+                ResolutionSelector
+                    .Builder()
+                    .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+                    .build()
+
             preview =
                 Preview
                     .Builder()
-                    .setPreviewStabilizationEnabled(true)
+                    .setResolutionSelector(resolutionSelector)
                     .build()
+                    .apply {
+                        setSurfaceProvider { request ->
+                            _surfaceRequest.value = request
+                        }
+                    }
 
             imageCapture =
                 ImageCapture
                     .Builder()
-                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                    .setResolutionSelector(resolutionSelector)
                     .build()
 
             val recorder =
@@ -97,13 +156,14 @@ class AndroidCameraCaptureManager(
             val owner = lifecycleOwner
             if (owner != null) {
                 provider.unbindAll()
-                provider.bindToLifecycle(
-                    owner,
-                    cameraSelector,
-                    preview,
-                    imageCapture,
-                    videoCapture,
-                )
+                camera =
+                    provider.bindToLifecycle(
+                        owner,
+                        cameraSelector,
+                        preview,
+                        imageCapture,
+                        videoCapture,
+                    )
             }
 
             _state.update {
@@ -130,6 +190,8 @@ class AndroidCameraCaptureManager(
         try {
             currentRecording?.stop()
             currentRecording = null
+            camera = null
+            _surfaceRequest.value = null
             cameraProvider?.unbindAll()
             _state.update {
                 it.copy(
@@ -153,7 +215,7 @@ class AndroidCameraCaptureManager(
                     return@withContext null
                 }
 
-            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+            val timeStamp = timestampFormat.format(Date())
             val fileName = "LOGDATE_$timeStamp.jpg"
 
             val contentValues =
@@ -213,7 +275,7 @@ class AndroidCameraCaptureManager(
             return
         }
 
-        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val timeStamp = timestampFormat.format(Date())
         val fileName = "LOGDATE_$timeStamp.mp4"
 
         val contentValues =
@@ -232,6 +294,9 @@ class AndroidCameraCaptureManager(
                     MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
                 ).setContentValues(contentValues)
                 .build()
+
+        val deferred = CompletableDeferred<String?>()
+        recordingDeferred = deferred
 
         try {
             currentRecording =
@@ -273,6 +338,8 @@ class AndroidCameraCaptureManager(
                                     )
                                 }
                                 currentRecording = null
+                                recordingDeferred?.complete(uri)
+                                recordingDeferred = null
                                 Napier.d("Video recording finalized: $uri")
                             }
                         }
@@ -280,9 +347,13 @@ class AndroidCameraCaptureManager(
         } catch (e: SecurityException) {
             Napier.e("Audio permission required for video recording", e)
             _state.update { it.copy(error = CameraCaptureError.PermissionDenied) }
+            deferred.complete(null)
+            recordingDeferred = null
         } catch (e: Exception) {
             Napier.e("Failed to start video recording", e)
             _state.update { it.copy(error = CameraCaptureError.RecordingFailed) }
+            deferred.complete(null)
+            recordingDeferred = null
         }
     }
 
@@ -293,26 +364,15 @@ class AndroidCameraCaptureManager(
                 return null
             }
 
+        val deferred =
+            recordingDeferred ?: run {
+                Napier.w("No recording deferred available")
+                recording.stop()
+                return null
+            }
+
         recording.stop()
-
-        return suspendCancellableCoroutine { continuation ->
-            var resumed = false
-            val checkState: () -> Unit = {
-                if (!resumed && !_state.value.isRecording && _state.value.lastCapturedUri != null) {
-                    resumed = true
-                    continuation.resume(_state.value.lastCapturedUri)
-                }
-            }
-
-            mainExecutor.execute {
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                    if (!resumed) {
-                        resumed = true
-                        continuation.resume(_state.value.lastCapturedUri)
-                    }
-                }, 2000)
-            }
-        }
+        return deferred.await()
     }
 
     override suspend fun switchCamera() {
@@ -336,9 +396,17 @@ class AndroidCameraCaptureManager(
         Napier.d("Capture mode set to: $mode")
     }
 
+    override fun clearCapturedUri() {
+        _state.update { it.copy(lastCapturedUri = null) }
+    }
+
     override fun release() {
         currentRecording?.stop()
         currentRecording = null
+        recordingDeferred?.complete(null)
+        recordingDeferred = null
+        camera = null
+        _surfaceRequest.value = null
         cameraProvider?.unbindAll()
         cameraProvider = null
         preview = null

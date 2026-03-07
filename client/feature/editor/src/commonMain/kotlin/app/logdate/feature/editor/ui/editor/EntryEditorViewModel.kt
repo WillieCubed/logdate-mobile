@@ -497,6 +497,29 @@ class EntryEditorViewModel(
     }
 
     /**
+     * Removes the lone empty block so the editor can return to the initial content-type picker.
+     *
+     * @return true if the editor was reset to the empty picker, false otherwise
+     */
+    fun clearSingleEmptyBlock(): Boolean {
+        val currentState = mutableEditorState.value
+        if (!currentState.shouldReturnToPickerOnBack()) {
+            Napier.d("clearSingleEmptyBlock skipped: editor does not qualify for picker reset")
+            return false
+        }
+
+        Napier.d("Clearing single empty block and returning to picker")
+        mutableEditorState.update {
+            it.copy(
+                blocks = emptyList(),
+                expandedBlockId = null,
+                isModified = false,
+            )
+        }
+        return true
+    }
+
+    /**
      * Dismisses the currently expanded block by collapsing it.
      * This is typically called when the user presses back while a block is focused.
      *
@@ -512,6 +535,18 @@ class EntryEditorViewModel(
             Napier.w("dismissExpandedBlock called but no block is expanded")
             false
         }
+    }
+
+    /**
+     * Handles back from an expanded block, preferring to restore the empty picker when
+     * the editor only contains a single untouched block.
+     */
+    fun dismissExpandedBlockOrClearSingleEmpty(): Boolean {
+        if (clearSingleEmptyBlock()) {
+            return true
+        }
+
+        return dismissExpandedBlock()
     }
 
     /**

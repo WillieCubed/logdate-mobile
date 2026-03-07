@@ -50,6 +50,7 @@ fun EntryEditorContent(
 ) {
     val editorState by viewModel.editorState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val shouldReturnToPickerOnBack = editorState.shouldReturnToPickerOnBack()
 
     val uiState =
         rememberBlocksUiState(
@@ -64,10 +65,18 @@ fun EntryEditorContent(
     var showExitConfirmation by remember { mutableStateOf(false) }
     var showDraftsDialog by remember { mutableStateOf(false) }
 
-    // Expanded-block back is handled by MainEditorContent via PlatformPredictiveBackHandler.
-    // This handler only covers the remaining cases: unsaved changes and plain exit.
-    PlatformBackHandler(enabled = editorState.expandedBlockId == null) {
+    val handleEditorBack: () -> Unit = {
         when {
+            editorState.expandedBlockId != null -> {
+                Napier.d("Back pressed: Dismissing expanded block")
+                viewModel.dismissExpandedBlockOrClearSingleEmpty()
+                Unit
+            }
+            shouldReturnToPickerOnBack -> {
+                Napier.d("Back pressed: Returning to content-type picker")
+                viewModel.clearSingleEmptyBlock()
+                Unit
+            }
             !editorState.canExitWithoutSaving -> {
                 Napier.d("Back pressed: Showing exit confirmation")
                 showExitConfirmation = true
@@ -77,6 +86,12 @@ fun EntryEditorContent(
                 onNavigateBack()
             }
         }
+    }
+
+    // Expanded-block back is handled by MainEditorContent via PlatformPredictiveBackHandler.
+    // This handler only covers the remaining cases: unsaved changes and plain exit.
+    PlatformBackHandler(enabled = editorState.expandedBlockId == null) {
+        handleEditorBack()
     }
 
     val autoSaveState =
@@ -126,13 +141,7 @@ fun EntryEditorContent(
         isEditorFocused = editorState.expandedBlockId != null,
         topBarContent = {
             NoteEditorToolbar(
-                onBack = {
-                    if (!editorState.canExitWithoutSaving) {
-                        showExitConfirmation = true
-                    } else {
-                        onNavigateBack()
-                    }
-                },
+                onBack = handleEditorBack,
                 onSave = { viewModel.saveEntry(editorState) },
                 onShowDrafts = { showDraftsDialog = true },
                 autoSaveStatus = autoSaveState.status,
@@ -142,9 +151,10 @@ fun EntryEditorContent(
             Napier.d("EntryEditorScreen: Rendering MainEditorContent with blocks: ${uiState.blocks.size}")
             MainEditorContent(
                 uiState = uiState,
+                shouldReturnToPickerOnBack = shouldReturnToPickerOnBack,
                 onDismissExpanded = {
                     Napier.d("MainEditorContent: Back committed, dismissing expanded block")
-                    viewModel.dismissExpandedBlock()
+                    viewModel.dismissExpandedBlockOrClearSingleEmpty()
                 },
             )
         },

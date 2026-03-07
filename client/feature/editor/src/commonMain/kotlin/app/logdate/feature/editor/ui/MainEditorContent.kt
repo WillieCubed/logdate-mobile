@@ -71,6 +71,7 @@ private sealed interface EditorDisplay {
 @Composable
 fun MainEditorContent(
     uiState: BlocksUiState,
+    shouldReturnToPickerOnBack: Boolean,
     onDismissExpanded: () -> Unit,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
@@ -100,10 +101,12 @@ fun MainEditorContent(
         }
     }
 
-    // Back always targets List. Empty state only shows when blocks.size == 0, which can't be
-    // true while a block is expanded. Targeting Empty would cause a loop: dismissing an expanded
-    // block doesn't delete it, so displayState lands on List and LaunchedEffect re-animates forward.
-    val backTarget: EditorDisplay = EditorDisplay.List
+    val backTarget: EditorDisplay =
+        if (shouldReturnToPickerOnBack) {
+            EditorDisplay.Empty
+        } else {
+            EditorDisplay.List
+        }
 
     // Single flow for seek progress — ensures seeks are processed sequentially via collectLatest,
     // dropping intermediate values if a new one arrives before the previous seekTo completes.

@@ -57,7 +57,16 @@ fun CameraBlockEditor(
         CapturedMediaContent(
             block = block,
             onBlockUpdated = onBlockUpdated,
-            onDeleteRequested = onDeleteRequested,
+            onDiscardMedia = {
+                Napier.d("CameraBlockEditor - Discarding captured media, returning to camera")
+                onBlockUpdated(
+                    block.copy(
+                        uri = null,
+                        caption = "",
+                        durationMs = 0,
+                    ),
+                )
+            },
             modifier = modifier,
         )
     } else {
@@ -86,7 +95,7 @@ fun CameraBlockEditor(
 private fun CapturedMediaContent(
     block: CameraBlockUiState,
     onBlockUpdated: (CameraBlockUiState) -> Unit,
-    onDeleteRequested: () -> Unit,
+    onDiscardMedia: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -140,7 +149,7 @@ private fun CapturedMediaContent(
             }
 
             DeleteMediaButton(
-                onClick = onDeleteRequested,
+                onClick = onDiscardMedia,
                 contentDescription = stringResource(Res.string.delete_media),
                 modifier = Modifier.align(Alignment.TopEnd),
             )

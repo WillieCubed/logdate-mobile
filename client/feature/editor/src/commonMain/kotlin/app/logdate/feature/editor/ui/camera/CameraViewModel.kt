@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.feature.editor.ui.formatMediaDuration
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,12 +14,17 @@ import kotlinx.coroutines.launch
 /**
  * ViewModel for managing camera capture operations.
  * Handles photo and video capture, camera switching, and state management.
+ *
+ * Camera preview lifecycle is serialized through [previewJob] to prevent
+ * stop/start races when transitioning between capture and review states.
  */
 class CameraViewModel(
     private val cameraCaptureManager: CameraCaptureManager,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(CameraUiState())
     val uiState: StateFlow<CameraUiState> = _uiState.asStateFlow()
+
+    private var previewJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -40,12 +46,18 @@ class CameraViewModel(
 
     /**
      * Starts the camera preview with the default back-facing camera.
+     * Cancels any in-flight stop operation first, then stops and restarts cleanly.
      */
     fun startPreview() {
-        viewModelScope.launch {
-            Napier.d("CameraViewModel: Starting preview")
-            cameraCaptureManager.startPreview()
-        }
+        // Cancel any pending stop/start to avoid races
+        previewJob?.cancel()
+        previewJob =
+            viewModelScope.launch {
+                Napier.d("CameraViewModel: Starting preview")
+                // Stop first in case previous session left the camera bound
+                cameraCaptureManager.stopPreview()
+                cameraCaptureManager.startPreview()
+            }
     }
 
     /**
@@ -55,22 +67,27 @@ class CameraViewModel(
 
     /**
      * Stops the camera preview.
+     * Cancels any in-flight start operation first.
      */
     fun stopPreview() {
-        viewModelScope.launch {
-            Napier.d("CameraViewModel: Stopping preview")
-            cameraCaptureManager.stopPreview()
-        }
+        previewJob?.cancel()
+        previewJob =
+            viewModelScope.launch {
+                Napier.d("CameraViewModel: Stopping preview")
+                cameraCaptureManager.stopPreview()
+            }
     }
 
     /**
      * Switches between front and back cameras.
      */
     fun switchCamera() {
-        viewModelScope.launch {
-            Napier.d("CameraViewModel: Switching camera")
-            cameraCaptureManager.switchCamera()
-        }
+        previewJob?.cancel()
+        previewJob =
+            viewModelScope.launch {
+                Napier.d("CameraViewModel: Switching camera")
+                cameraCaptureManager.switchCamera()
+            }
     }
 
     /**
@@ -138,8 +155,11 @@ class CameraViewModel(
 
     /**
      * Clears the captured media URI and resets capture state.
+     * Also clears the manager's state to prevent the init collector from
+     * resurrecting the old URI on the next state emission.
      */
     fun clearCapturedMedia() {
+        cameraCaptureManager.clearCapturedUri()
         _uiState.update {
             it.copy(
                 capturedMediaUri = null,

@@ -142,11 +142,10 @@ class TextEditingTest {
     @Test
     fun testCreateNewTextBlock() =
         testScope.runTest {
-            val block = viewModel.createNewBlock(BlockType.TEXT)
+            val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             advanceUntilIdle()
 
-            assertTrue(block is TextBlockUiState)
-            assertEquals("", (block as TextBlockUiState).content)
+            assertEquals("", block.content)
 
             val state = viewModel.editorState.value
             assertTrue(state.blocks.any { it.id == block.id })
@@ -206,5 +205,60 @@ class TextEditingTest {
             val updatedState = viewModel.editorState.value
             assertEquals(1, updatedState.blocks.size)
             assertEquals(block.id, updatedState.blocks.first().id)
+        }
+
+    @Test
+    fun testClearSingleEmptyBlockReturnsEditorToPicker() =
+        testScope.runTest {
+            val emptyTypes =
+                listOf(
+                    BlockType.TEXT,
+                    BlockType.AUDIO,
+                    BlockType.IMAGE,
+                    BlockType.CAMERA,
+                    BlockType.VIDEO,
+                )
+
+            emptyTypes.forEach { type ->
+                viewModel.createNewBlock(type)
+                advanceUntilIdle()
+
+                val cleared = viewModel.clearSingleEmptyBlock()
+                advanceUntilIdle()
+
+                assertTrue(cleared, "Expected $type to clear back to the picker")
+                assertTrue(
+                    viewModel.editorState.value.blocks
+                        .isEmpty(),
+                    "Expected $type block to be removed",
+                )
+                assertFalse(viewModel.editorState.value.isModified, "Expected $type clear to restore pristine state")
+            }
+        }
+
+    @Test
+    fun testDismissExpandedBlockOrClearSingleEmptyPreservesContent() =
+        testScope.runTest {
+            val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
+            advanceUntilIdle()
+
+            viewModel.updateBlock(block.copy(content = "Hello, world!"))
+            val updatedBlock =
+                viewModel.editorState.value.blocks
+                    .first { it.id == block.id } as TextBlockUiState
+
+            viewModel.setExpandedBlockId(updatedBlock.id)
+            val dismissed = viewModel.dismissExpandedBlockOrClearSingleEmpty()
+            advanceUntilIdle()
+
+            assertTrue(dismissed)
+            assertEquals(1, viewModel.editorState.value.blocks.size)
+            assertTrue(
+                viewModel.editorState.value.blocks
+                    .first()
+                    .hasContent(),
+            )
+            assertFalse(viewModel.editorState.value.shouldReturnToPickerOnBack())
+            assertEquals(null, viewModel.editorState.value.expandedBlockId)
         }
 }

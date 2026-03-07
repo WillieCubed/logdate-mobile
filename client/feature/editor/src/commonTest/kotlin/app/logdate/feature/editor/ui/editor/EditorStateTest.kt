@@ -135,6 +135,22 @@ class EditorStateTest {
     }
 
     @Test
+    fun testSingleEmptyBlockReturnsToPickerOnBack() {
+        val emptyBlock = TextBlockUiState(content = "")
+        val state = EditorState(blocks = listOf(emptyBlock))
+
+        assertTrue(state.shouldReturnToPickerOnBack())
+    }
+
+    @Test
+    fun testSingleBlockWithContentDoesNotReturnToPickerOnBack() {
+        val contentBlock = TextBlockUiState(content = "Has content")
+        val state = EditorState(blocks = listOf(contentBlock))
+
+        assertFalse(state.shouldReturnToPickerOnBack())
+    }
+
+    @Test
     fun testMixOfEmptyAndContentBlocks() {
         // Create blocks with and without content
         val emptyBlock = TextBlockUiState(content = "")

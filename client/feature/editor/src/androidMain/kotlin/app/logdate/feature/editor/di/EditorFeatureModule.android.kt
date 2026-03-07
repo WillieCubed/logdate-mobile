@@ -23,8 +23,9 @@ actual val platformEditorModule: Module =
             AndroidImagePickerService(androidContext())
         }
 
-        // Provide Android implementation of CameraCaptureManager
-        single<CameraCaptureManager> {
+        // Provide Android implementation of CameraCaptureManager.
+        // Factory-scoped so each CameraViewModel gets a fresh instance with clean lifecycle state.
+        factory<CameraCaptureManager> {
             AndroidCameraCaptureManager(androidContext())
         }
 

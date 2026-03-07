@@ -51,6 +51,12 @@ interface CameraCaptureManager {
     fun setCaptureMode(mode: CaptureMode)
 
     /**
+     * Clears the last captured URI from the manager's state.
+     * Called after the UI has consumed the captured media to prevent stale state.
+     */
+    fun clearCapturedUri()
+
+    /**
      * Releases all camera resources.
      * Should be called when the camera is no longer needed.
      */

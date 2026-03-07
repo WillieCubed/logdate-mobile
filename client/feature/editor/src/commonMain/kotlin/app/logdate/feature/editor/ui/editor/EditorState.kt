@@ -52,6 +52,12 @@ class EditorState(
     fun hasError(): Boolean = errorMessage != null
 
     /**
+     * Returns true when back should restore the empty content-type picker instead of
+     * exiting or leaving a single empty block stranded in the editor.
+     */
+    fun shouldReturnToPickerOnBack(): Boolean = blocks.size == 1 && !blocks.single().hasContent()
+
+    /**
      * Returns true if the editor has unsaved changes.
      * Content is considered dirty if:
      * 1. It has content that hasn't been saved

@@ -39,6 +39,10 @@ class DesktopCameraCaptureManager : CameraCaptureManager {
         _state.value = _state.value.copy(captureMode = mode)
     }
 
+    override fun clearCapturedUri() {
+        _state.value = _state.value.copy(lastCapturedUri = null)
+    }
+
     override fun release() {
         // No-op
     }

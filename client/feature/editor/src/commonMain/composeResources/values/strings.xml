@@ -16,6 +16,8 @@
     <string name="allow_microphone_access">Allow Microphone Access</string>
     <string name="back">Back</string>
     <string name="camera">Camera</string>
+    <string name="captured_photo">Captured photo</string>
+    <string name="captured_video">Captured video</string>
     <string name="camera_not_available_on_desktop">Camera not available on Desktop</string>
     <string name="camera_not_available_on_ios_yet">Camera not available on iOS yet</string>
     <string name="camera_permission_not_granted">Camera permission not granted</string>
@@ -65,6 +67,7 @@
     <string name="play_video">Play video</string>
     <string name="previous_drafts">Previous Drafts</string>
     <string name="record">Record</string>
+    <string name="retake">Retake</string>
     <string name="record_audio">Record audio</string>
     <string name="remove_block">Remove Block</string>
     <string name="restart">Restart</string>
@@ -89,6 +92,8 @@
     <string name="transcribing_audio">Transcribing audio...</string>
     <string name="transcription_queued">Transcription queued...</string>
     <string name="try_again">Try again</string>
+    <string name="use_photo">Use Photo</string>
+    <string name="use_video">Use Video</string>
     <string name="unsaved_changes">Unsaved Changes</string>
     <string name="video">Video</string>
     <string name="video_not_available_on_desktop">Video not available on Desktop</string>
