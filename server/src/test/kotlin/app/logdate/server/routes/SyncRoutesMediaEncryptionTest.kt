@@ -1,30 +1,26 @@
 package app.logdate.server.routes
 
 import app.logdate.server.auth.StubTokenService
+import app.logdate.server.routes.support.mediaUploadMultipartContent
 import app.logdate.server.sync.InMemorySyncRepository
 import app.logdate.server.sync.MediaAccessPolicy
 import app.logdate.server.sync.MediaEncryptionService
 import app.logdate.server.sync.SyncMetricsRegistry
-import app.logdate.shared.model.sync.DeviceId
 import app.logdate.shared.model.sync.MediaDownloadResponse
-import app.logdate.shared.model.sync.MediaUploadRequest
 import app.logdate.shared.model.sync.MediaUploadResponse
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
-import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.util.UUID
 import javax.crypto.Cipher
@@ -69,20 +65,18 @@ class SyncRoutesMediaEncryptionTest {
             val userId = UUID.randomUUID()
             val authHeader = "Bearer ${tokenService.generateAccessToken(userId.toString())}"
             val bytes = byteArrayOf(10, 11, 12, 13)
-            val uploadRequest =
-                MediaUploadRequest(
-                    contentId = "note-encrypted",
-                    fileName = "photo.jpg",
-                    mimeType = "image/jpeg",
-                    sizeBytes = bytes.size.toLong(),
-                    data = bytes,
-                    deviceId = DeviceId("dev-1"),
-                )
             val upload =
                 client.post("/api/v1/sync/media") {
                     header(HttpHeaders.Authorization, authHeader)
-                    contentType(ContentType.Application.Json)
-                    setBody(json.encodeToString(uploadRequest))
+                    setBody(
+                        mediaUploadMultipartContent(
+                            contentId = "note-encrypted",
+                            fileName = "photo.jpg",
+                            mimeType = "image/jpeg",
+                            data = bytes,
+                            deviceId = "dev-1",
+                        ),
+                    )
                 }
             assertEquals(HttpStatusCode.OK, upload.status)
 
@@ -136,20 +130,18 @@ class SyncRoutesMediaEncryptionTest {
             val clientKey = ByteArray(32) { index -> (index + 42).toByte() }
             val plaintext = "client-encrypted".encodeToByteArray()
             val clientCiphertext = encryptClientMedia(clientKey, plaintext)
-            val uploadRequest =
-                MediaUploadRequest(
-                    contentId = "note-client-encrypted",
-                    fileName = "secret.bin",
-                    mimeType = "application/octet-stream",
-                    sizeBytes = clientCiphertext.size.toLong(),
-                    data = clientCiphertext,
-                    deviceId = DeviceId("dev-1"),
-                )
             val upload =
                 client.post("/api/v1/sync/media") {
                     header(HttpHeaders.Authorization, authHeader)
-                    contentType(ContentType.Application.Json)
-                    setBody(json.encodeToString(uploadRequest))
+                    setBody(
+                        mediaUploadMultipartContent(
+                            contentId = "note-client-encrypted",
+                            fileName = "secret.bin",
+                            mimeType = "application/octet-stream",
+                            data = clientCiphertext,
+                            deviceId = "dev-1",
+                        ),
+                    )
                 }
             assertEquals(HttpStatusCode.OK, upload.status)
 

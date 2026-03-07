@@ -1,5 +1,9 @@
 # LogDate Cloud API Specification
 
+> Legacy reference document. For launch contracts, use:
+> - `server/docs/auth-v1-api.md`
+> - `server/docs/sync-v1-api.md`
+
 ## Base URL
 ```
 LogDate Cloud (Hosted): https://api.logdate.app/api/v1

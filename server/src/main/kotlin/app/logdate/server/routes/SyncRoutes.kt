@@ -14,6 +14,7 @@ import app.logdate.server.sync.MediaAccessPolicy
 import app.logdate.server.sync.MediaEncryptionService
 import app.logdate.server.sync.MediaRecord
 import app.logdate.server.sync.SyncMetricsRegistry
+import app.logdate.server.sync.SyncPurgeResult
 import app.logdate.server.sync.SyncRepository
 import app.logdate.shared.model.sync.AssociationChange
 import app.logdate.shared.model.sync.AssociationChangesResponse
@@ -23,7 +24,6 @@ import app.logdate.shared.model.sync.AssociationUploadRequest
 import app.logdate.shared.model.sync.AssociationUploadResponse
 import app.logdate.shared.model.sync.BackupInfoResponse
 import app.logdate.shared.model.sync.BackupListResponse
-import app.logdate.shared.model.sync.BackupUploadRequest
 import app.logdate.shared.model.sync.BackupUploadResponse
 import app.logdate.shared.model.sync.ContentChange
 import app.logdate.shared.model.sync.ContentChangesResponse
@@ -32,6 +32,7 @@ import app.logdate.shared.model.sync.ContentUpdateRequest
 import app.logdate.shared.model.sync.ContentUpdateResponse
 import app.logdate.shared.model.sync.ContentUploadRequest
 import app.logdate.shared.model.sync.ContentUploadResponse
+import app.logdate.shared.model.sync.DeviceId
 import app.logdate.shared.model.sync.JournalChange
 import app.logdate.shared.model.sync.JournalChangesResponse
 import app.logdate.shared.model.sync.JournalDeletion
@@ -40,17 +41,19 @@ import app.logdate.shared.model.sync.JournalUpdateResponse
 import app.logdate.shared.model.sync.JournalUploadRequest
 import app.logdate.shared.model.sync.JournalUploadResponse
 import app.logdate.shared.model.sync.MediaDownloadResponse
-import app.logdate.shared.model.sync.MediaUploadRequest
 import app.logdate.shared.model.sync.MediaUploadResponse
 import app.logdate.shared.model.sync.VersionConstraint
 import io.github.aakira.napier.Napier
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.PartData
+import io.ktor.http.content.forEachPart
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.request.header
 import io.ktor.server.request.receive
+import io.ktor.server.request.receiveMultipart
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondText
@@ -59,6 +62,8 @@ import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
+import io.ktor.utils.io.readRemaining
+import kotlinx.io.readByteArray
 import kotlinx.serialization.Serializable
 import java.util.UUID
 
@@ -68,6 +73,31 @@ private data class SyncStatusSnapshot(
     val journalCount: Int,
     val associationCount: Int,
     val lastTimestamp: Long,
+)
+
+@Serializable
+private data class SyncPurgeResponse(
+    val contentPurged: Int,
+    val journalPurged: Int,
+    val associationPurged: Int,
+    val mediaPurged: Int,
+    val cutoff: Long,
+    val retentionDaysApplied: Long,
+)
+
+private data class ParsedMediaMultipartUpload(
+    val contentId: String,
+    val fileName: String,
+    val mimeType: String,
+    val sizeBytes: Long,
+    val data: ByteArray,
+    val deviceId: String,
+)
+
+private data class ParsedBackupMultipartUpload(
+    val deviceId: String,
+    val manifest: String,
+    val data: ByteArray,
 )
 
 private const val DEFAULT_SYNC_PAGE_SIZE = 200
@@ -90,6 +120,177 @@ private const val METRIC_MEDIA_UPLOAD = "sync.media.upload"
 private const val METRIC_MEDIA_DOWNLOAD = "sync.media.download"
 private const val METRIC_SYNC_PURGE = "sync.maintenance.purge"
 private const val MILLIS_PER_DAY = 86_400_000L
+
+private suspend fun ApplicationCall.respondMissingMultipartField(field: String) {
+    respond(
+        HttpStatusCode.BadRequest,
+        error("VALIDATION_ERROR", "Missing required multipart field: $field"),
+    )
+}
+
+private fun SyncPurgeResult.toResponse(retentionDaysApplied: Long): SyncPurgeResponse =
+    SyncPurgeResponse(
+        contentPurged = contentPurged,
+        journalPurged = journalPurged,
+        associationPurged = associationPurged,
+        mediaPurged = mediaPurged,
+        cutoff = cutoff,
+        retentionDaysApplied = retentionDaysApplied,
+    )
+
+private suspend fun ApplicationCall.receiveMediaMultipartUpload(): ParsedMediaMultipartUpload? {
+    val multipart =
+        runCatching { receiveMultipart() }.getOrElse {
+            respond(
+                HttpStatusCode.BadRequest,
+                error("VALIDATION_ERROR", "Expected multipart/form-data body"),
+            )
+            return null
+        }
+
+    var contentId: String? = null
+    var fileName: String? = null
+    var mimeType: String? = null
+    var sizeBytes: Long? = null
+    var deviceId: String? = null
+    var data: ByteArray? = null
+
+    multipart.forEachPart { part ->
+        when (part) {
+            is PartData.FormItem -> {
+                when (part.name) {
+                    "contentId" -> contentId = part.value.trim()
+                    "fileName" -> fileName = part.value.trim()
+                    "mimeType" -> mimeType = part.value.trim()
+                    "sizeBytes" -> sizeBytes = part.value.trim().toLongOrNull()
+                    "deviceId" -> deviceId = part.value.trim()
+                }
+            }
+
+            is PartData.FileItem -> {
+                if (part.name == "data") {
+                    data = part.provider().readRemaining().readByteArray()
+                }
+            }
+
+            else -> Unit
+        }
+        part.dispose()
+    }
+
+    val requiredContentId =
+        contentId?.takeIf { it.isNotBlank() } ?: run {
+            respondMissingMultipartField("contentId")
+            return null
+        }
+    val requiredFileName =
+        fileName?.takeIf { it.isNotBlank() } ?: run {
+            respondMissingMultipartField("fileName")
+            return null
+        }
+    val requiredMimeType =
+        mimeType?.takeIf { it.isNotBlank() } ?: run {
+            respondMissingMultipartField("mimeType")
+            return null
+        }
+    val requiredSizeBytes =
+        sizeBytes ?: run {
+            respondMissingMultipartField("sizeBytes")
+            return null
+        }
+    val requiredDeviceId =
+        deviceId?.takeIf { it.isNotBlank() } ?: run {
+            respondMissingMultipartField("deviceId")
+            return null
+        }
+    val requiredData =
+        data ?: run {
+            respondMissingMultipartField("data")
+            return null
+        }
+
+    if (requiredSizeBytes <= 0) {
+        respond(HttpStatusCode.BadRequest, error("VALIDATION_ERROR", "sizeBytes must be greater than 0"))
+        return null
+    }
+    if (requiredSizeBytes != requiredData.size.toLong()) {
+        respond(
+            HttpStatusCode.BadRequest,
+            error("VALIDATION_ERROR", "sizeBytes does not match uploaded binary payload size"),
+        )
+        return null
+    }
+
+    return ParsedMediaMultipartUpload(
+        contentId = requiredContentId,
+        fileName = requiredFileName,
+        mimeType = requiredMimeType,
+        sizeBytes = requiredSizeBytes,
+        data = requiredData,
+        deviceId = requiredDeviceId,
+    )
+}
+
+private suspend fun ApplicationCall.receiveBackupMultipartUpload(): ParsedBackupMultipartUpload? {
+    val multipart =
+        runCatching { receiveMultipart() }.getOrElse {
+            respond(
+                HttpStatusCode.BadRequest,
+                error("VALIDATION_ERROR", "Expected multipart/form-data body"),
+            )
+            return null
+        }
+
+    var deviceId: String? = null
+    var manifest: String? = null
+    var data: ByteArray? = null
+
+    multipart.forEachPart { part ->
+        when (part) {
+            is PartData.FormItem -> {
+                when (part.name) {
+                    "deviceId" -> deviceId = part.value.trim()
+                    "manifest" -> manifest = part.value
+                }
+            }
+
+            is PartData.FileItem -> {
+                if (part.name == "data") {
+                    data = part.provider().readRemaining().readByteArray()
+                }
+            }
+
+            else -> Unit
+        }
+        part.dispose()
+    }
+
+    val requiredDeviceId =
+        deviceId?.takeIf { it.isNotBlank() } ?: run {
+            respondMissingMultipartField("deviceId")
+            return null
+        }
+    val requiredManifest =
+        manifest?.takeIf { it.isNotBlank() } ?: run {
+            respondMissingMultipartField("manifest")
+            return null
+        }
+    val requiredData =
+        data ?: run {
+            respondMissingMultipartField("data")
+            return null
+        }
+    if (requiredData.isEmpty()) {
+        respond(HttpStatusCode.BadRequest, error("VALIDATION_ERROR", "Backup payload must not be empty"))
+        return null
+    }
+
+    return ParsedBackupMultipartUpload(
+        deviceId = requiredDeviceId,
+        manifest = requiredManifest,
+        data = requiredData,
+    )
+}
 
 /**
  * Extracts and validates the user ID from the Authorization header.
@@ -577,7 +778,7 @@ fun Route.syncRoutes(
                 var bytes = 0L
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@post
-                    val req = call.receive<MediaUploadRequest>()
+                    val req = call.receiveMediaMultipartUpload() ?: return@post
                     bytes = req.sizeBytes
                     Napier.d("Media upload for user $userId: ${req.fileName}")
                     val mediaId = UUID.randomUUID().toString()
@@ -632,7 +833,7 @@ fun Route.syncRoutes(
                                 storagePath = storagePath,
                                 createdAt = System.currentTimeMillis(),
                                 serverVersion = 0L,
-                                deviceId = req.deviceId,
+                                deviceId = DeviceId(req.deviceId),
                                 encryptionVersion = 1,
                                 encryptionKeyId = "default",
                                 encryptionMode = "SERVER",
@@ -743,12 +944,12 @@ fun Route.syncRoutes(
                 var bytes = 0L
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@post
-                    val req = call.receive<BackupUploadRequest>()
+                    val req = call.receiveBackupMultipartUpload() ?: return@post
                     bytes = req.data.size.toLong()
 
                     val storage =
                         mediaStorage ?: return@post call.respond(
-                            HttpStatusCode.InternalServerError,
+                            HttpStatusCode.ServiceUnavailable,
                             error("BACKUP_STORAGE_UNAVAILABLE", "Backup storage not configured"),
                         )
 
@@ -842,7 +1043,7 @@ fun Route.syncRoutes(
 
                     val storage =
                         mediaStorage ?: return@get call.respond(
-                            HttpStatusCode.InternalServerError,
+                            HttpStatusCode.ServiceUnavailable,
                             error("BACKUP_STORAGE_UNAVAILABLE", "Backup storage not configured"),
                         )
 
@@ -910,7 +1111,7 @@ fun Route.syncRoutes(
                     val safeRetentionDays = retentionDays.coerceAtMost(3650L)
                     val cutoff = System.currentTimeMillis() - (safeRetentionDays * MILLIS_PER_DAY)
                     val result = repository.purgeTombstones(userId, cutoff)
-                    call.respond(simpleSuccess(result))
+                    call.respond(result.toResponse(retentionDaysApplied = safeRetentionDays))
                     success = true
                 } finally {
                     metrics.recordOperation(METRIC_SYNC_PURGE, System.currentTimeMillis() - start, success)

@@ -156,6 +156,11 @@ class WebAuthnPasskeyService(
         userId: Uuid,
     ): Boolean = runBlocking { passkeyRepository.deactivatePasskey(credentialId, userId) }
 
+    fun credentialBelongsToUser(
+        credentialId: String,
+        userId: Uuid,
+    ): Boolean = runBlocking { passkeyRepository.credentialBelongsToUser(credentialId, userId) }
+
     fun getUserCredentials(userId: Uuid): List<String> = runBlocking { passkeyRepository.getCredentialIdsForUser(userId) }
 
     private fun verifyRegistrationSimplified(

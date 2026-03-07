@@ -50,6 +50,14 @@ interface PasskeyRepository {
     ): Boolean
 
     /**
+     * Check whether a credential belongs to the given user, including inactive credentials.
+     */
+    suspend fun credentialBelongsToUser(
+        credentialId: String,
+        userId: Uuid,
+    ): Boolean
+
+    /**
      * Get credential IDs for a user (for exclude/allow lists).
      */
     suspend fun getCredentialIdsForUser(userId: Uuid): List<String>
@@ -177,6 +185,14 @@ class InMemoryPasskeyRepository : PasskeyRepository {
                 info = passkey.info.copy(isActive = false),
             )
         return true
+    }
+
+    override suspend fun credentialBelongsToUser(
+        credentialId: String,
+        userId: Uuid,
+    ): Boolean {
+        val passkey = passkeys[credentialId] ?: return false
+        return passkey.userId == userId
     }
 
     override suspend fun getCredentialIdsForUser(userId: Uuid): List<String> {

@@ -891,10 +891,10 @@ fun Route.authV1Routes(
                     )
                 }
 
-                val deleted = webAuthnService.deletePasskey(credentialId, account.id)
-                if (!deleted) {
+                if (!webAuthnService.credentialBelongsToUser(credentialId, account.id)) {
                     return@delete call.respondApiError(HttpStatusCode.NotFound, "PASSKEY_NOT_FOUND", "Passkey not found", metrics)
                 }
+                webAuthnService.deletePasskey(credentialId, account.id)
                 call.respond(HttpStatusCode.NoContent)
             } catch (e: Exception) {
                 Napier.e("Failed to delete passkey", e)

@@ -1,30 +1,25 @@
 package app.logdate.server.routes
 
 import app.logdate.server.auth.JwtTokenService
-import app.logdate.server.sync.GcsMediaStorage
+import app.logdate.server.routes.support.backupUploadMultipartContent
+import app.logdate.server.routes.support.createBackupStorageMock
+import app.logdate.server.sync.BackupRecord
 import app.logdate.server.sync.InMemorySyncRepository
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.shared.model.sync.BackupListResponse
-import app.logdate.shared.model.sync.BackupUploadRequest
 import app.logdate.shared.model.sync.BackupUploadResponse
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
-import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
-import io.mockk.every
-import io.mockk.mockk
-import io.mockk.slot
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.util.UUID
 import kotlin.test.Test
@@ -41,17 +36,8 @@ class SyncRoutesBackupTest {
     fun `should upload backup successfully`() =
         testApplication {
             val repository = InMemorySyncRepository()
-            val mockStorage = mockk<GcsMediaStorage>()
-            val storageSlot = slot<ByteArray>()
-
-            // Mock storage upload
-            every {
-                mockStorage.uploadBackup(any(), any(), capture(storageSlot))
-            } returns "users/$testUserId/backups/test-backup.enc"
-
-            // Mock signed URL generation (if used) or just return direct URL logic
-            every { mockStorage.getSignedDownloadUrl(any(), any()) } returns "https://signed-url.com"
-            every { mockStorage.downloadMedia(any()) } returns "encrypted-data".toByteArray()
+            val mockHarness = createBackupStorageMock("users/$testUserId/backups/test-backup.enc")
+            val mockStorage = mockHarness.storage
 
             application {
                 install(ServerContentNegotiation) {
@@ -77,14 +63,11 @@ class SyncRoutesBackupTest {
             val response =
                 client.post("/api/v1/sync/backups") {
                     header(HttpHeaders.Authorization, "Bearer $token")
-                    contentType(ContentType.Application.Json)
                     setBody(
-                        json.encodeToString(
-                            BackupUploadRequest(
-                                deviceId = "device-1",
-                                manifest = manifest,
-                                data = payload,
-                            ),
+                        backupUploadMultipartContent(
+                            deviceId = "device-1",
+                            manifest = manifest,
+                            data = payload,
                         ),
                     )
                 }
@@ -95,9 +78,9 @@ class SyncRoutesBackupTest {
             assertEquals(payload.size.toLong(), uploadResp.sizeBytes)
 
             // Verify storage was called with encrypted data (LDBK1 prefix)
-            assertTrue(storageSlot.captured.size > payload.size, "Encrypted data should be larger than plaintext")
+            assertTrue(mockHarness.uploadedPayload.captured.size > payload.size, "Encrypted data should be larger than plaintext")
             assertTrue(
-                String(storageSlot.captured.copyOfRange(0, 5), Charsets.UTF_8) == "LDBK1",
+                String(mockHarness.uploadedPayload.captured.copyOfRange(0, 5), Charsets.UTF_8) == "LDBK1",
                 "Uploaded data should have LDBK1 prefix",
             )
 
@@ -119,5 +102,86 @@ class SyncRoutesBackupTest {
                 }
             assertEquals(HttpStatusCode.OK, downloadResp.status)
             assertEquals("encrypted-data", downloadResp.bodyAsText())
+        }
+
+    @Test
+    fun `backup upload returns 503 when storage is not configured`() =
+        testApplication {
+            val repository = InMemorySyncRepository()
+            application {
+                install(ServerContentNegotiation) {
+                    json(json)
+                }
+                routing {
+                    route("/api/v1") {
+                        syncRoutes(
+                            repository = repository,
+                            tokenService = jwtService,
+                            mediaStorage = null,
+                            metrics = SyncMetricsRegistry(),
+                        )
+                    }
+                }
+            }
+
+            val token = jwtService.generateAccessToken(testUserId.toString())
+            val response =
+                client.post("/api/v1/sync/backups") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                    setBody(
+                        backupUploadMultipartContent(
+                            deviceId = "device-1",
+                            manifest = """{"version":1}""",
+                            data = "encrypted-data".toByteArray(),
+                        ),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
+            assertTrue(response.bodyAsText().contains("BACKUP_STORAGE_UNAVAILABLE"))
+        }
+
+    @Test
+    fun `backup download returns 503 when storage is not configured`() =
+        testApplication {
+            val repository = InMemorySyncRepository()
+            val backupId = UUID.randomUUID()
+            repository.createBackupRecord(
+                testUserId,
+                BackupRecord(
+                    id = backupId,
+                    userId = testUserId,
+                    deviceId = "device-1",
+                    manifest = """{"version":1}""",
+                    storagePath = "users/$testUserId/backups/$backupId.enc",
+                    createdAt = 1234L,
+                    sizeBytes = 100L,
+                ),
+            )
+
+            application {
+                install(ServerContentNegotiation) {
+                    json(json)
+                }
+                routing {
+                    route("/api/v1") {
+                        syncRoutes(
+                            repository = repository,
+                            tokenService = jwtService,
+                            mediaStorage = null,
+                            metrics = SyncMetricsRegistry(),
+                        )
+                    }
+                }
+            }
+
+            val token = jwtService.generateAccessToken(testUserId.toString())
+            val response =
+                client.get("/api/v1/sync/backups/$backupId") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                }
+
+            assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
+            assertTrue(response.bodyAsText().contains("BACKUP_STORAGE_UNAVAILABLE"))
         }
 }

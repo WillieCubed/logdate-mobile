@@ -8,6 +8,7 @@ import app.logdate.server.routes.support.googleClaimsByToken
 import app.logdate.server.routes.support.signinPasskeyBeginBody
 import app.logdate.server.routes.support.signupPasskeyBeginBody
 import app.logdate.server.routes.support.signupPasskeyCompleteBody
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
@@ -335,5 +336,78 @@ class AuthV1RoutesTest {
             assertTrue(prometheusBody.contains("logdate_auth_operation_success_total"))
             assertTrue(prometheusBody.contains("logdate_auth_error_total"))
             assertTrue(prometheusBody.contains("logdate_auth_rate_limit_total"))
+        }
+
+    @Test
+    fun `passkey delete is idempotent and unknown credential returns not found`() =
+        testApplication {
+            configureAuthV1TestApp()
+            val credentialId = "test-credential-id-delete"
+
+            val beginResponse =
+                client.post("/api/v1/auth/signup/passkey/begin") {
+                    contentType(ContentType.Application.Json)
+                    setBody(signupPasskeyBeginBody(username = "delete_user", displayName = "Delete User"))
+                }
+            assertEquals(HttpStatusCode.OK, beginResponse.status)
+
+            val beginPayload = json.parseToJsonElement(beginResponse.bodyAsText()).jsonObject
+            val sessionToken =
+                beginPayload["data"]
+                    ?.jsonObject
+                    ?.get("sessionToken")
+                    ?.jsonPrimitive
+                    ?.content
+            assertNotNull(sessionToken)
+
+            val completeResponse =
+                client.post("/api/v1/auth/signup/passkey/complete") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        signupPasskeyCompleteBody(
+                            sessionToken = sessionToken,
+                            credentialId = credentialId,
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.Created, completeResponse.status)
+
+            val completePayload = json.parseToJsonElement(completeResponse.bodyAsText()).jsonObject
+            val accessToken =
+                completePayload["data"]
+                    ?.jsonObject
+                    ?.get("tokens")
+                    ?.jsonObject
+                    ?.get("accessToken")
+                    ?.jsonPrimitive
+                    ?.content
+            assertNotNull(accessToken)
+
+            val firstDelete =
+                client.delete("/api/v1/auth/me/passkeys/$credentialId") {
+                    header("Authorization", "Bearer $accessToken")
+                }
+            assertEquals(HttpStatusCode.NoContent, firstDelete.status)
+
+            val secondDelete =
+                client.delete("/api/v1/auth/me/passkeys/$credentialId") {
+                    header("Authorization", "Bearer $accessToken")
+                }
+            assertEquals(HttpStatusCode.NoContent, secondDelete.status)
+
+            val missingDelete =
+                client.delete("/api/v1/auth/me/passkeys/does-not-exist") {
+                    header("Authorization", "Bearer $accessToken")
+                }
+            assertEquals(HttpStatusCode.NotFound, missingDelete.status)
+            val missingPayload = json.parseToJsonElement(missingDelete.bodyAsText()).jsonObject
+            assertEquals(
+                "PASSKEY_NOT_FOUND",
+                missingPayload["error"]
+                    ?.jsonObject
+                    ?.get("code")
+                    ?.jsonPrimitive
+                    ?.content,
+            )
         }
 }

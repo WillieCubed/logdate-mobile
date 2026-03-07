@@ -2,10 +2,9 @@ package app.logdate.server.routes
 
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.configureSyncTestApp
+import app.logdate.server.routes.support.mediaUploadMultipartContent
 import app.logdate.shared.model.sync.ContentChangesResponse
-import app.logdate.shared.model.sync.DeviceId
 import app.logdate.shared.model.sync.MediaDownloadResponse
-import app.logdate.shared.model.sync.MediaUploadRequest
 import app.logdate.shared.model.sync.MediaUploadResponse
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
@@ -19,7 +18,6 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.util.UUID
 import kotlin.test.Test
@@ -378,6 +376,16 @@ class SyncRoutesTest {
         val uploadedAt: Long,
     )
 
+    @Serializable
+    private data class PurgeResponse(
+        val contentPurged: Int,
+        val journalPurged: Int,
+        val associationPurged: Int,
+        val mediaPurged: Int,
+        val cutoff: Long,
+        val retentionDaysApplied: Long,
+    )
+
     @Test
     fun `association upload and changes work`() =
         testApplication {
@@ -420,21 +428,18 @@ class SyncRoutesTest {
             val env = configureSyncTestApp()
             val authHeader = authHeader(env.tokenService)
             val bytes = byteArrayOf(1, 2, 3, 4)
-
-            val uploadRequest =
-                MediaUploadRequest(
-                    contentId = "note-media",
-                    fileName = "photo.jpg",
-                    mimeType = "image/jpeg",
-                    sizeBytes = bytes.size.toLong(),
-                    data = bytes,
-                    deviceId = DeviceId("dev-1"),
-                )
             val upload =
                 client.post("/api/v1/sync/media") {
                     header(HttpHeaders.Authorization, authHeader)
-                    contentType(ContentType.Application.Json)
-                    setBody(json.encodeToString(uploadRequest))
+                    setBody(
+                        mediaUploadMultipartContent(
+                            contentId = "note-media",
+                            fileName = "photo.jpg",
+                            mimeType = "image/jpeg",
+                            data = bytes,
+                            deviceId = "dev-1",
+                        ),
+                    )
                 }
             assertEquals(HttpStatusCode.OK, upload.status)
 
@@ -448,6 +453,64 @@ class SyncRoutesTest {
             val downloadPayload = json.decodeFromString<MediaDownloadResponse>(download.bodyAsText())
             assertEquals(bytes.size.toLong(), downloadPayload.sizeBytes)
             assertTrue(downloadPayload.data.contentEquals(bytes))
+        }
+
+    @Test
+    fun `media upload validates declared size`() =
+        testApplication {
+            val env = configureSyncTestApp()
+            val authHeader = authHeader(env.tokenService)
+            val bytes = byteArrayOf(1, 2, 3, 4)
+
+            val upload =
+                client.post("/api/v1/sync/media") {
+                    header(HttpHeaders.Authorization, authHeader)
+                    setBody(
+                        mediaUploadMultipartContent(
+                            contentId = "note-size-mismatch",
+                            fileName = "photo.jpg",
+                            mimeType = "image/jpeg",
+                            data = bytes,
+                            deviceId = "dev-1",
+                            declaredSizeBytes = 99,
+                        ),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, upload.status)
+            assertTrue(upload.bodyAsText().contains("sizeBytes does not match"))
+        }
+
+    @Test
+    fun `maintenance purge returns concrete payload`() =
+        testApplication {
+            val env = configureSyncTestApp()
+            val authHeader = authHeader(env.tokenService)
+
+            val response =
+                client.post("/api/v1/sync/maintenance/purge?retentionDays=30") {
+                    header(HttpHeaders.Authorization, authHeader)
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val payload = json.decodeFromString<PurgeResponse>(response.bodyAsText())
+            assertEquals(30L, payload.retentionDaysApplied)
+            assertTrue(payload.cutoff > 0L)
+        }
+
+    @Test
+    fun `maintenance purge validates retention days`() =
+        testApplication {
+            val env = configureSyncTestApp()
+            val authHeader = authHeader(env.tokenService)
+
+            val response =
+                client.post("/api/v1/sync/maintenance/purge?retentionDays=0") {
+                    header(HttpHeaders.Authorization, authHeader)
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("retentionDays must be > 0"))
         }
 
     @Test

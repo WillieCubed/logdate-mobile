@@ -53,7 +53,7 @@ class PostgreSQLPasskeyRepository : PasskeyRepository {
         transaction {
             PasskeysTable
                 .selectAll()
-                .where { PasskeysTable.credentialId eq credentialId }
+                .where { (PasskeysTable.credentialId eq credentialId) and (PasskeysTable.isActive eq true) }
                 .singleOrNull()
                 ?.let { row ->
                     val userId = row[PasskeysTable.accountId].toKotlinUuid()
@@ -103,6 +103,18 @@ class PostgreSQLPasskeyRepository : PasskeyRepository {
                     it[isActive] = false
                 }
             updatedRows > 0
+        }
+
+    override suspend fun credentialBelongsToUser(
+        credentialId: String,
+        userId: Uuid,
+    ): Boolean =
+        transaction {
+            PasskeysTable
+                .selectAll()
+                .where {
+                    (PasskeysTable.credentialId eq credentialId) and (PasskeysTable.accountId eq userId.toJavaUUID())
+                }.count() > 0
         }
 
     override suspend fun getCredentialIdsForUser(userId: Uuid): List<String> =

@@ -1,10 +1,9 @@
 package app.logdate.server.e2e.sync
 
 import app.logdate.server.configureSyncTestApp
+import app.logdate.server.routes.support.mediaUploadMultipartContent
 import app.logdate.shared.model.sync.ContentChangesResponse
-import app.logdate.shared.model.sync.DeviceId
 import app.logdate.shared.model.sync.MediaDownloadResponse
-import app.logdate.shared.model.sync.MediaUploadRequest
 import app.logdate.shared.model.sync.MediaUploadResponse
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -16,7 +15,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.util.UUID
 import kotlin.test.Test
@@ -72,20 +70,18 @@ class SyncE2ETest {
             }
 
             val mediaBytes = byteArrayOf(9, 8, 7, 6)
-            val mediaRequest =
-                MediaUploadRequest(
-                    contentId = "note-e2e",
-                    fileName = "media.png",
-                    mimeType = "image/png",
-                    sizeBytes = mediaBytes.size.toLong(),
-                    data = mediaBytes,
-                    deviceId = DeviceId("device-a"),
-                )
             val mediaUpload =
                 client.post("/api/v1/sync/media") {
                     header(HttpHeaders.Authorization, authHeader)
-                    contentType(ContentType.Application.Json)
-                    setBody(json.encodeToString(mediaRequest))
+                    setBody(
+                        mediaUploadMultipartContent(
+                            contentId = "note-e2e",
+                            fileName = "media.png",
+                            mimeType = "image/png",
+                            data = mediaBytes,
+                            deviceId = "device-a",
+                        ),
+                    )
                 }
             assertEquals(HttpStatusCode.OK, mediaUpload.status)
             val mediaUploadPayload = json.decodeFromString<MediaUploadResponse>(mediaUpload.bodyAsText())

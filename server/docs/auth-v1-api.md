@@ -35,9 +35,14 @@ This document is the source of truth for launch auth endpoints.
 
 ## Audit Logging
 - Successful passkey signup/signin and Google signup/signin emit structured audit log entries.
-- Implicit Google link operations emit `audit.auth.link.google_implicit` entries.
+- Implicit Google link operations emit `audit.auth.link.google.implicit` entries.
 - Logged fields include account ID and hashed request metadata (`ipHash`, `userAgentHash`).
 - Full category/key registry: `server/docs/audit-schema.md`.
+
+## Passkey Deletion
+- `DELETE /api/v1/auth/me/passkeys/{credentialId}` is idempotent for credentials owned by the authenticated account.
+- Server returns `204 No Content` for first and repeated deletes of the same owned credential.
+- Server returns `404 PASSKEY_NOT_FOUND` only when the credential does not belong to the authenticated account.
 
 ## Auth Metrics
 - `GET /api/v1/auth/metrics` returns JSON counters for auth operations, errors by code, and rate-limit hits.
@@ -75,3 +80,4 @@ Primary auth responses return:
 - Client auth callers must use `/auth/*` paths only.
 - Legacy `/accounts/*` endpoints are removed from runtime routing.
 - Sync endpoints remain under `/api/v1/sync/*` and still require bearer auth.
+- Sync launch contract is documented in `server/docs/sync-v1-api.md`.
