@@ -240,7 +240,7 @@ fun DangerZoneSettings() {
         DangerZoneSettingsContent(
             onBack = {},
             onAppReset = {},
-            onClearData = {},
+            onClearData = { _, _ -> },
         )
     }
 }
