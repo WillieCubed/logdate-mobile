@@ -7,7 +7,7 @@ plugins {
     alias(libs.plugins.dokka)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.compose.compiler)
-    id("app.logdate.vosk-model")
+    id("app.logdate.speech-model")
 }
 
 kotlin {
@@ -68,7 +68,7 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
         }
         androidMain.dependencies {
-            implementation(libs.vosk.android)
+            implementation(files("${rootProject.projectDir}/libs/sherpa-onnx-1.12.28.aar"))
             implementation(libs.koin.android)
             implementation(libs.androidx.work.runtime)
             implementation(libs.media3.exoplayer)

@@ -123,7 +123,7 @@ class AndroidAudioRecordingManager(
             bindToService()
 
             // Start live transcription in parallel with recording.
-            // VoskTranscriptionService uses AudioRecord (no audio focus) so music keeps playing.
+            // SherpaOnnxTranscriptionService uses AudioRecord (no audio focus) so music keeps playing.
             transcriptionService?.let { service ->
                 if (service.supportsLiveTranscription) {
                     scope.launch { service.startLiveTranscription() }

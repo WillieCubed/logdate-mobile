@@ -1,3 +1,5 @@
+@file:Suppress("UnstableApiUsage")
+
 import com.android.build.api.dsl.ApplicationExtension
 
 plugins {
@@ -52,9 +54,6 @@ extensions.configure<ApplicationExtension> {
             pickFirsts += "META-INF/NOTICE.txt"
             pickFirsts += "META-INF/INDEX.LIST"
         }
-        jniLibs {
-            useLegacyPackaging = true
-        }
     }
 
     compileOptions {
@@ -88,7 +87,7 @@ tasks.withType<Test> {
 
 dependencies {
     implementation(projects.app.composeMain)
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)

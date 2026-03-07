@@ -1,5 +1,6 @@
 [versions]
 # Build Plugin Versions
+desugar_jdk_libs = "2.1.5"
 filekitCompose = "0.8.8"
 kotlin = "2.3.20-RC"
 dokkaGradlePlugin = "2.2.0-Beta"
@@ -117,10 +118,10 @@ uiAndroid = "1.11.0-alpha06"
 kotlinxUuid = "0.0.15"
 okio = "3.16.4"
 
-
-voskAndroid = "0.3.47"
+sherpaOnnx = "8.2.0"
 
 [libraries]
+desugar_jdk_libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar_jdk_libs" }
 filekit-compose = { module = "io.github.vinceglb:filekit-compose", version.ref = "filekitCompose" }
 screenshot-validation-api = { group = "com.android.tools.screenshot", name = "screenshot-validation-api", version.ref = "screenshot" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -338,7 +339,7 @@ horologist-tiles = { group = "com.google.android.horologist", name = "horologist
 androidx-watchface-complications-data-source-ktx = { group = "androidx.wear.watchface", name = "watchface-complications-data-source-ktx", version.ref = "watchfaceComplicationsDataSourceKtx" }
 androidx-ui-android = { group = "androidx.compose.ui", name = "ui-android", version.ref = "uiAndroid" }
 
-vosk-android = { module = "com.alphacephei:vosk-android", version.ref = "voskAndroid" }
+sherpa-onnx = { module = "com.bihe0832.android:lib-sherpa-onnx", version.ref = "sherpaOnnx" }
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
