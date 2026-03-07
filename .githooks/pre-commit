@@ -85,7 +85,7 @@ while IFS= read -r file; do
     [[ -z "$added_lines" ]] && continue
 
     for pattern in "${secret_line_patterns[@]}"; do
-        if echo "$added_lines" | grep -qiE "$pattern"; then
+        if echo "$added_lines" | grep -qiE -e "$pattern"; then
             secret_hits+=("$file")
             break
         fi
