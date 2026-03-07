@@ -1,6 +1,11 @@
 # Sync V1 API (Launch Contract)
 
-This document is the source of truth for launch sync endpoints.
+This document is the human-readable launch reference for sync endpoints.
+
+Machine-readable canonical source:
+- `GET /openapi.json`
+- `GET /openapi.yaml`
+- `server/docs/openapi.md`
 
 ## Base
 - `GET /api/v1/sync/status`

@@ -11,6 +11,7 @@ import app.logdate.server.di.initializeDatabase
 import app.logdate.server.di.serverModule
 import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.server.routes.authV1Routes
+import app.logdate.server.routes.openApiRoutes
 import app.logdate.server.routes.syncRoutes
 import app.logdate.server.sync.GcsMediaStorage
 import app.logdate.server.sync.SyncMetricsRegistry
@@ -27,6 +28,7 @@ import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
+import io.ktor.server.routing.openapi.registerBearerAuthSecurityScheme
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +57,12 @@ fun main() {
 
 @OptIn(ExperimentalUuidApi::class)
 fun Application.module(isDatabaseAvailable: Boolean = false) {
+    registerBearerAuthSecurityScheme(
+        name = "bearerAuth",
+        description = "JWT bearer token for authenticated endpoints.",
+        bearerFormat = "JWT",
+    )
+
     // Stop any existing Koin instance to ensure clean state for tests
     try {
         org.koin.core.context
@@ -108,6 +116,8 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     }
 
     routing {
+        openApiRoutes()
+
         get("/") {
             call.respondText("LogDate Server API v1.0")
         }

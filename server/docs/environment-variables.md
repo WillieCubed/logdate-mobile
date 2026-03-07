@@ -415,6 +415,7 @@ ALLOW_PASSTHROUGH_CLIENT_CIPHERTEXT=true
 
 - [Google Cloud Production Setup](./google-cloud-production.md)
 - [Google Cloud Architecture](./google-cloud-architecture.md)
+- [OpenAPI](./openapi.md)
 - [Auth V1 API](./auth-v1-api.md)
 - [Sync V1 API](./sync-v1-api.md)
 - [Encryption Architecture Design](../docs/plans/2026-01-27-encryption-architecture-overhaul-design.md)

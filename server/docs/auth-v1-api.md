@@ -1,6 +1,11 @@
 # Auth V1 API (Launch Contract)
 
-This document is the source of truth for launch auth endpoints.
+This document is the human-readable launch reference for auth endpoints.
+
+Machine-readable canonical source:
+- `GET /openapi.json`
+- `GET /openapi.yaml`
+- `server/docs/openapi.md`
 
 ## Base
 - `POST /api/v1/auth/signup/passkey/begin`

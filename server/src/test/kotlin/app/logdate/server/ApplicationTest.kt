@@ -56,4 +56,50 @@ class ApplicationTest {
                 assertTrue(responseBody.contains("data"))
             }
         }
+
+    @Test
+    fun testOpenApiJson() =
+        testApplication {
+            application {
+                module()
+            }
+
+            client.get("/openapi.json").apply {
+                assertEquals(HttpStatusCode.OK, status)
+                val responseBody = bodyAsText()
+                assertTrue(responseBody.contains("\"openapi\""))
+                assertTrue(responseBody.contains("\"/api/v1/auth/signup/google\""))
+                assertTrue(responseBody.contains("\"/api/v1/sync/media\""))
+                assertTrue(responseBody.contains("\"bearerAuth\""))
+            }
+        }
+
+    @Test
+    fun testOpenApiYaml() =
+        testApplication {
+            application {
+                module()
+            }
+
+            client.get("/openapi.yaml").apply {
+                assertEquals(HttpStatusCode.OK, status)
+                val responseBody = bodyAsText()
+                assertTrue(responseBody.contains("openapi:"))
+                assertTrue(responseBody.contains("/api/v1/sync/backups:"))
+            }
+        }
+
+    @Test
+    fun testSwaggerUi() =
+        testApplication {
+            application {
+                module()
+            }
+
+            client.get("/swagger").apply {
+                assertEquals(HttpStatusCode.OK, status)
+                val responseBody = bodyAsText()
+                assertTrue(responseBody.contains("SwaggerUIBundle"))
+            }
+        }
 }

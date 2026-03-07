@@ -37,6 +37,9 @@ dependencies {
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.netty)
     implementation(libs.ktor.server.content.negotiation)
+    implementation(libs.ktor.server.openapi)
+    implementation(libs.ktor.server.routing.openapi)
+    implementation(libs.ktor.server.swagger)
     implementation(libs.ktor.serialization.kotlinx.json)
 
     // Serialization
@@ -94,4 +97,33 @@ tasks.test {
 
 tasks.named<Jar>("jar") {
     archiveFileName.set("logdate-server.jar")
+}
+
+val openApiOutputDir = layout.buildDirectory.dir("openapi")
+
+tasks.register<JavaExec>("generateOpenApi") {
+    group = "documentation"
+    description = "Generate OpenAPI JSON and YAML from the running server routes."
+
+    dependsOn(tasks.named("classes"))
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("app.logdate.server.OpenApiExporterKt")
+    systemProperty("logdate.openapi.outputDir", openApiOutputDir.get().asFile.absolutePath)
+    outputs.dir(openApiOutputDir)
+}
+
+tasks.register<JavaExec>("validateOpenApi") {
+    group = "verification"
+    description = "Validate generated OpenAPI artifacts and required route coverage."
+    dependsOn("generateOpenApi")
+
+    dependsOn(tasks.named("classes"))
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("app.logdate.server.OpenApiValidatorKt")
+    systemProperty("logdate.openapi.outputDir", openApiOutputDir.get().asFile.absolutePath)
+    inputs.dir(openApiOutputDir)
+}
+
+tasks.named("check") {
+    dependsOn("validateOpenApi")
 }
