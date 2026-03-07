@@ -14,14 +14,14 @@ plugins {
     signing
 }
 
-group = "app.logdate.atproto"
+group = "studio.hypertext.atproto"
 version = "0.1.0"
 
 kotlin {
     explicitApi()
 
     android {
-        namespace = "app.logdate.atproto.identity"
+        namespace = "studio.hypertext.atproto.identity"
         compileSdk =
             libs.versions.android.compileSdk
                 .get()

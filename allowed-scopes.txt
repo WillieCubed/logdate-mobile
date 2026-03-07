@@ -42,6 +42,7 @@ util  # General-purpose utilities and extensions
 
 # Shared module scopes
 activitypub  # ActivityPub protocol implementation
+atproto  # AT Protocol standalone library implementation
 
 # Cross-cutting scopes
 infra  # CI/CD, Gradle config, Terraform, build scripts

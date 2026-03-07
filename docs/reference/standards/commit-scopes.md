@@ -58,9 +58,10 @@ These are the main scopes for user-facing features. **Prefer these scopes** for 
 
 | Directory | Scope |
 |-----------|-------|
-| `shared/model/` | `shared-model` |
-| `shared/config/` | `shared-config` |
-| `shared/activitypub/` | `shared-activitypub` |
+| `shared/activitypub/` | `activitypub` |
+| `shared/atproto-syntax/` | `atproto` |
+| `shared/atproto-identity/` | `atproto` |
+| `shared/atproto-xrpc/` | `atproto` |
 
 ## Cross-Cutting Changes
 
