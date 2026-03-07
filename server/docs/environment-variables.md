@@ -2,7 +2,7 @@
 
 **Authoritative reference for all environment variables used by the LogDate server.**
 
-> Last updated: 2026-03-05
+> Last updated: 2026-03-07
 
 ---
 
@@ -212,17 +212,6 @@ These can be used instead of `DATABASE_URL`:
 - **Required**: No
 - **Notes**: Disable this to force server-side re-encryption of all uploads
 
-### `MEDIA_ENCRYPTION_KEY`
-- **Description**: **DEPRECATED** - Legacy encryption key (LDME1 format)
-- **Type**: String (Base64)
-- **Default**: None
-- **Example**: `MEDIA_ENCRYPTION_KEY=LegacyKeyHere==`
-- **Required**: No
-- **Notes**: 
-  - Superseded by `SERVER_ENCRYPTION_KEY`
-  - Only needed for decrypting old LDME1 payloads during migration
-  - Will be removed in future versions
-
 ---
 
 ## Media Storage
@@ -248,12 +237,6 @@ These can be used instead of `DATABASE_URL`:
 - **Example**: `GCS_MEDIA_KMS_KEY=projects/my-project/locations/us/keyRings/my-ring/cryptoKeys/media-key`
 - **Required**: No
 - **Notes**: Separate from `SERVER_ENCRYPTION_KEY` - this is for GCS-level encryption
-
-### `GCS_KMS_KEY`
-- **Description**: **DEPRECATED** - Use `GCS_MEDIA_KMS_KEY` instead
-- **Type**: String
-- **Default**: None
-- **Required**: No
 
 ### `SYNC_MEDIA_SIGNED_URL_TTL_HOURS`
 - **Description**: TTL for GCS signed URLs (hours)
@@ -432,5 +415,6 @@ ALLOW_PASSTHROUGH_CLIENT_CIPHERTEXT=true
 
 - [Google Cloud Production Setup](./google-cloud-production.md)
 - [Google Cloud Architecture](./google-cloud-architecture.md)
-- [API Specification](./api-specification.md)
+- [Auth V1 API](./auth-v1-api.md)
+- [Sync V1 API](./sync-v1-api.md)
 - [Encryption Architecture Design](../docs/plans/2026-01-27-encryption-architecture-overhaul-design.md)

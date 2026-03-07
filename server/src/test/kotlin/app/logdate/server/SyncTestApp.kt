@@ -5,7 +5,6 @@ import app.logdate.server.routes.syncRoutes
 import app.logdate.server.sync.GcsMediaStorage
 import app.logdate.server.sync.InMemorySyncRepository
 import app.logdate.server.sync.MediaAccessPolicy
-import app.logdate.server.sync.MediaEncryptionService
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.util.UuidSerializer
 import io.ktor.serialization.kotlinx.json.json
@@ -32,7 +31,6 @@ fun TestApplicationBuilder.configureSyncTestApp(
     metrics: SyncMetricsRegistry = SyncMetricsRegistry(),
     mediaStorage: GcsMediaStorage? = null,
     mediaAccessPolicy: MediaAccessPolicy = MediaAccessPolicy(useSignedUrls = false, signedUrlTtlHours = 1),
-    mediaEncryption: MediaEncryptionService = MediaEncryptionService.fromEnvironment(),
 ): SyncTestEnvironment {
     val json =
         Json {
@@ -57,7 +55,6 @@ fun TestApplicationBuilder.configureSyncTestApp(
                     mediaStorage = mediaStorage,
                     metrics = metrics,
                     mediaAccessPolicy = mediaAccessPolicy,
-                    mediaEncryption = mediaEncryption,
                 )
             }
         }

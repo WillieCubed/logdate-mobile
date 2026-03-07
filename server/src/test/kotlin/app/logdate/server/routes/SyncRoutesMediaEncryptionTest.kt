@@ -1,10 +1,10 @@
 package app.logdate.server.routes
 
 import app.logdate.server.auth.StubTokenService
+import app.logdate.server.crypto.PayloadPrefixes
 import app.logdate.server.routes.support.mediaUploadMultipartContent
 import app.logdate.server.sync.InMemorySyncRepository
 import app.logdate.server.sync.MediaAccessPolicy
-import app.logdate.server.sync.MediaEncryptionService
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.shared.model.sync.MediaDownloadResponse
 import app.logdate.shared.model.sync.MediaUploadResponse
@@ -41,8 +41,6 @@ class SyncRoutesMediaEncryptionTest {
             val repository = InMemorySyncRepository()
             val tokenService = StubTokenService()
             val metrics = SyncMetricsRegistry()
-            val encryptionKey = ByteArray(32) { index -> (index + 1).toByte() }
-            val mediaEncryption = MediaEncryptionService.fromKeyBytes(encryptionKey)
 
             application {
                 install(ContentNegotiation) {
@@ -56,7 +54,6 @@ class SyncRoutesMediaEncryptionTest {
                             mediaStorage = null,
                             metrics = metrics,
                             mediaAccessPolicy = MediaAccessPolicy(useSignedUrls = false, signedUrlTtlHours = 1),
-                            mediaEncryption = mediaEncryption,
                         )
                     }
                 }
@@ -104,8 +101,6 @@ class SyncRoutesMediaEncryptionTest {
             val repository = InMemorySyncRepository()
             val tokenService = StubTokenService()
             val metrics = SyncMetricsRegistry()
-            val serverKey = ByteArray(32) { index -> (index + 10).toByte() }
-            val mediaEncryption = MediaEncryptionService.fromKeyBytes(serverKey)
 
             application {
                 install(ContentNegotiation) {
@@ -119,7 +114,6 @@ class SyncRoutesMediaEncryptionTest {
                             mediaStorage = null,
                             metrics = metrics,
                             mediaAccessPolicy = MediaAccessPolicy(useSignedUrls = false, signedUrlTtlHours = 1),
-                            mediaEncryption = mediaEncryption,
                         )
                     }
                 }
@@ -175,7 +169,7 @@ class SyncRoutesMediaEncryptionTest {
         val gcmSpec = GCMParameterSpec(128, iv)
         cipher.init(Cipher.ENCRYPT_MODE, keySpec, gcmSpec)
         val cipherText = cipher.doFinal(plaintext)
-        val prefix = MediaEncryptionService.clientPrefixBytes()
+        val prefix = PayloadPrefixes.CLIENT_MEDIA
         val output = ByteArray(prefix.size + iv.size + cipherText.size)
         System.arraycopy(prefix, 0, output, 0, prefix.size)
         System.arraycopy(iv, 0, output, prefix.size, iv.size)
@@ -187,7 +181,7 @@ class SyncRoutesMediaEncryptionTest {
         key: ByteArray,
         payload: ByteArray,
     ): ByteArray {
-        val prefix = MediaEncryptionService.clientPrefixBytes()
+        val prefix = PayloadPrefixes.CLIENT_MEDIA
         val ivStart = prefix.size
         val ivEnd = ivStart + 12
         val iv = payload.copyOfRange(ivStart, ivEnd)

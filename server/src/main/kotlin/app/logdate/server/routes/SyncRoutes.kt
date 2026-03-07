@@ -11,7 +11,6 @@ import app.logdate.server.sync.ContentRecord
 import app.logdate.server.sync.GcsMediaStorage
 import app.logdate.server.sync.JournalRecord
 import app.logdate.server.sync.MediaAccessPolicy
-import app.logdate.server.sync.MediaEncryptionService
 import app.logdate.server.sync.MediaRecord
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.sync.SyncPurgeResult
@@ -349,7 +348,6 @@ fun Route.syncRoutes(
     mediaStorage: GcsMediaStorage? = null,
     metrics: SyncMetricsRegistry,
     mediaAccessPolicy: MediaAccessPolicy = MediaAccessPolicy.fromEnvironment(),
-    mediaEncryption: MediaEncryptionService = MediaEncryptionService.fromEnvironment(),
     encryptionService: EncryptionService = EncryptionService.fromEnvironment(),
 ) {
     route("/sync") {
@@ -516,7 +514,7 @@ fun Route.syncRoutes(
                                 type = existing?.type ?: "TEXT",
                                 content = req.content ?: existing?.content,
                                 mediaUri = req.mediaUri ?: existing?.mediaUri,
-                                durationMs = req.durationMs ?: existing?.durationMs,
+                                durationMs = req.durationMs,
                                 createdAt = existing?.createdAt ?: System.currentTimeMillis(),
                                 lastUpdated = req.lastUpdated,
                                 serverVersion = existing?.serverVersion ?: 0L,

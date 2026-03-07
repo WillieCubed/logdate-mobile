@@ -195,7 +195,7 @@ class GcsMediaStorage(
         fun fromEnvironment(): GcsMediaStorage? {
             val bucketName = System.getenv("GCS_BUCKET_NAME") ?: return null
             val projectId = System.getenv("GCS_PROJECT_ID")
-            val kmsKeyName = System.getenv("GCS_MEDIA_KMS_KEY") ?: System.getenv("GCS_KMS_KEY")
+            val kmsKeyName = System.getenv("GCS_MEDIA_KMS_KEY")
             return GcsMediaStorage(bucketName, projectId, kmsKeyName)
         }
     }
