@@ -92,7 +92,7 @@ Kotlin Multiplatform library modules providing publishable AT Protocol primitive
 
 ```
 shared/atproto-syntax/
-  src/commonMain/kotlin/app/logdate/atproto/syntax/
+  src/commonMain/kotlin/studio/hypertext/atproto/syntax/
     Did.kt
     Handle.kt
     Nsid.kt
@@ -101,7 +101,7 @@ shared/atproto-syntax/
     AtUri.kt
 
 shared/atproto-identity/
-  src/commonMain/kotlin/app/logdate/atproto/identity/
+  src/commonMain/kotlin/studio/hypertext/atproto/identity/
     AtprotoDid.kt
     DidDocument.kt
     Resolvers.kt
@@ -109,7 +109,7 @@ shared/atproto-identity/
     IdentityException.kt
 
 shared/atproto-xrpc/
-  src/commonMain/kotlin/app/logdate/atproto/xrpc/
+  src/commonMain/kotlin/studio/hypertext/atproto/xrpc/
     XrpcClient.kt
     XrpcRequestBuilder.kt
     XrpcAuth.kt
@@ -233,7 +233,7 @@ object OAuthSessionsTable : Table("oauth_sessions") {
 
 ### User DID Document
 
-Served at `GET /users/{username}/did.json` (for did:web resolution).
+For a multi-user PDS, user identities should default to `did:plc`, not `did:web`. The DID document is resolved from the PLC directory, while the user's handle resolves to that DID through the standard AT Protocol handle lookup flow.
 
 ```json
 {
@@ -241,15 +241,16 @@ Served at `GET /users/{username}/did.json` (for did:web resolution).
     "https://www.w3.org/ns/did/v1",
     "https://w3id.org/security/multikey/v1"
   ],
-  "id": "did:web:logdate.app:users:alice",
+  "id": "did:plc:ewvi7nxzyoun6zhxrhs64oiz",
   "alsoKnownAs": [
-    "at://alice.logdate.app"
+    "at://alice.logdate.app",
+    "https://alice.logdate.app"
   ],
   "verificationMethod": [
     {
-      "id": "did:web:logdate.app:users:alice#atproto",
+      "id": "did:plc:ewvi7nxzyoun6zhxrhs64oiz#atproto",
       "type": "Multikey",
-      "controller": "did:web:logdate.app:users:alice",
+      "controller": "did:plc:ewvi7nxzyoun6zhxrhs64oiz",
       "publicKeyMultibase": "zDnae..."
     }
   ],
@@ -264,7 +265,7 @@ Served at `GET /users/{username}/did.json` (for did:web resolution).
 ```
 
 Field semantics:
-- `id`: The user's DID. For did:web, this encodes the URL path where the document is served.
+- `id`: The user's DID. For multi-user LogDate hosting, this should be a `did:plc`.
 - `alsoKnownAs`: The user's AT Protocol handle. Standard AT Protocol clients use this to display a human-readable name.
 - `verificationMethod[0]`: The signing key used for AT Protocol operations. The `#atproto` fragment is the AT Protocol convention.
 - `service[0]`: Tells AT Protocol clients where this user's PDS is. The `#atproto_pds` ID and `AtprotoPersonalDataServer` type are AT Protocol conventions.
@@ -295,13 +296,13 @@ Two resolution mechanisms (both required by AT Protocol):
 
 ### HTTP-based resolution
 ```
-GET https://logdate.app/.well-known/atproto-did?handle=alice.logdate.app
-Response: did:web:logdate.app:users:alice (plain text)
+GET https://alice.logdate.app/.well-known/atproto-did
+Response: did:plc:ewvi7nxzyoun6zhxrhs64oiz (plain text)
 ```
 
 ### DNS-based resolution (optional, for custom domains)
 ```
-_atproto.alice.example.com TXT "did=did:web:logdate.app:users:alice"
+_atproto.alice.example.com TXT "did=did:plc:ewvi7nxzyoun6zhxrhs64oiz"
 ```
 
 DNS resolution is optional but enables users to use their own domain as their handle while keeping their data on LogDate.
@@ -313,11 +314,10 @@ UUIDs remain the internal database primary key. DIDs are the external, portable 
 ```
 External world           LogDate server            Database
 
-  "did:web:logdate.app    resolves to               accounts.id =
-   :users:alice"      --> account lookup by DID --> "a1b2c3d4-..."
+  "did:plc:ewvi7n..."  resolves to               accounts.id =
+                    --> account lookup by DID --> "a1b2c3d4-..."
                                                    accounts.did =
-                                                   "did:web:logdate.app
-                                                    :users:alice"
+                                                   "did:plc:ewvi7n..."
 ```
 
 - All internal queries use UUID (no performance impact from DID adoption)
@@ -329,16 +329,16 @@ External world           LogDate server            Database
 
 | Property | did:web | did:plc |
 |----------|---------|---------|
-| Resolution | HTTPS fetch to the domain | PLC directory lookup |
+| Resolution | HTTPS fetch to a hostname-level DID document | PLC directory lookup |
 | Portability | Tied to domain control | Survives domain changes |
-| Complexity | Low (serve a JSON file) | Medium (PLC operations, signatures) |
-| Self-hosting | Natural fit | Works but needs PLC directory |
+| Multi-user hosting | Poor fit | Good fit |
+| Self-hosting | Natural fit for single-identity deployments | Works but needs PLC directory |
 | Key rotation | Update the JSON file | Signed PLC operation |
 | Dependency | None (just DNS + HTTPS) | PLC directory service |
 | Recovery | Domain admin restores file | Recovery key signs new operation |
 
-**Default**: did:web (simpler, natural for self-hosted servers)
-**Upgrade path**: Users can create a did:plc later and update their account. The old did:web continues to redirect/resolve as a convenience.
+**Default for LogDate user identities**: `did:plc`
+**Use `did:web` for**: server identity or self-hosted single-user deployments where hostname-level DID resolution is sufficient.
 
 ## Interaction with ActivityPub Module
 
