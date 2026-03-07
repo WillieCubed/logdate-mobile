@@ -61,6 +61,9 @@ fun EntryEditorContent(
             onUpdateJournalSelection = viewModel::setSelectedJournals,
         )
 
+    // Immersive chrome follows the currently expanded block only.
+    val isImmersiveBlockActive = editorState.isImmersiveBlockActive()
+
     var showExitConfirmation by remember { mutableStateOf(false) }
     var showDraftsDialog by remember { mutableStateOf(false) }
 
@@ -134,12 +137,14 @@ fun EntryEditorContent(
     ImmersiveEditorLayout(
         modifier = modifier,
         isEditorFocused = editorState.expandedBlockId != null,
+        isImmersiveBlockActive = isImmersiveBlockActive,
         topBarContent = {
             NoteEditorToolbar(
                 onBack = handleEditorBack,
                 onSave = { viewModel.saveEntry(editorState) },
                 onShowDrafts = { showDraftsDialog = true },
                 autoSaveStatus = autoSaveState.status,
+                actionsVisible = !isImmersiveBlockActive,
             )
         },
         editorContent = {

@@ -64,6 +64,7 @@ fun NoteEditorToolbar(
     onShowDrafts: () -> Unit,
     modifier: Modifier = Modifier,
     autoSaveStatus: AutoSaveStatus? = null,
+    actionsVisible: Boolean = true,
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -72,7 +73,7 @@ fun NoteEditorToolbar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Left-aligned back button
+        // Left-aligned back button — always visible
         FilledTonalIconButton(
             onClick = { onBack() },
         ) {
@@ -82,61 +83,58 @@ fun NoteEditorToolbar(
             )
         }
 
-        Row(
-            horizontalArrangement =
-                Arrangement.spacedBy(
-                    Spacing.xs,
-                    alignment = Alignment.End,
-                ),
-            verticalAlignment = Alignment.CenterVertically,
+        AnimatedVisibility(
+            visible = actionsVisible,
+            enter = fadeIn(tween(200)),
+            exit = fadeOut(tween(200)),
         ) {
-            // Use the separate AutoSaveIndicator composable
-            if (autoSaveStatus != null) {
-                AutoSaveIndicator(
-                    status = autoSaveStatus,
-                    modifier = Modifier.padding(end = Spacing.xs),
-                )
-            }
-
-            // Drafts button
-            FilledTonalIconButton(
-                onClick = { onShowDrafts() },
+            Row(
+                horizontalArrangement =
+                    Arrangement.spacedBy(
+                        Spacing.xs,
+                        alignment = Alignment.End,
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector = Icons.Default.Drafts,
-                    contentDescription = stringResource(Res.string.load_drafts),
-                )
-            }
-
-            // Save button
-            FilledTonalIconButton(
-                onClick = { onSave() },
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Save,
-                    contentDescription = stringResource(Res.string.save_entry),
-                )
-            }
-
-            // Menu button with additional options
-            FilledTonalIconButton(onClick = { showMenu = true }) {
-                Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = stringResource(Res.string.more_options),
-                )
-
-                DropdownMenu(
-                    expanded = showMenu,
-                    onDismissRequest = { showMenu = false },
-                ) {
-                    // Additional menu options can be added here if needed
-                    DropdownMenuItem(
-                        text = { Text(stringResource(Res.string.manage_drafts)) },
-                        onClick = {
-                            showMenu = false
-                            onShowDrafts()
-                        },
+                if (autoSaveStatus != null) {
+                    AutoSaveIndicator(
+                        status = autoSaveStatus,
+                        modifier = Modifier.padding(end = Spacing.xs),
                     )
+                }
+
+                FilledTonalIconButton(onClick = { onShowDrafts() }) {
+                    Icon(
+                        imageVector = Icons.Default.Drafts,
+                        contentDescription = stringResource(Res.string.load_drafts),
+                    )
+                }
+
+                FilledTonalIconButton(onClick = { onSave() }) {
+                    Icon(
+                        imageVector = Icons.Default.Save,
+                        contentDescription = stringResource(Res.string.save_entry),
+                    )
+                }
+
+                FilledTonalIconButton(onClick = { showMenu = true }) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = stringResource(Res.string.more_options),
+                    )
+
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(Res.string.manage_drafts)) },
+                            onClick = {
+                                showMenu = false
+                                onShowDrafts()
+                            },
+                        )
+                    }
                 }
             }
         }

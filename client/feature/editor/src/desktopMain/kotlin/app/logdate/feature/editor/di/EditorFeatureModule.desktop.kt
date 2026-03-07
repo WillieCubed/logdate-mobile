@@ -6,8 +6,6 @@ import app.logdate.feature.editor.audio.storage.DesktopWaveformStorage
 import app.logdate.feature.editor.audio.storage.WaveformStorage
 import app.logdate.feature.editor.ui.camera.CameraCaptureManager
 import app.logdate.feature.editor.ui.camera.DesktopCameraCaptureManager
-import app.logdate.feature.editor.ui.image.DesktopImagePickerService
-import app.logdate.feature.editor.ui.image.ImagePickerService
 import org.koin.core.module.Module
 import org.koin.dsl.module
 import java.io.File
@@ -18,11 +16,6 @@ import java.io.File
  */
 actual val platformEditorModule: Module =
     module {
-        // Provide Desktop implementation of ImagePickerService
-        factory<ImagePickerService> {
-            DesktopImagePickerService()
-        }
-
         // Provide Desktop stub implementation of CameraCaptureManager
         factory<CameraCaptureManager> {
             DesktopCameraCaptureManager()

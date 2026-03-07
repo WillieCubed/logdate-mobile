@@ -61,6 +61,11 @@ class EditorState(
     }
 
     /**
+     * Returns true when the currently expanded block opts into immersive editor chrome.
+     */
+    fun isImmersiveBlockActive(): Boolean = blocks.firstOrNull { it.id == expandedBlockId }?.wantsImmersiveLayout == true
+
+    /**
      * Returns true if the editor has unsaved changes.
      * Content is considered dirty if:
      * 1. It has content that hasn't been saved

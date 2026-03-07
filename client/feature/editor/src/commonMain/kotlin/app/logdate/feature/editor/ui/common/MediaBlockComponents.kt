@@ -3,7 +3,7 @@ package app.logdate.feature.editor.ui.common
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -35,7 +35,7 @@ fun DeleteMediaButton(
                 .padding(8.dp)
                 .background(
                     color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.7f),
-                    shape = RoundedCornerShape(4.dp),
+                    shape = CircleShape,
                 ),
     ) {
         Icon(

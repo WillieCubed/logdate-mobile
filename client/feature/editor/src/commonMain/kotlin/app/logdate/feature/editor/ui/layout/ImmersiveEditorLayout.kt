@@ -1,5 +1,8 @@
 package app.logdate.feature.editor.ui.layout
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -78,6 +81,7 @@ fun ImmersiveEditorLayout(
     editorContent: @Composable () -> Unit,
     bottomContent: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    isImmersiveBlockActive: Boolean = false,
 ) {
     // Get screen width using the cross-platform PlatformDimensions utility
     val screenWidth = PlatformDimensions.getScreenWidth()
@@ -98,12 +102,8 @@ fun ImmersiveEditorLayout(
             modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.50f)),
-//            .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            // Transparent app bar region - fixed position
+        Column(modifier = Modifier.fillMaxSize()) {
             Box(
                 modifier =
                     Modifier
@@ -114,22 +114,28 @@ fun ImmersiveEditorLayout(
                 topBarContent()
             }
 
-            // Editor container with responsive layout - this responds to IME
             Box(
                 modifier =
                     Modifier
                         .fillMaxSize()
+                        .weight(1f)
                         .windowInsetsPadding(WindowInsets.ime),
-                // Only this area adjusts for IME
                 contentAlignment = Alignment.Center,
             ) {
                 Column(
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .widthIn(max = maxWidth)
-                            .padding(horizontal = Spacing.sm)
-                            .padding(top = Spacing.sm),
+                            .then(
+                                if (!isImmersiveBlockActive) {
+                                    Modifier
+                                        .widthIn(max = maxWidth)
+                                        .padding(horizontal = Spacing.sm)
+                                        .padding(top = Spacing.sm)
+                                } else {
+                                    Modifier
+                                },
+                            ),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Top,
                 ) {
@@ -137,22 +143,28 @@ fun ImmersiveEditorLayout(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .weight(1f) // Use weight to fill available space
-                                .heightIn(min = 300.dp),
-                        // Keep minimum height as fallback
+                                .weight(1f)
+                                .then(
+                                    if (!isImmersiveBlockActive) Modifier.heightIn(min = 300.dp) else Modifier,
+                                ),
                     ) {
                         editorContent()
                     }
 
-                    // Bottom content with proper system insets and spacing from IME
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .windowInsetsPadding(WindowInsets.navigationBars)
-                                .padding(top = Spacing.sm, bottom = Spacing.md),
+                    AnimatedVisibility(
+                        visible = !isImmersiveBlockActive,
+                        enter = fadeIn(),
+                        exit = fadeOut(),
                     ) {
-                        bottomContent()
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .windowInsetsPadding(WindowInsets.navigationBars)
+                                    .padding(top = Spacing.sm, bottom = Spacing.md),
+                        ) {
+                            bottomContent()
+                        }
                     }
                 }
             }

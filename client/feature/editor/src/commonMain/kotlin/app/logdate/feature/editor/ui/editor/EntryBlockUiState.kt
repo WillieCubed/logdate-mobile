@@ -17,6 +17,13 @@ sealed interface EntryBlockUiState {
     val location: Location?
 
     fun hasContent(): Boolean
+
+    /**
+     * Whether this block requests full-screen immersive layout while active.
+     * When true, the editor expands the block to fill the screen and hides non-essential
+     * toolbar actions. Defaults to false; block types with capture/editing flows override this.
+     */
+    val wantsImmersiveLayout: Boolean get() = false
 }
 
 /**
@@ -50,6 +57,9 @@ data class ImageBlockUiState(
     override val caption: String = "",
 ) : MediaBlockUiState {
     override fun hasContent(): Boolean = uri != null
+
+    /** Image blocks use the immersive editor shell while focused. */
+    override val wantsImmersiveLayout: Boolean get() = true
 }
 
 /**
@@ -74,6 +84,9 @@ data class CameraBlockUiState(
     val durationMs: Long = 0,
 ) : MediaBlockUiState {
     override fun hasContent(): Boolean = uri != null
+
+    /** Requests immersive layout while the camera viewfinder is live (no captured media yet). */
+    override val wantsImmersiveLayout: Boolean get() = uri == null
 
     /**
      * Returns a formatted duration string in MM:SS format.

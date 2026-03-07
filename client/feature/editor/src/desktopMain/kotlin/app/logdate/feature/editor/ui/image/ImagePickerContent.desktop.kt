@@ -1,30 +1,10 @@
 package app.logdate.feature.editor.ui.image
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.launch
-import logdate.client.feature.editor.generated.resources.Res
-import logdate.client.feature.editor.generated.resources.add_an_image_to_your_entry
-import logdate.client.feature.editor.generated.resources.select_image
-import logdate.client.feature.editor.generated.resources.select_image_2
-import org.jetbrains.compose.resources.stringResource
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
@@ -34,7 +14,7 @@ import kotlin.io.path.absolutePathString
 
 /**
  * Desktop implementation of the image picker content.
- * Provides a button to open a file dialog to select an image.
+ * Provides an immersive gallery/file-library entry point.
  */
 @Suppress("ktlint:standard:function-naming")
 @Composable
@@ -44,44 +24,20 @@ actual fun ImagePickerContent(
 ) {
     val coroutineScope = rememberCoroutineScope()
 
-    Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            text = stringResource(Res.string.add_an_image_to_your_entry),
-            style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center,
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            onClick = {
-                coroutineScope.launch {
-                    openFileDialog { file ->
-                        if (file != null) {
-                            val uri = file.toURI().toString()
-                            Napier.d("Desktop image selected: $uri")
-                            onImageSelected(uri)
-                        }
+    ImmersiveImagePickerEmptyState(
+        onSelectImage = {
+            coroutineScope.launch {
+                openFileDialog { file ->
+                    if (file != null) {
+                        val uri = file.toURI().toString()
+                        Napier.d("Desktop image selected: $uri")
+                        onImageSelected(uri)
                     }
                 }
-            },
-            modifier = Modifier.fillMaxWidth(0.7f),
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Image,
-                contentDescription = stringResource(Res.string.select_image),
-                modifier = Modifier.padding(end = 8.dp),
-            )
-            Text(stringResource(Res.string.select_image_2))
-        }
-    }
+            }
+        },
+        modifier = modifier,
+    )
 }
 
 /**
@@ -97,7 +53,6 @@ private fun openFileDialog(callback: (File?) -> Unit) {
                 mode = FileDialog.LOAD
                 isMultipleMode = false
 
-                // Set file filter for images
                 setFilenameFilter { _, name ->
                     name.lowercase().endsWith(".jpg") ||
                         name.lowercase().endsWith(".jpeg") ||

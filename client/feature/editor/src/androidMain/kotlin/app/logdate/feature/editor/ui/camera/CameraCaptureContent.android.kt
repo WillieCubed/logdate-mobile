@@ -32,18 +32,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Cameraswitch
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,6 +61,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -79,7 +80,6 @@ import kotlinx.coroutines.delay
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.captured_photo
 import logdate.client.feature.editor.generated.resources.captured_video
-import logdate.client.feature.editor.generated.resources.close_camera
 import logdate.client.feature.editor.generated.resources.loading_camera
 import logdate.client.feature.editor.generated.resources.photo
 import logdate.client.feature.editor.generated.resources.retake
@@ -150,7 +150,6 @@ actual fun CameraCaptureContent(
         InlineCameraCapture(
             viewModel = viewModel,
             uiState = uiState,
-            onClose = onClose,
             modifier = modifier,
         )
     }
@@ -242,8 +241,10 @@ private fun MediaReviewContent(
                     Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
-                        .background(Color.Black.copy(alpha = 0.6f))
-                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                        .background(
+                            MaterialTheme.colorScheme.surfaceContainer,
+                            RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                        ).padding(horizontal = 24.dp, vertical = 16.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -251,7 +252,7 @@ private fun MediaReviewContent(
                     onClick = onRetake,
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text(stringResource(Res.string.retake), color = Color.White)
+                    Text(stringResource(Res.string.retake))
                 }
 
                 Spacer(modifier = Modifier.width(16.dp))
@@ -284,7 +285,6 @@ private fun MediaReviewContent(
 private fun InlineCameraCapture(
     viewModel: CameraViewModel,
     uiState: CameraUiState,
-    onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -319,6 +319,8 @@ private fun InlineCameraCapture(
             showFlash = false
         }
     }
+
+    val primaryColor = MaterialTheme.colorScheme.primary
 
     // Focus ring state
     var focusPoint by remember { mutableStateOf<Offset?>(null) }
@@ -355,7 +357,7 @@ private fun InlineCameraCapture(
                         Modifier
                             .align(Alignment.Center)
                             .aspectRatio(3f / 4f)
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(20.dp))
                             .onSizeChanged { viewfinderSize = it }
                             .pointerInput(Unit) {
                                 detectTransformGestures { _, _, zoom, _ ->
@@ -389,7 +391,7 @@ private fun InlineCameraCapture(
                         Canvas(modifier = Modifier.fillMaxSize()) {
                             val ringSize = 80f * focusRingScale.value
                             drawCircle(
-                                color = Color.White.copy(alpha = focusRingAlpha.value),
+                                color = primaryColor.copy(alpha = focusRingAlpha.value),
                                 radius = ringSize / 2,
                                 center = point,
                                 style = Stroke(width = 2f),
@@ -426,75 +428,62 @@ private fun InlineCameraCapture(
                 )
             }
 
-            // Top controls row
+            // Top controls row — recording indicator + switch camera only (back handled by editor toolbar)
             Row(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .align(Alignment.TopStart)
+                        .align(Alignment.TopEnd)
                         .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(
-                    onClick = onClose,
-                    modifier =
-                        Modifier
-                            .background(Color.Black.copy(alpha = 0.5f), CircleShape),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = stringResource(Res.string.close_camera),
-                        tint = Color.White,
-                    )
+                if (uiState.isRecording) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.errorContainer,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FiberManualRecord,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.size(12.dp),
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = uiState.formattedDuration,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
                 }
 
-                Row(
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
+                IconButton(
+                    onClick = {
+                        currentZoom = 1f
+                        viewModel.switchCamera()
+                    },
+                    enabled = !uiState.isRecording,
+                    modifier =
+                        Modifier
+                            .background(MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.7f), CircleShape),
                 ) {
-                    if (uiState.isRecording) {
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = Color.Red.copy(alpha = 0.8f),
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.FiberManualRecord,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(12.dp),
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = uiState.formattedDuration,
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.labelMedium,
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                    }
-
-                    IconButton(
-                        onClick = {
-                            currentZoom = 1f
-                            viewModel.switchCamera()
-                        },
-                        enabled = !uiState.isRecording,
-                        modifier =
-                            Modifier
-                                .background(Color.Black.copy(alpha = 0.5f), CircleShape),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Cameraswitch,
-                            contentDescription = stringResource(Res.string.switch_camera),
-                            tint = if (uiState.isRecording) Color.Gray else Color.White,
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.Cameraswitch,
+                        contentDescription = stringResource(Res.string.switch_camera),
+                        tint =
+                            if (uiState.isRecording) {
+                                MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.38f)
+                            } else {
+                                MaterialTheme.colorScheme.inverseOnSurface
+                            },
+                    )
                 }
             }
 
@@ -565,51 +554,37 @@ private fun PhotoVideoToggle(
     onModeChanged: (CaptureMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier =
-            modifier
-                .clip(RoundedCornerShape(24.dp))
-                .background(Color.Black.copy(alpha = 0.5f))
-                .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        val toggleColors =
-            FilterChipDefaults.filterChipColors(
-                selectedContainerColor = Color.White,
-                selectedLabelColor = Color.Black,
-                selectedLeadingIconColor = Color.Black,
-                containerColor = Color.Transparent,
-                labelColor = Color.White,
-                iconColor = Color.White,
-            )
-
-        FilterChip(
+    SingleChoiceSegmentedButtonRow(modifier = modifier) {
+        SegmentedButton(
             selected = currentMode == CaptureMode.PHOTO,
             onClick = { onModeChanged(CaptureMode.PHOTO) },
-            label = { Text(stringResource(Res.string.photo)) },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.CameraAlt,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-            },
-            colors = toggleColors,
+            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+            icon = { SegmentedButtonDefaults.Icon(active = currentMode == CaptureMode.PHOTO) },
+            label = { CameraToggleOption(Icons.Default.CameraAlt, stringResource(Res.string.photo)) },
         )
 
-        FilterChip(
+        SegmentedButton(
             selected = currentMode == CaptureMode.VIDEO,
             onClick = { onModeChanged(CaptureMode.VIDEO) },
-            label = { Text(stringResource(Res.string.video)) },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Videocam,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-            },
-            colors = toggleColors,
+            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+            icon = { SegmentedButtonDefaults.Icon(active = currentMode == CaptureMode.VIDEO) },
+            label = { CameraToggleOption(Icons.Default.Videocam, stringResource(Res.string.video)) },
         )
+    }
+}
+
+@Suppress("ktlint:standard:function-naming")
+@Composable
+private fun CameraToggleOption(
+    icon: ImageVector,
+    label: String,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(24.dp))
+        Text(label)
     }
 }
 
@@ -634,13 +609,18 @@ private fun ShutterButton(
                 .size(buttonSize)
                 .clickable(enabled = !isCapturing) { onClick() },
         shape = CircleShape,
-        color = Color.White.copy(alpha = 0.3f),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
     ) {
         Box(contentAlignment = Alignment.Center) {
             Surface(
                 modifier = Modifier.size(innerSize),
                 shape = if (isRecording) RoundedCornerShape(4.dp) else CircleShape,
-                color = if (captureMode == CaptureMode.VIDEO || isRecording) Color.Red else Color.White,
+                color =
+                    if (captureMode == CaptureMode.VIDEO || isRecording) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
             ) {}
         }
     }

@@ -8,7 +8,6 @@ import app.logdate.feature.editor.ui.editor.delegate.AutoSaveDelegate
 import app.logdate.feature.editor.ui.editor.delegate.JournalSelectionDelegate
 import app.logdate.feature.editor.ui.editor.mediator.EditorMediator
 import app.logdate.feature.editor.ui.editor.mediator.EditorMediatorImpl
-import app.logdate.feature.editor.ui.image.ImageBlockViewModel
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.factoryOf
 import org.koin.core.module.dsl.singleOf
@@ -24,12 +23,11 @@ import org.koin.dsl.module
  *
  * - domainModule: Provides use cases and domain logic, including FetchEntryUseCase which enables
  *   the multi-window editing feature by loading entries by ID
- * - platformEditorModule: Provides platform-specific services (camera, playback, image picker)
+ * - platformEditorModule: Provides platform-specific services (camera, playback, waveform storage)
  * - audioModule: Provides audio ViewModels and UI state wiring
  *
  * ViewModels provided:
  * - EntryEditorViewModel: Main editor state and operations (note creation, editing, saving)
- * - ImageBlockViewModel: Manages image selection and insertion
  * - CameraViewModel: Handles camera capture functionality
  *
  * Other dependencies:
@@ -50,8 +48,6 @@ val editorFeatureModule: Module =
 
         // AudioRecordingManager is provided by client.media audioModule at the app level.
         // AudioPlaybackManager is provided by the app-level audioModule.
-        // ImagePickerService is provided by platformEditorModule.
-
         // Provide mediator as a singleton to ensure consistent state across components
         singleOf(::EditorMediatorImpl) bind EditorMediator::class
 
@@ -60,13 +56,6 @@ val editorFeatureModule: Module =
         factoryOf(::JournalSelectionDelegate)
 
         // Audio ViewModel is now provided by the audioModule()
-
-        // Image block view model
-        viewModel {
-            ImageBlockViewModel(
-                imagePickerService = get(),
-            )
-        }
 
         // Camera view model
         viewModel {

@@ -3,14 +3,25 @@ package app.logdate.feature.editor.ui.image
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -18,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.common.DeleteMediaButton
 import app.logdate.feature.editor.ui.common.OverlayCaptionField
@@ -27,9 +39,10 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.add_an_image_to_your_entry
+import logdate.client.feature.editor.generated.resources.choose_a_photo
 import logdate.client.feature.editor.generated.resources.delete_image
 import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * A component that handles image display and editing within the editor.
@@ -41,7 +54,6 @@ import org.koin.compose.viewmodel.koinViewModel
  * @param onBlockUpdated Callback when the block is updated
  * @param onDeleteRequested Callback when the block should be deleted
  * @param modifier Modifier for layout customization
- * @param viewModel The view model for handling image picking logic
  */
 @Suppress("ktlint:standard:function-naming")
 @Composable
@@ -50,25 +62,9 @@ fun ImageBlockEditor(
     onBlockUpdated: (ImageBlockUiState) -> Unit,
     onDeleteRequested: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: ImageBlockViewModel = koinViewModel(),
 ) {
-    // Determine if we have an existing image
     val hasExistingImage = block.uri != null
 
-    // Get the state from the view model
-    val uiState by viewModel.uiState.collectAsState()
-
-    // When the view model provides a selected image URI, update the block
-    LaunchedEffect(uiState.selectedImageUri) {
-        uiState.selectedImageUri?.let { uri ->
-            if (block.uri == null) {
-                onBlockUpdated(block.copy(uri = uri))
-                viewModel.clearSelectedImage() // Clear to avoid duplicate updates
-            }
-        }
-    }
-
-    // Show either the existing image with caption or the image picker UI
     if (hasExistingImage) {
         val hasCaption = block.caption.isNotBlank()
         var showCaption by remember { mutableStateOf(hasCaption) }
@@ -121,6 +117,74 @@ fun ImageBlockEditor(
             },
             modifier = modifier.fillMaxSize(),
         )
+    }
+}
+
+@Suppress("ktlint:standard:function-naming")
+@Composable
+internal fun ImmersiveImagePickerEmptyState(
+    onSelectImage: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.16f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.88f),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.AddPhotoAlternate,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(20.dp).size(36.dp),
+                )
+            }
+
+            Spacer(modifier = Modifier.size(20.dp))
+
+            Text(
+                text = stringResource(Res.string.add_an_image_to_your_entry),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+            )
+
+            Spacer(modifier = Modifier.size(12.dp))
+
+            Text(
+                text = stringResource(Res.string.choose_a_photo),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+
+            Spacer(modifier = Modifier.size(24.dp))
+
+            Button(
+                onClick = onSelectImage,
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.AddPhotoAlternate,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 8.dp),
+                )
+                Text(text = stringResource(Res.string.choose_a_photo))
+            }
+        }
     }
 }
 

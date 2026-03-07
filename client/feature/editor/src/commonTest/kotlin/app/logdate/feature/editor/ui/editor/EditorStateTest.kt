@@ -159,6 +159,38 @@ class EditorStateTest {
     }
 
     @Test
+    fun testExpandedImageBlockActivatesImmersiveLayout() {
+        val block = ImageBlockUiState(uri = "content://images/1")
+        val state =
+            EditorState(
+                blocks = listOf(block),
+                expandedBlockId = block.id,
+            )
+
+        assertTrue(state.isImmersiveBlockActive())
+    }
+
+    @Test
+    fun testUnexpandedImageBlockDoesNotActivateImmersiveLayout() {
+        val block = ImageBlockUiState(uri = "content://images/1")
+        val state = EditorState(blocks = listOf(block))
+
+        assertFalse(state.isImmersiveBlockActive())
+    }
+
+    @Test
+    fun testExpandedTextBlockDoesNotActivateImmersiveLayout() {
+        val block = TextBlockUiState(content = "Hello")
+        val state =
+            EditorState(
+                blocks = listOf(block),
+                expandedBlockId = block.id,
+            )
+
+        assertFalse(state.isImmersiveBlockActive())
+    }
+
+    @Test
     fun testMixOfEmptyAndContentBlocks() {
         // Create blocks with and without content
         val emptyBlock = TextBlockUiState(content = "")
