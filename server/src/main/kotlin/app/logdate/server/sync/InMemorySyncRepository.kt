@@ -19,6 +19,7 @@ class InMemorySyncRepository : SyncRepository {
     private val associations = ConcurrentHashMap<UUID, ConcurrentHashMap<AssociationKey, AssociationRecord>>()
     private val associationDeletions = ConcurrentHashMap<UUID, ConcurrentHashMap<AssociationKey, Long>>()
     private val media = ConcurrentHashMap<UUID, ConcurrentHashMap<String, MediaRecord>>()
+    private val mediaDeletions = ConcurrentHashMap<UUID, ConcurrentHashMap<String, Long>>()
     private val backups = ConcurrentHashMap<UUID, ConcurrentHashMap<UUID, BackupRecord>>()
     private val lastTimestamp = AtomicLong(System.currentTimeMillis())
 
@@ -225,6 +226,16 @@ class InMemorySyncRepository : SyncRepository {
         userId: UUID,
         mediaId: String,
     ): MediaRecord? = media.forUser(userId)[mediaId]
+
+    override fun deleteMedia(
+        userId: UUID,
+        mediaId: String,
+        deletedAt: Long,
+    ) {
+        media.forUser(userId).remove(mediaId)
+        mediaDeletions.forUser(userId)[mediaId] = deletedAt
+        lastTimestamp.set(deletedAt)
+    }
 
     // Backups
     override fun createBackupRecord(

@@ -87,7 +87,7 @@ class BasicEndpointCoverageE2ETest {
     fun `sync status requires authorization`() =
         testApplication {
             application { module() }
-            val response = client.get("/api/v1/sync/status")
+            val response = client.get("/api/v1/ops/sync/status")
             assertEquals(HttpStatusCode.Unauthorized, response.status)
         }
 }

@@ -4,12 +4,15 @@ import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.configureSyncTestApp
 import app.logdate.server.routes.support.mediaUploadMultipartContent
 import app.logdate.shared.model.sync.ContentChangesResponse
-import app.logdate.shared.model.sync.MediaDownloadResponse
+import app.logdate.shared.model.sync.MediaMetadataResponse
 import app.logdate.shared.model.sync.MediaUploadResponse
+import io.ktor.client.call.body
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.patch
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -51,7 +54,7 @@ class SyncRoutesTest {
             val env = configureSyncTestApp()
             val authHeader = authHeader(env.tokenService)
             val response =
-                client.get("/api/v1/sync/status") {
+                client.get("/api/v1/ops/sync/status") {
                     header(HttpHeaders.Authorization, authHeader)
                 }
             assertEquals(HttpStatusCode.OK, response.status)
@@ -69,7 +72,7 @@ class SyncRoutesTest {
             val authHeader = authHeader(env.tokenService)
 
             val upload =
-                client.post("/api/v1/sync/content") {
+                client.put("/api/v1/contents/note-1") {
                     header(HttpHeaders.Authorization, authHeader)
                     contentType(ContentType.Application.Json)
                     setBody(
@@ -86,10 +89,10 @@ class SyncRoutesTest {
                         """.trimIndent(),
                     )
                 }
-            assertEquals(HttpStatusCode.OK, upload.status)
+            assertEquals(HttpStatusCode.Created, upload.status)
 
             val changes =
-                client.get("/api/v1/sync/content/changes?since=0") {
+                client.get("/api/v1/contents?since=0") {
                     header(HttpHeaders.Authorization, authHeader)
                 }
             assertEquals(HttpStatusCode.OK, changes.status)
@@ -106,7 +109,7 @@ class SyncRoutesTest {
             val authHeader = authHeader(env.tokenService, UUID.randomUUID().toString())
 
             // seed initial content
-            client.post("/api/v1/sync/content") {
+            client.put("/api/v1/contents/note-2") {
                 header(HttpHeaders.Authorization, authHeader)
                 contentType(ContentType.Application.Json)
                 setBody(
@@ -126,7 +129,7 @@ class SyncRoutesTest {
 
             // update with stale version constraint
             val conflict =
-                client.post("/api/v1/sync/content/note-2") {
+                client.patch("/api/v1/contents/note-2") {
                     header(HttpHeaders.Authorization, authHeader)
                     contentType(ContentType.Application.Json)
                     setBody(
@@ -153,7 +156,7 @@ class SyncRoutesTest {
             val env = configureSyncTestApp()
             val authHeader = authHeader(env.tokenService)
 
-            client.post("/api/v1/sync/content") {
+            client.put("/api/v1/contents/note-3") {
                 header(HttpHeaders.Authorization, authHeader)
                 contentType(ContentType.Application.Json)
                 setBody(
@@ -172,13 +175,13 @@ class SyncRoutesTest {
             }
 
             val delete =
-                client.post("/api/v1/sync/content/note-3/delete") {
+                client.delete("/api/v1/contents/note-3") {
                     header(HttpHeaders.Authorization, authHeader)
                 }
-            assertEquals(HttpStatusCode.OK, delete.status)
+            assertEquals(HttpStatusCode.NoContent, delete.status)
 
             val changes =
-                client.get("/api/v1/sync/content/changes?since=0") {
+                client.get("/api/v1/contents?since=0") {
                     header(HttpHeaders.Authorization, authHeader)
                 }
             val payload = json.decodeFromString<ContentChangesResponse>(changes.bodyAsText())
@@ -193,23 +196,26 @@ class SyncRoutesTest {
 
             val payloads =
                 listOf(
-                    """{ "id": "note-p1", "type": "TEXT", "content": "one", "mediaUri": null, "createdAt": 1, "lastUpdated": 1, "deviceId": "dev-1" }""",
-                    """{ "id": "note-p2", "type": "TEXT", "content": "two", "mediaUri": null, "createdAt": 2, "lastUpdated": 2, "deviceId": "dev-1" }""",
-                    """{ "id": "note-p3", "type": "TEXT", "content": "three", "mediaUri": null, "createdAt": 3, "lastUpdated": 3, "deviceId": "dev-1" }""",
+                    "note-p1" to
+                        """{ "id": "note-p1", "type": "TEXT", "content": "one", "mediaUri": null, "createdAt": 1, "lastUpdated": 1, "deviceId": "dev-1" }""",
+                    "note-p2" to
+                        """{ "id": "note-p2", "type": "TEXT", "content": "two", "mediaUri": null, "createdAt": 2, "lastUpdated": 2, "deviceId": "dev-1" }""",
+                    "note-p3" to
+                        """{ "id": "note-p3", "type": "TEXT", "content": "three", "mediaUri": null, "createdAt": 3, "lastUpdated": 3, "deviceId": "dev-1" }""",
                 )
 
-            payloads.forEach { payload ->
+            payloads.forEach { (id, payload) ->
                 val upload =
-                    client.post("/api/v1/sync/content") {
+                    client.put("/api/v1/contents/$id") {
                         header(HttpHeaders.Authorization, authHeader)
                         contentType(ContentType.Application.Json)
                         setBody(payload)
                     }
-                assertEquals(HttpStatusCode.OK, upload.status)
+                assertTrue(upload.status == HttpStatusCode.Created || upload.status == HttpStatusCode.OK)
             }
 
             val changes =
-                client.get("/api/v1/sync/content/changes?since=0&limit=2") {
+                client.get("/api/v1/contents?since=0&limit=2") {
                     header(HttpHeaders.Authorization, authHeader)
                 }
             assertEquals(HttpStatusCode.OK, changes.status)
@@ -255,7 +261,7 @@ class SyncRoutesTest {
 
             // Upload journal
             val upload =
-                client.post("/api/v1/sync/journals") {
+                client.put("/api/v1/journals/journal-1") {
                     header(HttpHeaders.Authorization, authHeader)
                     contentType(ContentType.Application.Json)
                     setBody(
@@ -271,11 +277,11 @@ class SyncRoutesTest {
                         """.trimIndent(),
                     )
                 }
-            assertEquals(HttpStatusCode.OK, upload.status)
+            assertEquals(HttpStatusCode.Created, upload.status)
 
             // Check changes
             val changes =
-                client.get("/api/v1/sync/journals/changes?since=0") {
+                client.get("/api/v1/journals?since=0") {
                     header(HttpHeaders.Authorization, authHeader)
                 }
             assertEquals(HttpStatusCode.OK, changes.status)
@@ -293,7 +299,7 @@ class SyncRoutesTest {
             val authHeader = authHeader(env.tokenService)
 
             // Create journal
-            client.post("/api/v1/sync/journals") {
+            client.put("/api/v1/journals/journal-2") {
                 header(HttpHeaders.Authorization, authHeader)
                 contentType(ContentType.Application.Json)
                 setBody(
@@ -301,7 +307,7 @@ class SyncRoutesTest {
                     {
                       "id": "journal-2",
                       "title": "Original Title",
-                      "description": null,
+                      "description": "",
                       "createdAt": 1000,
                       "lastUpdated": 1000,
                       "deviceId": "dev-1"
@@ -312,7 +318,7 @@ class SyncRoutesTest {
 
             // Update with no version constraint (should succeed)
             val update =
-                client.post("/api/v1/sync/journals/journal-2") {
+                client.patch("/api/v1/journals/journal-2") {
                     header(HttpHeaders.Authorization, authHeader)
                     contentType(ContentType.Application.Json)
                     setBody(
@@ -337,7 +343,7 @@ class SyncRoutesTest {
             val authHeader = authHeader(env.tokenService)
 
             // Create journal
-            client.post("/api/v1/sync/journals") {
+            client.put("/api/v1/journals/journal-3") {
                 header(HttpHeaders.Authorization, authHeader)
                 contentType(ContentType.Application.Json)
                 setBody(
@@ -345,7 +351,7 @@ class SyncRoutesTest {
                     {
                       "id": "journal-3",
                       "title": "To Delete",
-                      "description": null,
+                      "description": "",
                       "createdAt": 1000,
                       "lastUpdated": 1000,
                       "deviceId": "dev-1"
@@ -356,14 +362,14 @@ class SyncRoutesTest {
 
             // Delete
             val delete =
-                client.post("/api/v1/sync/journals/journal-3/delete") {
+                client.delete("/api/v1/journals/journal-3") {
                     header(HttpHeaders.Authorization, authHeader)
                 }
-            assertEquals(HttpStatusCode.OK, delete.status)
+            assertEquals(HttpStatusCode.NoContent, delete.status)
 
             // Check deletions
             val changes =
-                client.get("/api/v1/sync/journals/changes?since=0") {
+                client.get("/api/v1/journals?since=0") {
                     header(HttpHeaders.Authorization, authHeader)
                 }
             val payload = json.decodeFromString<JournalChangesPayload>(changes.bodyAsText())
@@ -394,7 +400,7 @@ class SyncRoutesTest {
 
             // Upload associations
             val upload =
-                client.post("/api/v1/sync/associations") {
+                client.put("/api/v1/associations") {
                     header(HttpHeaders.Authorization, authHeader)
                     contentType(ContentType.Application.Json)
                     setBody(
@@ -416,7 +422,7 @@ class SyncRoutesTest {
 
             // Check changes
             val changes =
-                client.get("/api/v1/sync/associations/changes?since=0") {
+                client.get("/api/v1/associations?since=0") {
                     header(HttpHeaders.Authorization, authHeader)
                 }
             assertEquals(HttpStatusCode.OK, changes.status)
@@ -429,7 +435,7 @@ class SyncRoutesTest {
             val authHeader = authHeader(env.tokenService)
             val bytes = byteArrayOf(1, 2, 3, 4)
             val upload =
-                client.post("/api/v1/sync/media") {
+                client.post("/api/v1/media") {
                     header(HttpHeaders.Authorization, authHeader)
                     setBody(
                         mediaUploadMultipartContent(
@@ -441,18 +447,23 @@ class SyncRoutesTest {
                         ),
                     )
                 }
-            assertEquals(HttpStatusCode.OK, upload.status)
+            assertEquals(HttpStatusCode.Created, upload.status)
 
             val uploadPayload = json.decodeFromString<MediaUploadResponse>(upload.bodyAsText())
-            val download =
-                client.get("/api/v1/sync/media/${uploadPayload.mediaId}") {
+            val metadata =
+                client.get("/api/v1/media/${uploadPayload.mediaId}") {
                     header(HttpHeaders.Authorization, authHeader)
                 }
-            assertEquals(HttpStatusCode.OK, download.status)
+            assertEquals(HttpStatusCode.OK, metadata.status)
+            val metadataPayload = json.decodeFromString<MediaMetadataResponse>(metadata.bodyAsText())
+            assertEquals(bytes.size.toLong(), metadataPayload.sizeBytes)
 
-            val downloadPayload = json.decodeFromString<MediaDownloadResponse>(download.bodyAsText())
-            assertEquals(bytes.size.toLong(), downloadPayload.sizeBytes)
-            assertTrue(downloadPayload.data.contentEquals(bytes))
+            val downloadBinary =
+                client.get("/api/v1/media/${uploadPayload.mediaId}/binary") {
+                    header(HttpHeaders.Authorization, authHeader)
+                }
+            assertEquals(HttpStatusCode.OK, downloadBinary.status)
+            assertTrue(downloadBinary.body<ByteArray>().contentEquals(bytes))
         }
 
     @Test
@@ -463,7 +474,7 @@ class SyncRoutesTest {
             val bytes = byteArrayOf(1, 2, 3, 4)
 
             val upload =
-                client.post("/api/v1/sync/media") {
+                client.post("/api/v1/media") {
                     header(HttpHeaders.Authorization, authHeader)
                     setBody(
                         mediaUploadMultipartContent(
@@ -488,7 +499,7 @@ class SyncRoutesTest {
             val authHeader = authHeader(env.tokenService)
 
             val response =
-                client.post("/api/v1/sync/maintenance/purge?retentionDays=30") {
+                client.post("/api/v1/ops/sync/tombstones:purge?retentionDays=30") {
                     header(HttpHeaders.Authorization, authHeader)
                 }
 
@@ -505,7 +516,7 @@ class SyncRoutesTest {
             val authHeader = authHeader(env.tokenService)
 
             val response =
-                client.post("/api/v1/sync/maintenance/purge?retentionDays=0") {
+                client.post("/api/v1/ops/sync/tombstones:purge?retentionDays=0") {
                     header(HttpHeaders.Authorization, authHeader)
                 }
 
@@ -514,15 +525,15 @@ class SyncRoutesTest {
         }
 
     @Test
-    fun `missing since parameter returns bad request`() =
+    fun `missing since parameter defaults to full feed`() =
         testApplication {
             val env = configureSyncTestApp()
             val authHeader = authHeader(env.tokenService)
             val response =
-                client.get("/api/v1/sync/content/changes") {
+                client.get("/api/v1/contents") {
                     header(HttpHeaders.Authorization, authHeader)
                 }
-            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals(HttpStatusCode.OK, response.status)
         }
 
     @Test

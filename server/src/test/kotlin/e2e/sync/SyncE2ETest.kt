@@ -3,11 +3,13 @@ package app.logdate.server.e2e.sync
 import app.logdate.server.configureSyncTestApp
 import app.logdate.server.routes.support.mediaUploadMultipartContent
 import app.logdate.shared.model.sync.ContentChangesResponse
-import app.logdate.shared.model.sync.MediaDownloadResponse
 import app.logdate.shared.model.sync.MediaUploadResponse
+import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.patch
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -34,7 +36,7 @@ class SyncE2ETest {
             val accountId = UUID.randomUUID().toString()
             val authHeader = "Bearer ${env.tokenService.generateAccessToken(accountId)}"
 
-            client.post("/api/v1/sync/journals") {
+            client.put("/api/v1/journals/journal-e2e") {
                 header(HttpHeaders.Authorization, authHeader)
                 contentType(ContentType.Application.Json)
                 setBody(
@@ -51,7 +53,7 @@ class SyncE2ETest {
                 )
             }
 
-            client.post("/api/v1/sync/content") {
+            client.put("/api/v1/contents/note-e2e") {
                 header(HttpHeaders.Authorization, authHeader)
                 contentType(ContentType.Application.Json)
                 setBody(
@@ -71,7 +73,7 @@ class SyncE2ETest {
 
             val mediaBytes = byteArrayOf(9, 8, 7, 6)
             val mediaUpload =
-                client.post("/api/v1/sync/media") {
+                client.post("/api/v1/media") {
                     header(HttpHeaders.Authorization, authHeader)
                     setBody(
                         mediaUploadMultipartContent(
@@ -83,11 +85,11 @@ class SyncE2ETest {
                         ),
                     )
                 }
-            assertEquals(HttpStatusCode.OK, mediaUpload.status)
+            assertEquals(HttpStatusCode.Created, mediaUpload.status)
             val mediaUploadPayload = json.decodeFromString<MediaUploadResponse>(mediaUpload.bodyAsText())
 
             val changes =
-                client.get("/api/v1/sync/content/changes?since=0") {
+                client.get("/api/v1/contents?since=0") {
                     header(HttpHeaders.Authorization, authHeader)
                 }
             assertEquals(HttpStatusCode.OK, changes.status)
@@ -95,7 +97,7 @@ class SyncE2ETest {
             assertTrue(changesPayload.changes.any { it.id == "note-e2e" })
 
             val conflict =
-                client.post("/api/v1/sync/content/note-e2e") {
+                client.patch("/api/v1/contents/note-e2e") {
                     header(HttpHeaders.Authorization, authHeader)
                     contentType(ContentType.Application.Json)
                     setBody(
@@ -116,11 +118,10 @@ class SyncE2ETest {
             assertEquals(HttpStatusCode.Conflict, conflict.status)
 
             val download =
-                client.get("/api/v1/sync/media/${mediaUploadPayload.mediaId}") {
+                client.get("/api/v1/media/${mediaUploadPayload.mediaId}/binary") {
                     header(HttpHeaders.Authorization, authHeader)
                 }
             assertEquals(HttpStatusCode.OK, download.status)
-            val downloadPayload = json.decodeFromString<MediaDownloadResponse>(download.bodyAsText())
-            assertTrue(downloadPayload.data.contentEquals(mediaBytes))
+            assertTrue(download.body<ByteArray>().contentEquals(mediaBytes))
         }
 }

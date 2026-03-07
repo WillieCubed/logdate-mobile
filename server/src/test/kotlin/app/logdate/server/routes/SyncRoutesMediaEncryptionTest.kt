@@ -6,8 +6,8 @@ import app.logdate.server.routes.support.mediaUploadMultipartContent
 import app.logdate.server.sync.InMemorySyncRepository
 import app.logdate.server.sync.MediaAccessPolicy
 import app.logdate.server.sync.SyncMetricsRegistry
-import app.logdate.shared.model.sync.MediaDownloadResponse
 import app.logdate.shared.model.sync.MediaUploadResponse
+import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
@@ -63,7 +63,7 @@ class SyncRoutesMediaEncryptionTest {
             val authHeader = "Bearer ${tokenService.generateAccessToken(userId.toString())}"
             val bytes = byteArrayOf(10, 11, 12, 13)
             val upload =
-                client.post("/api/v1/sync/media") {
+                client.post("/api/v1/media") {
                     header(HttpHeaders.Authorization, authHeader)
                     setBody(
                         mediaUploadMultipartContent(
@@ -75,7 +75,7 @@ class SyncRoutesMediaEncryptionTest {
                         ),
                     )
                 }
-            assertEquals(HttpStatusCode.OK, upload.status)
+            assertEquals(HttpStatusCode.Created, upload.status)
 
             val uploadPayload = json.decodeFromString<MediaUploadResponse>(upload.bodyAsText())
             val stored = repository.getMedia(userId, uploadPayload.mediaId)
@@ -86,13 +86,11 @@ class SyncRoutesMediaEncryptionTest {
             assertEquals("LDSM1", prefix)
 
             val download =
-                client.get("/api/v1/sync/media/${uploadPayload.mediaId}") {
+                client.get("/api/v1/media/${uploadPayload.mediaId}/binary") {
                     header(HttpHeaders.Authorization, authHeader)
                 }
             assertEquals(HttpStatusCode.OK, download.status)
-
-            val downloadPayload = json.decodeFromString<MediaDownloadResponse>(download.bodyAsText())
-            assertTrue(downloadPayload.data.contentEquals(bytes))
+            assertTrue(download.body<ByteArray>().contentEquals(bytes))
         }
 
     @Test
@@ -125,7 +123,7 @@ class SyncRoutesMediaEncryptionTest {
             val plaintext = "client-encrypted".encodeToByteArray()
             val clientCiphertext = encryptClientMedia(clientKey, plaintext)
             val upload =
-                client.post("/api/v1/sync/media") {
+                client.post("/api/v1/media") {
                     header(HttpHeaders.Authorization, authHeader)
                     setBody(
                         mediaUploadMultipartContent(
@@ -137,7 +135,7 @@ class SyncRoutesMediaEncryptionTest {
                         ),
                     )
                 }
-            assertEquals(HttpStatusCode.OK, upload.status)
+            assertEquals(HttpStatusCode.Created, upload.status)
 
             val uploadPayload = json.decodeFromString<MediaUploadResponse>(upload.bodyAsText())
             val stored = repository.getMedia(userId, uploadPayload.mediaId)
@@ -147,14 +145,13 @@ class SyncRoutesMediaEncryptionTest {
             assertEquals("LDCE1", prefix)
 
             val download =
-                client.get("/api/v1/sync/media/${uploadPayload.mediaId}") {
+                client.get("/api/v1/media/${uploadPayload.mediaId}/binary") {
                     header(HttpHeaders.Authorization, authHeader)
                 }
             assertEquals(HttpStatusCode.OK, download.status)
-
-            val downloadPayload = json.decodeFromString<MediaDownloadResponse>(download.bodyAsText())
-            assertTrue(downloadPayload.data.contentEquals(clientCiphertext))
-            val decrypted = decryptClientMedia(clientKey, downloadPayload.data)
+            val payload = download.body<ByteArray>()
+            assertTrue(payload.contentEquals(clientCiphertext))
+            val decrypted = decryptClientMedia(clientKey, payload)
             assertTrue(decrypted.contentEquals(plaintext))
         }
 

@@ -61,7 +61,7 @@ class SyncRoutesBackupTest {
 
             // 1. Upload Backup
             val response =
-                client.post("/api/v1/sync/backups") {
+                client.post("/api/v1/backups") {
                     header(HttpHeaders.Authorization, "Bearer $token")
                     setBody(
                         backupUploadMultipartContent(
@@ -72,7 +72,7 @@ class SyncRoutesBackupTest {
                     )
                 }
 
-            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(HttpStatusCode.Created, response.status)
             val uploadResp = json.decodeFromString<BackupUploadResponse>(response.bodyAsText())
             assertTrue(uploadResp.id.isNotBlank())
             assertEquals(payload.size.toLong(), uploadResp.sizeBytes)
@@ -86,7 +86,7 @@ class SyncRoutesBackupTest {
 
             // 2. List Backups
             val listResp =
-                client.get("/api/v1/sync/backups") {
+                client.get("/api/v1/backups") {
                     header(HttpHeaders.Authorization, "Bearer $token")
                 }
             assertEquals(HttpStatusCode.OK, listResp.status)
@@ -97,7 +97,7 @@ class SyncRoutesBackupTest {
 
             // 3. Download Backup
             val downloadResp =
-                client.get("/api/v1/sync/backups/${uploadResp.id}") {
+                client.get("/api/v1/backups/${uploadResp.id}/binary") {
                     header(HttpHeaders.Authorization, "Bearer $token")
                 }
             assertEquals(HttpStatusCode.OK, downloadResp.status)
@@ -126,7 +126,7 @@ class SyncRoutesBackupTest {
 
             val token = jwtService.generateAccessToken(testUserId.toString())
             val response =
-                client.post("/api/v1/sync/backups") {
+                client.post("/api/v1/backups") {
                     header(HttpHeaders.Authorization, "Bearer $token")
                     setBody(
                         backupUploadMultipartContent(
@@ -177,7 +177,7 @@ class SyncRoutesBackupTest {
 
             val token = jwtService.generateAccessToken(testUserId.toString())
             val response =
-                client.get("/api/v1/sync/backups/$backupId") {
+                client.get("/api/v1/backups/$backupId/binary") {
                     header(HttpHeaders.Authorization, "Bearer $token")
                 }
 

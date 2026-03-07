@@ -84,5 +84,5 @@ Primary auth responses return:
 ## Frontend Integration Notes
 - Client auth callers must use `/auth/*` paths only.
 - Legacy `/accounts/*` endpoints are removed from runtime routing.
-- Sync endpoints remain under `/api/v1/sync/*` and still require bearer auth.
+- Sync endpoints are resource-first under `/api/v1/*` (`/contents`, `/journals`, `/associations`, `/media`, `/backups`) with ops under `/api/v1/ops/sync/*`.
 - Sync launch contract is documented in `server/docs/sync-v1-api.md`.

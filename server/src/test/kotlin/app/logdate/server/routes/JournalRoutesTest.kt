@@ -12,14 +12,14 @@ import kotlin.test.assertEquals
 
 class JournalRoutesTest {
     @Test
-    fun testJournalRoutesAreNotExposed() =
+    fun testJournalRoutesRequireAuthAndEnforceMethods() =
         testApplication {
             application { module() }
 
-            assertEquals(HttpStatusCode.NotFound, client.get("/api/v1/journals").status)
-            assertEquals(HttpStatusCode.NotFound, client.get("/api/v1/journals/test").status)
-            assertEquals(HttpStatusCode.NotFound, client.post("/api/v1/journals").status)
-            assertEquals(HttpStatusCode.NotFound, client.put("/api/v1/journals/test").status)
-            assertEquals(HttpStatusCode.NotFound, client.delete("/api/v1/journals/test").status)
+            assertEquals(HttpStatusCode.Unauthorized, client.get("/api/v1/journals").status)
+            assertEquals(HttpStatusCode.Unauthorized, client.get("/api/v1/journals/test").status)
+            assertEquals(HttpStatusCode.MethodNotAllowed, client.post("/api/v1/journals").status)
+            assertEquals(HttpStatusCode.Unauthorized, client.put("/api/v1/journals/test").status)
+            assertEquals(HttpStatusCode.Unauthorized, client.delete("/api/v1/journals/test").status)
         }
 }

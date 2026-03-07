@@ -247,6 +247,17 @@ data class MediaUploadResponse(
 )
 
 @Serializable
+data class MediaMetadataResponse(
+    val contentId: String,
+    val mediaId: String,
+    val fileName: String,
+    val mimeType: String,
+    val sizeBytes: Long,
+    val downloadUrl: String,
+    val uploadedAt: Long,
+)
+
+@Serializable
 data class MediaDownloadResponse(
     val contentId: String,
     val fileName: String,

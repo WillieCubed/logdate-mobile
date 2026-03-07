@@ -153,6 +153,12 @@ interface SyncRepository {
         mediaId: String,
     ): MediaRecord?
 
+    fun deleteMedia(
+        userId: UUID,
+        mediaId: String,
+        deletedAt: Long,
+    )
+
     // Backups
     fun createBackupRecord(
         userId: UUID,

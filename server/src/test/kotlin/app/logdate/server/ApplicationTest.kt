@@ -69,7 +69,7 @@ class ApplicationTest {
                 val responseBody = bodyAsText()
                 assertTrue(responseBody.contains("\"openapi\""))
                 assertTrue(responseBody.contains("\"/api/v1/auth/signup/google\""))
-                assertTrue(responseBody.contains("\"/api/v1/sync/media\""))
+                assertTrue(responseBody.contains("\"/api/v1/media\""))
                 assertTrue(responseBody.contains("\"bearerAuth\""))
             }
         }
@@ -85,7 +85,7 @@ class ApplicationTest {
                 assertEquals(HttpStatusCode.OK, status)
                 val responseBody = bodyAsText()
                 assertTrue(responseBody.contains("openapi:"))
-                assertTrue(responseBody.contains("/api/v1/sync/backups:"))
+                assertTrue(responseBody.contains("/api/v1/backups:"))
             }
         }
 

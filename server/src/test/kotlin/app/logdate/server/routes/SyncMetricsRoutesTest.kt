@@ -5,7 +5,7 @@ import app.logdate.server.configureSyncTestApp
 import app.logdate.server.sync.SyncMetricsSnapshot
 import io.ktor.client.request.get
 import io.ktor.client.request.header
-import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -40,7 +40,7 @@ class SyncMetricsRoutesTest {
             val authHeader = authHeader(env.tokenService)
 
             val upload =
-                client.post("/api/v1/sync/content") {
+                client.put("/api/v1/contents/note-metrics") {
                     header(HttpHeaders.Authorization, authHeader)
                     contentType(ContentType.Application.Json)
                     setBody(
@@ -57,10 +57,10 @@ class SyncMetricsRoutesTest {
                         """.trimIndent(),
                     )
                 }
-            assertEquals(HttpStatusCode.OK, upload.status)
+            assertEquals(HttpStatusCode.Created, upload.status)
 
             val metricsResponse =
-                client.get("/api/v1/sync/metrics") {
+                client.get("/api/v1/ops/sync/metrics") {
                     header(HttpHeaders.Authorization, authHeader)
                 }
             assertEquals(HttpStatusCode.OK, metricsResponse.status)

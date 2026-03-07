@@ -104,7 +104,9 @@ class DbSyncRepository : SyncRepository {
             ContentSyncTable
                 .selectAll()
                 .where {
-                    (ContentSyncTable.id eq id) and (ContentSyncTable.userId eq userId)
+                    (ContentSyncTable.id eq id) and
+                        (ContentSyncTable.userId eq userId) and
+                        (ContentSyncTable.deleted eq false)
                 }.singleOrNull()
                 ?.toContentRecord()
         }
@@ -224,7 +226,9 @@ class DbSyncRepository : SyncRepository {
             JournalSyncTable
                 .selectAll()
                 .where {
-                    (JournalSyncTable.id eq id) and (JournalSyncTable.userId eq userId)
+                    (JournalSyncTable.id eq id) and
+                        (JournalSyncTable.userId eq userId) and
+                        (JournalSyncTable.deleted eq false)
                 }.singleOrNull()
                 ?.toJournalRecord()
         }
@@ -476,10 +480,33 @@ class DbSyncRepository : SyncRepository {
             MediaSyncTable
                 .selectAll()
                 .where {
-                    (MediaSyncTable.mediaId eq mediaId) and (MediaSyncTable.userId eq userId)
+                    (MediaSyncTable.mediaId eq mediaId) and
+                        (MediaSyncTable.userId eq userId) and
+                        (MediaSyncTable.deleted eq false)
                 }.singleOrNull()
                 ?.toMediaRecord()
         }
+
+    override fun deleteMedia(
+        userId: UUID,
+        mediaId: String,
+        deletedAt: Long,
+    ) {
+        transaction {
+            val existingVersion =
+                MediaSyncTable
+                    .selectAll()
+                    .where { (MediaSyncTable.mediaId eq mediaId) and (MediaSyncTable.userId eq userId) }
+                    .singleOrNull()
+                    ?.get(MediaSyncTable.serverVersion)
+            val newVersion = nextVersion(existingVersion)
+            MediaSyncTable.update({ (MediaSyncTable.mediaId eq mediaId) and (MediaSyncTable.userId eq userId) }) {
+                it[deleted] = true
+                it[MediaSyncTable.deletedAt] = deletedAt
+                it[MediaSyncTable.serverVersion] = newVersion
+            }
+        }
+    }
 
     override fun createBackupRecord(
         userId: UUID,
