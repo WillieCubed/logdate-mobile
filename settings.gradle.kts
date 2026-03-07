@@ -78,6 +78,9 @@ include(":client:feature:onboarding")
 include(":client:feature:search")
 // Shared cross-platform modules
 include(":shared:activitypub")
+include(":shared:atproto-syntax")
+include(":shared:atproto-identity")
+include(":shared:atproto-xrpc")
 include(":shared:config")
 include(":shared:model")
 // Server-specific modules

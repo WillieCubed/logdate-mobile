@@ -1,5 +1,15 @@
 # Architecture
 
+## Spec Note
+
+This document now assumes the shared Kotlin library modules are the first implementation step:
+
+- `shared/atproto-syntax`
+- `shared/atproto-identity`
+- `shared/atproto-xrpc`
+
+AT Protocol-specific DID handling must reject path-based `did:web`. Older draft examples using `did:web:logdate.app:users:alice` are obsolete and must not be implemented.
+
 ## Credential Hierarchy
 
 The system has four distinct credential types, each with a different purpose, storage location, and trust boundary. Understanding their relationships is essential.
@@ -76,24 +86,38 @@ The LogDate server holds user data and signing keys **on behalf of** the user. T
 
 ## Module Structure
 
-### New module: `shared/did/`
+### New modules: `shared/atproto-syntax`, `shared/atproto-identity`, `shared/atproto-xrpc`
 
-Kotlin Multiplatform module providing DID primitives for both client and server.
+Kotlin Multiplatform library modules providing publishable AT Protocol primitives for both client and server consumers.
 
 ```
-shared/did/
-  src/commonMain/kotlin/app/logdate/shared/did/
-    Did.kt                  -- DID value class with parsing and validation
-    DidDocument.kt          -- W3C DID Document data model
-    VerificationMethod.kt   -- Public key representation
-    ServiceEndpoint.kt      -- Service discovery entries
-    DidResolver.kt          -- Interface for resolving DIDs to DID Documents
-    DidWebResolver.kt       -- did:web resolution via HTTPS
-    DidPlcResolver.kt       -- did:plc resolution via PLC directory
-    DidException.kt         -- Resolution and validation errors
+shared/atproto-syntax/
+  src/commonMain/kotlin/app/logdate/atproto/syntax/
+    Did.kt
+    Handle.kt
+    Nsid.kt
+    RecordKey.kt
+    Tid.kt
+    AtUri.kt
+
+shared/atproto-identity/
+  src/commonMain/kotlin/app/logdate/atproto/identity/
+    AtprotoDid.kt
+    DidDocument.kt
+    Resolvers.kt
+    ResolversImpl.kt
+    IdentityException.kt
+
+shared/atproto-xrpc/
+  src/commonMain/kotlin/app/logdate/atproto/xrpc/
+    XrpcClient.kt
+    XrpcRequestBuilder.kt
+    XrpcAuth.kt
+    XrpcException.kt
+    KtorXrpcClient.kt
 ```
 
-Dependencies: `kotlinx.serialization` (JSON), Ktor client (HTTP fetching). Both already in the project.
+Dependencies: `kotlinx.serialization`, coroutines, and Ktor client. These modules remain free of LogDate app models.
 
 ### New server package: `server/.../identity/`
 
@@ -142,7 +166,7 @@ object AccountsTable : Table("accounts") {
 }
 ```
 
-- `did`: The user's canonical DID (`did:web:logdate.app:users:alice` or `did:plc:abc123`)
+- `did`: The user's canonical DID (`did:plc:abc123` or a hostname-level `did:web`)
 - `signingKeyPublic`: The current active signing key's public component (multibase-encoded Ed25519)
 - Both nullable for backward compatibility during migration
 

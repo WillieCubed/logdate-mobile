@@ -11,6 +11,13 @@ LogDate is a **custodian, not owner**, of user data. This principle drives every
 
 Today, LogDate uses proprietary UUIDs for identity and a custom auth API. This makes users dependent on LogDate infrastructure for their identity to mean anything. The AT Protocol's identity layer (DIDs, handles, signing keys) gives us the standards-based foundation to make good on the custodian promise.
 
+## Spec Alignment
+
+This plan is now **spec-led, not draft-led**. When the AT Protocol specs and this document disagree, the specs win.
+
+- AT Protocol identity support starts with a publishable Kotlin/KMP library core, not app-local helpers.
+- Path-based `did:web` is **not** valid for AT Protocol. Library and server work must only accept `did:plc` and hostname-level `did:web`.
+
 ## Core Insight
 
 Three concerns must be separated:
@@ -27,11 +34,11 @@ Passkeys authenticate a user **to** their custodian. DIDs identify the user **to
 
 | Phase | Deliverable | Documents |
 |-------|------------|-----------|
-| 1 | DID primitives (`shared/did` KMP module) | [Architecture](./01-architecture.md) |
-| 2 | Server-side DID identity (did:web, signing keys, DID Documents) | [Architecture](./01-architecture.md), [Signing Keys](./05-signing-key-management.md) |
+| 1 | Publishable Kotlin/KMP library modules: `shared/atproto-syntax`, `shared/atproto-identity`, `shared/atproto-xrpc` | [Architecture](./01-architecture.md) |
+| 2 | Server-side identity integration (signing keys, DID Documents, DID-aware account models) | [Architecture](./01-architecture.md), [Signing Keys](./05-signing-key-management.md) |
 | 3 | OAuth 2.0 Authorization Server with passkey authentication | [OAuth + Passkeys](./04-oauth-passkey-integration.md) |
-| 4 | did:plc support for domain-independent portable identity | [Architecture](./01-architecture.md) |
-| 5 | XRPC identity resolution endpoints | [Architecture](./01-architecture.md) |
+| 4 | did:plc write support, PLC operations, and migration tooling | [Architecture](./01-architecture.md) |
+| 5 | XRPC server endpoints backed by the shared library modules | [Architecture](./01-architecture.md) |
 
 ## Documents in This Plan
 
@@ -47,7 +54,7 @@ Passkeys authenticate a user **to** their custodian. DIDs identify the user **to
 
 ## What This Plan Does NOT Cover (Yet)
 
-These are future work that builds on the identity layer:
+These are future work that build on the library core:
 
 - **Lexicon schemas** for LogDate data types (e.g., `app.logdate.journal.entry`)
 - **AT Protocol repo format** (Merkle Search Tree, CAR file export)
@@ -60,6 +67,9 @@ The identity layer is the prerequisite for all of these. Get identity right firs
 
 | Component | Location | Role in this plan |
 |-----------|----------|-------------------|
+| `shared:atproto-syntax` | `shared/atproto-syntax` | Publishable Kotlin syntax types for DID, handle, NSID, record key, TID, and AT URI |
+| `shared:atproto-identity` | `shared/atproto-identity` | Publishable Kotlin identity types and resolvers for AT Protocol DIDs and handles |
+| `shared:atproto-xrpc` | `shared/atproto-xrpc` | Publishable Kotlin XRPC runtime with typed request builders and auth hooks |
 | `WebAuthnPasskeyService` | `server/src/.../passkeys/WebAuthnPasskeyService.kt` | Reused unchanged as authentication within OAuth |
 | `TokenService` | `server/src/.../auth/TokenService.kt` | Extended with DID-aware token generation |
 | `AccountsTable` | `server/src/.../database/Tables.kt` | Extended with `did` and `signingKeyPublic` columns |
