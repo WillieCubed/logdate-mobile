@@ -88,6 +88,15 @@ class AndroidAudioRecordingManager(
     override fun setTranscriptionService(service: TranscriptionService) {
         this.transcriptionService = service
 
+        // Eagerly warm up models so they're ready when the user taps Record
+        scope.launch(Dispatchers.IO) {
+            try {
+                service.warmUp()
+            } catch (e: Exception) {
+                Napier.e("Transcription model warm-up failed", e)
+            }
+        }
+
         // Listen for transcription updates
         scope.launch {
             service.getTranscriptionFlow().collectLatest { result ->

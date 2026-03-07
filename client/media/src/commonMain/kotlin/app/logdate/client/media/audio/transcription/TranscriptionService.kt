@@ -89,6 +89,12 @@ interface TranscriptionService {
     suspend fun resetTranscription()
 
     /**
+     * Pre-loads models so that subsequent calls to [startLiveTranscription] start faster.
+     * Implementations should make this idempotent. The default is a no-op.
+     */
+    suspend fun warmUp() {}
+
+    /**
      * Releases resources when the service is no longer needed
      */
     fun release()

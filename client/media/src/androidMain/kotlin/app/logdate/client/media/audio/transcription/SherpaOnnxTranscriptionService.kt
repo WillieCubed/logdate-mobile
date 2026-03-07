@@ -28,6 +28,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -57,8 +59,14 @@ class SherpaOnnxTranscriptionService(
     private val accumulatedSegments = mutableListOf<String>()
     private var currentPartial: String = ""
 
+    private val modelInitMutex = Mutex()
+
     @Volatile
     private var isListening = false
+
+    override suspend fun warmUp() {
+        initializeModels()
+    }
 
     override fun getTranscriptionFlow(): SharedFlow<TranscriptionResult> = _transcriptionFlow.asSharedFlow()
 
@@ -74,8 +82,61 @@ class SherpaOnnxTranscriptionService(
         }
 
         return try {
-            initializeModels()
-            startRecognition()
+            // Start capturing audio immediately so no speech is lost during model init
+            val ar = createAndStartAudioRecord()
+            isListening = true
+            _transcriptionFlow.emit(TranscriptionResult.InProgress)
+
+            // Buffer audio samples while models load
+            val preBuffer = ArrayDeque<FloatArray>()
+            recognitionJob =
+                scope.launch(Dispatchers.IO) {
+                    val shortBuffer = ShortArray(BUFFER_SIZE_SHORTS)
+
+                    // Phase 1: buffer audio while models initialize
+                    val initJob =
+                        launch {
+                            initializeModels()
+                        }
+
+                    while (isActive && isListening && initJob.isActive) {
+                        val shortsRead = ar.read(shortBuffer, 0, shortBuffer.size)
+                        if (shortsRead > 0) {
+                            preBuffer.addLast(shortsToFloats(shortBuffer, shortsRead))
+                        }
+                    }
+
+                    if (!isActive || !isListening) return@launch
+
+                    // Phase 2: models ready — create stream and drain buffer
+                    val rec = recognizer ?: return@launch
+                    val s = rec.createStream()
+                    stream = s
+
+                    for (samples in preBuffer) {
+                        s.acceptWaveform(samples, SAMPLE_RATE)
+                        while (rec.isReady(s)) {
+                            rec.decode(s)
+                        }
+                        processEndpointResults(rec, s)
+                    }
+                    preBuffer.clear()
+
+                    // Phase 3: live decode loop
+                    while (isActive && isListening) {
+                        val shortsRead = ar.read(shortBuffer, 0, shortBuffer.size)
+                        if (shortsRead <= 0) continue
+
+                        s.acceptWaveform(shortsToFloats(shortBuffer, shortsRead), SAMPLE_RATE)
+
+                        while (rec.isReady(s)) {
+                            rec.decode(s)
+                        }
+                        processEndpointResults(rec, s)
+                    }
+                }
+
+            Napier.d("Sherpa-ONNX recognition started (${SAMPLE_RATE}Hz, mono, PCM 16-bit)")
             true
         } catch (e: Exception) {
             Napier.e("Failed to start Sherpa-ONNX transcription", e)
@@ -163,78 +224,75 @@ class SherpaOnnxTranscriptionService(
         currentPartial = ""
     }
 
-    private suspend fun initializeModels() {
-        if (recognizer != null) return
+    private suspend fun initializeModels() =
+        modelInitMutex.withLock {
+            if (recognizer != null) return@withLock
 
-        val sttModelPath =
-            withContext(Dispatchers.IO) {
-                modelManager.getModelPath()
-            } ?: throw IllegalStateException("Sherpa-ONNX STT model not available")
+            val sttModelPath =
+                withContext(Dispatchers.IO) {
+                    modelManager.getModelPath()
+                } ?: throw IllegalStateException("Sherpa-ONNX STT model not available")
 
-        Napier.d("STT model path: $sttModelPath")
+            Napier.d("STT model path: $sttModelPath")
 
-        val config =
-            OnlineRecognizerConfig(
-                featConfig = FeatureConfig(sampleRate = SAMPLE_RATE, featureDim = 80),
-                modelConfig =
-                    OnlineModelConfig(
-                        transducer =
-                            OnlineTransducerModelConfig(
-                                encoder = "$sttModelPath/encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx",
-                                decoder = "$sttModelPath/decoder-epoch-99-avg-1-chunk-16-left-128.onnx",
-                                joiner = "$sttModelPath/joiner-epoch-99-avg-1-chunk-16-left-128.int8.onnx",
-                            ),
-                        tokens = "$sttModelPath/tokens.txt",
-                        numThreads = 2,
-                        provider = "cpu",
-                    ),
-                endpointConfig =
-                    EndpointConfig(
-                        rule1 = EndpointRule(false, 2.4f, 0.0f),
-                        rule2 = EndpointRule(true, 1.2f, 0.0f),
-                        rule3 = EndpointRule(false, 0.0f, 20.0f),
-                    ),
-                enableEndpoint = true,
-                decodingMethod = "greedy_search",
-            )
-
-        recognizer =
-            withContext(Dispatchers.IO) {
-                OnlineRecognizer(assetManager = null, config = config)
-            }
-        Napier.d("Sherpa-ONNX recognizer loaded from $sttModelPath")
-
-        val punctModelPath =
-            withContext(Dispatchers.IO) {
-                modelManager.getPunctuationModelPath()
-            }
-        if (punctModelPath != null) {
-            Napier.d("Punctuation model path: $punctModelPath")
-            val punctConfig =
-                OnlinePunctuationConfig(
-                    model =
-                        OnlinePunctuationModelConfig(
-                            cnnBilstm = "$punctModelPath/model.onnx",
-                            bpeVocab = "$punctModelPath/bpe.vocab",
-                            numThreads = 1,
+            val config =
+                OnlineRecognizerConfig(
+                    featConfig = FeatureConfig(sampleRate = SAMPLE_RATE, featureDim = 80),
+                    modelConfig =
+                        OnlineModelConfig(
+                            transducer =
+                                OnlineTransducerModelConfig(
+                                    encoder = "$sttModelPath/encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx",
+                                    decoder = "$sttModelPath/decoder-epoch-99-avg-1-chunk-16-left-128.onnx",
+                                    joiner = "$sttModelPath/joiner-epoch-99-avg-1-chunk-16-left-128.int8.onnx",
+                                ),
+                            tokens = "$sttModelPath/tokens.txt",
+                            numThreads = 2,
                             provider = "cpu",
                         ),
+                    endpointConfig =
+                        EndpointConfig(
+                            rule1 = EndpointRule(false, 2.4f, 0.0f),
+                            rule2 = EndpointRule(true, 1.2f, 0.0f),
+                            rule3 = EndpointRule(false, 0.0f, 20.0f),
+                        ),
+                    enableEndpoint = true,
+                    decodingMethod = "greedy_search",
                 )
-            punctuation =
+
+            recognizer =
                 withContext(Dispatchers.IO) {
-                    OnlinePunctuation(assetManager = null, config = punctConfig)
+                    OnlineRecognizer(assetManager = null, config = config)
                 }
-            Napier.d("Sherpa-ONNX punctuation model loaded from $punctModelPath")
-        } else {
-            Napier.w("Punctuation model not available; transcription will lack punctuation")
+            Napier.d("Sherpa-ONNX recognizer loaded from $sttModelPath")
+
+            val punctModelPath =
+                withContext(Dispatchers.IO) {
+                    modelManager.getPunctuationModelPath()
+                }
+            if (punctModelPath != null) {
+                Napier.d("Punctuation model path: $punctModelPath")
+                val punctConfig =
+                    OnlinePunctuationConfig(
+                        model =
+                            OnlinePunctuationModelConfig(
+                                cnnBilstm = "$punctModelPath/model.onnx",
+                                bpeVocab = "$punctModelPath/bpe.vocab",
+                                numThreads = 1,
+                                provider = "cpu",
+                            ),
+                    )
+                punctuation =
+                    withContext(Dispatchers.IO) {
+                        OnlinePunctuation(assetManager = null, config = punctConfig)
+                    }
+                Napier.d("Sherpa-ONNX punctuation model loaded from $punctModelPath")
+            } else {
+                Napier.w("Punctuation model not available; transcription will lack punctuation")
+            }
         }
-    }
 
-    private fun startRecognition() {
-        val rec = recognizer ?: throw IllegalStateException("Recognizer not initialized")
-
-        stream = rec.createStream()
-
+    private fun createAndStartAudioRecord(): AudioRecord {
         val bufferSize =
             AudioRecord
                 .getMinBufferSize(
@@ -243,7 +301,7 @@ class SherpaOnnxTranscriptionService(
                     AudioFormat.ENCODING_PCM_16BIT,
                 ).coerceAtLeast(BUFFER_SIZE_BYTES)
 
-        audioRecord =
+        val ar =
             AudioRecord(
                 MediaRecorder.AudioSource.MIC,
                 SAMPLE_RATE,
@@ -252,53 +310,39 @@ class SherpaOnnxTranscriptionService(
                 bufferSize,
             )
 
-        if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+        if (ar.state != AudioRecord.STATE_INITIALIZED) {
             throw IllegalStateException("AudioRecord failed to initialize")
         }
 
-        audioRecord?.startRecording()
-        isListening = true
-
-        scope.launch {
-            _transcriptionFlow.emit(TranscriptionResult.InProgress)
-        }
-
-        recognitionJob =
-            scope.launch {
-                val shortBuffer = ShortArray(BUFFER_SIZE_SHORTS)
-                val s = stream ?: return@launch
-
-                while (isActive && isListening) {
-                    val ar = audioRecord ?: break
-                    val shortsRead = ar.read(shortBuffer, 0, shortBuffer.size)
-                    if (shortsRead <= 0) continue
-
-                    val floatSamples = FloatArray(shortsRead) { shortBuffer[it] / 32768.0f }
-                    s.acceptWaveform(floatSamples, SAMPLE_RATE)
-
-                    while (rec.isReady(s)) {
-                        rec.decode(s)
-                    }
-
-                    val result = rec.getResult(s)
-
-                    if (rec.isEndpoint(s)) {
-                        if (result.text.isNotBlank()) {
-                            val punctuated = addPunctuation(result.text)
-                            accumulatedSegments.add(punctuated)
-                            currentPartial = ""
-                            _transcriptionFlow.emit(TranscriptionResult.Success(buildAccumulatedText()))
-                        }
-                        rec.reset(s)
-                    } else if (result.text.isNotBlank()) {
-                        currentPartial = result.text.lowercase()
-                        _transcriptionFlow.emit(TranscriptionResult.Success(buildAccumulatedText()))
-                    }
-                }
-            }
-
-        Napier.d("Sherpa-ONNX recognition started (${SAMPLE_RATE}Hz, mono, PCM 16-bit)")
+        ar.startRecording()
+        audioRecord = ar
+        return ar
     }
+
+    private suspend fun processEndpointResults(
+        rec: OnlineRecognizer,
+        s: OnlineStream,
+    ) {
+        val result = rec.getResult(s)
+
+        if (rec.isEndpoint(s)) {
+            if (result.text.isNotBlank()) {
+                val punctuated = addPunctuation(result.text)
+                accumulatedSegments.add(punctuated)
+                currentPartial = ""
+                _transcriptionFlow.emit(TranscriptionResult.Success(buildAccumulatedText()))
+            }
+            rec.reset(s)
+        } else if (result.text.isNotBlank()) {
+            currentPartial = result.text.lowercase()
+            _transcriptionFlow.emit(TranscriptionResult.Success(buildAccumulatedText()))
+        }
+    }
+
+    private fun shortsToFloats(
+        shorts: ShortArray,
+        count: Int,
+    ): FloatArray = FloatArray(count) { shorts[it] / 32768.0f }
 
     private fun addPunctuation(text: String): String =
         try {

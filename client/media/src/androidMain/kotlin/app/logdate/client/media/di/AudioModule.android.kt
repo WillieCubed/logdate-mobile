@@ -26,5 +26,5 @@ actual val audioModule: Module =
         single<AudioDurationResolver> { AndroidAudioDurationResolver(androidContext()) }
 
         // Provide Sherpa-ONNX-based transcription (on-device, no audio focus required)
-        factory<TranscriptionService> { SherpaOnnxTranscriptionService(androidContext()) }
+        single<TranscriptionService> { SherpaOnnxTranscriptionService(androidContext()) }
     }
