@@ -20,7 +20,8 @@ interface MediaManager {
     /**
      * Retrieves the most recent media objects.
      *
-     * This consists of all images and videos that have been added to the app recently.
+     * This consists of the most recent images and videos currently available from the
+     * platform media library or photo storage source.
      */
     suspend fun getRecentMedia(): Flow<List<MediaObject>>
 

@@ -57,9 +57,6 @@ data class ImageBlockUiState(
     override val caption: String = "",
 ) : MediaBlockUiState {
     override fun hasContent(): Boolean = uri != null
-
-    /** Image blocks use the immersive editor shell while focused. */
-    override val wantsImmersiveLayout: Boolean get() = true
 }
 
 /**

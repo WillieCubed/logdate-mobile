@@ -159,8 +159,28 @@ class EditorStateTest {
     }
 
     @Test
-    fun testExpandedImageBlockActivatesImmersiveLayout() {
+    fun testExpandedImageBlockDoesNotActivateImmersiveLayout() {
         val block = ImageBlockUiState(uri = "content://images/1")
+        val state =
+            EditorState(
+                blocks = listOf(block),
+                expandedBlockId = block.id,
+            )
+
+        assertFalse(state.isImmersiveBlockActive())
+    }
+
+    @Test
+    fun testUnexpandedCameraBlockDoesNotActivateImmersiveLayout() {
+        val block = CameraBlockUiState()
+        val state = EditorState(blocks = listOf(block))
+
+        assertFalse(state.isImmersiveBlockActive())
+    }
+
+    @Test
+    fun testExpandedCameraBlockActivatesImmersiveLayout() {
+        val block = CameraBlockUiState()
         val state =
             EditorState(
                 blocks = listOf(block),
@@ -168,26 +188,6 @@ class EditorStateTest {
             )
 
         assertTrue(state.isImmersiveBlockActive())
-    }
-
-    @Test
-    fun testUnexpandedImageBlockDoesNotActivateImmersiveLayout() {
-        val block = ImageBlockUiState(uri = "content://images/1")
-        val state = EditorState(blocks = listOf(block))
-
-        assertFalse(state.isImmersiveBlockActive())
-    }
-
-    @Test
-    fun testExpandedTextBlockDoesNotActivateImmersiveLayout() {
-        val block = TextBlockUiState(content = "Hello")
-        val state =
-            EditorState(
-                blocks = listOf(block),
-                expandedBlockId = block.id,
-            )
-
-        assertFalse(state.isImmersiveBlockActive())
     }
 
     @Test

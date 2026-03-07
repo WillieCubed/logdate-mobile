@@ -5,7 +5,9 @@ import kotlinx.coroutines.flow.flowOf
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.FileTime
+import java.util.function.BiPredicate
 import kotlin.io.path.createDirectories
 import kotlin.io.path.extension
 import kotlin.io.path.name
@@ -25,7 +27,7 @@ class DesktopMediaManager : MediaManager {
 
     override suspend fun getRecentMedia(): Flow<List<MediaObject>> {
         val media =
-            listMediaObjects()
+            listLibraryMediaObjects()
                 .sortedByDescending { it.timestamp }
                 .take(MAX_RECENT_MEDIA)
         return flowOf(media)
@@ -36,7 +38,7 @@ class DesktopMediaManager : MediaManager {
         end: Instant,
     ): Flow<List<MediaObject>> {
         val media =
-            listMediaObjects()
+            listLibraryMediaObjects()
                 .filter { it.timestamp >= start && it.timestamp < end }
         return flowOf(media)
     }
@@ -98,16 +100,38 @@ class DesktopMediaManager : MediaManager {
         return directory
     }
 
-    private fun listMediaObjects(): List<MediaObject> {
-        if (!Files.exists(mediaRoot)) return emptyList()
-        return Files.list(mediaRoot).use { stream ->
-            stream
-                .filter { Files.isRegularFile(it) }
-                .asSequence()
-                .mapNotNull(::toMediaObject)
-                .toList()
+    private fun listLibraryMediaObjects(): List<MediaObject> {
+        val libraryRoots = existingLibraryRoots()
+        if (libraryRoots.isEmpty()) {
+            return emptyList()
         }
+
+        return libraryRoots
+            .flatMap(::scanLibraryRoot)
+            .distinctBy { it.uri }
     }
+
+    private fun scanLibraryRoot(root: Path): List<MediaObject> =
+        Files
+            .find(
+                root,
+                LIBRARY_SCAN_DEPTH,
+                BiPredicate<Path, BasicFileAttributes> { path, attributes ->
+                    attributes.isRegularFile && !path.hasIgnoredLibrarySegment(root)
+                },
+            ).use { stream ->
+                stream
+                    .asSequence()
+                    .mapNotNull(::toMediaObject)
+                    .toList()
+            }
+
+    private fun existingLibraryRoots(): List<Path> =
+        if (Files.exists(picturesRoot)) {
+            listOf(picturesRoot)
+        } else {
+            listOf(mediaRoot).filter(Files::exists)
+        }
 
     private fun toMediaObject(path: Path): MediaObject? {
         val extension = path.extension.lowercase()
@@ -160,6 +184,19 @@ class DesktopMediaManager : MediaManager {
 
     private companion object {
         private const val MAX_RECENT_MEDIA = 50
+        private const val LIBRARY_SCAN_DEPTH = 4
         private val mediaRoot: Path = Path.of(System.getProperty("user.home"), ".logdate", "media")
+        private val picturesRoot: Path = Path.of(System.getProperty("user.home"), "Pictures")
+    }
+}
+
+private fun Path.hasIgnoredLibrarySegment(root: Path): Boolean {
+    val relativePath = root.relativize(this)
+    val relativeNameCount = relativePath.nameCount
+    return (0 until relativeNameCount).any { index ->
+        val segment = relativePath.getName(index).toString()
+        segment.startsWith(".") ||
+            segment.endsWith(".photoslibrary") ||
+            segment.endsWith(".app")
     }
 }

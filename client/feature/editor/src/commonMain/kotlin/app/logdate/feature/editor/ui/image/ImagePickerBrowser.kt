@@ -1,0 +1,355 @@
+@file:Suppress("ktlint:standard:function-naming")
+
+package app.logdate.feature.editor.ui.image
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import app.logdate.client.media.MediaObject
+import coil3.compose.AsyncImage
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.allow_access
+import logdate.client.feature.editor.generated.resources.browse_all_photos
+import logdate.client.feature.editor.generated.resources.loading_recent_photos
+import logdate.client.feature.editor.generated.resources.no_recent_photos_found
+import logdate.client.feature.editor.generated.resources.open_app_settings
+import logdate.client.feature.editor.generated.resources.pick_from_your_library_or_browse_all_your_photos
+import logdate.client.feature.editor.generated.resources.recent_photos
+import logdate.client.feature.editor.generated.resources.show_your_recent_photos_here_after_you_allow_library_access
+import logdate.client.feature.editor.generated.resources.try_again
+import logdate.client.feature.editor.generated.resources.we_couldnt_load_your_recent_photos
+import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
+
+internal const val RECENT_IMAGE_PREVIEW_LIMIT = 24
+
+internal sealed interface ImagePickerLibraryState {
+    data object Loading : ImagePickerLibraryState
+
+    data class Loaded(
+        val images: List<MediaObject.Image>,
+    ) : ImagePickerLibraryState
+
+    data class PermissionRequired(
+        val permanentlyDenied: Boolean = false,
+    ) : ImagePickerLibraryState
+
+    data object Empty : ImagePickerLibraryState
+
+    data object Error : ImagePickerLibraryState
+}
+
+sealed interface ImagePickerPreviewState {
+    data object Loading : ImagePickerPreviewState
+
+    data class Loaded(
+        val sampleImageUri: String,
+        val itemCount: Int = 12,
+    ) : ImagePickerPreviewState
+
+    data class PermissionRequired(
+        val permanentlyDenied: Boolean = false,
+    ) : ImagePickerPreviewState
+
+    data object Empty : ImagePickerPreviewState
+
+    data object Error : ImagePickerPreviewState
+}
+
+@Composable
+fun ImagePickerPreviewContent(
+    state: ImagePickerPreviewState,
+    modifier: Modifier = Modifier,
+) {
+    ImagePickerBrowser(
+        state = state.toLibraryState(),
+        onImageSelected = {},
+        onBrowseLibrary = {},
+        onRequestLibraryAccess = {},
+        onOpenSettings = {},
+        onRetryLoading = {},
+        modifier = modifier,
+    )
+}
+
+internal fun recentImagePreviews(
+    media: List<MediaObject>,
+    limit: Int = RECENT_IMAGE_PREVIEW_LIMIT,
+): List<MediaObject.Image> =
+    media
+        .filterIsInstance<MediaObject.Image>()
+        .sortedByDescending { it.timestamp }
+        .take(limit)
+
+@Composable
+internal fun ImagePickerBrowser(
+    state: ImagePickerLibraryState,
+    onImageSelected: (String) -> Unit,
+    onBrowseLibrary: () -> Unit,
+    modifier: Modifier = Modifier,
+    onRequestLibraryAccess: (() -> Unit)? = null,
+    onOpenSettings: (() -> Unit)? = null,
+    onRetryLoading: (() -> Unit)? = null,
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 112.dp),
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            ImagePickerHeader(
+                onBrowseLibrary = onBrowseLibrary,
+            )
+        }
+
+        when (state) {
+            ImagePickerLibraryState.Loading -> {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    ImagePickerMessageCard(
+                        icon = {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(28.dp),
+                                strokeWidth = 2.5.dp,
+                            )
+                        },
+                        message = stringResource(Res.string.loading_recent_photos),
+                    )
+                }
+            }
+
+            is ImagePickerLibraryState.Loaded -> {
+                items(
+                    items = state.images,
+                    key = { "${it.uri}_${it.timestamp.toEpochMilliseconds()}" },
+                ) { image ->
+                    RecentImageTile(
+                        image = image,
+                        onClick = { onImageSelected(image.uri) },
+                    )
+                }
+            }
+
+            is ImagePickerLibraryState.PermissionRequired -> {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    ImagePickerMessageCard(
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Outlined.PhotoLibrary,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp),
+                            )
+                        },
+                        message = stringResource(Res.string.show_your_recent_photos_here_after_you_allow_library_access),
+                        action =
+                            when {
+                                state.permanentlyDenied && onOpenSettings != null -> {
+                                    {
+                                        OutlinedButton(onClick = onOpenSettings) {
+                                            Text(stringResource(Res.string.open_app_settings))
+                                        }
+                                    }
+                                }
+
+                                onRequestLibraryAccess != null -> {
+                                    {
+                                        Button(onClick = onRequestLibraryAccess) {
+                                            Text(stringResource(Res.string.allow_access))
+                                        }
+                                    }
+                                }
+
+                                else -> null
+                            },
+                    )
+                }
+            }
+
+            ImagePickerLibraryState.Empty -> {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    ImagePickerMessageCard(
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Outlined.AddPhotoAlternate,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp),
+                            )
+                        },
+                        message = stringResource(Res.string.no_recent_photos_found),
+                    )
+                }
+            }
+
+            ImagePickerLibraryState.Error -> {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    ImagePickerMessageCard(
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Outlined.PhotoLibrary,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp),
+                            )
+                        },
+                        message = stringResource(Res.string.we_couldnt_load_your_recent_photos),
+                        action =
+                            onRetryLoading?.let { retry ->
+                                {
+                                    OutlinedButton(onClick = retry) {
+                                        Text(stringResource(Res.string.try_again))
+                                    }
+                                }
+                            },
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun ImagePickerPreviewState.toLibraryState(): ImagePickerLibraryState =
+    when (this) {
+        ImagePickerPreviewState.Loading -> ImagePickerLibraryState.Loading
+        is ImagePickerPreviewState.Loaded ->
+            ImagePickerLibraryState.Loaded(
+                images =
+                    List(itemCount.coerceAtLeast(1)) { index ->
+                        MediaObject.Image(
+                            uri = sampleImageUri,
+                            size = 0,
+                            name = "Preview image ${index + 1}",
+                            timestamp = Clock.System.now() - index.minutes,
+                        )
+                    },
+            )
+        is ImagePickerPreviewState.PermissionRequired ->
+            ImagePickerLibraryState.PermissionRequired(permanentlyDenied = permanentlyDenied)
+        ImagePickerPreviewState.Empty -> ImagePickerLibraryState.Empty
+        ImagePickerPreviewState.Error -> ImagePickerLibraryState.Error
+    }
+
+@Composable
+private fun ImagePickerHeader(
+    onBrowseLibrary: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = stringResource(Res.string.recent_photos),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+
+            Text(
+                text = stringResource(Res.string.pick_from_your_library_or_browse_all_your_photos),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        OutlinedButton(onClick = onBrowseLibrary) {
+            Icon(
+                imageVector = Icons.Outlined.AddPhotoAlternate,
+                contentDescription = null,
+                modifier = Modifier.padding(end = 8.dp),
+            )
+            Text(stringResource(Res.string.browse_all_photos))
+        }
+    }
+}
+
+@Composable
+private fun RecentImageTile(
+    image: MediaObject.Image,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(18.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .clickable(onClick = onClick),
+    ) {
+        AsyncImage(
+            model = image.uri,
+            contentDescription = image.name,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@Composable
+private fun ImagePickerMessageCard(
+    icon: @Composable () -> Unit,
+    message: String,
+    modifier: Modifier = Modifier,
+    action: (@Composable () -> Unit)? = null,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            icon()
+
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+
+            action?.invoke()
+        }
+    }
+}
