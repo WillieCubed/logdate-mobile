@@ -98,9 +98,6 @@ private fun parseComponents(value: String): AtUriComponents {
 
     val collection: Nsid? = segments.getOrNull(1)?.let(Nsid::require)
     val recordKey: RecordKey? = segments.getOrNull(2)?.let(RecordKey::require)
-    if (recordKey != null && collection == null) {
-        throw InvalidAtUriException(value)
-    }
 
     val normalized: String =
         buildString {

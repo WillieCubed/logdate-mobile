@@ -11,10 +11,11 @@ public sealed class XrpcException(
 /**
  * Thrown when an XRPC request fails before a protocol response is received.
  */
-public class XrpcTransportException(
-    message: String,
-    cause: Throwable? = null,
-) : XrpcException(message, cause)
+public class XrpcTransportException : XrpcException {
+    public constructor(message: String) : super(message)
+
+    public constructor(message: String, cause: Throwable?) : super(message, cause)
+}
 
 /**
  * Thrown when an XRPC server returns a non-success HTTP status.
@@ -46,7 +47,8 @@ public class XrpcProtocolException(
 /**
  * Thrown when an XRPC payload cannot be serialized or deserialized.
  */
-public class XrpcSerializationException(
-    message: String,
-    cause: Throwable? = null,
-) : XrpcException(message, cause)
+public class XrpcSerializationException : XrpcException {
+    public constructor(message: String) : super(message)
+
+    public constructor(message: String, cause: Throwable?) : super(message, cause)
+}

@@ -47,6 +47,9 @@ class AtprotoDidTest {
         assertTrue(AtprotoDid.parse("did:web:example.com%3Aabc").isFailure)
 
         assertFailsWith<InvalidAtprotoDidException> {
+            AtprotoDid.require("did:plc:short")
+        }
+        assertFailsWith<InvalidAtprotoDidException> {
             AtprotoDid.require("did:web:exa_mple.com")
         }
         assertFailsWith<InvalidAtprotoDidException> {

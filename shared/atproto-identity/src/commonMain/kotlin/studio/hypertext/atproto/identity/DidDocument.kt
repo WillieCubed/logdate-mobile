@@ -12,8 +12,7 @@ import kotlinx.serialization.Serializable
  * @property verificationMethod Verification methods published by the DID document.
  * @property service Service endpoints published by the DID document.
  */
-@Serializable
-public data class DidDocument(
+@Serializable public data class DidDocument(
     @SerialName("@context")
     val context: List<String> = listOf("https://www.w3.org/ns/did/v1"),
     val id: AtprotoDid,
@@ -30,8 +29,7 @@ public data class DidDocument(
  * @property controller DID that controls the verification method.
  * @property publicKeyMultibase Optional multibase-encoded public key value.
  */
-@Serializable
-public data class VerificationMethod(
+@Serializable public data class VerificationMethod(
     val id: String,
     val type: String,
     val controller: AtprotoDid,
@@ -45,8 +43,7 @@ public data class VerificationMethod(
  * @property type Service type.
  * @property serviceEndpoint Service endpoint URL.
  */
-@Serializable
-public data class Service(
+@Serializable public data class Service(
     val id: String,
     val type: String,
     val serviceEndpoint: String,

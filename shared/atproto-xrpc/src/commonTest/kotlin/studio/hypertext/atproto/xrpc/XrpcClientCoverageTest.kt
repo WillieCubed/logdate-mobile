@@ -24,18 +24,25 @@ class XrpcClientCoverageTest {
                     queryParameter("limit", "10")
                 }
             assertEquals("""{"did":"did:plc:ewvi7nxzyoun6zhxrhs64oiz"}""", rawQuery)
+            assertEquals("""{"did":"did:plc:ewvi7nxzyoun6zhxrhs64oiz"}""", client.queryRaw(nsid))
 
             val typedQuery: CoverageQueryResponse =
                 client.query(nsid) {
                     header("X-Test", "query")
                 }
             assertEquals("did:plc:ewvi7nxzyoun6zhxrhs64oiz", typedQuery.did)
+            assertEquals(
+                "did:plc:ewvi7nxzyoun6zhxrhs64oiz",
+                client.query(nsid, CoverageQueryResponse.serializer()).did,
+            )
+            assertEquals("did:plc:ewvi7nxzyoun6zhxrhs64oiz", client.query<CoverageQueryResponse>(nsid).did)
 
             val rawProcedure =
                 client.procedureRaw(nsid, """{"title":"hello"}""") {
                     auth = BearerToken("token-123")
                 }
             assertEquals("""{"ok":true}""", rawProcedure)
+            assertEquals("""{"ok":true}""", client.procedureRaw(nsid))
 
             val typedProcedure: CoverageProcedureResponse =
                 client.procedure(nsid, CoverageProcedureRequest("hello")) {
@@ -43,6 +50,24 @@ class XrpcClientCoverageTest {
                     header("X-Test", "procedure")
                 }
             assertEquals(true, typedProcedure.ok)
+            assertEquals(
+                true,
+                client
+                    .procedure(
+                        nsid,
+                        CoverageProcedureRequest("hello"),
+                        CoverageProcedureRequest.serializer(),
+                        CoverageProcedureResponse.serializer(),
+                    ).ok,
+            )
+            assertEquals(
+                true,
+                client
+                    .procedure<CoverageProcedureRequest, CoverageProcedureResponse>(
+                        nsid,
+                        CoverageProcedureRequest("hello"),
+                    ).ok,
+            )
 
             val builder = XrpcRequestBuilder()
             builder.queryParameter("cursor", "abc")
@@ -57,12 +82,16 @@ class XrpcClientCoverageTest {
 
     @Test
     fun exceptionMessagesAreStable() {
+        val transportWithoutCause = XrpcTransportException("transport only")
         val transport = XrpcTransportException("transport broke", IllegalStateException("boom"))
         val protocol = XrpcProtocolException(statusCode = 401, error = "AuthRequired", errorMessage = "token missing")
+        val serializationWithoutCause = XrpcSerializationException("decode only")
         val serialization = XrpcSerializationException("decode broke", IllegalArgumentException("bad json"))
 
+        assertEquals("transport only", transportWithoutCause.message)
         assertEquals("transport broke", transport.message)
         assertEquals("XRPC request failed with HTTP 401 [AuthRequired]: token missing", protocol.message)
+        assertEquals("decode only", serializationWithoutCause.message)
         assertEquals("decode broke", serialization.message)
     }
 }
@@ -105,9 +134,10 @@ private class FakeXrpcClient : XrpcClient {
     ): Response {
         val builder = XrpcRequestBuilder().apply(block)
         val payload = json.encodeToString(serializer, body)
+        val token = (builder.auth as? BearerToken)?.token.orEmpty()
         return json.decodeFromString(
             deserializer,
-            """{"ok":${payload.contains("hello")},"auth":"${(builder.auth as BearerToken).token}"}""",
+            """{"ok":${payload.contains("hello")},"auth":"$token"}""",
         )
     }
 }

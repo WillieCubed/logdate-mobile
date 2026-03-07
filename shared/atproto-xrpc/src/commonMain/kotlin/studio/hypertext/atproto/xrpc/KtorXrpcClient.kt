@@ -13,10 +13,13 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import kotlinx.serialization.DeserializationStrategy
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import studio.hypertext.atproto.syntax.Nsid
 
 /**
@@ -124,23 +127,17 @@ public class KtorXrpcClient(
         status: HttpStatusCode,
         body: String,
     ): XrpcProtocolException {
-        val errorPayload: XrpcErrorPayload? =
+        val errorPayload: JsonObject? =
             try {
-                json.decodeFromString(XrpcErrorPayload.serializer(), body)
-            } catch (_: SerializationException) {
+                json.parseToJsonElement(body).jsonObject
+            } catch (_: Exception) {
                 null
             }
 
         return XrpcProtocolException(
             statusCode = status.value,
-            error = errorPayload?.error,
-            errorMessage = errorPayload?.message,
+            error = errorPayload?.get("error")?.jsonPrimitive?.contentOrNull,
+            errorMessage = errorPayload?.get("message")?.jsonPrimitive?.contentOrNull,
         )
     }
 }
-
-@Serializable
-private data class XrpcErrorPayload(
-    val error: String? = null,
-    val message: String? = null,
-)

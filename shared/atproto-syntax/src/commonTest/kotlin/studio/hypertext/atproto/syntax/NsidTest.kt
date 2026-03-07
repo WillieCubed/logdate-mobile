@@ -41,6 +41,7 @@ class NsidTest {
     fun reportsValidityAndRejectsAdditionalInvalidShapes() {
         assertTrue(Nsid.isValid("com.example.fooBar"))
 
+        val overlongAuthority = "${"a".repeat(64)}.${"b".repeat(64)}.${"c".repeat(64)}.${"d".repeat(61)}.foo"
         assertFailsWith<InvalidNsidException> {
             Nsid.require("com.exámple.foo")
         }
@@ -49,6 +50,18 @@ class NsidTest {
         }
         assertFailsWith<InvalidNsidException> {
             Nsid.require("com.${"a".repeat(64)}.foo")
+        }
+        assertFailsWith<InvalidNsidException> {
+            Nsid.require(overlongAuthority)
+        }
+        assertFailsWith<InvalidNsidException> {
+            Nsid.require("-com.example.foo")
+        }
+        assertFailsWith<InvalidNsidException> {
+            Nsid.require("co_m.example.foo")
+        }
+        assertFailsWith<InvalidNsidException> {
+            Nsid.require("com.example.9foo")
         }
     }
 }
