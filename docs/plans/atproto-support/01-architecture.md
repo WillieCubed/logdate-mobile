@@ -29,7 +29,7 @@ Recovery Phrase (BIP-39, 12 words)
                      allowing the user to recover or migrate their AT Protocol
                      identity without the server's involvement.
 
-Signing Key (Ed25519 keypair)
+Signing Key (currently P-256 keypair)
   Stored: server database (private key encrypted at rest with server KEK)
   Exportable: yes, encrypted with recovery-phrase-derived key
   Purpose: sign AT Protocol repo commits and operations
@@ -86,7 +86,7 @@ The LogDate server holds user data and signing keys **on behalf of** the user. T
 
 ## Module Structure
 
-### New modules: `shared/atproto-syntax`, `shared/atproto-identity`, `shared/atproto-xrpc`
+### New modules: `shared/atproto-syntax`, `shared/atproto-identity`, `shared/atproto-xrpc`, `shared/atproto-crypto`, `shared/atproto-plc`, `shared/atproto-repo`
 
 Kotlin Multiplatform library modules providing publishable AT Protocol primitives for both client and server consumers.
 
@@ -115,9 +115,44 @@ shared/atproto-xrpc/
     XrpcAuth.kt
     XrpcException.kt
     KtorXrpcClient.kt
+
+shared/atproto-crypto/
+  src/commonMain/kotlin/studio/hypertext/atproto/crypto/
+    Base58Btc.kt
+    Multikey.kt
+
+shared/atproto-plc/
+  src/commonMain/kotlin/studio/hypertext/atproto/plc/
+    PlcModels.kt
+    PlcOperations.kt
+    PlcEncoding.kt
+    PlcDirectoryClient.kt
+
+shared/atproto-repo/
+  src/commonMain/kotlin/studio/hypertext/atproto/repo/
+    RepoModels.kt
+    RepoRecordStore.kt
+    RepoException.kt
 ```
 
 Dependencies: `kotlinx.serialization`, coroutines, and Ktor client. These modules remain free of LogDate app models.
+
+### Current repo-backed server slice
+
+The server now exposes a narrow repo-style XRPC surface backed by the existing content sync store:
+
+- `com.atproto.repo.describeRepo`
+- `com.atproto.repo.getRecord`
+- `com.atproto.repo.listRecords`
+- `com.atproto.repo.createRecord`
+- `com.atproto.repo.putRecord`
+- `com.atproto.repo.deleteRecord`
+
+This slice intentionally supports one collection first:
+
+- `studio.hypertext.logdate.content`
+
+The backing implementation is a compatibility adapter, not the final canonical AT Protocol repo format. It gives third-party clients a standards-named entrypoint while LogDate continues toward a fuller repo/MST/CAR implementation.
 
 ### New server package: `server/.../identity/`
 
@@ -125,10 +160,11 @@ Server-side identity management.
 
 ```
 server/src/main/kotlin/app/logdate/server/identity/
-    DidService.kt           -- DID generation, DID Document construction
-    SigningKeyService.kt    -- Ed25519 keypair lifecycle
-    SigningKeyRepository.kt -- Database access for signing keys
-    HandleResolver.kt       -- Handle-to-DID resolution logic
+    AtprotoIdentityConfig.kt  -- Hosted DID and handle-domain configuration
+    AtprotoIdentityService.kt -- Account identity provisioning and DID Documents
+    SigningKeyService.kt      -- server signing-key lifecycle
+    SigningKeyRepository.kt   -- Database access for signing keys
+    PlcIdentityService.kt     -- Hosted PLC genesis creation
 ```
 
 ### New server package: `server/.../oauth/`
@@ -137,20 +173,24 @@ OAuth 2.0 Authorization Server implementation.
 
 ```
 server/src/main/kotlin/app/logdate/server/oauth/
-    OAuthConfig.kt              -- Server configuration (issuer, endpoints)
-    OAuthTokenService.kt        -- DPoP-bound token issuance and validation
-    AuthorizationCodeStore.kt   -- Temporary authorization code storage
-    ClientMetadataResolver.kt   -- Resolves client_id URLs to client metadata
-    DPoPVerifier.kt             -- Validates DPoP proof JWTs
+    OAuthConfig.kt                 -- Server configuration (issuer, endpoints)
+    OAuthErrors.kt                 -- OAuth exception hierarchy
+    OAuthNonceService.kt           -- DPoP nonce issuance and reuse
+    OAuthClientMetadataResolver.kt -- Resolves client_id URLs to client metadata
+    OAuthDpopVerifier.kt           -- Validates DPoP proof JWTs
+    OAuthKeyService.kt             -- ES256 signing key and JWKS
+    OAuthAccessTokenService.kt     -- DPoP-bound access token issuance and validation
+    OAuthAuthorizationService.kt   -- PAR, auth-code, refresh-token, and revoke state
 ```
 
 ### New server routes
 
 ```
 server/src/main/kotlin/app/logdate/server/routes/
-    IdentityRoutes.kt   -- DID Document endpoints, handle resolution
-    OAuthRoutes.kt       -- OAuth 2.0 endpoints
-    XrpcRoutes.kt        -- AT Protocol XRPC identity endpoints
+    IdentityRoutes.kt     -- DID Document and handle-resolution endpoints
+    IdentityApiRoutes.kt  -- first-party signing-key export endpoint
+    OAuthRoutes.kt        -- OAuth 2.0 endpoints
+    XrpcRoutes.kt         -- AT Protocol identity and repo endpoints
 ```
 
 ## Database Schema Changes
@@ -162,23 +202,25 @@ server/src/main/kotlin/app/logdate/server/routes/
 object AccountsTable : Table("accounts") {
     // ... existing columns ...
     val did = varchar("did", 255).uniqueIndex().nullable()
+    val handle = varchar("handle", 255).uniqueIndex().nullable()
     val signingKeyPublic = text("signing_key_public").nullable()
 }
 ```
 
 - `did`: The user's canonical DID (`did:plc:abc123` or a hostname-level `did:web`)
-- `signingKeyPublic`: The current active signing key's public component (multibase-encoded Ed25519)
+- `handle`: The canonical AT Protocol handle for the account
+- `signingKeyPublic`: The current active signing key's public component (multibase-encoded key, currently P-256)
 - Both nullable for backward compatibility during migration
 
 ### New table: SigningKeysTable
 
 ```kotlin
-// In server/src/main/kotlin/app/logdate/server/database/SigningKeysTable.kt
+// In server/src/main/kotlin/app/logdate/server/database/Tables.kt
 object SigningKeysTable : Table("signing_keys") {
     val id = uuid("id").autoGenerate()
     val accountId = uuid("account_id").references(AccountsTable.id)
     val purpose = varchar("purpose", 32)              // "atproto"
-    val algorithm = varchar("algorithm", 32).default("Ed25519")
+    val algorithm = varchar("algorithm", 32).default("P-256")
     val publicKeyMultibase = text("public_key_multibase")
     val privateKeyEncrypted = text("private_key_encrypted")
     val createdAt = timestamp("created_at")
@@ -193,41 +235,17 @@ This table maintains key history. When a key is rotated:
 3. `AccountsTable.signingKeyPublic` is updated to the new key
 4. Old key remains for verifying historical signatures
 
-### New table: OAuthAuthorizationCodesTable
+### OAuth state storage
 
-```kotlin
-object OAuthAuthorizationCodesTable : Table("oauth_authorization_codes") {
-    val code = varchar("code", 128)
-    val accountId = uuid("account_id").references(AccountsTable.id)
-    val clientId = text("client_id")         // URL-based client ID
-    val redirectUri = text("redirect_uri")
-    val scope = varchar("scope", 255)
-    val codeChallenge = text("code_challenge")
-    val codeChallengeMethod = varchar("code_challenge_method", 10).default("S256")
-    val dpopJkt = text("dpop_jkt").nullable()  // DPoP key thumbprint
-    val createdAt = timestamp("created_at")
-    val expiresAt = timestamp("expires_at")
-    val isUsed = bool("is_used").default(false)
-    override val primaryKey = PrimaryKey(code)
-}
-```
+The current OAuth implementation keeps:
 
-### New table: OAuthSessionsTable
+- pushed authorization requests
+- authorization codes
+- refresh tokens
 
-```kotlin
-object OAuthSessionsTable : Table("oauth_sessions") {
-    val id = varchar("id", 128)
-    val accountId = uuid("account_id").references(AccountsTable.id)
-    val clientId = text("client_id")
-    val scope = varchar("scope", 255)
-    val dpopJkt = text("dpop_jkt")
-    val refreshToken = text("refresh_token").nullable()
-    val createdAt = timestamp("created_at")
-    val expiresAt = timestamp("expires_at")
-    val revokedAt = timestamp("revoked_at").nullable()
-    override val primaryKey = PrimaryKey(id)
-}
-```
+in memory inside `OAuthAuthorizationService`.
+
+That is accurate for the current standalone slice and is intentionally narrower than a future durable multi-instance authorization server design.
 
 ## DID Document Structure
 

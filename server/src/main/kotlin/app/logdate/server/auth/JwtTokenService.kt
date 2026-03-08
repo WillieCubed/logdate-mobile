@@ -52,9 +52,13 @@ class JwtTokenService(
         val exp: Long, // expiration time (seconds since epoch)
         val iat: Long, // issued at (seconds since epoch)
         val type: String, // token type: "access", "refresh", "session"
+        val did: String? = null, // AT Protocol DID for user-bound tokens
     )
 
-    override fun generateAccessToken(accountId: String): String {
+    override fun generateAccessToken(
+        accountId: String,
+        did: String?,
+    ): String {
         val now = Clock.System.now()
         val expiry = now + ACCESS_TOKEN_DURATION
 
@@ -66,12 +70,16 @@ class JwtTokenService(
                 exp = expiry.epochSeconds,
                 iat = now.epochSeconds,
                 type = "access",
+                did = did,
             )
 
         return generateToken(payload)
     }
 
-    override fun generateRefreshToken(accountId: String): String {
+    override fun generateRefreshToken(
+        accountId: String,
+        did: String?,
+    ): String {
         val now = Clock.System.now()
         val expiry = now + REFRESH_TOKEN_DURATION
 
@@ -83,6 +91,7 @@ class JwtTokenService(
                 exp = expiry.epochSeconds,
                 iat = now.epochSeconds,
                 type = "refresh",
+                did = did,
             )
 
         return generateToken(payload)

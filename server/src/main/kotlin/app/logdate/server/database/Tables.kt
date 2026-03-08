@@ -14,6 +14,9 @@ object AccountsTable : Table("accounts") {
     val id = uuid("id").autoGenerate()
     val username = varchar("username", 50).uniqueIndex()
     val displayName = varchar("display_name", 100)
+    val did = varchar("did", 255).nullable().uniqueIndex()
+    val handle = varchar("handle", 255).nullable().uniqueIndex()
+    val signingKeyPublic = text("signing_key_public").nullable()
     val email = varchar("email", 255).nullable()
     val emailVerified = bool("email_verified").default(false)
     val bio = text("bio").nullable()
@@ -21,6 +24,20 @@ object AccountsTable : Table("accounts") {
     val lastSignInAt = timestamp("last_sign_in_at").nullable()
     val isActive = bool("is_active").default(true)
     val preferences = text("preferences").default("{}")
+
+    override val primaryKey = PrimaryKey(id)
+}
+
+@OptIn(ExperimentalUuidApi::class)
+object SigningKeysTable : Table("signing_keys") {
+    val id = uuid("id").autoGenerate()
+    val accountId = uuid("account_id").references(AccountsTable.id)
+    val purpose = varchar("purpose", 32).default("atproto")
+    val algorithm = varchar("algorithm", 32).default("P-256")
+    val publicKeyMultibase = text("public_key_multibase")
+    val privateKeyEncrypted = text("private_key_encrypted")
+    val createdAt = timestamp("created_at")
+    val revokedAt = timestamp("revoked_at").nullable()
 
     override val primaryKey = PrimaryKey(id)
 }

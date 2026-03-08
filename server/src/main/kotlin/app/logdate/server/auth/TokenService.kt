@@ -11,13 +11,19 @@ interface TokenService {
      * Generate a new access token for the given account ID.
      * Access tokens are short-lived (1 hour) and used for API authentication.
      */
-    fun generateAccessToken(accountId: String): String
+    fun generateAccessToken(
+        accountId: String,
+        did: String? = null,
+    ): String
 
     /**
      * Generate a new refresh token for the given account ID.
      * Refresh tokens are long-lived (30 days) and used to obtain new access tokens.
      */
-    fun generateRefreshToken(accountId: String): String
+    fun generateRefreshToken(
+        accountId: String,
+        did: String? = null,
+    ): String
 
     /**
      * Validate an access token and extract the account ID.

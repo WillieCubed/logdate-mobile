@@ -15,6 +15,7 @@ import app.logdate.server.auth.IdentityProvider
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.SessionType
 import app.logdate.server.auth.TokenService
+import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.shared.model.AccountInfoResponse
 import app.logdate.shared.model.AccountTokens
@@ -152,6 +153,8 @@ data class AuthAccountView(
     val id: String,
     val username: String,
     val displayName: String,
+    val did: String? = null,
+    val handle: String? = null,
     val bio: String? = null,
     val email: String? = null,
     val emailVerified: Boolean,
@@ -222,6 +225,7 @@ fun Route.authV1Routes(
     identityRepository: AccountIdentityRepository,
     sessionManager: SessionManager,
     webAuthnService: WebAuthnPasskeyService,
+    atprotoIdentityService: AtprotoIdentityService,
     tokenService: TokenService,
     googleIdTokenVerifier: GoogleIdTokenVerifier,
     metrics: AuthMetricsRegistry,
@@ -437,7 +441,15 @@ fun Route.authV1Routes(
                             )
                         }
 
-                        val response = issueAuthResponse(account, accountRepository, identityRepository, webAuthnService, tokenService)
+                        val response =
+                            issueAuthResponse(
+                                account = account,
+                                accountRepository = accountRepository,
+                                identityRepository = identityRepository,
+                                webAuthnService = webAuthnService,
+                                atprotoIdentityService = atprotoIdentityService,
+                                tokenService = tokenService,
+                            )
                         Napier.i(
                             formatAuditLog(
                                 AuditCategory.AUTH_SIGNUP_PASSKEY_SUCCESS,
@@ -511,6 +523,7 @@ fun Route.authV1Routes(
                             accountRepository,
                             identityRepository,
                             webAuthnService,
+                            atprotoIdentityService,
                             tokenService,
                         )
                     Napier.i(
@@ -629,7 +642,15 @@ fun Route.authV1Routes(
                             identityRepository.touchLastSignIn(existingPasskeyIdentity.id)
                         }
 
-                        val response = issueAuthResponse(account, accountRepository, identityRepository, webAuthnService, tokenService)
+                        val response =
+                            issueAuthResponse(
+                                account = account,
+                                accountRepository = accountRepository,
+                                identityRepository = identityRepository,
+                                webAuthnService = webAuthnService,
+                                atprotoIdentityService = atprotoIdentityService,
+                                tokenService = tokenService,
+                            )
                         Napier.i(
                             formatAuditLog(
                                 AuditCategory.AUTH_SIGNIN_PASSKEY_SUCCESS,
@@ -702,6 +723,7 @@ fun Route.authV1Routes(
                             accountRepository,
                             identityRepository,
                             webAuthnService,
+                            atprotoIdentityService,
                             tokenService,
                         )
                     Napier.i(
@@ -748,7 +770,11 @@ fun Route.authV1Routes(
                             metrics,
                         )
                     }
-                    val accessToken = tokenService.generateAccessToken(accountId)
+                    val did =
+                        runCatching { Uuid.parse(accountId) }
+                            .getOrNull()
+                            ?.let { accountRepository.findById(it)?.did }
+                    val accessToken = tokenService.generateAccessToken(accountId, did)
                     call.respond(HttpStatusCode.OK, RefreshTokenResponseV1(true, RefreshTokenDataV1(accessToken)))
                     success = true
                 } catch (e: Exception) {
@@ -799,7 +825,15 @@ fun Route.authV1Routes(
                 val account =
                     resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics)
                         ?: return@get
-                val response = issueAuthResponse(account, accountRepository, identityRepository, webAuthnService, tokenService)
+                val response =
+                    issueAuthResponse(
+                        account = account,
+                        accountRepository = accountRepository,
+                        identityRepository = identityRepository,
+                        webAuthnService = webAuthnService,
+                        atprotoIdentityService = atprotoIdentityService,
+                        tokenService = tokenService,
+                    )
                 call.respond(HttpStatusCode.OK, response)
             } catch (e: Exception) {
                 Napier.e("Failed to get current account", e)
@@ -852,6 +886,7 @@ fun Route.authV1Routes(
                             bio = request.bio ?: account.bio,
                         ),
                     )
+                val ensuredAccount = atprotoIdentityService.ensureIdentity(saved)
 
                 call.respond(
                     HttpStatusCode.OK,
@@ -859,13 +894,15 @@ fun Route.authV1Routes(
                         success = true,
                         data =
                             app.logdate.shared.model.LogDateAccount(
-                                id = saved.id,
-                                username = saved.username,
-                                displayName = saved.displayName,
-                                bio = saved.bio,
-                                passkeyCredentialIds = webAuthnService.getPasskeysForUser(saved.id).map { it.credentialId },
-                                createdAt = saved.createdAt,
-                                updatedAt = saved.lastSignInAt ?: saved.createdAt,
+                                id = ensuredAccount.id,
+                                username = ensuredAccount.username,
+                                displayName = ensuredAccount.displayName,
+                                did = ensuredAccount.did,
+                                handle = ensuredAccount.handle,
+                                bio = ensuredAccount.bio,
+                                passkeyCredentialIds = webAuthnService.getPasskeysForUser(ensuredAccount.id).map { it.credentialId },
+                                createdAt = ensuredAccount.createdAt,
+                                updatedAt = ensuredAccount.lastSignInAt ?: ensuredAccount.createdAt,
                             ),
                     ),
                 )
@@ -1090,17 +1127,18 @@ private suspend fun issueAuthResponse(
     accountRepository: AccountRepository,
     identityRepository: AccountIdentityRepository,
     webAuthnService: WebAuthnPasskeyService,
+    atprotoIdentityService: AtprotoIdentityService,
     tokenService: TokenService,
 ): AuthResponse {
-    val fresh = accountRepository.findById(account.id) ?: account
+    val fresh = atprotoIdentityService.ensureIdentity(accountRepository.findById(account.id) ?: account)
     val identities = identityRepository.findByAccountId(fresh.id)
     val linkedProviders = identities.map { it.provider.name.lowercase() }.distinct().sorted()
     val passkeyCredentialIds = webAuthnService.getPasskeysForUser(fresh.id).map { it.credentialId }
 
     val tokens =
         AccountTokens(
-            accessToken = tokenService.generateAccessToken(fresh.id.toString()),
-            refreshToken = tokenService.generateRefreshToken(fresh.id.toString()),
+            accessToken = tokenService.generateAccessToken(fresh.id.toString(), fresh.did),
+            refreshToken = tokenService.generateRefreshToken(fresh.id.toString(), fresh.did),
         )
 
     return AuthResponse(
@@ -1112,6 +1150,8 @@ private suspend fun issueAuthResponse(
                         id = fresh.id.toString(),
                         username = fresh.username,
                         displayName = fresh.displayName,
+                        did = fresh.did,
+                        handle = fresh.handle,
                         bio = fresh.bio,
                         email = fresh.email,
                         emailVerified = fresh.emailVerified,

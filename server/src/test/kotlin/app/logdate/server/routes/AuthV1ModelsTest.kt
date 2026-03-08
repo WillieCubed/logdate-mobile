@@ -89,6 +89,8 @@ class AuthV1ModelsTest {
                 id = "id",
                 username = "user",
                 displayName = "User",
+                did = "did:web:user.logdate.app",
+                handle = "user.logdate.app",
                 bio = "bio",
                 email = "u@example.com",
                 emailVerified = true,
@@ -209,6 +211,8 @@ class AuthV1ModelsTest {
                         id = "acc-1",
                         username = "user_a",
                         displayName = "User A",
+                        did = "did:web:user-a.logdate.app",
+                        handle = "user-a.logdate.app",
                         bio = "bio",
                         email = "user@example.com",
                         emailVerified = true,
@@ -250,6 +254,8 @@ class AuthV1ModelsTest {
         assertNotNull(refreshDataObj)
         assertEquals("access-token", refreshDataObj.javaClass.getMethod("getAccessToken").invoke(refreshDataObj))
         assertEquals("acc-1", invokeGetter(authResponseData.account, "getId"))
+        assertEquals("did:web:user-a.logdate.app", invokeGetter(authResponseData.account, "getDid"))
+        assertEquals("user-a.logdate.app", invokeGetter(authResponseData.account, "getHandle"))
         assertEquals("bio", invokeGetter(authResponseData.account, "getBio"))
         assertEquals("user@example.com", invokeGetter(authResponseData.account, "getEmail"))
         assertEquals("true", invokeGetter(authResponseData.account, "getEmailVerified").toString())
@@ -257,7 +263,7 @@ class AuthV1ModelsTest {
         assertEquals(1, (invokeGetter(authResponseData.account, "getPasskeyCredentialIds") as List<*>).size)
         assertEquals("2026-01-01T00:00:00Z", invokeGetter(authResponseData.account, "getCreatedAt"))
         assertEquals("2026-01-01T00:00:00Z", invokeGetter(authResponseData.account, "getUpdatedAt"))
-        assertEquals("id-token-only", invokeGetter(googleReqWithDefaults, "getIdToken"))
+        assertEquals("id-tok", invokeGetter(googleReqWithDefaults, "getIdToken"))
         assertEquals("null", invokeGetter(googleReqWithDefaults, "getUsername").toString())
         assertEquals("acc-2", invokeGetter(authAccountWithDefaults, "getId"))
         assertEquals("subject", invokeGetter(identity, "getProviderSubject"))

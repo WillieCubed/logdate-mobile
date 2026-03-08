@@ -8,6 +8,7 @@ import app.logdate.server.auth.IdentityProvider
 import app.logdate.server.auth.SessionType
 import app.logdate.server.auth.TemporarySession
 import app.logdate.server.database.support.withH2Database
+import app.logdate.server.identity.StoredSigningKey
 import app.logdate.server.util.toKotlinxInstant
 import app.logdate.shared.model.PasskeyInfo
 import kotlinx.coroutines.runBlocking
@@ -55,6 +56,9 @@ class PostgreSqlRepositoriesTest {
                     id = Uuid.random(),
                     username = "alice",
                     displayName = "Alice",
+                    did = "did:web:alice.logdate.app",
+                    handle = "alice.logdate.app",
+                    signingKeyPublic = "zAliceKey",
                     email = "alice@example.com",
                     emailVerified = true,
                     bio = "bio",
@@ -64,6 +68,8 @@ class PostgreSqlRepositoriesTest {
 
             repository.save(account)
             assertNotNull(repository.findById(account.id))
+            assertNotNull(repository.findByDid("did:web:alice.logdate.app"))
+            assertNotNull(repository.findByHandle("alice.logdate.app"))
             assertNotNull(repository.findByUsername("alice"))
             assertNotNull(repository.findByEmail("alice@example.com"))
             assertTrue(repository.usernameExists("alice"))
@@ -140,6 +146,32 @@ class PostgreSqlRepositoriesTest {
                 )
             val persistedEvent = repository.saveLinkEvent(linkEvent)
             assertEquals(linkEvent.id, persistedEvent.id)
+        }
+    }
+
+    @Test
+    fun `signing key repository supports save lookup and revoke`() {
+        withH2Database(AccountsTable, SigningKeysTable) {
+            val accountId = Uuid.random()
+            val accountRepository = PostgreSQLAccountRepository()
+            val repository = PostgreSQLSigningKeyRepository()
+
+            val stored =
+                StoredSigningKey(
+                    id = Uuid.random(),
+                    accountId = accountId,
+                    publicKeyMultibase = "zSigningKey",
+                    privateKeyEncrypted = "encrypted",
+                    createdAt = Clock.System.now(),
+                )
+
+            runBlocking {
+                accountRepository.save(sampleAccount(accountId, username = "signing-owner"))
+                repository.save(stored)
+                assertEquals(stored.publicKeyMultibase, repository.findActiveByAccountId(accountId)?.publicKeyMultibase)
+                assertEquals(1, repository.revokeActiveKeys(accountId))
+                assertNull(repository.findActiveByAccountId(accountId))
+            }
         }
     }
 

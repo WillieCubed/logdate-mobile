@@ -46,6 +46,8 @@ class DefaultCloudAccountRepository(
         const val ACCOUNT_ID = "cloud_account_id"
         const val ACCOUNT_USERNAME = "cloud_username"
         const val ACCOUNT_DISPLAY_NAME = "cloud_display_name"
+        const val ACCOUNT_DID = "cloud_account_did"
+        const val ACCOUNT_HANDLE = "cloud_account_handle"
         const val USER_ID = "cloud_user_id"
         const val CREATED_AT = "cloud_created_at"
         const val UPDATED_AT = "cloud_updated_at"
@@ -69,6 +71,8 @@ class DefaultCloudAccountRepository(
             val accountId = secureStorage.getString(StorageKeys.ACCOUNT_ID)
             val username = secureStorage.getString(StorageKeys.ACCOUNT_USERNAME)
             val displayName = secureStorage.getString(StorageKeys.ACCOUNT_DISPLAY_NAME)
+            val did = secureStorage.getString(StorageKeys.ACCOUNT_DID)
+            val handle = secureStorage.getString(StorageKeys.ACCOUNT_HANDLE)
             val userIdString = secureStorage.getString(StorageKeys.USER_ID)
             val createdAtString = secureStorage.getString(StorageKeys.CREATED_AT)
             val updatedAtString = secureStorage.getString(StorageKeys.UPDATED_AT)
@@ -96,6 +100,8 @@ class DefaultCloudAccountRepository(
                         id = Uuid.parse(accountId),
                         username = username,
                         displayName = displayName,
+                        did = did,
+                        handle = handle,
                         userId = userId,
                         createdAt = createdAt,
                         updatedAt = updatedAt,
@@ -219,6 +225,8 @@ class DefaultCloudAccountRepository(
                             id = accountDto.id,
                             username = accountDto.username,
                             displayName = accountDto.displayName,
+                            did = accountDto.did,
+                            handle = accountDto.handle,
                             userId = accountDto.id,
                             createdAt = accountDto.createdAt,
                             updatedAt = accountDto.updatedAt,
@@ -302,6 +310,8 @@ class DefaultCloudAccountRepository(
             secureStorage.remove(StorageKeys.ACCOUNT_ID)
             secureStorage.remove(StorageKeys.ACCOUNT_USERNAME)
             secureStorage.remove(StorageKeys.ACCOUNT_DISPLAY_NAME)
+            secureStorage.remove(StorageKeys.ACCOUNT_DID)
+            secureStorage.remove(StorageKeys.ACCOUNT_HANDLE)
             secureStorage.remove(StorageKeys.USER_ID)
             secureStorage.remove(StorageKeys.CREATED_AT)
             secureStorage.remove(StorageKeys.UPDATED_AT)
@@ -382,6 +392,9 @@ class DefaultCloudAccountRepository(
                 secureStorage.putString(StorageKeys.ACCOUNT_ID, account.id.toString())
                 secureStorage.putString(StorageKeys.ACCOUNT_USERNAME, account.username)
                 secureStorage.putString(StorageKeys.ACCOUNT_DISPLAY_NAME, account.displayName)
+                account.did?.let { secureStorage.putString(StorageKeys.ACCOUNT_DID, it) } ?: secureStorage.remove(StorageKeys.ACCOUNT_DID)
+                account.handle?.let { secureStorage.putString(StorageKeys.ACCOUNT_HANDLE, it) }
+                    ?: secureStorage.remove(StorageKeys.ACCOUNT_HANDLE)
                 secureStorage.putString(StorageKeys.USER_ID, account.userId.toString())
                 secureStorage.putString(StorageKeys.CREATED_AT, account.createdAt.toString())
                 secureStorage.putString(StorageKeys.UPDATED_AT, account.updatedAt.toString())

@@ -26,7 +26,7 @@ Three concerns must be separated:
 |---------|-----------|-------------|---------|
 | **Authentication** | Passkeys (WebAuthn) | User's device hardware | Prove to the custodian "I am authorized to act on this account" |
 | **Identity** | DIDs (did:web, did:plc) | Public (DID Document served by custodian or PLC directory) | Tell the world "this is who I am" -- portable, permanent |
-| **Data provenance** | Signing keys (Ed25519) | Server (as custodian), exportable to user | Prove "this data was created/approved by this identity" |
+| **Data provenance** | Signing keys (currently P-256 multikey) | Server (as custodian), exportable to user | Prove "this data was created/approved by this identity" |
 
 Passkeys authenticate a user **to** their custodian. DIDs identify the user **to the world**. Signing keys prove data provenance **to anyone**.
 
@@ -34,11 +34,11 @@ Passkeys authenticate a user **to** their custodian. DIDs identify the user **to
 
 | Phase | Deliverable | Documents |
 |-------|------------|-----------|
-| 1 | Publishable Kotlin/KMP library modules: `shared/atproto-syntax`, `shared/atproto-identity`, `shared/atproto-xrpc` | [Architecture](./01-architecture.md) |
+| 1 | Publishable Kotlin/KMP library modules: `shared/atproto-syntax`, `shared/atproto-identity`, `shared/atproto-xrpc`, `shared/atproto-crypto`, `shared/atproto-plc`, and `shared/atproto-repo` | [Architecture](./01-architecture.md) |
 | 2 | Server-side identity integration (signing keys, DID Documents, DID-aware account models) | [Architecture](./01-architecture.md), [Signing Keys](./05-signing-key-management.md) |
 | 3 | OAuth 2.0 Authorization Server with passkey authentication | [OAuth + Passkeys](./04-oauth-passkey-integration.md) |
-| 4 | did:plc write support, PLC operations, and migration tooling | [Architecture](./01-architecture.md) |
-| 5 | XRPC server endpoints backed by the shared library modules | [Architecture](./01-architecture.md) |
+| 4 | Hosted PLC provisioning plus future PLC update and recovery tooling | [Architecture](./01-architecture.md) |
+| 5 | XRPC server endpoints backed by the shared library modules, starting with identity and a content-backed repo collection | [Architecture](./01-architecture.md) |
 
 ## Documents in This Plan
 
@@ -70,6 +70,9 @@ The identity layer is the prerequisite for all of these. Get identity right firs
 | `shared:atproto-syntax` | `shared/atproto-syntax` | Publishable Kotlin syntax types for DID, handle, NSID, record key, TID, and AT URI |
 | `shared:atproto-identity` | `shared/atproto-identity` | Publishable Kotlin identity types and resolvers for AT Protocol DIDs and handles |
 | `shared:atproto-xrpc` | `shared/atproto-xrpc` | Publishable Kotlin XRPC runtime with typed request builders and auth hooks |
+| `shared:atproto-crypto` | `shared/atproto-crypto` | Publishable Kotlin crypto helpers for multibase, multikey, and base58btc |
+| `shared:atproto-plc` | `shared/atproto-plc` | Publishable Kotlin PLC models, encoding, and directory client interfaces |
+| `shared:atproto-repo` | `shared/atproto-repo` | Publishable Kotlin repo record primitives and store interfaces |
 | `WebAuthnPasskeyService` | `server/src/.../passkeys/WebAuthnPasskeyService.kt` | Reused unchanged as authentication within OAuth |
 | `TokenService` | `server/src/.../auth/TokenService.kt` | Extended with DID-aware token generation |
 | `AccountsTable` | `server/src/.../database/Tables.kt` | Extended with `did` and `signingKeyPublic` columns |

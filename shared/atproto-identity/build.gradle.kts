@@ -43,7 +43,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            api(project(":shared:atproto-syntax"))
+            api(projects.shared.atprotoSyntax)
             api(libs.kotlinx.serialization.core)
             api(libs.kotlinx.serialization.json)
             api(libs.ktor.client.core)

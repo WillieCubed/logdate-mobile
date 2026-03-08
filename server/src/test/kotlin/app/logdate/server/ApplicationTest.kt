@@ -5,6 +5,7 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
@@ -38,6 +39,26 @@ class ApplicationTest {
                 assertEquals(HttpStatusCode.OK, status)
                 val payload = json.parseToJsonElement(bodyAsText()).jsonObject
                 assertEquals("healthy", payload["status"]?.jsonPrimitive?.content)
+            }
+        }
+
+    @Test
+    fun testOAuthDiscoveryRoutes() =
+        testApplication {
+            application {
+                module()
+            }
+
+            client.get("/.well-known/oauth-authorization-server").apply {
+                assertEquals(HttpStatusCode.OK, status)
+                val payload = json.parseToJsonElement(bodyAsText()).jsonObject
+                assertEquals("https://logdate.app/oauth/authorize", payload["authorization_endpoint"]?.jsonPrimitive?.content)
+            }
+
+            client.get("/oauth/jwks").apply {
+                assertEquals(HttpStatusCode.OK, status)
+                val payload = json.parseToJsonElement(bodyAsText()).jsonObject
+                assertTrue(payload["keys"]?.jsonArray?.isNotEmpty() == true)
             }
         }
 

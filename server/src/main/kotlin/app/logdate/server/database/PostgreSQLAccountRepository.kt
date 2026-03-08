@@ -34,6 +34,9 @@ class PostgreSQLAccountRepository : AccountRepository {
                 AccountsTable.update({ AccountsTable.id eq account.id.toJavaUUID() }) {
                     it[username] = account.username
                     it[displayName] = account.displayName
+                    it[did] = account.did
+                    it[handle] = account.handle
+                    it[signingKeyPublic] = account.signingKeyPublic
                     it[email] = account.email
                     it[emailVerified] = account.emailVerified
                     it[bio] = account.bio
@@ -48,6 +51,9 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[id] = account.id.toJavaUUID()
                     it[username] = account.username
                     it[displayName] = account.displayName
+                    it[did] = account.did
+                    it[handle] = account.handle
+                    it[signingKeyPublic] = account.signingKeyPublic
                     it[email] = account.email
                     it[emailVerified] = account.emailVerified
                     it[bio] = account.bio
@@ -65,6 +71,24 @@ class PostgreSQLAccountRepository : AccountRepository {
             AccountsTable
                 .selectAll()
                 .where { AccountsTable.id eq id.toJavaUUID() }
+                .singleOrNull()
+                ?.toAccount()
+        }
+
+    override suspend fun findByDid(did: String): Account? =
+        transaction {
+            AccountsTable
+                .selectAll()
+                .where { AccountsTable.did eq did }
+                .singleOrNull()
+                ?.toAccount()
+        }
+
+    override suspend fun findByHandle(handle: String): Account? =
+        transaction {
+            AccountsTable
+                .selectAll()
+                .where { AccountsTable.handle eq handle }
                 .singleOrNull()
                 ?.toAccount()
         }
@@ -162,6 +186,9 @@ class PostgreSQLAccountRepository : AccountRepository {
             id = this[AccountsTable.id].toKotlinUuid(),
             username = this[AccountsTable.username],
             displayName = this[AccountsTable.displayName],
+            did = this[AccountsTable.did],
+            handle = this[AccountsTable.handle],
+            signingKeyPublic = this[AccountsTable.signingKeyPublic],
             email = this[AccountsTable.email],
             emailVerified = this[AccountsTable.emailVerified],
             bio = this[AccountsTable.bio],

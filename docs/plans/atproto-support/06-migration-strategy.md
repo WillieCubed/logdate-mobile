@@ -1,280 +1,127 @@
 # Migration Strategy
 
-## Principle: Additive, Not Breaking
+This document describes the migration strategy for the currently implemented AT Protocol identity and PDS-compatible slices.
 
-Every change in this plan is additive. No existing API contracts change. No existing data is modified in a destructive way. The migration path is:
+## Principles
 
-1. Add new columns/tables (nullable).
-2. Populate them for new accounts at creation time.
-3. Backfill existing accounts via background job.
-4. Client models gain new optional fields.
-5. External-facing APIs begin including new fields.
+- Existing LogDate auth and sync behavior must remain shippable on `main`.
+- AT Protocol identity fields are added without breaking current first-party clients.
+- Hosted multi-user users should default to `did:plc`.
+- Hostname-level `did:web` remains valid for dedicated deployments.
+- Path-based `did:web` is not migrated or supported.
 
-At no point does any existing behavior break. A client that doesn't understand DIDs continues to work using UUIDs.
+## Implemented Migration Stages
 
-## Database Migration
+## Stage 1: Schema Expansion
 
-### Migration 1: Add DID columns to AccountsTable
+Database changes add:
 
-```sql
-ALTER TABLE accounts ADD COLUMN did VARCHAR(255) UNIQUE;
-ALTER TABLE accounts ADD COLUMN signing_key_public TEXT;
-```
+- `accounts.did`
+- `accounts.handle`
+- `accounts.signing_key_public`
+- `signing_keys` table
 
-Both columns are nullable. Existing rows get `NULL`.
+These fields are additive and can coexist with the pre-existing account and sync model.
 
-### Migration 2: Create SigningKeysTable
+## Stage 2: Account Model Expansion
 
-```sql
-CREATE TABLE signing_keys (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    purpose VARCHAR(32) NOT NULL DEFAULT 'atproto',
-    algorithm VARCHAR(32) NOT NULL DEFAULT 'Ed25519',
-    public_key_multibase TEXT NOT NULL,
-    private_key_encrypted TEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    revoked_at TIMESTAMP
-);
+Server, shared-model, and client-domain account models gain:
 
-CREATE INDEX idx_signing_keys_account ON signing_keys(account_id);
-CREATE INDEX idx_signing_keys_active ON signing_keys(account_id, revoked_at) WHERE revoked_at IS NULL;
-```
+- `did`
+- `handle`
 
-### Migration 3: Create OAuth tables
+This allows first-party clients to start storing identity metadata without changing their authentication path.
 
-```sql
-CREATE TABLE oauth_authorization_codes (
-    code VARCHAR(128) PRIMARY KEY,
-    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    client_id TEXT NOT NULL,
-    redirect_uri TEXT NOT NULL,
-    scope VARCHAR(255) NOT NULL,
-    code_challenge TEXT NOT NULL,
-    code_challenge_method VARCHAR(10) NOT NULL DEFAULT 'S256',
-    dpop_jkt TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    expires_at TIMESTAMP NOT NULL,
-    is_used BOOLEAN NOT NULL DEFAULT FALSE
-);
+## Stage 3: Identity Backfill
 
-CREATE TABLE oauth_sessions (
-    id VARCHAR(128) PRIMARY KEY,
-    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    client_id TEXT NOT NULL,
-    scope VARCHAR(255) NOT NULL,
-    dpop_jkt TEXT NOT NULL,
-    refresh_token TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    expires_at TIMESTAMP NOT NULL,
-    revoked_at TIMESTAMP
-);
+On startup, `AtprotoIdentityService.backfillMissingIdentities()`:
 
-CREATE INDEX idx_oauth_sessions_account ON oauth_sessions(account_id);
-CREATE INDEX idx_oauth_sessions_refresh ON oauth_sessions(refresh_token) WHERE refresh_token IS NOT NULL;
-```
+- normalizes any existing DID or handle values
+- provisions missing handles
+- provisions hosted DIDs using the configured hosted DID method
+- ensures an active signing key exists
 
-### Migration ordering
+This stage is idempotent by design.
 
-Migrations are sequential and each is independently safe:
-1. Migration 1 can run while the server is live (nullable column addition is non-blocking in PostgreSQL).
-2. Migration 2 creates a new table (no impact on existing tables).
-3. Migration 3 creates new tables (no impact on existing tables).
+## Stage 4: Additive Routes
 
-In Exposed ORM, these are added via `SchemaUtils.createMissingTablesAndColumns()` or explicit migration scripts.
+New routes are added without removing existing ones:
 
-## Background DID Generation
+- `/.well-known/atproto-did`
+- `/.well-known/did.json`
+- OAuth discovery and auth endpoints
+- XRPC identity and repo routes
+- `POST /api/v1/identity/signing-key/export`
 
-After Migration 1 deploys, a background job populates DIDs for existing accounts.
+The existing auth and sync endpoints remain intact.
 
-### Job Design
+## Stage 5: Compatibility Repo Adapter
 
-```kotlin
-class DidMigrationJob(
-    private val accountRepository: AccountRepository,
-    private val signingKeyService: SigningKeyService,
-    private val didService: DidService,
-    private val serverDomain: String,
-) {
-    suspend fun run() {
-        var offset = 0
-        val batchSize = 100
+The initial PDS slice maps AT Protocol repo requests onto the current LogDate content storage via `AtprotoContentRecordStore`.
 
-        while (true) {
-            val accounts = accountRepository.findAccountsWithoutDid(
-                limit = batchSize,
-                offset = offset,
-            )
-            if (accounts.isEmpty()) break
+This means:
 
-            for (account in accounts) {
-                try {
-                    val did = didService.generateDidWeb(serverDomain, account.username)
-                    val keyPair = signingKeyService.generateKeyPair()
-                    signingKeyService.storeKey(account.id, keyPair)
-                    accountRepository.updateDid(account.id, did, keyPair.publicKeyMultibase)
-                    Napier.d("Migrated account ${account.id} to DID: $did")
-                } catch (e: Exception) {
-                    Napier.e("Failed to migrate account ${account.id}", e)
-                    // Continue with next account; failed ones will be picked up on re-run
-                }
-            }
+- AT Protocol clients can read and write the compatibility collection now
+- the existing sync/content storage remains the source behind that adapter for now
+- the final MST/CAR-backed repo migration is still future work
 
-            offset += batchSize
-        }
-    }
-}
-```
+## Hosted DID Method Strategy
 
-### Properties
+### Hosted multi-user default
 
-- **Idempotent**: `findAccountsWithoutDid` only returns accounts where `did IS NULL`. Re-running the job skips already-migrated accounts.
-- **Resumable**: If the job crashes, it picks up where it left off (accounts with `did = NULL`).
-- **Non-blocking**: Runs in the background. No API endpoints are blocked.
-- **Batch processing**: Processes 100 accounts at a time to limit memory and database pressure.
-- **Error isolation**: A failure on one account doesn't stop the job. Failed accounts are logged and retried on the next run.
+Use `did:plc`.
 
-### Race condition handling
+Reason:
 
-If a new account is created during the job's execution:
-- The account creation flow assigns a DID at creation time (it doesn't rely on the background job).
-- The background job's `findAccountsWithoutDid` query won't return this account (it already has a DID).
-- No conflict.
+- matches AT Protocol hosting expectations better
+- avoids invalid path-based `did:web` designs
+- gives a portable public identity shape for hosted users
 
-## Client-Side Model Changes
+### Dedicated or custom-domain deployments
 
-### UserIdentity
+Use hostname-level `did:web` where that deployment model makes sense.
 
-```kotlin
-// client/domain/src/commonMain/kotlin/app/logdate/client/domain/account/model/UserIdentity.kt
-data class UserIdentity(
-    val userId: Uuid,
-    val isCloudLinked: Boolean,
-    val cloudAccountId: String? = null,
-    val did: String? = null,          // NEW
-)
-```
+## Operational Notes
 
-### CloudAccount
+## First-party client compatibility
 
-```kotlin
-// shared/model/src/commonMain/kotlin/app/logdate/shared/model/CloudAccount.kt
-data class CloudAccount(
-    val id: Uuid,
-    val userId: Uuid,
-    val username: String,
-    val displayName: String,
-    // ... existing fields ...
-    val did: String? = null,          // NEW
-)
-```
+- the LogDate app continues using its current passkey + bearer-JWT flow
+- DID and handle fields are additive metadata
+- no first-party forced OAuth migration is required
 
-### AccountInfo (server response model)
+## Third-party interoperability
 
-```kotlin
-// server/src/main/kotlin/app/logdate/server/auth/AccountModels.kt
-data class AccountInfo(
-    val userId: Uuid,
-    val did: String? = null,          // NEW
-    val username: String,
-    val displayName: String,
-    val createdAt: Instant,
-    val lastSignInAt: Instant? = null,
-)
-```
+- OAuth + DPoP is additive
+- XRPC repo endpoints are additive
+- third-party clients can start integrating without breaking first-party clients
 
-All new fields are nullable. Existing code that doesn't use them is unaffected.
+## Current non-persistent areas
 
-## API Response Evolution
+The current OAuth authorization service stores:
 
-### Phase 1: DID appears as optional field
+- PAR requests
+- authorization codes
+- refresh tokens
 
-Existing responses gain a `did` field:
+in memory.
 
-```json
-{
-  "success": true,
-  "data": {
-    "account": {
-      "id": "a1b2c3d4-...",
-      "did": "did:web:logdate.app:users:alice",
-      "username": "alice",
-      "displayName": "Alice",
-      ...
-    },
-    "tokens": { ... }
-  }
-}
-```
+That is acceptable for the current standalone server slice, but it is not yet the final clustered or durable deployment story.
 
-- `did` is nullable in the response schema.
-- Clients that don't parse `did` ignore it (JSON deserialization ignores unknown fields by default in kotlinx.serialization with `ignoreUnknownKeys`).
-- The UUID `id` remains the primary identifier in all responses.
+## Rollback Expectations
 
-### Phase 2: DID becomes non-null
+Because the current AT Protocol work is additive:
 
-Once all accounts have been migrated (background job complete):
-- `did` is always present in responses.
-- Server code can treat `did` as non-null internally.
-- The JSON field remains technically nullable in the schema for backward compatibility.
+- existing auth endpoints can remain enabled even if OAuth routes are disabled
+- existing sync endpoints can remain enabled even if XRPC repo routes are disabled
+- identity fields can remain populated without forcing AT Protocol client usage
 
-### Phase 3: OAuth tokens use DID as subject
+Rolling back should not require inventing an invalid `did:web` shape.
 
-- OAuth access tokens have `sub = DID` (not UUID).
-- Existing JWT tokens (Path A) continue using `sub = UUID` but gain a `did` claim.
-- Server resolves either UUID or DID to the account record.
+## What Is Still Future Migration Work
 
-## IdentityProvider Enum Change
-
-```kotlin
-// server/src/main/kotlin/app/logdate/server/auth/IdentityModels.kt
-@Serializable
-enum class IdentityProvider {
-    PASSKEY,
-    GOOGLE,
-    DID,       // NEW: for DID-based authentication in future
-}
-```
-
-The `DID` provider is not used immediately but reserves the enum value for future use (e.g., when another PDS authenticates a user via their DID and forwards a request).
-
-## Rollback Strategy
-
-Each phase can be rolled back independently:
-
-### Phase 1 Rollback (DID Primitives)
-- Remove `shared/did` module from `settings.gradle.kts`.
-- No database changes to roll back (the module is client-side only).
-
-### Phase 2 Rollback (Server-Side DID)
-- Drop `signing_keys` table.
-- Set `AccountsTable.did` and `AccountsTable.signingKeyPublic` to NULL for all rows.
-- Remove DID Document and handle resolution routes.
-- Optionally drop the columns (but nullable columns cause no harm if left).
-
-### Phase 3 Rollback (OAuth)
-- Drop `oauth_authorization_codes` and `oauth_sessions` tables.
-- Remove OAuth routes.
-- Remove OAuth metadata endpoints.
-- Existing passkey auth continues to work (it was never changed).
-
-### Phase 4 Rollback (did:plc)
-- PLC entries cannot be deleted from the PLC directory (by design).
-- Revert `AccountsTable.did` from `did:plc:...` back to `did:web:...`.
-- PLC entries will point to LogDate but LogDate will serve did:web documents.
-- This is a graceful degradation, not a clean rollback.
-
-### Phase 5 Rollback (XRPC)
-- Remove XRPC route handlers.
-- No database changes to roll back.
-
-## Risk Assessment
-
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| DID generation fails for some accounts | Low | Low | Background job retries; failures don't block the app |
-| OAuth implementation has security vulnerability | Medium | High | Thorough testing against AT Protocol test suite; security review before enabling |
-| Ed25519 library has platform issues (KMP) | Medium | Medium | Test on all platforms; fall back to JVM-only if needed |
-| PLC directory is unavailable | Low | Medium | did:plc creation retries with backoff; did:web remains functional |
-| Clients break on new `did` field in responses | Very Low | Low | Field is nullable; kotlinx.serialization ignores unknown keys by default |
-| Server KEK compromise exposes signing keys | Very Low | Critical | KEK in secrets manager; key rotation re-encrypts all stored keys |
+- durable OAuth storage
+- PLC update and recovery flows
+- user-controlled rotation keys
+- canonical MST/CAR repo persistence
+- broader LogDate lexicon and multi-collection repo migration
+- federation surfaces such as relay or firehose

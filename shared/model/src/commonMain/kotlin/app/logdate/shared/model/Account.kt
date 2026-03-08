@@ -13,6 +13,8 @@ data class LogDateAccount(
     val id: @Contextual Uuid = Uuid.random(),
     val username: String,
     val displayName: String,
+    val did: String? = null,
+    val handle: String? = null,
     val bio: String? = null,
     val passkeyCredentialIds: List<String> = emptyList(),
     val createdAt: Instant = Clock.System.now(),

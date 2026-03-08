@@ -12,6 +12,8 @@ import app.logdate.server.database.PostgreSQLAccountIdentityRepository
 import app.logdate.server.database.PostgreSQLAccountRepository
 import app.logdate.server.database.PostgreSQLPasskeyRepository
 import app.logdate.server.database.PostgreSQLSessionManager
+import app.logdate.server.identity.AtprotoIdentityConfig
+import app.logdate.server.identity.PlcIdentityService
 import app.logdate.server.passkeys.InMemoryPasskeyRepository
 import app.logdate.server.passkeys.PasskeyRepository
 import app.logdate.server.passkeys.WebAuthnPasskeyService
@@ -28,6 +30,7 @@ import org.jetbrains.exposed.sql.Transaction
 import org.koin.core.context.stopKoin
 import org.koin.core.logger.EmptyLogger
 import org.koin.dsl.koinApplication
+import org.koin.dsl.module
 import javax.sql.DataSource
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -87,12 +90,7 @@ class ServerModuleTest {
         mockkObject(SchemaUtils)
         every {
             SchemaUtils.createMissingTablesAndColumns(
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
+                *anyVararg(),
             )
         } returns Unit
 
@@ -116,12 +114,7 @@ class ServerModuleTest {
         every { DatabaseConfig.initializeDatabase(dataSource) } returns database
         every {
             SchemaUtils.createMissingTablesAndColumns(
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
+                *anyVararg(),
             )
         } returns Unit
 
@@ -131,5 +124,29 @@ class ServerModuleTest {
         )
 
         assertTrue(initializeDatabase())
+    }
+
+    @Test
+    fun `server module builds plc publishing client when enabled`() {
+        val koin =
+            koinApplication {
+                logger(EmptyLogger())
+                allowOverride(true)
+                modules(
+                    serverModule(isDatabaseAvailable = false),
+                    module {
+                        single {
+                            AtprotoIdentityConfig(
+                                handleDomain = "logdate.app",
+                                pdsServiceEndpoint = "https://logdate.app",
+                                publishHostedPlcOperations = true,
+                                plcDirectoryUrl = "https://plc.example.com/",
+                            )
+                        }
+                    },
+                )
+            }.koin
+
+        assertIs<PlcIdentityService>(koin.get<PlcIdentityService>())
     }
 }

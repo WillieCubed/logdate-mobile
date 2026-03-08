@@ -20,6 +20,9 @@ class AccountModelsSerializationTest {
                 id = Uuid.random(),
                 username = "u1",
                 displayName = "User One",
+                did = "did:web:u1.logdate.app",
+                handle = "u1.logdate.app",
+                signingKeyPublic = "zExampleKey",
                 email = "u1@example.com",
                 emailVerified = true,
                 bio = "bio",
@@ -34,6 +37,9 @@ class AccountModelsSerializationTest {
         val decodedAccount = json.decodeFromString(Account.serializer(), encodedAccount)
         assertEquals(account.id, decodedAccount.id)
         assertEquals("u1", decodedAccount.username)
+        assertEquals("did:web:u1.logdate.app", decodedAccount.did)
+        assertEquals("u1.logdate.app", decodedAccount.handle)
+        assertEquals("zExampleKey", decodedAccount.signingKeyPublic)
         assertEquals("UTC", decodedAccount.timezone)
         assertEquals("en-US", decodedAccount.locale)
 

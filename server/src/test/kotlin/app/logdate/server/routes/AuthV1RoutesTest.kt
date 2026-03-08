@@ -62,6 +62,8 @@ class AuthV1RoutesTest {
             val account = payload["data"]?.jsonObject?.get("account")?.jsonObject
             assertNotNull(account)
             assertEquals("new.user@example.com", account["email"]?.jsonPrimitive?.content)
+            assertTrue(account["did"]?.jsonPrimitive?.content?.startsWith("did:plc:") == true)
+            assertEquals("new-user.logdate.app", account["handle"]?.jsonPrimitive?.content)
             assertTrue(account["linkedProviders"]?.jsonArray?.any { it.jsonPrimitive.content == "google" } == true)
             val tokens = payload["data"]?.jsonObject?.get("tokens")?.jsonObject
             assertNotNull(tokens)
@@ -194,6 +196,8 @@ class AuthV1RoutesTest {
             val account = signinPayload["data"]?.jsonObject?.get("account")?.jsonObject
             assertNotNull(account)
             assertEquals("bind.user@example.com", account["email"]?.jsonPrimitive?.content)
+            assertTrue(account["did"]?.jsonPrimitive?.content?.startsWith("did:plc:") == true)
+            assertEquals("bind-user.logdate.app", account["handle"]?.jsonPrimitive?.content)
             val providers = account["linkedProviders"]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty()
             assertTrue(providers.contains("google"))
             assertTrue(providers.contains("passkey"))

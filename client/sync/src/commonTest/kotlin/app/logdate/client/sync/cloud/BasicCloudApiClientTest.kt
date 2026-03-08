@@ -109,6 +109,8 @@ class BasicCloudApiClientTest {
                                       "id": "550e8400-e29b-41d4-a716-446655440000",
                                       "username": "newuser",
                                       "displayName": "New User",
+                                      "did": "did:web:newuser.logdate.app",
+                                      "handle": "newuser.logdate.app",
                                       "passkeyCredentialIds": ["cred-1"],
                                       "createdAt": "2026-03-05T00:00:00Z",
                                       "updatedAt": "2026-03-05T00:00:00Z"
@@ -144,6 +146,18 @@ class BasicCloudApiClientTest {
                     .data
                     .account
                     .username,
+            )
+            assertEquals(
+                "did:web:newuser.logdate.app",
+                result
+                    .getOrThrow()
+                    .data.account.did,
+            )
+            assertEquals(
+                "newuser.logdate.app",
+                result
+                    .getOrThrow()
+                    .data.account.handle,
             )
             assertEquals(
                 "access",
@@ -256,6 +270,8 @@ class BasicCloudApiClientTest {
                                       "id": "550e8400-e29b-41d4-a716-446655440001",
                                       "username": "tester",
                                       "displayName": "Tester",
+                                      "did": "did:web:tester.logdate.app",
+                                      "handle": "tester.logdate.app",
                                       "passkeyCredentialIds": ["cred-1"],
                                       "createdAt": "2026-03-05T00:00:00Z",
                                       "updatedAt": "2026-03-05T00:00:00Z"
@@ -273,6 +289,8 @@ class BasicCloudApiClientTest {
             val result = client.getAccountInfo("jwt-abc")
             assertTrue(result.isSuccess)
             assertEquals("tester", result.getOrThrow().username)
+            assertEquals("did:web:tester.logdate.app", result.getOrThrow().did)
+            assertEquals("tester.logdate.app", result.getOrThrow().handle)
         }
 
     @Test

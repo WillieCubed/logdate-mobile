@@ -1,5 +1,6 @@
 package app.logdate.server
 
+import app.logdate.server.atproto.AtprotoContentRecordStore
 import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.AuthMetricsRegistry
@@ -11,9 +12,28 @@ import app.logdate.server.auth.InMemoryAccountRepository
 import app.logdate.server.auth.InMemorySessionManager
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.auth.SessionManager
+import app.logdate.server.identity.AtprotoIdentityConfig
+import app.logdate.server.identity.AtprotoIdentityService
+import app.logdate.server.identity.InMemorySigningKeyRepository
+import app.logdate.server.identity.SigningKeyService
+import app.logdate.server.oauth.OAuthAccessTokenService
+import app.logdate.server.oauth.OAuthAuthorizationService
+import app.logdate.server.oauth.OAuthClientMetadataResolver
+import app.logdate.server.oauth.OAuthConfig
+import app.logdate.server.oauth.OAuthDpopVerifier
+import app.logdate.server.oauth.OAuthKeyService
+import app.logdate.server.oauth.OAuthNonceService
 import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.server.routes.authV1Routes
+import app.logdate.server.routes.identityApiRoutes
+import app.logdate.server.routes.identityRoutes
+import app.logdate.server.routes.oauthRoutes
+import app.logdate.server.routes.xrpcRoutes
+import app.logdate.server.sync.InMemorySyncRepository
+import app.logdate.server.sync.SyncRepository
 import app.logdate.util.UuidSerializer
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
@@ -30,6 +50,15 @@ data class AuthV1TestEnvironment(
     val accountRepository: AccountRepository,
     val identityRepository: AccountIdentityRepository,
     val metrics: AuthMetricsRegistry,
+    val syncRepository: SyncRepository,
+    val signingKeyService: SigningKeyService,
+    val atprotoIdentityService: AtprotoIdentityService,
+    val oauthConfig: OAuthConfig,
+    val oauthKeyService: OAuthKeyService,
+    val oauthNonceService: OAuthNonceService,
+    val oauthDpopVerifier: OAuthDpopVerifier,
+    val oauthAccessTokenService: OAuthAccessTokenService,
+    val oauthAuthorizationService: OAuthAuthorizationService,
 )
 
 @OptIn(ExperimentalUuidApi::class)
@@ -42,8 +71,32 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
     metrics: AuthMetricsRegistry = AuthMetricsRegistry(),
     googleIdTokenVerifier: GoogleIdTokenVerifier? = null,
     googleClaimsByToken: Map<String, GoogleIdTokenClaims> = emptyMap(),
+    atprotoIdentityConfig: AtprotoIdentityConfig = AtprotoIdentityConfig("logdate.app", "https://logdate.app"),
+    syncRepository: SyncRepository = InMemorySyncRepository(),
+    oauthConfig: OAuthConfig = OAuthConfig(issuer = atprotoIdentityConfig.pdsServiceEndpoint),
+    oauthClientMetadataResolver: OAuthClientMetadataResolver? = null,
 ): AuthV1TestEnvironment {
     val verifier: GoogleIdTokenVerifier = googleIdTokenVerifier ?: FakeGoogleIdTokenVerifier(googleClaimsByToken)
+    val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-signing-key-kek")
+    val atprotoIdentityService =
+        AtprotoIdentityService(
+            accountRepository = accountRepository,
+            signingKeyService = signingKeyService,
+            config = atprotoIdentityConfig,
+        )
+    val atprotoContentRecordStore = AtprotoContentRecordStore(syncRepository = syncRepository, identityService = atprotoIdentityService)
+    val oauthKeyService = OAuthKeyService()
+    val oauthNonceService = OAuthNonceService()
+    val oauthDpopVerifier = OAuthDpopVerifier()
+    val oauthAccessTokenService = OAuthAccessTokenService(config = oauthConfig, keyService = oauthKeyService)
+    val metadataResolver = oauthClientMetadataResolver ?: OAuthClientMetadataResolver(HttpClient(OkHttp))
+    val oauthAuthorizationService =
+        OAuthAuthorizationService(
+            clientMetadataResolver = metadataResolver,
+            dpopVerifier = oauthDpopVerifier,
+            accessTokenService = oauthAccessTokenService,
+            nonceService = oauthNonceService,
+        )
 
     val json =
         Json {
@@ -61,19 +114,58 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
             json(json)
         }
         routing {
+            identityRoutes(atprotoIdentityService)
+            oauthRoutes(
+                config = oauthConfig,
+                keyService = oauthKeyService,
+                authorizationService = oauthAuthorizationService,
+                accountRepository = accountRepository,
+                tokenService = tokenService,
+                identityService = atprotoIdentityService,
+            )
+            xrpcRoutes(
+                identityService = atprotoIdentityService,
+                accountRepository = accountRepository,
+                tokenService = tokenService,
+                repoRecordStore = atprotoContentRecordStore,
+                oauthAccessTokenService = oauthAccessTokenService,
+                oauthDpopVerifier = oauthDpopVerifier,
+                oauthNonceService = oauthNonceService,
+            )
             route("/api/v1") {
                 authV1Routes(
                     accountRepository = accountRepository,
                     identityRepository = identityRepository,
                     sessionManager = sessionManager,
                     webAuthnService = webAuthnPasskeyService,
+                    atprotoIdentityService = atprotoIdentityService,
                     tokenService = tokenService,
                     googleIdTokenVerifier = verifier,
                     metrics = metrics,
+                )
+                identityApiRoutes(
+                    accountRepository = accountRepository,
+                    tokenService = tokenService,
+                    atprotoIdentityService = atprotoIdentityService,
+                    signingKeyService = signingKeyService,
                 )
             }
         }
     }
 
-    return AuthV1TestEnvironment(tokenService, accountRepository, identityRepository, metrics)
+    return AuthV1TestEnvironment(
+        tokenService = tokenService,
+        accountRepository = accountRepository,
+        identityRepository = identityRepository,
+        metrics = metrics,
+        syncRepository = syncRepository,
+        signingKeyService = signingKeyService,
+        atprotoIdentityService = atprotoIdentityService,
+        oauthConfig = oauthConfig,
+        oauthKeyService = oauthKeyService,
+        oauthNonceService = oauthNonceService,
+        oauthDpopVerifier = oauthDpopVerifier,
+        oauthAccessTokenService = oauthAccessTokenService,
+        oauthAuthorizationService = oauthAuthorizationService,
+    )
 }

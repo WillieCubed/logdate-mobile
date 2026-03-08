@@ -13,6 +13,10 @@ interface AccountRepository {
 
     suspend fun findByUsername(username: String): Account?
 
+    suspend fun findByHandle(handle: String): Account?
+
+    suspend fun findByDid(did: String): Account?
+
     suspend fun findByEmail(email: String): Account?
 
     suspend fun findByVerifiedEmail(email: String): List<Account>
@@ -39,6 +43,8 @@ class InMemoryAccountRepository : AccountRepository {
     private val accounts = mutableMapOf<Uuid, Account>()
     private val usernameIndex = mutableMapOf<String, Uuid>() // username -> account ID
     private val emailIndex = mutableMapOf<String, Uuid>() // email -> account ID
+    private val didIndex = mutableMapOf<String, Uuid>() // did -> account ID
+    private val handleIndex = mutableMapOf<String, Uuid>() // handle -> account ID
 
     override suspend fun save(account: Account): Account {
         val existingAccount = accounts[account.id]
@@ -48,14 +54,32 @@ class InMemoryAccountRepository : AccountRepository {
         if (existingAccount != null && existingAccount.email != account.email) {
             existingAccount.email?.let { emailIndex.remove(it) }
         }
+        if (existingAccount != null && existingAccount.did != account.did) {
+            existingAccount.did?.let { didIndex.remove(it) }
+        }
+        if (existingAccount != null && existingAccount.handle != account.handle) {
+            existingAccount.handle?.let { handleIndex.remove(it) }
+        }
 
         accounts[account.id] = account
         usernameIndex[account.username] = account.id
         account.email?.let { emailIndex[it] = account.id }
+        account.did?.let { didIndex[it] = account.id }
+        account.handle?.let { handleIndex[it] = account.id }
         return account
     }
 
     override suspend fun findById(id: Uuid): Account? = accounts[id]
+
+    override suspend fun findByDid(did: String): Account? {
+        val accountId = didIndex[did] ?: return null
+        return accounts[accountId]
+    }
+
+    override suspend fun findByHandle(handle: String): Account? {
+        val accountId = handleIndex[handle] ?: return null
+        return accounts[accountId]
+    }
 
     override suspend fun findByUsername(username: String): Account? {
         val accountId = usernameIndex[username] ?: return null
@@ -99,6 +123,8 @@ class InMemoryAccountRepository : AccountRepository {
         account?.let {
             usernameIndex.remove(it.username)
             it.email?.let { email -> emailIndex.remove(email) }
+            it.did?.let { did -> didIndex.remove(did) }
+            it.handle?.let { handle -> handleIndex.remove(handle) }
         }
         return account != null
     }

@@ -18,7 +18,10 @@ class StubTokenService(
     private val refreshTokenExpiration = 720.hours // 30 days
     private val sessionTokenExpiration = 15.minutes
 
-    override fun generateAccessToken(accountId: String): String {
+    override fun generateAccessToken(
+        accountId: String,
+        did: String?,
+    ): String {
         val now = Clock.System.now()
         val expiresAt = now + accessTokenExpiration
 
@@ -27,7 +30,10 @@ class StubTokenService(
         return "stub_${tokenData.hashCode().toString(16)}_$tokenData"
     }
 
-    override fun generateRefreshToken(accountId: String): String {
+    override fun generateRefreshToken(
+        accountId: String,
+        did: String?,
+    ): String {
         val now = Clock.System.now()
         val expiresAt = now + refreshTokenExpiration
 

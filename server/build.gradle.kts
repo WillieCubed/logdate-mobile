@@ -40,6 +40,10 @@ dependencies {
     // Shared project dependencies
     implementation(projects.shared.model)
     implementation(projects.shared.config)
+    implementation(projects.shared.atprotoCrypto)
+    implementation(projects.shared.atprotoIdentity)
+    implementation(projects.shared.atprotoPlc)
+    implementation(projects.shared.atprotoRepo)
     implementation(projects.client.util)
 
     // Ktor Server (only using available libs)
@@ -51,6 +55,7 @@ dependencies {
     implementation(libs.ktor.server.routing.openapi)
     implementation(libs.ktor.server.swagger)
     implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.ktor.client.okhttp)
 
     // Serialization
     implementation(libs.kotlinx.serialization.json)
@@ -85,6 +90,7 @@ dependencies {
 
     // Testing
     testImplementation(libs.ktor.server.test.host)
+    testImplementation(libs.ktor.client.mock)
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation("com.h2database:h2:2.3.232")

@@ -15,6 +15,8 @@ class CloudAccountTest {
         val id = Uuid.parse("6ba7b812-9dad-11d1-80b4-00c04fd430c8")
         val username = "testuser"
         val displayName = "Test User"
+        val did = "did:web:testuser.logdate.app"
+        val handle = "testuser.logdate.app"
         val userId = Uuid.parse("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
         val createdAt = Instant.parse("2023-01-01T00:00:00Z")
         val updatedAt = Instant.parse("2023-01-02T00:00:00Z")
@@ -30,6 +32,8 @@ class CloudAccountTest {
                 id = id,
                 username = username,
                 displayName = displayName,
+                did = did,
+                handle = handle,
                 userId = userId,
                 createdAt = createdAt,
                 updatedAt = updatedAt,
@@ -40,6 +44,8 @@ class CloudAccountTest {
         assertEquals(id, account.id)
         assertEquals(username, account.username)
         assertEquals(displayName, account.displayName)
+        assertEquals(did, account.did)
+        assertEquals(handle, account.handle)
         assertEquals(userId, account.userId)
         assertEquals(createdAt, account.createdAt)
         assertEquals(updatedAt, account.updatedAt)
@@ -54,6 +60,8 @@ class CloudAccountTest {
                 id = Uuid.parse("6ba7b812-9dad-11d1-80b4-00c04fd430c8"),
                 username = "testuser",
                 displayName = "Test User",
+                did = "did:web:testuser.logdate.app",
+                handle = "testuser.logdate.app",
                 userId = Uuid.parse("6ba7b810-9dad-11d1-80b4-00c04fd430c8"),
                 createdAt = Instant.parse("2023-01-01T00:00:00Z"),
                 updatedAt = Instant.parse("2023-01-02T00:00:00Z"),

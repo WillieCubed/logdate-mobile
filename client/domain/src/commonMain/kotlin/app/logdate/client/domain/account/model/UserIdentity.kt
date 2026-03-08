@@ -11,6 +11,8 @@ data class UserIdentity(
     val userId: Uuid,
     val isCloudLinked: Boolean = false,
     val cloudAccountId: String? = null,
+    val did: String? = null,
+    val handle: String? = null,
 )
 
 /**

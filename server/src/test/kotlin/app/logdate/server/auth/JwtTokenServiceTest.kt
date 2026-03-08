@@ -3,6 +3,9 @@ package app.logdate.server.auth
 import io.mockk.every
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.nio.charset.StandardCharsets
 import java.util.Base64
 import javax.crypto.Mac
@@ -36,6 +39,17 @@ class JwtTokenServiceTest {
         assertNull(service.validateRefreshToken(access))
         assertNull(service.validateSessionToken(access))
         assertNull(service.validateAccessToken(refresh))
+    }
+
+    @Test
+    fun `access and refresh tokens include did claim when provided`() {
+        val service = JwtTokenService(secret = hmacKey, issuer = issuer, audience = audience)
+
+        val access = service.generateAccessToken(accountId = "acc-1", did = "did:plc:alice123")
+        val refresh = service.generateRefreshToken(accountId = "acc-1", did = "did:plc:alice123")
+
+        assertEquals("did:plc:alice123", payloadOf(access)["did"]?.jsonPrimitive?.content)
+        assertEquals("did:plc:alice123", payloadOf(refresh)["did"]?.jsonPrimitive?.content)
     }
 
     @Test
@@ -150,10 +164,12 @@ class JwtTokenServiceTest {
                 Long::class.java,
                 Long::class.java,
                 String::class.java,
+                String::class.java,
             )
         payloadConstructor.isAccessible = true
-        val payload = payloadConstructor.newInstance("acc-1", issuer, audience, 1000L, 900L, "access")
+        val payload = payloadConstructor.newInstance("acc-1", issuer, audience, 1000L, 900L, "access", "did:plc:alice123")
         assertEquals(900L, payloadClass.getMethod("getIat").invoke(payload))
+        assertEquals("did:plc:alice123", payloadClass.getMethod("getDid").invoke(payload))
     }
 
     private fun buildToken(
@@ -171,4 +187,13 @@ class JwtTokenServiceTest {
     }
 
     private fun base64Url(bytes: ByteArray): String = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+
+    private fun payloadOf(token: String) =
+        Json
+            .parseToJsonElement(
+                String(
+                    Base64.getUrlDecoder().decode(token.split(".")[1]),
+                    StandardCharsets.UTF_8,
+                ),
+            ).jsonObject
 }

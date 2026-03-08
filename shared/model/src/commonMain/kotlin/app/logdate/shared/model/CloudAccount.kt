@@ -16,6 +16,8 @@ data class CloudAccount(
     val id: Uuid,
     val username: String,
     val displayName: String,
+    val did: String? = null,
+    val handle: String? = null,
     @Serializable(with = UuidSerializer::class)
     val userId: Uuid,
     val createdAt: Instant,

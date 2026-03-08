@@ -23,6 +23,8 @@ class UserIdentityTest {
         assertEquals(userId, userIdentity.userId)
         assertFalse(userIdentity.isCloudLinked)
         assertNull(userIdentity.cloudAccountId)
+        assertNull(userIdentity.did)
+        assertNull(userIdentity.handle)
     }
 
     @Test
@@ -30,6 +32,8 @@ class UserIdentityTest {
         // Arrange
         val userId = Uuid.parse("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
         val cloudAccountId = "acc_12345"
+        val did = "did:web:testuser.logdate.app"
+        val handle = "testuser.logdate.app"
 
         // Act
         val userIdentity =
@@ -37,12 +41,16 @@ class UserIdentityTest {
                 userId = userId,
                 isCloudLinked = true,
                 cloudAccountId = cloudAccountId,
+                did = did,
+                handle = handle,
             )
 
         // Assert
         assertEquals(userId, userIdentity.userId)
         assertTrue(userIdentity.isCloudLinked)
         assertEquals(cloudAccountId, userIdentity.cloudAccountId)
+        assertEquals(did, userIdentity.did)
+        assertEquals(handle, userIdentity.handle)
     }
 
     @Test

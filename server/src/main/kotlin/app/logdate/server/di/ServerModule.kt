@@ -12,15 +12,32 @@ import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.database.AccountIdentitiesTable
 import app.logdate.server.database.AccountLinkEventsTable
+import app.logdate.server.database.AccountsTable
 import app.logdate.server.database.DatabaseConfig
 import app.logdate.server.database.PostgreSQLAccountIdentityRepository
 import app.logdate.server.database.PostgreSQLAccountRepository
 import app.logdate.server.database.PostgreSQLPasskeyRepository
 import app.logdate.server.database.PostgreSQLSessionManager
+import app.logdate.server.database.PostgreSQLSigningKeyRepository
+import app.logdate.server.database.SigningKeysTable
+import app.logdate.server.identity.AtprotoIdentityConfig
+import app.logdate.server.identity.AtprotoIdentityService
+import app.logdate.server.identity.InMemorySigningKeyRepository
+import app.logdate.server.identity.PlcIdentityService
+import app.logdate.server.identity.SigningKeyRepository
+import app.logdate.server.identity.SigningKeyService
+import app.logdate.server.oauth.OAuthAccessTokenService
+import app.logdate.server.oauth.OAuthAuthorizationService
+import app.logdate.server.oauth.OAuthClientMetadataResolver
+import app.logdate.server.oauth.OAuthConfig
+import app.logdate.server.oauth.OAuthDpopVerifier
+import app.logdate.server.oauth.OAuthKeyService
+import app.logdate.server.oauth.OAuthNonceService
 import app.logdate.server.passkeys.InMemoryPasskeyRepository
 import app.logdate.server.passkeys.PasskeyRepository
 import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.server.sync.AssociationSyncTable
+import app.logdate.server.sync.BackupSyncTable
 import app.logdate.server.sync.ContentSyncTable
 import app.logdate.server.sync.DbSyncRepository
 import app.logdate.server.sync.InMemorySyncRepository
@@ -29,9 +46,12 @@ import app.logdate.server.sync.MediaSyncTable
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.sync.SyncRepository
 import io.github.aakira.napier.Napier
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.koin.dsl.module
+import studio.hypertext.atproto.plc.KtorPlcDirectoryClient
 
 /**
  * Initializes the database connection and tables.
@@ -43,12 +63,15 @@ fun initializeDatabase(): Boolean =
         DatabaseConfig.initializeDatabase(dataSource)
         transaction {
             SchemaUtils.createMissingTablesAndColumns(
+                AccountsTable,
                 ContentSyncTable,
                 JournalSyncTable,
                 AssociationSyncTable,
                 MediaSyncTable,
+                BackupSyncTable,
                 AccountIdentitiesTable,
                 AccountLinkEventsTable,
+                SigningKeysTable,
             )
         }
         Napier.i("Database repositories initialized successfully")
@@ -79,6 +102,10 @@ fun serverModule(isDatabaseAvailable: Boolean) =
             if (isDatabaseAvailable) PostgreSQLPasskeyRepository() else InMemoryPasskeyRepository()
         }
 
+        single<SigningKeyRepository> {
+            if (isDatabaseAvailable) PostgreSQLSigningKeyRepository() else InMemorySigningKeyRepository()
+        }
+
         single<SessionManager> {
             if (isDatabaseAvailable) PostgreSQLSessionManager() else InMemorySessionManager()
         }
@@ -89,6 +116,59 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                 relyingPartyId = System.getenv("WEBAUTHN_RP_ID") ?: "logdate.app",
                 relyingPartyName = System.getenv("WEBAUTHN_RP_NAME") ?: "LogDate",
                 origin = System.getenv("WEBAUTHN_ORIGIN") ?: "https://app.logdate.com",
+            )
+        }
+
+        single { AtprotoIdentityConfig.fromEnvironment() }
+        single {
+            OAuthConfig.fromEnvironment(
+                defaultIssuer = get<AtprotoIdentityConfig>().pdsServiceEndpoint,
+            )
+        }
+        single { HttpClient(OkHttp) }
+        single { OAuthKeyService() }
+        single { OAuthNonceService() }
+        single { OAuthDpopVerifier() }
+        single { OAuthClientMetadataResolver(httpClient = get()) }
+        single { OAuthAccessTokenService(config = get(), keyService = get()) }
+        single {
+            OAuthAuthorizationService(
+                clientMetadataResolver = get(),
+                dpopVerifier = get(),
+                accessTokenService = get(),
+                nonceService = get(),
+            )
+        }
+        single {
+            SigningKeyService(
+                repository = get(),
+                encryptionKeySeed =
+                    System.getenv("ATPROTO_SIGNING_KEY_KEK")
+                        ?: System.getenv("JWT_SECRET")
+                        ?: "logdate-atproto-dev-signing-key",
+            )
+        }
+        single {
+            PlcIdentityService(
+                signingKeyService = get(),
+                config = get(),
+                plcDirectoryClient =
+                    get<AtprotoIdentityConfig>()
+                        .takeIf(AtprotoIdentityConfig::publishHostedPlcOperations)
+                        ?.let { config ->
+                            KtorPlcDirectoryClient(
+                                httpClient = get(),
+                                baseUrl = config.normalizedPlcDirectoryUrl,
+                            )
+                        },
+            )
+        }
+        single {
+            AtprotoIdentityService(
+                accountRepository = get(),
+                signingKeyService = get(),
+                config = get(),
+                plcIdentityService = get(),
             )
         }
 

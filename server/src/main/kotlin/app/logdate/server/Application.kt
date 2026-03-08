@@ -1,6 +1,7 @@
 package app.logdate.server
 
 import app.logdate.SERVER_PORT
+import app.logdate.server.atproto.AtprotoContentRecordStore
 import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.AuthMetricsRegistry
@@ -9,10 +10,22 @@ import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.di.initializeDatabase
 import app.logdate.server.di.serverModule
+import app.logdate.server.identity.AtprotoIdentityService
+import app.logdate.server.identity.SigningKeyService
+import app.logdate.server.oauth.OAuthAccessTokenService
+import app.logdate.server.oauth.OAuthAuthorizationService
+import app.logdate.server.oauth.OAuthConfig
+import app.logdate.server.oauth.OAuthDpopVerifier
+import app.logdate.server.oauth.OAuthKeyService
+import app.logdate.server.oauth.OAuthNonceService
 import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.server.routes.authV1Routes
+import app.logdate.server.routes.identityApiRoutes
+import app.logdate.server.routes.identityRoutes
+import app.logdate.server.routes.oauthRoutes
 import app.logdate.server.routes.openApiRoutes
 import app.logdate.server.routes.syncRoutes
+import app.logdate.server.routes.xrpcRoutes
 import app.logdate.server.sync.GcsMediaStorage
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.sync.SyncRepository
@@ -37,6 +50,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import org.koin.ktor.ext.inject
@@ -95,6 +109,18 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     val googleIdTokenVerifier: GoogleIdTokenVerifier by inject()
     val sessionManager: SessionManager by inject()
     val webAuthnService: WebAuthnPasskeyService by inject()
+    val atprotoIdentityService: AtprotoIdentityService by inject()
+    val signingKeyService: SigningKeyService by inject()
+    val oauthConfig: OAuthConfig by inject()
+    val oauthKeyService: OAuthKeyService by inject()
+    val oauthNonceService: OAuthNonceService by inject()
+    val oauthDpopVerifier: OAuthDpopVerifier by inject()
+    val oauthAccessTokenService: OAuthAccessTokenService by inject()
+    val oauthAuthorizationService: OAuthAuthorizationService by inject()
+    val atprotoContentRecordStore = AtprotoContentRecordStore(syncRepository = syncRepository, identityService = atprotoIdentityService)
+
+    runCatching { runBlocking { atprotoIdentityService.backfillMissingIdentities() } }
+        .onFailure { log.warn("Failed to backfill AT Protocol identities on startup", it) }
 
     val maintenanceReadEnv: (String) -> String? =
         if (isDatabaseAvailable) {
@@ -145,6 +171,25 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
             call.respond(status)
         }
 
+        identityRoutes(atprotoIdentityService)
+        oauthRoutes(
+            config = oauthConfig,
+            keyService = oauthKeyService,
+            authorizationService = oauthAuthorizationService,
+            accountRepository = accountRepository,
+            tokenService = tokenService,
+            identityService = atprotoIdentityService,
+        )
+        xrpcRoutes(
+            identityService = atprotoIdentityService,
+            accountRepository = accountRepository,
+            tokenService = tokenService,
+            repoRecordStore = atprotoContentRecordStore,
+            oauthAccessTokenService = oauthAccessTokenService,
+            oauthDpopVerifier = oauthDpopVerifier,
+            oauthNonceService = oauthNonceService,
+        )
+
         route("/api/v1") {
             val mediaStorage = GcsMediaStorage.fromEnvironment()
             authV1Routes(
@@ -152,9 +197,16 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
                 identityRepository = accountIdentityRepository,
                 sessionManager = sessionManager,
                 webAuthnService = webAuthnService,
+                atprotoIdentityService = atprotoIdentityService,
                 tokenService = tokenService,
                 googleIdTokenVerifier = googleIdTokenVerifier,
                 metrics = authMetrics,
+            )
+            identityApiRoutes(
+                accountRepository = accountRepository,
+                tokenService = tokenService,
+                atprotoIdentityService = atprotoIdentityService,
+                signingKeyService = signingKeyService,
             )
             syncRoutes(syncRepository, tokenService, mediaStorage, syncMetrics)
         }
