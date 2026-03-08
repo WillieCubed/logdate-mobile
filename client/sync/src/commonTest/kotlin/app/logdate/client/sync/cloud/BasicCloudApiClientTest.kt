@@ -9,6 +9,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -181,7 +182,7 @@ class BasicCloudApiClientTest {
                 createApiClient(
                     MockEngine { request ->
                         assertEquals("$baseUrl/auth/me", request.url.toString())
-                        assertEquals("Bearer token-123", request.headers[HttpHeaders.Authorization])
+                        assertEquals("Bearer jwt-abc", request.headers[HttpHeaders.Authorization])
                         respond(
                             content =
                                 """
@@ -206,9 +207,52 @@ class BasicCloudApiClientTest {
                     },
                 )
 
-            val result = client.getAccountInfo("token-123")
+            val result = client.getAccountInfo("jwt-abc")
             assertTrue(result.isSuccess)
             assertEquals("tester", result.getOrThrow().username)
+        }
+
+    @Test
+    fun `upload media uses multipart media collection path`() =
+        runTest {
+            val client =
+                createApiClient(
+                    MockEngine { request ->
+                        assertEquals("$baseUrl/media", request.url.toString())
+                        assertEquals("Bearer jwt-abc", request.headers[HttpHeaders.Authorization])
+                        assertTrue(request.body is MultiPartFormDataContent)
+                        respond(
+                            content =
+                                """
+                                {
+                                  "contentId":"content-1",
+                                  "mediaId":"media-1",
+                                  "downloadUrl":"https://example.com/media-1",
+                                  "uploadedAt": 1234
+                                }
+                                """.trimIndent(),
+                            status = HttpStatusCode.Created,
+                            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                        )
+                    },
+                )
+
+            val result =
+                client.uploadMedia(
+                    accessToken = "jwt-abc",
+                    media =
+                        MediaUploadRequest(
+                            contentId = "content-1",
+                            fileName = "photo.jpg",
+                            mimeType = "image/jpeg",
+                            sizeBytes = 3,
+                            data = byteArrayOf(1, 2, 3),
+                            deviceId = DeviceId("device-a"),
+                        ),
+                )
+
+            assertTrue(result.isSuccess)
+            assertEquals("media-1", result.getOrThrow().mediaId)
         }
 
     private fun createApiClient(mockEngine: MockEngine): LogDateCloudApiClient {
