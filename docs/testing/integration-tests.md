@@ -11,6 +11,7 @@ Integration tests cover:
 - Data synchronization workflows
 - Cross-layer interactions
 - Data consistency between local and remote
+- Real client-server API journeys via `integration/server-client-e2e`
 
 ## Database Testing
 
@@ -394,6 +395,9 @@ class TimelineRepositoryTest {
 ```bash
 # Run all integration tests (including database tests)
 ./gradlew connectedAndroidTest
+
+# Run real client-server integration suite
+./gradlew :integration:server-client-e2e:test
 
 # Run specific test class
 ./gradlew connectedAndroidTest --tests "JournalDaoTest"

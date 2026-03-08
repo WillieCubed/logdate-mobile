@@ -20,6 +20,9 @@ See [E2E Test Organization Standard](./e2e-test-organization.md) for the complet
 # Run all server-side e2e tests
 ./gradlew :server:test --tests "app.logdate.server.e2e.*"
 
+# Run real client-server integration e2e tests
+./gradlew :integration:server-client-e2e:test
+
 # Run specific e2e test suite
 ./gradlew :app:android-main:connectedDebugAndroidTest -k "TestClassName"
 
@@ -156,6 +159,18 @@ Server-side tests verify API endpoints and backend functionality using Ktor's te
 ./tests/e2e/test-sync-e2e.sh
 ```
 
+### 4. Real Client-Server Integration E2E Tests
+
+**Module**: `integration/server-client-e2e`
+
+**Scenario**: Real `LogDateCloudApiClient` interactions against a booted Ktor server for auth and sync journeys.
+
+```bash
+./gradlew :integration:server-client-e2e:test
+```
+
+See [Server-Client E2E README](../../integration/server-client-e2e/README.md) for suite layout and harness details.
+
 ---
 
 ## Test Organization Summary
@@ -166,6 +181,7 @@ Server-side tests verify API endpoints and backend functionality using Ktor's te
 | AuthV1E2ETest | Pure Server | `server/.../auth/` | ✅ `test-accounts-e2e.sh` |
 | BasicEndpointCoverageE2ETest | Pure Server | `server/.../basic-coverage/` | ❌ None |
 | SyncE2ETest | Pure Server | `server/.../sync/` | ✅ `test-sync-e2e.sh` |
+| server-client-e2e | Pure Server + Client API | `integration/server-client-e2e/...` | ❌ None |
 
 **Legend**:
 - **Client Gradle**: Android instrumented test + optional adb shell script

@@ -85,3 +85,4 @@ include(":shared:config")
 include(":shared:model")
 // Server-specific modules
 include(":server")
+include(":integration:server-client-e2e")
