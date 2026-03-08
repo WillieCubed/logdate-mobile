@@ -1,4 +1,4 @@
-package app.logdate.server.e2e.sync
+package app.logdate.server.e2e.journeys.sync
 
 import app.logdate.server.configureSyncTestApp
 import app.logdate.server.routes.support.mediaUploadMultipartContent
@@ -24,9 +24,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * End-to-end sync tests that cover multi-device behavior, conflict handling, and media flow.
+ * End-to-end sync journey tests for multi-device conflict handling and media flow.
  */
-class SyncE2ETest {
+class BackupAndSyncJourneyE2ETest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test

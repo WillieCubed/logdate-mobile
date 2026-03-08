@@ -34,12 +34,13 @@ object DatabaseConfig {
         return HikariDataSource(dataSourceConfig)
     }
 
-    fun initializeDatabase(dataSource: DataSource): Database {
-        // Run Flyway migrations
-        runMigrations(dataSource)
-
-        // Connect Exposed to the database
-        return Database.connect(dataSource)
+    fun initializeDatabase(
+        dataSource: DataSource,
+        migrate: (DataSource) -> Unit = ::runMigrations,
+        connect: (DataSource) -> Database = Database::connect,
+    ): Database {
+        migrate(dataSource)
+        return connect(dataSource)
     }
 
     private fun runMigrations(dataSource: DataSource) {
@@ -89,6 +90,7 @@ object DatabaseConfig {
             connectionTimeout = 30000
             idleTimeout = 600000
             maxLifetime = 1800000
+            initializationFailTimeout = -1
 
             // Validation settings
             isAutoCommit = false

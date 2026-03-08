@@ -1,0 +1,174 @@
+package app.logdate.server.auth
+
+import io.mockk.every
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
+import java.nio.charset.StandardCharsets
+import java.util.Base64
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlin.time.Clock
+
+class JwtTokenServiceTest {
+    private val hmacKey = "test-secret-0123456789"
+    private val issuer = "issuer-a"
+    private val audience = "aud-a"
+
+    @Test
+    fun `generate and validate access refresh and session tokens`() {
+        val service = JwtTokenService(secret = hmacKey, issuer = issuer, audience = audience)
+
+        val access = service.generateAccessToken("acc-1")
+        val refresh = service.generateRefreshToken("acc-1")
+        val session = service.generateSessionToken("sess-1")
+
+        assertNotNull(service.validateAccessToken(access))
+        assertNotNull(service.validateRefreshToken(refresh))
+        assertNotNull(service.validateSessionToken(session))
+
+        assertNull(service.validateRefreshToken(access))
+        assertNull(service.validateSessionToken(access))
+        assertNull(service.validateAccessToken(refresh))
+    }
+
+    @Test
+    fun `invalid format and tampered signature return null`() {
+        val service = JwtTokenService(secret = hmacKey, issuer = issuer, audience = audience)
+        assertNull(service.validateAccessToken("not-a-jwt"))
+
+        val token = service.generateAccessToken("acc-2")
+        val tampered = token + "tampered"
+        assertNull(service.validateAccessToken(tampered))
+    }
+
+    @Test
+    fun `issuer and audience mismatches are rejected`() {
+        val producer = JwtTokenService(secret = hmacKey, issuer = "issuer-a", audience = "aud-a")
+        val token = producer.generateAccessToken("acc-3")
+
+        val wrongIssuer = JwtTokenService(secret = hmacKey, issuer = "issuer-b", audience = "aud-a")
+        val wrongAudience = JwtTokenService(secret = hmacKey, issuer = "issuer-a", audience = "aud-b")
+
+        assertNull(wrongIssuer.validateAccessToken(token))
+        assertNull(wrongAudience.validateAccessToken(token))
+    }
+
+    @Test
+    fun `expired token is rejected`() {
+        val now = Clock.System.now().epochSeconds
+        val expiredPayload =
+            "{" +
+                "\"sub\":\"acc-expired\"," +
+                "\"iss\":\"$issuer\"," +
+                "\"aud\":\"$audience\"," +
+                "\"exp\":${now - 60}," +
+                "\"iat\":${now - 120}," +
+                "\"type\":\"access\"" +
+                "}"
+        val header = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}"
+        val token = buildToken(hmacKey, header, expiredPayload)
+
+        val service = JwtTokenService(secret = hmacKey, issuer = issuer, audience = audience)
+        assertNull(service.validateAccessToken(token))
+    }
+
+    @Test
+    fun `secret generation yields non-empty random values`() {
+        val first = JwtTokenService.generateSecret()
+        val second = JwtTokenService.generateSecret()
+
+        assertTrue(first.isNotBlank())
+        assertTrue(second.isNotBlank())
+        assertNotEquals(first, second)
+    }
+
+    @Test
+    fun `generate token wraps cryptographic failures`() {
+        val service = JwtTokenService(secret = hmacKey, issuer = issuer, audience = audience)
+
+        mockkStatic(Mac::class)
+        try {
+            every { Mac.getInstance(any<String>()) } throws IllegalStateException("mac-failure")
+            assertFailsWith<IllegalStateException> {
+                service.generateAccessToken("acc-err")
+            }
+        } finally {
+            unmockkStatic(Mac::class)
+        }
+    }
+
+    @Test
+    fun `invalid payload encoding returns null during validation`() {
+        val service = JwtTokenService(secret = hmacKey, issuer = issuer, audience = audience)
+        val tokenWithInvalidPayload = "a.b@d.c"
+        assertNull(service.validateAccessToken(tokenWithInvalidPayload))
+    }
+
+    @Test
+    fun `validation catches cryptographic exceptions and returns null`() {
+        val service = JwtTokenService(secret = hmacKey, issuer = issuer, audience = audience)
+        val token = service.generateAccessToken("acc-validate-catch")
+
+        mockkStatic(Mac::class)
+        try {
+            every { Mac.getInstance(any<String>()) } throws IllegalStateException("mac-validate-failure")
+            assertNull(service.validateAccessToken(token))
+        } finally {
+            unmockkStatic(Mac::class)
+        }
+    }
+
+    @Test
+    fun `service supports default secret constructor`() {
+        val service = JwtTokenService()
+        val token = service.generateAccessToken("acc-default-secret")
+        assertNotNull(service.validateAccessToken(token))
+    }
+
+    @Test
+    fun `jwt internal header and payload getters are accessible`() {
+        val headerClass = Class.forName("app.logdate.server.auth.JwtTokenService\$JwtHeader")
+        val headerConstructor = headerClass.getDeclaredConstructor(String::class.java, String::class.java)
+        headerConstructor.isAccessible = true
+        val header = headerConstructor.newInstance("HS256", "JWT")
+        assertEquals("HS256", headerClass.getMethod("getAlg").invoke(header))
+        assertEquals("JWT", headerClass.getMethod("getTyp").invoke(header))
+
+        val payloadClass = Class.forName("app.logdate.server.auth.JwtTokenService\$JwtPayload")
+        val payloadConstructor =
+            payloadClass.getDeclaredConstructor(
+                String::class.java,
+                String::class.java,
+                String::class.java,
+                Long::class.java,
+                Long::class.java,
+                String::class.java,
+            )
+        payloadConstructor.isAccessible = true
+        val payload = payloadConstructor.newInstance("acc-1", issuer, audience, 1000L, 900L, "access")
+        assertEquals(900L, payloadClass.getMethod("getIat").invoke(payload))
+    }
+
+    private fun buildToken(
+        secret: String,
+        headerJson: String,
+        payloadJson: String,
+    ): String {
+        val header = base64Url(headerJson.toByteArray(StandardCharsets.UTF_8))
+        val payload = base64Url(payloadJson.toByteArray(StandardCharsets.UTF_8))
+        val message = "$header.$payload"
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(secret.toByteArray(StandardCharsets.UTF_8), "HmacSHA256"))
+        val signature = base64Url(mac.doFinal(message.toByteArray(StandardCharsets.UTF_8)))
+        return "$message.$signature"
+    }
+
+    private fun base64Url(bytes: ByteArray): String = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+}

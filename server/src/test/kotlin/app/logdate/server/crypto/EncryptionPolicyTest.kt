@@ -110,4 +110,18 @@ class EncryptionPolicyTest {
 
         assertEquals(PolicyDecision.AcceptPlaintext, decision)
     }
+
+    @Test
+    fun `AT_REST_ONLY encrypts client ciphertext when passthrough is disabled`() {
+        val policy =
+            EncryptionPolicy(
+                mode = EncryptionMode.AT_REST_ONLY,
+                serverEncryptionEnabled = true,
+                allowPassthroughClientCiphertext = false,
+            )
+
+        val clientCiphertext = "LDCE1".toByteArray() + ByteArray(28)
+        val decision = policy.evaluate(clientCiphertext)
+        assertEquals(PolicyDecision.EncryptAtRest, decision)
+    }
 }

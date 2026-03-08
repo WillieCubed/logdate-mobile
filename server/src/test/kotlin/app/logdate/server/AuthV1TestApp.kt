@@ -40,9 +40,10 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
     sessionManager: SessionManager = InMemorySessionManager(),
     webAuthnPasskeyService: WebAuthnPasskeyService = WebAuthnPasskeyService(),
     metrics: AuthMetricsRegistry = AuthMetricsRegistry(),
+    googleIdTokenVerifier: GoogleIdTokenVerifier? = null,
     googleClaimsByToken: Map<String, GoogleIdTokenClaims> = emptyMap(),
 ): AuthV1TestEnvironment {
-    val verifier: GoogleIdTokenVerifier = FakeGoogleIdTokenVerifier(googleClaimsByToken)
+    val verifier: GoogleIdTokenVerifier = googleIdTokenVerifier ?: FakeGoogleIdTokenVerifier(googleClaimsByToken)
 
     val json =
         Json {

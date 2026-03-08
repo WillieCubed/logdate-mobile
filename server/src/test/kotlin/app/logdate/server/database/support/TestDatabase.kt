@@ -1,0 +1,31 @@
+package app.logdate.server.database.support
+
+import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.SchemaUtils
+import org.jetbrains.exposed.sql.Table
+import org.jetbrains.exposed.sql.transactions.transaction
+
+fun withH2Database(
+    vararg tables: Table,
+    block: () -> Unit,
+) {
+    val dbName = "server_test_${System.nanoTime()}"
+    Database.connect(
+        url = "jdbc:h2:mem:$dbName;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false",
+        driver = "org.h2.Driver",
+        user = "sa",
+        password = "",
+    )
+
+    transaction {
+        SchemaUtils.create(*tables)
+    }
+
+    try {
+        block()
+    } finally {
+        transaction {
+            SchemaUtils.drop(*tables)
+        }
+    }
+}

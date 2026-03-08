@@ -1,4 +1,4 @@
-package app.logdate.server.e2e.auth
+package app.logdate.server.e2e.journeys.auth
 
 import app.logdate.server.module
 import io.ktor.client.request.get
@@ -18,9 +18,9 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * End-to-end coverage for auth v1 endpoints.
+ * End-to-end auth v1 journey scenarios.
  */
-class AuthV1E2ETest {
+class AuthOnboardingAndSigninJourneyE2ETest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test

@@ -1,4 +1,4 @@
-package app.logdate.server.e2e.basic
+package app.logdate.server.e2e.smoke
 
 import app.logdate.server.module
 import io.ktor.client.request.get
@@ -14,9 +14,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Basic endpoint coverage for the current public API surface.
+ * Platform sanity checks for core API availability and auth guards.
  */
-class BasicEndpointCoverageE2ETest {
+class PlatformSanityE2ETest {
     @Test
     fun `health endpoint returns OK`() =
         testApplication {

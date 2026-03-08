@@ -92,6 +92,13 @@ class PayloadCodecTest {
                 emptyCodec.decryptMedia(encrypted)
             }
         assertTrue(exception.message?.contains("Key not found") == true)
+
+        val encryptedBackup = codec.encryptBackup("backup".toByteArray(), "user1", "backup1")
+        val backupException =
+            assertFailsWith<EncryptionException> {
+                emptyCodec.decryptBackup(encryptedBackup)
+            }
+        assertTrue(backupException.message?.contains("Key not found") == true)
     }
 
     @Test
@@ -121,5 +128,51 @@ class PayloadCodecTest {
         val decrypted = codec.decryptMedia(encrypted)
 
         assertTrue(plaintext.contentEquals(decrypted))
+    }
+
+    @Test
+    fun `payload header codec validates prefix size version key id and iv`() {
+        val prefix = PayloadPrefixes.SERVER_MEDIA
+        val keyId = "key-1"
+        val iv = ByteArray(AesGcmCipher.IV_SIZE_BYTES) { 1 }
+        val ciphertext = ByteArray(AesGcmCipher.GCM_TAG_BYTES) { 2 }
+        val encoded = PayloadHeaderCodec.encode(prefix, keyId, iv, ciphertext)
+
+        val header = PayloadHeaderCodec.decode(encoded, prefix)
+        assertEquals(keyId, header.keyId)
+        assertEquals(AesGcmCipher.IV_SIZE_BYTES, header.iv.size)
+        assertTrue(header.ciphertextOffset > prefix.size)
+
+        assertFailsWith<EncryptionException> {
+            PayloadHeaderCodec.decode(encoded, PayloadPrefixes.SERVER_BACKUP)
+        }
+
+        assertFailsWith<EncryptionException> {
+            PayloadHeaderCodec.decode(ByteArray(prefix.size + 2), prefix)
+        }
+
+        val unsupportedVersion = encoded.copyOf().also { it[prefix.size] = 0x02 }
+        assertFailsWith<EncryptionException> {
+            PayloadHeaderCodec.decode(unsupportedVersion, prefix)
+        }
+
+        val invalidKeyIdLength =
+            encoded.copyOf().also {
+                it[prefix.size + 1] = 0x00
+                it[prefix.size + 2] = 0x00
+            }
+        assertFailsWith<EncryptionException> {
+            PayloadHeaderCodec.decode(invalidKeyIdLength, prefix)
+        }
+
+        assertFailsWith<EncryptionException> {
+            PayloadHeaderCodec.encode(prefix, "", iv, ciphertext)
+        }
+        assertFailsWith<EncryptionException> {
+            PayloadHeaderCodec.encode(prefix, "k".repeat(129), iv, ciphertext)
+        }
+        assertFailsWith<EncryptionException> {
+            PayloadHeaderCodec.encode(prefix, keyId, ByteArray(4), ciphertext)
+        }
     }
 }

@@ -13,16 +13,18 @@ interface EncryptionKeyring {
     fun getKey(keyId: String): EncryptionKey?
 }
 
-class EnvironmentKeyring : EncryptionKeyring {
+class EnvironmentKeyring(
+    private val env: (String) -> String?,
+) : EncryptionKeyring {
     private val keys: Map<String, EncryptionKey>
     private val activeKeyId: String
 
     init {
         val rawKey =
-            System.getenv("SERVER_ENCRYPTION_KEY")
+            env("SERVER_ENCRYPTION_KEY")
                 ?: throw IllegalStateException("SERVER_ENCRYPTION_KEY not configured")
         val keyBytes = decodeKey(rawKey)
-        activeKeyId = System.getenv("SERVER_ENCRYPTION_KEY_ID") ?: "default"
+        activeKeyId = env("SERVER_ENCRYPTION_KEY_ID") ?: "default"
         keys = mapOf(activeKeyId to EncryptionKey(activeKeyId, keyBytes))
     }
 
@@ -48,9 +50,9 @@ class EnvironmentKeyring : EncryptionKeyring {
     }
 
     companion object {
-        fun fromEnvironmentOrNull(): EnvironmentKeyring? =
+        fun fromEnvironmentOrNull(env: (String) -> String? = System::getenv): EnvironmentKeyring? =
             try {
-                EnvironmentKeyring()
+                EnvironmentKeyring(env)
             } catch (e: IllegalStateException) {
                 null
             }

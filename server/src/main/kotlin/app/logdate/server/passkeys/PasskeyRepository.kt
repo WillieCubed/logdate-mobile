@@ -118,24 +118,20 @@ class InMemoryPasskeyRepository : PasskeyRepository {
         publicKey: ByteArray,
         signCount: Long,
         info: PasskeyInfo,
-    ): Boolean =
-        try {
-            val storedData =
-                StoredPasskeyData(
-                    credentialId = credentialId,
-                    publicKey = publicKey,
-                    signCount = signCount,
-                    info = info,
-                    userId = userId,
-                )
+    ): Boolean {
+        val storedData =
+            StoredPasskeyData(
+                credentialId = credentialId,
+                publicKey = publicKey,
+                signCount = signCount,
+                info = info,
+                userId = userId,
+            )
 
-            passkeys[credentialId] = storedData
-            userPasskeys.computeIfAbsent(userId) { mutableListOf() }.add(credentialId)
-
-            true
-        } catch (e: Exception) {
-            false
-        }
+        passkeys[credentialId] = storedData
+        userPasskeys.computeIfAbsent(userId) { mutableListOf() }.add(credentialId)
+        return true
+    }
 
     override suspend fun getPasskeyByCredentialId(credentialId: String): Pair<Uuid, StoredPasskeyData>? {
         val passkey = passkeys[credentialId] ?: return null

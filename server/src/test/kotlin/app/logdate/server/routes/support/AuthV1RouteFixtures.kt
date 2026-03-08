@@ -55,3 +55,49 @@ fun signinPasskeyBeginBody(username: String?): String =
     } else {
         """{"username":"$username"}"""
     }
+
+fun signinPasskeyCompleteBody(
+    challenge: String,
+    credentialId: String,
+): String =
+    """
+    {
+      "challenge": "$challenge",
+      "credential": {
+        "id": "$credentialId",
+        "rawId": "$credentialId",
+        "response": {
+          "clientDataJSON": "test-client-data",
+          "authenticatorData": "test-authenticator-data",
+          "signature": "test-signature",
+          "userHandle": "test-user-handle"
+        },
+        "type": "public-key"
+      }
+    }
+    """.trimIndent()
+
+fun signupPasskeyCompleteBodyWithBindingSource(
+    sessionToken: String,
+    credentialId: String,
+    source: String,
+    bindingToken: String,
+): String =
+    """
+    {
+      "sessionToken": "$sessionToken",
+      "credential": {
+        "id": "$credentialId",
+        "rawId": "test-raw-id",
+        "response": {
+          "clientDataJSON": "test-client-data",
+          "attestationObject": "test-attestation"
+        },
+        "type": "public-key"
+      },
+      "emailBinding": {
+        "source": "$source",
+        "value": "$bindingToken"
+      }
+    }
+    """.trimIndent()

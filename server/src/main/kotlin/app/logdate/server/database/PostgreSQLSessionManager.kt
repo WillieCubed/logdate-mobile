@@ -4,6 +4,7 @@ import app.logdate.server.auth.DeviceInfo
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.SessionType
 import app.logdate.server.auth.TemporarySession
+import app.logdate.server.util.toKotlinInstant
 import app.logdate.server.util.toKotlinxInstant
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -91,7 +92,7 @@ class PostgreSQLSessionManager : SessionManager {
             // Delete expired or used sessions
             val deletedRows =
                 SessionsTable.deleteWhere {
-                    (expiresAt less now) or (isUsed eq true)
+                    (expiresAt less now.toKotlinxInstant()) or (isUsed eq true)
                 }
 
             deletedRows
@@ -195,8 +196,8 @@ class PostgreSQLSessionManager : SessionManager {
                     null // For now, keeping it simple
                 },
             sessionType = SessionType.valueOf(this[SessionsTable.sessionType]),
-            createdAt = this[SessionsTable.createdAt].toKotlinxInstant(),
-            expiresAt = this[SessionsTable.expiresAt].toKotlinxInstant(),
+            createdAt = this[SessionsTable.createdAt].toKotlinInstant(),
+            expiresAt = this[SessionsTable.expiresAt].toKotlinInstant(),
             isUsed = this[SessionsTable.isUsed],
         )
 }

@@ -17,14 +17,13 @@ class GcsMediaStorage(
     private val bucketName: String,
     projectId: String? = null,
     private val kmsKeyName: String? = null,
-) {
     private val storage: Storage =
         StorageOptions
             .newBuilder()
             .apply { projectId?.let { setProjectId(it) } }
             .build()
-            .service
-
+            .service,
+) {
     /**
      * Upload media file to GCS.
      * @param userId The owner's user ID
@@ -192,10 +191,10 @@ class GcsMediaStorage(
          * Create GcsMediaStorage from environment variables.
          * @return GcsMediaStorage instance, or null if not configured
          */
-        fun fromEnvironment(): GcsMediaStorage? {
-            val bucketName = System.getenv("GCS_BUCKET_NAME") ?: return null
-            val projectId = System.getenv("GCS_PROJECT_ID")
-            val kmsKeyName = System.getenv("GCS_MEDIA_KMS_KEY")
+        fun fromEnvironment(env: (String) -> String? = System::getenv): GcsMediaStorage? {
+            val bucketName = env("GCS_BUCKET_NAME") ?: return null
+            val projectId = env("GCS_PROJECT_ID")
+            val kmsKeyName = env("GCS_MEDIA_KMS_KEY")
             return GcsMediaStorage(bucketName, projectId, kmsKeyName)
         }
     }

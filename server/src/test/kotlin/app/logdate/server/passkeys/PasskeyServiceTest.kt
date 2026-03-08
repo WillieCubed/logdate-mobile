@@ -11,6 +11,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -201,6 +202,32 @@ class PasskeyServiceTest {
         }
 
     @Test
+    fun `verifyAuthentication rejects invalid challenge`() =
+        runTest {
+            val authResponse =
+                PasskeyAuthenticationResponse(
+                    id = "any-credential-id",
+                    rawId = "YW55LWNyZWRlbnRpYWwtaWQ",
+                    response =
+                        AuthenticatorAssertionResponse(
+                            clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0In0=",
+                            authenticatorData = "YXV0aGVudGljYXRvckRhdGE=",
+                            signature = "c2lnbmF0dXJl",
+                            userHandle = testUserId.toString(),
+                        ),
+                )
+
+            val result =
+                passkeyService.verifyAuthentication(
+                    challenge = "missing-challenge",
+                    authenticationResponse = authResponse,
+                )
+
+            assertFalse(result.success)
+            assertEquals("Invalid challenge", result.error)
+        }
+
+    @Test
     fun `getUserCredentials returns empty list for new user`() =
         runTest {
             val credentials = passkeyService.getUserCredentials(testUserId)
@@ -279,4 +306,155 @@ class PasskeyServiceTest {
             assertTrue(credentials.contains("credential-1"))
             assertTrue(credentials.contains("credential-2"))
         }
+
+    @Test
+    fun `authentication options honor explicit allowed credentials without user id`() =
+        runTest {
+            val options =
+                passkeyService.generateAuthenticationOptions(
+                    userId = null,
+                    allowedCredentials = listOf("cred-explicit-1", "cred-explicit-2"),
+                )
+
+            assertEquals(listOf("cred-explicit-1", "cred-explicit-2"), options.allowCredentials)
+        }
+
+    @Test
+    fun `authentication options with no user and no explicit credentials return empty allow list`() =
+        runTest {
+            val options = passkeyService.generateAuthenticationOptions()
+            assertTrue(options.allowCredentials.isEmpty())
+        }
+
+    @Test
+    fun `registration fails when challenge belongs to different user`() =
+        runTest {
+            val owner = Uuid.random()
+            val other = Uuid.random()
+            val options = passkeyService.generateRegistrationOptions(owner, "owner_user", "Owner User")
+            val response =
+                PasskeyRegistrationResponse(
+                    id = "credential-owner",
+                    rawId = "Y3JlZGVudGlhbC1vd25lcg==",
+                    response =
+                        AuthenticatorAttestationResponse(
+                            clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0=",
+                            attestationObject = "YXR0ZXN0YXRpb25PYmplY3Q=",
+                        ),
+                )
+
+            val result = passkeyService.verifyRegistration(other, options.challenge, response)
+            assertFalse(result.success)
+            assertEquals("User ID mismatch", result.error)
+        }
+
+    @Test
+    fun `challenge cannot be reused for authentication and delete handles missing credentials`() =
+        runTest {
+            val options = passkeyService.generateRegistrationOptions(testUserId, testUsername, testDisplayName)
+            val registrationResponse =
+                PasskeyRegistrationResponse(
+                    id = "reused-credential",
+                    rawId = "cmV1c2VkLWNyZWRlbnRpYWw=",
+                    response =
+                        AuthenticatorAttestationResponse(
+                            clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0=",
+                            attestationObject = "YXR0ZXN0YXRpb25PYmplY3Q=",
+                        ),
+                )
+            passkeyService.verifyRegistration(testUserId, options.challenge, registrationResponse)
+
+            val authOptions = passkeyService.generateAuthenticationOptions(testUserId)
+            val authResponse =
+                PasskeyAuthenticationResponse(
+                    id = "reused-credential",
+                    rawId = "cmV1c2VkLWNyZWRlbnRpYWw=",
+                    response =
+                        AuthenticatorAssertionResponse(
+                            clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0In0=",
+                            authenticatorData = "YXV0aGVudGljYXRvckRhdGE=",
+                            signature = "c2lnbmF0dXJl",
+                            userHandle = testUserId.toString(),
+                        ),
+                )
+            val first = passkeyService.verifyAuthentication(authOptions.challenge, authResponse)
+            assertTrue(first.success)
+
+            val second = passkeyService.verifyAuthentication(authOptions.challenge, authResponse)
+            assertFalse(second.success)
+            assertEquals("Challenge already used", second.error)
+
+            assertFalse(passkeyService.deletePasskey("missing-credential", testUserId))
+            assertTrue(passkeyService.deletePasskey("reused-credential", testUserId))
+            assertTrue(passkeyService.getPasskeysForUser(testUserId).isEmpty())
+            assertTrue(passkeyService.getUserCredentials(testUserId).isEmpty())
+            assertNull(passkeyService.getPasskeysForUser(testUserId).firstOrNull())
+        }
+
+    @Test
+    fun `verification catches unexpected repository map failures`() =
+        runTest {
+            val registrationOptions =
+                passkeyService.generateRegistrationOptions(
+                    userId = testUserId,
+                    username = testUsername,
+                    displayName = testDisplayName,
+                )
+            val registrationResponse =
+                PasskeyRegistrationResponse(
+                    id = "throwing-credential",
+                    rawId = "dGhyb3dpbmctY3JlZGVudGlhbA==",
+                    response =
+                        AuthenticatorAttestationResponse(
+                            clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0=",
+                            attestationObject = "YXR0ZXN0YXRpb25PYmplY3Q=",
+                        ),
+                )
+
+            val throwingMap =
+                object : MutableMap<String, app.logdate.shared.model.PasskeyInfo> by mutableMapOf() {
+                    override fun put(
+                        key: String,
+                        value: app.logdate.shared.model.PasskeyInfo,
+                    ): app.logdate.shared.model.PasskeyInfo? = throw IllegalStateException("forced put failure")
+                }
+            replacePrivateMap(passkeyService, "passkeys", throwingMap)
+            val registration = passkeyService.verifyRegistration(testUserId, registrationOptions.challenge, registrationResponse)
+            assertFalse(registration.success)
+            assertEquals("forced put failure", registration.error)
+
+            val authOptions = passkeyService.generateAuthenticationOptions(userId = testUserId)
+            val throwingGetMap =
+                object : MutableMap<String, app.logdate.shared.model.PasskeyInfo> by mutableMapOf() {
+                    override fun get(key: String): app.logdate.shared.model.PasskeyInfo? = throw IllegalStateException("forced get failure")
+                }
+            replacePrivateMap(passkeyService, "passkeys", throwingGetMap)
+            val authentication =
+                passkeyService.verifyAuthentication(
+                    authOptions.challenge,
+                    PasskeyAuthenticationResponse(
+                        id = "any",
+                        rawId = "YW55",
+                        response =
+                            AuthenticatorAssertionResponse(
+                                clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0In0=",
+                                authenticatorData = "YXV0aGVudGljYXRvckRhdGE=",
+                                signature = "c2lnbmF0dXJl",
+                                userHandle = testUserId.toString(),
+                            ),
+                    ),
+                )
+            assertFalse(authentication.success)
+            assertEquals("forced get failure", authentication.error)
+        }
+
+    private fun replacePrivateMap(
+        target: Any,
+        fieldName: String,
+        value: MutableMap<String, app.logdate.shared.model.PasskeyInfo>,
+    ) {
+        val field = target::class.java.getDeclaredField(fieldName)
+        field.isAccessible = true
+        field.set(target, value)
+    }
 }

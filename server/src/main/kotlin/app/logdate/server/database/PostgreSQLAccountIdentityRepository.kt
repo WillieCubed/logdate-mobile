@@ -4,6 +4,8 @@ import app.logdate.server.auth.AccountIdentity
 import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountLinkEvent
 import app.logdate.server.auth.IdentityProvider
+import app.logdate.server.util.toKotlinInstant
+import app.logdate.server.util.toKotlinxInstant
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
@@ -35,8 +37,8 @@ class PostgreSQLAccountIdentityRepository : AccountIdentityRepository {
                     it[providerSubject] = identity.providerSubject
                     it[email] = identity.email
                     it[emailVerified] = identity.emailVerified
-                    it[createdAt] = identity.createdAt
-                    it[lastSignInAt] = identity.lastSignInAt
+                    it[createdAt] = identity.createdAt.toKotlinxInstant()
+                    it[lastSignInAt] = identity.lastSignInAt?.toKotlinxInstant()
                     it[metadataJson] = identity.metadataJson
                 }
                 identity
@@ -46,7 +48,7 @@ class PostgreSQLAccountIdentityRepository : AccountIdentityRepository {
                     it[accountId] = identity.accountId.toJavaUUID()
                     it[email] = identity.email
                     it[emailVerified] = identity.emailVerified
-                    it[lastSignInAt] = identity.lastSignInAt
+                    it[lastSignInAt] = identity.lastSignInAt?.toKotlinxInstant()
                     it[metadataJson] = identity.metadataJson
                 }
                 identity.copy(id = identityId)
@@ -88,7 +90,7 @@ class PostgreSQLAccountIdentityRepository : AccountIdentityRepository {
     override suspend fun touchLastSignIn(identityId: Uuid): Boolean =
         transaction {
             AccountIdentitiesTable.update({ AccountIdentitiesTable.id eq identityId.toJavaUUID() }) {
-                it[lastSignInAt] = Clock.System.now()
+                it[lastSignInAt] = Clock.System.now().toKotlinxInstant()
             } > 0
         }
 
@@ -102,7 +104,7 @@ class PostgreSQLAccountIdentityRepository : AccountIdentityRepository {
                 it[reason] = event.reason
                 it[ipHash] = event.ipHash
                 it[userAgentHash] = event.userAgentHash
-                it[createdAt] = event.createdAt
+                it[createdAt] = event.createdAt.toKotlinxInstant()
                 it[metadataJson] = event.metadataJson
             }
             event
@@ -116,8 +118,8 @@ class PostgreSQLAccountIdentityRepository : AccountIdentityRepository {
             providerSubject = this[AccountIdentitiesTable.providerSubject],
             email = this[AccountIdentitiesTable.email],
             emailVerified = this[AccountIdentitiesTable.emailVerified],
-            createdAt = this[AccountIdentitiesTable.createdAt],
-            lastSignInAt = this[AccountIdentitiesTable.lastSignInAt],
+            createdAt = this[AccountIdentitiesTable.createdAt].toKotlinInstant(),
+            lastSignInAt = this[AccountIdentitiesTable.lastSignInAt]?.toKotlinInstant(),
             metadataJson = this[AccountIdentitiesTable.metadataJson],
         )
 }

@@ -2,6 +2,8 @@ package app.logdate.server.database
 
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountRepository
+import app.logdate.server.util.toKotlinInstant
+import app.logdate.server.util.toKotlinxInstant
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -35,7 +37,7 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[email] = account.email
                     it[emailVerified] = account.emailVerified
                     it[bio] = account.bio
-                    it[lastSignInAt] = account.lastSignInAt
+                    it[lastSignInAt] = account.lastSignInAt?.toKotlinxInstant()
                     it[isActive] = account.isActive
                     it[preferences] = account.preferences?.toString() ?: "{}"
                 }
@@ -49,8 +51,8 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[email] = account.email
                     it[emailVerified] = account.emailVerified
                     it[bio] = account.bio
-                    it[createdAt] = account.createdAt
-                    it[lastSignInAt] = account.lastSignInAt
+                    it[createdAt] = account.createdAt.toKotlinxInstant()
+                    it[lastSignInAt] = account.lastSignInAt?.toKotlinxInstant()
                     it[isActive] = account.isActive
                     it[preferences] = account.preferences?.toString() ?: "{}"
                 }
@@ -115,7 +117,7 @@ class PostgreSQLAccountRepository : AccountRepository {
         transaction {
             val updatedRows =
                 AccountsTable.update({ AccountsTable.id eq accountId.toJavaUUID() }) {
-                    it[lastSignInAt] = Clock.System.now()
+                    it[lastSignInAt] = Clock.System.now().toKotlinxInstant()
                 }
             updatedRows > 0
         }
@@ -133,6 +135,7 @@ class PostgreSQLAccountRepository : AccountRepository {
         transaction {
             AccountsTable
                 .selectAll()
+                .where { AccountsTable.isActive eq true }
                 .orderBy(AccountsTable.createdAt, SortOrder.DESC)
                 .map { it.toAccount() }
         }
@@ -141,8 +144,10 @@ class PostgreSQLAccountRepository : AccountRepository {
         transaction {
             AccountsTable
                 .selectAll()
-                .where { AccountsTable.createdAt greater timestamp }
-                .orderBy(AccountsTable.createdAt, SortOrder.DESC)
+                .where {
+                    (AccountsTable.createdAt greater timestamp.toKotlinxInstant()) and
+                        (AccountsTable.isActive eq true)
+                }.orderBy(AccountsTable.createdAt, SortOrder.DESC)
                 .map { it.toAccount() }
         }
 
@@ -160,8 +165,8 @@ class PostgreSQLAccountRepository : AccountRepository {
             email = this[AccountsTable.email],
             emailVerified = this[AccountsTable.emailVerified],
             bio = this[AccountsTable.bio],
-            createdAt = this[AccountsTable.createdAt],
-            lastSignInAt = this[AccountsTable.lastSignInAt],
+            createdAt = this[AccountsTable.createdAt].toKotlinInstant(),
+            lastSignInAt = this[AccountsTable.lastSignInAt]?.toKotlinInstant(),
             isActive = this[AccountsTable.isActive],
             preferences = this[AccountsTable.preferences],
         )

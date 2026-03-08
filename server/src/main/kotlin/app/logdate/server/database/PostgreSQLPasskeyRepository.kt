@@ -86,7 +86,7 @@ class PostgreSQLPasskeyRepository : PasskeyRepository {
             val updatedRows =
                 PasskeysTable.update({ PasskeysTable.credentialId eq credentialId }) {
                     it[signCount] = newSignCount
-                    it[lastUsedAt] = Clock.System.now()
+                    it[lastUsedAt] = Clock.System.now().toKotlinxInstant()
                 }
             updatedRows > 0
         }
@@ -167,7 +167,7 @@ class PostgreSQLPasskeyRepository : PasskeyRepository {
         transaction {
             val updatedRows =
                 PasskeysTable.update({ PasskeysTable.credentialId eq credentialId }) {
-                    it[lastUsedAt] = Clock.System.now()
+                    it[lastUsedAt] = Clock.System.now().toKotlinxInstant()
                 }
             updatedRows > 0
         }

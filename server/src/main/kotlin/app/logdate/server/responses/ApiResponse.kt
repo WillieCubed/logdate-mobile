@@ -5,30 +5,9 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 
 @Serializable
-sealed class ApiResponse<out T> {
-    abstract val timestamp: Instant
-
-    @Serializable
-    data class Success<T>(
-        val data: T,
-        val message: String? = null,
-        override val timestamp: Instant = Clock.System.now(),
-    ) : ApiResponse<T>()
-
-    @Serializable
-    data class Error(
-        val code: String,
-        val message: String,
-        val details: Map<String, String>? = null,
-        override val timestamp: Instant = Clock.System.now(),
-    ) : ApiResponse<Nothing>()
-}
-
-// Simple non-sealed versions for testing
-@Serializable
 data class SimpleSuccessResponse<T>(
     val data: T,
-    val message: String? = null,
+    val message: String = "Success",
     val timestamp: Instant = Clock.System.now(),
 )
 
@@ -36,43 +15,17 @@ data class SimpleSuccessResponse<T>(
 data class SimpleErrorResponse(
     val code: String,
     val message: String,
-    val details: Map<String, String>? = null,
+    val details: Map<String, String> = emptyMap(),
     val timestamp: Instant = Clock.System.now(),
 )
 
-@Serializable
-data class PaginatedResponse<T>(
-    val items: List<T>,
-    val page: Int,
-    val limit: Int,
-    val total: Int,
-    val hasMore: Boolean,
-)
-
-fun <T> success(
+fun <T> simpleSuccess(
     data: T,
-    message: String? = null,
-) = ApiResponse.Success(data, message)
-
-@Suppress("UNCHECKED_CAST")
-fun <T> success(message: String) = ApiResponse.Success(Unit as T, message)
+    message: String = "Success",
+): SimpleSuccessResponse<T> = SimpleSuccessResponse(data = data, message = message)
 
 fun error(
     code: String,
     message: String,
-    details: Map<String, String>? = null,
-) = ApiResponse.Error(code, message, details)
-
-// Simple helper functions for cleaner responses
-fun <T> simpleSuccess(
-    data: T,
-    message: String? = null,
-) = SimpleSuccessResponse(data, message)
-
-fun <T> simpleSuccess(message: String) = SimpleSuccessResponse(Unit, message)
-
-fun simpleError(
-    code: String,
-    message: String,
-    details: Map<String, String>? = null,
-) = SimpleErrorResponse(code, message, details)
+    details: Map<String, String> = emptyMap(),
+): SimpleErrorResponse = SimpleErrorResponse(code = code, message = message, details = details)

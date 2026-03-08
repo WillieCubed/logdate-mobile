@@ -1,6 +1,5 @@
 package app.logdate.server.passkeys
 
-import app.logdate.server.util.toKotlinInstant
 import app.logdate.shared.model.PasskeyAuthenticationOptions
 import app.logdate.shared.model.PasskeyAuthenticationResponse
 import app.logdate.shared.model.PasskeyChallenge
@@ -184,7 +183,7 @@ class WebAuthnPasskeyService(
                     credentialId = credentialId,
                     nickname = relyingPartyName,
                     deviceType = "platform",
-                    createdAt = Clock.System.now().toKotlinInstant(),
+                    createdAt = Clock.System.now(),
                     lastUsedAt = null,
                     isActive = true,
                 )
@@ -247,9 +246,7 @@ class WebAuthnPasskeyService(
             val attestationObject =
                 registrationData.attestationObject
                     ?: return RegistrationResult(success = false, error = "Attestation object is missing")
-            val authenticatorData =
-                attestationObject.authenticatorData
-                    ?: return RegistrationResult(success = false, error = "Authenticator data is missing")
+            val authenticatorData = attestationObject.authenticatorData
 
             val attestedCredentialData =
                 authenticatorData.attestedCredentialData
@@ -267,7 +264,7 @@ class WebAuthnPasskeyService(
                     credentialId = canonicalCredentialId,
                     nickname = relyingPartyName,
                     deviceType = "platform",
-                    createdAt = Clock.System.now().toKotlinInstant(),
+                    createdAt = Clock.System.now(),
                     lastUsedAt = null,
                     isActive = true,
                 )
@@ -459,8 +456,9 @@ class WebAuthnPasskeyService(
 private fun readBooleanEnv(
     name: String,
     defaultValue: Boolean,
+    readEnv: (String) -> String? = System::getenv,
 ): Boolean {
-    val raw = System.getenv(name) ?: return defaultValue
+    val raw = readEnv(name) ?: return defaultValue
     return raw.equals("true", ignoreCase = true) ||
         raw.equals("yes", ignoreCase = true) ||
         raw == "1"

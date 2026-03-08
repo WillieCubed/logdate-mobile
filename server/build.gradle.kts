@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.ktor)
+    jacoco
     application
 }
 
@@ -24,6 +25,15 @@ kotlin {
 java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
+}
+
+configurations.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "org.jetbrains.kotlinx" && requested.name.startsWith("kotlinx-datetime")) {
+            useVersion("0.6.2")
+            because("Exposed kotlin-datetime integration requires kotlinx.datetime.Instant runtime class")
+        }
+    }
 }
 
 dependencies {
@@ -77,6 +87,7 @@ dependencies {
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation("com.h2database:h2:2.3.232")
 
     // E2E Testing
     testImplementation(libs.testcontainers.testcontainers)
@@ -93,6 +104,38 @@ tasks.test {
 
     // Testcontainers configuration
     systemProperty("testcontainers.reuse.enable", "true")
+}
+
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
+    }
+}
+
+tasks.jacocoTestCoverageVerification {
+    dependsOn(tasks.test)
+    violationRules {
+        rule {
+            element = "BUNDLE"
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "1.0".toBigDecimal()
+            }
+            limit {
+                counter = "METHOD"
+                value = "COVEREDRATIO"
+                minimum = "1.0".toBigDecimal()
+            }
+        }
+    }
 }
 
 tasks.named<Jar>("jar") {
@@ -126,4 +169,5 @@ tasks.register<JavaExec>("validateOpenApi") {
 
 tasks.named("check") {
     dependsOn("validateOpenApi")
+    dependsOn("jacocoTestCoverageVerification")
 }

@@ -1,0 +1,348 @@
+package app.logdate.server.routes.auth
+
+import app.logdate.server.auth.Account
+import app.logdate.server.auth.AccountIdentity
+import app.logdate.server.auth.AccountRepository
+import app.logdate.server.auth.GoogleIdTokenClaims
+import app.logdate.server.auth.GoogleIdTokenVerifier
+import app.logdate.server.auth.IdentityProvider
+import app.logdate.server.auth.SessionManager
+import app.logdate.server.auth.SessionType
+import app.logdate.server.auth.TemporarySession
+import app.logdate.server.configureAuthV1TestApp
+import app.logdate.server.passkeys.WebAuthnPasskeyService
+import app.logdate.server.routes.support.googleAuthBody
+import app.logdate.server.routes.support.googleClaims
+import app.logdate.server.routes.support.googleClaimsByToken
+import app.logdate.server.routes.support.signupPasskeyCompleteBody
+import app.logdate.server.routes.support.signupPasskeyCompleteBodyWithBindingSource
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
+import io.ktor.server.testing.testApplication
+import io.mockk.coEvery
+import io.mockk.every
+import io.mockk.mockk
+import kotlinx.coroutines.runBlocking
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+
+@OptIn(ExperimentalUuidApi::class)
+class AuthSignupFlowContractsTest {
+    @Test
+    fun `google auth rejects invalid signup token and unverified signin email`() =
+        testApplication {
+            configureAuthV1TestApp(
+                googleClaimsByToken =
+                    googleClaimsByToken(
+                        "signin-unverified" to
+                            GoogleIdTokenClaims(
+                                subject = "signin-unverified-sub",
+                                email = "signin-unverified@example.com",
+                                emailVerified = false,
+                                name = "Signin Unverified",
+                                issuer = "https://accounts.google.com",
+                                audience = "client",
+                                expiresAtEpochSeconds = Clock.System.now().epochSeconds + 3600,
+                                issuedAtEpochSeconds = Clock.System.now().epochSeconds,
+                            ),
+                    ),
+            )
+
+            val signupInvalidToken =
+                client.post("/api/v1/auth/signup/google") {
+                    contentType(ContentType.Application.Json)
+                    setBody(googleAuthBody("missing-token"))
+                }
+            assertEquals(HttpStatusCode.Unauthorized, signupInvalidToken.status)
+            assertTrue(signupInvalidToken.bodyAsText().contains("GOOGLE_TOKEN_INVALID"))
+
+            val signinUnverified =
+                client.post("/api/v1/auth/signin/google") {
+                    contentType(ContentType.Application.Json)
+                    setBody(googleAuthBody("signin-unverified"))
+                }
+            assertEquals(HttpStatusCode.BadRequest, signinUnverified.status)
+            assertTrue(signinUnverified.bodyAsText().contains("GOOGLE_EMAIL_UNVERIFIED"))
+        }
+
+    @Test
+    fun `google signup chooses suffixed username when requested username is already taken`() =
+        testApplication {
+            val env =
+                configureAuthV1TestApp(
+                    googleClaimsByToken =
+                        googleClaimsByToken(
+                            "suffix-token" to
+                                googleClaims(
+                                    subject = "suffix-subject",
+                                    email = "suffix@example.com",
+                                    name = "Suffix User",
+                                ),
+                        ),
+                )
+            runBlocking {
+                env.accountRepository.save(
+                    Account(
+                        id = Uuid.random(),
+                        username = "takenbase",
+                        displayName = "Taken Base",
+                        email = "takenbase@example.com",
+                        emailVerified = true,
+                        createdAt = Clock.System.now(),
+                    ),
+                )
+            }
+
+            val response =
+                client.post("/api/v1/auth/signup/google") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"idToken":"suffix-token","username":"takenbase"}""")
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertTrue(response.bodyAsText().contains("takenbase_1001"))
+        }
+
+    @Test
+    fun `google signup returns conflict when no unique username can be generated`() =
+        testApplication {
+            val accountRepository = mockk<AccountRepository>(relaxed = true)
+            coEvery { accountRepository.findByVerifiedEmail(any()) } returns emptyList()
+            coEvery { accountRepository.usernameExists(any()) } returns true
+
+            configureAuthV1TestApp(
+                accountRepository = accountRepository,
+                googleClaimsByToken =
+                    googleClaimsByToken(
+                        "exhaust-token" to
+                            googleClaims(
+                                subject = "exhaust-subject",
+                                email = "exhaust@example.com",
+                                name = "Exhaust User",
+                            ),
+                    ),
+            )
+
+            val response =
+                client.post("/api/v1/auth/signup/google") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"idToken":"exhaust-token","username":"takenbase"}""")
+                }
+
+            assertEquals(HttpStatusCode.Conflict, response.status)
+            assertTrue(response.bodyAsText().contains("ACCOUNT_LINK_CONFLICT"))
+        }
+
+    @Test
+    fun `passkey signup completion rejects failed passkey verification`() =
+        testApplication {
+            val sessionToken = "s-sgn-a"
+            val accountId = Uuid.random()
+            val sessionManager = mockk<SessionManager>(relaxed = true)
+            coEvery { sessionManager.validateSession(eq(sessionToken), eq(SessionType.ACCOUNT_CREATION)) } returns
+                accountCreationSession(sessionToken, accountId)
+
+            val passkeyService = mockk<WebAuthnPasskeyService>(relaxed = true)
+            every { passkeyService.verifyRegistration(any(), any(), any()) } returns
+                WebAuthnPasskeyService.RegistrationResult(success = false, error = "verification-nope")
+
+            configureAuthV1TestApp(
+                sessionManager = sessionManager,
+                webAuthnPasskeyService = passkeyService,
+            )
+
+            val verifyFailed =
+                client.post("/api/v1/auth/signup/passkey/complete") {
+                    contentType(ContentType.Application.Json)
+                    setBody(signupPasskeyCompleteBody(sessionToken = sessionToken, credentialId = "cred-a"))
+                }
+            assertEquals(HttpStatusCode.BadRequest, verifyFailed.status)
+            assertTrue(verifyFailed.bodyAsText().contains("PASSKEY_VERIFICATION_FAILED"))
+        }
+
+    @Test
+    fun `passkey signup completion handles session failures and invalid email binding`() =
+        testApplication {
+            val sessionToken = "s-catch"
+            val accountId = Uuid.random()
+            val sessionManager = mockk<SessionManager>(relaxed = true)
+            coEvery { sessionManager.validateSession(eq(sessionToken), eq(SessionType.ACCOUNT_CREATION)) } throws
+                IllegalStateException("session-boom") andThen
+                accountCreationSession(sessionToken, accountId)
+
+            val passkeyService = mockk<WebAuthnPasskeyService>(relaxed = true)
+            every { passkeyService.verifyRegistration(any(), any(), any()) } returns
+                WebAuthnPasskeyService.RegistrationResult(success = true, credentialId = "cred-catch")
+            every { passkeyService.getPasskeysForUser(any()) } returns emptyList()
+            configureAuthV1TestApp(
+                sessionManager = sessionManager,
+                webAuthnPasskeyService = passkeyService,
+                googleClaimsByToken =
+                    googleClaimsByToken(
+                        "b-unvfy" to
+                            GoogleIdTokenClaims(
+                                subject = "binding-sub",
+                                email = "binding@example.com",
+                                emailVerified = false,
+                                name = "Binding",
+                                issuer = "https://accounts.google.com",
+                                audience = "client",
+                                expiresAtEpochSeconds = Clock.System.now().epochSeconds + 3600,
+                                issuedAtEpochSeconds = Clock.System.now().epochSeconds,
+                            ),
+                    ),
+            )
+
+            val caughtFailure =
+                client.post("/api/v1/auth/signup/passkey/complete") {
+                    contentType(ContentType.Application.Json)
+                    setBody(signupPasskeyCompleteBody(sessionToken = sessionToken, credentialId = "cred-catch"))
+                }
+            assertEquals(HttpStatusCode.InternalServerError, caughtFailure.status)
+
+            val unverifiedBinding =
+                client.post("/api/v1/auth/signup/passkey/complete") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        signupPasskeyCompleteBodyWithBindingSource(
+                            sessionToken = sessionToken,
+                            credentialId = "cred-catch",
+                            source = "google_id_token",
+                            bindingToken = "b-unvfy",
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.BadRequest, unverifiedBinding.status)
+            assertTrue(unverifiedBinding.bodyAsText().contains("EMAIL_BINDING_INVALID"))
+        }
+
+    @Test
+    fun `passkey signup completion rejects conflicting google link and falls back to request credential id`() =
+        testApplication {
+            val sessionToken = "s-sgn-b"
+            val accountId = Uuid.random()
+            val sessionManager = mockk<SessionManager>(relaxed = true)
+            coEvery { sessionManager.validateSession(eq(sessionToken), eq(SessionType.ACCOUNT_CREATION)) } returns
+                accountCreationSession(sessionToken, accountId)
+            coEvery { sessionManager.markSessionUsed(sessionToken) } returns true
+
+            val passkeyService = mockk<WebAuthnPasskeyService>(relaxed = true)
+            every { passkeyService.verifyRegistration(any(), any(), any()) } returns
+                WebAuthnPasskeyService.RegistrationResult(
+                    success = true,
+                    credentialId = null,
+                    passkey = null,
+                )
+            every { passkeyService.getPasskeysForUser(any()) } returns emptyList()
+
+            val env =
+                configureAuthV1TestApp(
+                    sessionManager = sessionManager,
+                    webAuthnPasskeyService = passkeyService,
+                    googleClaimsByToken =
+                        googleClaimsByToken(
+                            "b-tok" to
+                                googleClaims(
+                                    subject = "google-conflict-sub",
+                                    email = "conflict@example.com",
+                                    name = "Conflict User",
+                                ),
+                        ),
+                )
+
+            runBlocking {
+                env.identityRepository.save(
+                    AccountIdentity(
+                        id = Uuid.random(),
+                        accountId = Uuid.random(),
+                        provider = IdentityProvider.GOOGLE,
+                        providerSubject = "google-conflict-sub",
+                        email = "conflict@example.com",
+                        emailVerified = true,
+                        createdAt = Clock.System.now(),
+                    ),
+                )
+            }
+
+            val conflict =
+                client.post("/api/v1/auth/signup/passkey/complete") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        signupPasskeyCompleteBodyWithBindingSource(
+                            sessionToken = sessionToken,
+                            credentialId = "cred-conflict",
+                            source = "google_id_token",
+                            bindingToken = "b-tok",
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.Conflict, conflict.status)
+            assertTrue(conflict.bodyAsText().contains("ACCOUNT_LINK_CONFLICT"))
+
+            val success =
+                client.post("/api/v1/auth/signup/passkey/complete") {
+                    contentType(ContentType.Application.Json)
+                    setBody(signupPasskeyCompleteBody(sessionToken = sessionToken, credentialId = "cred-request-fallback"))
+                }
+            assertEquals(HttpStatusCode.Created, success.status)
+            runBlocking {
+                val identities = env.identityRepository.findByAccountId(accountId)
+                assertTrue(
+                    identities.any {
+                        it.provider == IdentityProvider.PASSKEY && it.providerSubject == "cred-request-fallback"
+                    },
+                )
+            }
+        }
+
+    @Test
+    fun `google signup and signin return server error when verifier crashes`() =
+        testApplication {
+            val verifier = mockk<GoogleIdTokenVerifier>()
+            coEvery { verifier.verify(any(), any()) } throws IllegalStateException("google-verifier-boom")
+            configureAuthV1TestApp(googleIdTokenVerifier = verifier)
+
+            val signup =
+                client.post("/api/v1/auth/signup/google") {
+                    contentType(ContentType.Application.Json)
+                    setBody(googleAuthBody("token-boom"))
+                }
+            assertEquals(HttpStatusCode.InternalServerError, signup.status)
+
+            val signin =
+                client.post("/api/v1/auth/signin/google") {
+                    contentType(ContentType.Application.Json)
+                    setBody(googleAuthBody("token-boom"))
+                }
+            assertEquals(HttpStatusCode.InternalServerError, signin.status)
+        }
+
+    private fun accountCreationSession(
+        token: String,
+        userId: Uuid,
+    ): TemporarySession {
+        val now = Clock.System.now()
+        return TemporarySession(
+            id = token,
+            temporaryUserId = userId,
+            challenge = "challenge",
+            username = "signup_user",
+            displayName = "Signup User",
+            bio = "bio",
+            deviceInfo = null,
+            sessionType = SessionType.ACCOUNT_CREATION,
+            createdAt = now,
+            expiresAt = now + 10.minutes,
+            isUsed = false,
+        )
+    }
+}

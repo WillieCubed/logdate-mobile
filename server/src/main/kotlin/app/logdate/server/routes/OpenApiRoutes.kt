@@ -18,11 +18,11 @@ private const val OPENAPI_TITLE = "LogDate Server API"
 private const val OPENAPI_DESCRIPTION = "Machine-readable contract for LogDate auth and sync endpoints."
 private const val OPENAPI_DOC_VERSION = "1.0.0"
 
-fun Route.openApiRoutes() {
-    val baseDoc = buildBaseOpenApiDoc()
-    val jsonSource = OpenApiDocSource.Routing(contentType = ContentType.Application.Json)
-    val yamlSource = OpenApiDocSource.Routing(contentType = ContentType.Application.Yaml)
-
+fun Route.openApiRoutes(
+    baseDoc: OpenApiDoc = buildBaseOpenApiDoc(),
+    jsonSource: OpenApiDocSource = OpenApiDocSource.Routing(contentType = ContentType.Application.Json),
+    yamlSource: OpenApiDocSource = OpenApiDocSource.Routing(contentType = ContentType.Application.Yaml),
+) {
     get("/openapi.json") {
         call.respondOpenApi(jsonSource, baseDoc)
     }

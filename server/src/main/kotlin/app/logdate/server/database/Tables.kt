@@ -87,31 +87,3 @@ object SessionsTable : Table("sessions") {
 
     override val primaryKey = PrimaryKey(id)
 }
-
-object WebAuthnChallengesTable : Table("webauthn_challenges") {
-    val challenge = text("challenge")
-    val userId = uuid("user_id")
-    val challengeType = varchar("challenge_type", 20)
-    val expiresAt = timestamp("expires_at")
-    val isUsed = bool("is_used").default(false)
-    val createdAt = timestamp("created_at")
-
-    override val primaryKey = PrimaryKey(challenge)
-}
-
-/**
- * Custom data types for JSON serialization
- */
-data class UserPreferences(
-    val theme: String? = null,
-    val language: String? = null,
-    val notifications: Map<String, Boolean> = emptyMap(),
-    val privacy: Map<String, Any> = emptyMap(),
-)
-
-data class WebAuthnData(
-    val attestationType: String? = null,
-    val transports: List<String> = emptyList(),
-    val userVerification: String? = null,
-    val extensions: Map<String, Any> = emptyMap(),
-)

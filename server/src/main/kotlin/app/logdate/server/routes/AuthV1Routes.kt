@@ -16,7 +16,6 @@ import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.SessionType
 import app.logdate.server.auth.TokenService
 import app.logdate.server.passkeys.WebAuthnPasskeyService
-import app.logdate.server.util.toKotlinInstant
 import app.logdate.shared.model.AccountInfoResponse
 import app.logdate.shared.model.AccountTokens
 import app.logdate.shared.model.ApiError
@@ -865,8 +864,8 @@ fun Route.authV1Routes(
                                 displayName = saved.displayName,
                                 bio = saved.bio,
                                 passkeyCredentialIds = webAuthnService.getPasskeysForUser(saved.id).map { it.credentialId },
-                                createdAt = saved.createdAt.toKotlinInstant(),
-                                updatedAt = (saved.lastSignInAt ?: saved.createdAt).toKotlinInstant(),
+                                createdAt = saved.createdAt,
+                                updatedAt = saved.lastSignInAt ?: saved.createdAt,
                             ),
                     ),
                 )
@@ -1234,7 +1233,7 @@ private suspend fun resolveAuthenticatedAccount(
     call: ApplicationCall,
     accountRepository: AccountRepository,
     tokenService: TokenService,
-    metrics: AuthMetricsRegistry? = null,
+    metrics: AuthMetricsRegistry?,
 ): Account? {
     val authHeader = call.request.header(HttpHeaders.Authorization)
     if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -1267,7 +1266,7 @@ private suspend fun ApplicationCall.respondApiError(
     status: HttpStatusCode,
     code: String,
     message: String,
-    metrics: AuthMetricsRegistry? = null,
+    metrics: AuthMetricsRegistry?,
 ) {
     metrics?.recordError(code)
     respond(status, ApiErrorResponse(ApiError(code, message)))
@@ -1276,7 +1275,7 @@ private suspend fun ApplicationCall.respondApiError(
 private suspend fun ApplicationCall.respondForRequestException(
     error: Exception,
     fallbackMessage: String,
-    metrics: AuthMetricsRegistry? = null,
+    metrics: AuthMetricsRegistry?,
 ) {
     when (error) {
         is ContentTransformationException,
@@ -1293,7 +1292,7 @@ private suspend fun ApplicationCall.enforceRateLimit(
     rateLimiter: InMemoryAuthRateLimiter,
     operation: String,
     policy: AuthRateLimitPolicy,
-    metrics: AuthMetricsRegistry? = null,
+    metrics: AuthMetricsRegistry?,
 ): Boolean {
     val ipKey = hashRemoteIp() ?: request.local.remoteHost.ifBlank { "unknown" }
     val rateLimitKey = "$operation:$ipKey"

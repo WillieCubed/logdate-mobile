@@ -31,6 +31,7 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.openapi.registerBearerAuthSecurityScheme
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -47,12 +48,23 @@ import kotlin.uuid.Uuid
 fun main() {
     val isDatabaseAvailable = initializeDatabase()
 
-    val port = System.getenv("PORT")?.toIntOrNull() ?: SERVER_PORT
-    val host = System.getenv("HOST") ?: "0.0.0.0"
+    val port = System.getProperty("PORT")?.toIntOrNull() ?: System.getenv("PORT")?.toIntOrNull() ?: SERVER_PORT
+    val host = System.getProperty("HOST") ?: System.getenv("HOST") ?: "0.0.0.0"
+    val wait = System.getProperty("LOGDATE_SERVER_WAIT")?.toBooleanStrictOrNull() ?: true
 
-    embeddedServer(Netty, port = port, host = host) {
-        module(isDatabaseAvailable)
-    }.start(wait = true)
+    val engine = buildMainServer(isDatabaseAvailable, port, host)
+    engine.start(wait = wait)
+    if (!wait) {
+        engine.stop(gracePeriodMillis = 0, timeoutMillis = 0)
+    }
+}
+
+private fun buildMainServer(
+    isDatabaseAvailable: Boolean,
+    port: Int,
+    host: String,
+) = embeddedServer(Netty, port = port, host = host) {
+    module(isDatabaseAvailable)
 }
 
 @OptIn(ExperimentalUuidApi::class)
@@ -64,27 +76,14 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     )
 
     // Stop any existing Koin instance to ensure clean state for tests
-    try {
+    runCatching {
         org.koin.core.context
             .stopKoin()
-    } catch (_: Exception) {
-        // Ignore if Koin wasn't started
     }
 
     install(Koin) {
         slf4jLogger()
         modules(serverModule(isDatabaseAvailable))
-    }
-
-    var maintenanceJob: Job? = null
-    monitor.subscribe(ApplicationStopped) {
-        maintenanceJob?.cancel()
-        try {
-            org.koin.core.context
-                .stopKoin()
-        } catch (_: Exception) {
-            // Ignore if already stopped
-        }
     }
 
     val syncRepository: SyncRepository by inject()
@@ -97,8 +96,19 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     val sessionManager: SessionManager by inject()
     val webAuthnService: WebAuthnPasskeyService by inject()
 
-    if (isDatabaseAvailable) {
-        maintenanceJob = startSyncMaintenance(syncRepository, syncMetrics)
+    val maintenanceReadEnv: (String) -> String? =
+        if (isDatabaseAvailable) {
+            System::getenv
+        } else {
+            { name -> if (name == "SYNC_TOMBSTONE_PURGE_ENABLED") "false" else null }
+        }
+    val maintenanceJob: Job? = startSyncMaintenance(syncRepository, syncMetrics, maintenanceReadEnv)
+    monitor.subscribe(ApplicationStopped) {
+        maintenanceJob?.cancel()
+        runCatching {
+            org.koin.core.context
+                .stopKoin()
+        }
     }
 
     install(ContentNegotiation) {
@@ -123,29 +133,16 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
         }
 
         get("/health") {
-            try {
-                val status =
-                    mapOf(
-                        "status" to "healthy",
-                        "timestamp" to
-                            kotlin.time.Clock.System
-                                .now()
-                                .toString(),
-                        "version" to "1.0.0",
-                    )
-                call.respond(status)
-            } catch (e: Exception) {
-                val status =
-                    mapOf(
-                        "status" to "unhealthy",
-                        "error" to e.message,
-                        "timestamp" to
-                            kotlin.time.Clock.System
-                                .now()
-                                .toString(),
-                    )
-                call.respond(io.ktor.http.HttpStatusCode.ServiceUnavailable, status)
-            }
+            val status =
+                mapOf(
+                    "status" to "healthy",
+                    "timestamp" to
+                        kotlin.time.Clock.System
+                            .now()
+                            .toString(),
+                    "version" to "1.0.0",
+                )
+            call.respond(status)
         }
 
         route("/api/v1") {
@@ -171,15 +168,16 @@ private const val MILLIS_PER_DAY = 24 * MILLIS_PER_HOUR
 private fun Application.startSyncMaintenance(
     repository: SyncRepository,
     metrics: SyncMetricsRegistry,
+    readEnv: (String) -> String?,
 ): Job? {
-    val enabled = readBooleanEnv("SYNC_TOMBSTONE_PURGE_ENABLED", defaultValue = true)
+    val enabled = readBooleanEnv("SYNC_TOMBSTONE_PURGE_ENABLED", defaultValue = true, readEnv = readEnv)
     if (!enabled) {
         log.info("Sync tombstone purge disabled by SYNC_TOMBSTONE_PURGE_ENABLED")
         return null
     }
 
-    val retentionDays = System.getenv("SYNC_TOMBSTONE_RETENTION_DAYS")?.toLongOrNull() ?: 30L
-    val intervalHours = System.getenv("SYNC_TOMBSTONE_PURGE_INTERVAL_HOURS")?.toLongOrNull() ?: 24L
+    val retentionDays = readEnv("SYNC_TOMBSTONE_RETENTION_DAYS")?.toLongOrNull() ?: 30L
+    val intervalHours = readEnv("SYNC_TOMBSTONE_PURGE_INTERVAL_HOURS")?.toLongOrNull() ?: 24L
     val safeRetentionDays = retentionDays.coerceIn(1L, 3650L)
     val safeIntervalHours = intervalHours.coerceAtLeast(1L)
     val intervalMs = safeIntervalHours * MILLIS_PER_HOUR
@@ -209,7 +207,11 @@ private fun Application.startSyncMaintenance(
                 metrics.recordOperation(SYNC_PURGE_METRIC_NAME, System.currentTimeMillis() - start, false)
                 log.error("Sync tombstone purge failed", e)
             }
-            delay(intervalMs)
+            try {
+                delay(intervalMs)
+            } catch (_: CancellationException) {
+                break
+            }
         }
     }
 }
@@ -217,8 +219,9 @@ private fun Application.startSyncMaintenance(
 private fun readBooleanEnv(
     name: String,
     defaultValue: Boolean,
+    readEnv: (String) -> String?,
 ): Boolean {
-    val raw = System.getenv(name) ?: return defaultValue
+    val raw = readEnv(name) ?: return defaultValue
     return raw.equals("true", ignoreCase = true) ||
         raw.equals("yes", ignoreCase = true) ||
         raw == "1"

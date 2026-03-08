@@ -41,6 +41,17 @@ class AuditLogSchemaTest {
     }
 
     @Test
+    fun `formatAuditLog returns category only when all fields are null`() {
+        val line =
+            formatAuditLog(
+                category = AuditCategory.AUTH_SIGNIN_PASSKEY_SUCCESS,
+                fields = mapOf(AuditKey.ACCOUNT_ID to null, AuditKey.IP_HASH to null),
+            )
+
+        assertEquals("audit.auth.signin.passkey.success", line)
+    }
+
+    @Test
     fun `audit schema doc enumerates all categories and keys`() {
         val docPath = resolveAuditSchemaDocPath()
         val content = Files.readString(docPath)

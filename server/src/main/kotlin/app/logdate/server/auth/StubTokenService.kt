@@ -48,13 +48,9 @@ class StubTokenService(
     override fun validateRefreshToken(token: String): String? = validateToken(token, "refresh")
 
     override fun validateSessionToken(token: String): String? =
-        validateToken(token, "session")?.let { accountId ->
-            // For session tokens, return the session ID instead of account ID
-            if (token.contains("session.")) {
-                token.substringAfter("session.").substringBefore(".")
-            } else {
-                accountId
-            }
+        validateToken(token, "session")?.let {
+            // For session tokens, return the session ID instead of account ID.
+            token.substringAfter("session.").substringBefore(".")
         }
 
     private fun validateToken(
@@ -63,26 +59,21 @@ class StubTokenService(
     ): String? {
         if (!token.startsWith("stub_")) return null
 
-        try {
-            val tokenData = token.substringAfter("stub_").substringAfter("_")
-            val parts = tokenData.split(".")
+        val tokenData = token.substringAfter("stub_").substringAfter("_")
+        val parts = tokenData.split(".")
 
-            if (parts.size != 3) return null
+        if (parts.size != 3) return null
 
-            val type = parts[0]
-            val accountId = parts[1]
-            val expiresAtSeconds = parts[2].toLongOrNull() ?: return null
+        val type = parts[0]
+        val accountId = parts[1]
+        val expiresAtSeconds = parts[2].toLongOrNull() ?: return null
 
-            if (type != expectedType) return null
+        if (type != expectedType) return null
 
-            val now = Clock.System.now()
-            val expiresAt = kotlin.time.Instant.fromEpochSeconds(expiresAtSeconds)
+        val now = Clock.System.now()
+        val expiresAt = kotlin.time.Instant.fromEpochSeconds(expiresAtSeconds)
+        if (now > expiresAt) return null
 
-            if (now > expiresAt) return null
-
-            return accountId
-        } catch (e: Exception) {
-            return null
-        }
+        return accountId
     }
 }

@@ -28,7 +28,7 @@ data class GoogleIdTokenClaims(
 interface GoogleIdTokenVerifier {
     suspend fun verify(
         idToken: String,
-        nonce: String? = null,
+        nonce: String?,
     ): GoogleIdTokenClaims?
 }
 

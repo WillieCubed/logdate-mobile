@@ -347,6 +347,9 @@ private suspend fun extractUserId(
     }
 }
 
+private fun ApplicationCall.requiredPathParam(name: String): String =
+    requireNotNull(parameters[name]) { "Missing required route parameter: $name" }
+
 /**
  * Sync routes with JWT authentication.
  * All endpoints require a valid Bearer token and scope data by user ID.
@@ -421,11 +424,7 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@put
-                    val contentId =
-                        call.parameters["contentId"] ?: return@put call.respond(
-                            HttpStatusCode.BadRequest,
-                            error("MISSING_PARAMETER", "contentId is required"),
-                        )
+                    val contentId = call.requiredPathParam("contentId")
                     val req = call.receive<ContentUploadRequest>()
                     if (req.id != contentId) {
                         return@put call.respond(
@@ -515,11 +514,7 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@get
-                    val contentId =
-                        call.parameters["contentId"] ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            error("MISSING_PARAMETER", "contentId is required"),
-                        )
+                    val contentId = call.requiredPathParam("contentId")
                     val record =
                         repository.getContent(userId, contentId)
                             ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Content not found"))
@@ -547,11 +542,7 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@patch
-                    val contentId =
-                        call.parameters["contentId"] ?: return@patch call.respond(
-                            HttpStatusCode.BadRequest,
-                            error("MISSING_PARAMETER", "contentId is required"),
-                        )
+                    val contentId = call.requiredPathParam("contentId")
                     val req = call.receive<ContentUpdateRequest>()
                     val existing = repository.getContent(userId, contentId)
                     when (val constraint = req.versionConstraint) {
@@ -596,11 +587,7 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@delete
-                    val contentId =
-                        call.parameters["contentId"] ?: return@delete call.respond(
-                            HttpStatusCode.BadRequest,
-                            error("MISSING_PARAMETER", "contentId is required"),
-                        )
+                    val contentId = call.requiredPathParam("contentId")
                     val deletedAt = System.currentTimeMillis()
                     repository.deleteContent(userId, contentId, deletedAt)
                     call.respond(HttpStatusCode.NoContent)
@@ -618,11 +605,7 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@put
-                    val journalId =
-                        call.parameters["journalId"] ?: return@put call.respond(
-                            HttpStatusCode.BadRequest,
-                            error("MISSING_PARAMETER", "journalId is required"),
-                        )
+                    val journalId = call.requiredPathParam("journalId")
                     val req = call.receive<JournalUploadRequest>()
                     if (req.id != journalId) {
                         return@put call.respond(
@@ -702,11 +685,7 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@get
-                    val journalId =
-                        call.parameters["journalId"] ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            error("MISSING_PARAMETER", "journalId is required"),
-                        )
+                    val journalId = call.requiredPathParam("journalId")
                     val record =
                         repository.getJournal(userId, journalId)
                             ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Journal not found"))
@@ -732,11 +711,7 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@patch
-                    val journalId =
-                        call.parameters["journalId"] ?: return@patch call.respond(
-                            HttpStatusCode.BadRequest,
-                            error("MISSING_PARAMETER", "journalId is required"),
-                        )
+                    val journalId = call.requiredPathParam("journalId")
                     val req = call.receive<JournalUpdateRequest>()
                     val existing = repository.getJournal(userId, journalId)
                     when (val constraint = req.versionConstraint) {
@@ -780,11 +755,7 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@delete
-                    val journalId =
-                        call.parameters["journalId"] ?: return@delete call.respond(
-                            HttpStatusCode.BadRequest,
-                            error("MISSING_PARAMETER", "journalId is required"),
-                        )
+                    val journalId = call.requiredPathParam("journalId")
                     val deletedAt = System.currentTimeMillis()
                     repository.deleteJournal(userId, journalId, deletedAt)
                     call.respond(HttpStatusCode.NoContent)
@@ -874,16 +845,8 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@put
-                    val journalId =
-                        call.parameters["journalId"] ?: return@put call.respond(
-                            HttpStatusCode.BadRequest,
-                            error("MISSING_PARAMETER", "journalId is required"),
-                        )
-                    val contentId =
-                        call.parameters["contentId"] ?: return@put call.respond(
-                            HttpStatusCode.BadRequest,
-                            error("MISSING_PARAMETER", "contentId is required"),
-                        )
+                    val journalId = call.requiredPathParam("journalId")
+                    val contentId = call.requiredPathParam("contentId")
                     val req = call.receive<AssociationLinkUpsertRequest>()
                     repository.upsertAssociations(
                         userId,
@@ -909,16 +872,8 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@delete
-                    val journalId =
-                        call.parameters["journalId"] ?: return@delete call.respond(
-                            HttpStatusCode.BadRequest,
-                            error("MISSING_PARAMETER", "journalId is required"),
-                        )
-                    val contentId =
-                        call.parameters["contentId"] ?: return@delete call.respond(
-                            HttpStatusCode.BadRequest,
-                            error("MISSING_PARAMETER", "contentId is required"),
-                        )
+                    val journalId = call.requiredPathParam("journalId")
+                    val contentId = call.requiredPathParam("contentId")
                     val deletedAt = System.currentTimeMillis()
                     repository.deleteAssociations(userId, listOf(AssociationKey(journalId, contentId)), deletedAt)
                     call.respond(HttpStatusCode.NoContent)
@@ -1052,11 +1007,7 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@get
-                    val mediaId =
-                        call.parameters["mediaId"] ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            error("MISSING_PARAMETER", "mediaId is required"),
-                        )
+                    val mediaId = call.requiredPathParam("mediaId")
                     val record =
                         repository.getMedia(userId, mediaId)
                             ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Media not found"))
@@ -1088,11 +1039,7 @@ fun Route.syncRoutes(
                 var bytes = 0L
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@get
-                    val mediaId =
-                        call.parameters["mediaId"] ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            error("MISSING_PARAMETER", "mediaId is required"),
-                        )
+                    val mediaId = call.requiredPathParam("mediaId")
                     val record =
                         repository.getMedia(userId, mediaId)
                             ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Media not found"))
@@ -1146,11 +1093,7 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@delete
-                    val mediaId =
-                        call.parameters["mediaId"] ?: return@delete call.respond(
-                            HttpStatusCode.BadRequest,
-                            error("MISSING_PARAMETER", "mediaId is required"),
-                        )
+                    val mediaId = call.requiredPathParam("mediaId")
                     val record = repository.getMedia(userId, mediaId)
                     if (record != null) {
                         record.storagePath?.let { mediaStorage?.deleteMedia(it) }
@@ -1269,10 +1212,13 @@ fun Route.syncRoutes(
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@get
                     val backupId =
-                        call.parameters["backupId"]?.let { UUID.fromString(it) } ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            error("INVALID_ID", "Invalid backupId"),
-                        )
+                        call
+                            .requiredPathParam("backupId")
+                            .let { raw -> runCatching { UUID.fromString(raw) }.getOrNull() }
+                            ?: return@get call.respond(
+                                HttpStatusCode.BadRequest,
+                                error("INVALID_ID", "Invalid backupId"),
+                            )
 
                     val record =
                         repository.getBackupRecord(userId, backupId)
@@ -1299,10 +1245,13 @@ fun Route.syncRoutes(
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@get
                     val backupId =
-                        call.parameters["backupId"]?.let { UUID.fromString(it) } ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            error("INVALID_ID", "Invalid backupId"),
-                        )
+                        call
+                            .requiredPathParam("backupId")
+                            .let { raw -> runCatching { UUID.fromString(raw) }.getOrNull() }
+                            ?: return@get call.respond(
+                                HttpStatusCode.BadRequest,
+                                error("INVALID_ID", "Invalid backupId"),
+                            )
 
                     val record =
                         repository.getBackupRecord(userId, backupId)
@@ -1342,10 +1291,13 @@ fun Route.syncRoutes(
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@delete
                     val backupId =
-                        call.parameters["backupId"]?.let { UUID.fromString(it) } ?: return@delete call.respond(
-                            HttpStatusCode.BadRequest,
-                            error("INVALID_ID", "Invalid backupId"),
-                        )
+                        call
+                            .requiredPathParam("backupId")
+                            .let { raw -> runCatching { UUID.fromString(raw) }.getOrNull() }
+                            ?: return@delete call.respond(
+                                HttpStatusCode.BadRequest,
+                                error("INVALID_ID", "Invalid backupId"),
+                            )
 
                     val record = repository.getBackupRecord(userId, backupId)
                     if (record != null) {

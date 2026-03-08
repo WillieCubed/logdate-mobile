@@ -22,12 +22,12 @@ interface SessionManager {
      * Create a new temporary session for account creation.
      */
     suspend fun createAccountCreationSession(
-        temporaryUserId: Uuid? = null,
+        temporaryUserId: Uuid?,
         username: String,
         displayName: String,
         challenge: String,
-        deviceInfo: DeviceInfo? = null,
-        bio: String? = null,
+        deviceInfo: DeviceInfo?,
+        bio: String?,
     ): TemporarySession
 
     /**
@@ -35,8 +35,8 @@ interface SessionManager {
      */
     suspend fun createAuthenticationSession(
         challenge: String,
-        accountHint: String? = null,
-        deviceInfo: DeviceInfo? = null,
+        accountHint: String?,
+        deviceInfo: DeviceInfo?,
     ): TemporarySession
 
     /**
@@ -44,7 +44,7 @@ interface SessionManager {
      */
     suspend fun validateSession(
         sessionId: String,
-        expectedType: SessionType? = null,
+        expectedType: SessionType?,
     ): TemporarySession?
 }
 
