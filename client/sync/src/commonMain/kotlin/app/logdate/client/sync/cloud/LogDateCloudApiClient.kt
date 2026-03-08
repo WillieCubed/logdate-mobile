@@ -24,12 +24,14 @@ import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -46,6 +48,8 @@ class LogDateCloudApiClient(
     private val baseUrl: String,
     private val httpClient: HttpClient,
 ) : CloudApiClient {
+    private val errorJson = Json { ignoreUnknownKeys = true }
+
     /**
      * Checks if a username is available for registration using the availability endpoint.
      *
@@ -285,25 +289,49 @@ class LogDateCloudApiClient(
      * @param response The HTTP response containing the error.
      * @return A Result.failure with appropriate error information.
      */
-    private suspend fun <T> handleApiError(response: HttpResponse): Result<T> =
-        try {
-            val errorBody = response.body<ApiErrorResponse>()
+    private suspend fun <T> handleApiError(response: HttpResponse): Result<T> {
+        val statusCode = response.status.value
+        val errorPayload = runCatching { response.bodyAsText() }.getOrDefault("")
+        val parsedError = parseErrorPayload(errorPayload)
+        return if (parsedError != null) {
             Result.failure(
                 CloudApiException(
-                    errorCode = errorBody.error.code,
-                    message = errorBody.error.message,
-                    statusCode = response.status.value,
+                    errorCode = parsedError.code,
+                    message = parsedError.message,
+                    statusCode = statusCode,
                 ),
             )
-        } catch (e: Exception) {
+        } else {
             Result.failure(
                 CloudApiException(
                     errorCode = "UNKNOWN_ERROR",
                     message = "An unknown error occurred: ${response.status.description}",
-                    statusCode = response.status.value,
+                    statusCode = statusCode,
                 ),
             )
         }
+    }
+
+    private fun parseErrorPayload(payload: String): ParsedErrorBody? {
+        if (payload.isBlank()) {
+            return null
+        }
+        val authErrorBody = runCatching { errorJson.decodeFromString<ApiErrorResponse>(payload) }.getOrNull()
+        if (authErrorBody != null) {
+            return ParsedErrorBody(
+                code = authErrorBody.error.code,
+                message = authErrorBody.error.message,
+            )
+        }
+        val syncErrorBody = runCatching { errorJson.decodeFromString<SyncErrorResponseBody>(payload) }.getOrNull()
+        if (syncErrorBody != null && syncErrorBody.code.isNotBlank()) {
+            return ParsedErrorBody(
+                code = syncErrorBody.code,
+                message = syncErrorBody.message,
+            )
+        }
+        return null
+    }
 
     // Content Sync Operations
     override suspend fun uploadContent(
@@ -775,6 +803,17 @@ private data class RefreshTokenResponseV1Dto(
 @Serializable
 private data class RefreshTokenDataV1Dto(
     val accessToken: String,
+)
+
+@Serializable
+private data class SyncErrorResponseBody(
+    val code: String,
+    val message: String,
+)
+
+private data class ParsedErrorBody(
+    val code: String,
+    val message: String,
 )
 
 private fun AuthAccountDto.toLogDateAccount(): LogDateAccount =

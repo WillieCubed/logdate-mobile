@@ -176,6 +176,69 @@ class BasicCloudApiClientTest {
         }
 
     @Test
+    fun `auth error envelope maps into cloud api exception`() =
+        runTest {
+            val client =
+                createApiClient(
+                    MockEngine {
+                        respond(
+                            content = """{"error":{"code":"INVALID_REFRESH_TOKEN","message":"Refresh token is invalid"}}""",
+                            status = HttpStatusCode.Unauthorized,
+                            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                        )
+                    },
+                )
+
+            val result = client.refreshAccessToken("bad-refresh-token")
+            assertTrue(result.isFailure)
+            val exception = result.exceptionOrNull() as CloudApiException
+            assertEquals("INVALID_REFRESH_TOKEN", exception.errorCode)
+            assertEquals(HttpStatusCode.Unauthorized.value, exception.statusCode)
+        }
+
+    @Test
+    fun `sync error envelope maps into cloud api exception`() =
+        runTest {
+            val client =
+                createApiClient(
+                    MockEngine {
+                        respond(
+                            content =
+                                """
+                                {
+                                  "code": "UNAUTHORIZED",
+                                  "message": "Missing or invalid Authorization header",
+                                  "details": {},
+                                  "timestamp": "2026-03-07T00:00:00Z"
+                                }
+                                """.trimIndent(),
+                            status = HttpStatusCode.Unauthorized,
+                            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                        )
+                    },
+                )
+
+            val result =
+                client.uploadContent(
+                    accessToken = "bad",
+                    content =
+                        ContentUploadRequest(
+                            id = "content-err",
+                            type = "TEXT",
+                            content = "test",
+                            mediaUri = null,
+                            createdAt = 1_700_000_000_000L,
+                            lastUpdated = 1_700_000_000_000L,
+                            deviceId = DeviceId("device-test"),
+                        ),
+                )
+            assertTrue(result.isFailure)
+            val exception = result.exceptionOrNull() as CloudApiException
+            assertEquals("UNAUTHORIZED", exception.errorCode)
+            assertEquals(HttpStatusCode.Unauthorized.value, exception.statusCode)
+        }
+
+    @Test
     fun `get account info uses auth me path`() =
         runTest {
             val client =
