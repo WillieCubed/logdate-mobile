@@ -15,11 +15,18 @@ import app.logdate.shared.model.UsernameAvailabilityResponse
 import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.request.delete
+import io.ktor.client.request.forms.MultiPartFormDataContent
+import io.ktor.client.request.forms.formData
 import io.ktor.client.request.get
+import io.ktor.client.request.patch
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
+import io.ktor.http.Headers
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import kotlinx.serialization.Serializable
@@ -305,14 +312,14 @@ class LogDateCloudApiClient(
     ): Result<ContentUploadResponse> =
         try {
             val response =
-                httpClient.post("$baseUrl/sync/content") {
+                httpClient.put("$baseUrl/contents/${content.id}") {
                     headers.append("Authorization", "Bearer $accessToken")
                     contentType(ContentType.Application.Json)
                     setBody(content)
                 }
 
             when (response.status) {
-                HttpStatusCode.OK -> {
+                HttpStatusCode.OK, HttpStatusCode.Created -> {
                     val responseBody = response.body<ContentUploadResponse>()
                     Result.success(responseBody)
                 }
@@ -337,7 +344,7 @@ class LogDateCloudApiClient(
         try {
             val limitParam = limit?.let { "&limit=$it" }.orEmpty()
             val response =
-                httpClient.get("$baseUrl/sync/content/changes?since=$since$limitParam") {
+                httpClient.get("$baseUrl/contents?since=$since$limitParam") {
                     headers.append("Authorization", "Bearer $accessToken")
                 }
 
@@ -366,7 +373,7 @@ class LogDateCloudApiClient(
     ): Result<ContentUpdateResponse> =
         try {
             val response =
-                httpClient.post("$baseUrl/sync/content/$contentId") {
+                httpClient.patch("$baseUrl/contents/$contentId") {
                     headers.append("Authorization", "Bearer $accessToken")
                     contentType(ContentType.Application.Json)
                     setBody(content)
@@ -396,12 +403,12 @@ class LogDateCloudApiClient(
     ): Result<Unit> =
         try {
             val response =
-                httpClient.post("$baseUrl/sync/content/$contentId/delete") {
+                httpClient.delete("$baseUrl/contents/$contentId") {
                     headers.append("Authorization", "Bearer $accessToken")
                 }
 
             when (response.status) {
-                HttpStatusCode.OK -> Result.success(Unit)
+                HttpStatusCode.NoContent -> Result.success(Unit)
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
@@ -422,14 +429,14 @@ class LogDateCloudApiClient(
     ): Result<JournalUploadResponse> =
         try {
             val response =
-                httpClient.post("$baseUrl/sync/journals") {
+                httpClient.put("$baseUrl/journals/${journal.id}") {
                     headers.append("Authorization", "Bearer $accessToken")
                     contentType(ContentType.Application.Json)
                     setBody(journal)
                 }
 
             when (response.status) {
-                HttpStatusCode.OK -> {
+                HttpStatusCode.OK, HttpStatusCode.Created -> {
                     val responseBody = response.body<JournalUploadResponse>()
                     Result.success(responseBody)
                 }
@@ -454,7 +461,7 @@ class LogDateCloudApiClient(
         try {
             val limitParam = limit?.let { "&limit=$it" }.orEmpty()
             val response =
-                httpClient.get("$baseUrl/sync/journals/changes?since=$since$limitParam") {
+                httpClient.get("$baseUrl/journals?since=$since$limitParam") {
                     headers.append("Authorization", "Bearer $accessToken")
                 }
 
@@ -483,7 +490,7 @@ class LogDateCloudApiClient(
     ): Result<JournalUpdateResponse> =
         try {
             val response =
-                httpClient.post("$baseUrl/sync/journals/$journalId") {
+                httpClient.patch("$baseUrl/journals/$journalId") {
                     headers.append("Authorization", "Bearer $accessToken")
                     contentType(ContentType.Application.Json)
                     setBody(journal)
@@ -513,12 +520,12 @@ class LogDateCloudApiClient(
     ): Result<Unit> =
         try {
             val response =
-                httpClient.post("$baseUrl/sync/journals/$journalId/delete") {
+                httpClient.delete("$baseUrl/journals/$journalId") {
                     headers.append("Authorization", "Bearer $accessToken")
                 }
 
             when (response.status) {
-                HttpStatusCode.OK -> Result.success(Unit)
+                HttpStatusCode.NoContent -> Result.success(Unit)
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
@@ -539,7 +546,7 @@ class LogDateCloudApiClient(
     ): Result<AssociationUploadResponse> =
         try {
             val response =
-                httpClient.post("$baseUrl/sync/associations") {
+                httpClient.put("$baseUrl/associations") {
                     headers.append("Authorization", "Bearer $accessToken")
                     contentType(ContentType.Application.Json)
                     setBody(associations)
@@ -571,7 +578,7 @@ class LogDateCloudApiClient(
         try {
             val limitParam = limit?.let { "&limit=$it" }.orEmpty()
             val response =
-                httpClient.get("$baseUrl/sync/associations/changes?since=$since$limitParam") {
+                httpClient.get("$baseUrl/associations?since=$since$limitParam") {
                     headers.append("Authorization", "Bearer $accessToken")
                 }
 
@@ -599,14 +606,14 @@ class LogDateCloudApiClient(
     ): Result<Unit> =
         try {
             val response =
-                httpClient.post("$baseUrl/sync/associations/delete") {
+                httpClient.delete("$baseUrl/associations") {
                     headers.append("Authorization", "Bearer $accessToken")
                     contentType(ContentType.Application.Json)
                     setBody(associations)
                 }
 
             when (response.status) {
-                HttpStatusCode.OK -> Result.success(Unit)
+                HttpStatusCode.NoContent -> Result.success(Unit)
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
@@ -627,14 +634,32 @@ class LogDateCloudApiClient(
     ): Result<MediaUploadResponse> =
         try {
             val response =
-                httpClient.post("$baseUrl/sync/media") {
+                httpClient.post("$baseUrl/media") {
                     headers.append("Authorization", "Bearer $accessToken")
-                    contentType(ContentType.Application.Json)
-                    setBody(media)
+                    setBody(
+                        MultiPartFormDataContent(
+                            formData {
+                                append("contentId", media.contentId)
+                                append("fileName", media.fileName)
+                                append("mimeType", media.mimeType)
+                                append("sizeBytes", media.sizeBytes.toString())
+                                append("deviceId", media.deviceId.value)
+                                append(
+                                    key = "data",
+                                    value = media.data,
+                                    headers =
+                                        Headers.build {
+                                            append(HttpHeaders.ContentDisposition, "filename=\"${media.fileName}\"")
+                                            append(HttpHeaders.ContentType, media.mimeType)
+                                        },
+                                )
+                            },
+                        ),
+                    )
                 }
 
             when (response.status) {
-                HttpStatusCode.OK -> {
+                HttpStatusCode.Created -> {
                     val responseBody = response.body<MediaUploadResponse>()
                     Result.success(responseBody)
                 }
@@ -656,17 +681,34 @@ class LogDateCloudApiClient(
         mediaId: String,
     ): Result<MediaDownloadResponse> =
         try {
-            val response =
-                httpClient.get("$baseUrl/sync/media/$mediaId") {
+            val metadataResponse =
+                httpClient.get("$baseUrl/media/$mediaId") {
                     headers.append("Authorization", "Bearer $accessToken")
                 }
 
-            when (response.status) {
+            when (metadataResponse.status) {
                 HttpStatusCode.OK -> {
-                    val responseBody = response.body<MediaDownloadResponse>()
-                    Result.success(responseBody)
+                    val metadata = metadataResponse.body<MediaMetadataResponse>()
+                    val binaryResponse =
+                        httpClient.get("$baseUrl/media/$mediaId/binary") {
+                            headers.append("Authorization", "Bearer $accessToken")
+                        }
+                    when (binaryResponse.status) {
+                        HttpStatusCode.OK ->
+                            Result.success(
+                                MediaDownloadResponse(
+                                    contentId = metadata.contentId,
+                                    fileName = metadata.fileName,
+                                    mimeType = metadata.mimeType,
+                                    sizeBytes = metadata.sizeBytes,
+                                    data = binaryResponse.body<ByteArray>(),
+                                    downloadUrl = metadata.downloadUrl,
+                                ),
+                            )
+                        else -> handleApiError(binaryResponse)
+                    }
                 }
-                else -> handleApiError(response)
+                else -> handleApiError(metadataResponse)
             }
         } catch (e: Exception) {
             Napier.e("Failed to download media", e)
