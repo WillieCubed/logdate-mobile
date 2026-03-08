@@ -47,8 +47,8 @@ kotlin {
         }
         commonMain.dependencies {
             // Project dependencies
-            implementation(project(":shared:model"))
-            implementation(project(":shared:config"))
+            implementation(projects.shared.model)
+            implementation(projects.shared.config)
             implementation(projects.client.util)
             // External dependencies
             implementation(libs.kotlinx.datetime)

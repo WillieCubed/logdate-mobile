@@ -76,10 +76,12 @@ LogDate follows the [Android Testing Guide](https://developer.android.com/traini
 
 Learn how to write specific test types:
 
+- [Android In-App Updates Behavior](../feature-design/android-in-app-updates.md) - Product behavior, thresholds, and UX rules for Play-managed updates
 - [Unit Tests Guide](./unit-tests.md) - Testing individual components with fakes and mocks
 - [Integration Tests Guide](./integration-tests.md) - Testing database and API interactions
 - [UI Tests Guide](./ui-tests.md) - Testing Compose components and user interactions
 - [Screenshot Tests Guide](./screenshot-tests.md) - Visual regression testing for screens
+- [Android In-App Updates](./android-in-app-updates.md) - Verifying Play-managed update flows locally and through Play tracks
 
 ## Reference: Test Types
 

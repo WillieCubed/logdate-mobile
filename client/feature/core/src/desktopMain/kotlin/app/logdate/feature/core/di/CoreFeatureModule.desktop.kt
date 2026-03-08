@@ -20,6 +20,8 @@ import app.logdate.feature.core.settings.ui.DangerZoneSettingsViewModel
 import app.logdate.feature.core.settings.ui.DataSettingsViewModel
 import app.logdate.feature.core.settings.ui.LocationSettingsViewModel
 import app.logdate.feature.core.settings.ui.PrivacySettingsViewModel
+import app.logdate.feature.core.settings.updates.AppUpdateController
+import app.logdate.feature.core.settings.updates.UnsupportedAppUpdateController
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
@@ -37,6 +39,7 @@ actual val coreFeatureModule: Module =
 
         // TODO: Refactor to separate auth module
         single<BiometricGatekeeper> { StubBiometricGatekeeper() }
+        single<AppUpdateController> { UnsupportedAppUpdateController(get()) }
 
         // Export functionality for desktop
         single<ExportLauncher> { DesktopExportLauncher() }
@@ -74,7 +77,7 @@ actual val coreFeatureModule: Module =
             )
         }
         viewModel { ExportViewModel(get(), get()) }
-        viewModel { AdvancedSettingsViewModel(get(), get()) }
+        viewModel { AdvancedSettingsViewModel(get(), get(), get()) }
         viewModel {
             DangerZoneSettingsViewModel(
                 get(),

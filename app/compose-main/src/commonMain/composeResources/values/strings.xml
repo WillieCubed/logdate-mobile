@@ -8,6 +8,8 @@
     <string name="open_recovery_tools">Open recovery tools</string>
     <string name="reset_encrypted_storage">Reset encrypted storage</string>
     <string name="reset_encrypted_storage_2">Reset encrypted storage?</string>
+    <string name="restart">Restart</string>
     <string name="select_a_setting_to_configure">Select a setting to configure</string>
     <string name="select_an_entry_to_view_details">Select an entry to view details</string>
+    <string name="update_ready_restart_to_finish_installing">Update ready. Restart LogDate to finish installing.</string>
 </resources>

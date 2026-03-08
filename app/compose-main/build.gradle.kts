@@ -109,9 +109,11 @@ kotlin {
             implementation(libs.androidx.navigation3.ui)
             implementation(libs.androidx.navigation3.runtime)
             implementation(libs.kotlinx.coroutines.android)
+            implementation(libs.kotlinx.coroutines.play.services)
             implementation(libs.koin.android)
             implementation(libs.koin.androidx.workmanager)
             implementation(libs.material)
+            implementation(libs.play.app.update.ktx)
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)

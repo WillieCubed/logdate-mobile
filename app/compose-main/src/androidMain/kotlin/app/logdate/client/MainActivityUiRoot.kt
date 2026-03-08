@@ -2,9 +2,14 @@ package app.logdate.client
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -14,10 +19,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavKey
 import app.logdate.client.database.DatabaseStartupState
 import app.logdate.feature.core.GlobalAppUiLoadedState
 import app.logdate.feature.core.requiresUnlock
+import app.logdate.feature.core.settings.updates.AppUpdateStatus
+import app.logdate.feature.core.settings.updates.AppUpdateUiState
 import app.logdate.navigation.MainAppNavigator
 import app.logdate.navigation.MainNavigationRoot
 import app.logdate.navigation.rememberMainAppNavigator
@@ -37,8 +46,17 @@ import logdate.app.composemain.generated.resources.i_understand_reset
 import logdate.app.composemain.generated.resources.open_recovery_tools
 import logdate.app.composemain.generated.resources.reset_encrypted_storage
 import logdate.app.composemain.generated.resources.reset_encrypted_storage_2
+import logdate.app.composemain.generated.resources.restart
+import logdate.app.composemain.generated.resources.update_ready_restart_to_finish_installing
 import org.jetbrains.compose.resources.stringResource
 
+/**
+ * Renders the Android root UI once startup gates have produced a loaded app state.
+ *
+ * In addition to normal navigation, this root owns two global surfaces:
+ * - the encrypted-database recovery dialogs,
+ * - the persistent restart snackbar shown after a flexible Play update finishes downloading.
+ */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Suppress("ktlint:standard:function-naming")
 @Composable
@@ -49,12 +67,15 @@ fun MainActivityUiRoot(
     onDeepLinkHandled: () -> Unit = {},
     databaseStartupState: DatabaseStartupState = DatabaseStartupState.Ready,
     onResetEncryptedStorage: () -> Unit = {},
+    appUpdateUiState: AppUpdateUiState = AppUpdateUiState(),
+    onCompleteAppUpdate: () -> Unit = {},
     mainAppNavigator: MainAppNavigator = rememberMainAppNavigator(initialRoute = NavigationStart),
 ) {
     var hasRequestedUnlock by remember { mutableStateOf(false) }
     var hasHandledInitialNavigation by remember { mutableStateOf(false) }
     var showResetConfirmation by remember { mutableStateOf(false) }
     var hideRecoveryDialog by remember { mutableStateOf(false) }
+    val appUpdateSnackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(appUiState.isOnboarded, appUiState.requiresUnlock, pendingNavKey, databaseStartupState) {
         if (databaseStartupState is DatabaseStartupState.Ready) {
@@ -96,7 +117,14 @@ fun MainActivityUiRoot(
             CompositionLocalProvider(
                 LocalSharedTransitionScope provides this,
             ) {
-                MainNavigationRoot(mainAppNavigator)
+                Box(modifier = Modifier.fillMaxSize()) {
+                    MainNavigationRoot(mainAppNavigator)
+
+                    SnackbarHost(
+                        hostState = appUpdateSnackbarHostState,
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                    )
+                }
 
                 if (databaseStartupState is DatabaseStartupState.RecoveryRequired && !hideRecoveryDialog) {
                     val recovery = databaseStartupState
@@ -164,6 +192,30 @@ fun MainActivityUiRoot(
                     )
                 }
             }
+        }
+    }
+
+    val updateReadyMessage = stringResource(Res.string.update_ready_restart_to_finish_installing)
+    val restartLabel = stringResource(Res.string.restart)
+
+    // Keep the restart affordance visible until the downloaded flexible update is completed
+    // or Play clears the downloaded state.
+    LaunchedEffect(appUpdateUiState.status) {
+        if (appUpdateUiState.status != AppUpdateStatus.Downloaded) {
+            appUpdateSnackbarHostState.currentSnackbarData?.dismiss()
+            return@LaunchedEffect
+        }
+
+        val result =
+            appUpdateSnackbarHostState.showSnackbar(
+                message = updateReadyMessage,
+                actionLabel = restartLabel,
+                withDismissAction = true,
+                duration = SnackbarDuration.Indefinite,
+            )
+
+        if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+            onCompleteAppUpdate()
         }
     }
 }

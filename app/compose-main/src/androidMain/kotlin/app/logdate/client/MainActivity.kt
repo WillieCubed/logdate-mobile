@@ -2,7 +2,6 @@ package app.logdate.client
 
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import androidx.activity.compose.setContent
@@ -25,6 +24,8 @@ import app.logdate.client.database.DatabaseStartupState
 import app.logdate.client.media.audio.EXTRA_NAV_SOURCE
 import app.logdate.client.media.audio.EXTRA_NOTE_ID
 import app.logdate.client.media.audio.NAV_SOURCE_AUDIO_PLAYBACK
+import app.logdate.client.updates.ActivityResultAppUpdateFlowLauncher
+import app.logdate.client.updates.PlayInAppUpdateController
 import app.logdate.feature.core.AndroidBiometricGatekeeper
 import app.logdate.feature.core.AppViewModel
 import app.logdate.feature.core.BiometricGatekeeper
@@ -33,8 +34,12 @@ import app.logdate.feature.core.GlobalAppUiLoadingState
 import app.logdate.feature.core.GlobalAppUiState
 import app.logdate.feature.core.di.ActivityProvider
 import app.logdate.feature.core.export.AndroidExportLauncher
+import app.logdate.feature.core.isAppUnlocked
 import app.logdate.feature.core.restore.AndroidRestoreLauncher
+import app.logdate.feature.core.settings.updates.AppUpdateCheckTrigger
+import app.logdate.feature.core.settings.updates.AppUpdateUiState
 import app.logdate.navigation.routes.core.NoteViewerRoute
+import io.github.aakira.napier.Napier
 import io.github.vinceglb.filekit.core.FileKit
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -61,11 +66,14 @@ class MainActivity : FragmentActivity() {
     private val androidRestoreLauncher: AndroidRestoreLauncher by inject()
     private val databaseStartupMonitor: DatabaseStartupMonitor by inject()
     private val databaseRecoveryController: DatabaseRecoveryController by inject()
+    private val playInAppUpdateController: PlayInAppUpdateController by inject()
 
     private val viewModel by viewModel<AppViewModel>()
 
     private var pendingNavKey by mutableStateOf<NavKey?>(null)
     private var databaseStartupState by mutableStateOf<DatabaseStartupState>(DatabaseStartupState.Ready)
+    private var appUpdateUiState by mutableStateOf(AppUpdateUiState())
+    private var hasCheckedForAppUpdates by mutableStateOf(false)
 
     // Register the document picker for export functionality
     private val createDocumentLauncher =
@@ -94,18 +102,26 @@ class MainActivity : FragmentActivity() {
             androidRestoreLauncher.onRestoreSourceSelected(uri)
         }
 
+    // Bridges Play Core's update UI back into the controller through the Activity Result API.
+    private val appUpdateLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.StartIntentSenderForResult(),
+        ) { result ->
+            playInAppUpdateController.onUpdateFlowResult(result.resultCode)
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
-        Log.i(APP_LAUNCH_TAG, "MainActivity onCreate: starting launch")
+        Napier.i("MainActivity onCreate: starting launch", tag = APP_LAUNCH_TAG)
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
 
         // Set up FileKit for file operations
         FileKit.init(this)
-        Log.i(APP_LAUNCH_TAG, "MainActivity onCreate: FileKit initialized")
+        Napier.i("MainActivity onCreate: FileKit initialized", tag = APP_LAUNCH_TAG)
 
         // Set up biometric gatekeeper
         (biometricGatekeeper as? AndroidBiometricGatekeeper)?.setActivity(this)
-        Log.i(APP_LAUNCH_TAG, "MainActivity onCreate: biometric gatekeeper configured")
+        Napier.i("MainActivity onCreate: biometric gatekeeper configured", tag = APP_LAUNCH_TAG)
 
         // Register this activity for use by the export launcher
         activityProvider.currentActivity = this
@@ -113,11 +129,12 @@ class MainActivity : FragmentActivity() {
         androidExportLauncher.setupWorkObserver(this)
         androidRestoreLauncher.setupActivityResultLauncher(openDocumentLauncher)
         androidRestoreLauncher.setupWorkObserver(this)
-        Log.i(APP_LAUNCH_TAG, "MainActivity onCreate: export/restore launchers configured")
+        playInAppUpdateController.attachLauncher(ActivityResultAppUpdateFlowLauncher(appUpdateLauncher))
+        Napier.i("MainActivity onCreate: export/restore/update launchers configured", tag = APP_LAUNCH_TAG)
 
         // Set up multi-window support
         setupMultiWindowSupport()
-        Log.i(APP_LAUNCH_TAG, "MainActivity onCreate: multi-window support configured")
+        Napier.i("MainActivity onCreate: multi-window support configured", tag = APP_LAUNCH_TAG)
 
         // TODO: Maybe reconsider sealed class approach to uiState loading
         var uiState: GlobalAppUiState by mutableStateOf(GlobalAppUiLoadingState)
@@ -127,22 +144,29 @@ class MainActivity : FragmentActivity() {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
                     viewModel.uiState
-                        .onEach { uiState = it }
-                        .collect {}
+                        .onEach { state ->
+                            uiState = state
+                            maybeCheckForUpdates(state)
+                        }.collect {}
                 }
                 launch {
                     databaseStartupMonitor.state
                         .onEach { state ->
                             databaseStartupState = state
                             if (state is DatabaseStartupState.RecoveryRequired) {
-                                Log.w(
-                                    APP_LAUNCH_TAG,
+                                Napier.w(
                                     "MainActivity launch gate: recovery required (${state.reason})",
+                                    tag = APP_LAUNCH_TAG,
                                 )
                             } else {
-                                Log.i(APP_LAUNCH_TAG, "MainActivity launch gate: database state ready")
+                                Napier.i("MainActivity launch gate: database state ready", tag = APP_LAUNCH_TAG)
                             }
                         }.collect {}
+                }
+                launch {
+                    playInAppUpdateController.uiState
+                        .onEach { state -> appUpdateUiState = state }
+                        .collect {}
                 }
             }
         }
@@ -164,10 +188,16 @@ class MainActivity : FragmentActivity() {
                     onDeepLinkHandled = { pendingNavKey = null },
                     databaseStartupState = databaseStartupState,
                     onResetEncryptedStorage = ::resetEncryptedStorageAndRestart,
+                    appUpdateUiState = appUpdateUiState,
+                    onCompleteAppUpdate = {
+                        lifecycleScope.launch {
+                            playInAppUpdateController.completeUpdate()
+                        }
+                    },
                 )
             }
         }
-        Log.i(APP_LAUNCH_TAG, "MainActivity onCreate: Compose content attached")
+        Napier.i("MainActivity onCreate: Compose content attached", tag = APP_LAUNCH_TAG)
 
         // Handle the intent if this activity was launched with one
         intent?.let { handleMultiWindowIntent(it) }
@@ -197,6 +227,9 @@ class MainActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         activityProvider.currentActivity = this
+        lifecycleScope.launch {
+            playInAppUpdateController.resumeIfUpdateInProgress()
+        }
     }
 
     override fun onPause() {
@@ -210,17 +243,17 @@ class MainActivity : FragmentActivity() {
 
     private fun resetEncryptedStorageAndRestart() {
         lifecycleScope.launch {
-            Log.w(APP_LAUNCH_TAG, "Recovery action: user requested encrypted storage reset")
+            Napier.w("Recovery action: user requested encrypted storage reset", tag = APP_LAUNCH_TAG)
             databaseRecoveryController
                 .quarantineAndResetEncryptedStorage()
                 .onSuccess { backup ->
-                    Log.w(
-                        APP_LAUNCH_TAG,
+                    Napier.w(
                         "Recovery action: reset complete, backup preserved at ${backup.absolutePath}",
+                        tag = APP_LAUNCH_TAG,
                     )
                     restartApplicationProcess()
                 }.onFailure { error ->
-                    Log.e(APP_LAUNCH_TAG, "Recovery action: failed to reset encrypted storage", error)
+                    Napier.e("Recovery action: failed to reset encrypted storage", error, tag = APP_LAUNCH_TAG)
                 }
         }
     }
@@ -235,6 +268,26 @@ class MainActivity : FragmentActivity() {
         }
         finishAffinity()
         Runtime.getRuntime().exit(0)
+    }
+
+    /**
+     * Starts one automatic Play update check after the app is actually usable.
+     *
+     * This prevents the update flow from competing with onboarding or the biometric unlock gate.
+     */
+    private fun maybeCheckForUpdates(state: GlobalAppUiState) {
+        val loadedState = state as? GlobalAppUiLoadedState ?: return
+        if (hasCheckedForAppUpdates) {
+            return
+        }
+        if (!loadedState.isOnboarded || !loadedState.isAppUnlocked) {
+            return
+        }
+
+        hasCheckedForAppUpdates = true
+        lifecycleScope.launch {
+            playInAppUpdateController.checkForUpdates(AppUpdateCheckTrigger.Automatic)
+        }
     }
 
 //    override fun onProvideAssistContent(assistContent: AssistContent) {
@@ -259,6 +312,7 @@ class MainActivity : FragmentActivity() {
 //    }
 }
 
+/** Resolves the optional deep-link destination used when audio playback re-enters the app. */
 private fun resolveNavKey(intent: Intent?): NavKey? {
     if (intent == null) return null
     if (intent.getStringExtra(EXTRA_NAV_SOURCE) != NAV_SOURCE_AUDIO_PLAYBACK) return null
@@ -266,6 +320,7 @@ private fun resolveNavKey(intent: Intent?): NavKey? {
     return runCatching { NoteViewerRoute(Uuid.parse(noteId)) }.getOrNull()
 }
 
+/** Compose preview for the Android activity root. */
 @Preview
 @Suppress("ktlint:standard:function-naming")
 @Composable

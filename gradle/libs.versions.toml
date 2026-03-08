@@ -297,6 +297,7 @@ play-services-location = { group = "com.google.android.gms", name = "play-servic
 play-services-maps = { group = "com.google.android.gms", name = "play-services-maps", version.ref = "playServicesMaps" }
 play-install-referrer = { group = "com.android.installreferrer", name = "installreferrer", version.ref = "playInstallReferrer" }
 play-app-update-ktx = { group = "com.google.android.play", name = "app-update-ktx", version.ref = "playAppUpdate" }
+play-app-update-testing = { group = "com.google.android.play", name = "app-update-testing", version.ref = "playAppUpdate" }
 google-maps-places = { group = "com.google.android.libraries.places", name = "places", version.ref = "googleMapsPlaces" }
 google-maps-compose = { group = "com.google.maps.android", name = "maps-compose", version.ref = "googleMapsCompose" }
 

@@ -20,6 +20,8 @@ import app.logdate.feature.core.settings.ui.DangerZoneSettingsViewModel
 import app.logdate.feature.core.settings.ui.DataSettingsViewModel
 import app.logdate.feature.core.settings.ui.LocationSettingsViewModel
 import app.logdate.feature.core.settings.ui.PrivacySettingsViewModel
+import app.logdate.feature.core.settings.updates.AppUpdateController
+import app.logdate.feature.core.settings.updates.UnsupportedAppUpdateController
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
@@ -38,6 +40,7 @@ actual val coreFeatureModule: Module =
 
         // TODO: Refactor to separate auth module
         single<BiometricGatekeeper> { IosBiometricGatekeeper() }
+        single<AppUpdateController> { UnsupportedAppUpdateController(get()) }
 
         // TODO: Verify this iOS export implementation works correctly with the root view controller
         // Export functionality for iOS - gets root view controller from the main application window
@@ -90,7 +93,7 @@ actual val coreFeatureModule: Module =
             )
         }
         viewModel { ExportViewModel(get(), get()) }
-        viewModel { AdvancedSettingsViewModel(get(), get()) }
+        viewModel { AdvancedSettingsViewModel(get(), get(), get()) }
         viewModel {
             DangerZoneSettingsViewModel(
                 get(),

@@ -23,6 +23,7 @@ import app.logdate.feature.core.settings.ui.DangerZoneSettingsViewModel
 import app.logdate.feature.core.settings.ui.DataSettingsViewModel
 import app.logdate.feature.core.settings.ui.LocationSettingsViewModel
 import app.logdate.feature.core.settings.ui.PrivacySettingsViewModel
+import app.logdate.feature.core.settings.updates.AppUpdateController
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.workmanager.dsl.workerOf
 import org.koin.core.module.Module
@@ -91,7 +92,7 @@ actual val coreFeatureModule: Module =
             )
         }
         viewModel { ExportViewModel(get(), get()) }
-        viewModel { AdvancedSettingsViewModel(get(), get()) }
+        viewModel { AdvancedSettingsViewModel(get(), get(), get<AppUpdateController>()) }
         viewModel {
             DangerZoneSettingsViewModel(
                 get(),

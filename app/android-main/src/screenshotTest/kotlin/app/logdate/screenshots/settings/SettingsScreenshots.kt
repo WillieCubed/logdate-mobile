@@ -23,6 +23,9 @@ import app.logdate.feature.core.settings.ui.StorageQuotaUi
 import app.logdate.feature.core.settings.ui.UserProfile
 import app.logdate.feature.core.settings.ui.dialogs.DangerConfirmationDialog
 import app.logdate.feature.core.settings.ui.dialogs.ResetAppConfirmationDialog
+import app.logdate.feature.core.settings.updates.AppUpdateFlowType
+import app.logdate.feature.core.settings.updates.AppUpdateStatus
+import app.logdate.feature.core.settings.updates.AppUpdateUiState
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.shared.model.user.UserData
 import androidx.compose.foundation.layout.Box
@@ -222,10 +225,62 @@ fun AdvancedSettings() {
         AdvancedSettingsContent(
             onBack = {},
             serverSelectionState = ServerSelectionState(),
+            appUpdateUiState = AppUpdateUiState(currentVersionName = "0.1.0"),
             onSelectPreset = {},
             onUpdateLocalAddress = {},
             onUpdateCustomUrl = {},
             onValidateAndSave = {},
+            onCheckForAppUpdates = {},
+            onCompleteAppUpdate = {},
+        )
+    }
+}
+
+/** Captures the advanced settings state after a flexible update has downloaded. */
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun AdvancedSettings_UpdateReady() {
+    ScreenshotTheme {
+        AdvancedSettingsContent(
+            onBack = {},
+            serverSelectionState = ServerSelectionState(),
+            appUpdateUiState =
+                AppUpdateUiState(
+                    currentVersionName = "0.1.0",
+                    status = AppUpdateStatus.Downloaded,
+                ),
+            onSelectPreset = {},
+            onUpdateLocalAddress = {},
+            onUpdateCustomUrl = {},
+            onValidateAndSave = {},
+            onCheckForAppUpdates = {},
+            onCompleteAppUpdate = {},
+        )
+    }
+}
+
+/** Captures the advanced settings state when an immediate Play update is available. */
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun AdvancedSettings_UpdateAvailableImmediate() {
+    ScreenshotTheme {
+        AdvancedSettingsContent(
+            onBack = {},
+            serverSelectionState = ServerSelectionState(),
+            appUpdateUiState =
+                AppUpdateUiState(
+                    currentVersionName = "0.1.0",
+                    status = AppUpdateStatus.Available,
+                    flowType = AppUpdateFlowType.Immediate,
+                ),
+            onSelectPreset = {},
+            onUpdateLocalAddress = {},
+            onUpdateCustomUrl = {},
+            onValidateAndSave = {},
+            onCheckForAppUpdates = {},
+            onCompleteAppUpdate = {},
         )
     }
 }

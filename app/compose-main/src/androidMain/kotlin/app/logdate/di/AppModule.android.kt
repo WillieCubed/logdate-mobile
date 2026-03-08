@@ -13,6 +13,8 @@ import app.logdate.client.intelligence.di.intelligenceModule
 import app.logdate.client.location.di.locationModule
 import app.logdate.client.media.di.audioModule
 import app.logdate.client.networking.di.networkingModule
+import app.logdate.client.updates.PlayInAppUpdateController
+import app.logdate.feature.core.settings.updates.AppUpdateController
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.androidx.workmanager.koin.workManagerFactory
@@ -41,6 +43,9 @@ actual val appModule: Module =
         includes(locationModule)
         includes(audioModule)
         includes(windowingModule)
+
+        single { PlayInAppUpdateController(androidContext(), get()) }
+        single<AppUpdateController> { get<PlayInAppUpdateController>() }
     }
 
 /**

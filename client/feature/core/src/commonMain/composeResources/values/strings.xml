@@ -15,6 +15,17 @@
     <string name="account_information">Account Information</string>
     <string name="account_recovery">Account Recovery</string>
     <string name="advanced">Advanced</string>
+    <string name="app_update_available">An update is available and can be downloaded in the background.</string>
+    <string name="app_update_check_failed">Unable to check for updates right now.</string>
+    <string name="app_update_checking">Checking for updates...</string>
+    <string name="app_update_downloaded">Update ready. Restart the app to finish installing.</string>
+    <string name="app_update_downloading">Update downloading in the background.</string>
+    <string name="app_update_immediate_required">A required update is available.</string>
+    <string name="app_update_manual_label">Check for app updates</string>
+    <string name="app_update_restart_action">Restart to update</string>
+    <string name="app_update_unsupported">In-app updates require a Google Play installed build.</string>
+    <string name="app_update_up_to_date">App is up to date.</string>
+    <string name="app_updates">App Updates</string>
     <string name="almost_ready">Almost ready!</string>
     <string name="app_security">App Security</string>
     <string name="are_you_sure_you_want_to_reset_this_devices_id_this_is_primarily_used_for_privacy_purposes_and_will_generate_a_new_unique_identifier_for_this_device_this_wont_affect_your_data_but_may_require_re_syncing_with_logdate_cloud">Are you sure you want to reset this device&apos;s ID? This is primarily used for privacy purposes and will generate a new unique identifier for this device. This won&apos;t affect your data but may require re-syncing with LogDate Cloud.</string>
@@ -248,6 +259,7 @@
     <string name="account_created_signed_in_as">Your account has been created successfully. You are now signed in as %1$s.</string>
     <string name="app_version_label">App version: %1$s</string>
     <string name="check">Check</string>
+    <string name="check_for_updates">Check for updates</string>
     <string name="checking">Checking...</string>
     <string name="conflicts_need_review">%1$d conflict%2$s need review</string>
     <string name="detected_timestamp">Detected %1$s</string>

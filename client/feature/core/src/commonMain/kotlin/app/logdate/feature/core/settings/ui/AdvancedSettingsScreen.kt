@@ -45,13 +45,29 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.core.settings.updates.AppUpdateFlowType
+import app.logdate.feature.core.settings.updates.AppUpdateStatus
+import app.logdate.feature.core.settings.updates.AppUpdateUiState
 import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.advanced
+import logdate.client.feature.core.generated.resources.app_update_available
+import logdate.client.feature.core.generated.resources.app_update_check_failed
+import logdate.client.feature.core.generated.resources.app_update_checking
+import logdate.client.feature.core.generated.resources.app_update_downloaded
+import logdate.client.feature.core.generated.resources.app_update_downloading
+import logdate.client.feature.core.generated.resources.app_update_immediate_required
+import logdate.client.feature.core.generated.resources.app_update_manual_label
+import logdate.client.feature.core.generated.resources.app_update_restart_action
+import logdate.client.feature.core.generated.resources.app_update_unsupported
+import logdate.client.feature.core.generated.resources.app_update_up_to_date
+import logdate.client.feature.core.generated.resources.app_updates
+import logdate.client.feature.core.generated.resources.app_version_label
 import logdate.client.feature.core.generated.resources.back
+import logdate.client.feature.core.generated.resources.check_for_updates
 import logdate.client.feature.core.generated.resources.https_your_server_example_com
 import logdate.client.feature.core.generated.resources.localhost_8765
 import logdate.client.feature.core.generated.resources.server_address
@@ -68,6 +84,7 @@ import org.koin.compose.viewmodel.koinViewModel
  * Advanced settings screen for developer and power-user options.
  *
  * This screen provides:
+ * - Manual app update controls and status
  * - Server selection (Production, Local, Custom)
  * - Connection validation
  *
@@ -80,26 +97,39 @@ fun AdvancedSettingsScreen(
     viewModel: AdvancedSettingsViewModel = koinViewModel(),
 ) {
     val serverSelectionState by viewModel.serverSelectionState.collectAsState()
+    val appUpdateUiState by viewModel.appUpdateUiState.collectAsState()
 
     AdvancedSettingsContent(
         onBack = onBack,
         serverSelectionState = serverSelectionState,
+        appUpdateUiState = appUpdateUiState,
         onSelectPreset = viewModel::selectServerPreset,
         onUpdateLocalAddress = viewModel::updateLocalServerAddress,
         onUpdateCustomUrl = viewModel::updateCustomServerUrl,
         onValidateAndSave = viewModel::validateAndSaveServer,
+        onCheckForAppUpdates = viewModel::checkForAppUpdates,
+        onCompleteAppUpdate = viewModel::completeAppUpdate,
     )
 }
 
+/**
+ * Stateless advanced settings content used by the real screen and screenshot previews.
+ *
+ * The layout intentionally groups app-update controls above server configuration so support,
+ * QA, and power users can verify Play update behavior quickly.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdvancedSettingsContent(
     onBack: () -> Unit,
     serverSelectionState: ServerSelectionState,
+    appUpdateUiState: AppUpdateUiState,
     onSelectPreset: (ServerPreset) -> Unit,
     onUpdateLocalAddress: (String) -> Unit,
     onUpdateCustomUrl: (String) -> Unit,
     onValidateAndSave: () -> Unit,
+    onCheckForAppUpdates: () -> Unit,
+    onCompleteAppUpdate: () -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
@@ -128,6 +158,15 @@ fun AdvancedSettingsContent(
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
                 item {
+                    AppUpdateSection(
+                        appUpdateUiState = appUpdateUiState,
+                        onCheckForAppUpdates = onCheckForAppUpdates,
+                        onCompleteAppUpdate = onCompleteAppUpdate,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
+
+                item {
                     ServerSelectionSection(
                         serverSelectionState = serverSelectionState,
                         onSelectPreset = onSelectPreset,
@@ -136,6 +175,91 @@ fun AdvancedSettingsContent(
                         onValidateAndSave = onValidateAndSave,
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * App-update status and actions shown in `Settings > Advanced`.
+ *
+ * This surface mirrors the Android root restart prompt so the user still has a visible
+ * completion path if they dismiss the global snackbar after a flexible download finishes.
+ */
+@Composable
+private fun AppUpdateSection(
+    appUpdateUiState: AppUpdateUiState,
+    onCheckForAppUpdates: () -> Unit,
+    onCompleteAppUpdate: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val actionLabel =
+        when (appUpdateUiState.status) {
+            AppUpdateStatus.Checking -> stringResource(Res.string.app_update_checking)
+            AppUpdateStatus.Downloaded -> stringResource(Res.string.app_update_restart_action)
+            else -> stringResource(Res.string.check_for_updates)
+        }
+
+    val statusMessage =
+        when (appUpdateUiState.status) {
+            AppUpdateStatus.Idle ->
+                stringResource(
+                    Res.string.app_version_label,
+                    appUpdateUiState.currentVersionName,
+                )
+            AppUpdateStatus.Checking -> stringResource(Res.string.app_update_checking)
+            AppUpdateStatus.UpToDate ->
+                appUpdateUiState.message ?: stringResource(Res.string.app_update_up_to_date)
+            AppUpdateStatus.Available ->
+                when (appUpdateUiState.flowType) {
+                    AppUpdateFlowType.Immediate -> stringResource(Res.string.app_update_immediate_required)
+                    else -> stringResource(Res.string.app_update_available)
+                }
+            AppUpdateStatus.Downloading -> stringResource(Res.string.app_update_downloading)
+            AppUpdateStatus.Downloaded -> stringResource(Res.string.app_update_downloaded)
+            AppUpdateStatus.Unsupported ->
+                appUpdateUiState.message ?: stringResource(Res.string.app_update_unsupported)
+            AppUpdateStatus.Error ->
+                appUpdateUiState.message ?: stringResource(Res.string.app_update_check_failed)
+        }
+
+    val buttonEnabled = appUpdateUiState.status != AppUpdateStatus.Checking
+
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Text(
+            text = stringResource(Res.string.app_updates),
+            style = MaterialTheme.typography.titleMedium,
+        )
+
+        MaterialContainer {
+            Column(
+                modifier = Modifier.padding(Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Text(
+                    text = stringResource(Res.string.app_update_manual_label),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = statusMessage,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(
+                    onClick = {
+                        if (appUpdateUiState.status == AppUpdateStatus.Downloaded) {
+                            onCompleteAppUpdate()
+                        } else {
+                            onCheckForAppUpdates()
+                        }
+                    },
+                    enabled = buttonEnabled,
+                ) {
+                    Text(actionLabel)
                 }
             }
         }
@@ -425,10 +549,13 @@ private fun AdvancedSettingsScreenPreview() {
     AdvancedSettingsContent(
         onBack = {},
         serverSelectionState = ServerSelectionState(),
+        appUpdateUiState = AppUpdateUiState(currentVersionName = "0.1.0"),
         onSelectPreset = {},
         onUpdateLocalAddress = {},
         onUpdateCustomUrl = {},
         onValidateAndSave = {},
+        onCheckForAppUpdates = {},
+        onCompleteAppUpdate = {},
     )
 }
 
@@ -442,10 +569,18 @@ private fun AdvancedSettingsScreenLocalSelectedPreview() {
                 selectedPreset = ServerPreset.LOCAL,
                 localServerAddress = "192.168.1.100:8765",
             ),
+        appUpdateUiState =
+            AppUpdateUiState(
+                currentVersionName = "0.1.0",
+                status = AppUpdateStatus.Available,
+                flowType = AppUpdateFlowType.Flexible,
+            ),
         onSelectPreset = {},
         onUpdateLocalAddress = {},
         onUpdateCustomUrl = {},
         onValidateAndSave = {},
+        onCheckForAppUpdates = {},
+        onCompleteAppUpdate = {},
     )
 }
 
@@ -459,9 +594,16 @@ private fun AdvancedSettingsScreenValidatingPreview() {
                 selectedPreset = ServerPreset.LOCAL,
                 validationState = ServerValidationState.Validating,
             ),
+        appUpdateUiState =
+            AppUpdateUiState(
+                currentVersionName = "0.1.0",
+                status = AppUpdateStatus.Downloaded,
+            ),
         onSelectPreset = {},
         onUpdateLocalAddress = {},
         onUpdateCustomUrl = {},
         onValidateAndSave = {},
+        onCheckForAppUpdates = {},
+        onCompleteAppUpdate = {},
     )
 }

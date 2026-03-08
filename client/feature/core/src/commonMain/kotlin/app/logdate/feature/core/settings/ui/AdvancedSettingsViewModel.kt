@@ -3,6 +3,9 @@ package app.logdate.feature.core.settings.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.networking.ServerHealthChecker
+import app.logdate.feature.core.settings.updates.AppUpdateCheckTrigger
+import app.logdate.feature.core.settings.updates.AppUpdateController
+import app.logdate.feature.core.settings.updates.AppUpdateUiState
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.LogDateConfigRepository
 import io.github.aakira.napier.Napier
@@ -31,23 +34,35 @@ data class ServerSelectionState(
     val validationState: ServerValidationState = ServerValidationState.Idle,
 )
 
+/** Result of validating the selected server configuration before persisting it. */
 sealed class ServerValidationState {
+    /** No validation has run for the current selection. */
     data object Idle : ServerValidationState()
 
+    /** A connection test is currently in progress. */
     data object Validating : ServerValidationState()
 
+    /** The selected server responded successfully and reported its version. */
     data class Success(
         val serverVersion: String?,
     ) : ServerValidationState()
 
+    /** The selected server could not be reached or rejected the request. */
     data class Error(
         val message: String,
     ) : ServerValidationState()
 }
 
+/**
+ * Coordinates advanced settings actions for server configuration and manual app updates.
+ *
+ * The view model keeps server-editing state local to the screen while exposing the shared
+ * app-update state produced by the platform-specific [AppUpdateController].
+ */
 class AdvancedSettingsViewModel(
     private val serverHealthChecker: ServerHealthChecker,
     private val configRepository: LogDateConfigRepository,
+    private val appUpdateController: AppUpdateController,
 ) : ViewModel() {
     private val _serverSelectionState =
         MutableStateFlow(
@@ -55,8 +70,14 @@ class AdvancedSettingsViewModel(
                 localServerAddress = DefaultLogDateConfigRepository.DEFAULT_LOCAL_SERVER_ADDRESS,
             ),
         )
+
+    /** Editable server-selection state shown in the advanced settings form. */
     val serverSelectionState: StateFlow<ServerSelectionState> = _serverSelectionState.asStateFlow()
 
+    /** Play-update status exposed directly from the platform app-update controller. */
+    val appUpdateUiState: StateFlow<AppUpdateUiState> = appUpdateController.uiState
+
+    /** Switches the selected server preset and clears any previous validation outcome. */
     fun selectServerPreset(preset: ServerPreset) {
         _serverSelectionState.update {
             it.copy(
@@ -66,6 +87,7 @@ class AdvancedSettingsViewModel(
         }
     }
 
+    /** Updates the editable local server address without persisting it yet. */
     fun updateLocalServerAddress(address: String) {
         _serverSelectionState.update {
             it.copy(
@@ -75,6 +97,7 @@ class AdvancedSettingsViewModel(
         }
     }
 
+    /** Updates the editable custom server URL without persisting it yet. */
     fun updateCustomServerUrl(url: String) {
         _serverSelectionState.update {
             it.copy(
@@ -84,6 +107,11 @@ class AdvancedSettingsViewModel(
         }
     }
 
+    /**
+     * Validates the currently selected server, then persists it when the health check succeeds.
+     *
+     * Production does not need a live probe because it always points at the default backend URL.
+     */
     fun validateAndSaveServer() {
         val currentState = _serverSelectionState.value
 
@@ -136,6 +164,20 @@ class AdvancedSettingsViewModel(
                     }
                 },
             )
+        }
+    }
+
+    /** Starts a user-initiated Play update check from `Settings > Advanced`. */
+    fun checkForAppUpdates() {
+        viewModelScope.launch {
+            appUpdateController.checkForUpdates(AppUpdateCheckTrigger.Manual)
+        }
+    }
+
+    /** Requests installation of a flexible update that has already been downloaded. */
+    fun completeAppUpdate() {
+        viewModelScope.launch {
+            appUpdateController.completeUpdate()
         }
     }
 
