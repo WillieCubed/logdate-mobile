@@ -7,7 +7,12 @@ import app.logdate.client.domain.account.CheckUsernameAvailabilityUseCase
 import app.logdate.client.domain.account.CreatePasskeyAccountUseCase
 import app.logdate.client.permissions.PasskeyManager
 import app.logdate.client.repository.profile.ProfileRepository
+import app.logdate.feature.core.settings.ui.ServerConfigurationCoordinator
+import app.logdate.feature.core.settings.ui.ServerPreset
+import app.logdate.feature.core.settings.ui.ServerSelectionState
+import app.logdate.feature.core.settings.ui.ServerValidationState
 import app.logdate.shared.model.LogDateAccount
+import app.logdate.shared.model.ServerDescriptor
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -22,8 +27,14 @@ class CloudAccountOnboardingViewModel(
     private val authenticateWithPasskeyUseCase: AuthenticateWithPasskeyUseCase,
     private val passkeyManager: PasskeyManager,
     private val profileRepository: ProfileRepository,
+    private val serverConfigurationCoordinator: ServerConfigurationCoordinator,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(CloudAccountOnboardingUiState())
+    private val _uiState =
+        MutableStateFlow(
+            CloudAccountOnboardingUiState(
+                serverSelectionState = serverConfigurationCoordinator.initialSelectionState(),
+            ),
+        )
     val uiState: StateFlow<CloudAccountOnboardingUiState> = _uiState.asStateFlow()
 
     private var usernameCheckJob: Job? = null
@@ -34,17 +45,14 @@ class CloudAccountOnboardingViewModel(
 
     fun goToNextStep() {
         val currentStep = _uiState.value.currentStep
-        val nextStep =
-            when (currentStep) {
-                OnboardingStep.Welcome -> OnboardingStep.DisplayName
-                OnboardingStep.SignIn -> OnboardingStep.Complete // After successful sign-in
-                OnboardingStep.DisplayName -> OnboardingStep.Username
-                OnboardingStep.Username -> OnboardingStep.PasskeyCreation
-                OnboardingStep.PasskeyCreation -> OnboardingStep.Complete
-                OnboardingStep.Complete -> OnboardingStep.Complete // Stay on complete
-            }
-
-        _uiState.value = _uiState.value.copy(currentStep = nextStep)
+        when (currentStep) {
+            OnboardingStep.Welcome -> prepareServerSelection(OnboardingStep.DisplayName)
+            OnboardingStep.SignIn -> _uiState.value = _uiState.value.copy(currentStep = OnboardingStep.Complete)
+            OnboardingStep.DisplayName -> _uiState.value = _uiState.value.copy(currentStep = OnboardingStep.Username)
+            OnboardingStep.Username -> _uiState.value = _uiState.value.copy(currentStep = OnboardingStep.PasskeyCreation)
+            OnboardingStep.PasskeyCreation -> _uiState.value = _uiState.value.copy(currentStep = OnboardingStep.Complete)
+            OnboardingStep.Complete -> _uiState.value = _uiState.value.copy(currentStep = OnboardingStep.Complete)
+        }
     }
 
     fun goToPreviousStep() {
@@ -147,13 +155,10 @@ class CloudAccountOnboardingViewModel(
     }
 
     fun goToSignIn() {
-        _uiState.value = _uiState.value.copy(currentStep = OnboardingStep.SignIn, errorMessage = null)
+        prepareServerSelection(OnboardingStep.SignIn)
     }
 
-    fun signInWithPasskey(
-        username: String,
-        serverUrl: String,
-    ) {
+    fun signInWithPasskey(username: String) {
         _uiState.value =
             _uiState.value.copy(
                 isSigningIn = true,
@@ -195,8 +200,35 @@ class CloudAccountOnboardingViewModel(
     }
 
     fun resetFlow() {
-        _uiState.value = CloudAccountOnboardingUiState()
+        _uiState.value =
+            CloudAccountOnboardingUiState(
+                serverSelectionState = serverConfigurationCoordinator.initialSelectionState(),
+            )
         checkPasskeySupport()
+    }
+
+    fun selectServerPreset(preset: ServerPreset) {
+        _uiState.value =
+            _uiState.value.copy(
+                serverSelectionState =
+                    _uiState.value.serverSelectionState.copy(
+                        selectedPreset = preset,
+                        validationState = ServerValidationState.Idle,
+                    ),
+                errorMessage = null,
+            )
+    }
+
+    fun updateCustomServerUrl(url: String) {
+        _uiState.value =
+            _uiState.value.copy(
+                serverSelectionState =
+                    _uiState.value.serverSelectionState.copy(
+                        customServerUrl = url,
+                        validationState = ServerValidationState.Idle,
+                    ),
+                errorMessage = null,
+            )
     }
 
     private fun checkPasskeySupport() {
@@ -233,6 +265,89 @@ class CloudAccountOnboardingViewModel(
                             UsernameAvailability.Error
                         }
                     },
+            )
+    }
+
+    private fun prepareServerSelection(nextStep: OnboardingStep) {
+        viewModelScope.launch {
+            val serverSelectionState = _uiState.value.serverSelectionState
+            when (serverSelectionState.selectedPreset) {
+                ServerPreset.PRODUCTION ->
+                    persistServerSelection(
+                        nextStep = nextStep,
+                        failureMessage = "Failed to configure LogDate Cloud",
+                    ) {
+                        serverConfigurationCoordinator.saveLogDateCloudSelection()
+                    }
+
+                ServerPreset.CUSTOM -> {
+                    val customServerUrl = serverSelectionState.customServerUrl
+                    if (customServerUrl.isBlank()) {
+                        updateServerSelectionState(
+                            validationState = ServerValidationState.Error("Server URL cannot be empty"),
+                            errorMessage = "Server URL cannot be empty",
+                        )
+                        return@launch
+                    }
+
+                    updateServerSelectionState(
+                        validationState = ServerValidationState.Validating,
+                        errorMessage = null,
+                    )
+
+                    persistServerSelection(
+                        nextStep = nextStep,
+                        failureMessage = "Failed to connect to server",
+                    ) {
+                        serverConfigurationCoordinator.validateAndSaveCustomServer(customServerUrl)
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun persistServerSelection(
+        nextStep: OnboardingStep,
+        failureMessage: String,
+        save: suspend () -> Result<ServerConfigurationCoordinator.SaveResult>,
+    ) {
+        save()
+            .onSuccess { result ->
+                updateServerSelectionState(
+                    validationState = ServerValidationState.Success(result.serverVersion),
+                    errorMessage = null,
+                    nextStep = nextStep,
+                    activeServerDescriptor = result.descriptor,
+                    customServerUrl =
+                        result.serverOrigin.takeIf {
+                            _uiState.value.serverSelectionState.selectedPreset == ServerPreset.CUSTOM
+                        },
+                )
+            }.onFailure { error ->
+                updateServerSelectionState(
+                    validationState = ServerValidationState.Error(error.message ?: failureMessage),
+                    errorMessage = error.message ?: failureMessage,
+                )
+            }
+    }
+
+    private fun updateServerSelectionState(
+        validationState: ServerValidationState,
+        errorMessage: String?,
+        nextStep: OnboardingStep? = null,
+        activeServerDescriptor: ServerDescriptor? = _uiState.value.serverSelectionState.activeServerDescriptor,
+        customServerUrl: String? = null,
+    ) {
+        _uiState.value =
+            _uiState.value.copy(
+                currentStep = nextStep ?: _uiState.value.currentStep,
+                errorMessage = errorMessage,
+                serverSelectionState =
+                    _uiState.value.serverSelectionState.copy(
+                        validationState = validationState,
+                        activeServerDescriptor = activeServerDescriptor,
+                        customServerUrl = customServerUrl ?: _uiState.value.serverSelectionState.customServerUrl,
+                    ),
             )
     }
 
@@ -328,6 +443,7 @@ class CloudAccountOnboardingViewModel(
 
 data class CloudAccountOnboardingUiState(
     val currentStep: OnboardingStep = OnboardingStep.Welcome,
+    val serverSelectionState: ServerSelectionState = ServerSelectionState(),
     val displayName: String = "",
     val username: String = "",
     val bio: String = "",

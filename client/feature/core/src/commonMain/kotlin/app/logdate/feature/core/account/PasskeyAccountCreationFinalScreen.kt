@@ -40,7 +40,6 @@ import logdate.client.feature.core.generated.resources.try_again
 import logdate.client.feature.core.generated.resources.unique_address_username
 import logdate.client.feature.core.generated.resources.username
 import logdate.client.feature.core.generated.resources.your_device_doesnt_support_passkeys_please_use_a_device_with_biometric_authentication_or_a_security_key
-import logdate.client.feature.core.generated.resources.your_logdate_cloud_account
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -55,6 +54,8 @@ fun PasskeyAccountCreationFinalContent(
     errorMessage: String?,
     onClearError: () -> Unit,
     isPasskeySupported: Boolean,
+    handleDomain: String,
+    serverDisplayName: String,
     modifier: Modifier = Modifier,
 ) {
     val focusManager = LocalFocusManager.current
@@ -115,6 +116,7 @@ fun PasskeyAccountCreationFinalContent(
                     text =
                         stringResource(
                             Res.string.review_your_details_and_create_your_secure_passkey_to_complete_your_logdate_cloud_account,
+                            serverDisplayName,
                         ),
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
@@ -135,7 +137,7 @@ fun PasskeyAccountCreationFinalContent(
                     verticalArrangement = Arrangement.spacedBy(Spacing.md),
                 ) {
                     Text(
-                        text = stringResource(Res.string.your_logdate_cloud_account),
+                        text = "Your $serverDisplayName account",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -188,6 +190,7 @@ fun PasskeyAccountCreationFinalContent(
                                     stringResource(
                                         Res.string.unique_address_username,
                                         username,
+                                        handleDomain,
                                     ),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -385,6 +388,8 @@ private fun PasskeyAccountCreationFinalScreenPreview() {
                 errorMessage = null,
                 onClearError = {},
                 isPasskeySupported = true,
+                handleDomain = "logdate.app",
+                serverDisplayName = "LogDate Cloud",
             )
         }
     }
@@ -406,6 +411,8 @@ private fun PasskeyAccountCreationFinalScreenLoadingPreview() {
                 errorMessage = null,
                 onClearError = {},
                 isPasskeySupported = true,
+                handleDomain = "journal.example.com",
+                serverDisplayName = "Custom server",
             )
         }
     }

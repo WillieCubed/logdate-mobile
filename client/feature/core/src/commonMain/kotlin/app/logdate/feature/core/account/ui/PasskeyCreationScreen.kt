@@ -82,12 +82,28 @@ fun PasskeyCreationScreen(
         }
     }
 
+    PasskeyCreationContent(
+        uiState = uiState,
+        onCreatePasskey = viewModel::createPasskey,
+        onBack = onBack,
+        snackbarHostState = snackbarHostState,
+    )
+}
+
+@Composable
+fun PasskeyCreationContent(
+    uiState: PasskeyCreationUiState,
+    onCreatePasskey: () -> Unit,
+    onBack: () -> Unit,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    modifier: Modifier = Modifier,
+) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { paddingValues ->
         Box(
             modifier =
-                Modifier
+                modifier
                     .fillMaxSize()
                     .padding(paddingValues),
             contentAlignment = Alignment.Center,
@@ -163,7 +179,7 @@ fun PasskeyCreationScreen(
                         Spacer(modifier = Modifier.weight(1f))
 
                         Button(
-                            onClick = { viewModel.createPasskey() },
+                            onClick = onCreatePasskey,
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !uiState.isCreatingPasskey && !uiState.isCreatingAccount,
                         ) {

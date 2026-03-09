@@ -57,6 +57,22 @@ fun CloudAccountIntroScreen(
 ) {
     // No need to observe ViewModel state for navigation - use callbacks directly
 
+    CloudAccountIntroContent(
+        isFromOnboarding = isFromOnboarding,
+        onContinue = onContinue,
+        onSkip = onSkip,
+        onBack = onBack,
+    )
+}
+
+@Composable
+fun CloudAccountIntroContent(
+    isFromOnboarding: Boolean,
+    onContinue: () -> Unit,
+    onSkip: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Scaffold { paddingValues ->
         Column(
             modifier =
@@ -68,65 +84,88 @@ fun CloudAccountIntroScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Icon(
-                imageVector = Icons.Rounded.Cloud,
-                contentDescription = null,
-                modifier = Modifier.size(72.dp),
-                tint = MaterialTheme.colorScheme.primary,
+            CloudAccountIntroBody(
+                isFromOnboarding = isFromOnboarding,
+                onContinue = onContinue,
+                onSkip = onSkip,
+                onBack = onBack,
+                modifier = modifier,
             )
+        }
+    }
+}
 
-            Text(
-                text = stringResource(Res.string.logdate_cloud),
-                style = MaterialTheme.typography.headlineMedium,
-                textAlign = TextAlign.Center,
-            )
+@Composable
+private fun CloudAccountIntroBody(
+    isFromOnboarding: Boolean,
+    onContinue: () -> Unit,
+    onSkip: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Spacer(modifier = Modifier.height(32.dp))
 
-            Spacer(modifier = Modifier.height(16.dp))
+        Icon(
+            imageVector = Icons.Rounded.Cloud,
+            contentDescription = null,
+            modifier = Modifier.size(72.dp),
+            tint = MaterialTheme.colorScheme.primary,
+        )
 
-            Text(
-                text = stringResource(Res.string.securely_sync_your_journals_notes_and_memories_across_all_your_devices),
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center,
-            )
+        Text(
+            text = stringResource(Res.string.logdate_cloud),
+            style = MaterialTheme.typography.headlineMedium,
+            textAlign = TextAlign.Center,
+        )
 
-            Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-            Text(
-                text =
-                    "• No password required - uses secure passkeys\n" +
-                        "• End-to-end encryption for your data\n" +
-                        "• Works across all your devices\n" +
-                        "• Your data remains available offline",
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Start,
-                modifier = Modifier.fillMaxWidth(),
-            )
+        Text(
+            text = stringResource(Res.string.securely_sync_your_journals_notes_and_memories_across_all_your_devices),
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+        )
 
-            Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(8.dp))
 
-            Button(
-                onClick = onContinue,
+        Text(
+            text =
+                "• No password required - uses secure passkeys\n" +
+                    "• End-to-end encryption for your data\n" +
+                    "• Works across all your devices\n" +
+                    "• Your data remains available offline",
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Start,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        Button(
+            onClick = onContinue,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(Res.string.`continue`))
+        }
+
+        if (isFromOnboarding) {
+            TextButton(
+                onClick = onSkip,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(stringResource(Res.string.`continue`))
+                Text(stringResource(Res.string.skip_for_now_2))
             }
-
-            if (isFromOnboarding) {
-                TextButton(
-                    onClick = onSkip,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(Res.string.skip_for_now_2))
-                }
-            } else {
-                TextButton(
-                    onClick = onBack,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(Res.string.not_now))
-                }
+        } else {
+            TextButton(
+                onClick = onBack,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(Res.string.not_now))
             }
         }
     }

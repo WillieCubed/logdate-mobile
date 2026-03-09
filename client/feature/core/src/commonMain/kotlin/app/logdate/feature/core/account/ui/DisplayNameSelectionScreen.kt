@@ -75,12 +75,37 @@ fun DisplayNameSelectionScreen(
         }
     }
 
+    DisplayNameSelectionContent(
+        uiState = uiState,
+        onDisplayNameChange = viewModel::onDisplayNameChanged,
+        onContinue = {
+            viewModel.onDisplayNameContinue()
+            onContinue()
+        },
+        onBack = onBack,
+        focusRequester = focusRequester,
+        snackbarHostState = snackbarHostState,
+    )
+}
+
+@Composable
+fun DisplayNameSelectionContent(
+    uiState: AccountOnboardingUiState,
+    onDisplayNameChange: (String) -> Unit,
+    onContinue: () -> Unit,
+    onBack: () -> Unit,
+    focusRequester: FocusRequester = remember { FocusRequester() },
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    modifier: Modifier = Modifier,
+) {
+    val focusManager = LocalFocusManager.current
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { paddingValues ->
         Column(
             modifier =
-                Modifier
+                modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(paddingValues)
@@ -101,7 +126,7 @@ fun DisplayNameSelectionScreen(
 
             OutlinedTextField(
                 value = uiState.displayName,
-                onValueChange = { viewModel.onDisplayNameChanged(it) },
+                onValueChange = onDisplayNameChange,
                 label = { Text(stringResource(Res.string.display_name)) },
                 isError = uiState.displayNameError != null,
                 supportingText = uiState.displayNameError?.let { { Text(it) } },
@@ -118,7 +143,6 @@ fun DisplayNameSelectionScreen(
                         onDone = {
                             focusManager.clearFocus()
                             if (uiState.canContinueFromDisplayName) {
-                                viewModel.onDisplayNameContinue()
                                 onContinue()
                             }
                         },
@@ -129,10 +153,7 @@ fun DisplayNameSelectionScreen(
             Spacer(modifier = Modifier.weight(1f))
 
             Button(
-                onClick = {
-                    viewModel.onDisplayNameContinue()
-                    onContinue()
-                },
+                onClick = onContinue,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = uiState.canContinueFromDisplayName,
             ) {

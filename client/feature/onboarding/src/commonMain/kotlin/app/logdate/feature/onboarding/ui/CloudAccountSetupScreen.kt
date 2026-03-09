@@ -81,7 +81,7 @@ fun CloudAccountSetupScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CloudAccountSetupContent(
+fun CloudAccountSetupContent(
     useCompactLayout: Boolean,
     selectedOption: CloudSetupOption?,
     onBack: () -> Unit,

@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.at
-import logdate.client.feature.core.generated.resources.at_logdate_app
 import logdate.client.feature.core.generated.resources.choose_your_username
 import logdate.client.feature.core.generated.resources.connected_to_the_fediverse
 import logdate.client.feature.core.generated.resources.`continue`
@@ -51,6 +50,7 @@ fun UsernameSetupScreen(
     onUsernameChange: (String) -> Unit,
     onContinue: () -> Unit,
     onBack: () -> Unit,
+    handleDomain: String,
     usernameAvailability: UsernameAvailability = UsernameAvailability.Unknown,
     isValid: Boolean = true,
     modifier: Modifier = Modifier,
@@ -60,6 +60,7 @@ fun UsernameSetupScreen(
         onUsernameChange = onUsernameChange,
         onContinue = onContinue,
         onBack = onBack,
+        handleDomain = handleDomain,
         usernameAvailability = usernameAvailability,
         isValid = isValid,
         modifier = modifier,
@@ -73,6 +74,7 @@ private fun UsernameSetupContent(
     onUsernameChange: (String) -> Unit,
     onContinue: () -> Unit,
     onBack: () -> Unit,
+    handleDomain: String,
     usernameAvailability: UsernameAvailability,
     isValid: Boolean,
     modifier: Modifier = Modifier,
@@ -158,7 +160,7 @@ private fun UsernameSetupContent(
                     label = { Text(stringResource(Res.string.username)) },
                     placeholder = { Text(stringResource(Res.string.your_username)) },
                     prefix = { Text(stringResource(Res.string.at)) },
-                    suffix = { Text(stringResource(Res.string.at_logdate_app)) },
+                    suffix = { Text("@$handleDomain") },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.AlternateEmail,
@@ -214,6 +216,7 @@ private fun UsernameSetupContent(
                                     stringResource(
                                         Res.string.unique_address_username,
                                         username,
+                                        handleDomain,
                                     ),
                                 )
                         }
@@ -379,6 +382,7 @@ private fun UsernameSetupScreenPreview() {
                 onUsernameChange = {},
                 onContinue = {},
                 onBack = {},
+                handleDomain = "logdate.app",
                 usernameAvailability = UsernameAvailability.Available,
                 isValid = true,
             )
@@ -396,6 +400,7 @@ private fun UsernameSetupScreenTakenPreview() {
                 onUsernameChange = {},
                 onContinue = {},
                 onBack = {},
+                handleDomain = "logdate.app",
                 usernameAvailability = UsernameAvailability.Taken,
                 isValid = false,
             )

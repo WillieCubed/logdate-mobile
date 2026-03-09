@@ -20,6 +20,7 @@ import app.logdate.feature.core.settings.ui.DangerZoneSettingsViewModel
 import app.logdate.feature.core.settings.ui.DataSettingsViewModel
 import app.logdate.feature.core.settings.ui.LocationSettingsViewModel
 import app.logdate.feature.core.settings.ui.PrivacySettingsViewModel
+import app.logdate.feature.core.settings.ui.ServerConfigurationCoordinator
 import app.logdate.feature.core.settings.updates.AppUpdateController
 import app.logdate.feature.core.settings.updates.UnsupportedAppUpdateController
 import org.koin.core.module.Module
@@ -44,6 +45,7 @@ actual val coreFeatureModule: Module =
         // Export functionality for desktop
         single<ExportLauncher> { DesktopExportLauncher() }
         single<RestoreLauncher> { DesktopRestoreLauncher() }
+        factory { ServerConfigurationCoordinator(get(), get(), get()) }
 
         viewModel { AppViewModel(get(), get(), get()) }
         viewModel {
@@ -78,7 +80,7 @@ actual val coreFeatureModule: Module =
             )
         }
         viewModel { ExportViewModel(get(), get()) }
-        viewModel { AdvancedSettingsViewModel(get(), get(), get(), get()) }
+        viewModel { AdvancedSettingsViewModel(get(), get()) }
         viewModel {
             DangerZoneSettingsViewModel(
                 get(),
@@ -88,7 +90,7 @@ actual val coreFeatureModule: Module =
             )
         }
         viewModel { HomeViewModel(get(), get(), get(), get()) }
-        viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get()) }
+        viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get()) }
         // TODO(desktop): Wire location settings UX and platform permissions; keep settings storage available for now.
         viewModel { LocationSettingsViewModel(get()) }
         viewModel { ProfileViewModel(get(), get(), get(), get()) }

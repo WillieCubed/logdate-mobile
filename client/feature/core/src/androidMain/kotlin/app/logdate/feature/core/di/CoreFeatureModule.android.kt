@@ -23,6 +23,7 @@ import app.logdate.feature.core.settings.ui.DangerZoneSettingsViewModel
 import app.logdate.feature.core.settings.ui.DataSettingsViewModel
 import app.logdate.feature.core.settings.ui.LocationSettingsViewModel
 import app.logdate.feature.core.settings.ui.PrivacySettingsViewModel
+import app.logdate.feature.core.settings.ui.ServerConfigurationCoordinator
 import app.logdate.feature.core.settings.updates.AppUpdateController
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.workmanager.dsl.workerOf
@@ -59,6 +60,7 @@ actual val coreFeatureModule: Module =
 
         // Account setup helpers
         factoryOf(::SaveAccountSetupDataUseCase)
+        factory { ServerConfigurationCoordinator(get(), get(), get()) }
 
         viewModel { AppViewModel(get(), get(), get()) }
         viewModel {
@@ -93,7 +95,7 @@ actual val coreFeatureModule: Module =
             )
         }
         viewModel { ExportViewModel(get(), get()) }
-        viewModel { AdvancedSettingsViewModel(get(), get(), get(), get<AppUpdateController>()) }
+        viewModel { AdvancedSettingsViewModel(get(), get<AppUpdateController>()) }
         viewModel {
             DangerZoneSettingsViewModel(
                 get(),
@@ -103,7 +105,7 @@ actual val coreFeatureModule: Module =
             )
         }
         viewModel { HomeViewModel(get(), get(), get(), get()) }
-        viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get()) }
+        viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get()) }
         viewModel { LocationSettingsViewModel(get()) }
         viewModel { ProfileViewModel(get(), get(), get(), get()) }
     }

@@ -53,6 +53,23 @@ fun OnboardingStartScreen(
         shouldShowMain = true
     }
 
+    OnboardingStartScreenContent(
+        showLanding = shouldShowMain,
+        onGetStarted = onNext,
+        onStartFromBackup = onStartFromBackup,
+        modifier = modifier,
+        useLargerTextSizes = useLargerTextSizes,
+    )
+}
+
+@Composable
+fun OnboardingStartScreenContent(
+    showLanding: Boolean,
+    onGetStarted: () -> Unit,
+    onStartFromBackup: () -> Unit,
+    modifier: Modifier = Modifier,
+    useLargerTextSizes: Boolean = false,
+) {
     Box(
         modifier =
             modifier
@@ -61,13 +78,13 @@ fun OnboardingStartScreen(
                 .padding(Spacing.lg),
     ) {
         AnimatedContent(
-            shouldShowMain,
+            showLanding,
             label = "Main Content",
             modifier = Modifier.align(Alignment.Center),
         ) { target ->
             if (target) {
                 OnboardingLandingContent(
-                    onGetStarted = onNext,
+                    onGetStarted = onGetStarted,
                     onStartFromBackup = onStartFromBackup,
                     useLargerTextSizes = useLargerTextSizes,
                 )

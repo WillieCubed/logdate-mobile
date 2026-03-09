@@ -64,7 +64,6 @@ fun UsernameSelectionScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val focusRequester = remember { FocusRequester() }
-    val focusManager = LocalFocusManager.current
     val snackbarHostState = remember { SnackbarHostState() }
 
     // Request focus on the username field when the screen appears
@@ -80,14 +79,38 @@ fun UsernameSelectionScreen(
         }
     }
 
-    // No longer needed - handle navigation directly in button clicks
+    UsernameSelectionContent(
+        uiState = uiState,
+        onUsernameChange = viewModel::onUsernameChanged,
+        onCheckAvailability = viewModel::checkUsernameAvailability,
+        onContinue = {
+            viewModel.onUsernameContinue()
+            onContinue()
+        },
+        onBack = onBack,
+        focusRequester = focusRequester,
+        snackbarHostState = snackbarHostState,
+    )
+}
 
+@Composable
+fun UsernameSelectionContent(
+    uiState: AccountOnboardingUiState,
+    onUsernameChange: (String) -> Unit,
+    onCheckAvailability: () -> Unit,
+    onContinue: () -> Unit,
+    onBack: () -> Unit,
+    focusRequester: FocusRequester = remember { FocusRequester() },
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    modifier: Modifier = Modifier,
+) {
+    val focusManager = LocalFocusManager.current
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { paddingValues ->
         Column(
             modifier =
-                Modifier
+                modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(paddingValues)
@@ -108,7 +131,7 @@ fun UsernameSelectionScreen(
 
             OutlinedTextField(
                 value = uiState.username,
-                onValueChange = { viewModel.onUsernameChanged(it) },
+                onValueChange = onUsernameChange,
                 label = { Text(stringResource(Res.string.username)) },
                 isError = uiState.usernameError != null,
                 supportingText = uiState.usernameError?.let { { Text(it) } },
@@ -125,10 +148,9 @@ fun UsernameSelectionScreen(
                         onDone = {
                             focusManager.clearFocus()
                             if (uiState.canContinueFromUsername) {
-                                viewModel.onUsernameContinue()
                                 onContinue()
                             } else {
-                                viewModel.checkUsernameAvailability()
+                                onCheckAvailability()
                             }
                         },
                     ),
@@ -144,7 +166,7 @@ fun UsernameSelectionScreen(
             )
 
             Button(
-                onClick = { viewModel.checkUsernameAvailability() },
+                onClick = onCheckAvailability,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = uiState.canCheckUsernameAvailability,
             ) {
@@ -168,10 +190,7 @@ fun UsernameSelectionScreen(
             Spacer(modifier = Modifier.weight(1f))
 
             Button(
-                onClick = {
-                    viewModel.onUsernameContinue()
-                    onContinue()
-                },
+                onClick = onContinue,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = uiState.canContinueFromUsername,
             ) {
