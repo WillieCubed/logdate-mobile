@@ -62,19 +62,25 @@ import studio.hypertext.atproto.plc.KtorPlcDirectoryClient
 fun initializeDatabase(): Boolean =
     try {
         val dataSource = DatabaseConfig.createDataSource()
-        DatabaseConfig.initializeDatabase(dataSource)
-        transaction {
-            SchemaUtils.createMissingTablesAndColumns(
-                AccountsTable,
-                ContentSyncTable,
-                JournalSyncTable,
-                AssociationSyncTable,
-                MediaSyncTable,
-                BackupSyncTable,
-                AccountIdentitiesTable,
-                AccountLinkEventsTable,
-                SigningKeysTable,
-            )
+        val autoMigrate = DatabaseConfig.shouldRunMigrations()
+        if (autoMigrate) {
+            DatabaseConfig.initializeDatabase(dataSource, autoMigrate = true)
+            transaction {
+                SchemaUtils.createMissingTablesAndColumns(
+                    AccountsTable,
+                    ContentSyncTable,
+                    JournalSyncTable,
+                    AssociationSyncTable,
+                    MediaSyncTable,
+                    BackupSyncTable,
+                    AccountIdentitiesTable,
+                    AccountLinkEventsTable,
+                    SigningKeysTable,
+                )
+            }
+        } else {
+            DatabaseConfig.initializeDatabase(dataSource, autoMigrate = false)
+            Napier.i("Database schema reconciliation skipped because AUTO_MIGRATE=false")
         }
         Napier.i("Database repositories initialized successfully")
         true
@@ -112,7 +118,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
             if (isDatabaseAvailable) PostgreSQLSessionManager() else InMemorySessionManager()
         }
 
-        single { WebAuthnConfig.fromEnvironment() }
+        single { WebAuthnConfig.fromEnvironment(serverOrigin = get<AtprotoIdentityConfig>().pdsServiceEndpoint) }
         single {
             val webAuthnConfig: WebAuthnConfig = get()
             WebAuthnPasskeyService(
@@ -122,7 +128,6 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                 origin = webAuthnConfig.origin,
             )
         }
-
         single { AtprotoIdentityConfig.fromEnvironment() }
         single { ServerDescriptorConfig.fromEnvironment() }
         single {

@@ -9,6 +9,8 @@ import app.logdate.shared.model.ServerPasskeyConfig
 data class ServerDescriptorConfig(
     val deploymentKind: DeploymentKind = DeploymentKind.SELF_HOSTED,
     val displayName: String = defaultDisplayName(DeploymentKind.SELF_HOSTED),
+    val privacyPolicyUrl: String? = null,
+    val termsOfServiceUrl: String? = null,
 ) {
     fun toDescriptor(
         identityConfig: AtprotoIdentityConfig,
@@ -38,6 +40,8 @@ data class ServerDescriptorConfig(
             handleDomain = identityConfig.normalizedHandleDomain,
             passkey = ServerPasskeyConfig(rpId = webAuthnRpId, rpName = webAuthnRpName),
             capabilities = capabilities,
+            privacyPolicyUrl = privacyPolicyUrl,
+            termsOfServiceUrl = termsOfServiceUrl,
         )
     }
 
@@ -45,6 +49,8 @@ data class ServerDescriptorConfig(
         fun fromEnvironment(
             deploymentKind: String? = System.getenv("LOGDATE_DEPLOYMENT_KIND"),
             displayName: String? = System.getenv("LOGDATE_SERVER_DISPLAY_NAME"),
+            privacyPolicyUrl: String? = System.getenv("LOGDATE_PRIVACY_POLICY_URL"),
+            termsOfServiceUrl: String? = System.getenv("LOGDATE_TERMS_OF_SERVICE_URL"),
         ): ServerDescriptorConfig {
             val resolvedDeploymentKind =
                 when (deploymentKind?.trim()?.lowercase()) {
@@ -59,6 +65,16 @@ data class ServerDescriptorConfig(
                         ?.trim()
                         .orEmpty()
                         .ifBlank { defaultDisplayName(resolvedDeploymentKind) },
+                privacyPolicyUrl =
+                    privacyPolicyUrl
+                        ?.trim()
+                        .orEmpty()
+                        .ifBlank { defaultPrivacyPolicyUrl(resolvedDeploymentKind) },
+                termsOfServiceUrl =
+                    termsOfServiceUrl
+                        ?.trim()
+                        .orEmpty()
+                        .ifBlank { defaultTermsOfServiceUrl(resolvedDeploymentKind) },
             )
         }
 
@@ -66,6 +82,18 @@ data class ServerDescriptorConfig(
             when (deploymentKind) {
                 DeploymentKind.FIRST_PARTY -> "LogDate Cloud"
                 DeploymentKind.SELF_HOSTED -> "LogDate Server"
+            }
+
+        private fun defaultPrivacyPolicyUrl(deploymentKind: DeploymentKind): String? =
+            when (deploymentKind) {
+                DeploymentKind.FIRST_PARTY -> "https://logdate.app/privacy"
+                DeploymentKind.SELF_HOSTED -> null
+            }
+
+        private fun defaultTermsOfServiceUrl(deploymentKind: DeploymentKind): String? =
+            when (deploymentKind) {
+                DeploymentKind.FIRST_PARTY -> "https://logdate.app/terms"
+                DeploymentKind.SELF_HOSTED -> null
             }
     }
 }

@@ -33,9 +33,12 @@ class AuthV1ModelsTest {
                 sessionToken = "sess-1",
                 registrationOptions =
                     app.logdate.shared.model.PasskeyRegistrationOptions(
-                        "challenge",
-                        app.logdate.shared.model
-                            .PasskeyUser("1", "u", "U"),
+                        challenge = "challenge",
+                        rpId = "logdate.app",
+                        rpName = "LogDate",
+                        user =
+                            app.logdate.shared.model
+                                .PasskeyUser("1", "u", "U"),
                     ),
             )
         val signupBeginResp = SignupPasskeyBeginResponse(success = true, data = signupBeginData)
@@ -167,6 +170,8 @@ class AuthV1ModelsTest {
         val registrationOptions =
             app.logdate.shared.model.PasskeyRegistrationOptions(
                 challenge = "challenge",
+                rpId = "logdate.app",
+                rpName = "LogDate",
                 user =
                     app.logdate.shared.model
                         .PasskeyUser("u1", "user_a", "User A"),

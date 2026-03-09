@@ -49,6 +49,8 @@ class GoogleIdTokenVerifierTest {
             )
 
         assertNull(runSuspend { verifierWithClientIds.verify("", null) })
+        assertTrue(verifierWithClientIds.isConfigured())
+        assertTrue(!verifierWithoutClientIds.isConfigured())
         assertNull(runSuspend { verifierWithoutClientIds.verify("token", null) })
     }
 
@@ -144,10 +146,13 @@ class GoogleIdTokenVerifierTest {
                 issuedAtEpochSeconds = 1,
             )
         val verifier = FakeGoogleIdTokenVerifier(tokens = mapOf("token-1" to claim))
+        val disabledVerifier = FakeGoogleIdTokenVerifier(tokens = emptyMap(), configured = false)
 
         assertEquals(claim, runSuspend { verifier.verify("token-1", null) })
         assertEquals(claim, runSuspend { verifier.verify("token-1", null) })
         assertNull(runSuspend { verifier.verify("missing", null) })
+        assertTrue(verifier.isConfigured())
+        assertTrue(!disabledVerifier.isConfigured())
 
         val serializer = GoogleIdTokenClaims.Companion.serializer()
         assertNotNull(serializer)

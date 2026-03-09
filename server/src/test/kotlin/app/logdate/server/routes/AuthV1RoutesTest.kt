@@ -1,6 +1,7 @@
 package app.logdate.server.routes
 
 import app.logdate.server.auth.Account
+import app.logdate.server.auth.FakeGoogleIdTokenVerifier
 import app.logdate.server.configureAuthV1TestApp
 import app.logdate.server.routes.support.googleAuthBody
 import app.logdate.server.routes.support.googleClaims
@@ -139,6 +140,60 @@ class AuthV1RoutesTest {
                 }
 
             assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+
+    @Test
+    fun `google auth routes return service unavailable when google auth is not configured`() =
+        testApplication {
+            configureAuthV1TestApp(
+                googleIdTokenVerifier = FakeGoogleIdTokenVerifier(tokens = emptyMap(), configured = false),
+            )
+
+            val signup =
+                client.post("/api/v1/auth/signup/google") {
+                    contentType(ContentType.Application.Json)
+                    setBody(googleAuthBody("google-token-new"))
+                }
+            assertEquals(HttpStatusCode.ServiceUnavailable, signup.status)
+            assertTrue(signup.bodyAsText().contains("GOOGLE_AUTH_NOT_CONFIGURED"))
+
+            val signin =
+                client.post("/api/v1/auth/signin/google") {
+                    contentType(ContentType.Application.Json)
+                    setBody(googleAuthBody("google-token-new"))
+                }
+            assertEquals(HttpStatusCode.ServiceUnavailable, signin.status)
+            assertTrue(signin.bodyAsText().contains("GOOGLE_AUTH_NOT_CONFIGURED"))
+
+            val beginResponse =
+                client.post("/api/v1/auth/signup/passkey/begin") {
+                    contentType(ContentType.Application.Json)
+                    setBody(signupPasskeyBeginBody(username = "passkey_only_user", displayName = "Passkey User"))
+                }
+            assertEquals(HttpStatusCode.OK, beginResponse.status)
+
+            val beginPayload = json.parseToJsonElement(beginResponse.bodyAsText()).jsonObject
+            val sessionToken =
+                beginPayload["data"]
+                    ?.jsonObject
+                    ?.get("sessionToken")
+                    ?.jsonPrimitive
+                    ?.content
+            assertNotNull(sessionToken)
+
+            val complete =
+                client.post("/api/v1/auth/signup/passkey/complete") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        signupPasskeyCompleteBody(
+                            sessionToken = sessionToken,
+                            credentialId = "test-credential-id-config",
+                            emailBindingToken = "g-bind",
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.ServiceUnavailable, complete.status)
+            assertTrue(complete.bodyAsText().contains("GOOGLE_AUTH_NOT_CONFIGURED"))
         }
 
     @Test

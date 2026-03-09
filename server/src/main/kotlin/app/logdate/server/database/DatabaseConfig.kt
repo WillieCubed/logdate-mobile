@@ -8,6 +8,13 @@ import org.jetbrains.exposed.sql.Database
 import javax.sql.DataSource
 
 object DatabaseConfig {
+    fun shouldRunMigrations(autoMigrate: String? = System.getenv("AUTO_MIGRATE")): Boolean =
+        when (autoMigrate?.trim()?.lowercase()) {
+            null, "" -> true
+            "false", "0", "no" -> false
+            else -> true
+        }
+
     fun createDataSource(
         host: String = System.getenv("DB_HOST") ?: "localhost",
         port: Int = System.getenv("DB_PORT")?.toIntOrNull() ?: 5432,
@@ -15,8 +22,10 @@ object DatabaseConfig {
         username: String? = System.getenv("DATABASE_USER") ?: System.getenv("DB_USER"),
         password: String? = System.getenv("DATABASE_PASSWORD") ?: System.getenv("DB_PASSWORD"),
         databaseUrl: String? = System.getenv("DATABASE_URL"),
+        instanceConnectionName: String? = System.getenv("CLOUD_SQL_INSTANCE_CONNECTION_NAME"),
     ): DataSource {
         val urlFromEnv = databaseUrl?.trim().takeIf { !it.isNullOrEmpty() }
+        val instanceConnection = instanceConnectionName?.trim().takeIf { !it.isNullOrEmpty() }
         val dataSourceConfig =
             if (urlFromEnv != null) {
                 val parsedUrl = parseDatabaseUrl(urlFromEnv)
@@ -24,6 +33,14 @@ object DatabaseConfig {
                 val resolvedUsername = username ?: parsedUrl?.username ?: "logdate"
                 val resolvedPassword = password ?: parsedUrl?.password ?: "logdate"
                 buildConfig(jdbcUrl, resolvedUsername, resolvedPassword)
+            } else if (instanceConnection != null) {
+                val resolvedUsername = username ?: "logdate"
+                val resolvedPassword = password ?: "logdate"
+                buildConfig("jdbc:postgresql://google/$database", resolvedUsername, resolvedPassword).apply {
+                    addDataSourceProperty("socketFactory", "com.google.cloud.sql.postgres.SocketFactory")
+                    addDataSourceProperty("cloudSqlInstance", instanceConnection)
+                    addDataSourceProperty("cloudSqlRefreshStrategy", "lazy")
+                }
             } else {
                 val jdbcUrl = "jdbc:postgresql://$host:$port/$database"
                 val resolvedUsername = username ?: "logdate"
@@ -38,8 +55,25 @@ object DatabaseConfig {
         dataSource: DataSource,
         migrate: (DataSource) -> Unit = ::runMigrations,
         connect: (DataSource) -> Database = Database::connect,
+    ): Database =
+        initializeDatabase(
+            dataSource = dataSource,
+            autoMigrate = shouldRunMigrations(),
+            migrate = migrate,
+            connect = connect,
+        )
+
+    fun initializeDatabase(
+        dataSource: DataSource,
+        autoMigrate: Boolean,
+        migrate: (DataSource) -> Unit = ::runMigrations,
+        connect: (DataSource) -> Database = Database::connect,
     ): Database {
-        migrate(dataSource)
+        if (autoMigrate) {
+            migrate(dataSource)
+        } else {
+            Napier.i("Database migrations skipped because AUTO_MIGRATE=false")
+        }
         return connect(dataSource)
     }
 

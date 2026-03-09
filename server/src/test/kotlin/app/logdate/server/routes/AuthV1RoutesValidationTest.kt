@@ -1,6 +1,7 @@
 package app.logdate.server.routes
 
 import app.logdate.server.auth.Account
+import app.logdate.server.auth.FakeGoogleIdTokenVerifier
 import app.logdate.server.auth.GoogleIdTokenClaims
 import app.logdate.server.auth.IdentityProvider
 import app.logdate.server.configureAuthV1TestApp
@@ -199,6 +200,23 @@ class AuthV1RoutesValidationTest {
                 }
             assertEquals(HttpStatusCode.Conflict, duplicate.status)
             assertTrue(duplicate.bodyAsText().contains("ACCOUNT_LINK_CONFLICT"))
+        }
+
+    @Test
+    fun `google signup returns a configuration error when google auth is disabled`() =
+        testApplication {
+            configureAuthV1TestApp(
+                googleIdTokenVerifier = FakeGoogleIdTokenVerifier(tokens = emptyMap(), configured = false),
+            )
+
+            val response =
+                client.post("/api/v1/auth/signup/google") {
+                    contentType(ContentType.Application.Json)
+                    setBody(googleAuthBody("disabled-google"))
+                }
+
+            assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
+            assertTrue(response.bodyAsText().contains("GOOGLE_AUTH_NOT_CONFIGURED"))
         }
 
     @Test

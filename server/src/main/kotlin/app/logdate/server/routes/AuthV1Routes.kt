@@ -73,6 +73,8 @@ private const val METRIC_AUTH_SIGNIN_GOOGLE = "auth.signin.google"
 private const val METRIC_AUTH_TOKEN_REFRESH = "auth.token.refresh"
 private const val METRIC_AUTH_METRICS = "auth.metrics"
 private const val METRIC_AUTH_METRICS_PROM = "auth.metrics.prometheus"
+private const val GOOGLE_AUTH_NOT_CONFIGURED_CODE = "GOOGLE_AUTH_NOT_CONFIGURED"
+private const val GOOGLE_AUTH_NOT_CONFIGURED_MESSAGE = "Google sign-in is not configured on this server"
 
 @Serializable
 data class EmailBindingRequest(
@@ -368,6 +370,18 @@ fun Route.authV1Routes(
                                 isActive = true,
                             )
 
+                        if (
+                            request.emailBinding?.source == EMAIL_BINDING_SOURCE_GOOGLE &&
+                            !googleIdTokenVerifier.isConfigured()
+                        ) {
+                            return@post call.respondApiError(
+                                HttpStatusCode.ServiceUnavailable,
+                                GOOGLE_AUTH_NOT_CONFIGURED_CODE,
+                                GOOGLE_AUTH_NOT_CONFIGURED_MESSAGE,
+                                metrics,
+                            )
+                        }
+
                         val bindingClaims = resolveEmailBinding(request.emailBinding, googleIdTokenVerifier)
                         if (request.emailBinding != null && bindingClaims == null) {
                             return@post call.respondApiError(
@@ -477,6 +491,14 @@ fun Route.authV1Routes(
                 try {
                     if (!call.enforceRateLimit(rateLimiter, "signup.google", SIGNUP_RATE_LIMIT, metrics)) {
                         return@post
+                    }
+                    if (!googleIdTokenVerifier.isConfigured()) {
+                        return@post call.respondApiError(
+                            HttpStatusCode.ServiceUnavailable,
+                            GOOGLE_AUTH_NOT_CONFIGURED_CODE,
+                            GOOGLE_AUTH_NOT_CONFIGURED_MESSAGE,
+                            metrics,
+                        )
                     }
                     val request = call.receive<GoogleAuthRequest>()
                     val claims = googleIdTokenVerifier.verify(request.idToken, request.nonce)
@@ -679,6 +701,14 @@ fun Route.authV1Routes(
                 try {
                     if (!call.enforceRateLimit(rateLimiter, "signin.google", SIGNIN_RATE_LIMIT, metrics)) {
                         return@post
+                    }
+                    if (!googleIdTokenVerifier.isConfigured()) {
+                        return@post call.respondApiError(
+                            HttpStatusCode.ServiceUnavailable,
+                            GOOGLE_AUTH_NOT_CONFIGURED_CODE,
+                            GOOGLE_AUTH_NOT_CONFIGURED_MESSAGE,
+                            metrics,
+                        )
                     }
                     val request = call.receive<GoogleAuthRequest>()
                     val claims = googleIdTokenVerifier.verify(request.idToken, request.nonce)

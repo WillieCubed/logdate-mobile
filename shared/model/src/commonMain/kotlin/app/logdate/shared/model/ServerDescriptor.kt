@@ -35,6 +35,8 @@ data class ServerDescriptor(
     val handleDomain: String? = null,
     val passkey: ServerPasskeyConfig? = null,
     val capabilities: List<ServerCapability> = emptyList(),
+    val privacyPolicyUrl: String? = null,
+    val termsOfServiceUrl: String? = null,
 ) {
     fun hasCapability(capability: ServerCapability): Boolean = capabilities.contains(capability)
 }
