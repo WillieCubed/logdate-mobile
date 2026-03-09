@@ -20,6 +20,11 @@ variable "cloud_run_image" {
   description = "Container image URI to deploy."
 }
 
+variable "enable_cloud_run_service" {
+  type        = bool
+  description = "Whether Terraform should manage the Cloud Run service resource."
+  default     = true
+}
 
 variable "runtime_service_account_name" {
   type        = string
@@ -118,6 +123,60 @@ variable "gcs_bucket_name" {
   type        = string
   description = "GCS bucket name for media."
   default     = ""
+}
+
+variable "create_cloud_sql_instance" {
+  type        = bool
+  description = "Whether to create a managed Cloud SQL PostgreSQL instance."
+  default     = false
+}
+
+variable "cloud_sql_instance_name" {
+  type        = string
+  description = "Cloud SQL instance name."
+  default     = "logdate-db"
+}
+
+variable "cloud_sql_database_name" {
+  type        = string
+  description = "Cloud SQL database name."
+  default     = "logdate"
+}
+
+variable "cloud_sql_user_name" {
+  type        = string
+  description = "Cloud SQL application username."
+  default     = "logdate"
+}
+
+variable "cloud_sql_database_version" {
+  type        = string
+  description = "Cloud SQL database engine version."
+  default     = "POSTGRES_16"
+}
+
+variable "cloud_sql_tier" {
+  type        = string
+  description = "Cloud SQL machine tier."
+  default     = "db-custom-1-3840"
+}
+
+variable "cloud_sql_disk_size_gb" {
+  type        = number
+  description = "Cloud SQL disk size in GB."
+  default     = 20
+}
+
+variable "cloud_sql_availability_type" {
+  type        = string
+  description = "Cloud SQL availability type."
+  default     = "ZONAL"
+}
+
+variable "cloud_sql_deletion_protection" {
+  type        = bool
+  description = "Whether Cloud SQL deletion protection is enabled."
+  default     = true
 }
 
 variable "artifact_registry_repo" {

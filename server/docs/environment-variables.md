@@ -2,7 +2,7 @@
 
 **Authoritative reference for all environment variables used by the LogDate server.**
 
-> Last updated: 2026-03-07
+> Last updated: 2026-03-09
 
 ---
 
@@ -63,6 +63,16 @@ The server supports two sets of database environment variables for flexibility:
 - **Example**: `DATABASE_PASSWORD=secure_password_here`
 - **Required**: Yes (if `DATABASE_URL` is set)
 - **Security**: Store securely, never commit to version control
+
+### `CLOUD_SQL_INSTANCE_CONNECTION_NAME`
+- **Description**: Cloud SQL instance connection name for Google-managed PostgreSQL connectivity
+- **Type**: String
+- **Default**: None
+- **Example**: `CLOUD_SQL_INSTANCE_CONNECTION_NAME=my-project:us-central1:logdate-db`
+- **Required**: No
+- **Notes**:
+  - Use this instead of `DATABASE_URL` for Cloud Run + Cloud SQL bootstrap deployments
+  - Requires `DATABASE_USER` / `DATABASE_PASSWORD` and the Cloud SQL PostgreSQL socket factory on the classpath
 
 ### Alternative Database Variables
 
@@ -129,6 +139,8 @@ These can be used instead of `DATABASE_URL`:
   - Keep aligned with released mobile/web client IDs only
   - Rotate/remove deprecated client IDs promptly
   - Prefer storing in secret manager for production deployments
+- **Notes**:
+  - When this is unset, Google auth routes are treated as not configured and return `GOOGLE_AUTH_NOT_CONFIGURED`
 
 ### `WEBAUTHN_RP_ID`
 - **Description**: WebAuthn relying party ID used for passkey ceremonies
@@ -150,6 +162,8 @@ These can be used instead of `DATABASE_URL`:
 - **Default**: `https://app.logdate.com`
 - **Example**: `WEBAUTHN_ORIGIN=https://app.logdate.com`
 - **Required**: Yes (for production passkeys)
+- **Notes**:
+  - If unset, the server derives the value from the configured public server origin when available
 
 ### `WEBAUTHN_STRICT_VERIFICATION`
 - **Description**: Enables strict WebAuthn4J cryptographic verification for passkeys
@@ -258,6 +272,16 @@ These can be used instead of `DATABASE_URL`:
 - **Required**: No
 - **Notes**: Disable for debugging or to manually control purge operations
 
+### `AUTO_MIGRATE`
+- **Description**: Controls whether startup applies Flyway migrations and schema reconciliation
+- **Type**: Boolean
+- **Default**: `true`
+- **Example**: `AUTO_MIGRATE=false`
+- **Required**: No
+- **Notes**:
+  - Set to `false` when the deployment pipeline manages schema changes separately
+  - When `false`, startup still connects to the database but skips schema mutation
+
 ### `SYNC_TOMBSTONE_RETENTION_DAYS`
 - **Description**: How many days to keep deletion markers before purging
 - **Type**: Integer
@@ -316,9 +340,11 @@ PORT=8080
 HOST=0.0.0.0
 
 # Database (Cloud SQL)
-DATABASE_URL=jdbc:postgresql://10.1.2.3:5432/logdate_prod
+CLOUD_SQL_INSTANCE_CONNECTION_NAME=logdate-prod:us-central1:logdate-db
+DB_NAME=logdate_prod
 DATABASE_USER=logdate_user
 DATABASE_PASSWORD=${DB_PASSWORD_FROM_SECRET_MANAGER}
+AUTO_MIGRATE=false
 
 # Auth
 JWT_SECRET=${JWT_SECRET_FROM_SECRET_MANAGER}

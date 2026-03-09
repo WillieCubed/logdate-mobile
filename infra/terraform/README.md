@@ -27,6 +27,27 @@ terraform apply \
   -var "github_repo=owner/repo"
 ```
 
+## Turnkey bootstrap
+For a brand-new single-instance deployment, use the opinionated bootstrap command instead of
+manually creating the project, Cloud SQL instance, bucket, secrets, and Cloud Run service.
+
+```bash
+./run deploy:bootstrap --yes --project-id YOUR_PROJECT_ID
+```
+
+What it does:
+- creates or reuses the GCP project and links billing
+- creates a remote Terraform state bucket
+- provisions Artifact Registry, runtime/deploy identities, Secret Manager, GCS media storage, and Cloud SQL
+- generates first-install secrets outside Terraform state and uploads them to Secret Manager
+- builds and pushes the initial server image
+- deploys Cloud Run and rewrites local bootstrap config with the managed service URL
+- stores instance state in `.logdate/deploy/<project-id>/`
+
+If `gh` is authenticated and has repo admin access, bootstrap also writes the GitHub deploy
+secrets and repository variables used by `.github/workflows/deploy-server.yml`, so CI can keep
+shipping image-only deploys without a committed `*.tfvars` file.
+
 ## Environment configuration
 This repo treats `*.tfvars` as the shared source of truth for both Terraform and
 runbooks (including `scripts/deploy-cloud-run.sh`) and CI. Keep staging/production
@@ -78,7 +99,8 @@ create_secrets = true
 
 Use `production.tfvars.example` as a template for production.
 Commit only non-sensitive fields; keep secrets in Secret Manager.
-CI expects a real `production.tfvars` to exist for tag-based deployments.
+CI expects a real `production.tfvars` to exist for tag-based deployments unless
+`LOGDATE_DEPLOY_SOURCE=repo_vars` is set for a bootstrap-managed instance.
 
 ## Secrets workflow
 - `create_secrets = true` creates empty Secret Manager secrets only.
@@ -87,6 +109,9 @@ CI expects a real `production.tfvars` to exist for tag-based deployments.
   echo -n "value" | gcloud secrets versions add logdate-db-url --data-file=-
   ```
 - Ensure the runtime service account has `roles/secretmanager.secretAccessor`.
+- The turnkey bootstrap command uploads first-install secret versions with `gcloud` after
+  Terraform creates the secret containers, so plaintext secret material does not land in
+  Terraform state.
 
 ## State backend (recommended)
 Use a remote state backend for staging/production. Copy `backend.tf.example` to

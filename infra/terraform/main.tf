@@ -15,6 +15,11 @@ locals {
     GCS_PROJECT_ID = var.project_id
   }
 
+  cloud_sql_env = var.create_cloud_sql_instance ? {
+    CLOUD_SQL_INSTANCE_CONNECTION_NAME = google_sql_database_instance.postgres[0].connection_name
+    DB_NAME                            = google_sql_database.database[0].name
+  } : {}
+
   bucket_env = var.gcs_bucket_name != "" ? {
     GCS_BUCKET_NAME = var.gcs_bucket_name
   } : {}
@@ -29,6 +34,7 @@ locals {
 
   env_vars = merge(
     local.base_env,
+    local.cloud_sql_env,
     local.bucket_env,
     local.webauthn_env,
     local.webauthn_origin_env,
@@ -48,6 +54,7 @@ locals {
 resource "google_project_service" "required" {
   for_each = var.enable_services ? toset([
     "run.googleapis.com",
+    "sqladmin.googleapis.com",
     "artifactregistry.googleapis.com",
     "iam.googleapis.com",
     "iamcredentials.googleapis.com",
@@ -162,6 +169,51 @@ resource "google_storage_bucket_iam_member" "media_access" {
   member = "serviceAccount:${google_service_account.runtime.email}"
 }
 
+resource "google_project_iam_member" "runtime_roles" {
+  for_each = var.create_cloud_sql_instance ? toset([
+    "roles/cloudsql.client"
+  ]) : toset([])
+
+  project = var.project_id
+  role    = each.key
+  member  = "serviceAccount:${google_service_account.runtime.email}"
+}
+
+resource "google_sql_database_instance" "postgres" {
+  count               = var.create_cloud_sql_instance ? 1 : 0
+  name                = var.cloud_sql_instance_name
+  region              = var.region
+  database_version    = var.cloud_sql_database_version
+  deletion_protection = var.cloud_sql_deletion_protection
+
+  settings {
+    tier              = var.cloud_sql_tier
+    availability_type = var.cloud_sql_availability_type
+    disk_size         = var.cloud_sql_disk_size_gb
+    disk_type         = "PD_SSD"
+
+    backup_configuration {
+      enabled = true
+    }
+
+    insights_config {
+      query_insights_enabled = true
+    }
+
+    ip_configuration {
+      ipv4_enabled = true
+    }
+  }
+
+  depends_on = [google_project_service.required]
+}
+
+resource "google_sql_database" "database" {
+  count    = var.create_cloud_sql_instance ? 1 : 0
+  instance = google_sql_database_instance.postgres[0].name
+  name     = var.cloud_sql_database_name
+}
+
 resource "google_secret_manager_secret" "env" {
   for_each = local.secret_ids_to_create
 
@@ -185,6 +237,7 @@ resource "google_secret_manager_secret_iam_member" "runtime_access" {
 }
 
 resource "google_cloud_run_v2_service" "server" {
+  count    = var.enable_cloud_run_service ? 1 : 0
   name     = var.service_name
   location = var.region
   ingress  = var.ingress
@@ -236,20 +289,23 @@ resource "google_cloud_run_v2_service" "server" {
     ignore_changes = [template[0].containers[0].image]
   }
 
-  depends_on = [google_project_service.required]
+  depends_on = [
+    google_project_service.required,
+    google_secret_manager_secret_iam_member.runtime_access,
+  ]
 }
 
 resource "google_cloud_run_v2_service_iam_member" "public_invoker" {
-  count    = var.allow_unauthenticated ? 1 : 0
+  count    = var.allow_unauthenticated && var.enable_cloud_run_service ? 1 : 0
   project  = var.project_id
-  location = google_cloud_run_v2_service.server.location
-  name     = google_cloud_run_v2_service.server.name
+  location = google_cloud_run_v2_service.server[0].location
+  name     = google_cloud_run_v2_service.server[0].name
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
 
 resource "google_cloud_run_domain_mapping" "default" {
-  count    = var.enable_domain_mapping ? 1 : 0
+  count    = var.enable_domain_mapping && var.enable_cloud_run_service ? 1 : 0
   provider = google-beta
   location = var.region
   name     = var.domain
@@ -259,6 +315,6 @@ resource "google_cloud_run_domain_mapping" "default" {
   }
 
   spec {
-    route_name = google_cloud_run_v2_service.server.name
+    route_name = google_cloud_run_v2_service.server[0].name
   }
 }

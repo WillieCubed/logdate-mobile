@@ -51,6 +51,13 @@ jobs:
           (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) && 'production' ||
           'staging'
         }}
+      REPO_PROJECT_ID: ${{ vars.LOGDATE_PROJECT_ID }}
+      REPO_REGION: ${{ vars.LOGDATE_REGION }}
+      REPO_SERVICE_NAME: ${{ vars.LOGDATE_SERVICE_NAME }}
+      REPO_DOMAIN: ${{ vars.LOGDATE_DOMAIN }}
+      REPO_ARTIFACT_REGISTRY_REPO: ${{ vars.LOGDATE_ARTIFACT_REGISTRY_REPO }}
+      REPO_RUNTIME_SERVICE_ACCOUNT: ${{ vars.LOGDATE_RUNTIME_SERVICE_ACCOUNT }}
+      REPO_DEPLOY_SOURCE: ${{ vars.LOGDATE_DEPLOY_SOURCE }}
 
     permissions:
       contents: read
@@ -68,37 +75,54 @@ jobs:
         run: |
           TF_DIR="infra/terraform"
           TFVARS_FILE="${TF_DIR}/${ENVIRONMENT}.tfvars"
-          if [[ ! -f "$TFVARS_FILE" ]]; then
-            echo "Config file not found: $TFVARS_FILE"
-            exit 1
-          fi
+          if [[ "${REPO_DEPLOY_SOURCE}" == "repo_vars" ]]; then
+            PROJECT_ID="${REPO_PROJECT_ID}"
+            REGION="${REPO_REGION}"
+            SERVICE_NAME="${REPO_SERVICE_NAME}"
+            DOMAIN="${REPO_DOMAIN}"
+            ARTIFACT_REGISTRY_REPO="${REPO_ARTIFACT_REGISTRY_REPO}"
+            RUNTIME_SERVICE_ACCOUNT_EMAIL="${REPO_RUNTIME_SERVICE_ACCOUNT}"
 
-          terraform -chdir="$TF_DIR" init -backend=false -input=false
+            echo "Using repository deployment variables because LOGDATE_DEPLOY_SOURCE=repo_vars."
+          elif [[ -f "$TFVARS_FILE" ]]; then
+            terraform -chdir="$TF_DIR" init -backend=false -input=false
 
-          tf_value() {
-            local value
-            value=$(terraform -chdir="$TF_DIR" console -var-file="$TFVARS_FILE" <<EOF | sed -e 's/^> //' | sed '/^$/d' | tail -n 1)
+            tf_value() {
+              local value
+              value=$(terraform -chdir="$TF_DIR" console -var-file="$TFVARS_FILE" <<EOF | sed -e 's/^> //' | sed '/^$/d' | tail -n 1)
 var.$1
 EOF
-            value="${value%\"}"
-            value="${value#\"}"
-            if [[ "$value" == "null" ]]; then
-              value=""
+              value="${value%\"}"
+              value="${value#\"}"
+              if [[ "$value" == "null" ]]; then
+                value=""
+              fi
+              echo "$value"
+            }
+
+            PROJECT_ID=$(tf_value project_id)
+            REGION=$(tf_value region)
+            SERVICE_NAME=$(tf_value service_name)
+            DOMAIN=$(tf_value domain)
+            ARTIFACT_REGISTRY_REPO=$(tf_value artifact_registry_repo)
+            RUNTIME_SERVICE_ACCOUNT_NAME=$(tf_value runtime_service_account_name)
+
+            if [[ -n "$RUNTIME_SERVICE_ACCOUNT_NAME" && -n "$PROJECT_ID" ]]; then
+              RUNTIME_SERVICE_ACCOUNT_EMAIL="${RUNTIME_SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+            else
+              RUNTIME_SERVICE_ACCOUNT_EMAIL=""
             fi
-            echo "$value"
-          }
 
-          PROJECT_ID=$(tf_value project_id)
-          REGION=$(tf_value region)
-          SERVICE_NAME=$(tf_value service_name)
-          DOMAIN=$(tf_value domain)
-          ARTIFACT_REGISTRY_REPO=$(tf_value artifact_registry_repo)
-          RUNTIME_SERVICE_ACCOUNT_NAME=$(tf_value runtime_service_account_name)
-
-          if [[ -n "$RUNTIME_SERVICE_ACCOUNT_NAME" && -n "$PROJECT_ID" ]]; then
-            RUNTIME_SERVICE_ACCOUNT_EMAIL="${RUNTIME_SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+            echo "Using tfvars configuration from $TFVARS_FILE"
           else
-            RUNTIME_SERVICE_ACCOUNT_EMAIL=""
+            PROJECT_ID="${REPO_PROJECT_ID}"
+            REGION="${REPO_REGION}"
+            SERVICE_NAME="${REPO_SERVICE_NAME}"
+            DOMAIN="${REPO_DOMAIN}"
+            ARTIFACT_REGISTRY_REPO="${REPO_ARTIFACT_REGISTRY_REPO}"
+            RUNTIME_SERVICE_ACCOUNT_EMAIL="${REPO_RUNTIME_SERVICE_ACCOUNT}"
+
+            echo "Using repository deployment variables because $TFVARS_FILE is not present."
           fi
 
           echo "TFVARS_FILE=$TFVARS_FILE" >> "$GITHUB_ENV"
@@ -112,7 +136,7 @@ EOF
       - name: Validate deployment configuration
         run: |
           if [[ -z "${SERVICE_NAME}" || -z "${PROJECT_ID}" || -z "${REGION}" ]]; then
-            echo "SERVICE_NAME, PROJECT_ID, and REGION must be set in infra/terraform/${ENVIRONMENT}.tfvars."
+            echo "SERVICE_NAME, PROJECT_ID, and REGION must be set in infra/terraform/${ENVIRONMENT}.tfvars or repository variables."
             exit 1
           fi
           if [[ -z "${DOMAIN}" ]]; then

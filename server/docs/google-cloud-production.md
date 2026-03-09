@@ -7,6 +7,26 @@ available for emergency deploys and manual intervention.
 ## Environments
 - **Staging (default)**: Deploys on main branch CI success.
 - **Production**: Deploys only from tags.
+- **Bootstrap-managed single instance**: Deploys from the managed Cloud Run URL and uses GitHub
+  repository variables instead of committed `staging.tfvars` / `production.tfvars`.
+
+## Turnkey bootstrap
+Use this when you want a fresh first-party instance with the least manual setup:
+
+```bash
+./run deploy:bootstrap --yes --project-id YOUR_PROJECT_ID
+```
+
+The bootstrap command is intentionally opinionated:
+- GCP-only
+- Cloud SQL PostgreSQL instead of an external database
+- managed Cloud Run URL instead of a custom domain for first install
+- passkey auth ready immediately, Google sign-in optional until client IDs are added
+- generated deployment metadata stored under `.logdate/deploy/<project-id>/`
+
+If `gh` is authenticated, bootstrap also sets the GitHub Actions auth secrets and the repository
+variables used for ongoing image deploys. That path remains OIDC-based; it does not create
+service account keys.
 
 ## IaC (endgame)
 Terraform lives in `infra/terraform`.
@@ -41,11 +61,23 @@ Terraform lives in `infra/terraform`.
 The workflow in `.github/workflows/deploy-server.yml` is the emergency path.
 
 The workflow reads `infra/terraform/<env>.tfvars` for project/service metadata
-and only requires Workload Identity secrets for authentication.
+when those files exist. Bootstrap-managed instances can instead use repository variables for
+project/service metadata and only require Workload Identity secrets for authentication.
 
 Required GitHub Secrets:
 - `GCP_WORKLOAD_IDENTITY_PROVIDER`
 - `GCP_SERVICE_ACCOUNT`
+
+Bootstrap-managed repository variables:
+- `LOGDATE_DEPLOY_SOURCE=repo_vars`
+- `LOGDATE_PROJECT_ID`
+- `LOGDATE_REGION`
+- `LOGDATE_SERVICE_NAME`
+- `LOGDATE_ARTIFACT_REGISTRY_REPO`
+- `LOGDATE_RUNTIME_SERVICE_ACCOUNT`
+
+When `LOGDATE_DEPLOY_SOURCE=repo_vars`, the workflow prefers those repository variables even if
+checked-in `staging.tfvars` / `production.tfvars` files still exist.
 
 ## Manual gcloud deploy
 Use `scripts/deploy-cloud-run.sh` when Terraform or CI is unavailable.

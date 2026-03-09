@@ -1,11 +1,11 @@
 output "cloud_run_service_name" {
   description = "Cloud Run service name."
-  value       = google_cloud_run_v2_service.server.name
+  value       = var.enable_cloud_run_service ? google_cloud_run_v2_service.server[0].name : null
 }
 
 output "cloud_run_service_url" {
   description = "Cloud Run service URL."
-  value       = google_cloud_run_v2_service.server.uri
+  value       = var.enable_cloud_run_service ? google_cloud_run_v2_service.server[0].uri : null
 }
 
 output "runtime_service_account_email" {
@@ -26,4 +26,19 @@ output "workload_identity_provider" {
 output "artifact_registry_repository" {
   description = "Artifact Registry repository ID."
   value       = var.enable_artifact_registry ? google_artifact_registry_repository.logdate[0].id : null
+}
+
+output "cloud_sql_connection_name" {
+  description = "Cloud SQL connection name."
+  value       = var.create_cloud_sql_instance ? google_sql_database_instance.postgres[0].connection_name : null
+}
+
+output "cloud_sql_instance_name" {
+  description = "Cloud SQL instance name."
+  value       = var.create_cloud_sql_instance ? google_sql_database_instance.postgres[0].name : null
+}
+
+output "media_bucket_name" {
+  description = "Media bucket name."
+  value       = var.create_gcs_bucket ? google_storage_bucket.media[0].name : null
 }
