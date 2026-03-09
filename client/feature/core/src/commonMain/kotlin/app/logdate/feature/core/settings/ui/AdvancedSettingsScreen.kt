@@ -14,8 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.Check
@@ -30,8 +28,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -39,10 +35,11 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.core.settings.updates.AppUpdateFlowType
@@ -68,11 +65,7 @@ import logdate.client.feature.core.generated.resources.app_updates
 import logdate.client.feature.core.generated.resources.app_version_label
 import logdate.client.feature.core.generated.resources.back
 import logdate.client.feature.core.generated.resources.check_for_updates
-import logdate.client.feature.core.generated.resources.https_your_server_example_com
-import logdate.client.feature.core.generated.resources.localhost_8765
-import logdate.client.feature.core.generated.resources.server_address
 import logdate.client.feature.core.generated.resources.server_configuration
-import logdate.client.feature.core.generated.resources.server_url
 import logdate.client.feature.core.generated.resources.switching_servers_keeps_your_local_data_intact_data_is_stored_separately_per_server_and_will_not_automatically_sync_between_different_servers
 import logdate.client.feature.core.generated.resources.test_connection_before_saving
 import logdate.client.feature.core.generated.resources.testing_connection
@@ -85,7 +78,7 @@ import org.koin.compose.viewmodel.koinViewModel
  *
  * This screen provides:
  * - Manual app update controls and status
- * - Server selection (Production, Local, Custom)
+ * - Server selection (LogDate Cloud or Custom)
  * - Connection validation
  *
  * @param onBack Callback for when the user presses the back button
@@ -98,17 +91,28 @@ fun AdvancedSettingsScreen(
 ) {
     val serverSelectionState by viewModel.serverSelectionState.collectAsState()
     val appUpdateUiState by viewModel.appUpdateUiState.collectAsState()
+    val showCustomServerInfo = remember { mutableStateOf(false) }
+
+    if (showCustomServerInfo.value) {
+        CustomServerInfoBottomSheet(
+            onDismiss = { showCustomServerInfo.value = false },
+            onUseCustomServer = {
+                viewModel.selectServerPreset(ServerPreset.CUSTOM)
+                showCustomServerInfo.value = false
+            },
+        )
+    }
 
     AdvancedSettingsContent(
         onBack = onBack,
         serverSelectionState = serverSelectionState,
         appUpdateUiState = appUpdateUiState,
         onSelectPreset = viewModel::selectServerPreset,
-        onUpdateLocalAddress = viewModel::updateLocalServerAddress,
         onUpdateCustomUrl = viewModel::updateCustomServerUrl,
         onValidateAndSave = viewModel::validateAndSaveServer,
         onCheckForAppUpdates = viewModel::checkForAppUpdates,
         onCompleteAppUpdate = viewModel::completeAppUpdate,
+        onShowCustomServerInfo = { showCustomServerInfo.value = true },
     )
 }
 
@@ -125,11 +129,11 @@ fun AdvancedSettingsContent(
     serverSelectionState: ServerSelectionState,
     appUpdateUiState: AppUpdateUiState,
     onSelectPreset: (ServerPreset) -> Unit,
-    onUpdateLocalAddress: (String) -> Unit,
     onUpdateCustomUrl: (String) -> Unit,
     onValidateAndSave: () -> Unit,
     onCheckForAppUpdates: () -> Unit,
     onCompleteAppUpdate: () -> Unit,
+    onShowCustomServerInfo: () -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
@@ -170,9 +174,9 @@ fun AdvancedSettingsContent(
                     ServerSelectionSection(
                         serverSelectionState = serverSelectionState,
                         onSelectPreset = onSelectPreset,
-                        onUpdateLocalAddress = onUpdateLocalAddress,
                         onUpdateCustomUrl = onUpdateCustomUrl,
                         onValidateAndSave = onValidateAndSave,
+                        onShowCustomServerInfo = onShowCustomServerInfo,
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }
@@ -270,9 +274,9 @@ private fun AppUpdateSection(
 private fun ServerSelectionSection(
     serverSelectionState: ServerSelectionState,
     onSelectPreset: (ServerPreset) -> Unit,
-    onUpdateLocalAddress: (String) -> Unit,
     onUpdateCustomUrl: (String) -> Unit,
     onValidateAndSave: () -> Unit,
+    onShowCustomServerInfo: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -314,58 +318,12 @@ private fun ServerSelectionSection(
 
         Spacer(modifier = Modifier.height(Spacing.xs))
 
-        MaterialContainer {
-            Column(modifier = Modifier.selectableGroup()) {
-                ServerPresetOption(
-                    title = "Production",
-                    description = "Official LogDate Cloud server (cloud.logdate.app)",
-                    selected = serverSelectionState.selectedPreset == ServerPreset.PRODUCTION,
-                    onClick = { onSelectPreset(ServerPreset.PRODUCTION) },
-                )
-
-                ServerPresetOption(
-                    title = "Local",
-                    description = "Local development server",
-                    selected = serverSelectionState.selectedPreset == ServerPreset.LOCAL,
-                    onClick = { onSelectPreset(ServerPreset.LOCAL) },
-                )
-
-                AnimatedVisibility(visible = serverSelectionState.selectedPreset == ServerPreset.LOCAL) {
-                    OutlinedTextField(
-                        value = serverSelectionState.localServerAddress,
-                        onValueChange = onUpdateLocalAddress,
-                        label = { Text(stringResource(Res.string.server_address)) },
-                        placeholder = { Text(stringResource(Res.string.localhost_8765)) },
-                        singleLine = true,
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-                    )
-                }
-
-                ServerPresetOption(
-                    title = "Custom",
-                    description = "Connect to a self-hosted server",
-                    selected = serverSelectionState.selectedPreset == ServerPreset.CUSTOM,
-                    onClick = { onSelectPreset(ServerPreset.CUSTOM) },
-                )
-
-                AnimatedVisibility(visible = serverSelectionState.selectedPreset == ServerPreset.CUSTOM) {
-                    OutlinedTextField(
-                        value = serverSelectionState.customServerUrl,
-                        onValueChange = onUpdateCustomUrl,
-                        label = { Text(stringResource(Res.string.server_url)) },
-                        placeholder = { Text(stringResource(Res.string.https_your_server_example_com)) },
-                        singleLine = true,
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-                    )
-                }
-            }
-        }
+        ServerSelectionCard(
+            serverSelectionState = serverSelectionState,
+            onSelectPreset = onSelectPreset,
+            onUpdateCustomUrl = onUpdateCustomUrl,
+            onShowCustomServerInfo = onShowCustomServerInfo,
+        )
 
         Spacer(modifier = Modifier.height(Spacing.sm))
 
@@ -406,44 +364,6 @@ private fun ServerSelectionSection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun ServerPresetOption(
-    title: String,
-    description: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .selectable(
-                    selected = selected,
-                    onClick = onClick,
-                    role = Role.RadioButton,
-                ).padding(Spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RadioButton(
-            selected = selected,
-            onClick = null,
-        )
-        Spacer(modifier = Modifier.width(Spacing.md))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }
@@ -551,23 +471,23 @@ private fun AdvancedSettingsScreenPreview() {
         serverSelectionState = ServerSelectionState(),
         appUpdateUiState = AppUpdateUiState(currentVersionName = "0.1.0"),
         onSelectPreset = {},
-        onUpdateLocalAddress = {},
         onUpdateCustomUrl = {},
         onValidateAndSave = {},
         onCheckForAppUpdates = {},
         onCompleteAppUpdate = {},
+        onShowCustomServerInfo = {},
     )
 }
 
 @Preview
 @Composable
-private fun AdvancedSettingsScreenLocalSelectedPreview() {
+private fun AdvancedSettingsScreenCustomSelectedPreview() {
     AdvancedSettingsContent(
         onBack = {},
         serverSelectionState =
             ServerSelectionState(
-                selectedPreset = ServerPreset.LOCAL,
-                localServerAddress = "192.168.1.100:8765",
+                selectedPreset = ServerPreset.CUSTOM,
+                customServerUrl = "https://journal.example.com",
             ),
         appUpdateUiState =
             AppUpdateUiState(
@@ -576,11 +496,11 @@ private fun AdvancedSettingsScreenLocalSelectedPreview() {
                 flowType = AppUpdateFlowType.Flexible,
             ),
         onSelectPreset = {},
-        onUpdateLocalAddress = {},
         onUpdateCustomUrl = {},
         onValidateAndSave = {},
         onCheckForAppUpdates = {},
         onCompleteAppUpdate = {},
+        onShowCustomServerInfo = {},
     )
 }
 
@@ -591,7 +511,7 @@ private fun AdvancedSettingsScreenValidatingPreview() {
         onBack = {},
         serverSelectionState =
             ServerSelectionState(
-                selectedPreset = ServerPreset.LOCAL,
+                selectedPreset = ServerPreset.CUSTOM,
                 validationState = ServerValidationState.Validating,
             ),
         appUpdateUiState =
@@ -600,10 +520,10 @@ private fun AdvancedSettingsScreenValidatingPreview() {
                 status = AppUpdateStatus.Downloaded,
             ),
         onSelectPreset = {},
-        onUpdateLocalAddress = {},
         onUpdateCustomUrl = {},
         onValidateAndSave = {},
         onCheckForAppUpdates = {},
         onCompleteAppUpdate = {},
+        onShowCustomServerInfo = {},
     )
 }

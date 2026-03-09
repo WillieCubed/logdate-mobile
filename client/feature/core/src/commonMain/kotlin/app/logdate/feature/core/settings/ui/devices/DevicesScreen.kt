@@ -91,40 +91,90 @@ fun DevicesScreen(
     var selectedDevice by remember { mutableStateOf<DeviceInfoUiState?>(null) }
     var newDeviceName by remember { mutableStateOf("") }
 
+    DevicesScreenContent(
+        onBackClick = onBackClick,
+        uiState = uiState,
+        showRenameDialog = showRenameDialog,
+        showDeleteDialog = showDeleteDialog,
+        showResetDialog = showResetDialog,
+        selectedDevice = selectedDevice,
+        newDeviceName = newDeviceName,
+        onNewDeviceNameChange = { newDeviceName = it },
+        onRenameClick = { device ->
+            selectedDevice = device
+            newDeviceName = device.name
+            showRenameDialog = true
+        },
+        onRemoveClick = { device ->
+            selectedDevice = device
+            showDeleteDialog = true
+        },
+        onRenameConfirm = {
+            viewModel.renameDevice(newDeviceName)
+            showRenameDialog = false
+        },
+        onRemoveConfirm = {
+            selectedDevice?.let { viewModel.removeDevice(it.id) }
+            showDeleteDialog = false
+        },
+        onResetDeviceId = {
+            viewModel.resetDeviceId()
+            showResetDialog = false
+        },
+        onShowResetDialog = { showResetDialog = true },
+        onDismissRenameDialog = { showRenameDialog = false },
+        onDismissDeleteDialog = { showDeleteDialog = false },
+        onDismissResetDialog = { showResetDialog = false },
+    )
+}
+
+@Composable
+fun DevicesScreenContent(
+    onBackClick: () -> Unit,
+    uiState: DevicesUiState,
+    showRenameDialog: Boolean = false,
+    showDeleteDialog: Boolean = false,
+    showResetDialog: Boolean = false,
+    selectedDevice: DeviceInfoUiState? = null,
+    newDeviceName: String = selectedDevice?.name.orEmpty(),
+    onNewDeviceNameChange: (String) -> Unit = {},
+    onRenameClick: (DeviceInfoUiState) -> Unit = {},
+    onRemoveClick: (DeviceInfoUiState) -> Unit = {},
+    onRenameConfirm: () -> Unit = {},
+    onRemoveConfirm: () -> Unit = {},
+    onResetDeviceId: () -> Unit = {},
+    onShowResetDialog: () -> Unit = {},
+    onDismissRenameDialog: () -> Unit = {},
+    onDismissDeleteDialog: () -> Unit = {},
+    onDismissResetDialog: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
     if (showRenameDialog && selectedDevice != null) {
         RenameDeviceDialog(
-            currentName = selectedDevice!!.name,
-            onNameChange = { newDeviceName = it },
-            onConfirm = {
-                viewModel.renameDevice(newDeviceName)
-                showRenameDialog = false
-            },
-            onDismiss = { showRenameDialog = false },
+            currentName = newDeviceName.ifBlank { selectedDevice.name },
+            onNameChange = onNewDeviceNameChange,
+            onConfirm = onRenameConfirm,
+            onDismiss = onDismissRenameDialog,
         )
     }
 
     if (showDeleteDialog && selectedDevice != null) {
         RemoveDeviceDialog(
-            deviceName = selectedDevice!!.name,
-            onConfirm = {
-                viewModel.removeDevice(selectedDevice!!.id)
-                showDeleteDialog = false
-            },
-            onDismiss = { showDeleteDialog = false },
+            deviceName = selectedDevice.name,
+            onConfirm = onRemoveConfirm,
+            onDismiss = onDismissDeleteDialog,
         )
     }
 
     if (showResetDialog) {
         ResetDeviceIdDialog(
-            onConfirm = {
-                viewModel.resetDeviceId()
-                showResetDialog = false
-            },
-            onDismiss = { showResetDialog = false },
+            onConfirm = onResetDeviceId,
+            onDismiss = onDismissResetDialog,
         )
     }
 
     Scaffold(
+        modifier = modifier,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
@@ -154,21 +204,14 @@ fun DevicesScreen(
                 } else {
                     DevicesList(
                         devices = uiState.devices,
-                        onRenameClick = { device ->
-                            selectedDevice = device
-                            newDeviceName = device.name
-                            showRenameDialog = true
-                        },
-                        onRemoveClick = { device ->
-                            selectedDevice = device
-                            showDeleteDialog = true
-                        },
+                        onRenameClick = onRenameClick,
+                        onRemoveClick = onRemoveClick,
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Button(
-                        onClick = { showResetDialog = true },
+                        onClick = onShowResetDialog,
                         modifier = Modifier.align(Alignment.CenterHorizontally),
                     ) {
                         Icon(
@@ -312,7 +355,7 @@ private fun DeviceCard(
 }
 
 @Composable
-private fun RenameDeviceDialog(
+fun RenameDeviceDialog(
     currentName: String,
     onNameChange: (String) -> Unit,
     onConfirm: () -> Unit,
@@ -356,7 +399,7 @@ private fun RenameDeviceDialog(
 }
 
 @Composable
-private fun RemoveDeviceDialog(
+fun RemoveDeviceDialog(
     deviceName: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
@@ -388,7 +431,7 @@ private fun RemoveDeviceDialog(
 }
 
 @Composable
-private fun ResetDeviceIdDialog(
+fun ResetDeviceIdDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {

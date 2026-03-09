@@ -48,9 +48,12 @@ class AdvancedSettingsViewModelTest {
             val updateController = FakeAppUpdateController()
             val viewModel =
                 AdvancedSettingsViewModel(
-                    serverHealthChecker = FakeServerHealthChecker(),
-                    serverDiscoveryClient = FakeServerDiscoveryClient(),
-                    configRepository = DefaultLogDateConfigRepository(),
+                    serverConfigurationCoordinator =
+                        ServerConfigurationCoordinator(
+                            serverHealthChecker = FakeServerHealthChecker(),
+                            serverDiscoveryClient = FakeServerDiscoveryClient(),
+                            configRepository = DefaultLogDateConfigRepository(),
+                        ),
                     appUpdateController = updateController,
                 )
 
@@ -73,9 +76,12 @@ class AdvancedSettingsViewModelTest {
                 )
             val viewModel =
                 AdvancedSettingsViewModel(
-                    serverHealthChecker = FakeServerHealthChecker(),
-                    serverDiscoveryClient = FakeServerDiscoveryClient(),
-                    configRepository = DefaultLogDateConfigRepository(),
+                    serverConfigurationCoordinator =
+                        ServerConfigurationCoordinator(
+                            serverHealthChecker = FakeServerHealthChecker(),
+                            serverDiscoveryClient = FakeServerDiscoveryClient(),
+                            configRepository = DefaultLogDateConfigRepository(),
+                        ),
                     appUpdateController = updateController,
                 )
 
@@ -88,18 +94,20 @@ class AdvancedSettingsViewModelTest {
             val configRepository = DefaultLogDateConfigRepository()
             val viewModel =
                 AdvancedSettingsViewModel(
-                    serverHealthChecker = FakeServerHealthChecker(),
-                    serverDiscoveryClient = FakeServerDiscoveryClient(),
-                    configRepository = configRepository,
+                    serverConfigurationCoordinator =
+                        ServerConfigurationCoordinator(
+                            serverHealthChecker = FakeServerHealthChecker(),
+                            serverDiscoveryClient = FakeServerDiscoveryClient(),
+                            configRepository = configRepository,
+                        ),
                     appUpdateController = FakeAppUpdateController(),
                 )
 
-            viewModel.selectServerPreset(ServerPreset.LOCAL)
-            viewModel.updateLocalServerAddress("10.0.2.2:8765")
+            viewModel.selectServerPreset(ServerPreset.CUSTOM)
+            viewModel.updateCustomServerUrl("http://10.0.2.2:8765")
             viewModel.validateAndSaveServer()
             advanceUntilIdle()
 
-            assertEquals("10.0.2.2:8765", configRepository.localServerAddress.value)
             assertTrue(configRepository.backendUrl.value.startsWith("http://10.0.2.2:8765"))
             assertEquals("http://10.0.2.2:8765", configRepository.serverDescriptor.value?.serverOrigin)
         }

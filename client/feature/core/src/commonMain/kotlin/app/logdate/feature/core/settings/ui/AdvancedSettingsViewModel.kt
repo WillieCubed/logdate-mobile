@@ -2,13 +2,9 @@ package app.logdate.feature.core.settings.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.logdate.client.networking.ServerDiscoveryClient
-import app.logdate.client.networking.ServerHealthChecker
 import app.logdate.feature.core.settings.updates.AppUpdateCheckTrigger
 import app.logdate.feature.core.settings.updates.AppUpdateController
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
-import app.logdate.shared.config.DefaultLogDateConfigRepository
-import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.ServerDescriptor
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,7 +18,6 @@ import kotlinx.coroutines.launch
  */
 enum class ServerPreset {
     PRODUCTION,
-    LOCAL,
     CUSTOM,
 }
 
@@ -31,9 +26,9 @@ enum class ServerPreset {
  */
 data class ServerSelectionState(
     val selectedPreset: ServerPreset = ServerPreset.PRODUCTION,
-    val localServerAddress: String = DefaultLogDateConfigRepository.DEFAULT_LOCAL_SERVER_ADDRESS,
     val customServerUrl: String = "",
     val validationState: ServerValidationState = ServerValidationState.Idle,
+    val activeServerDescriptor: ServerDescriptor? = null,
 )
 
 /** Result of validating the selected server configuration before persisting it. */
@@ -62,17 +57,10 @@ sealed class ServerValidationState {
  * app-update state produced by the platform-specific [AppUpdateController].
  */
 class AdvancedSettingsViewModel(
-    private val serverHealthChecker: ServerHealthChecker,
-    private val serverDiscoveryClient: ServerDiscoveryClient,
-    private val configRepository: LogDateConfigRepository,
+    private val serverConfigurationCoordinator: ServerConfigurationCoordinator,
     private val appUpdateController: AppUpdateController,
 ) : ViewModel() {
-    private val _serverSelectionState =
-        MutableStateFlow(
-            ServerSelectionState(
-                localServerAddress = DefaultLogDateConfigRepository.DEFAULT_LOCAL_SERVER_ADDRESS,
-            ),
-        )
+    private val _serverSelectionState = MutableStateFlow(serverConfigurationCoordinator.initialSelectionState())
 
     /** Editable server-selection state shown in the advanced settings form. */
     val serverSelectionState: StateFlow<ServerSelectionState> = _serverSelectionState.asStateFlow()
@@ -85,16 +73,6 @@ class AdvancedSettingsViewModel(
         _serverSelectionState.update {
             it.copy(
                 selectedPreset = preset,
-                validationState = ServerValidationState.Idle,
-            )
-        }
-    }
-
-    /** Updates the editable local server address without persisting it yet. */
-    fun updateLocalServerAddress(address: String) {
-        _serverSelectionState.update {
-            it.copy(
-                localServerAddress = address,
                 validationState = ServerValidationState.Idle,
             )
         }
@@ -120,22 +98,28 @@ class AdvancedSettingsViewModel(
 
         if (currentState.selectedPreset == ServerPreset.PRODUCTION) {
             viewModelScope.launch {
-                val serverUrl = DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL
-                val descriptor = serverDiscoveryClient.discoverServer(serverUrl).getOrNull()
-                saveServerConfiguration(serverUrl, descriptor)
+                serverConfigurationCoordinator
+                    .saveLogDateCloudSelection()
+                    .onSuccess { result ->
+                        _serverSelectionState.update {
+                            it.copy(
+                                validationState = ServerValidationState.Success(result.serverVersion),
+                                activeServerDescriptor = result.descriptor,
+                            )
+                        }
+                    }.onFailure { error ->
+                        Napier.e("Failed to save LogDate Cloud server configuration", error)
+                        _serverSelectionState.update {
+                            it.copy(
+                                validationState = ServerValidationState.Error(error.message ?: "Failed to save server"),
+                            )
+                        }
+                    }
             }
             return
         }
 
-        val serverUrl =
-            when (currentState.selectedPreset) {
-                ServerPreset.LOCAL -> {
-                    val address = currentState.localServerAddress
-                    if (address.startsWith("http")) address else "http://$address"
-                }
-                ServerPreset.CUSTOM -> currentState.customServerUrl
-                ServerPreset.PRODUCTION -> DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL
-            }
+        val serverUrl = currentState.customServerUrl
 
         if (serverUrl.isBlank()) {
             _serverSelectionState.update {
@@ -149,34 +133,18 @@ class AdvancedSettingsViewModel(
                 it.copy(validationState = ServerValidationState.Validating)
             }
 
-            val result = serverHealthChecker.checkServerHealth(serverUrl)
-
-            result.fold(
-                onSuccess = { healthInfo ->
-                    Napier.i("Server health check succeeded: $healthInfo")
-                    val discoveryResult = serverDiscoveryClient.discoverServer(serverUrl)
-                    discoveryResult.fold(
-                        onSuccess = { descriptor ->
-                            _serverSelectionState.update {
-                                it.copy(validationState = ServerValidationState.Success(healthInfo.version))
-                            }
-                            saveServerConfiguration(serverUrl, descriptor)
-                        },
-                        onFailure = { error ->
-                            Napier.e("Server discovery failed", error)
-                            _serverSelectionState.update {
-                                it.copy(
-                                    validationState =
-                                        ServerValidationState.Error(
-                                            error.message ?: "Server responded to health checks but is not a supported LogDate server",
-                                        ),
-                                )
-                            }
-                        },
-                    )
-                },
-                onFailure = { error ->
-                    Napier.e("Server health check failed", error)
+            serverConfigurationCoordinator
+                .validateAndSaveCustomServer(serverUrl)
+                .onSuccess { result ->
+                    _serverSelectionState.update {
+                        it.copy(
+                            validationState = ServerValidationState.Success(result.serverVersion),
+                            activeServerDescriptor = result.descriptor,
+                        )
+                    }
+                    Napier.i("Server configuration saved: ${result.serverOrigin}")
+                }.onFailure { error ->
+                    Napier.e("Server validation failed", error)
                     _serverSelectionState.update {
                         it.copy(
                             validationState =
@@ -185,8 +153,7 @@ class AdvancedSettingsViewModel(
                                 ),
                         )
                     }
-                },
-            )
+                }
         }
     }
 
@@ -201,27 +168,6 @@ class AdvancedSettingsViewModel(
     fun completeAppUpdate() {
         viewModelScope.launch {
             appUpdateController.completeUpdate()
-        }
-    }
-
-    private fun saveServerConfiguration(
-        serverUrl: String,
-        descriptor: ServerDescriptor?,
-    ) {
-        viewModelScope.launch {
-            try {
-                configRepository.updateBackendUrl(serverUrl)
-                configRepository.updateServerDescriptor(descriptor)
-
-                val currentState = _serverSelectionState.value
-                if (currentState.selectedPreset == ServerPreset.LOCAL) {
-                    configRepository.updateLocalServerAddress(currentState.localServerAddress)
-                }
-
-                Napier.i("Server configuration saved: $serverUrl")
-            } catch (e: Exception) {
-                Napier.e("Failed to save server configuration", e)
-            }
         }
     }
 }
