@@ -18,12 +18,14 @@ import app.logdate.server.oauth.OAuthConfig
 import app.logdate.server.oauth.OAuthDpopVerifier
 import app.logdate.server.oauth.OAuthKeyService
 import app.logdate.server.oauth.OAuthNonceService
+import app.logdate.server.passkeys.WebAuthnConfig
 import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.server.routes.authV1Routes
 import app.logdate.server.routes.identityApiRoutes
 import app.logdate.server.routes.identityRoutes
 import app.logdate.server.routes.oauthRoutes
 import app.logdate.server.routes.openApiRoutes
+import app.logdate.server.routes.serverInfoRoutes
 import app.logdate.server.routes.syncRoutes
 import app.logdate.server.routes.xrpcRoutes
 import app.logdate.server.sync.GcsMediaStorage
@@ -110,6 +112,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     val sessionManager: SessionManager by inject()
     val webAuthnService: WebAuthnPasskeyService by inject()
     val atprotoIdentityService: AtprotoIdentityService by inject()
+    val serverDescriptorConfig: ServerDescriptorConfig by inject()
     val signingKeyService: SigningKeyService by inject()
     val oauthConfig: OAuthConfig by inject()
     val oauthKeyService: OAuthKeyService by inject()
@@ -117,7 +120,14 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     val oauthDpopVerifier: OAuthDpopVerifier by inject()
     val oauthAccessTokenService: OAuthAccessTokenService by inject()
     val oauthAuthorizationService: OAuthAuthorizationService by inject()
+    val webAuthnConfig: WebAuthnConfig by inject()
     val atprotoContentRecordStore = AtprotoContentRecordStore(syncRepository = syncRepository, identityService = atprotoIdentityService)
+    val serverDescriptor =
+        serverDescriptorConfig.toDescriptor(
+            identityConfig = atprotoIdentityService.config,
+            webAuthnRpId = webAuthnConfig.relyingPartyId,
+            webAuthnRpName = webAuthnConfig.relyingPartyName,
+        )
 
     runCatching { runBlocking { atprotoIdentityService.backfillMissingIdentities() } }
         .onFailure { log.warn("Failed to backfill AT Protocol identities on startup", it) }
@@ -192,6 +202,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
 
         route("/api/v1") {
             val mediaStorage = GcsMediaStorage.fromEnvironment()
+            serverInfoRoutes(serverDescriptor)
             authV1Routes(
                 accountRepository = accountRepository,
                 identityRepository = accountIdentityRepository,

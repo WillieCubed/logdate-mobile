@@ -1,9 +1,12 @@
 package app.logdate.server
 
+import app.logdate.shared.model.ServerCapability
+import app.logdate.shared.model.ServerInfoResponse
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.testApplication
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -75,6 +78,14 @@ class ApplicationTest {
                 val responseBody = bodyAsText()
                 assertTrue(responseBody.contains("success"))
                 assertTrue(responseBody.contains("data"))
+            }
+
+            client.get("/api/v1/server/info").apply {
+                assertEquals(HttpStatusCode.OK, status)
+                val payload = json.decodeFromString<ServerInfoResponse>(bodyAsText())
+                assertTrue(payload.success)
+                assertTrue(payload.data.capabilities.contains(ServerCapability.AUTH_PASSKEY))
+                assertTrue(payload.data.capabilities.contains(ServerCapability.SYNC_CONTENT))
             }
         }
 

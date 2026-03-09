@@ -1,5 +1,6 @@
 package app.logdate.server.di
 
+import app.logdate.server.ServerDescriptorConfig
 import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.AuthMetricsRegistry
@@ -35,6 +36,7 @@ import app.logdate.server.oauth.OAuthKeyService
 import app.logdate.server.oauth.OAuthNonceService
 import app.logdate.server.passkeys.InMemoryPasskeyRepository
 import app.logdate.server.passkeys.PasskeyRepository
+import app.logdate.server.passkeys.WebAuthnConfig
 import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.server.sync.AssociationSyncTable
 import app.logdate.server.sync.BackupSyncTable
@@ -110,16 +112,19 @@ fun serverModule(isDatabaseAvailable: Boolean) =
             if (isDatabaseAvailable) PostgreSQLSessionManager() else InMemorySessionManager()
         }
 
+        single { WebAuthnConfig.fromEnvironment() }
         single {
+            val webAuthnConfig: WebAuthnConfig = get()
             WebAuthnPasskeyService(
                 passkeyRepository = get(),
-                relyingPartyId = System.getenv("WEBAUTHN_RP_ID") ?: "logdate.app",
-                relyingPartyName = System.getenv("WEBAUTHN_RP_NAME") ?: "LogDate",
-                origin = System.getenv("WEBAUTHN_ORIGIN") ?: "https://app.logdate.com",
+                relyingPartyId = webAuthnConfig.relyingPartyId,
+                relyingPartyName = webAuthnConfig.relyingPartyName,
+                origin = webAuthnConfig.origin,
             )
         }
 
         single { AtprotoIdentityConfig.fromEnvironment() }
+        single { ServerDescriptorConfig.fromEnvironment() }
         single {
             OAuthConfig.fromEnvironment(
                 defaultIssuer = get<AtprotoIdentityConfig>().pdsServiceEndpoint,
