@@ -81,8 +81,13 @@ kotlin {
     }
 }
 
-tasks.withType<Test> {
-    maxHeapSize = "4g"
+tasks.withType<Test>().configureEach {
+    maxHeapSize =
+        if (name.contains("Screenshot", ignoreCase = true)) {
+            "12g"
+        } else {
+            "4g"
+        }
 }
 
 dependencies {
@@ -110,7 +115,6 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.ui.test.junit4)
-    androidTestImplementation(libs.play.app.update.testing)
 
     screenshotTestImplementation(libs.androidx.ui.tooling)
     screenshotTestImplementation(libs.screenshot.validation.api)
@@ -129,6 +133,9 @@ dependencies {
     screenshotTestImplementation(projects.client.feature.search)
     screenshotTestImplementation(projects.client.permissions)
     screenshotTestImplementation(projects.client.domain)
+    screenshotTestImplementation(projects.client.data)
+    screenshotTestImplementation(projects.client.database)
+    screenshotTestImplementation(projects.client.sync)
     screenshotTestImplementation(projects.client.location)
     screenshotTestImplementation(projects.client.repository)
     screenshotTestImplementation(projects.client.ui)
@@ -136,4 +143,5 @@ dependencies {
     screenshotTestImplementation(projects.client.theme)
     screenshotTestImplementation(projects.shared.model)
     screenshotTestImplementation(libs.kotlinx.datetime)
+    screenshotTestImplementation(libs.androidx.navigation3.runtime)
 }

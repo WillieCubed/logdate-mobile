@@ -2,6 +2,7 @@
 
 package app.logdate.screenshots.common
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import app.logdate.ui.theme.LogDateTheme
@@ -18,11 +19,13 @@ import org.jetbrains.compose.resources.LocalResourceReader
  */
 @Composable
 fun ScreenshotTheme(
-    darkTheme: Boolean = false,
+    darkTheme: Boolean? = null,
     content: @Composable () -> Unit,
 ) {
+    val resolvedDarkTheme = darkTheme ?: isSystemInDarkTheme()
+
     CompositionLocalProvider(LocalResourceReader provides ScreenshotResourceReader) {
-        LogDateTheme(darkTheme = darkTheme) {
+        LogDateTheme(darkTheme = resolvedDarkTheme) {
             content()
         }
     }

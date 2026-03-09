@@ -1,12 +1,11 @@
 package app.logdate.screenshots.settings
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.feature.core.account.CloudAccountSignInContent
 import app.logdate.feature.core.account.CloudAccountWelcomeContent
-import app.logdate.feature.core.account.CloudAccountWelcomeScreen
 import app.logdate.feature.core.account.PasskeyAccountCreationFinalContent
+import app.logdate.feature.core.settings.ui.ServerSelectionState
 import app.logdate.feature.core.account.ui.AccountCreationCompletionScreen
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTheme
@@ -23,6 +22,10 @@ fun CloudAccount_Welcome() {
             onContinue = {},
             onSignIn = {},
             onSkip = {},
+            serverSelectionState = ServerSelectionState(),
+            onSelectServerPreset = {},
+            onCustomServerUrlChange = {},
+            onShowCustomServerInfo = {},
         )
     }
 }
@@ -36,6 +39,10 @@ fun CloudAccount_Welcome_Dark() {
             onContinue = {},
             onSignIn = {},
             onSkip = {},
+            serverSelectionState = ServerSelectionState(),
+            onSelectServerPreset = {},
+            onCustomServerUrlChange = {},
+            onShowCustomServerInfo = {},
         )
     }
 }
@@ -50,18 +57,13 @@ fun CloudAccount_SignIn() {
         CloudAccountSignInContent(
             username = "",
             onUsernameChange = {},
-            serverDomain = "logdate.app",
-            onServerDomainChange = {},
-            isServerEditable = false,
-            onServerDomainDoubleClick = {},
-            onServerFocusLost = {},
-            serverFocusRequester = FocusRequester(),
             onSignIn = {},
             onAccountRecovery = {},
             onPrivacyPolicy = {},
             onTermsOfService = {},
-            showRecoveryPopup = false,
-            onDismissRecoveryPopup = {},
+            onBack = {},
+            serverDisplayName = "LogDate Cloud",
+            serverHandleDomain = "logdate.app",
         )
     }
 }
@@ -74,18 +76,13 @@ fun CloudAccount_SignIn_Filled() {
         CloudAccountSignInContent(
             username = "alex_j",
             onUsernameChange = {},
-            serverDomain = "logdate.app",
-            onServerDomainChange = {},
-            isServerEditable = false,
-            onServerDomainDoubleClick = {},
-            onServerFocusLost = {},
-            serverFocusRequester = FocusRequester(),
             onSignIn = {},
             onAccountRecovery = {},
             onPrivacyPolicy = {},
             onTermsOfService = {},
-            showRecoveryPopup = false,
-            onDismissRecoveryPopup = {},
+            onBack = {},
+            serverDisplayName = "LogDate Cloud",
+            serverHandleDomain = "logdate.app",
             isSigningIn = false,
         )
     }
@@ -99,18 +96,13 @@ fun CloudAccount_SignIn_Loading() {
         CloudAccountSignInContent(
             username = "alex_j",
             onUsernameChange = {},
-            serverDomain = "logdate.app",
-            onServerDomainChange = {},
-            isServerEditable = false,
-            onServerDomainDoubleClick = {},
-            onServerFocusLost = {},
-            serverFocusRequester = FocusRequester(),
             onSignIn = {},
             onAccountRecovery = {},
             onPrivacyPolicy = {},
             onTermsOfService = {},
-            showRecoveryPopup = false,
-            onDismissRecoveryPopup = {},
+            onBack = {},
+            serverDisplayName = "LogDate Cloud",
+            serverHandleDomain = "logdate.app",
             isSigningIn = true,
         )
     }
@@ -134,6 +126,8 @@ fun CloudAccount_CreationFinal() {
             errorMessage = null,
             onClearError = {},
             isPasskeySupported = true,
+            handleDomain = "logdate.app",
+            serverDisplayName = "LogDate Cloud",
         )
     }
 }
@@ -154,6 +148,8 @@ fun CloudAccount_CreationFinal_Creating() {
             errorMessage = null,
             onClearError = {},
             isPasskeySupported = true,
+            handleDomain = "logdate.app",
+            serverDisplayName = "LogDate Cloud",
         )
     }
 }
@@ -174,6 +170,8 @@ fun CloudAccount_CreationFinal_Error() {
             errorMessage = "Failed to create passkey. Please try again.",
             onClearError = {},
             isPasskeySupported = true,
+            handleDomain = "logdate.app",
+            serverDisplayName = "LogDate Cloud",
         )
     }
 }

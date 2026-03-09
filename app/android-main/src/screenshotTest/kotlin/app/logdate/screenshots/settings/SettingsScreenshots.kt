@@ -228,11 +228,11 @@ fun AdvancedSettings() {
             serverSelectionState = ServerSelectionState(),
             appUpdateUiState = AppUpdateUiState(currentVersionName = "0.1.0"),
             onSelectPreset = {},
-            onUpdateLocalAddress = {},
             onUpdateCustomUrl = {},
             onValidateAndSave = {},
             onCheckForAppUpdates = {},
             onCompleteAppUpdate = {},
+            onShowCustomServerInfo = {},
         )
     }
 }
@@ -252,11 +252,11 @@ fun AdvancedSettings_UpdateReady() {
                     status = AppUpdateStatus.Downloaded,
                 ),
             onSelectPreset = {},
-            onUpdateLocalAddress = {},
             onUpdateCustomUrl = {},
             onValidateAndSave = {},
             onCheckForAppUpdates = {},
             onCompleteAppUpdate = {},
+            onShowCustomServerInfo = {},
         )
     }
 }
@@ -277,11 +277,11 @@ fun AdvancedSettings_UpdateAvailableImmediate() {
                     flowType = AppUpdateFlowType.Immediate,
                 ),
             onSelectPreset = {},
-            onUpdateLocalAddress = {},
             onUpdateCustomUrl = {},
             onValidateAndSave = {},
             onCheckForAppUpdates = {},
             onCompleteAppUpdate = {},
+            onShowCustomServerInfo = {},
         )
     }
 }
