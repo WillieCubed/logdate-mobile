@@ -1,5 +1,14 @@
 package app.logdate.server.oauth
 
+import studio.hypertext.atproto.pds.AuthorizationCodeTokenRequest
+import studio.hypertext.atproto.pds.AuthorizationDecisionRequest
+import studio.hypertext.atproto.pds.AuthorizationPrompt
+import studio.hypertext.atproto.pds.OAuthRevokeRequest
+import studio.hypertext.atproto.pds.OAuthTokenResponse
+import studio.hypertext.atproto.pds.PdsOAuthService
+import studio.hypertext.atproto.pds.PushedAuthorizationRequest
+import studio.hypertext.atproto.pds.PushedAuthorizationResponse
+import studio.hypertext.atproto.pds.RefreshTokenGrantRequest
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -18,7 +27,7 @@ class OAuthAuthorizationService(
     private val nonceService: OAuthNonceService,
     private val clock: Clock = Clock.System,
     private val secureRandom: SecureRandom = SecureRandom(),
-) {
+) : PdsOAuthService {
     private val requestUris = mutableMapOf<String, StoredAuthorizationRequest>()
     private val authorizationCodes = mutableMapOf<String, StoredAuthorizationCode>()
     private val refreshTokens = mutableMapOf<String, StoredRefreshToken>()
@@ -298,7 +307,68 @@ class OAuthAuthorizationService(
     /**
      * Returns the currently valid server nonce for DPoP responses.
      */
-    fun nonce(): String = nonceService.currentNonce()
+    override fun nonce(): String = nonceService.currentNonce()
+
+    override suspend fun createPushedAuthorizationRequest(request: PushedAuthorizationRequest): Result<PushedAuthorizationResponse> =
+        runCatching {
+            createPushedAuthorizationRequest(
+                clientId = request.clientId,
+                redirectUri = request.redirectUri,
+                scope = request.scope,
+                responseType = request.responseType,
+                codeChallenge = request.codeChallenge,
+                codeChallengeMethod = request.codeChallengeMethod,
+                state = request.state,
+                loginHint = request.loginHint,
+                dpopProof = request.dpopProof,
+                htu = request.htu,
+            )
+        }
+
+    override fun loadAuthorizationPrompt(requestUri: String): Result<AuthorizationPrompt> =
+        runCatching { describeAuthorizationRequest(requestUri) }
+
+    override fun completeAuthorization(request: AuthorizationDecisionRequest): Result<String> =
+        runCatching {
+            completeAuthorization(
+                requestUri = request.requestUri,
+                subjectDid = request.subjectDid,
+                subjectHandle = request.subjectHandle,
+                approved = request.approved,
+            )
+        }
+
+    override fun exchangeAuthorizationCode(request: AuthorizationCodeTokenRequest): Result<OAuthTokenResponse> =
+        runCatching {
+            exchangeAuthorizationCode(
+                code = request.code,
+                redirectUri = request.redirectUri,
+                clientId = request.clientId,
+                codeVerifier = request.codeVerifier,
+                dpopProof = request.dpopProof,
+                htu = request.htu,
+            )
+        }
+
+    override fun exchangeRefreshToken(request: RefreshTokenGrantRequest): Result<OAuthTokenResponse> =
+        runCatching {
+            exchangeRefreshToken(
+                refreshToken = request.refreshToken,
+                clientId = request.clientId,
+                dpopProof = request.dpopProof,
+                htu = request.htu,
+            )
+        }
+
+    override fun revokeRefreshToken(request: OAuthRevokeRequest): Result<Unit> =
+        runCatching {
+            revokeRefreshToken(
+                refreshToken = request.refreshToken,
+                clientId = request.clientId,
+                dpopProof = request.dpopProof,
+                htu = request.htu,
+            )
+        }
 
     private fun pkceChallenge(codeVerifier: String): String {
         if (codeVerifier.isBlank()) {
@@ -326,37 +396,6 @@ class OAuthAuthorizationService(
 /**
  * Stored request metadata surfaced to the consent UI.
  */
-@kotlinx.serialization.Serializable
-data class AuthorizationPrompt(
-    val requestUri: String,
-    val clientId: String,
-    val clientName: String,
-    val redirectUri: String,
-    val scope: String,
-    val state: String?,
-    val loginHint: String?,
-)
-
-/**
- * Successful PAR response plus the current DPoP nonce header value.
- */
-@kotlinx.serialization.Serializable
-data class PushedAuthorizationResponse(
-    val requestUri: String,
-    val expiresInSeconds: Long,
-    val dpopNonce: String,
-)
-
-@kotlinx.serialization.Serializable
-data class OAuthTokenResponse(
-    val access_token: String,
-    val token_type: String,
-    val expires_in: Long,
-    val refresh_token: String,
-    val sub: String,
-    val scope: String,
-)
-
 private data class StoredAuthorizationRequest(
     val requestUri: String,
     val clientId: String,

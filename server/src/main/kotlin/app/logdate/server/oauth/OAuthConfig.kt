@@ -1,6 +1,7 @@
 package app.logdate.server.oauth
 
-import kotlinx.serialization.Serializable
+import studio.hypertext.atproto.pds.AuthorizationServerMetadata
+import studio.hypertext.atproto.pds.ProtectedResourceMetadata
 
 /**
  * Server configuration and discovery metadata for AT Protocol OAuth surfaces.
@@ -83,28 +84,3 @@ data class OAuthConfig(
 /**
  * RFC 8414-style authorization server metadata for AT Protocol clients.
  */
-@Serializable
-data class AuthorizationServerMetadata(
-    val issuer: String,
-    val authorization_endpoint: String,
-    val token_endpoint: String,
-    val pushed_authorization_request_endpoint: String,
-    val revocation_endpoint: String,
-    val jwks_uri: String,
-    val response_types_supported: List<String>,
-    val grant_types_supported: List<String>,
-    val code_challenge_methods_supported: List<String>,
-    val token_endpoint_auth_methods_supported: List<String>,
-    val dpop_signing_alg_values_supported: List<String>,
-    val scopes_supported: List<String>,
-    val client_id_metadata_document_supported: Boolean,
-)
-
-/**
- * OAuth protected resource metadata served by the PDS.
- */
-@Serializable
-data class ProtectedResourceMetadata(
-    val resource: String,
-    val authorization_servers: List<String>,
-)

@@ -6,7 +6,11 @@ import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.identity.DidDocument
 import studio.hypertext.atproto.identity.Service
 import studio.hypertext.atproto.identity.VerificationMethod
+import studio.hypertext.atproto.pds.DescribeRepoResponse
+import studio.hypertext.atproto.pds.PdsIdentityService
+import studio.hypertext.atproto.pds.ResolveHandleResponse
 import studio.hypertext.atproto.syntax.Handle
+import studio.hypertext.atproto.syntax.Nsid
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -19,7 +23,7 @@ class AtprotoIdentityService(
     private val signingKeyService: SigningKeyService,
     val config: AtprotoIdentityConfig,
     private val plcIdentityService: PlcIdentityService = PlcIdentityService(signingKeyService = signingKeyService, config = config),
-) {
+) : PdsIdentityService {
     suspend fun ensureIdentity(account: Account): Account {
         val existingHandle = account.handle?.let(::canonicalizeHandle)
         val existingDid = account.did?.let(::canonicalizeDid)
@@ -87,6 +91,35 @@ class AtprotoIdentityService(
     }
 
     fun didForHandle(handle: String): AtprotoDid = AtprotoDid.require("did:web:${requireNotNull(canonicalizeHandle(handle))}")
+
+    override suspend fun resolveHandle(handle: String): Result<ResolveHandleResponse?> =
+        runCatching {
+            findByHandle(handle)
+                ?.did
+                ?.let(AtprotoDid::require)
+                ?.let(::ResolveHandleResponse)
+        }
+
+    override suspend fun describeRepo(repo: String): Result<DescribeRepoResponse?> =
+        runCatching {
+            val account =
+                when {
+                    repo.startsWith("did:") -> findByDid(repo)
+                    else -> findByHandle(repo)
+                } ?: return@runCatching null
+            DescribeRepoResponse(
+                handle = requireNotNull(account.handle),
+                did = AtprotoDid.require(requireNotNull(account.did)),
+                didDoc = documentFor(account),
+                collections = listOf(Nsid.require("studio.hypertext.logdate.content")),
+                handleIsCorrect = true,
+            )
+        }
+
+    override suspend fun didDocument(did: AtprotoDid): Result<DidDocument?> =
+        runCatching {
+            findByDid(did.toString())?.let(::documentFor)
+        }
 
     fun documentFor(account: Account): DidDocument {
         val did = AtprotoDid.require(requireNotNull(account.did))

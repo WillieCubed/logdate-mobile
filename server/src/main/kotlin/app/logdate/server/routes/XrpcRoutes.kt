@@ -23,88 +23,28 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
-import studio.hypertext.atproto.repo.RepoRecord
+import studio.hypertext.atproto.identity.AtprotoDid
+import studio.hypertext.atproto.pds.CreateRecordRequest
+import studio.hypertext.atproto.pds.DeleteRecordRequest
+import studio.hypertext.atproto.pds.DescribeRepoResponse
+import studio.hypertext.atproto.pds.DescribeServerResponse
+import studio.hypertext.atproto.pds.EmptyPdsResponse
+import studio.hypertext.atproto.pds.ListRecordsResponse
+import studio.hypertext.atproto.pds.PdsErrorResponse
+import studio.hypertext.atproto.pds.PutRecordRequest
+import studio.hypertext.atproto.pds.ResolveHandleResponse
+import studio.hypertext.atproto.repo.RepoEngine
 import studio.hypertext.atproto.repo.RepoRecordId
-import studio.hypertext.atproto.repo.RepoRecordStore
 import studio.hypertext.atproto.repo.UnsupportedCollectionException
 import studio.hypertext.atproto.syntax.Nsid
 import studio.hypertext.atproto.syntax.RecordKey
 import java.util.UUID
 
-@Serializable
-private data class XrpcErrorResponse(
-    val error: String,
-    val message: String,
-)
-
-@Serializable
-private data class ResolveHandleResponse(
-    val did: String,
-)
-
-@Serializable
-private data class DescribeServerResponse(
-    val did: String,
-    val availableUserDomains: List<String>,
-    val inviteCodeRequired: Boolean,
-    val phoneVerificationRequired: Boolean,
-)
-
-@Serializable
-private data class DescribeRepoResponse(
-    val handle: String,
-    val did: String,
-    val didDoc: studio.hypertext.atproto.identity.DidDocument,
-    val collections: List<String>,
-    val handleIsCorrect: Boolean,
-)
-
-@Serializable
-private data class ListRecordsResponse(
-    val records: List<RepoRecord>,
-    val cursor: String? = null,
-)
-
-@Serializable
-private data class CreateRecordRequest(
-    val repo: String,
-    val collection: String,
-    val rkey: String? = null,
-    val validate: Boolean? = null,
-    val record: JsonObject,
-    val swapCommit: String? = null,
-)
-
-@Serializable
-private data class PutRecordRequest(
-    val repo: String,
-    val collection: String,
-    val rkey: String,
-    val validate: Boolean? = null,
-    val record: JsonObject,
-    val swapRecord: String? = null,
-    val swapCommit: String? = null,
-)
-
-@Serializable
-private data class DeleteRecordRequest(
-    val repo: String,
-    val collection: String,
-    val rkey: String,
-    val swapRecord: String? = null,
-    val swapCommit: String? = null,
-)
-
-@Serializable
-private class EmptyXrpcResponse
-
 fun Route.xrpcRoutes(
     identityService: AtprotoIdentityService,
     accountRepository: AccountRepository? = null,
     tokenService: TokenService? = null,
-    repoRecordStore: RepoRecordStore? = null,
+    repoRecordStore: RepoEngine? = null,
     oauthAccessTokenService: OAuthAccessTokenService? = null,
     oauthDpopVerifier: OAuthDpopVerifier? = null,
     oauthNonceService: OAuthNonceService? = null,
@@ -118,7 +58,7 @@ fun Route.xrpcRoutes(
             if (handleValue.isBlank()) {
                 call.respond(
                     HttpStatusCode.BadRequest,
-                    XrpcErrorResponse("InvalidRequest", "Handle is required"),
+                    PdsErrorResponse("InvalidRequest", "Handle is required"),
                 )
                 return@get
             }
@@ -127,12 +67,12 @@ fun Route.xrpcRoutes(
             if (account?.did == null) {
                 call.respond(
                     HttpStatusCode.BadRequest,
-                    XrpcErrorResponse("HandleNotFound", "Handle not found: ${handleValue.lowercase()}"),
+                    PdsErrorResponse("HandleNotFound", "Handle not found: ${handleValue.lowercase()}"),
                 )
                 return@get
             }
 
-            call.respond(HttpStatusCode.OK, ResolveHandleResponse(account.did))
+            call.respond(HttpStatusCode.OK, ResolveHandleResponse(AtprotoDid.require(account.did)))
         }
 
         get("/com.atproto.server.describeServer") {
@@ -155,7 +95,7 @@ fun Route.xrpcRoutes(
             if (repoValue.isBlank()) {
                 call.respond(
                     HttpStatusCode.BadRequest,
-                    XrpcErrorResponse("InvalidRequest", "Repo is required"),
+                    PdsErrorResponse("InvalidRequest", "Repo is required"),
                 )
                 return@get
             }
@@ -164,21 +104,21 @@ fun Route.xrpcRoutes(
             if (account?.did == null || account.handle == null) {
                 call.respond(
                     HttpStatusCode.BadRequest,
-                    XrpcErrorResponse("RepoNotFound", "Repo not found: $repoValue"),
+                    PdsErrorResponse("RepoNotFound", "Repo not found: $repoValue"),
                 )
                 return@get
             }
 
             val collections =
                 when (repoRecordStore) {
-                    is AtprotoContentRecordStore -> repoRecordStore.collectionsForDid(account.did).map(Nsid::toString)
+                    is AtprotoContentRecordStore -> repoRecordStore.collectionsForDid(account.did)
                     else -> emptyList()
                 }
             call.respond(
                 HttpStatusCode.OK,
                 DescribeRepoResponse(
                     handle = account.handle,
-                    did = account.did,
+                    did = AtprotoDid.require(account.did),
                     didDoc = identityService.documentFor(account),
                     collections = collections,
                     handleIsCorrect = true,
@@ -190,7 +130,7 @@ fun Route.xrpcRoutes(
             val repoStore =
                 repoRecordStore ?: return@get call.respond(
                     HttpStatusCode.NotImplemented,
-                    XrpcErrorResponse("Unsupported", "Repo record store is not configured"),
+                    PdsErrorResponse("Unsupported", "Repo record store is not configured"),
                 )
             val repoValue =
                 call.request.queryParameters["repo"]
@@ -207,7 +147,7 @@ fun Route.xrpcRoutes(
             if (repoValue.isBlank() || collectionValue.isBlank() || recordKeyValue.isBlank()) {
                 call.respond(
                     HttpStatusCode.BadRequest,
-                    XrpcErrorResponse("InvalidRequest", "repo, collection, and rkey are required"),
+                    PdsErrorResponse("InvalidRequest", "repo, collection, and rkey are required"),
                 )
                 return@get
             }
@@ -216,7 +156,7 @@ fun Route.xrpcRoutes(
                 parseRecordId(identityService, repoValue, collectionValue, recordKeyValue)
                     ?: return@get call.respond(
                         HttpStatusCode.BadRequest,
-                        XrpcErrorResponse("InvalidRequest", "Invalid repo, collection, or record key"),
+                        PdsErrorResponse("InvalidRequest", "Invalid repo, collection, or record key"),
                     )
 
             val recordResult = repoStore.getRecord(recordId)
@@ -228,7 +168,7 @@ fun Route.xrpcRoutes(
             if (record == null) {
                 call.respond(
                     HttpStatusCode.BadRequest,
-                    XrpcErrorResponse("RecordNotFound", "Record not found"),
+                    PdsErrorResponse("RecordNotFound", "Record not found"),
                 )
                 return@get
             }
@@ -240,7 +180,7 @@ fun Route.xrpcRoutes(
             if (cidConstraint.isNotBlank() && record.cid != cidConstraint) {
                 call.respond(
                     HttpStatusCode.BadRequest,
-                    XrpcErrorResponse("RecordNotFound", "Record not found"),
+                    PdsErrorResponse("RecordNotFound", "Record not found"),
                 )
                 return@get
             }
@@ -252,7 +192,7 @@ fun Route.xrpcRoutes(
             val repoStore =
                 repoRecordStore ?: return@get call.respond(
                     HttpStatusCode.NotImplemented,
-                    XrpcErrorResponse("Unsupported", "Repo record store is not configured"),
+                    PdsErrorResponse("Unsupported", "Repo record store is not configured"),
                 )
             val repoValue =
                 call.request.queryParameters["repo"]
@@ -265,7 +205,7 @@ fun Route.xrpcRoutes(
             if (repoValue.isBlank() || collectionValue.isBlank()) {
                 call.respond(
                     HttpStatusCode.BadRequest,
-                    XrpcErrorResponse("InvalidRequest", "repo and collection are required"),
+                    PdsErrorResponse("InvalidRequest", "repo and collection are required"),
                 )
                 return@get
             }
@@ -275,7 +215,7 @@ fun Route.xrpcRoutes(
             if (repo == null || collection == null) {
                 call.respond(
                     HttpStatusCode.BadRequest,
-                    XrpcErrorResponse("InvalidRequest", "Invalid repo or collection"),
+                    PdsErrorResponse("InvalidRequest", "Invalid repo or collection"),
                 )
                 return@get
             }
@@ -284,7 +224,11 @@ fun Route.xrpcRoutes(
                 repoStore.listRecords(
                     repo = repo,
                     collection = collection,
-                    limit = (call.request.queryParameters["limit"]?.toIntOrNull() ?: RepoRecordStore.DEFAULT_PAGE_SIZE).coerceIn(1, 100),
+                    limit =
+                        (
+                            call.request.queryParameters["limit"]?.toIntOrNull()
+                                ?: studio.hypertext.atproto.pds.ListRecordsRequest.DEFAULT_PAGE_SIZE
+                        ).coerceIn(1, 100),
                     cursor =
                         call.request.queryParameters["cursor"]
                             ?.trim()
@@ -293,7 +237,7 @@ fun Route.xrpcRoutes(
                 )
             val page = result.getOrNull()
             if (page != null) {
-                call.respond(HttpStatusCode.OK, ListRecordsResponse(records = page.records, cursor = page.cursor))
+                call.respond(HttpStatusCode.OK, ListRecordsResponse.fromPage(page))
                 return@get
             }
 
@@ -304,7 +248,7 @@ fun Route.xrpcRoutes(
             val repoStore =
                 repoRecordStore ?: return@post call.respond(
                     HttpStatusCode.NotImplemented,
-                    XrpcErrorResponse("Unsupported", "Repo record store is not configured"),
+                    PdsErrorResponse("Unsupported", "Repo record store is not configured"),
                 )
             val authenticatedAccount =
                 call.requireAuthenticatedAccount(
@@ -316,19 +260,18 @@ fun Route.xrpcRoutes(
                     oauthNonceService = oauthNonceService,
                 ) ?: return@post
             val request = call.receive<CreateRecordRequest>()
-            val repo = resolveRepoDid(identityService, request.repo)
-            val collection = Nsid.parse(request.collection).getOrNull()
-            val recordKey = request.rkey?.let { RecordKey.parse(it).getOrNull() }
-            if (repo == null || collection == null || (request.rkey != null && recordKey == null)) {
-                call.respond(HttpStatusCode.BadRequest, XrpcErrorResponse("InvalidRequest", "Invalid repo, collection, or record key"))
-                return@post
-            }
-            if (!ownsRepo(authenticatedAccount, request.repo)) {
-                call.respond(HttpStatusCode.Forbidden, XrpcErrorResponse("RepoMismatch", "Authenticated account does not own repo"))
+            if (!ownsRepo(authenticatedAccount, request.repo.toString())) {
+                call.respond(HttpStatusCode.Forbidden, PdsErrorResponse("RepoMismatch", "Authenticated account does not own repo"))
                 return@post
             }
 
-            val result = repoStore.createRecord(repo = repo, collection = collection, value = request.record, recordKey = recordKey)
+            val result =
+                repoStore.createRecord(
+                    repo = request.repo,
+                    collection = request.collection,
+                    value = request.record,
+                    recordKey = request.recordKey,
+                )
             val writeResult = result.getOrNull()
             if (writeResult != null) {
                 call.respond(HttpStatusCode.OK, writeResult)
@@ -342,7 +285,7 @@ fun Route.xrpcRoutes(
             val repoStore =
                 repoRecordStore ?: return@post call.respond(
                     HttpStatusCode.NotImplemented,
-                    XrpcErrorResponse("Unsupported", "Repo record store is not configured"),
+                    PdsErrorResponse("Unsupported", "Repo record store is not configured"),
                 )
             val authenticatedAccount =
                 call.requireAuthenticatedAccount(
@@ -354,17 +297,17 @@ fun Route.xrpcRoutes(
                     oauthNonceService = oauthNonceService,
                 ) ?: return@post
             val request = call.receive<PutRecordRequest>()
-            if (!ownsRepo(authenticatedAccount, request.repo)) {
-                call.respond(HttpStatusCode.Forbidden, XrpcErrorResponse("RepoMismatch", "Authenticated account does not own repo"))
+            if (!ownsRepo(authenticatedAccount, request.repo.toString())) {
+                call.respond(HttpStatusCode.Forbidden, PdsErrorResponse("RepoMismatch", "Authenticated account does not own repo"))
                 return@post
             }
 
             val recordId =
-                parseRecordId(identityService, request.repo, request.collection, request.rkey)
-                    ?: return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        XrpcErrorResponse("InvalidRequest", "Invalid repo, collection, or record key"),
-                    )
+                RepoRecordId(
+                    repo = request.repo,
+                    collection = request.collection,
+                    recordKey = request.recordKey,
+                )
             val result = repoStore.putRecord(recordId = recordId, value = request.record, swapRecord = request.swapRecord)
             val writeResult = result.getOrNull()
             if (writeResult != null) {
@@ -379,7 +322,7 @@ fun Route.xrpcRoutes(
             val repoStore =
                 repoRecordStore ?: return@post call.respond(
                     HttpStatusCode.NotImplemented,
-                    XrpcErrorResponse("Unsupported", "Repo record store is not configured"),
+                    PdsErrorResponse("Unsupported", "Repo record store is not configured"),
                 )
             val authenticatedAccount =
                 call.requireAuthenticatedAccount(
@@ -391,20 +334,20 @@ fun Route.xrpcRoutes(
                     oauthNonceService = oauthNonceService,
                 ) ?: return@post
             val request = call.receive<DeleteRecordRequest>()
-            if (!ownsRepo(authenticatedAccount, request.repo)) {
-                call.respond(HttpStatusCode.Forbidden, XrpcErrorResponse("RepoMismatch", "Authenticated account does not own repo"))
+            if (!ownsRepo(authenticatedAccount, request.repo.toString())) {
+                call.respond(HttpStatusCode.Forbidden, PdsErrorResponse("RepoMismatch", "Authenticated account does not own repo"))
                 return@post
             }
 
             val recordId =
-                parseRecordId(identityService, request.repo, request.collection, request.rkey)
-                    ?: return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        XrpcErrorResponse("InvalidRequest", "Invalid repo, collection, or record key"),
-                    )
+                RepoRecordId(
+                    repo = request.repo,
+                    collection = request.collection,
+                    recordKey = request.recordKey,
+                )
             val result = repoStore.deleteRecord(recordId = recordId, swapRecord = request.swapRecord)
             if (result.isSuccess) {
-                call.respond(HttpStatusCode.OK, EmptyXrpcResponse())
+                call.respond(HttpStatusCode.OK, EmptyPdsResponse())
                 return@post
             }
 
@@ -425,26 +368,26 @@ private suspend fun io.ktor.server.application.ApplicationCall.requireAuthentica
     if (accountRepository == null || tokenService == null) {
         respond(
             HttpStatusCode.NotImplemented,
-            XrpcErrorResponse("Unsupported", "Repo auth is not configured"),
+            PdsErrorResponse("Unsupported", "Repo auth is not configured"),
         )
         return null
     }
 
     val authHeader = request.header(HttpHeaders.Authorization)
     if (authHeader == null) {
-        respond(HttpStatusCode.Unauthorized, XrpcErrorResponse("AuthRequired", "Missing bearer token"))
+        respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", "Missing bearer token"))
         return null
     }
 
     if (authHeader.startsWith("DPoP ")) {
         if (oauthAccessTokenService == null || oauthDpopVerifier == null || oauthNonceService == null) {
-            respond(HttpStatusCode.NotImplemented, XrpcErrorResponse("Unsupported", "OAuth DPoP auth is not configured"))
+            respond(HttpStatusCode.NotImplemented, PdsErrorResponse("Unsupported", "OAuth DPoP auth is not configured"))
             return null
         }
         val accessToken = authHeader.removePrefix("DPoP ").trim()
         val accessClaims = oauthAccessTokenService.validateAccessToken(accessToken)
         if (accessClaims == null) {
-            respond(HttpStatusCode.Unauthorized, XrpcErrorResponse("AuthRequired", "Invalid DPoP access token"))
+            respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", "Invalid DPoP access token"))
             return null
         }
         val proof =
@@ -453,7 +396,7 @@ private suspend fun io.ktor.server.application.ApplicationCall.requireAuthentica
                 ?.trim()
                 ?.takeIf(String::isNotEmpty)
                 ?: run {
-                    respond(HttpStatusCode.Unauthorized, XrpcErrorResponse("AuthRequired", "Missing DPoP proof"))
+                    respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", "Missing DPoP proof"))
                     return null
                 }
         val verification =
@@ -469,31 +412,31 @@ private suspend fun io.ktor.server.application.ApplicationCall.requireAuthentica
                 if (error is OAuthUseDpopNonceException) {
                     response.headers.append(DPOP_NONCE_HEADER, error.nonce)
                 }
-                respond(HttpStatusCode.Unauthorized, XrpcErrorResponse("AuthRequired", error.message ?: "Invalid DPoP proof"))
+                respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", error.message ?: "Invalid DPoP proof"))
                 return null
             }
         if (verified.keyThumbprint != accessClaims.keyThumbprint) {
-            respond(HttpStatusCode.Unauthorized, XrpcErrorResponse("AuthRequired", "DPoP proof does not match the access token"))
+            respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", "DPoP proof does not match the access token"))
             return null
         }
         val account =
             accountRepository.findByDid(accessClaims.subjectDid)?.let { identityService.ensureIdentity(it) }
         if (account == null) {
-            respond(HttpStatusCode.Unauthorized, XrpcErrorResponse("AuthRequired", "Account not found for DPoP access token"))
+            respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", "Account not found for DPoP access token"))
             return null
         }
         return account
     }
 
     if (!authHeader.startsWith("Bearer ")) {
-        respond(HttpStatusCode.Unauthorized, XrpcErrorResponse("AuthRequired", "Missing bearer token"))
+        respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", "Missing bearer token"))
         return null
     }
 
     val subject = tokenService.validateAccessToken(authHeader.removePrefix("Bearer ").trim())
     val accountId = subject?.let { runCatching { UUID.fromString(it) }.getOrNull() }
     if (accountId == null) {
-        respond(HttpStatusCode.Unauthorized, XrpcErrorResponse("AuthRequired", "Invalid bearer token"))
+        respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", "Invalid bearer token"))
         return null
     }
     val account =
@@ -501,7 +444,7 @@ private suspend fun io.ktor.server.application.ApplicationCall.requireAuthentica
             .findById(kotlin.uuid.Uuid.parse(accountId.toString()))
             ?.let { identityService.ensureIdentity(it) }
     if (account == null) {
-        respond(HttpStatusCode.Unauthorized, XrpcErrorResponse("AuthRequired", "Account not found for bearer token"))
+        respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", "Account not found for bearer token"))
         return null
     }
 
@@ -534,8 +477,10 @@ private suspend fun resolveRepoAccount(
 private suspend fun resolveRepoDid(
     identityService: AtprotoIdentityService,
     repo: String,
-): studio.hypertext.atproto.identity.AtprotoDid? =
-    resolveRepoAccount(identityService, repo)?.did?.let(studio.hypertext.atproto.identity.AtprotoDid::require)
+): AtprotoDid? =
+    resolveRepoAccount(identityService, repo)
+        ?.did
+        ?.let(AtprotoDid::require)
 
 private suspend fun parseRecordId(
     identityService: AtprotoIdentityService,
@@ -562,25 +507,25 @@ private suspend fun io.ktor.server.application.ApplicationCall.respondForRepoErr
         is UnsupportedCollectionException ->
             respond(
                 HttpStatusCode.BadRequest,
-                XrpcErrorResponse("InvalidRequest", error.message ?: "Unsupported collection"),
+                PdsErrorResponse("InvalidRequest", error.message ?: "Unsupported collection"),
             )
 
         is studio.hypertext.atproto.repo.InvalidRepoCursorException ->
             respond(
                 HttpStatusCode.BadRequest,
-                XrpcErrorResponse("InvalidRequest", error.message ?: "Invalid cursor"),
+                PdsErrorResponse("InvalidRequest", error.message ?: "Invalid cursor"),
             )
 
         is InvalidSwapException ->
             respond(
                 HttpStatusCode.BadRequest,
-                XrpcErrorResponse("InvalidSwap", error.message ?: "swapRecord did not match"),
+                PdsErrorResponse("InvalidSwap", error.message ?: "swapRecord did not match"),
             )
 
         else ->
             respond(
                 HttpStatusCode.BadRequest,
-                XrpcErrorResponse("InvalidRequest", error?.message ?: "Invalid XRPC request"),
+                PdsErrorResponse("InvalidRequest", error?.message ?: "Invalid XRPC request"),
             )
     }
 }

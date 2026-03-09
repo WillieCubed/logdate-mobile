@@ -2,6 +2,7 @@ package app.logdate.server.oauth
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
+import studio.hypertext.atproto.pds.OAuthTokenResponse
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

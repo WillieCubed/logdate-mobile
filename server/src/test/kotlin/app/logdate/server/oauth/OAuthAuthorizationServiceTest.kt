@@ -7,6 +7,9 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.serialization.json.Json
+import studio.hypertext.atproto.pds.AuthorizationPrompt
+import studio.hypertext.atproto.pds.OAuthTokenResponse
+import studio.hypertext.atproto.pds.PushedAuthorizationResponse
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

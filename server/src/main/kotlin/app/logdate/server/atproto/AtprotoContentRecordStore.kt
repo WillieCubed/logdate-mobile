@@ -14,13 +14,23 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
+import studio.hypertext.atproto.identity.AtprotoDid
+import studio.hypertext.atproto.repo.Cid
+import studio.hypertext.atproto.repo.DagCborCodec
+import studio.hypertext.atproto.repo.DigestRepoCommitSigner
 import studio.hypertext.atproto.repo.InvalidRepoCursorException
+import studio.hypertext.atproto.repo.MerkleSearchTree
+import studio.hypertext.atproto.repo.RepoBlock
+import studio.hypertext.atproto.repo.RepoCommit
+import studio.hypertext.atproto.repo.RepoEngine
+import studio.hypertext.atproto.repo.RepoExport
+import studio.hypertext.atproto.repo.RepoHead
 import studio.hypertext.atproto.repo.RepoListPage
 import studio.hypertext.atproto.repo.RepoRecord
 import studio.hypertext.atproto.repo.RepoRecordId
-import studio.hypertext.atproto.repo.RepoRecordStore
 import studio.hypertext.atproto.repo.RepoValidationStatus
 import studio.hypertext.atproto.repo.RepoWriteResult
+import studio.hypertext.atproto.repo.SignedRepoCommit
 import studio.hypertext.atproto.repo.UnsupportedCollectionException
 import studio.hypertext.atproto.syntax.Nsid
 import studio.hypertext.atproto.syntax.RecordKey
@@ -38,7 +48,7 @@ import kotlin.uuid.Uuid
 class AtprotoContentRecordStore(
     private val syncRepository: SyncRepository,
     private val identityService: AtprotoIdentityService,
-) : RepoRecordStore {
+) : RepoEngine {
     suspend fun collectionsForDid(did: String): List<Nsid> {
         val account = requireNotNull(identityService.findByDid(did)) { "Unknown repo DID: $did" }
         return if (loadAllContent(account.id.toJavaUUID()).isEmpty()) emptyList() else listOf(contentCollection)
@@ -54,7 +64,7 @@ class AtprotoContentRecordStore(
         }
 
     override suspend fun listRecords(
-        repo: studio.hypertext.atproto.identity.AtprotoDid,
+        repo: AtprotoDid,
         collection: Nsid,
         limit: Int,
         cursor: String?,
@@ -100,7 +110,7 @@ class AtprotoContentRecordStore(
         }
 
     override suspend fun createRecord(
-        repo: studio.hypertext.atproto.identity.AtprotoDid,
+        repo: AtprotoDid,
         collection: Nsid,
         value: JsonObject,
         recordKey: RecordKey?,
@@ -271,6 +281,94 @@ class AtprotoContentRecordStore(
 
     private fun JsonObject.longValue(key: String): Long? = this[key]?.jsonPrimitive?.longOrNull
 
+    override suspend fun loadHead(repo: AtprotoDid): Result<RepoHead?> =
+        runCatching {
+            syntheticExport(repo)?.head
+        }
+
+    override suspend fun listCommits(
+        repo: AtprotoDid,
+        limit: Int,
+    ): Result<List<SignedRepoCommit>> =
+        runCatching {
+            syntheticExport(repo)
+                ?.commits
+                ?.takeLast(limit.coerceAtLeast(1))
+                ?.reversed()
+                .orEmpty()
+        }
+
+    override suspend fun export(repo: AtprotoDid): Result<RepoExport> =
+        runCatching {
+            requireNotNull(syntheticExport(repo)) { "Unknown repo DID: $repo" }
+        }
+
+    override suspend fun import(export: RepoExport): Result<RepoHead> =
+        Result.failure(UnsupportedOperationException("Sync-backed repo engine does not support imports"))
+
+    private suspend fun syntheticExport(repo: AtprotoDid): RepoExport? {
+        val account = identityService.findByDid(repo.toString()) ?: return null
+        val records = loadAllContent(account.id.toJavaUUID())
+        var tree = MerkleSearchTree.empty()
+        val blocks = mutableListOf<RepoBlock>()
+
+        records
+            .sortedBy(ContentRecord::id)
+            .forEach { record ->
+                val value = record.toJsonValue()
+                val bytes = DagCborCodec.encode(value)
+                val cid = Cid.sha256(REPO_DAG_CBOR_CODEC, bytes)
+                blocks += RepoBlock(cid = cid, bytes = bytes)
+                tree = tree.put(RecordKey.require(record.id), cid)
+            }
+
+        val snapshotBytes = DagCborCodec.encode(tree.toJsonElement())
+        val rootCid = Cid.sha256(REPO_DAG_CBOR_CODEC, snapshotBytes)
+        blocks += RepoBlock(cid = rootCid, bytes = snapshotBytes)
+
+        val commit =
+            RepoCommit(
+                repo = repo,
+                root = rootCid,
+                prev = null,
+                revision = records.maxOfOrNull(ContentRecord::serverVersion) ?: 0L,
+                createdAtEpochMillis = records.maxOfOrNull(ContentRecord::lastUpdated) ?: 0L,
+                recordCount = records.size,
+            )
+        val commitBytes =
+            DagCborCodec.encode(
+                buildJsonObject {
+                    put("repo", commit.repo.toString())
+                    put("root", commit.root.toString())
+                    put("revision", commit.revision)
+                    put("createdAtEpochMillis", commit.createdAtEpochMillis)
+                    put("recordCount", commit.recordCount)
+                },
+            )
+        val commitCid = Cid.sha256(REPO_DAG_CBOR_CODEC, commitBytes)
+        blocks += RepoBlock(cid = commitCid, bytes = commitBytes)
+
+        val signedCommit =
+            SignedRepoCommit(
+                cid = commitCid,
+                commit = commit,
+                signature = DigestRepoCommitSigner.sign(commitBytes),
+            )
+        val head =
+            RepoHead(
+                repo = repo,
+                root = rootCid,
+                commitCid = commitCid,
+                revision = commit.revision,
+            )
+        return RepoExport(
+            repo = repo,
+            head = head,
+            commits = listOf(signedCommit),
+            blocks = blocks,
+        )
+    }
+
     companion object {
         val contentCollection: Nsid = Nsid.require("studio.hypertext.logdate.content")
 
@@ -279,6 +377,7 @@ class AtprotoContentRecordStore(
         private const val DEFAULT_CONTENT_TYPE = "TEXT"
         private const val DEFAULT_DURATION_MS = 0L
         private const val TYPE_FIELD_NAME = "\$type"
+        private const val REPO_DAG_CBOR_CODEC = 0x71
     }
 }
 

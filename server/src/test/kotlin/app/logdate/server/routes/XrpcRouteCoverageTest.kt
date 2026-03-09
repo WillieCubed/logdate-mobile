@@ -41,12 +41,25 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.identity.DidDocument
+import studio.hypertext.atproto.pds.CreateRecordRequest
+import studio.hypertext.atproto.pds.DeleteRecordRequest
+import studio.hypertext.atproto.pds.DescribeRepoResponse
+import studio.hypertext.atproto.pds.DescribeServerResponse
+import studio.hypertext.atproto.pds.EmptyPdsResponse
+import studio.hypertext.atproto.pds.ListRecordsResponse
+import studio.hypertext.atproto.pds.PdsErrorResponse
+import studio.hypertext.atproto.pds.PutRecordRequest
+import studio.hypertext.atproto.pds.ResolveHandleResponse
+import studio.hypertext.atproto.repo.Cid
+import studio.hypertext.atproto.repo.RepoEngine
+import studio.hypertext.atproto.repo.RepoExport
+import studio.hypertext.atproto.repo.RepoHead
 import studio.hypertext.atproto.repo.RepoListPage
 import studio.hypertext.atproto.repo.RepoRecord
 import studio.hypertext.atproto.repo.RepoRecordId
-import studio.hypertext.atproto.repo.RepoRecordStore
 import studio.hypertext.atproto.repo.RepoValidationStatus
 import studio.hypertext.atproto.repo.RepoWriteResult
+import studio.hypertext.atproto.repo.SignedRepoCommit
 import studio.hypertext.atproto.repo.UnsupportedCollectionException
 import studio.hypertext.atproto.syntax.AtUri
 import studio.hypertext.atproto.syntax.Nsid
@@ -65,132 +78,76 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalUuidApi::class)
 class XrpcRouteCoverageTest {
     private val json = Json { ignoreUnknownKeys = true }
-    private val defaultConstructorMarkerClass = Class.forName("kotlin.jvm.internal.DefaultConstructorMarker")
 
     @Test
-    fun `xrpc route models expose getters and default constructors`() {
+    fun `xrpc route models expose shared contract fields and defaults`() {
         val didDocument = DidDocument(id = AtprotoDid.require("did:web:alice.logdate.app"))
+        val collection = Nsid.require("studio.hypertext.logdate.content")
         val repoRecord =
             RepoRecord(
                 uri = AtUri.require("at://did:web:alice.logdate.app/studio.hypertext.logdate.content/entry-1"),
                 cid = "bafy-record",
                 value = buildJsonObject { put("content", "hello") },
             )
-
-        val errorResponse = instantiatePrivate("app.logdate.server.routes.XrpcErrorResponse", "error", "message")
-        val resolveHandle = instantiatePrivate("app.logdate.server.routes.ResolveHandleResponse", "did:web:alice.logdate.app")
+        val errorResponse = PdsErrorResponse("error", "message")
+        val resolveHandle = ResolveHandleResponse(AtprotoDid.require("did:web:alice.logdate.app"))
         val describeServer =
-            instantiatePrivate(
-                "app.logdate.server.routes.DescribeServerResponse",
-                "did:web:logdate.app",
-                listOf("logdate.app"),
-                false,
-                false,
+            DescribeServerResponse(
+                did = "did:web:logdate.app",
+                availableUserDomains = listOf("logdate.app"),
+                inviteCodeRequired = false,
+                phoneVerificationRequired = false,
             )
         val describeRepo =
-            instantiatePrivate(
-                "app.logdate.server.routes.DescribeRepoResponse",
-                "alice.logdate.app",
-                "did:web:alice.logdate.app",
-                didDocument,
-                listOf("studio.hypertext.logdate.content"),
-                true,
+            DescribeRepoResponse(
+                handle = "alice.logdate.app",
+                did = AtprotoDid.require("did:web:alice.logdate.app"),
+                didDoc = didDocument,
+                collections = listOf(collection),
+                handleIsCorrect = true,
             )
-        val listRecords =
-            instantiatePrivateDefault(
-                "app.logdate.server.routes.ListRecordsResponse",
-                arrayOf<Class<*>>(List::class.java, String::class.java, Int::class.javaPrimitiveType!!, defaultConstructorMarkerClass),
-                listOf(repoRecord),
-                null,
-                2,
-                null,
-            )
+        val listRecords = ListRecordsResponse.fromPage(RepoListPage(records = listOf(repoRecord)))
         val createRequest =
-            instantiatePrivateDefault(
-                "app.logdate.server.routes.CreateRecordRequest",
-                arrayOf<Class<*>>(
-                    String::class.java,
-                    String::class.java,
-                    String::class.java,
-                    java.lang.Boolean::class.java,
-                    JsonObject::class.java,
-                    String::class.java,
-                    Int::class.javaPrimitiveType!!,
-                    defaultConstructorMarkerClass,
-                ),
-                "did:web:alice.logdate.app",
-                "studio.hypertext.logdate.content",
-                null,
-                null,
-                buildJsonObject { put("content", "hello") },
-                null,
-                44,
-                null,
+            CreateRecordRequest(
+                repo = AtprotoDid.require("did:web:alice.logdate.app"),
+                collection = collection,
+                record = buildJsonObject { put("content", "hello") },
             )
         val putRequest =
-            instantiatePrivateDefault(
-                "app.logdate.server.routes.PutRecordRequest",
-                arrayOf<Class<*>>(
-                    String::class.java,
-                    String::class.java,
-                    String::class.java,
-                    java.lang.Boolean::class.java,
-                    JsonObject::class.java,
-                    String::class.java,
-                    String::class.java,
-                    Int::class.javaPrimitiveType!!,
-                    defaultConstructorMarkerClass,
-                ),
-                "did:web:alice.logdate.app",
-                "studio.hypertext.logdate.content",
-                "entry-1",
-                null,
-                buildJsonObject { put("content", "hello") },
-                null,
-                null,
-                104,
-                null,
+            PutRecordRequest(
+                repo = AtprotoDid.require("did:web:alice.logdate.app"),
+                collection = collection,
+                recordKey = RecordKey.require("entry-1"),
+                record = buildJsonObject { put("content", "hello") },
             )
         val deleteRequest =
-            instantiatePrivateDefault(
-                "app.logdate.server.routes.DeleteRecordRequest",
-                arrayOf<Class<*>>(
-                    String::class.java,
-                    String::class.java,
-                    String::class.java,
-                    String::class.java,
-                    String::class.java,
-                    Int::class.javaPrimitiveType!!,
-                    defaultConstructorMarkerClass,
-                ),
-                "did:web:alice.logdate.app",
-                "studio.hypertext.logdate.content",
-                "entry-1",
-                null,
-                null,
-                24,
-                null,
+            DeleteRecordRequest(
+                repo = AtprotoDid.require("did:web:alice.logdate.app"),
+                collection = collection,
+                recordKey = RecordKey.require("entry-1"),
             )
+        val emptyResponse = EmptyPdsResponse()
 
-        assertEquals("error", invokeGetter(errorResponse, "getError"))
-        assertEquals("message", invokeGetter(errorResponse, "getMessage"))
-        assertEquals("did:web:alice.logdate.app", invokeGetter(resolveHandle, "getDid"))
-        assertEquals("did:web:logdate.app", invokeGetter(describeServer, "getDid"))
-        assertEquals(listOf("logdate.app"), invokeGetter(describeServer, "getAvailableUserDomains"))
-        assertFalse(invokeGetter(describeServer, "getInviteCodeRequired") as Boolean)
-        assertFalse(invokeGetter(describeServer, "getPhoneVerificationRequired") as Boolean)
-        assertEquals("alice.logdate.app", invokeGetter(describeRepo, "getHandle"))
-        assertEquals("did:web:alice.logdate.app", invokeGetter(describeRepo, "getDid"))
-        assertEquals(didDocument, invokeGetter(describeRepo, "getDidDoc"))
-        assertEquals(listOf("studio.hypertext.logdate.content"), invokeGetter(describeRepo, "getCollections"))
-        assertEquals(true, invokeGetter(describeRepo, "getHandleIsCorrect"))
-        assertEquals(listOf(repoRecord), invokeGetter(listRecords, "getRecords"))
-        assertEquals(null, invokeGetter(listRecords, "getCursor"))
-        assertEquals(null, invokeGetter(createRequest, "getValidate"))
-        assertEquals(null, invokeGetter(createRequest, "getSwapCommit"))
-        assertEquals(null, invokeGetter(putRequest, "getValidate"))
-        assertEquals(null, invokeGetter(putRequest, "getSwapCommit"))
-        assertEquals(null, invokeGetter(deleteRequest, "getSwapCommit"))
+        assertEquals("error", errorResponse.error)
+        assertEquals("message", errorResponse.message)
+        assertEquals("did:web:alice.logdate.app", resolveHandle.did.toString())
+        assertEquals("did:web:logdate.app", describeServer.did)
+        assertEquals(listOf("logdate.app"), describeServer.availableUserDomains)
+        assertFalse(describeServer.inviteCodeRequired)
+        assertFalse(describeServer.phoneVerificationRequired)
+        assertEquals("alice.logdate.app", describeRepo.handle)
+        assertEquals("did:web:alice.logdate.app", describeRepo.did.toString())
+        assertEquals(didDocument, describeRepo.didDoc)
+        assertEquals(listOf(collection), describeRepo.collections)
+        assertTrue(describeRepo.handleIsCorrect)
+        assertEquals(listOf(repoRecord), listRecords.records)
+        assertEquals(null, listRecords.cursor)
+        assertEquals(null, createRequest.validate)
+        assertEquals(null, createRequest.swapCommit)
+        assertEquals(null, putRequest.validate)
+        assertEquals(null, putRequest.swapCommit)
+        assertEquals(null, deleteRequest.swapCommit)
+        assertTrue(emptyResponse is EmptyPdsResponse)
     }
 
     @Test
@@ -258,12 +215,13 @@ class XrpcRouteCoverageTest {
                     )
                 }
             val ensuredAccount = runBlocking { env.identityService.ensureIdentity(account) }
+            val repoDid = requireNotNull(ensuredAccount.did)
             val clientKey = generateP256KeyPair()
             val thumbprint = env.oauthDpopVerifier.jwkThumbprint(publicJwk(clientKey))
             val accessToken =
                 env.oauthAccessTokenService
                     .issueAccessToken(
-                        subjectDid = requireNotNull(ensuredAccount.did),
+                        subjectDid = repoDid,
                         clientId = "https://viewer.example.com/client.json",
                         scope = "atproto",
                         keyThumbprint = thumbprint,
@@ -286,7 +244,7 @@ class XrpcRouteCoverageTest {
                     setBody(
                         """
                         {
-                          "repo": "dpop-user.logdate.app",
+                          "repo": "$repoDid",
                           "collection": "studio.hypertext.logdate.content",
                           "rkey": "entry-1",
                           "record": { "type": "TEXT" }
@@ -300,7 +258,7 @@ class XrpcRouteCoverageTest {
                 client.post("/xrpc/com.atproto.repo.createRecord") {
                     contentType(ContentType.Application.Json)
                     header(HttpHeaders.Authorization, "DPoP $accessToken")
-                    setBody("""{"repo":"dpop-user.logdate.app","collection":"studio.hypertext.logdate.content","record":{"type":"TEXT"}}""")
+                    setBody("""{"repo":"$repoDid","collection":"studio.hypertext.logdate.content","record":{"type":"TEXT"}}""")
                 }
             assertEquals(HttpStatusCode.Unauthorized, missingProof.status)
 
@@ -318,7 +276,7 @@ class XrpcRouteCoverageTest {
                             ath = env.oauthDpopVerifier.accessTokenHash(accessToken),
                         ),
                     )
-                    setBody("""{"repo":"dpop-user.logdate.app","collection":"studio.hypertext.logdate.content","record":{"type":"TEXT"}}""")
+                    setBody("""{"repo":"$repoDid","collection":"studio.hypertext.logdate.content","record":{"type":"TEXT"}}""")
                 }
             assertEquals(HttpStatusCode.Unauthorized, wrongKey.status)
 
@@ -336,7 +294,7 @@ class XrpcRouteCoverageTest {
                             ath = env.oauthDpopVerifier.accessTokenHash(accessToken),
                         ),
                     )
-                    setBody("""{"repo":"dpop-user.logdate.app","collection":"studio.hypertext.logdate.content","record":{"type":"TEXT"}}""")
+                    setBody("""{"repo":"$repoDid","collection":"studio.hypertext.logdate.content","record":{"type":"TEXT"}}""")
                 }
             assertEquals(HttpStatusCode.Unauthorized, wrongNonce.status)
             assertEquals(env.oauthNonceService.currentNonce(), wrongNonce.headers["DPoP-Nonce"])
@@ -363,7 +321,7 @@ class XrpcRouteCoverageTest {
                             ath = env.oauthDpopVerifier.accessTokenHash(missingAccountToken),
                         ),
                     )
-                    setBody("""{"repo":"dpop-user.logdate.app","collection":"studio.hypertext.logdate.content","record":{"type":"TEXT"}}""")
+                    setBody("""{"repo":"$repoDid","collection":"studio.hypertext.logdate.content","record":{"type":"TEXT"}}""")
                 }
             assertEquals(HttpStatusCode.Unauthorized, missingAccount.status)
         }
@@ -385,12 +343,13 @@ class XrpcRouteCoverageTest {
                     )
                 }
             val ensuredAccount = runBlocking { env.identityService.ensureIdentity(account) }
+            val repoDid = requireNotNull(ensuredAccount.did)
             val clientKey = generateP256KeyPair()
             val thumbprint = env.oauthDpopVerifier.jwkThumbprint(publicJwk(clientKey))
             val accessToken =
                 env.oauthAccessTokenService
                     .issueAccessToken(
-                        subjectDid = requireNotNull(ensuredAccount.did),
+                        subjectDid = repoDid,
                         clientId = "https://viewer.example.com/client.json",
                         scope = "atproto",
                         keyThumbprint = thumbprint,
@@ -400,13 +359,13 @@ class XrpcRouteCoverageTest {
                 client.post("/xrpc/com.atproto.repo.createRecord") {
                     contentType(ContentType.Application.Json)
                     header(HttpHeaders.Authorization, "DPoP bad-token")
-                    setBody("""{"repo":"port-user.logdate.app","collection":"studio.hypertext.logdate.content","record":{"type":"TEXT"}}""")
+                    setBody("""{"repo":"$repoDid","collection":"studio.hypertext.logdate.content","record":{"type":"TEXT"}}""")
                 }
             val unsupportedScheme =
                 client.post("/xrpc/com.atproto.repo.createRecord") {
                     contentType(ContentType.Application.Json)
                     header(HttpHeaders.Authorization, "Basic abc")
-                    setBody("""{"repo":"port-user.logdate.app","collection":"studio.hypertext.logdate.content","record":{"type":"TEXT"}}""")
+                    setBody("""{"repo":"$repoDid","collection":"studio.hypertext.logdate.content","record":{"type":"TEXT"}}""")
                 }
             val customPort =
                 client.post("/xrpc/com.atproto.repo.createRecord") {
@@ -426,7 +385,7 @@ class XrpcRouteCoverageTest {
                     setBody(
                         """
                         {
-                          "repo": "port-user.logdate.app",
+                          "repo": "$repoDid",
                           "collection": "studio.hypertext.logdate.content",
                           "rkey": "entry-custom-port",
                           "record": { "type": "TEXT" }
@@ -601,6 +560,8 @@ class XrpcRouteCoverageTest {
                     )
                 }
             val ensuredOtherAccount = runBlocking { env.identityService.ensureIdentity(otherAccount) }
+            val repoDid = requireNotNull(ensuredAccount.did)
+            val otherRepoDid = requireNotNull(ensuredOtherAccount.did)
             val validToken = env.tokenService.generateAccessToken(ensuredAccount.id.toString())
             val missingAccountToken = env.tokenService.generateAccessToken(Uuid.random().toString())
 
@@ -630,7 +591,7 @@ class XrpcRouteCoverageTest {
                     setBody(
                         """
                         {
-                          "repo": "alice.logdate.app",
+                          "repo": "$repoDid",
                           "collection": "studio.hypertext.logdate.content",
                           "record": { "type": "TEXT" }
                         }
@@ -644,7 +605,7 @@ class XrpcRouteCoverageTest {
                     setBody(
                         """
                         {
-                          "repo": "alice.logdate.app",
+                          "repo": "$repoDid",
                           "collection": "studio.hypertext.logdate.content",
                           "record": { "type": "TEXT" }
                         }
@@ -658,7 +619,7 @@ class XrpcRouteCoverageTest {
                     setBody(
                         """
                         {
-                          "repo": "${ensuredOtherAccount.handle}",
+                          "repo": "$otherRepoDid",
                           "collection": "studio.hypertext.logdate.content",
                           "record": { "type": "TEXT" }
                         }
@@ -674,7 +635,7 @@ class XrpcRouteCoverageTest {
                     setBody(
                         """
                         {
-                          "repo": "alice.logdate.app",
+                          "repo": "$repoDid",
                           "collection": "studio.hypertext.logdate.content",
                           "record": { "type": "TEXT" }
                         }
@@ -690,7 +651,7 @@ class XrpcRouteCoverageTest {
                     setBody(
                         """
                         {
-                          "repo": "alice.logdate.app",
+                          "repo": "$repoDid",
                           "collection": "studio.hypertext.logdate.content",
                           "rkey": "entry-1",
                           "record": { "type": "TEXT" }
@@ -714,7 +675,7 @@ class XrpcRouteCoverageTest {
                     setBody(
                         """
                         {
-                          "repo": "alice.logdate.app",
+                          "repo": "$repoDid",
                           "collection": "studio.hypertext.logdate.content",
                           "rkey": "entry-1",
                           "record": { "type": "TEXT" }
@@ -747,7 +708,7 @@ class XrpcRouteCoverageTest {
                     setBody(
                         """
                         {
-                          "repo": "alice.logdate.app",
+                          "repo": "$repoDid",
                           "collection": "studio.hypertext.logdate.content",
                           "rkey": "entry-1"
                         }
@@ -761,7 +722,7 @@ class XrpcRouteCoverageTest {
                     setBody(
                         """
                         {
-                          "repo": "${ensuredOtherAccount.handle}",
+                          "repo": "$otherRepoDid",
                           "collection": "studio.hypertext.logdate.content",
                           "rkey": "entry-1"
                         }
@@ -776,7 +737,7 @@ class XrpcRouteCoverageTest {
                     setBody(
                         """
                         {
-                          "repo": "alice.logdate.app",
+                          "repo": "$repoDid",
                           "collection": "studio.hypertext.logdate.content",
                           "rkey": "bad key!",
                           "record": { "type": "TEXT" }
@@ -791,7 +752,7 @@ class XrpcRouteCoverageTest {
                     setBody(
                         """
                         {
-                          "repo": "alice.logdate.app",
+                          "repo": "$repoDid",
                           "collection": "bad collection",
                           "rkey": "entry-1",
                           "record": { "type": "TEXT" }
@@ -806,7 +767,7 @@ class XrpcRouteCoverageTest {
                     setBody(
                         """
                         {
-                          "repo": "alice.logdate.app",
+                          "repo": "$repoDid",
                           "collection": "studio.hypertext.logdate.content",
                           "rkey": "bad key!"
                         }
@@ -1000,32 +961,6 @@ class XrpcRouteCoverageTest {
             assertEquals(null, missingRecordId)
         }
 
-    private fun instantiatePrivate(
-        className: String,
-        vararg args: Any,
-    ): Any {
-        val clazz = Class.forName(className)
-        val ctor = clazz.declaredConstructors.single { it.parameterCount == args.size }
-        ctor.isAccessible = true
-        return ctor.newInstance(*args)
-    }
-
-    private fun instantiatePrivateDefault(
-        className: String,
-        parameterTypes: Array<out Class<*>>,
-        vararg args: Any?,
-    ): Any {
-        val clazz = Class.forName(className)
-        val ctor = clazz.getDeclaredConstructor(*parameterTypes)
-        ctor.isAccessible = true
-        return ctor.newInstance(*args)
-    }
-
-    private fun invokeGetter(
-        target: Any,
-        getter: String,
-    ): Any? = target::class.java.getMethod(getter).invoke(target)
-
     private suspend fun invokeSuspendingMethod(
         target: Any?,
         method: java.lang.reflect.Method,
@@ -1041,7 +976,7 @@ class XrpcRouteCoverageTest {
         }
 
     private fun TestApplicationBuilder.configureXrpcApp(
-        repoRecordStore: RepoRecordStore,
+        repoRecordStore: RepoEngine,
         accountRepository: AccountRepository? = InMemoryAccountRepository(),
         tokenService: JwtTokenService? = JwtTokenService("xrpc-route-coverage-secret"),
     ): XrpcCoverageEnvironment {
@@ -1109,7 +1044,7 @@ class XrpcRouteCoverageTest {
         val oauthAccessTokenService: OAuthAccessTokenService,
     )
 
-    private class StubRepoRecordStore : RepoRecordStore {
+    private class StubRepoRecordStore : RepoEngine {
         var getRecordResult: Result<RepoRecord?> = Result.success(null)
         var listRecordsResult: Result<RepoListPage> = Result.success(RepoListPage(emptyList()))
         var createRecordResult: Result<RepoWriteResult> =
@@ -1129,6 +1064,17 @@ class XrpcRouteCoverageTest {
                 ),
             )
         var deleteRecordResult: Result<Boolean> = Result.success(true)
+        var loadHeadResult: Result<RepoHead?> = Result.success(null)
+        var listCommitsResult: Result<List<SignedRepoCommit>> = Result.success(emptyList())
+        var exportResult: Result<RepoExport> =
+            Result.success(
+                RepoExport(
+                    repo = DEFAULT_REPO,
+                    head = DEFAULT_HEAD,
+                    commits = emptyList(),
+                    blocks = emptyList(),
+                ),
+            )
         var lastListLimit: Int? = null
         var lastListCursor: String? = null
         var lastListReverse: Boolean? = null
@@ -1165,5 +1111,28 @@ class XrpcRouteCoverageTest {
             recordId: RepoRecordId,
             swapRecord: String?,
         ): Result<Boolean> = deleteRecordResult
+
+        override suspend fun loadHead(repo: AtprotoDid): Result<RepoHead?> = loadHeadResult
+
+        override suspend fun listCommits(
+            repo: AtprotoDid,
+            limit: Int,
+        ): Result<List<SignedRepoCommit>> = listCommitsResult
+
+        override suspend fun export(repo: AtprotoDid): Result<RepoExport> = exportResult
+
+        override suspend fun import(export: RepoExport): Result<RepoHead> = Result.success(export.head)
+
+        private companion object {
+            private val DEFAULT_REPO = AtprotoDid.require("did:web:alice.logdate.app")
+            private val DEFAULT_CID = Cid.sha256(codec = 0x71, bytes = "head".toByteArray())
+            private val DEFAULT_HEAD =
+                RepoHead(
+                    repo = DEFAULT_REPO,
+                    root = DEFAULT_CID,
+                    commitCid = DEFAULT_CID,
+                    revision = 1L,
+                )
+        }
     }
 }

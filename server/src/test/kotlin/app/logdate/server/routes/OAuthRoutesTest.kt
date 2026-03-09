@@ -7,7 +7,9 @@ import app.logdate.server.configureAuthV1TestApp
 import app.logdate.server.oauth.OAuthAuthorizationService
 import app.logdate.server.oauth.OAuthClientMetadataResolver
 import app.logdate.server.oauth.OAuthConfig
+import app.logdate.server.oauth.OAuthInvalidRequestException
 import app.logdate.server.oauth.OAuthKeyService
+import app.logdate.server.oauth.OAuthUseDpopNonceException
 import app.logdate.server.oauth.clientMetadataJson
 import app.logdate.server.oauth.createDpopProof
 import app.logdate.server.oauth.generateP256KeyPair
@@ -38,6 +40,13 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import studio.hypertext.atproto.pds.AuthorizationDecisionRequest
+import studio.hypertext.atproto.pds.AuthorizationPrompt
+import studio.hypertext.atproto.pds.AuthorizationPromptResponse
+import studio.hypertext.atproto.pds.OAuthErrorResponse
+import studio.hypertext.atproto.pds.PushedAuthorizationBody
+import studio.hypertext.atproto.pds.PushedAuthorizationRequest
+import studio.hypertext.atproto.pds.PushedAuthorizationResponse
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -130,33 +139,32 @@ class OAuthRoutesTest {
 
     @Test
     fun `oauth route models expose getters`() {
-        val pushed = instantiatePrivate("app.logdate.server.routes.PushedAuthorizationBody", "urn:ietf:params:oauth:request_uri:test", 300L)
+        val pushed = PushedAuthorizationBody("urn:ietf:params:oauth:request_uri:test", 300L)
         val prompt =
-            instantiatePrivate(
-                "app.logdate.server.routes.AuthorizationPromptResponse",
-                "https://viewer.example.com/client.json",
-                "Viewer",
-                "https://viewer.example.com/callback",
-                "atproto",
-                "state",
-                "alice.logdate.app",
-                "did:plc:alice123",
-                "alice.logdate.app",
+            AuthorizationPromptResponse(
+                clientId = "https://viewer.example.com/client.json",
+                clientName = "Viewer",
+                redirectUri = "https://viewer.example.com/callback",
+                scope = "atproto",
+                state = "state",
+                loginHint = "alice.logdate.app",
+                did = "did:plc:alice123",
+                handle = "alice.logdate.app",
             )
-        val error = instantiatePrivate("app.logdate.server.routes.OAuthErrorResponse", "invalid_request", "Missing value")
+        val error = OAuthErrorResponse("invalid_request", "Missing value")
 
-        assertEquals("urn:ietf:params:oauth:request_uri:test", invokeGetter(pushed, "getRequest_uri"))
-        assertEquals(300L, invokeGetter(pushed, "getExpires_in"))
-        assertEquals("https://viewer.example.com/client.json", invokeGetter(prompt, "getClient_id"))
-        assertEquals("Viewer", invokeGetter(prompt, "getClient_name"))
-        assertEquals("https://viewer.example.com/callback", invokeGetter(prompt, "getRedirect_uri"))
-        assertEquals("atproto", invokeGetter(prompt, "getScope"))
-        assertEquals("state", invokeGetter(prompt, "getState"))
-        assertEquals("alice.logdate.app", invokeGetter(prompt, "getLogin_hint"))
-        assertEquals("did:plc:alice123", invokeGetter(prompt, "getDid"))
-        assertEquals("alice.logdate.app", invokeGetter(prompt, "getHandle"))
-        assertEquals("invalid_request", invokeGetter(error, "getError"))
-        assertEquals("Missing value", invokeGetter(error, "getError_description"))
+        assertEquals("urn:ietf:params:oauth:request_uri:test", pushed.requestUri)
+        assertEquals(300L, pushed.expiresInSeconds)
+        assertEquals("https://viewer.example.com/client.json", prompt.clientId)
+        assertEquals("Viewer", prompt.clientName)
+        assertEquals("https://viewer.example.com/callback", prompt.redirectUri)
+        assertEquals("atproto", prompt.scope)
+        assertEquals("state", prompt.state)
+        assertEquals("alice.logdate.app", prompt.loginHint)
+        assertEquals("did:plc:alice123", prompt.did)
+        assertEquals("alice.logdate.app", prompt.handle)
+        assertEquals("invalid_request", error.error)
+        assertEquals("Missing value", error.errorDescription)
     }
 
     @Test
@@ -439,48 +447,42 @@ class OAuthRoutesTest {
             val authorizationService = mockk<OAuthAuthorizationService>()
             var capturedHtu: String? = null
 
-            io.mockk.every { authorizationService.describeAuthorizationRequest("urn:bad") } throws
-                app.logdate.server.oauth
-                    .OAuthInvalidRequestException("Bad request uri")
-            io.mockk.every { authorizationService.describeAuthorizationRequest("urn:good") } returns
-                app.logdate.server.oauth.AuthorizationPrompt(
-                    requestUri = "urn:good",
-                    clientId = "https://viewer.example.com/client.json",
-                    clientName = "Viewer",
-                    redirectUri = "https://viewer.example.com/callback",
-                    scope = "atproto",
-                    state = null,
-                    loginHint = "alice.logdate.app",
+            io.mockk.every { authorizationService.loadAuthorizationPrompt("urn:bad") } returns
+                Result.failure(
+                    OAuthInvalidRequestException("Bad request uri"),
+                )
+            io.mockk.every { authorizationService.loadAuthorizationPrompt("urn:good") } returns
+                Result.success(
+                    AuthorizationPrompt(
+                        requestUri = "urn:good",
+                        clientId = "https://viewer.example.com/client.json",
+                        clientName = "Viewer",
+                        redirectUri = "https://viewer.example.com/callback",
+                        scope = "atproto",
+                        state = null,
+                        loginHint = "alice.logdate.app",
+                    ),
                 )
             io.mockk.every {
                 authorizationService.completeAuthorization(
-                    requestUri = "urn:bad",
-                    subjectDid = any(),
-                    subjectHandle = any(),
-                    approved = true,
+                    match<AuthorizationDecisionRequest> { request ->
+                        request.requestUri == "urn:bad" && request.approved
+                    },
                 )
-            } throws
-                app.logdate.server.oauth
-                    .OAuthInvalidRequestException("Bad request uri")
+            } returns
+                Result.failure(
+                    OAuthInvalidRequestException("Bad request uri"),
+                )
             coEvery {
-                authorizationService.createPushedAuthorizationRequest(
-                    clientId = "https://viewer.example.com/client.json",
-                    redirectUri = "https://viewer.example.com/callback",
-                    scope = "atproto",
-                    responseType = "code",
-                    codeChallenge = "challenge",
-                    codeChallengeMethod = "S256",
-                    state = null,
-                    loginHint = null,
-                    dpopProof = any(),
-                    htu = any(),
-                )
+                authorizationService.createPushedAuthorizationRequest(any())
             } answers {
-                capturedHtu = invocation.args[9] as String
-                app.logdate.server.oauth.PushedAuthorizationResponse(
-                    requestUri = "urn:good",
-                    expiresInSeconds = 300,
-                    dpopNonce = "nonce-1",
+                capturedHtu = firstArg<PushedAuthorizationRequest>().htu
+                Result.success(
+                    PushedAuthorizationResponse(
+                        requestUri = "urn:good",
+                        expiresInSeconds = 300,
+                        dpopNonce = "nonce-1",
+                    ),
                 )
             }
 
@@ -578,22 +580,10 @@ class OAuthRoutesTest {
         testApplication {
             val authorizationService = mockk<OAuthAuthorizationService>()
 
-            coEvery {
-                authorizationService.createPushedAuthorizationRequest(
-                    clientId = any(),
-                    redirectUri = any(),
-                    scope = any(),
-                    responseType = any(),
-                    codeChallenge = any(),
-                    codeChallengeMethod = any(),
-                    state = any(),
-                    loginHint = any(),
-                    dpopProof = any(),
-                    htu = any(),
+            coEvery { authorizationService.createPushedAuthorizationRequest(any()) } returns
+                Result.failure(
+                    OAuthUseDpopNonceException("fresh-nonce"),
                 )
-            } throws
-                app.logdate.server.oauth
-                    .OAuthUseDpopNonceException("fresh-nonce")
 
             application {
                 install(ContentNegotiation) {
@@ -696,42 +686,4 @@ class OAuthRoutesTest {
             oauthClientMetadataResolver = metadataResolver,
         )
     }
-
-    private fun instantiatePrivate(
-        className: String,
-        vararg args: Any?,
-    ): Any {
-        val clazz = Class.forName(className)
-        val constructor =
-            clazz.declaredConstructors.single { candidate ->
-                val parameterTypes = candidate.parameterTypes
-                parameterTypes.size == args.size &&
-                    parameterTypes.withIndex().all { (index, type) ->
-                        val value = args[index]
-                        value == null || parameterMatches(type, value)
-                    }
-            }
-        constructor.isAccessible = true
-        return constructor.newInstance(*args)
-    }
-
-    private fun invokeGetter(
-        target: Any,
-        methodName: String,
-    ): Any? =
-        target.javaClass
-            .getDeclaredMethod(methodName)
-            .apply { isAccessible = true }
-            .invoke(target)
-
-    private fun parameterMatches(
-        type: Class<*>,
-        value: Any,
-    ): Boolean =
-        when {
-            type.isPrimitive && type == java.lang.Long.TYPE -> value is Long
-            type.isPrimitive && type == java.lang.Integer.TYPE -> value is Int
-            type.isPrimitive && type == java.lang.Boolean.TYPE -> value is Boolean
-            else -> type.isAssignableFrom(value.javaClass)
-        }
 }

@@ -42,6 +42,8 @@ dependencies {
     implementation(projects.shared.config)
     implementation(projects.shared.atprotoCrypto)
     implementation(projects.shared.atprotoIdentity)
+    implementation(projects.shared.atprotoLexicon)
+    implementation(projects.shared.atprotoPds)
     implementation(projects.shared.atprotoPlc)
     implementation(projects.shared.atprotoRepo)
     implementation(projects.client.util)
