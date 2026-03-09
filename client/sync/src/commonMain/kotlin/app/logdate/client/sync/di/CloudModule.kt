@@ -26,8 +26,7 @@ val cloudModule =
         // API Client
         single<CloudApiClient> {
             LogDateCloudApiClient(
-                // In a real app, this URL would come from configuration
-                baseUrl = "https://api.logdate.app/api/v1",
+                configRepository = get(),
                 httpClient = get(),
             )
         }

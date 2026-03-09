@@ -36,6 +36,7 @@ kotlin {
             api(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.kotlinx.coroutines.core)
+            implementation(projects.shared.model)
             implementation(project.dependencies.platform(libs.koin.bom))
             implementation(libs.koin.core)
         }

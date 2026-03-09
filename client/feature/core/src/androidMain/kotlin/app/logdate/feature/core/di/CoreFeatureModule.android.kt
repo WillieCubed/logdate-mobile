@@ -89,10 +89,11 @@ actual val coreFeatureModule: Module =
                 get(),
                 get(),
                 get(),
+                get(),
             )
         }
         viewModel { ExportViewModel(get(), get()) }
-        viewModel { AdvancedSettingsViewModel(get(), get(), get<AppUpdateController>()) }
+        viewModel { AdvancedSettingsViewModel(get(), get(), get(), get<AppUpdateController>()) }
         viewModel {
             DangerZoneSettingsViewModel(
                 get(),

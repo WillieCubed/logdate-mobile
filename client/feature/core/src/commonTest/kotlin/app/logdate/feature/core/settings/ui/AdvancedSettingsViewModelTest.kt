@@ -1,5 +1,6 @@
 package app.logdate.feature.core.settings.ui
 
+import app.logdate.client.networking.ServerDiscoveryClient
 import app.logdate.client.networking.ServerHealthChecker
 import app.logdate.client.networking.ServerHealthInfo
 import app.logdate.feature.core.settings.updates.AppUpdateCheckTrigger
@@ -7,6 +8,9 @@ import app.logdate.feature.core.settings.updates.AppUpdateController
 import app.logdate.feature.core.settings.updates.AppUpdateStatus
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
 import app.logdate.shared.config.DefaultLogDateConfigRepository
+import app.logdate.shared.model.DeploymentKind
+import app.logdate.shared.model.ServerCapability
+import app.logdate.shared.model.ServerDescriptor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,6 +49,7 @@ class AdvancedSettingsViewModelTest {
             val viewModel =
                 AdvancedSettingsViewModel(
                     serverHealthChecker = FakeServerHealthChecker(),
+                    serverDiscoveryClient = FakeServerDiscoveryClient(),
                     configRepository = DefaultLogDateConfigRepository(),
                     appUpdateController = updateController,
                 )
@@ -69,6 +74,7 @@ class AdvancedSettingsViewModelTest {
             val viewModel =
                 AdvancedSettingsViewModel(
                     serverHealthChecker = FakeServerHealthChecker(),
+                    serverDiscoveryClient = FakeServerDiscoveryClient(),
                     configRepository = DefaultLogDateConfigRepository(),
                     appUpdateController = updateController,
                 )
@@ -83,6 +89,7 @@ class AdvancedSettingsViewModelTest {
             val viewModel =
                 AdvancedSettingsViewModel(
                     serverHealthChecker = FakeServerHealthChecker(),
+                    serverDiscoveryClient = FakeServerDiscoveryClient(),
                     configRepository = configRepository,
                     appUpdateController = FakeAppUpdateController(),
                 )
@@ -94,6 +101,7 @@ class AdvancedSettingsViewModelTest {
 
             assertEquals("10.0.2.2:8765", configRepository.localServerAddress.value)
             assertTrue(configRepository.backendUrl.value.startsWith("http://10.0.2.2:8765"))
+            assertEquals("http://10.0.2.2:8765", configRepository.serverDescriptor.value?.serverOrigin)
         }
 
     private class FakeServerHealthChecker : ServerHealthChecker {
@@ -102,6 +110,25 @@ class AdvancedSettingsViewModelTest {
                 ServerHealthInfo(
                     status = "healthy",
                     version = "1.0.0",
+                ),
+            )
+    }
+
+    private class FakeServerDiscoveryClient : ServerDiscoveryClient {
+        override suspend fun discoverServer(serverOrigin: String): Result<ServerDescriptor> =
+            Result.success(
+                ServerDescriptor(
+                    serverOrigin = serverOrigin,
+                    apiBaseUrl = "${serverOrigin.trimEnd('/')}/api/v1",
+                    deploymentKind = DeploymentKind.SELF_HOSTED,
+                    displayName = "Test Server",
+                    handleDomain = "example.com",
+                    capabilities =
+                        listOf(
+                            ServerCapability.AUTH_PASSKEY,
+                            ServerCapability.SYNC_CONTENT,
+                            ServerCapability.SYNC_MEDIA,
+                        ),
                 ),
             )
     }

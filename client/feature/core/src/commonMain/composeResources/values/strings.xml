@@ -234,7 +234,7 @@
     <string name="when_were_you_born">When were you born?</string>
     <string name="with_passkeys_you_dont_need_to_remember_your_password_instead_use_your_fingerprint_face_or_screen_lock_to_sign_in">With passkeys, you don&apos;t need to remember your password. Instead, use your fingerprint, face, or screen lock to sign in.</string>
     <string name="yes_clear_all_data">Yes, Clear All Data</string>
-    <string name="you_are_using_a_non_production_server_your_data_will_not_sync_with_logdate_cloud">You are using a non-production server. Your data will not sync with LogDate Cloud.</string>
+    <string name="you_are_using_a_non_production_server_your_data_will_not_sync_with_logdate_cloud">Hosted-only features depend on the selected server and may differ from LogDate Cloud.</string>
     <string name="youll_need_to_sign_in_again_to_sync_data_on_this_device">You&apos;ll need to sign in again to sync data on this device.</string>
     <string name="your_device_doesnt_support_passkeys_please_use_a_device_with_biometric_authentication_or_a_security_key">Your device doesn&apos;t support passkeys. Please use a device with biometric authentication or a security key.</string>
     <string name="your_display_name">Your Display Name</string>

@@ -42,6 +42,7 @@ kotlin {
         commonMain.dependencies {
             // Project dependencies
             implementation(projects.shared.model)
+            implementation(projects.shared.config)
             implementation(projects.client.networking)
             implementation(projects.client.repository)
             implementation(projects.client.database)

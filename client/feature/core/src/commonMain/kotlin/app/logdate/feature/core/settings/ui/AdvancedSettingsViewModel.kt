@@ -2,12 +2,14 @@ package app.logdate.feature.core.settings.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.networking.ServerDiscoveryClient
 import app.logdate.client.networking.ServerHealthChecker
 import app.logdate.feature.core.settings.updates.AppUpdateCheckTrigger
 import app.logdate.feature.core.settings.updates.AppUpdateController
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.LogDateConfigRepository
+import app.logdate.shared.model.ServerDescriptor
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -61,6 +63,7 @@ sealed class ServerValidationState {
  */
 class AdvancedSettingsViewModel(
     private val serverHealthChecker: ServerHealthChecker,
+    private val serverDiscoveryClient: ServerDiscoveryClient,
     private val configRepository: LogDateConfigRepository,
     private val appUpdateController: AppUpdateController,
 ) : ViewModel() {
@@ -116,7 +119,11 @@ class AdvancedSettingsViewModel(
         val currentState = _serverSelectionState.value
 
         if (currentState.selectedPreset == ServerPreset.PRODUCTION) {
-            saveServerConfiguration(DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL)
+            viewModelScope.launch {
+                val serverUrl = DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL
+                val descriptor = serverDiscoveryClient.discoverServer(serverUrl).getOrNull()
+                saveServerConfiguration(serverUrl, descriptor)
+            }
             return
         }
 
@@ -147,10 +154,26 @@ class AdvancedSettingsViewModel(
             result.fold(
                 onSuccess = { healthInfo ->
                     Napier.i("Server health check succeeded: $healthInfo")
-                    _serverSelectionState.update {
-                        it.copy(validationState = ServerValidationState.Success(healthInfo.version))
-                    }
-                    saveServerConfiguration(serverUrl)
+                    val discoveryResult = serverDiscoveryClient.discoverServer(serverUrl)
+                    discoveryResult.fold(
+                        onSuccess = { descriptor ->
+                            _serverSelectionState.update {
+                                it.copy(validationState = ServerValidationState.Success(healthInfo.version))
+                            }
+                            saveServerConfiguration(serverUrl, descriptor)
+                        },
+                        onFailure = { error ->
+                            Napier.e("Server discovery failed", error)
+                            _serverSelectionState.update {
+                                it.copy(
+                                    validationState =
+                                        ServerValidationState.Error(
+                                            error.message ?: "Server responded to health checks but is not a supported LogDate server",
+                                        ),
+                                )
+                            }
+                        },
+                    )
                 },
                 onFailure = { error ->
                     Napier.e("Server health check failed", error)
@@ -181,10 +204,14 @@ class AdvancedSettingsViewModel(
         }
     }
 
-    private fun saveServerConfiguration(serverUrl: String) {
+    private fun saveServerConfiguration(
+        serverUrl: String,
+        descriptor: ServerDescriptor?,
+    ) {
         viewModelScope.launch {
             try {
                 configRepository.updateBackendUrl(serverUrl)
+                configRepository.updateServerDescriptor(descriptor)
 
                 val currentState = _serverSelectionState.value
                 if (currentState.selectedPreset == ServerPreset.LOCAL) {

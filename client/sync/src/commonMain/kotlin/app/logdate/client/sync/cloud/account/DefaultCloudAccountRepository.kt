@@ -2,6 +2,8 @@ package app.logdate.client.sync.cloud.account
 
 import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.sync.cloud.CloudApiClient
+import app.logdate.shared.config.DefaultLogDateConfigRepository
+import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.AccountCredentials
 import app.logdate.shared.model.AuthenticationResult
 import app.logdate.shared.model.BeginAccountCreationResult
@@ -33,6 +35,7 @@ import kotlin.uuid.Uuid
 class DefaultCloudAccountRepository(
     private val apiClient: CloudApiClient,
     private val secureStorage: KeyValueStorage,
+    private val configRepository: LogDateConfigRepository = DefaultLogDateConfigRepository(),
     private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.IO),
 ) : CloudAccountRepository {
     private val accountFlow = MutableStateFlow<CloudAccount?>(null)
@@ -164,11 +167,12 @@ class DefaultCloudAccountRepository(
 
             result.map { response ->
                 val registrationUserId = decodeWebAuthnUserId(response.data.registrationOptions.user.id) ?: Uuid.random()
+                val passkeyConfig = configRepository.getCurrentServerDescriptor()?.passkey
                 BeginAccountCreationResult(
                     sessionToken = response.data.sessionToken,
                     challenge = response.data.registrationOptions.challenge,
-                    rpId = "logdate.app",
-                    rpName = "LogDate",
+                    rpId = passkeyConfig?.rpId ?: fallbackRpId(),
+                    rpName = passkeyConfig?.rpName ?: "LogDate",
                     userId = registrationUserId,
                     username = response.data.registrationOptions.user.name,
                     displayName = response.data.registrationOptions.user.displayName,
@@ -410,4 +414,11 @@ class DefaultCloudAccountRepository(
             val raw = Base64.decode(encodedUserId)
             Uuid.parse(raw.decodeToString())
         }.getOrNull()
+
+    private fun fallbackRpId(): String =
+        configRepository
+            .getCurrentBackendUrl()
+            .removePrefix("https://")
+            .removePrefix("http://")
+            .substringBefore('/')
 }

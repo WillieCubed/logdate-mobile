@@ -174,6 +174,7 @@ fun DataSettings() {
         DataSettingsContent(
             onBack = {},
             quotaUsage = sampleQuota,
+            isQuotaAvailable = true,
             exportState = ExportState.Idle,
             onShowExportOptions = {},
             onUpdateExportOptions = {},

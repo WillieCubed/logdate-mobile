@@ -6,10 +6,12 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.LogDateConfigRepository
+import app.logdate.shared.model.ServerDescriptor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 
 /**
  * Data source for persisting LogDate configuration settings
@@ -22,7 +24,10 @@ class LogDateConfigDataSource(
     companion object {
         private val BACKEND_URL_KEY = stringPreferencesKey("backend_url")
         private val API_VERSION_KEY = stringPreferencesKey("api_version")
+        private val SERVER_DESCRIPTOR_KEY = stringPreferencesKey("server_descriptor")
     }
+
+    private val json = Json { ignoreUnknownKeys = true }
 
     init {
         // Load configuration on initialization
@@ -42,6 +47,12 @@ class LogDateConfigDataSource(
                 saveApiVersion(version)
             }
         }
+
+        scope.launch {
+            configRepository.serverDescriptor.collect { descriptor ->
+                saveServerDescriptor(descriptor)
+            }
+        }
     }
 
     /**
@@ -52,9 +63,14 @@ class LogDateConfigDataSource(
 
         val backendUrl = preferences[BACKEND_URL_KEY] ?: DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL
         val apiVersion = preferences[API_VERSION_KEY] ?: DefaultLogDateConfigRepository.DEFAULT_API_VERSION
+        val serverDescriptor =
+            preferences[SERVER_DESCRIPTOR_KEY]?.let { raw ->
+                runCatching { json.decodeFromString<ServerDescriptor>(raw) }.getOrNull()
+            }
 
         configRepository.updateBackendUrl(backendUrl)
         configRepository.updateApiVersion(apiVersion)
+        configRepository.updateServerDescriptor(serverDescriptor)
     }
 
     /**
@@ -76,6 +92,19 @@ class LogDateConfigDataSource(
     }
 
     /**
+     * Save server descriptor to persistent storage.
+     */
+    private suspend fun saveServerDescriptor(descriptor: ServerDescriptor?) {
+        dataStore.edit { preferences ->
+            if (descriptor == null) {
+                preferences.remove(SERVER_DESCRIPTOR_KEY)
+            } else {
+                preferences[SERVER_DESCRIPTOR_KEY] = json.encodeToString(descriptor)
+            }
+        }
+    }
+
+    /**
      * Get backend URL flow
      */
     fun getBackendUrl() =
@@ -89,5 +118,15 @@ class LogDateConfigDataSource(
     fun getApiVersion() =
         dataStore.data.map { preferences ->
             preferences[API_VERSION_KEY] ?: DefaultLogDateConfigRepository.DEFAULT_API_VERSION
+        }
+
+    /**
+     * Get cached server descriptor flow.
+     */
+    fun getServerDescriptor() =
+        dataStore.data.map { preferences ->
+            preferences[SERVER_DESCRIPTOR_KEY]?.let { raw ->
+                runCatching { json.decodeFromString<ServerDescriptor>(raw) }.getOrNull()
+            }
         }
 }

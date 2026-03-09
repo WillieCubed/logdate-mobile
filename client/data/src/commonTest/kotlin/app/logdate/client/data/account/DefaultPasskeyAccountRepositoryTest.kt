@@ -834,36 +834,46 @@ class DefaultPasskeyAccountRepositoryTest {
     class FakeConfigRepository : LogDateConfigRepository {
         private val _backendUrl = MutableStateFlow("https://api.logdate.app")
         private val _apiVersion = MutableStateFlow("v1")
+        private val _apiBaseUrl = MutableStateFlow("https://api.logdate.app/api/v1")
         private val _localServerAddress = MutableStateFlow("localhost:8765")
+        private val _serverDescriptor = MutableStateFlow<app.logdate.shared.model.ServerDescriptor?>(null)
 
         override val backendUrl: StateFlow<String> = _backendUrl.asStateFlow()
         override val apiVersion: StateFlow<String> = _apiVersion.asStateFlow()
-        override val apiBaseUrl: Flow<String> =
-            flow {
-                emit("https://api.logdate.app/api/v1")
-            }
+        override val apiBaseUrl: Flow<String> = _apiBaseUrl.asStateFlow()
         override val localServerAddress: StateFlow<String> = _localServerAddress.asStateFlow()
+        override val serverDescriptor: StateFlow<app.logdate.shared.model.ServerDescriptor?> = _serverDescriptor.asStateFlow()
 
         override suspend fun updateBackendUrl(url: String) {
             _backendUrl.value = url
+            _apiBaseUrl.value = "${url.trimEnd('/')}/api/${_apiVersion.value}"
         }
 
         override suspend fun updateApiVersion(version: String) {
             _apiVersion.value = version
+            _apiBaseUrl.value = "${_backendUrl.value.trimEnd('/')}/api/$version"
         }
 
         override suspend fun updateLocalServerAddress(address: String) {
             _localServerAddress.value = address
         }
 
+        override suspend fun updateServerDescriptor(descriptor: app.logdate.shared.model.ServerDescriptor?) {
+            _serverDescriptor.value = descriptor
+        }
+
         override suspend fun resetToDefaults() {
             _backendUrl.value = "https://api.logdate.app"
             _apiVersion.value = "v1"
+            _apiBaseUrl.value = "https://api.logdate.app/api/v1"
             _localServerAddress.value = "localhost:8765"
+            _serverDescriptor.value = null
         }
 
-        override fun getCurrentBackendUrl(): String = "https://api.logdate.app"
+        override fun getCurrentBackendUrl(): String = _backendUrl.value
 
-        override fun getCurrentApiBaseUrl(): String = "https://api.logdate.app/api/v1"
+        override fun getCurrentApiBaseUrl(): String = _apiBaseUrl.value
+
+        override fun getCurrentServerDescriptor(): app.logdate.shared.model.ServerDescriptor? = _serverDescriptor.value
     }
 }

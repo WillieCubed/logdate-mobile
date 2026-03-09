@@ -1,5 +1,6 @@
 package app.logdate.client.sync.cloud
 
+import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.AccountTokens
 import app.logdate.shared.model.ApiErrorResponse
 import app.logdate.shared.model.BeginAccountCreationData
@@ -30,6 +31,7 @@ import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.time.Instant
@@ -41,14 +43,16 @@ import kotlin.uuid.Uuid
  * This client uses Ktor for HTTP requests and handles authentication, serialization,
  * and error handling for all LogDate Cloud API interactions.
  *
- * @param baseUrl The base URL for the LogDate Cloud API.
+ * @param configRepository The runtime server configuration for the selected LogDate server.
  * @param httpClient The Ktor HTTP client instance to use for requests. Defaults to the application's shared client.
  */
 class LogDateCloudApiClient(
-    private val baseUrl: String,
+    private val configRepository: LogDateConfigRepository,
     private val httpClient: HttpClient,
 ) : CloudApiClient {
     private val errorJson = Json { ignoreUnknownKeys = true }
+
+    private suspend fun getBaseUrl(): String = configRepository.apiBaseUrl.first()
 
     /**
      * Checks if a username is available for registration using the availability endpoint.
@@ -59,6 +63,7 @@ class LogDateCloudApiClient(
      */
     override suspend fun checkUsernameAvailability(username: String): Result<CheckUsernameAvailabilityResponse> =
         try {
+            val baseUrl = getBaseUrl()
             val response = httpClient.get("$baseUrl/auth/signup/username/$username/available")
 
             when (response.status) {
@@ -100,6 +105,7 @@ class LogDateCloudApiClient(
      */
     override suspend fun beginAccountCreation(request: BeginAccountCreationRequest): Result<BeginAccountCreationResponse> =
         try {
+            val baseUrl = getBaseUrl()
             val response =
                 httpClient.post("$baseUrl/auth/signup/passkey/begin") {
                     contentType(ContentType.Application.Json)
@@ -155,6 +161,7 @@ class LogDateCloudApiClient(
      */
     override suspend fun completeAccountCreation(request: CompleteAccountCreationRequest): Result<CompleteAccountCreationResponse> =
         try {
+            val baseUrl = getBaseUrl()
             val response =
                 httpClient.post("$baseUrl/auth/signup/passkey/complete") {
                     contentType(ContentType.Application.Json)
@@ -201,6 +208,7 @@ class LogDateCloudApiClient(
      */
     override suspend fun refreshAccessToken(refreshToken: String): Result<String> =
         try {
+            val baseUrl = getBaseUrl()
             val response =
                 httpClient.post("$baseUrl/auth/token/refresh") {
                     contentType(ContentType.Application.Json)
@@ -238,6 +246,7 @@ class LogDateCloudApiClient(
      */
     override suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount> =
         try {
+            val baseUrl = getBaseUrl()
             Napier.d("Getting account info with token: ${accessToken.take(5)}...")
 
             val response =
@@ -339,6 +348,7 @@ class LogDateCloudApiClient(
         content: ContentUploadRequest,
     ): Result<ContentUploadResponse> =
         try {
+            val baseUrl = getBaseUrl()
             val response =
                 httpClient.put("$baseUrl/contents/${content.id}") {
                     headers.append("Authorization", "Bearer $accessToken")
@@ -370,6 +380,7 @@ class LogDateCloudApiClient(
         limit: Int?,
     ): Result<ContentChangesResponse> =
         try {
+            val baseUrl = getBaseUrl()
             val limitParam = limit?.let { "&limit=$it" }.orEmpty()
             val response =
                 httpClient.get("$baseUrl/contents?since=$since$limitParam") {
@@ -400,6 +411,7 @@ class LogDateCloudApiClient(
         content: ContentUpdateRequest,
     ): Result<ContentUpdateResponse> =
         try {
+            val baseUrl = getBaseUrl()
             val response =
                 httpClient.patch("$baseUrl/contents/$contentId") {
                     headers.append("Authorization", "Bearer $accessToken")
@@ -430,6 +442,7 @@ class LogDateCloudApiClient(
         contentId: String,
     ): Result<Unit> =
         try {
+            val baseUrl = getBaseUrl()
             val response =
                 httpClient.delete("$baseUrl/contents/$contentId") {
                     headers.append("Authorization", "Bearer $accessToken")
@@ -456,6 +469,7 @@ class LogDateCloudApiClient(
         journal: JournalUploadRequest,
     ): Result<JournalUploadResponse> =
         try {
+            val baseUrl = getBaseUrl()
             val response =
                 httpClient.put("$baseUrl/journals/${journal.id}") {
                     headers.append("Authorization", "Bearer $accessToken")
@@ -487,6 +501,7 @@ class LogDateCloudApiClient(
         limit: Int?,
     ): Result<JournalChangesResponse> =
         try {
+            val baseUrl = getBaseUrl()
             val limitParam = limit?.let { "&limit=$it" }.orEmpty()
             val response =
                 httpClient.get("$baseUrl/journals?since=$since$limitParam") {
@@ -517,6 +532,7 @@ class LogDateCloudApiClient(
         journal: JournalUpdateRequest,
     ): Result<JournalUpdateResponse> =
         try {
+            val baseUrl = getBaseUrl()
             val response =
                 httpClient.patch("$baseUrl/journals/$journalId") {
                     headers.append("Authorization", "Bearer $accessToken")
@@ -547,6 +563,7 @@ class LogDateCloudApiClient(
         journalId: String,
     ): Result<Unit> =
         try {
+            val baseUrl = getBaseUrl()
             val response =
                 httpClient.delete("$baseUrl/journals/$journalId") {
                     headers.append("Authorization", "Bearer $accessToken")
@@ -573,6 +590,7 @@ class LogDateCloudApiClient(
         associations: AssociationUploadRequest,
     ): Result<AssociationUploadResponse> =
         try {
+            val baseUrl = getBaseUrl()
             val response =
                 httpClient.put("$baseUrl/associations") {
                     headers.append("Authorization", "Bearer $accessToken")
@@ -604,6 +622,7 @@ class LogDateCloudApiClient(
         limit: Int?,
     ): Result<AssociationChangesResponse> =
         try {
+            val baseUrl = getBaseUrl()
             val limitParam = limit?.let { "&limit=$it" }.orEmpty()
             val response =
                 httpClient.get("$baseUrl/associations?since=$since$limitParam") {
@@ -633,6 +652,7 @@ class LogDateCloudApiClient(
         associations: AssociationDeleteRequest,
     ): Result<Unit> =
         try {
+            val baseUrl = getBaseUrl()
             val response =
                 httpClient.delete("$baseUrl/associations") {
                     headers.append("Authorization", "Bearer $accessToken")
@@ -661,6 +681,7 @@ class LogDateCloudApiClient(
         media: MediaUploadRequest,
     ): Result<MediaUploadResponse> =
         try {
+            val baseUrl = getBaseUrl()
             val response =
                 httpClient.post("$baseUrl/media") {
                     headers.append("Authorization", "Bearer $accessToken")
@@ -709,6 +730,7 @@ class LogDateCloudApiClient(
         mediaId: String,
     ): Result<MediaDownloadResponse> =
         try {
+            val baseUrl = getBaseUrl()
             val metadataResponse =
                 httpClient.get("$baseUrl/media/$mediaId") {
                     headers.append("Authorization", "Bearer $accessToken")

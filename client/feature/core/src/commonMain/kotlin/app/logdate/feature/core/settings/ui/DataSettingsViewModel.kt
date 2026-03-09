@@ -14,7 +14,10 @@ import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.feature.core.restore.RestoreLauncher
 import app.logdate.feature.core.restore.RestoreOutcome
 import app.logdate.feature.core.restore.RestoreSummary
+import app.logdate.shared.config.DefaultLogDateConfigRepository
+import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.CloudStorageQuota
+import app.logdate.shared.model.ServerCapability
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +35,7 @@ import kotlin.time.Instant
 
 data class DataSettingsState(
     val quotaState: CloudStorageQuota,
+    val isQuotaAvailable: Boolean,
     val restoreState: RestoreState,
     val integrityState: IntegrityState,
     val conflictsState: ConflictsState,
@@ -79,6 +83,7 @@ class DataSettingsViewModel(
     private val syncManager: SyncManager,
     private val sessionStorage: SessionStorage,
     private val preferencesDataSource: LogdatePreferencesDataSource,
+    private val configRepository: LogDateConfigRepository,
     private val dataIntegrityService: DataIntegrityService,
     private val conflictStore: SyncConflictStore,
 ) : ViewModel() {
@@ -94,6 +99,15 @@ class DataSettingsViewModel(
     private val quotaFlow = observeCloudQuotaUseCase()
     private val sessionFlow = sessionStorage.getSessionFlow()
     private val backgroundSyncEnabledFlow = preferencesDataSource.backgroundSyncEnabled
+    private val quotaAvailabilityFlow =
+        configRepository.serverDescriptor
+            .combine(configRepository.backendUrl) { descriptor, backendUrl ->
+                when {
+                    descriptor != null -> descriptor.hasCapability(ServerCapability.MANAGED_QUOTA)
+                    backendUrl == DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL -> true
+                    else -> false
+                }
+            }
 
     private val syncStatusFlow =
         flow {
@@ -107,12 +121,14 @@ class DataSettingsViewModel(
     private val sourceStateFlow =
         combine(
             quotaFlow,
+            quotaAvailabilityFlow,
             _restoreState,
             _integrityState,
             _conflictsState,
-        ) { quotaState, restoreState, integrityState, conflictsState ->
+        ) { quotaState, isQuotaAvailable, restoreState, integrityState, conflictsState ->
             DataSettingsState(
                 quotaState = quotaState.orDefault(),
+                isQuotaAvailable = isQuotaAvailable,
                 restoreState = restoreState,
                 integrityState = integrityState,
                 conflictsState = conflictsState,
@@ -139,6 +155,7 @@ class DataSettingsViewModel(
             SharingStarted.WhileSubscribed(5000),
             DataSettingsState(
                 quotaState = (null as CloudStorageQuota?).orDefault(),
+                isQuotaAvailable = true,
                 restoreState = RestoreState.Idle,
                 integrityState = IntegrityState(),
                 conflictsState = ConflictsState(),

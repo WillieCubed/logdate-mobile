@@ -1,5 +1,6 @@
 package app.logdate.client.sync.cloud
 
+import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.BeginAccountCreationRequest
 import app.logdate.shared.model.CompleteAccountCreationRequest
 import app.logdate.shared.model.PasskeyAuthenticatorResponse
@@ -15,6 +16,9 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
@@ -343,6 +347,48 @@ class BasicCloudApiClientTest {
                     json(json)
                 }
             }
-        return LogDateCloudApiClient(baseUrl, httpClient)
+        return LogDateCloudApiClient(MockConfigRepository(baseUrl), httpClient)
+    }
+
+    private class MockConfigRepository(
+        baseUrl: String,
+    ) : LogDateConfigRepository {
+        private val _backendUrl = MutableStateFlow(baseUrl.removeSuffix("/api/v1"))
+        private val _apiVersion = MutableStateFlow("v1")
+        private val _apiBaseUrl = MutableStateFlow(baseUrl)
+        private val _localServerAddress = MutableStateFlow("localhost:8765")
+        private val _serverDescriptor = MutableStateFlow<app.logdate.shared.model.ServerDescriptor?>(null)
+
+        override val backendUrl: StateFlow<String> = _backendUrl
+        override val apiVersion: StateFlow<String> = _apiVersion
+        override val apiBaseUrl: Flow<String> = _apiBaseUrl
+        override val localServerAddress: StateFlow<String> = _localServerAddress
+        override val serverDescriptor: StateFlow<app.logdate.shared.model.ServerDescriptor?> = _serverDescriptor
+
+        override suspend fun updateBackendUrl(url: String) {
+            _backendUrl.value = url
+            _apiBaseUrl.value = "${url.trimEnd('/')}/api/${_apiVersion.value}"
+        }
+
+        override suspend fun updateApiVersion(version: String) {
+            _apiVersion.value = version
+            _apiBaseUrl.value = "${_backendUrl.value.trimEnd('/')}/api/$version"
+        }
+
+        override suspend fun updateLocalServerAddress(address: String) {
+            _localServerAddress.value = address
+        }
+
+        override suspend fun updateServerDescriptor(descriptor: app.logdate.shared.model.ServerDescriptor?) {
+            _serverDescriptor.value = descriptor
+        }
+
+        override suspend fun resetToDefaults() = Unit
+
+        override fun getCurrentBackendUrl(): String = _backendUrl.value
+
+        override fun getCurrentApiBaseUrl(): String = _apiBaseUrl.value
+
+        override fun getCurrentServerDescriptor(): app.logdate.shared.model.ServerDescriptor? = _serverDescriptor.value
     }
 }

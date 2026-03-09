@@ -158,6 +158,7 @@ fun DataSettingsScreen(
     DataSettingsContent(
         onBack = onBack,
         quotaUsage = uiState.quotaState.toStorageQuotaUi(),
+        isQuotaAvailable = uiState.isQuotaAvailable,
         exportState = exportState,
         isExportSheetVisible = isExportSheetVisible,
         onShowExportOptions = exportViewModel::showExportOptions,
@@ -191,6 +192,7 @@ fun DataSettingsScreen(
 fun DataSettingsContent(
     onBack: () -> Unit,
     quotaUsage: StorageQuotaUi,
+    isQuotaAvailable: Boolean,
     exportState: ExportState,
     isExportSheetVisible: Boolean = exportState !is ExportState.Idle,
     onShowExportOptions: () -> Unit,
@@ -258,7 +260,7 @@ fun DataSettingsContent(
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
                 // Storage quota section (only show when authenticated)
-                if (isAuthenticated) {
+                if (isAuthenticated && isQuotaAvailable) {
                     item {
                         QuotaUsageBlock(
                             quotaUsage = quotaUsage,
@@ -728,6 +730,7 @@ private fun DataSettingsScreenPreview() {
                 formattedUsed = "0 B",
                 categories = emptyList(),
             ),
+        isQuotaAvailable = true,
         exportState = ExportState.Idle,
         onShowExportOptions = {},
         onUpdateExportOptions = {},
