@@ -15,8 +15,14 @@ import kotlinx.coroutines.flow.Flow
 interface SyncMetadataDao {
     // --- Sync Cursors ---
 
-    @Query("SELECT * FROM sync_cursors WHERE entityType = :entityType")
-    suspend fun getCursor(entityType: String): SyncCursorEntity?
+    @Query("SELECT * FROM sync_cursors WHERE serverOrigin = :serverOrigin AND entityType = :entityType")
+    suspend fun getCursor(
+        serverOrigin: String,
+        entityType: String,
+    ): SyncCursorEntity?
+
+    @Query("SELECT * FROM sync_cursors WHERE serverOrigin = '' AND entityType = :entityType")
+    suspend fun getLegacyCursor(entityType: String): SyncCursorEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertCursor(cursor: SyncCursorEntity)
@@ -24,13 +30,23 @@ interface SyncMetadataDao {
     @Query("DELETE FROM sync_cursors")
     suspend fun deleteAllCursors()
 
+    @Query("DELETE FROM sync_cursors WHERE serverOrigin = '' AND entityType = :entityType")
+    suspend fun deleteLegacyCursor(entityType: String)
+
     // --- Pending Uploads ---
 
-    @Query("SELECT * FROM pending_uploads WHERE entityType = :entityType ORDER BY createdAt ASC")
-    suspend fun getPendingByType(entityType: String): List<PendingUploadEntity>
+    @Query("SELECT * FROM pending_uploads WHERE serverOrigin = :serverOrigin AND entityType = :entityType ORDER BY createdAt ASC")
+    suspend fun getPendingByType(
+        serverOrigin: String,
+        entityType: String,
+    ): List<PendingUploadEntity>
 
-    @Query("SELECT * FROM pending_uploads WHERE entityType = :entityType AND entityId = :entityId")
+    @Query("SELECT * FROM pending_uploads WHERE serverOrigin = '' AND entityType = :entityType ORDER BY createdAt ASC")
+    suspend fun getLegacyPendingByType(entityType: String): List<PendingUploadEntity>
+
+    @Query("SELECT * FROM pending_uploads WHERE serverOrigin = :serverOrigin AND entityType = :entityType AND entityId = :entityId")
     suspend fun getPending(
+        serverOrigin: String,
         entityType: String,
         entityId: String,
     ): PendingUploadEntity?
@@ -41,8 +57,9 @@ interface SyncMetadataDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPending(pending: PendingUploadEntity)
 
-    @Query("DELETE FROM pending_uploads WHERE entityType = :entityType AND entityId = :entityId")
+    @Query("DELETE FROM pending_uploads WHERE serverOrigin = :serverOrigin AND entityType = :entityType AND entityId = :entityId")
     suspend fun deletePending(
+        serverOrigin: String,
         entityType: String,
         entityId: String,
     )
@@ -50,15 +67,21 @@ interface SyncMetadataDao {
     @Query("DELETE FROM pending_uploads")
     suspend fun deleteAllPending()
 
-    @Query("SELECT COUNT(*) FROM pending_uploads")
-    suspend fun getPendingCount(): Int
+    @Query("SELECT COUNT(*) FROM pending_uploads WHERE serverOrigin = :serverOrigin")
+    suspend fun getPendingCount(serverOrigin: String): Int
 
-    @Query("SELECT COUNT(*) FROM pending_uploads")
-    fun observePendingCount(): Flow<Int>
+    @Query("SELECT COUNT(*) FROM pending_uploads WHERE serverOrigin = :serverOrigin")
+    fun observePendingCount(serverOrigin: String): Flow<Int>
 
-    @Query("UPDATE pending_uploads SET retryCount = retryCount + 1 WHERE entityType = :entityType AND entityId = :entityId")
+    @Query(
+        "UPDATE pending_uploads SET retryCount = retryCount + 1 WHERE serverOrigin = :serverOrigin AND entityType = :entityType AND entityId = :entityId",
+    )
     suspend fun incrementRetryCount(
+        serverOrigin: String,
         entityType: String,
         entityId: String,
     )
+
+    @Query("DELETE FROM pending_uploads WHERE serverOrigin = '' AND entityType = :entityType")
+    suspend fun deleteLegacyPendingByType(entityType: String)
 }

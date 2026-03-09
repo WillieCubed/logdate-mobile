@@ -66,6 +66,7 @@ import app.logdate.client.database.migrations.MIGRATION_1_2
 import app.logdate.client.database.migrations.MIGRATION_20_21
 import app.logdate.client.database.migrations.MIGRATION_21_22
 import app.logdate.client.database.migrations.MIGRATION_22_23
+import app.logdate.client.database.migrations.MIGRATION_23_24
 import app.logdate.client.database.migrations.MIGRATION_2_3
 import app.logdate.client.database.migrations.MIGRATION_3_4
 import app.logdate.client.database.migrations.MIGRATION_4_5
@@ -116,7 +117,7 @@ import kotlinx.coroutines.IO
         TranscriptionEntity::class,
         PlaceEntity::class,
     ],
-    version = 23, // Rename voice_notes to audio_notes and enforce durationMs
+    version = 24, // Scope sync metadata by server origin
     exportSchema = true,
 )
 @TypeConverters(
@@ -223,6 +224,7 @@ fun getRoomDatabase(
                 MIGRATION_20_21,
                 MIGRATION_21_22,
                 MIGRATION_22_23,
+                MIGRATION_23_24,
             ).fallbackToDestructiveMigration(destroyTablesOnUpgrade)
             .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)
             .setQueryCoroutineContext(dispatcher)
