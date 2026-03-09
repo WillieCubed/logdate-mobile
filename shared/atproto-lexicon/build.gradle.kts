@@ -21,7 +21,7 @@ kotlin {
     explicitApi()
 
     android {
-        namespace = "studio.hypertext.atproto.repo"
+        namespace = "studio.hypertext.atproto.lexicon"
         compileSdk =
             libs.versions.android.compileSdk
                 .get()
@@ -43,11 +43,9 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            api(projects.shared.atprotoIdentity)
             api(projects.shared.atprotoSyntax)
             api(libs.kotlinx.serialization.core)
             api(libs.kotlinx.serialization.json)
-            api(libs.okio)
         }
 
         commonTest.dependencies {
@@ -59,8 +57,8 @@ kotlin {
 publishing {
     publications.withType(MavenPublication::class.java).configureEach {
         pom {
-            name.set("atproto-repo")
-            description.set("Kotlin Multiplatform AT Protocol repository record primitives.")
+            name.set("atproto-lexicon")
+            description.set("Kotlin Multiplatform AT Protocol lexicon parsing and code generation.")
             url.set("https://github.com/TheHypertextStudio/logdate-android")
             licenses {
                 license {
