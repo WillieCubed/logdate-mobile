@@ -53,7 +53,7 @@ internal object ScreenshotResourceReader : ResourceReader {
 
     private fun findAssetsDir(): File {
         // Find the repository root by searching for settings.gradle.kts
-        val startDir = File(System.getProperty("user.dir"))
+        val startDir = File(System.getProperty("user.dir") ?: ".")
         var dir: File? = startDir
         while (dir != null) {
             if (File(dir, "settings.gradle.kts").exists()) {

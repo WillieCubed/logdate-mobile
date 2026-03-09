@@ -91,3 +91,5 @@ include(":shared:model")
 // Server-specific modules
 include(":server")
 include(":integration:server-client-e2e")
+// Sample apps
+include(":samples:atproto-consumer")
