@@ -77,7 +77,25 @@ fun ShareJournalScreen(
 
     val uiState by viewModel.uiState.collectAsState()
 
+    ShareJournalScreenContent(
+        uiState = uiState,
+        onGoBack = onGoBack,
+        onShareToInstagram = { journal -> viewModel.shareToInstagram(journal) },
+        onShareJournal = { journal -> viewModel.shareJournal(journal) },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ShareJournalScreenContent(
+    uiState: ShareJournalUiState,
+    onGoBack: () -> Unit,
+    onShareToInstagram: (Journal) -> Unit,
+    onShareJournal: (Journal) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Scaffold(
+        modifier = modifier,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(Res.string.share_journal_2)) },
@@ -115,8 +133,8 @@ fun ShareJournalScreen(
                 ShareJournalContent(
                     journal = state.journal,
                     lastUpdatedText = state.lastUpdatedDisplay,
-                    onShareToInstagram = { viewModel.shareToInstagram(state.journal) },
-                    onShareJournal = { viewModel.shareJournal(state.journal) },
+                    onShareToInstagram = { onShareToInstagram(state.journal) },
+                    onShareJournal = { onShareJournal(state.journal) },
                     modifier = Modifier.padding(paddingValues),
                 )
             }
@@ -134,7 +152,7 @@ fun ShareJournalScreen(
  * @param modifier Modifier for this composable
  */
 @Composable
-private fun ShareJournalContent(
+fun ShareJournalContent(
     journal: Journal,
     lastUpdatedText: String,
     onShareToInstagram: () -> Unit,

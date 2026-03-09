@@ -26,6 +26,8 @@ data class GoogleIdTokenClaims(
 )
 
 interface GoogleIdTokenVerifier {
+    fun isConfigured(): Boolean = true
+
     suspend fun verify(
         idToken: String,
         nonce: String?,
@@ -38,6 +40,8 @@ class HttpGoogleIdTokenVerifier(
     private val httpClient: HttpClient = HttpClient.newHttpClient(),
 ) : GoogleIdTokenVerifier {
     private val json = Json { ignoreUnknownKeys = true }
+
+    override fun isConfigured(): Boolean = allowedClientIds.isNotEmpty()
 
     override suspend fun verify(
         idToken: String,
@@ -126,7 +130,10 @@ class HttpGoogleIdTokenVerifier(
 
 class FakeGoogleIdTokenVerifier(
     private val tokens: Map<String, GoogleIdTokenClaims>,
+    private val configured: Boolean = true,
 ) : GoogleIdTokenVerifier {
+    override fun isConfigured(): Boolean = configured
+
     override suspend fun verify(
         idToken: String,
         nonce: String?,

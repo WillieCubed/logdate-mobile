@@ -63,6 +63,28 @@ fun SearchScreen(
     val query by viewModel.query.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
 
+    SearchScreenContent(
+        query = query,
+        searchResults = searchResults,
+        onQueryChange = viewModel::updateQuery,
+        onClearSearch = viewModel::clearSearch,
+        onNavigateToDay = onNavigateToDay,
+        onGoBack = onGoBack,
+        modifier = modifier,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SearchScreenContent(
+    query: String,
+    searchResults: List<SearchResult>,
+    onQueryChange: (String) -> Unit,
+    onClearSearch: () -> Unit,
+    onNavigateToDay: (LocalDate) -> Unit,
+    onGoBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -70,14 +92,14 @@ fun SearchScreen(
                 title = {
                     TextField(
                         value = query,
-                        onValueChange = { viewModel.updateQuery(it) },
+                        onValueChange = onQueryChange,
                         placeholder = { Text(stringResource(Res.string.search_entries)) },
                         leadingIcon = {
                             Icon(Icons.Default.Search, contentDescription = stringResource(Res.string.search))
                         },
                         trailingIcon = {
                             if (query.isNotEmpty()) {
-                                IconButton(onClick = { viewModel.clearSearch() }) {
+                                IconButton(onClick = onClearSearch) {
                                     Icon(Icons.Default.Clear, contentDescription = stringResource(Res.string.clear_search))
                                 }
                             }

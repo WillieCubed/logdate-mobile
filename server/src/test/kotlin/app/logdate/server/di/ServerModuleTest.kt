@@ -111,7 +111,8 @@ class ServerModuleTest {
         mockkObject(SchemaUtils)
 
         every { DatabaseConfig.createDataSource() } returns dataSource
-        every { DatabaseConfig.initializeDatabase(dataSource) } returns database
+        every { DatabaseConfig.shouldRunMigrations() } returns true
+        every { DatabaseConfig.initializeDatabase(dataSource, true, any(), any()) } returns database
         every {
             SchemaUtils.createMissingTablesAndColumns(
                 *anyVararg(),

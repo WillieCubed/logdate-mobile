@@ -85,20 +85,51 @@ fun JournalDetailScreen(
     }
 
     val state by viewModel.uiState.collectAsState()
+    var openDeleteConfirmation by rememberSaveable { mutableStateOf(false) }
+    JournalDetailScreenContent(
+        uiState = state,
+        onGoBack = onGoBack,
+        onNavigateToNoteDetail = onNavigateToNoteDetail,
+        onNavigateToSettings = onNavigateToSettings,
+        onNavigateToShare = onNavigateToShare,
+        onToggleSortOrder = viewModel::toggleSortOrder,
+        onRequestDelete = { openDeleteConfirmation = true },
+        showDeleteConfirmation = openDeleteConfirmation,
+        onDismissDeleteConfirmation = { openDeleteConfirmation = false },
+        onConfirmDelete = {
+            viewModel.deleteJournal(onJournalDeleted)
+            openDeleteConfirmation = false
+        },
+        modifier = modifier,
+    )
+}
+
+@Composable
+fun JournalDetailScreenContent(
+    uiState: JournalDetailUiState,
+    onGoBack: () -> Unit,
+    onNavigateToNoteDetail: (noteId: Uuid) -> Unit = { _ -> },
+    onNavigateToSettings: (journalId: Uuid) -> Unit = {},
+    onNavigateToShare: (journalId: Uuid) -> Unit = {},
+    onToggleSortOrder: () -> Unit = {},
+    onRequestDelete: () -> Unit = {},
+    showDeleteConfirmation: Boolean = false,
+    onDismissDeleteConfirmation: () -> Unit = {},
+    onConfirmDelete: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
-    var openDeleteConfirmation by rememberSaveable { mutableStateOf(false) }
-    when (state) {
+    when (uiState) {
         is JournalDetailUiState.Loading -> {
             JournalDetailPlaceholder()
             return
         }
 
         is JournalDetailUiState.Error -> {
-            // TODO: Handle error state
-            // TODO: Redirect to home if journal not found
+            // Preserve the current empty error branch so previews match the route's real behavior.
             return
         }
 
@@ -111,9 +142,7 @@ fun JournalDetailScreen(
                             if (sharedTransitionScope != null && animatedVisibilityScope != null) {
                                 with(sharedTransitionScope) {
                                     baseModifier.sharedElement(
-                                        rememberSharedContentState(
-                                            "journal-container-${(state as JournalDetailUiState.Success).journalId}",
-                                        ),
+                                        rememberSharedContentState("journal-container-${uiState.journalId}"),
                                         animatedVisibilityScope,
                                     )
                                 }
@@ -124,9 +153,9 @@ fun JournalDetailScreen(
                 contentWindowInsets = WindowInsets.navigationBars,
                 topBar = {
                     LargeTopAppBar(
-                        title = { Text((state as JournalDetailUiState.Success).title) },
+                        title = { Text(uiState.title) },
                         navigationIcon = {
-                            IconButton(onClick = { onGoBack() }) {
+                            IconButton(onClick = onGoBack) {
                                 Icon(
                                     Icons.AutoMirrored.Default.ArrowBack,
                                     contentDescription = stringResource(Res.string.back),
@@ -135,19 +164,16 @@ fun JournalDetailScreen(
                         },
                         scrollBehavior = scrollBehavior,
                         actions = {
-                            // Sort order toggle button
-                            IconButton(onClick = { viewModel.toggleSortOrder() }) {
+                            IconButton(onClick = onToggleSortOrder) {
                                 val sortIcon =
-                                    if ((state as JournalDetailUiState.Success).sortOrder == SortOrder.NEWEST_FIRST) {
-                                        // Arrow pointing down for newest first
+                                    if (uiState.sortOrder == SortOrder.NEWEST_FIRST) {
                                         Icons.Default.ArrowDownward
                                     } else {
-                                        // Arrow pointing up for oldest first
                                         Icons.Default.ArrowUpward
                                     }
 
                                 val description =
-                                    if ((state as JournalDetailUiState.Success).sortOrder == SortOrder.NEWEST_FIRST) {
+                                    if (uiState.sortOrder == SortOrder.NEWEST_FIRST) {
                                         "Sorted: Newest first (click to show oldest first)"
                                     } else {
                                         "Sorted: Oldest first (click to show newest first)"
@@ -159,24 +185,21 @@ fun JournalDetailScreen(
                                 )
                             }
 
-                            // Share button
-                            IconButton(onClick = { onNavigateToShare((state as JournalDetailUiState.Success).journalId) }) {
+                            IconButton(onClick = { onNavigateToShare(uiState.journalId) }) {
                                 Icon(
                                     Icons.Default.Share,
                                     contentDescription = stringResource(Res.string.share_journal_2),
                                 )
                             }
 
-                            // Settings button
-                            IconButton(onClick = { onNavigateToSettings((state as JournalDetailUiState.Success).journalId) }) {
+                            IconButton(onClick = { onNavigateToSettings(uiState.journalId) }) {
                                 Icon(
                                     Icons.Default.Settings,
                                     contentDescription = stringResource(Res.string.journal_settings_2),
                                 )
                             }
 
-                            // Delete button
-                            IconButton(onClick = { openDeleteConfirmation = true }) {
+                            IconButton(onClick = onRequestDelete) {
                                 Icon(
                                     Icons.Default.DeleteOutline,
                                     contentDescription = stringResource(Res.string.delete_journal_2),
@@ -185,17 +208,15 @@ fun JournalDetailScreen(
                         },
                     )
                 },
-            ) {
-                val successState = state as JournalDetailUiState.Success
+            ) { paddingValues ->
                 val listState = rememberLazyListState()
 
-                if (successState.entries.isEmpty()) {
-                    // Empty state
+                if (uiState.entries.isEmpty()) {
                     Box(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .padding(it)
+                                .padding(paddingValues)
                                 .padding(Spacing.lg),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -206,9 +227,8 @@ fun JournalDetailScreen(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .padding(it),
+                                .padding(paddingValues),
                     ) {
-                        // Sort order indicator at the top
                         Row(
                             modifier =
                                 Modifier
@@ -219,7 +239,7 @@ fun JournalDetailScreen(
                         ) {
                             Text(
                                 text =
-                                    if (successState.sortOrder == SortOrder.NEWEST_FIRST) {
+                                    if (uiState.sortOrder == SortOrder.NEWEST_FIRST) {
                                         "Newest first"
                                     } else {
                                         "Oldest first"
@@ -229,7 +249,6 @@ fun JournalDetailScreen(
                             )
                         }
 
-                        // Journal entries list
                         LazyColumn(
                             state = listState,
                             modifier = Modifier.fillMaxSize(),
@@ -241,26 +260,22 @@ fun JournalDetailScreen(
                                 ),
                             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                         ) {
-                            items(successState.entries) { entry ->
+                            items(uiState.entries) { entry ->
                                 JournalEntryItem(
                                     content = entry.content,
                                     timestamp = entry.timestamp,
-                                    onClick = {
-                                        onNavigateToNoteDetail(entry.id)
-                                    },
+                                    onClick = { onNavigateToNoteDetail(entry.id) },
                                 )
                             }
                         }
                     }
                 }
             }
-            if (openDeleteConfirmation) {
+
+            if (showDeleteConfirmation) {
                 DeleteConfirmationDialog(
-                    onDismissRequest = { openDeleteConfirmation = false },
-                    onConfirmation = {
-                        viewModel.deleteJournal(onJournalDeleted)
-                        openDeleteConfirmation = false
-                    },
+                    onDismissRequest = onDismissDeleteConfirmation,
+                    onConfirmation = onConfirmDelete,
                 )
             }
         }

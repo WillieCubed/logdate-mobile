@@ -90,9 +90,41 @@ fun JournalSettingsScreen(
     }
 
     // Create a scroll behavior for the top app bar
+    JournalSettingsScreenContent(
+        uiState = state,
+        onGoBack = onGoBack,
+        onNameChange = viewModel::updateJournalName,
+        onSaveChanges = { viewModel.saveJournalChanges { onGoBack() } },
+        onShareJournal = viewModel::shareJournal,
+        onRequestDelete = { openDeleteConfirmation = true },
+        showDeleteConfirmation = openDeleteConfirmation,
+        onDismissDeleteConfirmation = { openDeleteConfirmation = false },
+        onConfirmDelete = {
+            viewModel.deleteJournal {
+                openDeleteConfirmation = false
+                onJournalDeleted()
+            }
+        },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun JournalSettingsScreenContent(
+    uiState: JournalSettingsUiState,
+    onGoBack: () -> Unit,
+    onNameChange: (String) -> Unit = {},
+    onSaveChanges: () -> Unit = {},
+    onShareJournal: () -> Unit = {},
+    onRequestDelete: () -> Unit = {},
+    showDeleteConfirmation: Boolean = false,
+    onDismissDeleteConfirmation: () -> Unit = {},
+    onConfirmDelete: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
 
-    when (state) {
+    when (uiState) {
         is JournalSettingsUiState.Unknown -> {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -103,8 +135,6 @@ fun JournalSettingsScreen(
         }
 
         is JournalSettingsUiState.Loaded -> {
-            val loadedState = state as JournalSettingsUiState.Loaded
-
             Scaffold(
                 topBar = {
                     TopAppBar(
@@ -120,9 +150,9 @@ fun JournalSettingsScreen(
                         actions = {
                             // Show save button with attractive animation when there are unsaved changes
                             val visibilityState =
-                                remember(loadedState.hasUnsavedChanges) {
-                                    MutableTransitionState(!loadedState.hasUnsavedChanges).apply {
-                                        targetState = loadedState.hasUnsavedChanges
+                                remember(uiState.hasUnsavedChanges) {
+                                    MutableTransitionState(!uiState.hasUnsavedChanges).apply {
+                                        targetState = uiState.hasUnsavedChanges
                                     }
                                 }
 
@@ -151,9 +181,7 @@ fun JournalSettingsScreen(
                             ) {
                                 // Use an IconButton for a cleaner, more compact appearance
                                 IconButton(
-                                    onClick = {
-                                        viewModel.saveJournalChanges { onGoBack() }
-                                    },
+                                    onClick = onSaveChanges,
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Save,
@@ -166,7 +194,7 @@ fun JournalSettingsScreen(
                     )
                 },
                 modifier =
-                    Modifier
+                    modifier
                         .applyScreenStyles()
                         .nestedScroll(scrollBehavior.nestedScrollConnection),
                 contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -181,16 +209,16 @@ fun JournalSettingsScreen(
                     // Journal overview section
                     item {
                         JournalOverviewSection(
-                            journal = loadedState.journal,
-                            onShareJournal = viewModel::shareJournal,
+                            journal = uiState.journal,
+                            onShareJournal = onShareJournal,
                         )
                     }
 
                     // Journal name section
                     item {
                         JournalNameField(
-                            journalName = loadedState.editedName,
-                            onNameChange = viewModel::updateJournalName,
+                            journalName = uiState.editedName,
+                            onNameChange = onNameChange,
                             modifier = Modifier.padding(horizontal = Spacing.lg),
                         )
                     }
@@ -205,7 +233,7 @@ fun JournalSettingsScreen(
                     // Danger zone
                     item {
                         JournalDangerZone(
-                            onDeleteClick = { openDeleteConfirmation = true },
+                            onDeleteClick = onRequestDelete,
                             modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
                         )
                     }
@@ -217,15 +245,10 @@ fun JournalSettingsScreen(
                 }
             }
 
-            if (openDeleteConfirmation) {
+            if (showDeleteConfirmation) {
                 DeleteConfirmationDialog(
-                    onDismissRequest = { openDeleteConfirmation = false },
-                    onConfirmation = {
-                        viewModel.deleteJournal {
-                            openDeleteConfirmation = false
-                            onJournalDeleted()
-                        }
-                    },
+                    onDismissRequest = onDismissDeleteConfirmation,
+                    onConfirmation = onConfirmDelete,
                 )
             }
         }

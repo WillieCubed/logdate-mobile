@@ -50,6 +50,8 @@ class SimplePasskeyService(
 
         return PasskeyRegistrationOptions(
             challenge = challenge,
+            rpId = relyingPartyId,
+            rpName = relyingPartyName,
             user =
                 PasskeyUser(
                     id = userId.toString(),
@@ -91,6 +93,7 @@ class SimplePasskeyService(
 
         return PasskeyAuthenticationOptions(
             challenge = challenge,
+            rpId = relyingPartyId,
             allowCredentials = allowCredentials,
             timeout = 300_000L,
         )

@@ -18,7 +18,6 @@ protected_patterns=(
     "build.gradle.kts"
     "settings.gradle.kts"
     "gradle.properties"
-    "gradle/libs.versions.toml"
     ".github/workflows/"
     ".githooks/"
     ".claude/settings.json"

@@ -75,7 +75,7 @@ class AuthSigninFlowContractsTest {
             assertEquals(HttpStatusCode.InternalServerError, begin.status)
 
             every { passkeyService.generateAuthenticationOptions(any(), any()) } returns
-                PasskeyAuthenticationOptions(challenge = "challenge-ok")
+                PasskeyAuthenticationOptions(challenge = "challenge-ok", rpId = "logdate.app")
             val complete =
                 client.post("/api/v1/auth/signin/passkey/complete") {
                     contentType(ContentType.Application.Json)

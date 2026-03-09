@@ -64,10 +64,13 @@ fun NoteViewerScreen(
 
     when (val state = uiState) {
         NoteViewerUiState.Loading -> {
-            LoadingContent()
+            NoteViewerLoadingContent(modifier = modifier)
         }
         is NoteViewerUiState.Error -> {
-            ErrorContent(message = state.message)
+            NoteViewerErrorContent(
+                message = state.message,
+                modifier = modifier,
+            )
         }
         is NoteViewerUiState.AudioContent -> {
             AudioNoteViewerEntry(
@@ -77,7 +80,7 @@ fun NoteViewerScreen(
             )
         }
         is NoteViewerUiState.TextContent -> {
-            NoteViewerScaffold(
+            NoteViewerScaffoldContent(
                 shared = state.shared,
                 onGoBack = onGoBack,
                 modifier = modifier,
@@ -89,7 +92,7 @@ fun NoteViewerScreen(
             }
         }
         is NoteViewerUiState.ImageContent -> {
-            NoteViewerScaffold(
+            NoteViewerScaffoldContent(
                 shared = state.shared,
                 onGoBack = onGoBack,
                 modifier = modifier,
@@ -112,7 +115,7 @@ fun NoteViewerScreen(
             }
         }
         is NoteViewerUiState.VideoContent -> {
-            NoteViewerScaffold(
+            NoteViewerScaffoldContent(
                 shared = state.shared,
                 onGoBack = onGoBack,
                 modifier = modifier,
@@ -149,39 +152,22 @@ private fun AudioNoteViewerEntry(
         ),
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    when (val state = uiState) {
-        AudioNoteViewerUiState.Loading -> {
-            LoadingContent()
-        }
-        is AudioNoteViewerUiState.Error -> {
-            ErrorContent(message = state.message)
-        }
-        is AudioNoteViewerUiState.Ready -> {
-            ImmersiveAudioScreen(
-                amplitudes = state.context.amplitudes,
-                progress = state.playbackState.progress,
-                isPlaying = state.playbackState.isPlaying,
-                palette = state.context.palette,
-                daylightPeriod = state.context.daylightPeriod,
-                durationMs = state.durationMs,
-                createdAt = state.createdAt,
-                segments = state.context.segments,
-                onPlayPause = viewModel::togglePlayback,
-                onSeek = viewModel::seekTo,
-                onSkipBack = { viewModel.skipByMillis(-10_000L) },
-                onSkipForward = { viewModel.skipByMillis(10_000L) },
-                onClose = onGoBack,
-                modifier = modifier.fillMaxSize(),
-            )
-        }
-    }
+    AudioNoteViewerContent(
+        uiState = uiState,
+        onGoBack = onGoBack,
+        onPlayPause = viewModel::togglePlayback,
+        onSeek = viewModel::seekTo,
+        onSkipBack = { viewModel.skipByMillis(-10_000L) },
+        onSkipForward = { viewModel.skipByMillis(10_000L) },
+        modifier = modifier,
+    )
 }
 
 /**
  * Shared layout for non-audio note presentations.
  */
 @Composable
-private fun NoteViewerScaffold(
+fun NoteViewerScaffoldContent(
     shared: NoteViewerShared,
     onGoBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -285,9 +271,9 @@ fun NoteViewerContent(
  * Loading state for note viewing.
  */
 @Composable
-private fun LoadingContent() {
+fun NoteViewerLoadingContent(modifier: Modifier = Modifier) {
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
         CircularProgressIndicator()
@@ -298,9 +284,12 @@ private fun LoadingContent() {
  * Error state for note viewing.
  */
 @Composable
-private fun ErrorContent(message: String) {
+fun NoteViewerErrorContent(
+    message: String,
+    modifier: Modifier = Modifier,
+) {
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -316,6 +305,52 @@ private fun ErrorContent(message: String) {
                 text = message,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * Audio note presentation for note viewer previews and route rendering.
+ */
+@Composable
+fun AudioNoteViewerContent(
+    uiState: AudioNoteViewerUiState,
+    onGoBack: () -> Unit,
+    onPlayPause: () -> Unit = {},
+    onSeek: (Float) -> Unit = {},
+    onSkipBack: () -> Unit = {},
+    onSkipForward: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
+    when (uiState) {
+        AudioNoteViewerUiState.Loading -> {
+            NoteViewerLoadingContent(modifier = modifier)
+        }
+
+        is AudioNoteViewerUiState.Error -> {
+            NoteViewerErrorContent(
+                message = uiState.message,
+                modifier = modifier,
+            )
+        }
+
+        is AudioNoteViewerUiState.Ready -> {
+            ImmersiveAudioScreen(
+                amplitudes = uiState.context.amplitudes,
+                progress = uiState.playbackState.progress,
+                isPlaying = uiState.playbackState.isPlaying,
+                palette = uiState.context.palette,
+                daylightPeriod = uiState.context.daylightPeriod,
+                durationMs = uiState.durationMs,
+                createdAt = uiState.createdAt,
+                segments = uiState.context.segments,
+                onPlayPause = onPlayPause,
+                onSeek = onSeek,
+                onSkipBack = onSkipBack,
+                onSkipForward = onSkipForward,
+                onClose = onGoBack,
+                modifier = modifier.fillMaxSize(),
             )
         }
     }

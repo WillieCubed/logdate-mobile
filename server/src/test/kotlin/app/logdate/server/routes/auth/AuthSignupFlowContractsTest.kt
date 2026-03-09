@@ -308,6 +308,7 @@ class AuthSignupFlowContractsTest {
     fun `google signup and signin return server error when verifier crashes`() =
         testApplication {
             val verifier = mockk<GoogleIdTokenVerifier>()
+            every { verifier.isConfigured() } returns true
             coEvery { verifier.verify(any(), any()) } throws IllegalStateException("google-verifier-boom")
             configureAuthV1TestApp(googleIdTokenVerifier = verifier)
 

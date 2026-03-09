@@ -86,6 +86,8 @@ class SimplePasskeyTest {
         val options =
             PasskeyRegistrationOptions(
                 challenge = "Y2hhbGxlbmdl",
+                rpId = "logdate.app",
+                rpName = "LogDate",
                 user = user,
             )
 
@@ -99,6 +101,7 @@ class SimplePasskeyTest {
         val options =
             PasskeyAuthenticationOptions(
                 challenge = "Y2hhbGxlbmdl",
+                rpId = "logdate.app",
             )
 
         assertEquals("Y2hhbGxlbmdl", options.challenge)

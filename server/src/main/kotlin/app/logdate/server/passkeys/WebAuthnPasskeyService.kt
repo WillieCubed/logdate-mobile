@@ -85,6 +85,8 @@ class WebAuthnPasskeyService(
 
         return PasskeyRegistrationOptions(
             challenge = challenge,
+            rpId = relyingPartyId,
+            rpName = relyingPartyName,
             user =
                 PasskeyUser(
                     id = Base64.getEncoder().encodeToString(userId.toString().toByteArray()),
@@ -122,6 +124,7 @@ class WebAuthnPasskeyService(
 
         return PasskeyAuthenticationOptions(
             challenge = challenge,
+            rpId = relyingPartyId,
             allowCredentials = allowCredentials,
             timeout = 300_000L,
         )

@@ -55,6 +55,7 @@ docs|docs:open|Open generated documentation|open build/dokka/htmlMultiModule/ind
 
 deploy|deploy:setup|One-time GCP infrastructure setup|./scripts/setup-gcp-deploy.sh
 deploy|deploy:cloud-run|Deploy server to Cloud Run|./scripts/deploy-cloud-run.sh
+deploy|deploy:bootstrap|Bootstrap a fresh GCP LogDate Cloud instance|./scripts/bootstrap-gcp-fresh.sh
 
 setup|setup:hooks|Configure git hooks for commit validation|./scripts/setup-hooks.sh
 

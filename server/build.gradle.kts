@@ -78,6 +78,7 @@ dependencies {
     implementation(libs.exposed.dao)
     implementation(libs.exposed.kotlin.datetime)
     implementation(libs.postgresql)
+    implementation("com.google.cloud.sql:postgres-socket-factory:1.15.0")
     implementation(libs.hikariCP)
     implementation(libs.flyway.core)
     implementation(libs.flyway.database.postgresql)

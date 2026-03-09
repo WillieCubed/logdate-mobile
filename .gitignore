@@ -28,3 +28,6 @@ captures
 
 # Firebase local config
 **/google-services.json
+
+# Turnkey deployment state
+.logdate/

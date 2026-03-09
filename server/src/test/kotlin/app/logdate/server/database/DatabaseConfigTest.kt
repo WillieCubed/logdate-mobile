@@ -61,8 +61,15 @@ class DatabaseConfigTest {
 
     @Test
     fun `buildConfig sets expected pool and driver properties`() {
-        val config =
-            invokePrivate("buildConfig", "jdbc:postgresql://localhost:5432/logdate", "user", "pass") as HikariConfig
+        val method =
+            DatabaseConfig::class.java.getDeclaredMethod(
+                "buildConfig",
+                String::class.java,
+                String::class.java,
+                String::class.java,
+            )
+        method.isAccessible = true
+        val config = method.invoke(DatabaseConfig, "jdbc:postgresql://localhost:5432/logdate", "user", "pass") as HikariConfig
 
         assertEquals("jdbc:postgresql://localhost:5432/logdate", config.jdbcUrl)
         assertEquals("user", config.username)
@@ -108,9 +115,46 @@ class DatabaseConfigTest {
         assertTrue(createFromUrl.isSuccess)
         (createFromUrl.getOrNull() as? HikariDataSource)?.close()
 
+        val createFromCloudSql =
+            runCatching {
+                DatabaseConfig.createDataSource(
+                    database = "logdate",
+                    username = "cloud",
+                    password = "secret",
+                    databaseUrl = null,
+                    instanceConnectionName = "project:region:instance",
+                )
+            }
+        assertTrue(createFromCloudSql.isSuccess)
+        val cloudSqlDataSource = createFromCloudSql.getOrNull() as? HikariDataSource
+        assertEquals("jdbc:postgresql://google/logdate", cloudSqlDataSource?.jdbcUrl)
+        assertEquals(
+            "com.google.cloud.sql.postgres.SocketFactory",
+            cloudSqlDataSource?.dataSourceProperties?.getProperty("socketFactory"),
+        )
+        assertEquals(
+            "project:region:instance",
+            cloudSqlDataSource?.dataSourceProperties?.getProperty("cloudSqlInstance"),
+        )
+        assertEquals(
+            "lazy",
+            cloudSqlDataSource?.dataSourceProperties?.getProperty("cloudSqlRefreshStrategy"),
+        )
+        cloudSqlDataSource?.close()
+
         val createTest = runCatching { DatabaseConfig.createTestDataSource() }
         assertTrue(createTest.isSuccess)
         (createTest.getOrNull() as? HikariDataSource)?.close()
+    }
+
+    @Test
+    fun `shouldRunMigrations defaults to true and respects explicit false values`() {
+        assertTrue(DatabaseConfig.shouldRunMigrations(null))
+        assertTrue(DatabaseConfig.shouldRunMigrations(""))
+        assertTrue(DatabaseConfig.shouldRunMigrations("true"))
+        assertTrue(DatabaseConfig.shouldRunMigrations("yes"))
+        assertTrue(!DatabaseConfig.shouldRunMigrations("false"))
+        assertTrue(!DatabaseConfig.shouldRunMigrations("0"))
     }
 
     @Test
@@ -166,6 +210,17 @@ class DatabaseConfigTest {
                 connect = { database },
             )
         }
+
+        var skippedMigration = false
+        val initializedWithoutMigrations =
+            DatabaseConfig.initializeDatabase(
+                dataSource = dataSource,
+                autoMigrate = false,
+                migrate = { skippedMigration = true },
+                connect = { database },
+            )
+        assertEquals(database, initializedWithoutMigrations)
+        assertTrue(!skippedMigration)
 
         val configuration = mockk<FluentConfiguration>()
         val flyway = mockk<Flyway>()

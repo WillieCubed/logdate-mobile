@@ -58,9 +58,22 @@ fun RewindDetailScreen(
         viewModel.loadRewind(rewindId)
     }
 
+    RewindDetailScreenContent(
+        uiState = uiState,
+        onExitRewind = onExitRewind,
+        modifier = modifier,
+    )
+}
+
+@Composable
+fun RewindDetailScreenContent(
+    uiState: RewindDetailUiState,
+    onExitRewind: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     when (val currentState = uiState) {
         is RewindDetailUiState.Loading -> {
-            LoadingScreen(modifier = modifier.fillMaxSize())
+            RewindLoadingScreen(modifier = modifier.fillMaxSize())
         }
 
         is RewindDetailUiState.Success -> {
@@ -75,7 +88,7 @@ fun RewindDetailScreen(
         }
 
         is RewindDetailUiState.Error -> {
-            ErrorScreen(
+            RewindErrorScreen(
                 message = "Whoops, we couldn't catch the rewind. Try again later.",
                 onExit = onExitRewind,
                 modifier = modifier.fillMaxSize(),
@@ -93,7 +106,7 @@ fun RewindDetailScreen(
  * @param modifier Modifier for customizing the loading screen container
  */
 @Composable
-private fun LoadingScreen(modifier: Modifier = Modifier) {
+fun RewindLoadingScreen(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier.background(Color.Black),
         contentAlignment = Alignment.Center,
@@ -115,7 +128,7 @@ private fun LoadingScreen(modifier: Modifier = Modifier) {
  * @param modifier Modifier for customizing the error screen container
  */
 @Composable
-private fun ErrorScreen(
+fun RewindErrorScreen(
     message: String,
     onExit: () -> Unit,
     modifier: Modifier = Modifier,

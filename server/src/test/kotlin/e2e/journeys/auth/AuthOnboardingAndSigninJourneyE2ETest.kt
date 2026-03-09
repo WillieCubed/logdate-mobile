@@ -130,7 +130,7 @@ class AuthOnboardingAndSigninJourneyE2ETest {
         }
 
     @Test
-    fun `google signin fails with invalid token`() =
+    fun `google signin reports missing configuration when google auth is not configured`() =
         testApplication {
             application { module() }
 
@@ -140,6 +140,7 @@ class AuthOnboardingAndSigninJourneyE2ETest {
                     setBody("""{"idToken":"not-a-real-token"}""")
                 }
 
-            assertEquals(HttpStatusCode.Unauthorized, response.status)
+            assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
+            assertTrue(response.bodyAsText().contains("GOOGLE_AUTH_NOT_CONFIGURED"))
         }
 }
