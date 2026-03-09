@@ -1,21 +1,17 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
-import org.gradle.api.publish.maven.MavenPublication
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
+    id("app.logdate.atproto-published-module")
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kmp.library)
     alias(libs.plugins.kotlinx.serialization)
-    alias(libs.plugins.dokka)
     alias(libs.plugins.kover)
-    `maven-publish`
-    signing
 }
 
-group = "studio.hypertext.atproto"
-version = "0.1.0"
+description = "Kotlin Multiplatform AT Protocol identity types and resolvers."
 
 kotlin {
     explicitApi()
@@ -55,29 +51,4 @@ kotlin {
             implementation(libs.ktor.client.mock)
         }
     }
-}
-
-publishing {
-    publications.withType(MavenPublication::class.java).configureEach {
-        pom {
-            name.set("atproto-identity")
-            description.set("Kotlin Multiplatform AT Protocol identity types and resolvers.")
-            url.set("https://github.com/TheHypertextStudio/logdate-android")
-            licenses {
-                license {
-                    name.set("Apache-2.0")
-                    url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
-                }
-            }
-            scm {
-                url.set("https://github.com/TheHypertextStudio/logdate-android")
-                connection.set("scm:git:https://github.com/TheHypertextStudio/logdate-android.git")
-                developerConnection.set("scm:git:ssh://git@github.com/TheHypertextStudio/logdate-android.git")
-            }
-        }
-    }
-}
-
-signing {
-    isRequired = false
 }
