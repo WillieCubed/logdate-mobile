@@ -248,6 +248,7 @@ private class MockConfigRepository : LogDateConfigRepository {
     override val apiVersion: StateFlow<String> = MutableStateFlow("v1")
     override val apiBaseUrl: Flow<String> = MutableStateFlow("http://localhost/api/v1")
     override val localServerAddress: StateFlow<String> = MutableStateFlow("localhost:8765")
+    override val serverDescriptor: StateFlow<app.logdate.shared.model.ServerDescriptor?> = MutableStateFlow(null)
 
     override suspend fun updateBackendUrl(url: String) = Unit
 
@@ -255,9 +256,13 @@ private class MockConfigRepository : LogDateConfigRepository {
 
     override suspend fun updateLocalServerAddress(address: String) = Unit
 
+    override suspend fun updateServerDescriptor(descriptor: app.logdate.shared.model.ServerDescriptor?) = Unit
+
     override suspend fun resetToDefaults() = Unit
 
     override fun getCurrentBackendUrl(): String = "http://localhost"
 
     override fun getCurrentApiBaseUrl(): String = "http://localhost/api/v1"
+
+    override fun getCurrentServerDescriptor(): app.logdate.shared.model.ServerDescriptor? = null
 }

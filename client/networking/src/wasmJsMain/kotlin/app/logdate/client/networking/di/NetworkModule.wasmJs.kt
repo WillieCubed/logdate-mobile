@@ -1,6 +1,8 @@
 package app.logdate.client.networking.di
 
+import app.logdate.client.networking.DefaultServerDiscoveryClient
 import app.logdate.client.networking.DefaultServerHealthChecker
+import app.logdate.client.networking.ServerDiscoveryClient
 import app.logdate.client.networking.ServerHealthChecker
 import app.logdate.client.networking.httpClient
 import org.koin.core.module.Module
@@ -10,4 +12,5 @@ actual val networkingModule: Module =
     module {
         single { httpClient }
         single<ServerHealthChecker> { DefaultServerHealthChecker(get()) }
+        single<ServerDiscoveryClient> { DefaultServerDiscoveryClient(get()) }
     }
