@@ -1,0 +1,20 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Launch Wear OS Tile" type="AndroidTileConfigurationType" factoryName="AndroidTileConfigurationFactory" show_console_on_std_err="false" show_console_on_std_out="false">
+    <module name="LogDate.app.wear" />
+    <option name="allowRunningInParallel" value="false" />
+    <option name="projectPathOnTarget" />
+    <option name="selectedOptions">
+      <list />
+    </option>
+    <LaunchOptions>
+      <option name="componentName" value="app.logdate.wear.tile.MainTileService" />
+    </LaunchOptions>
+    <DeployOptions>
+      <option name="pmInstallFlags" value="" />
+    </DeployOptions>
+    <method v="2">
+      <option name="Make" enabled="true" />
+      <option name="Android.Gradle.BeforeRunTask" enabled="true" />
+    </method>
+  </configuration>
+</component>
