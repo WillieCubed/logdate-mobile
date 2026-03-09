@@ -21,6 +21,7 @@ class AndroidAccountManager(
         const val TOKEN_TYPE_REFRESH = "refresh_token"
 
         // UserData keys
+        const val KEY_USERNAME = "username"
         const val KEY_USER_ID = "user_id"
         const val KEY_DISPLAY_NAME = "display_name"
         const val KEY_BIO = "bio"
@@ -40,10 +41,12 @@ class AndroidAccountManager(
         withContext(Dispatchers.IO) {
             try {
                 val systemAccount = Account(account.username, ACCOUNT_TYPE)
+                val backendAwareAccount = Account(accountKey(account.username, backendUrl), ACCOUNT_TYPE)
 
                 // Prepare user data
                 val userData =
                     Bundle().apply {
+                        putString(KEY_USERNAME, account.username)
                         putString(KEY_USER_ID, account.id.toString())
                         putString(KEY_DISPLAY_NAME, account.displayName)
                         putString(KEY_BIO, account.bio)
@@ -53,12 +56,12 @@ class AndroidAccountManager(
                     }
 
                 // Add account to system
-                val success = accountManager.addAccountExplicitly(systemAccount, null, userData)
+                val success = accountManager.addAccountExplicitly(backendAwareAccount, null, userData)
 
                 if (success) {
                     // Store tokens securely
-                    accountManager.setAuthToken(systemAccount, TOKEN_TYPE_ACCESS, accessToken)
-                    accountManager.setAuthToken(systemAccount, TOKEN_TYPE_REFRESH, refreshToken)
+                    accountManager.setAuthToken(backendAwareAccount, TOKEN_TYPE_ACCESS, accessToken)
+                    accountManager.setAuthToken(backendAwareAccount, TOKEN_TYPE_REFRESH, refreshToken)
 
                     Napier.i("Successfully added LogDate account to Android AccountManager: ${account.username}")
                     Result.success(Unit)
@@ -79,7 +82,7 @@ class AndroidAccountManager(
         withContext(Dispatchers.IO) {
             try {
                 val systemAccount =
-                    findSystemAccount(account.username)
+                    findSystemAccount(account.username, backendUrl)
                         ?: return@withContext Result.failure(Exception("Account not found"))
 
                 // Update user data
@@ -98,13 +101,14 @@ class AndroidAccountManager(
 
     override suspend fun updateTokens(
         username: String,
+        backendUrl: String,
         accessToken: String,
         refreshToken: String,
     ): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
                 val systemAccount =
-                    findSystemAccount(username)
+                    findSystemAccount(username, backendUrl)
                         ?: return@withContext Result.failure(Exception("Account not found"))
 
                 // Update tokens
@@ -119,11 +123,14 @@ class AndroidAccountManager(
             }
         }
 
-    override suspend fun removeAccount(username: String): Result<Unit> =
+    override suspend fun removeAccount(
+        username: String,
+        backendUrl: String,
+    ): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
                 val systemAccount =
-                    findSystemAccount(username)
+                    findSystemAccount(username, backendUrl)
                         ?: return@withContext Result.failure(Exception("Account not found"))
 
                 // Remove account from system
@@ -153,7 +160,7 @@ class AndroidAccountManager(
                 val accountInfos =
                     accounts.map { account ->
                         PlatformAccountInfo(
-                            username = account.name,
+                            username = accountManager.getUserData(account, KEY_USERNAME) ?: account.name,
                             displayName = accountManager.getUserData(account, KEY_DISPLAY_NAME) ?: account.name,
                             userId = accountManager.getUserData(account, KEY_USER_ID),
                             backendUrl = accountManager.getUserData(account, KEY_BACKEND_URL),
@@ -168,11 +175,14 @@ class AndroidAccountManager(
             }
         }
 
-    override suspend fun getTokens(username: String): Result<TokenPair?> =
+    override suspend fun getTokens(
+        username: String,
+        backendUrl: String,
+    ): Result<TokenPair?> =
         withContext(Dispatchers.IO) {
             try {
                 val systemAccount =
-                    findSystemAccount(username)
+                    findSystemAccount(username, backendUrl)
                         ?: return@withContext Result.success(null)
 
                 val accessToken = accountManager.peekAuthToken(systemAccount, TOKEN_TYPE_ACCESS)
@@ -213,8 +223,19 @@ class AndroidAccountManager(
             }
         }
 
-    private fun findSystemAccount(username: String): Account? =
+    private fun findSystemAccount(
+        username: String,
+        backendUrl: String,
+    ): Account? =
         accountManager
             .getAccountsByType(ACCOUNT_TYPE)
-            .find { it.name == username }
+            .find { account ->
+                accountManager.getUserData(account, KEY_BACKEND_URL) == backendUrl &&
+                    accountManager.getUserData(account, KEY_USERNAME) == username
+            }
+
+    private fun accountKey(
+        username: String,
+        backendUrl: String,
+    ): String = "$username@$backendUrl"
 }

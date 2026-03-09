@@ -5,6 +5,7 @@ import app.logdate.client.database.dao.maintenance.IntegrityDao
 import app.logdate.client.database.dao.sync.SyncMetadataDao
 import app.logdate.client.sync.metadata.AssociationPendingKey
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.shared.config.LogDateConfigRepository
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -15,6 +16,7 @@ class DataIntegrityService(
     private val integrityDao: IntegrityDao,
     private val syncMetadataDao: SyncMetadataDao,
     private val journalContentDao: JournalContentDao,
+    private val configRepository: LogDateConfigRepository,
 ) {
     suspend fun audit(): IntegrityReport {
         val orphanedJournalLinks = integrityDao.countOrphanedJournalLinks()
@@ -52,7 +54,7 @@ class DataIntegrityService(
     }
 
     private suspend fun auditPendingAssociations(): PendingAssociationAudit {
-        val pending = syncMetadataDao.getPendingByType(EntityType.ASSOCIATION.name)
+        val pending = syncMetadataDao.getPendingByType(currentOrigin(), EntityType.ASSOCIATION.name)
         var missingLinks = 0
         var malformed = 0
 
@@ -72,26 +74,28 @@ class DataIntegrityService(
     }
 
     private suspend fun repairPendingAssociations(): Int {
-        val pending = syncMetadataDao.getPendingByType(EntityType.ASSOCIATION.name)
+        val pending = syncMetadataDao.getPendingByType(currentOrigin(), EntityType.ASSOCIATION.name)
         var removed = 0
 
         for (entry in pending) {
             val key = AssociationPendingKey.fromPendingId(entry.entityId)
             if (key == null) {
-                syncMetadataDao.deletePending(EntityType.ASSOCIATION.name, entry.entityId)
+                syncMetadataDao.deletePending(currentOrigin(), EntityType.ASSOCIATION.name, entry.entityId)
                 removed++
                 continue
             }
 
             val exists = journalContentDao.isContentInJournal(key.journalId, key.contentId)
             if (!exists) {
-                syncMetadataDao.deletePending(EntityType.ASSOCIATION.name, entry.entityId)
+                syncMetadataDao.deletePending(currentOrigin(), EntityType.ASSOCIATION.name, entry.entityId)
                 removed++
             }
         }
 
         return removed
     }
+
+    private fun currentOrigin(): String = configRepository.getCurrentBackendUrl().trimEnd('/')
 }
 
 data class IntegrityReport(

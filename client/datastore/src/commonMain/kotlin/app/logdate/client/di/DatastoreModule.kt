@@ -2,6 +2,7 @@ package app.logdate.client.di
 
 import app.logdate.client.datastore.DataStoreKeyValueStorage
 import app.logdate.client.datastore.KeyValueStorage
+import app.logdate.client.datastore.LogDateConfigDataSource
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.createDataStore
 import org.koin.core.module.Module
@@ -41,5 +42,13 @@ val commonDatastoreModule =
         // Legacy data source (will be migrated to use KeyValueStorage)
         factory {
             LogdatePreferencesDataSource(get(named("mainDataStore")))
+        }
+
+        single(createdAtStart = true) {
+            LogDateConfigDataSource(
+                dataStore = get(named("mainDataStore")),
+                configRepository = get(),
+                scope = get(),
+            )
         }
     }

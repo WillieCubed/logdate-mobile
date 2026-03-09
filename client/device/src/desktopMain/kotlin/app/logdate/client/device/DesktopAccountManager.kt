@@ -21,7 +21,7 @@ class DesktopAccountManager : PlatformAccountManager {
         backendUrl: String,
     ): Result<Unit> =
         try {
-            accountStore[account.username] =
+            accountStore[accountKey(account.username, backendUrl)] =
                 PlatformAccountInfo(
                     username = account.username,
                     displayName = account.displayName,
@@ -29,7 +29,7 @@ class DesktopAccountManager : PlatformAccountManager {
                     backendUrl = backendUrl,
                 )
 
-            tokenStore[account.username] =
+            tokenStore[accountKey(account.username, backendUrl)] =
                 TokenPair(
                     accessToken = accessToken,
                     refreshToken = refreshToken,
@@ -48,10 +48,10 @@ class DesktopAccountManager : PlatformAccountManager {
     ): Result<Unit> {
         return try {
             val existingInfo =
-                accountStore[account.username]
+                accountStore[accountKey(account.username, backendUrl)]
                     ?: return Result.failure(Exception("Account not found"))
 
-            accountStore[account.username] =
+            accountStore[accountKey(account.username, backendUrl)] =
                 existingInfo.copy(
                     displayName = account.displayName,
                     backendUrl = backendUrl,
@@ -67,11 +67,12 @@ class DesktopAccountManager : PlatformAccountManager {
 
     override suspend fun updateTokens(
         username: String,
+        backendUrl: String,
         accessToken: String,
         refreshToken: String,
     ): Result<Unit> =
         try {
-            tokenStore[username] =
+            tokenStore[accountKey(username, backendUrl)] =
                 TokenPair(
                     accessToken = accessToken,
                     refreshToken = refreshToken,
@@ -84,10 +85,13 @@ class DesktopAccountManager : PlatformAccountManager {
             Result.failure(e)
         }
 
-    override suspend fun removeAccount(username: String): Result<Unit> =
+    override suspend fun removeAccount(
+        username: String,
+        backendUrl: String,
+    ): Result<Unit> =
         try {
-            accountStore.remove(username)
-            tokenStore.remove(username)
+            accountStore.remove(accountKey(username, backendUrl))
+            tokenStore.remove(accountKey(username, backendUrl))
 
             Napier.i("Removed LogDate account from desktop account store: $username")
             Result.success(Unit)
@@ -106,9 +110,12 @@ class DesktopAccountManager : PlatformAccountManager {
             Result.failure(e)
         }
 
-    override suspend fun getTokens(username: String): Result<TokenPair?> =
+    override suspend fun getTokens(
+        username: String,
+        backendUrl: String,
+    ): Result<TokenPair?> =
         try {
-            val tokens = tokenStore[username]
+            val tokens = tokenStore[accountKey(username, backendUrl)]
             Result.success(tokens)
         } catch (e: Exception) {
             Napier.e("Error retrieving tokens from desktop account store", e)
@@ -124,4 +131,9 @@ class DesktopAccountManager : PlatformAccountManager {
             Napier.e("Error clearing tokens from desktop account store", e)
             Result.failure(e)
         }
+
+    private fun accountKey(
+        username: String,
+        backendUrl: String,
+    ): String = "$username@$backendUrl"
 }

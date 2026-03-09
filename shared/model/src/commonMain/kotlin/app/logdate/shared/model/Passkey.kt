@@ -20,6 +20,8 @@ data class PasskeyInfo(
 @Serializable
 data class PasskeyRegistrationOptions(
     val challenge: String,
+    val rpId: String,
+    val rpName: String,
     val user: PasskeyUser,
     val excludeCredentials: List<String> = emptyList(),
     val timeout: Long = 300_000,
@@ -28,6 +30,7 @@ data class PasskeyRegistrationOptions(
 @Serializable
 data class PasskeyAuthenticationOptions(
     val challenge: String,
+    val rpId: String,
     val allowCredentials: List<String> = emptyList(),
     val timeout: Long = 300_000,
 )

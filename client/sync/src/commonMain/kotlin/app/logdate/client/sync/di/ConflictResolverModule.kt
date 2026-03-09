@@ -37,6 +37,6 @@ val conflictResolverModule: Module =
 
         // Sync metadata service backed by Room database
         single<SyncMetadataService> {
-            DatabaseSyncMetadataService(get<SyncMetadataDao>())
+            DatabaseSyncMetadataService(get<SyncMetadataDao>(), get())
         }
     }

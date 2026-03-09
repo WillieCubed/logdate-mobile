@@ -3,6 +3,7 @@ package app.logdate.client.sync.metadata
 import app.logdate.client.database.dao.sync.SyncMetadataDao
 import app.logdate.client.database.entities.sync.PendingUploadEntity
 import app.logdate.client.database.entities.sync.SyncCursorEntity
+import app.logdate.shared.config.LogDateConfigRepository
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -13,17 +14,19 @@ import kotlin.time.Instant
  */
 class DatabaseSyncMetadataService(
     private val dao: SyncMetadataDao,
+    private val configRepository: LogDateConfigRepository,
 ) : SyncMetadataService {
-    override suspend fun getPendingUploads(entityType: EntityType): List<PendingUpload> =
-        dao
-            .getPendingByType(entityType.name)
-            .map { entity ->
-                PendingUpload(
-                    entityId = entity.entityId,
-                    operation = PendingOperation.fromStorage(entity.operation),
-                    retryCount = entity.retryCount,
-                )
-            }
+    override suspend fun getPendingUploads(entityType: EntityType): List<PendingUpload> {
+        val serverOrigin = currentOrigin()
+        promoteLegacyPendingIfNeeded(serverOrigin, entityType)
+        return dao.getPendingByType(serverOrigin, entityType.name).map { entity ->
+            PendingUpload(
+                entityId = entity.entityId,
+                operation = PendingOperation.fromStorage(entity.operation),
+                retryCount = entity.retryCount,
+            )
+        }
+    }
 
     override suspend fun markAsSynced(
         entityId: String,
@@ -31,13 +34,16 @@ class DatabaseSyncMetadataService(
         syncedAt: Instant,
         version: Long,
     ) {
-        dao.deletePending(entityType.name, entityId)
+        dao.deletePending(currentOrigin(), entityType.name, entityId)
     }
 
-    override suspend fun getLastSyncTime(entityType: EntityType): Instant? =
-        dao.getCursor(entityType.name)?.let { cursor ->
+    override suspend fun getLastSyncTime(entityType: EntityType): Instant? {
+        val serverOrigin = currentOrigin()
+        promoteLegacyCursorIfNeeded(serverOrigin, entityType)
+        return dao.getCursor(serverOrigin, entityType.name)?.let { cursor ->
             Instant.fromEpochMilliseconds(cursor.lastSyncTimestamp)
         }
+    }
 
     override suspend fun updateLastSyncTime(
         entityType: EntityType,
@@ -51,10 +57,12 @@ class DatabaseSyncMetadataService(
         entityType: EntityType,
         operation: PendingOperation,
     ) {
-        val existing = dao.getPending(entityType.name, entityId)
+        val serverOrigin = currentOrigin()
+        promoteLegacyPendingIfNeeded(serverOrigin, entityType)
+        val existing = dao.getPending(serverOrigin, entityType.name, entityId)
         val resolvedOperation = resolveOperation(existing?.operation, operation)
         if (resolvedOperation == null) {
-            dao.deletePending(entityType.name, entityId)
+            dao.deletePending(serverOrigin, entityType.name, entityId)
             return
         }
 
@@ -62,6 +70,7 @@ class DatabaseSyncMetadataService(
         val retryCount = existing?.retryCount ?: 0
         dao.insertPending(
             PendingUploadEntity(
+                serverOrigin = serverOrigin,
                 entityType = entityType.name,
                 entityId = entityId,
                 operation = resolvedOperation.name,
@@ -78,15 +87,15 @@ class DatabaseSyncMetadataService(
         enqueuePending(entityId, entityType, PendingOperation.UPDATE)
     }
 
-    override suspend fun getPendingCount(): Int = dao.getPendingCount()
+    override suspend fun getPendingCount(): Int = dao.getPendingCount(currentOrigin())
 
-    override fun observePendingCount(): Flow<Int> = dao.observePendingCount()
+    override fun observePendingCount(): Flow<Int> = dao.observePendingCount(currentOrigin())
 
     override suspend fun incrementRetryCount(
         entityId: String,
         entityType: EntityType,
     ) {
-        dao.incrementRetryCount(entityType.name, entityId)
+        dao.incrementRetryCount(currentOrigin(), entityType.name, entityId)
     }
 
     /**
@@ -99,6 +108,7 @@ class DatabaseSyncMetadataService(
     ) {
         dao.insertPending(
             PendingUploadEntity(
+                serverOrigin = currentOrigin(),
                 entityType = entityType.name,
                 entityId = entityId,
                 operation = operation,
@@ -129,11 +139,14 @@ class DatabaseSyncMetadataService(
         entityType: EntityType,
         syncedAt: Instant,
     ) {
-        val current = dao.getCursor(entityType.name)?.lastSyncTimestamp ?: 0L
+        val serverOrigin = currentOrigin()
+        promoteLegacyCursorIfNeeded(serverOrigin, entityType)
+        val current = dao.getCursor(serverOrigin, entityType.name)?.lastSyncTimestamp ?: 0L
         val next = syncedAt.toEpochMilliseconds()
         if (next >= current) {
             dao.upsertCursor(
                 SyncCursorEntity(
+                    serverOrigin = serverOrigin,
                     entityType = entityType.name,
                     lastSyncTimestamp = next,
                 ),
@@ -167,5 +180,39 @@ class DatabaseSyncMetadataService(
                     PendingOperation.DELETE -> PendingOperation.DELETE
                 }
         }
+    }
+
+    private fun currentOrigin(): String = configRepository.getCurrentBackendUrl().trimEnd('/')
+
+    private suspend fun promoteLegacyCursorIfNeeded(
+        serverOrigin: String,
+        entityType: EntityType,
+    ) {
+        if (dao.getCursor(serverOrigin, entityType.name) != null) {
+            return
+        }
+
+        val legacyCursor = dao.getLegacyCursor(entityType.name) ?: return
+        dao.upsertCursor(legacyCursor.copy(serverOrigin = serverOrigin))
+        dao.deleteLegacyCursor(entityType.name)
+    }
+
+    private suspend fun promoteLegacyPendingIfNeeded(
+        serverOrigin: String,
+        entityType: EntityType,
+    ) {
+        if (dao.getPendingByType(serverOrigin, entityType.name).isNotEmpty()) {
+            return
+        }
+
+        val legacyPending = dao.getLegacyPendingByType(entityType.name)
+        if (legacyPending.isEmpty()) {
+            return
+        }
+
+        legacyPending.forEach { pending ->
+            dao.insertPending(pending.copy(serverOrigin = serverOrigin))
+        }
+        dao.deleteLegacyPendingByType(entityType.name)
     }
 }

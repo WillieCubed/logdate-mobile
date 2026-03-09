@@ -29,6 +29,7 @@ interface PlatformAccountManager {
      */
     suspend fun updateTokens(
         username: String,
+        backendUrl: String,
         accessToken: String,
         refreshToken: String,
     ): Result<Unit>
@@ -36,7 +37,10 @@ interface PlatformAccountManager {
     /**
      * Remove an account from the system account manager
      */
-    suspend fun removeAccount(username: String): Result<Unit>
+    suspend fun removeAccount(
+        username: String,
+        backendUrl: String,
+    ): Result<Unit>
 
     /**
      * Get all stored LogDate Cloud accounts
@@ -46,7 +50,10 @@ interface PlatformAccountManager {
     /**
      * Get stored tokens for a specific account
      */
-    suspend fun getTokens(username: String): Result<TokenPair?>
+    suspend fun getTokens(
+        username: String,
+        backendUrl: String,
+    ): Result<TokenPair?>
 
     /**
      * Clear all stored tokens (for security purposes)

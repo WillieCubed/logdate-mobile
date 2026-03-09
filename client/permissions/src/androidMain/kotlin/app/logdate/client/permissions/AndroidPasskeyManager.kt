@@ -132,8 +132,8 @@ class AndroidPasskeyManager(
         return """
             {
                 "rp": {
-                    "id": "logdate.app",
-                    "name": "LogDate"
+                    "id": "${options.rpId}",
+                    "name": "${options.rpName}"
                 },
                 "user": {
                     "id": "${options.user.id}",
@@ -163,7 +163,7 @@ class AndroidPasskeyManager(
             {
                 "challenge": "${options.challenge}",
                 "timeout": ${options.timeout},
-                "rpId": "logdate.app",
+                "rpId": "${options.rpId}",
                 "allowCredentials": ${Json.encodeToString(ListSerializer(String.serializer()), options.allowCredentials)},
                 "userVerification": "preferred"
             }

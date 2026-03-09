@@ -11,6 +11,7 @@ import app.logdate.client.device.identity.di.deviceIdentityModule
 import app.logdate.client.device.storage.DesktopSecureStorage
 import app.logdate.client.device.storage.SecureSessionStorage
 import app.logdate.client.device.storage.SecureStorage
+import app.logdate.shared.config.LogDateConfigRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -40,7 +41,8 @@ actual val deviceInstanceModule: Module =
         single<SessionStorage> {
             SecureSessionStorage(
                 secureStorage = get(),
-                scope = get(),
+                configRepository = get<LogDateConfigRepository>(),
+                scope = get<CoroutineScope>(),
             )
         }
 

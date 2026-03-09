@@ -19,9 +19,13 @@ import app.logdate.shared.model.PasskeyAssertionResponse
 import app.logdate.shared.model.PasskeyAuthenticationOptions
 import app.logdate.shared.model.PasskeyCredentialResponse
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
 /**
@@ -44,13 +48,28 @@ class DefaultPasskeyAccountRepository(
 
     private val _isAuthenticated = MutableStateFlow(false)
     override val isAuthenticated: StateFlow<Boolean> = _isAuthenticated.asStateFlow()
+    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     init {
-        // Load existing session on initialization
         val existingSession = sessionStorage.getSession()
         if (existingSession != null) {
             _isAuthenticated.value = true
-            // Note: We'll load account info lazily when needed
+        }
+
+        repositoryScope.launch {
+            sessionStorage.getSessionFlow().collect { session ->
+                _isAuthenticated.value = session != null
+                if (session == null) {
+                    _currentAccount.value = null
+                }
+            }
+        }
+
+        repositoryScope.launch {
+            configRepository.backendUrl.collect {
+                _currentAccount.value = null
+                _isAuthenticated.value = sessionStorage.getSession() != null
+            }
         }
     }
 
@@ -154,6 +173,7 @@ class DefaultPasskeyAccountRepository(
             val authOptions =
                 PasskeyAuthenticationOptions(
                     challenge = beginData.challenge,
+                    rpId = beginData.rpId,
                     allowCredentials = beginData.allowCredentials.map { it.id },
                     timeout = beginData.timeout,
                 )
@@ -194,6 +214,7 @@ class DefaultPasskeyAccountRepository(
             val platformTokenResult =
                 platformAccountManager.updateTokens(
                     username = completeData.account.username,
+                    backendUrl = configRepository.getCurrentBackendUrl(),
                     accessToken = completeData.tokens.accessToken,
                     refreshToken = completeData.tokens.refreshToken,
                 )
@@ -225,6 +246,7 @@ class DefaultPasskeyAccountRepository(
                 val platformResult =
                     platformAccountManager.updateTokens(
                         username = currentAccountValue.username,
+                        backendUrl = configRepository.getCurrentBackendUrl(),
                         accessToken = "",
                         refreshToken = "",
                     )
@@ -269,6 +291,7 @@ class DefaultPasskeyAccountRepository(
                 val platformResult =
                     platformAccountManager.updateTokens(
                         username = currentAccountValue.username,
+                        backendUrl = configRepository.getCurrentBackendUrl(),
                         accessToken = newAccessToken,
                         refreshToken = session.refreshToken,
                     )

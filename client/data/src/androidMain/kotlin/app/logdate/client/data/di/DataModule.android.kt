@@ -160,5 +160,5 @@ actual val dataModule: Module =
         single<SearchRepository> { OfflineFirstSearchRepository(get()) }
 
         // Integrity
-        single { DataIntegrityService(get(), get(), get()) }
+        single { DataIntegrityService(get(), get(), get(), get()) }
     }

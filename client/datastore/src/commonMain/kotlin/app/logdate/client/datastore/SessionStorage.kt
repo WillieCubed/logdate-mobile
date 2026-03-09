@@ -4,15 +4,19 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import app.logdate.shared.config.LogDateConfigRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.text.encodeToByteArray
 
 /**
  * Data class representing a user session
@@ -59,6 +63,7 @@ interface SessionStorage {
  */
 class DataStoreSessionStorage(
     private val dataStore: DataStore<Preferences>,
+    private val configRepository: LogDateConfigRepository,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) : SessionStorage {
     companion object {
@@ -71,22 +76,12 @@ class DataStoreSessionStorage(
 
     init {
         scope.launch {
-            dataStore.data
-                .map { preferences ->
-                    val accessToken = preferences[ACCESS_TOKEN_KEY]
-                    val refreshToken = preferences[REFRESH_TOKEN_KEY]
-                    val accountId = preferences[ACCOUNT_ID_KEY]
-
-                    if (accessToken != null && refreshToken != null && accountId != null) {
-                        UserSession(
-                            accessToken = accessToken,
-                            refreshToken = refreshToken,
-                            accountId = accountId,
-                        )
-                    } else {
-                        null
-                    }
-                }.distinctUntilChanged()
+            combine(
+                dataStore.data,
+                configRepository.backendUrl,
+            ) { preferences, backendUrl ->
+                decodeSession(preferences, backendUrl)
+            }.distinctUntilChanged()
                 .collect { sessionState.value = it }
         }
     }
@@ -95,22 +90,24 @@ class DataStoreSessionStorage(
 
     override fun saveSession(session: UserSession) {
         sessionState.value = session
+        val backendUrl = configRepository.getCurrentBackendUrl()
         scope.launch {
             dataStore.edit { preferences ->
-                preferences[ACCESS_TOKEN_KEY] = session.accessToken
-                preferences[REFRESH_TOKEN_KEY] = session.refreshToken
-                preferences[ACCOUNT_ID_KEY] = session.accountId
+                preferences[scopedKey(ACCESS_TOKEN_KEY.name, backendUrl)] = session.accessToken
+                preferences[scopedKey(REFRESH_TOKEN_KEY.name, backendUrl)] = session.refreshToken
+                preferences[scopedKey(ACCOUNT_ID_KEY.name, backendUrl)] = session.accountId
             }
         }
     }
 
     override fun clearSession() {
         sessionState.value = null
+        val backendUrl = configRepository.getCurrentBackendUrl()
         scope.launch {
             dataStore.edit { preferences ->
-                preferences.remove(ACCESS_TOKEN_KEY)
-                preferences.remove(REFRESH_TOKEN_KEY)
-                preferences.remove(ACCOUNT_ID_KEY)
+                preferences.remove(scopedKey(ACCESS_TOKEN_KEY.name, backendUrl))
+                preferences.remove(scopedKey(REFRESH_TOKEN_KEY.name, backendUrl))
+                preferences.remove(scopedKey(ACCOUNT_ID_KEY.name, backendUrl))
             }
         }
     }
@@ -130,11 +127,60 @@ class DataStoreSessionStorage(
         }
         return try {
             val preferences = dataStore.data.first()
-            preferences[ACCESS_TOKEN_KEY] != null &&
-                preferences[REFRESH_TOKEN_KEY] != null &&
-                preferences[ACCOUNT_ID_KEY] != null
+            val backendUrl = configRepository.getCurrentBackendUrl()
+            decodeSession(preferences, backendUrl) != null
         } catch (e: Exception) {
             false
         }
     }
+
+    private suspend fun decodeSession(
+        preferences: Preferences,
+        backendUrl: String,
+    ): UserSession? {
+        migrateLegacyKeysIfNeeded(preferences, backendUrl)
+
+        val accessToken = preferences[scopedKey(ACCESS_TOKEN_KEY.name, backendUrl)]
+        val refreshToken = preferences[scopedKey(REFRESH_TOKEN_KEY.name, backendUrl)]
+        val accountId = preferences[scopedKey(ACCOUNT_ID_KEY.name, backendUrl)]
+
+        return if (accessToken != null && refreshToken != null && accountId != null) {
+            UserSession(
+                accessToken = accessToken,
+                refreshToken = refreshToken,
+                accountId = accountId,
+            )
+        } else {
+            null
+        }
+    }
+
+    private suspend fun migrateLegacyKeysIfNeeded(
+        preferences: Preferences,
+        backendUrl: String,
+    ) {
+        val scopedAccessKey = scopedKey(ACCESS_TOKEN_KEY.name, backendUrl)
+        if (preferences[scopedAccessKey] != null) {
+            return
+        }
+
+        val legacyAccessToken = preferences[ACCESS_TOKEN_KEY] ?: return
+        val legacyRefreshToken = preferences[REFRESH_TOKEN_KEY] ?: return
+        val legacyAccountId = preferences[ACCOUNT_ID_KEY] ?: return
+
+        dataStore.edit { mutablePreferences ->
+            mutablePreferences[scopedAccessKey] = legacyAccessToken
+            mutablePreferences[scopedKey(REFRESH_TOKEN_KEY.name, backendUrl)] = legacyRefreshToken
+            mutablePreferences[scopedKey(ACCOUNT_ID_KEY.name, backendUrl)] = legacyAccountId
+            mutablePreferences.remove(ACCESS_TOKEN_KEY)
+            mutablePreferences.remove(REFRESH_TOKEN_KEY)
+            mutablePreferences.remove(ACCOUNT_ID_KEY)
+        }
+    }
+
+    @OptIn(ExperimentalEncodingApi::class)
+    private fun scopedKey(
+        baseKey: String,
+        backendUrl: String,
+    ) = stringPreferencesKey("${baseKey}_${Base64.UrlSafe.encode(backendUrl.trim().encodeToByteArray()).trimEnd('=')}")
 }

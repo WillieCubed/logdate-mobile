@@ -46,6 +46,7 @@ kotlin {
         }
         commonMain.dependencies {
             implementation(projects.shared.model)
+            implementation(projects.shared.config)
             implementation(projects.client.logdateDatastore)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.datetime)

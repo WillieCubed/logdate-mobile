@@ -34,6 +34,7 @@ class IosAccountManager : PlatformAccountManager {
 
     override suspend fun updateTokens(
         username: String,
+        backendUrl: String,
         accessToken: String,
         refreshToken: String,
     ): Result<Unit> =
@@ -42,7 +43,10 @@ class IosAccountManager : PlatformAccountManager {
             Result.success(Unit)
         }
 
-    override suspend fun removeAccount(username: String): Result<Unit> =
+    override suspend fun removeAccount(
+        username: String,
+        backendUrl: String,
+    ): Result<Unit> =
         withContext(Dispatchers.Default) {
             Napier.i("Stub: Removed LogDate account from iOS Keychain: $username")
             Result.success(Unit)
@@ -54,7 +58,10 @@ class IosAccountManager : PlatformAccountManager {
             Result.success(emptyList())
         }
 
-    override suspend fun getTokens(username: String): Result<TokenPair?> =
+    override suspend fun getTokens(
+        username: String,
+        backendUrl: String,
+    ): Result<TokenPair?> =
         withContext(Dispatchers.Default) {
             Napier.d("Stub: Retrieved null tokens for account: $username")
             Result.success(null)

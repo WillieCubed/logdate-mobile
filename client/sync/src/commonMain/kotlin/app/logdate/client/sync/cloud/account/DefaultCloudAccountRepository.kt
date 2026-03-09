@@ -62,6 +62,11 @@ class DefaultCloudAccountRepository(
         coroutineScope.launch {
             loadStoredAccount()
         }
+        coroutineScope.launch {
+            configRepository.backendUrl.collect {
+                loadStoredAccount()
+            }
+        }
     }
 
     /**
@@ -69,19 +74,23 @@ class DefaultCloudAccountRepository(
      */
     private suspend fun loadStoredAccount() {
         try {
-            // Check if we have stored credentials
-            val accessToken = secureStorage.getString(StorageKeys.ACCESS_TOKEN)
-            val accountId = secureStorage.getString(StorageKeys.ACCOUNT_ID)
-            val username = secureStorage.getString(StorageKeys.ACCOUNT_USERNAME)
-            val displayName = secureStorage.getString(StorageKeys.ACCOUNT_DISPLAY_NAME)
-            val did = secureStorage.getString(StorageKeys.ACCOUNT_DID)
-            val handle = secureStorage.getString(StorageKeys.ACCOUNT_HANDLE)
-            val userIdString = secureStorage.getString(StorageKeys.USER_ID)
-            val createdAtString = secureStorage.getString(StorageKeys.CREATED_AT)
-            val updatedAtString = secureStorage.getString(StorageKeys.UPDATED_AT)
-            val passkeyIdsString = secureStorage.getString(StorageKeys.PASSKEY_IDS)
+            val backendUrl = configRepository.getCurrentBackendUrl()
+            migrateLegacyKeysIfNeeded(backendUrl)
 
-            if (accountId != null &&
+            // Check if we have stored credentials
+            val accessToken = secureStorage.getString(scopedKey(StorageKeys.ACCESS_TOKEN, backendUrl))
+            val accountId = secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_ID, backendUrl))
+            val username = secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_USERNAME, backendUrl))
+            val displayName = secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_DISPLAY_NAME, backendUrl))
+            val did = secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_DID, backendUrl))
+            val handle = secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_HANDLE, backendUrl))
+            val userIdString = secureStorage.getString(scopedKey(StorageKeys.USER_ID, backendUrl))
+            val createdAtString = secureStorage.getString(scopedKey(StorageKeys.CREATED_AT, backendUrl))
+            val updatedAtString = secureStorage.getString(scopedKey(StorageKeys.UPDATED_AT, backendUrl))
+            val passkeyIdsString = secureStorage.getString(scopedKey(StorageKeys.PASSKEY_IDS, backendUrl))
+
+            if (accessToken != null &&
+                accountId != null &&
                 username != null &&
                 displayName != null &&
                 userIdString != null &&
@@ -113,6 +122,8 @@ class DefaultCloudAccountRepository(
 
                 accountFlow.value = account
                 Napier.d("Loaded stored account: $username")
+            } else {
+                accountFlow.value = null
             }
         } catch (e: Exception) {
             Napier.e("Failed to load stored account", e)
@@ -167,12 +178,11 @@ class DefaultCloudAccountRepository(
 
             result.map { response ->
                 val registrationUserId = decodeWebAuthnUserId(response.data.registrationOptions.user.id) ?: Uuid.random()
-                val passkeyConfig = configRepository.getCurrentServerDescriptor()?.passkey
                 BeginAccountCreationResult(
                     sessionToken = response.data.sessionToken,
                     challenge = response.data.registrationOptions.challenge,
-                    rpId = passkeyConfig?.rpId ?: fallbackRpId(),
-                    rpName = passkeyConfig?.rpName ?: "LogDate",
+                    rpId = response.data.registrationOptions.rpId,
+                    rpName = response.data.registrationOptions.rpName,
                     userId = registrationUserId,
                     username = response.data.registrationOptions.user.name,
                     displayName = response.data.registrationOptions.user.displayName,
@@ -292,7 +302,7 @@ class DefaultCloudAccountRepository(
 
             result.onSuccess { newToken ->
                 // Update the stored token
-                secureStorage.putString(StorageKeys.ACCESS_TOKEN, newToken)
+                secureStorage.putString(scopedKey(StorageKeys.ACCESS_TOKEN, configRepository.getCurrentBackendUrl()), newToken)
             }
 
             result
@@ -308,18 +318,19 @@ class DefaultCloudAccountRepository(
      */
     override suspend fun signOut(): Result<Boolean> =
         try {
+            val backendUrl = configRepository.getCurrentBackendUrl()
             // Clear all stored account information
-            secureStorage.remove(StorageKeys.ACCESS_TOKEN)
-            secureStorage.remove(StorageKeys.REFRESH_TOKEN)
-            secureStorage.remove(StorageKeys.ACCOUNT_ID)
-            secureStorage.remove(StorageKeys.ACCOUNT_USERNAME)
-            secureStorage.remove(StorageKeys.ACCOUNT_DISPLAY_NAME)
-            secureStorage.remove(StorageKeys.ACCOUNT_DID)
-            secureStorage.remove(StorageKeys.ACCOUNT_HANDLE)
-            secureStorage.remove(StorageKeys.USER_ID)
-            secureStorage.remove(StorageKeys.CREATED_AT)
-            secureStorage.remove(StorageKeys.UPDATED_AT)
-            secureStorage.remove(StorageKeys.PASSKEY_IDS)
+            secureStorage.remove(scopedKey(StorageKeys.ACCESS_TOKEN, backendUrl))
+            secureStorage.remove(scopedKey(StorageKeys.REFRESH_TOKEN, backendUrl))
+            secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_ID, backendUrl))
+            secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_USERNAME, backendUrl))
+            secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_DISPLAY_NAME, backendUrl))
+            secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_DID, backendUrl))
+            secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_HANDLE, backendUrl))
+            secureStorage.remove(scopedKey(StorageKeys.USER_ID, backendUrl))
+            secureStorage.remove(scopedKey(StorageKeys.CREATED_AT, backendUrl))
+            secureStorage.remove(scopedKey(StorageKeys.UPDATED_AT, backendUrl))
+            secureStorage.remove(scopedKey(StorageKeys.PASSKEY_IDS, backendUrl))
 
             // Clear the current account
             accountFlow.value = null
@@ -374,7 +385,7 @@ class DefaultCloudAccountRepository(
         // This would typically involve API calls to associate the user ID with the account
         // For now, we'll just store the association locally
         return try {
-            secureStorage.putString(StorageKeys.USER_ID, userId.toString())
+            secureStorage.putString(scopedKey(StorageKeys.USER_ID, configRepository.getCurrentBackendUrl()), userId.toString())
             Result.success(true)
         } catch (e: Exception) {
             Napier.e("Error associating user identity", e)
@@ -389,24 +400,23 @@ class DefaultCloudAccountRepository(
         account: CloudAccount,
         credentials: AccountCredentials,
     ) {
-        coroutineScope
-            .launch {
-                secureStorage.putString(StorageKeys.ACCESS_TOKEN, credentials.accessToken)
-                secureStorage.putString(StorageKeys.REFRESH_TOKEN, credentials.refreshToken)
-                secureStorage.putString(StorageKeys.ACCOUNT_ID, account.id.toString())
-                secureStorage.putString(StorageKeys.ACCOUNT_USERNAME, account.username)
-                secureStorage.putString(StorageKeys.ACCOUNT_DISPLAY_NAME, account.displayName)
-                account.did?.let { secureStorage.putString(StorageKeys.ACCOUNT_DID, it) } ?: secureStorage.remove(StorageKeys.ACCOUNT_DID)
-                account.handle?.let { secureStorage.putString(StorageKeys.ACCOUNT_HANDLE, it) }
-                    ?: secureStorage.remove(StorageKeys.ACCOUNT_HANDLE)
-                secureStorage.putString(StorageKeys.USER_ID, account.userId.toString())
-                secureStorage.putString(StorageKeys.CREATED_AT, account.createdAt.toString())
-                secureStorage.putString(StorageKeys.UPDATED_AT, account.updatedAt.toString())
-                secureStorage.putString(
-                    StorageKeys.PASSKEY_IDS,
-                    account.passkeyCredentialIds.joinToString(",") { it.toString() },
-                )
-            }.join() // Wait for the storage operations to complete
+        val backendUrl = configRepository.getCurrentBackendUrl()
+        secureStorage.putString(scopedKey(StorageKeys.ACCESS_TOKEN, backendUrl), credentials.accessToken)
+        secureStorage.putString(scopedKey(StorageKeys.REFRESH_TOKEN, backendUrl), credentials.refreshToken)
+        secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_ID, backendUrl), account.id.toString())
+        secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_USERNAME, backendUrl), account.username)
+        secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_DISPLAY_NAME, backendUrl), account.displayName)
+        account.did?.let { secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_DID, backendUrl), it) }
+            ?: secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_DID, backendUrl))
+        account.handle?.let { secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_HANDLE, backendUrl), it) }
+            ?: secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_HANDLE, backendUrl))
+        secureStorage.putString(scopedKey(StorageKeys.USER_ID, backendUrl), account.userId.toString())
+        secureStorage.putString(scopedKey(StorageKeys.CREATED_AT, backendUrl), account.createdAt.toString())
+        secureStorage.putString(scopedKey(StorageKeys.UPDATED_AT, backendUrl), account.updatedAt.toString())
+        secureStorage.putString(
+            scopedKey(StorageKeys.PASSKEY_IDS, backendUrl),
+            account.passkeyCredentialIds.joinToString(",") { it.toString() },
+        )
     }
 
     private fun decodeWebAuthnUserId(encodedUserId: String): Uuid? =
@@ -415,10 +425,82 @@ class DefaultCloudAccountRepository(
             Uuid.parse(raw.decodeToString())
         }.getOrNull()
 
-    private fun fallbackRpId(): String =
-        configRepository
-            .getCurrentBackendUrl()
-            .removePrefix("https://")
-            .removePrefix("http://")
-            .substringBefore('/')
+    private suspend fun migrateLegacyKeysIfNeeded(backendUrl: String) {
+        if (secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_ID, backendUrl)) != null) {
+            return
+        }
+
+        val legacyAccountId = secureStorage.getString(StorageKeys.ACCOUNT_ID) ?: return
+        copyLegacyValue(
+            sourceKey = StorageKeys.ACCESS_TOKEN,
+            destinationKey = scopedKey(StorageKeys.ACCESS_TOKEN, backendUrl),
+        )
+        copyLegacyValue(
+            sourceKey = StorageKeys.REFRESH_TOKEN,
+            destinationKey = scopedKey(StorageKeys.REFRESH_TOKEN, backendUrl),
+        )
+        secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_ID, backendUrl), legacyAccountId)
+        copyLegacyValue(
+            sourceKey = StorageKeys.ACCOUNT_USERNAME,
+            destinationKey = scopedKey(StorageKeys.ACCOUNT_USERNAME, backendUrl),
+        )
+        copyLegacyValue(
+            sourceKey = StorageKeys.ACCOUNT_DISPLAY_NAME,
+            destinationKey = scopedKey(StorageKeys.ACCOUNT_DISPLAY_NAME, backendUrl),
+        )
+        copyLegacyValue(
+            sourceKey = StorageKeys.ACCOUNT_DID,
+            destinationKey = scopedKey(StorageKeys.ACCOUNT_DID, backendUrl),
+        )
+        copyLegacyValue(
+            sourceKey = StorageKeys.ACCOUNT_HANDLE,
+            destinationKey = scopedKey(StorageKeys.ACCOUNT_HANDLE, backendUrl),
+        )
+        copyLegacyValue(
+            sourceKey = StorageKeys.USER_ID,
+            destinationKey = scopedKey(StorageKeys.USER_ID, backendUrl),
+        )
+        copyLegacyValue(
+            sourceKey = StorageKeys.CREATED_AT,
+            destinationKey = scopedKey(StorageKeys.CREATED_AT, backendUrl),
+        )
+        copyLegacyValue(
+            sourceKey = StorageKeys.UPDATED_AT,
+            destinationKey = scopedKey(StorageKeys.UPDATED_AT, backendUrl),
+        )
+        copyLegacyValue(
+            sourceKey = StorageKeys.PASSKEY_IDS,
+            destinationKey = scopedKey(StorageKeys.PASSKEY_IDS, backendUrl),
+        )
+
+        listOf(
+            StorageKeys.ACCESS_TOKEN,
+            StorageKeys.REFRESH_TOKEN,
+            StorageKeys.ACCOUNT_ID,
+            StorageKeys.ACCOUNT_USERNAME,
+            StorageKeys.ACCOUNT_DISPLAY_NAME,
+            StorageKeys.ACCOUNT_DID,
+            StorageKeys.ACCOUNT_HANDLE,
+            StorageKeys.USER_ID,
+            StorageKeys.CREATED_AT,
+            StorageKeys.UPDATED_AT,
+            StorageKeys.PASSKEY_IDS,
+        ).forEach { key ->
+            secureStorage.remove(key)
+        }
+    }
+
+    private suspend fun copyLegacyValue(
+        sourceKey: String,
+        destinationKey: String,
+    ) {
+        secureStorage.getString(sourceKey)?.let { value ->
+            secureStorage.putString(destinationKey, value)
+        }
+    }
+
+    private fun scopedKey(
+        baseKey: String,
+        backendUrl: String,
+    ): String = "${baseKey}_${backendUrl.trim().removePrefix("https://").removePrefix("http://").replace(Regex("[^A-Za-z0-9]"), "_")}"
 }
