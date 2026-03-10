@@ -32,13 +32,41 @@ Passkeys authenticate a user **to** their custodian. DIDs identify the user **to
 
 ## Phases
 
-| Phase | Deliverable | Documents |
-|-------|------------|-----------|
-| 1 | Publishable Kotlin/KMP library modules: `shared/atproto-syntax`, `shared/atproto-identity`, `shared/atproto-xrpc`, `shared/atproto-crypto`, `shared/atproto-plc`, and `shared/atproto-repo` | [Architecture](./01-architecture.md) |
-| 2 | Server-side identity integration (signing keys, DID Documents, DID-aware account models) | [Architecture](./01-architecture.md), [Signing Keys](./05-signing-key-management.md) |
-| 3 | OAuth 2.0 Authorization Server with passkey authentication | [OAuth + Passkeys](./04-oauth-passkey-integration.md) |
-| 4 | Hosted PLC provisioning plus future PLC update and recovery tooling | [Architecture](./01-architecture.md) |
-| 5 | XRPC server endpoints backed by the shared library modules, starting with identity and a content-backed repo collection | [Architecture](./01-architecture.md) |
+| Phase | Status | Deliverable | Documents |
+|-------|--------|-------------|-----------|
+| 1 | Complete for the current standalone slice | Publishable Kotlin/KMP library modules: `shared/atproto-syntax`, `shared/atproto-identity`, `shared/atproto-xrpc`, `shared/atproto-crypto`, `shared/atproto-plc`, `shared/atproto-repo`, `shared/atproto-lexicon`, `shared/atproto-pds`, and `shared/atproto-pds-runtime`, plus shared publication tooling, aggregate Dokka/publish tasks, release workflow, and a standalone consumer sample | [Architecture](./01-architecture.md), [Acceptance Criteria](./03-acceptance-criteria.md) |
+| 2 | Complete for the current hosted identity slice | Server-side identity integration (signing keys, DID Documents, DID-aware account models) | [Architecture](./01-architecture.md), [Signing Keys](./05-signing-key-management.md) |
+| 3 | Complete for the current standalone authorization slice | OAuth 2.0 Authorization Server with passkey authentication and DPoP-bound access tokens | [OAuth + Passkeys](./04-oauth-passkey-integration.md) |
+| 4 | Partially complete | Hosted PLC provisioning plus future PLC update and recovery tooling | [Architecture](./01-architecture.md) |
+| 5 | Complete for the compatibility PDS slice | XRPC server endpoints backed by the shared library modules, shared discovery/repo runtime services, and a sync-backed multi-collection LogDate repo adapter | [Architecture](./01-architecture.md) |
+
+## Current Status
+
+The repo now has a real standalone `studio.hypertext.atproto` library surface:
+
+- publishable KMP modules under `shared/atproto-*`
+- `studio.hypertext.atproto.*` package namespaces across the shared library
+- Dokka-backed `javadoc` jars, `sources` jars, shared Maven POM metadata, and optional signing via the shared publication convention
+- aggregate `generateAtprotoDokka` and `publishAtprotoToMavenLocal` tasks plus an Android Studio run configuration for Dokka generation
+- a GitHub Actions release workflow for hosted Maven publication
+- checked-in LogDate lexicon JSON documents plus deterministic generated Kotlin models
+- checked-in official `com.atproto.identity.*`, `com.atproto.server.*`, and `com.atproto.repo.*` lexicon JSON documents plus deterministic generated Kotlin models for the currently served protocol surface
+- a standalone consumer sample in `samples/atproto-consumer` that builds against `mavenLocal()` artifacts instead of project dependencies
+- server identity, OAuth, and XRPC slices consuming the shared library contracts instead of duplicating route-local ATProto DTOs
+- a sync-backed multi-collection repo adapter that surfaces `content`, `journal`, and `association` collections through shared repo engine semantics
+
+The current backend ATProto support is still intentionally a hosted compatibility slice, not a full independently deployed PDS product.
+
+## Next Tasks / Todos
+
+These are the remaining ATProto tasks after the current library and compatibility-PDS milestone:
+
+- Expand lexicon/codegen coverage beyond the currently checked-in LogDate and official `com.atproto.*` surfaces we already consume.
+- Expand repo interoperability so CAR/MST/DAG-CBOR behavior is validated against external AT Protocol implementations, not only internal deterministic tests.
+- Replace the current sync-backed hydration adapter with durable canonical repo block-store persistence.
+- Expand the checked-in lexicon/codegen set from the current LogDate records to the broader protocol surface we consume.
+- Migrate the remaining legacy sync/auth compatibility layers onto the canonical repo model now that LogDate lexicons exist.
+- Implement the remaining hosted identity lifecycle work: PLC updates, recovery flows, and user-controlled export/import tooling beyond hosted genesis support.
 
 ## Documents in This Plan
 
@@ -54,12 +82,13 @@ Passkeys authenticate a user **to** their custodian. DIDs identify the user **to
 
 ## What This Plan Does NOT Cover (Yet)
 
-These are future work that build on the library core:
+These are future work that build on the current library core:
 
-- **Lexicon schemas** for LogDate data types (e.g., `app.logdate.journal.entry`)
-- **AT Protocol repo format** (Merkle Search Tree, CAR file export)
+- **Durable canonical repo persistence**, replacing the current sync-backed hydration adapter with a persistent block store
+- **Broader protocol-surface lexicon/codegen support** beyond the current checked-in LogDate records and shared parser/runtime
 - **Federation** (firehose, relay, AppView)
 - **ActivityPub integration** (kept as separate parallel effort in `shared/activitypub`)
+- **User-facing PLC recovery and migration tooling** beyond hosted genesis and key export
 
 The identity layer is the prerequisite for all of these. Get identity right first.
 
@@ -72,7 +101,13 @@ The identity layer is the prerequisite for all of these. Get identity right firs
 | `shared:atproto-xrpc` | `shared/atproto-xrpc` | Publishable Kotlin XRPC runtime with typed request builders and auth hooks |
 | `shared:atproto-crypto` | `shared/atproto-crypto` | Publishable Kotlin crypto helpers for multibase, multikey, and base58btc |
 | `shared:atproto-plc` | `shared/atproto-plc` | Publishable Kotlin PLC models, encoding, and directory client interfaces |
-| `shared:atproto-repo` | `shared/atproto-repo` | Publishable Kotlin repo record primitives and store interfaces |
+| `shared:atproto-repo` | `shared/atproto-repo` | Publishable Kotlin repo primitives, CID/DAG-CBOR helpers, block storage, and deterministic repo engine interfaces |
+| `shared:atproto-lexicon` | `shared/atproto-lexicon` | Publishable Kotlin lexicon parsing, validation, registry, and deterministic codegen utilities |
+| `shared:atproto-pds` | `shared/atproto-pds` | Publishable Kotlin discovery, OAuth, identity, and repo wire models plus shared service contracts |
+| `shared:atproto-pds-runtime` | `shared/atproto-pds-runtime` | Publishable Kotlin runtime implementations for shared discovery and repo PDS services |
+| `AtprotoPublishedModulePlugin` | `build-logic/src/main/kotlin/app/logdate/AtprotoPublishedModulePlugin.kt` | Shared Gradle publication convention for all standalone ATProto modules |
+| `ATProto Library Docs` | `docs/reference/atproto-library.md`, `docs/reference/atproto-publishing.md` | Consumer-facing and maintainer-facing documentation for the standalone library |
+| `ATProto Consumer Sample` | `samples/atproto-consumer` | External JVM sample that consumes the published Maven-local artifacts |
 | `WebAuthnPasskeyService` | `server/src/.../passkeys/WebAuthnPasskeyService.kt` | Reused unchanged as authentication within OAuth |
 | `TokenService` | `server/src/.../auth/TokenService.kt` | Extended with DID-aware token generation |
 | `AccountsTable` | `server/src/.../database/Tables.kt` | Extended with `did` and `signingKeyPublic` columns |

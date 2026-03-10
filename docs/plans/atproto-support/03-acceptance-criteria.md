@@ -13,6 +13,9 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
   - `shared:atproto-crypto`
   - `shared:atproto-plc`
   - `shared:atproto-repo`
+  - `shared:atproto-lexicon`
+  - `shared:atproto-pds`
+  - `shared:atproto-pds-runtime`
 - Their package namespace is `studio.hypertext.atproto.*`.
 - They do not depend on LogDate app models.
 
@@ -46,6 +49,28 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
 
 - `atproto-repo` exposes repo record identifiers, list-page models, write results, and a record-store interface.
 - The repo module is usable by server code without depending on sync DTOs.
+
+### P1.7 Publication and External Consumption
+
+- The standalone ATProto modules share one publication convention plugin.
+- Publishing to `mavenLocal()` produces:
+  - module jars
+  - `sources` jars
+  - Dokka-backed `javadoc` jars
+  - Maven POM metadata
+- A standalone sample project can consume the published Maven-local artifacts without using project dependencies.
+- The root build exposes:
+  - `generateAtprotoDokka`
+  - `publishAtprotoToMavenLocal`
+- A checked-in Android Studio run configuration exists for `generateAtprotoDokka`.
+- Hosted Maven release automation exists for the ATProto artifact family.
+
+### P1.8 Lexicon Resources and Deterministic Codegen
+
+- `shared:atproto-lexicon` validates the checked-in LogDate lexicon documents.
+- `shared:atproto-lexicon` validates the checked-in official `com.atproto.identity.*`, `com.atproto.server.*`, and `com.atproto.repo.*` lexicon documents used by the current server surface.
+- `generateLogDateLexicons` rewrites the checked-in LogDate generated Kotlin without content drift.
+- `generateOfficialAtprotoLexicons` rewrites the checked-in official generated Kotlin without content drift.
 
 ## Phase 2: Server Identity Integration
 
@@ -145,24 +170,27 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
 
 ### P5.2 Repo Record Endpoints
 
-- `com.atproto.repo.getRecord` reads the compatibility collection.
-- `com.atproto.repo.listRecords` pages the compatibility collection.
-- `com.atproto.repo.createRecord`, `putRecord`, and `deleteRecord` mutate the compatibility collection.
+- `com.atproto.repo.getRecord` reads the currently exposed LogDate repo collections.
+- `com.atproto.repo.listRecords` pages the currently exposed LogDate repo collections.
+- `com.atproto.repo.createRecord`, `putRecord`, and `deleteRecord` mutate the currently exposed LogDate repo collections.
 - Repo writes accept either:
   - first-party LogDate bearer JWTs
   - OAuth DPoP access tokens
 
 ### P5.3 Current Repo Scope
 
-- The currently exposed collection is `studio.hypertext.logdate.content`.
-- The backing store is `AtprotoContentRecordStore`.
-- This is an adapter over the existing content sync store, not the final canonical MST/CAR repo implementation.
+- The currently exposed collections are:
+  - `studio.hypertext.logdate.content`
+  - `studio.hypertext.logdate.journal`
+  - `studio.hypertext.logdate.association`
+- The backing store is `LogDateRepoStore`, which uses the shared repo engine for collection-aware reads, writes, cursors, and export semantics.
+- Persistence is still sync-backed today, not the final durable MST/CAR block-store implementation.
 
 ## Explicit Non-Goals for This Plan Revision
 
 - Path-based `did:web`
 - Replacing the first-party LogDate auth flow
-- Full AT Protocol repo persistence, CAR export, or MST support
+- Full externally verified AT Protocol repo interoperability and durable canonical repo persistence
 - Relay, firehose, or AppView federation
-- Lexicon code generation
+- Full protocol-surface lexicon code generation
 - User-facing PLC recovery and migration flows beyond hosted genesis support

@@ -156,9 +156,9 @@ These journeys describe the current target architecture and the shipped AT Proto
 - LogDate still supports standards-based `did:web` where it fits the deployment model.
 - Path-based `did:web` is never used.
 
-## Journey 8: Repo-Style XRPC Writes Map to Existing LogDate Content
+## Journey 8: Repo-Style XRPC Writes Map to Current LogDate Collections
 
-**Actor**: A client writing the current compatibility collection.
+**Actor**: A client writing the currently exposed LogDate repo collections.
 
 1. The client authenticates with either:
    - LogDate bearer JWT
@@ -167,10 +167,14 @@ These journeys describe the current target architecture and the shipped AT Proto
    - `com.atproto.repo.createRecord`
    - `com.atproto.repo.putRecord`
    - `com.atproto.repo.deleteRecord`
-3. The server routes the write through `AtprotoContentRecordStore`.
-4. That store maps the XRPC record to LogDate’s existing content sync records.
-5. Reads from `getRecord` and `listRecords` surface the same compatibility collection.
+3. The server routes the write through `LogDateRepoStore` via the shared `PdsRepoService` runtime.
+4. `LogDateRepoStore` hydrates the shared repo engine from the account's sync-backed records, applies the repo write with collection-aware semantics, and persists the resulting state back into LogDate storage.
+5. The currently exposed collections are:
+   - `studio.hypertext.logdate.content`
+   - `studio.hypertext.logdate.journal`
+   - `studio.hypertext.logdate.association`
+6. Reads from `getRecord` and `listRecords` surface the same collection set with shared repo cursors and record IDs.
 
 **Outcome**
 
-- LogDate exposes a small standalone PDS-like surface now while the full repo implementation remains future work.
+- LogDate exposes a small standalone PDS-like surface now while durable block-store persistence and broader protocol interoperability remain future work.

@@ -32,6 +32,52 @@ This manifest reflects the current AT Protocol implementation shape in the repo.
 - `shared/atproto-crypto/src/commonMain/kotlin/studio/hypertext/atproto/crypto/Base58Btc.kt`
 - `shared/atproto-crypto/src/commonMain/kotlin/studio/hypertext/atproto/crypto/Multikey.kt`
 
+### Lexicon
+
+- `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/LexiconModels.kt`
+- `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/LexiconParser.kt`
+- `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/LexiconValidator.kt`
+- `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/LexiconRegistry.kt`
+- `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/LexiconCodegen.kt`
+- `shared/atproto-lexicon/src/jvmMain/kotlin/studio/hypertext/atproto/lexicon/GenerateLexicons.kt`
+- `shared/atproto-lexicon/src/commonMain/resources/studio/hypertext/logdate/content.json`
+- `shared/atproto-lexicon/src/commonMain/resources/studio/hypertext/logdate/journal.json`
+- `shared/atproto-lexicon/src/commonMain/resources/studio/hypertext/logdate/association.json`
+- `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/logdate/ContentLexicon.kt`
+- `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/logdate/JournalLexicon.kt`
+- `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/logdate/AssociationLexicon.kt`
+- `shared/atproto-lexicon/src/commonMain/resources/com/atproto/identity/resolveHandle.json`
+- `shared/atproto-lexicon/src/commonMain/resources/com/atproto/server/describeServer.json`
+- `shared/atproto-lexicon/src/commonMain/resources/com/atproto/repo/createRecord.json`
+- `shared/atproto-lexicon/src/commonMain/resources/com/atproto/repo/defs.json`
+- `shared/atproto-lexicon/src/commonMain/resources/com/atproto/repo/deleteRecord.json`
+- `shared/atproto-lexicon/src/commonMain/resources/com/atproto/repo/describeRepo.json`
+- `shared/atproto-lexicon/src/commonMain/resources/com/atproto/repo/getRecord.json`
+- `shared/atproto-lexicon/src/commonMain/resources/com/atproto/repo/listRecords.json`
+- `shared/atproto-lexicon/src/commonMain/resources/com/atproto/repo/putRecord.json`
+- `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/com/atproto/identity/ResolveHandleLexicon.kt`
+- `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/com/atproto/server/DescribeServerLexicon.kt`
+- `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/com/atproto/repo/CreateRecordLexicon.kt`
+- `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/com/atproto/repo/DefsLexicon.kt`
+- `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/com/atproto/repo/DeleteRecordLexicon.kt`
+- `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/com/atproto/repo/DescribeRepoLexicon.kt`
+- `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/com/atproto/repo/GetRecordLexicon.kt`
+- `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/com/atproto/repo/ListRecordsLexicon.kt`
+- `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/com/atproto/repo/PutRecordLexicon.kt`
+
+### PDS Contracts
+
+- `shared/atproto-pds/src/commonMain/kotlin/studio/hypertext/atproto/pds/DiscoveryModels.kt`
+- `shared/atproto-pds/src/commonMain/kotlin/studio/hypertext/atproto/pds/OAuthModels.kt`
+- `shared/atproto-pds/src/commonMain/kotlin/studio/hypertext/atproto/pds/RepoModels.kt`
+- `shared/atproto-pds/src/commonMain/kotlin/studio/hypertext/atproto/pds/Services.kt`
+- `shared/atproto-pds/src/commonMain/kotlin/studio/hypertext/atproto/pds/PdsException.kt`
+
+### PDS Runtime
+
+- `shared/atproto-pds-runtime/src/commonMain/kotlin/studio/hypertext/atproto/pds/runtime/StaticPdsDiscoveryService.kt`
+- `shared/atproto-pds-runtime/src/commonMain/kotlin/studio/hypertext/atproto/pds/runtime/DefaultPdsRepoService.kt`
+
 ### PLC
 
 - `shared/atproto-plc/src/commonMain/kotlin/studio/hypertext/atproto/plc/PlcModels.kt`
@@ -41,6 +87,11 @@ This manifest reflects the current AT Protocol implementation shape in the repo.
 
 ### Repo
 
+- `shared/atproto-repo/src/commonMain/kotlin/studio/hypertext/atproto/repo/Cid.kt`
+- `shared/atproto-repo/src/commonMain/kotlin/studio/hypertext/atproto/repo/DagCborCodec.kt`
+- `shared/atproto-repo/src/commonMain/kotlin/studio/hypertext/atproto/repo/MerkleSearchTree.kt`
+- `shared/atproto-repo/src/commonMain/kotlin/studio/hypertext/atproto/repo/RepoBlockStore.kt`
+- `shared/atproto-repo/src/commonMain/kotlin/studio/hypertext/atproto/repo/RepoEngine.kt`
 - `shared/atproto-repo/src/commonMain/kotlin/studio/hypertext/atproto/repo/RepoModels.kt`
 - `shared/atproto-repo/src/commonMain/kotlin/studio/hypertext/atproto/repo/RepoRecordStore.kt`
 - `shared/atproto-repo/src/commonMain/kotlin/studio/hypertext/atproto/repo/RepoException.kt`
@@ -70,6 +121,8 @@ This manifest reflects the current AT Protocol implementation shape in the repo.
 - `server/src/main/kotlin/app/logdate/server/routes/OAuthRoutes.kt`
 - `server/src/main/kotlin/app/logdate/server/routes/XrpcRoutes.kt`
 - `server/src/main/kotlin/app/logdate/server/atproto/AtprotoContentRecordStore.kt`
+- `server/src/main/kotlin/app/logdate/server/atproto/LogDateRepoStore.kt`
+- `server/src/main/kotlin/app/logdate/server/atproto/SyntheticCid.kt`
 
 ## Shared and Client Model Integration
 
@@ -84,12 +137,30 @@ This manifest reflects the current AT Protocol implementation shape in the repo.
 ## Wiring and Build Integration
 
 - `settings.gradle.kts`
+- `gradle.properties`
+- `build-logic/src/main/kotlin/app/logdate/AtprotoPublishedModulePlugin.kt`
+- `build.gradle.kts`
 - `server/build.gradle.kts`
+- `shared/atproto-syntax/build.gradle.kts`
 - `shared/atproto-identity/build.gradle.kts`
-- `shared/atproto-xrpc/build.gradle.kts`
 - `shared/atproto-crypto/build.gradle.kts`
+- `shared/atproto-xrpc/build.gradle.kts`
 - `shared/atproto-plc/build.gradle.kts`
 - `shared/atproto-repo/build.gradle.kts`
+- `shared/atproto-lexicon/build.gradle.kts`
+- `shared/atproto-pds/build.gradle.kts`
+- `shared/atproto-pds-runtime/build.gradle.kts`
+
+## Library Documentation and Samples
+
+- `docs/reference/atproto-library.md`
+- `docs/reference/atproto-publishing.md`
+- `.run/Generate ATProto Dokka.run.xml`
+- `.github/workflows/publish-atproto.yml`
+- `samples/atproto-consumer/build.gradle.kts`
+- `samples/atproto-consumer/settings.gradle.kts`
+- `samples/atproto-consumer/README.md`
+- `samples/atproto-consumer/src/main/kotlin/studio/hypertext/atproto/sample/Main.kt`
 
 ## Primary Test Coverage
 
@@ -97,6 +168,10 @@ This manifest reflects the current AT Protocol implementation shape in the repo.
 
 - `shared/atproto-crypto/src/commonTest/...`
 - `shared/atproto-identity/src/commonTest/...`
+- `shared/atproto-lexicon/src/commonTest/...`
+- `shared/atproto-lexicon/src/jvmTest/...`
+- `shared/atproto-pds/src/commonTest/...`
+- `shared/atproto-pds-runtime/src/commonTest/...`
 - `shared/atproto-plc/src/commonTest/...`
 - `shared/atproto-repo/src/commonTest/...`
 - `shared/atproto-syntax/src/commonTest/...`

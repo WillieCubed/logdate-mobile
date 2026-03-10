@@ -86,7 +86,7 @@ The LogDate server holds user data and signing keys **on behalf of** the user. T
 
 ## Module Structure
 
-### New modules: `shared/atproto-syntax`, `shared/atproto-identity`, `shared/atproto-xrpc`, `shared/atproto-crypto`, `shared/atproto-plc`, `shared/atproto-repo`
+### Shared library modules
 
 Kotlin Multiplatform library modules providing publishable AT Protocol primitives for both client and server consumers.
 
@@ -130,16 +130,46 @@ shared/atproto-plc/
 
 shared/atproto-repo/
   src/commonMain/kotlin/studio/hypertext/atproto/repo/
+    Cid.kt
+    DagCborCodec.kt
+    MerkleSearchTree.kt
+    RepoBlockStore.kt
+    RepoEngine.kt
     RepoModels.kt
     RepoRecordStore.kt
     RepoException.kt
+
+shared/atproto-lexicon/
+  src/commonMain/kotlin/studio/hypertext/atproto/lexicon/
+    LexiconModels.kt
+    LexiconParser.kt
+    LexiconValidator.kt
+    LexiconRegistry.kt
+    LexiconCodegen.kt
+  src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/logdate/
+    ContentLexicon.kt
+    JournalLexicon.kt
+    AssociationLexicon.kt
+
+shared/atproto-pds/
+  src/commonMain/kotlin/studio/hypertext/atproto/pds/
+    DiscoveryModels.kt
+    OAuthModels.kt
+    RepoModels.kt
+    Services.kt
+    PdsException.kt
+
+shared/atproto-pds-runtime/
+  src/commonMain/kotlin/studio/hypertext/atproto/pds/runtime/
+    StaticPdsDiscoveryService.kt
+    DefaultPdsRepoService.kt
 ```
 
 Dependencies: `kotlinx.serialization`, coroutines, and Ktor client. These modules remain free of LogDate app models.
 
 ### Current repo-backed server slice
 
-The server now exposes a narrow repo-style XRPC surface backed by the existing content sync store:
+The server now exposes a repo-style XRPC surface backed by a sync-backed multi-collection adapter that hydrates the shared repo engine:
 
 - `com.atproto.repo.describeRepo`
 - `com.atproto.repo.getRecord`
@@ -148,11 +178,13 @@ The server now exposes a narrow repo-style XRPC surface backed by the existing c
 - `com.atproto.repo.putRecord`
 - `com.atproto.repo.deleteRecord`
 
-This slice intentionally supports one collection first:
+This slice currently exposes:
 
 - `studio.hypertext.logdate.content`
+- `studio.hypertext.logdate.journal`
+- `studio.hypertext.logdate.association`
 
-The backing implementation is a compatibility adapter, not the final canonical AT Protocol repo format. It gives third-party clients a standards-named entrypoint while LogDate continues toward a fuller repo/MST/CAR implementation.
+The backing implementation is `LogDateRepoStore`, which hydrates `DefaultRepoEngine` from the existing sync repository and persists writes back into those sync tables. That gives route behavior canonical collection-aware repo semantics today while remaining compatible with the current storage model. Durable block-store persistence is still future work.
 
 ### New server package: `server/.../identity/`
 
@@ -191,6 +223,22 @@ server/src/main/kotlin/app/logdate/server/routes/
     IdentityApiRoutes.kt  -- first-party signing-key export endpoint
     OAuthRoutes.kt        -- OAuth 2.0 endpoints
     XrpcRoutes.kt         -- AT Protocol identity and repo endpoints
+```
+
+### Publishing and tooling
+
+The ATProto modules now share a publication and tooling layer:
+
+```
+build-logic/src/main/kotlin/app/logdate/
+    AtprotoPublishedModulePlugin.kt -- Shared publish/signing/Dokka convention
+
+root project
+    generateAtprotoDokka            -- Aggregate Dokka HTML generation
+    publishAtprotoToMavenLocal      -- Aggregate local publication
+
+.github/workflows/
+    publish-atproto.yml             -- Hosted Maven release workflow
 ```
 
 ## Database Schema Changes

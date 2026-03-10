@@ -17,9 +17,11 @@
 - `shared/atproto-xrpc`
   - Ktor-backed XRPC client primitives
 - `shared/atproto-lexicon`
-  - lexicon parsing, validation, registry lookups, and deterministic codegen output
+  - lexicon parsing, validation, registry lookups, official `com.atproto.*` resources, and deterministic codegen output
 - `shared/atproto-pds`
   - shared request/response models and service contracts for discovery, identity, OAuth, and repo surfaces
+- `shared/atproto-pds-runtime`
+  - reusable runtime implementations for discovery and repo services backed by the shared PDS contracts
 
 ## Maven Coordinates
 
@@ -31,6 +33,7 @@
 - `studio.hypertext.atproto:atproto-plc:$version`
 - `studio.hypertext.atproto:atproto-lexicon:$version`
 - `studio.hypertext.atproto:atproto-pds:$version`
+- `studio.hypertext.atproto:atproto-pds-runtime:$version`
 
 The repo-wide default version lives in [`gradle.properties`](/Users/williecubed/Projects/TheHypertextStudio/logdate-android/gradle.properties) as `atproto.version`.
 
@@ -66,18 +69,15 @@ val response: ResolveHandleResponse =
 
 ## Publishing
 
+Maintainers should use the detailed publishing guide in
+[`atproto-publishing.md`](/Users/williecubed/Projects/TheHypertextStudio/logdate-android/docs/reference/atproto-publishing.md)
+for property precedence, remote publish task names, signing behavior, and
+artifact expectations.
+
 Publish locally:
 
 ```bash
-./gradlew \
-  :shared:atproto-crypto:publishToMavenLocal \
-  :shared:atproto-syntax:publishToMavenLocal \
-  :shared:atproto-identity:publishToMavenLocal \
-  :shared:atproto-xrpc:publishToMavenLocal \
-  :shared:atproto-repo:publishToMavenLocal \
-  :shared:atproto-plc:publishToMavenLocal \
-  :shared:atproto-lexicon:publishToMavenLocal \
-  :shared:atproto-pds:publishToMavenLocal
+./gradlew publishAtprotoToMavenLocal
 ```
 
 Publish to a remote Maven repository by setting:
@@ -90,6 +90,27 @@ Publish to a remote Maven repository by setting:
 - `SIGNING_PASSWORD`
 
 The build logic uses those values for Maven repository credentials, POM metadata, Dokka-backed `javadoc` jars, and in-memory PGP signing.
+
+Generate API docs for every ATProto module:
+
+```bash
+./gradlew generateAtprotoDokka
+```
+
+Regenerate the checked-in LogDate lexicon models:
+
+```bash
+./gradlew :shared:atproto-lexicon:generateLogDateLexicons
+```
+
+Regenerate the checked-in official AT Protocol lexicon models used by this repo:
+
+```bash
+./gradlew :shared:atproto-lexicon:generateOfficialAtprotoLexicons
+```
+
+Android Studio users can run the same Dokka task through
+[`Generate ATProto Dokka.run.xml`](/Users/williecubed/Projects/TheHypertextStudio/logdate-android/.run/Generate%20ATProto%20Dokka.run.xml).
 
 ## Standalone Sample
 
@@ -104,15 +125,18 @@ Run it after publishing the ATProto modules locally:
 ## Current Scope
 
 - Standalone Kotlin/KMP modules with explicit public APIs and typed value objects
-- ATProto identity resolution, OAuth/PDS wire models, repo CRUD plus commit/export primitives, and low-level XRPC client support
+- ATProto identity resolution, OAuth/PDS wire models, reusable PDS runtime services, repo CRUD plus commit/export primitives, and low-level XRPC client support
 - Server integration in this repo now consumes shared PDS and repo contracts instead of defining duplicate route DTOs
-- Publishable Maven metadata, signing hooks, Dokka-backed documentation jars, and a standalone consumer sample
+- Checked-in LogDate lexicon JSON documents plus deterministic generated Kotlin models
+- Checked-in official `com.atproto.*` lexicon JSON documents plus deterministic generated Kotlin models for the current server/repo/identity surface
+- Publishable Maven metadata, signing hooks, Dokka-backed documentation jars, aggregate Dokka/publish tasks, and a standalone consumer sample
+- GitHub Actions release automation for hosted Maven publishing
 
 ## Not Yet Complete
 
 - Full CAR/MST interoperability with external AT Protocol implementations
 - Lexicon code generation for the full protocol surface
-- A standalone PDS server runtime module
-- Hosted release automation
+- A durable standalone PDS deployment story outside this repository's `server` module
+- Durable repo block-store persistence instead of the current sync-backed hydration adapter
 
 Until those pieces land, treat the current library as a strong standalone core rather than a full end-to-end AT Protocol SDK.

@@ -55,15 +55,16 @@ New routes are added without removing existing ones:
 
 The existing auth and sync endpoints remain intact.
 
-## Stage 5: Compatibility Repo Adapter
+## Stage 5: Sync-Backed Multi-Collection Repo Adapter
 
-The initial PDS slice maps AT Protocol repo requests onto the current LogDate content storage via `AtprotoContentRecordStore`.
+The current PDS slice maps AT Protocol repo requests onto LogDate's existing sync-backed storage through `LogDateRepoStore`, which hydrates the shared repo engine and persists the resulting state back into the sync repository.
 
 This means:
 
-- AT Protocol clients can read and write the compatibility collection now
-- the existing sync/content storage remains the source behind that adapter for now
-- the final MST/CAR-backed repo migration is still future work
+- AT Protocol clients can read and write the currently exposed LogDate collections now
+- collection-aware repo behavior comes from the shared repo engine rather than route-local DTO logic
+- the existing sync storage remains the persistence layer behind that adapter for now
+- the final durable block-store MST/CAR migration is still future work
 
 ## Hosted DID Method Strategy
 
@@ -122,6 +123,6 @@ Rolling back should not require inventing an invalid `did:web` shape.
 - durable OAuth storage
 - PLC update and recovery flows
 - user-controlled rotation keys
-- canonical MST/CAR repo persistence
-- broader LogDate lexicon and multi-collection repo migration
+- durable repo block-store persistence beyond the current sync-backed adapter
+- broader protocol-surface lexicon/codegen coverage
 - federation surfaces such as relay or firehose
