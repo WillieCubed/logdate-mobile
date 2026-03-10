@@ -24,6 +24,7 @@ import app.logdate.feature.editor.ui.editor.fakes.FakeJournalContentRepository
 import app.logdate.feature.editor.ui.editor.fakes.FakeJournalNotesRepository
 import app.logdate.feature.editor.ui.editor.fakes.FakeJournalRepository
 import app.logdate.feature.editor.ui.editor.fakes.FakeLocationHistoryRepository
+import app.logdate.feature.editor.ui.editor.fakes.FakeLocationTrackingSettingsRepository
 import app.logdate.feature.editor.ui.editor.fakes.FakeMediaManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -92,6 +93,7 @@ class TextEditingTest {
                 journalContentRepository = journalContentRepository,
                 logLocationUseCase = logLocationUseCase,
                 logCurrentLocationUseCase = logCurrentLocationUseCase,
+                settingsRepository = FakeLocationTrackingSettingsRepository(),
                 mediaManager = mediaManager,
             )
         val fetchEntryUseCase = FetchEntryUseCase(journalNotesRepository)
@@ -272,5 +274,81 @@ class TextEditingTest {
 
             assertFalse(cleared)
             assertEquals(1, viewModel.editorState.value.blocks.size)
+        }
+
+    @Test
+    fun testAppendTextBlockAddsNewBlock() =
+        testScope.runTest {
+            viewModel.appendTextBlock("Hello from drag-and-drop")
+            advanceUntilIdle()
+
+            val state = viewModel.editorState.value
+            assertEquals(1, state.blocks.size)
+            val block = state.blocks.first() as TextBlockUiState
+            assertEquals("Hello from drag-and-drop", block.content)
+        }
+
+    @Test
+    fun testAppendTextBlockWithBlankTextIsIgnored() =
+        testScope.runTest {
+            viewModel.appendTextBlock("   ")
+            advanceUntilIdle()
+
+            assertTrue(
+                viewModel.editorState.value.blocks
+                    .isEmpty(),
+            )
+        }
+
+    @Test
+    fun testAppendTextBlockWithEmptyStringIsIgnored() =
+        testScope.runTest {
+            viewModel.appendTextBlock("")
+            advanceUntilIdle()
+
+            assertTrue(
+                viewModel.editorState.value.blocks
+                    .isEmpty(),
+            )
+        }
+
+    @Test
+    fun testAppendTextBlockSetsIsModified() =
+        testScope.runTest {
+            viewModel.appendTextBlock("Some dropped text")
+            advanceUntilIdle()
+
+            assertTrue(viewModel.editorState.value.isDirty)
+        }
+
+    @Test
+    fun testAppendTextBlockOnPopulatedEditorAppendsToEnd() =
+        testScope.runTest {
+            val existing = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
+            viewModel.updateBlock(existing.copy(content = "First block"))
+            advanceUntilIdle()
+
+            viewModel.appendTextBlock("Dropped text")
+            advanceUntilIdle()
+
+            val state = viewModel.editorState.value
+            assertEquals(2, state.blocks.size)
+            val appended = state.blocks.last() as TextBlockUiState
+            assertEquals("Dropped text", appended.content)
+        }
+
+    @Test
+    fun testAppendTextBlockMultipleDropsAppendInOrder() =
+        testScope.runTest {
+            viewModel.appendTextBlock("First drop")
+            viewModel.appendTextBlock("Second drop")
+            viewModel.appendTextBlock("Third drop")
+            advanceUntilIdle()
+
+            val blocks = viewModel.editorState.value.blocks
+            assertEquals(3, blocks.size)
+            assertEquals("First drop", (blocks[0] as TextBlockUiState).content)
+            assertEquals("Second drop", (blocks[1] as TextBlockUiState).content)
+            assertEquals("Third drop", (blocks[2] as TextBlockUiState).content)
         }
 }

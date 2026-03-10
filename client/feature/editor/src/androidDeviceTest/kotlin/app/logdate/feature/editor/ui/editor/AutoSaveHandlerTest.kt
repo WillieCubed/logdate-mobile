@@ -85,7 +85,7 @@ class AutoSaveHandlerTest {
         assertNotNull(lastSavedState)
         val savedBlock = lastSavedState?.blocks?.firstOrNull() as? TextBlockUiState
         assertNotNull(savedBlock)
-        assertEquals("Updated content", savedBlock.content)
+        assertEquals("Updated content", savedBlock!!.content)
     }
 
     @Test

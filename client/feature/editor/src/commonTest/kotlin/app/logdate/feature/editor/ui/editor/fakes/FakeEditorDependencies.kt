@@ -1,6 +1,8 @@
 package app.logdate.feature.editor.ui.editor.fakes
 
 import app.logdate.client.location.ClientLocationProvider
+import app.logdate.client.location.settings.LocationTrackingSettings
+import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
 import app.logdate.client.media.MediaPayload
@@ -323,6 +325,26 @@ class FakeMediaManager : MediaManager {
         )
 
     override suspend fun saveMedia(payload: MediaPayload): String = "file:///tmp/${payload.fileName}"
+}
+
+class FakeLocationTrackingSettingsRepository : LocationTrackingSettingsRepository {
+    private val settings = LocationTrackingSettings()
+
+    override suspend fun getSettings(): LocationTrackingSettings = settings
+
+    override fun observeSettings(): kotlinx.coroutines.flow.Flow<LocationTrackingSettings> = flowOf(settings)
+
+    override suspend fun updateSettings(settings: LocationTrackingSettings) {
+        // No-op for tests
+    }
+
+    override suspend fun setBackgroundTrackingEnabled(enabled: Boolean) {
+        // No-op for tests
+    }
+
+    override suspend fun setTrackingInterval(intervalMinutes: Long) {
+        // No-op for tests
+    }
 }
 
 class FakeEditorMediator : EditorMediator {
