@@ -1,6 +1,6 @@
 package app.logdate.server
 
-import app.logdate.server.atproto.AtprotoContentRecordStore
+import app.logdate.server.atproto.LogDateRepoStore
 import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.AuthMetricsRegistry
@@ -42,6 +42,9 @@ import io.ktor.server.routing.routing
 import io.ktor.server.testing.TestApplicationBuilder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
+import studio.hypertext.atproto.pds.DescribeServerResponse
+import studio.hypertext.atproto.pds.runtime.DefaultPdsRepoService
+import studio.hypertext.atproto.pds.runtime.StaticPdsDiscoveryService
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -84,11 +87,25 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
             signingKeyService = signingKeyService,
             config = atprotoIdentityConfig,
         )
-    val atprotoContentRecordStore = AtprotoContentRecordStore(syncRepository = syncRepository, identityService = atprotoIdentityService)
+    val logDateRepoStore = LogDateRepoStore(syncRepository = syncRepository, identityService = atprotoIdentityService)
+    atprotoIdentityService.setRepoCollectionsResolver(logDateRepoStore::collectionsForDid)
     val oauthKeyService = OAuthKeyService()
     val oauthNonceService = OAuthNonceService()
     val oauthDpopVerifier = OAuthDpopVerifier()
     val oauthAccessTokenService = OAuthAccessTokenService(config = oauthConfig, keyService = oauthKeyService)
+    val pdsRepoService = DefaultPdsRepoService(logDateRepoStore)
+    val pdsDiscoveryService =
+        StaticPdsDiscoveryService(
+            authorizationServerMetadata = oauthConfig.authorizationServerMetadata(),
+            protectedResourceMetadata = oauthConfig.protectedResourceMetadata(),
+            describeServerResponse =
+                DescribeServerResponse(
+                    did = atprotoIdentityConfig.serverDid,
+                    availableUserDomains = listOf(atprotoIdentityConfig.normalizedHandleDomain),
+                    inviteCodeRequired = false,
+                    phoneVerificationRequired = false,
+                ),
+        )
     val metadataResolver = oauthClientMetadataResolver ?: OAuthClientMetadataResolver(HttpClient(OkHttp))
     val oauthAuthorizationService =
         OAuthAuthorizationService(
@@ -118,6 +135,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
             oauthRoutes(
                 config = oauthConfig,
                 keyService = oauthKeyService,
+                discoveryService = pdsDiscoveryService,
                 authorizationService = oauthAuthorizationService,
                 accountRepository = accountRepository,
                 tokenService = tokenService,
@@ -125,9 +143,10 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
             )
             xrpcRoutes(
                 identityService = atprotoIdentityService,
+                discoveryService = pdsDiscoveryService,
                 accountRepository = accountRepository,
                 tokenService = tokenService,
-                repoRecordStore = atprotoContentRecordStore,
+                repoService = pdsRepoService,
                 oauthAccessTokenService = oauthAccessTokenService,
                 oauthDpopVerifier = oauthDpopVerifier,
                 oauthNonceService = oauthNonceService,

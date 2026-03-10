@@ -31,6 +31,7 @@ import studio.hypertext.atproto.pds.AuthorizationPromptResponse
 import studio.hypertext.atproto.pds.OAuthErrorResponse
 import studio.hypertext.atproto.pds.OAuthRevokeRequest
 import studio.hypertext.atproto.pds.OAuthTokenResponse
+import studio.hypertext.atproto.pds.PdsDiscoveryService
 import studio.hypertext.atproto.pds.PushedAuthorizationBody
 import studio.hypertext.atproto.pds.PushedAuthorizationRequest
 import studio.hypertext.atproto.pds.RefreshTokenGrantRequest
@@ -44,17 +45,18 @@ import kotlin.uuid.Uuid
 fun Route.oauthRoutes(
     config: OAuthConfig,
     keyService: OAuthKeyService,
+    discoveryService: PdsDiscoveryService? = null,
     authorizationService: OAuthAuthorizationService? = null,
     accountRepository: AccountRepository? = null,
     tokenService: TokenService? = null,
     identityService: AtprotoIdentityService? = null,
 ) {
     get("/.well-known/oauth-authorization-server") {
-        call.respond(HttpStatusCode.OK, config.authorizationServerMetadata())
+        call.respond(HttpStatusCode.OK, discoveryService?.authorizationServerMetadata() ?: config.authorizationServerMetadata())
     }
 
     get("/.well-known/oauth-protected-resource") {
-        call.respond(HttpStatusCode.OK, config.protectedResourceMetadata())
+        call.respond(HttpStatusCode.OK, discoveryService?.protectedResourceMetadata() ?: config.protectedResourceMetadata())
     }
 
     get("/oauth/jwks") {

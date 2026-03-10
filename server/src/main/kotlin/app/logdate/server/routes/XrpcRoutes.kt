@@ -1,6 +1,5 @@
 package app.logdate.server.routes
 
-import app.logdate.server.atproto.AtprotoContentRecordStore
 import app.logdate.server.atproto.InvalidSwapException
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountRepository
@@ -23,17 +22,19 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.pds.CreateRecordRequest
 import studio.hypertext.atproto.pds.DeleteRecordRequest
-import studio.hypertext.atproto.pds.DescribeRepoResponse
-import studio.hypertext.atproto.pds.DescribeServerResponse
 import studio.hypertext.atproto.pds.EmptyPdsResponse
-import studio.hypertext.atproto.pds.ListRecordsResponse
+import studio.hypertext.atproto.pds.GetRecordRequest
+import studio.hypertext.atproto.pds.ListRecordsRequest
+import studio.hypertext.atproto.pds.PdsDiscoveryService
 import studio.hypertext.atproto.pds.PdsErrorResponse
+import studio.hypertext.atproto.pds.PdsRepoService
 import studio.hypertext.atproto.pds.PutRecordRequest
-import studio.hypertext.atproto.pds.ResolveHandleResponse
-import studio.hypertext.atproto.repo.RepoEngine
 import studio.hypertext.atproto.repo.RepoRecordId
 import studio.hypertext.atproto.repo.UnsupportedCollectionException
 import studio.hypertext.atproto.syntax.Nsid
@@ -42,9 +43,10 @@ import java.util.UUID
 
 fun Route.xrpcRoutes(
     identityService: AtprotoIdentityService,
+    discoveryService: PdsDiscoveryService? = null,
     accountRepository: AccountRepository? = null,
     tokenService: TokenService? = null,
-    repoRecordStore: RepoEngine? = null,
+    repoService: PdsRepoService? = null,
     oauthAccessTokenService: OAuthAccessTokenService? = null,
     oauthDpopVerifier: OAuthDpopVerifier? = null,
     oauthNonceService: OAuthNonceService? = null,
@@ -63,8 +65,9 @@ fun Route.xrpcRoutes(
                 return@get
             }
 
-            val account = runCatching { identityService.findByHandle(handleValue) }.getOrNull()
-            if (account?.did == null) {
+            val result = identityService.resolveHandle(handleValue)
+            val resolved = result.getOrNull()
+            if (resolved == null) {
                 call.respond(
                     HttpStatusCode.BadRequest,
                     PdsErrorResponse("HandleNotFound", "Handle not found: ${handleValue.lowercase()}"),
@@ -72,19 +75,19 @@ fun Route.xrpcRoutes(
                 return@get
             }
 
-            call.respond(HttpStatusCode.OK, ResolveHandleResponse(AtprotoDid.require(account.did)))
+            call.respond(HttpStatusCode.OK, resolved)
         }
 
         get("/com.atproto.server.describeServer") {
-            call.respond(
-                HttpStatusCode.OK,
-                DescribeServerResponse(
-                    did = identityService.config.serverDid,
-                    availableUserDomains = listOf(identityService.config.normalizedHandleDomain),
-                    inviteCodeRequired = false,
-                    phoneVerificationRequired = false,
-                ),
-            )
+            val response =
+                discoveryService?.describeServer()
+                    ?: studio.hypertext.atproto.pds.DescribeServerResponse(
+                        did = identityService.config.serverDid,
+                        availableUserDomains = listOf(identityService.config.normalizedHandleDomain),
+                        inviteCodeRequired = false,
+                        phoneVerificationRequired = false,
+                    )
+            call.respond(HttpStatusCode.OK, response)
         }
 
         get("/com.atproto.repo.describeRepo") {
@@ -100,8 +103,9 @@ fun Route.xrpcRoutes(
                 return@get
             }
 
-            val account = resolveRepoAccount(identityService, repoValue)
-            if (account?.did == null || account.handle == null) {
+            val result = identityService.describeRepo(repoValue)
+            val repoDescription = result.getOrNull()
+            if (repoDescription == null) {
                 call.respond(
                     HttpStatusCode.BadRequest,
                     PdsErrorResponse("RepoNotFound", "Repo not found: $repoValue"),
@@ -109,28 +113,14 @@ fun Route.xrpcRoutes(
                 return@get
             }
 
-            val collections =
-                when (repoRecordStore) {
-                    is AtprotoContentRecordStore -> repoRecordStore.collectionsForDid(account.did)
-                    else -> emptyList()
-                }
-            call.respond(
-                HttpStatusCode.OK,
-                DescribeRepoResponse(
-                    handle = account.handle,
-                    did = AtprotoDid.require(account.did),
-                    didDoc = identityService.documentFor(account),
-                    collections = collections,
-                    handleIsCorrect = true,
-                ),
-            )
+            call.respond(HttpStatusCode.OK, repoDescription)
         }
 
         get("/com.atproto.repo.getRecord") {
-            val repoStore =
-                repoRecordStore ?: return@get call.respond(
+            val repoApi =
+                repoService ?: return@get call.respond(
                     HttpStatusCode.NotImplemented,
-                    PdsErrorResponse("Unsupported", "Repo record store is not configured"),
+                    PdsErrorResponse("Unsupported", "Repo service is not configured"),
                 )
             val repoValue =
                 call.request.queryParameters["repo"]
@@ -159,7 +149,18 @@ fun Route.xrpcRoutes(
                         PdsErrorResponse("InvalidRequest", "Invalid repo, collection, or record key"),
                     )
 
-            val recordResult = repoStore.getRecord(recordId)
+            val recordResult =
+                repoApi.getRecord(
+                    GetRecordRequest(
+                        repo = recordId.repo,
+                        collection = recordId.collection,
+                        recordKey = recordId.recordKey,
+                        cid =
+                            call.request.queryParameters["cid"]
+                                ?.trim()
+                                ?.takeIf(String::isNotEmpty),
+                    ),
+                )
             if (recordResult.isFailure) {
                 call.respondForRepoError(recordResult.exceptionOrNull())
                 return@get
@@ -173,26 +174,14 @@ fun Route.xrpcRoutes(
                 return@get
             }
 
-            val cidConstraint =
-                call.request.queryParameters["cid"]
-                    ?.trim()
-                    .orEmpty()
-            if (cidConstraint.isNotBlank() && record.cid != cidConstraint) {
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    PdsErrorResponse("RecordNotFound", "Record not found"),
-                )
-                return@get
-            }
-
             call.respond(HttpStatusCode.OK, record)
         }
 
         get("/com.atproto.repo.listRecords") {
-            val repoStore =
-                repoRecordStore ?: return@get call.respond(
+            val repoApi =
+                repoService ?: return@get call.respond(
                     HttpStatusCode.NotImplemented,
-                    PdsErrorResponse("Unsupported", "Repo record store is not configured"),
+                    PdsErrorResponse("Unsupported", "Repo service is not configured"),
                 )
             val repoValue =
                 call.request.queryParameters["repo"]
@@ -221,23 +210,25 @@ fun Route.xrpcRoutes(
             }
 
             val result =
-                repoStore.listRecords(
-                    repo = repo,
-                    collection = collection,
-                    limit =
-                        (
-                            call.request.queryParameters["limit"]?.toIntOrNull()
-                                ?: studio.hypertext.atproto.pds.ListRecordsRequest.DEFAULT_PAGE_SIZE
-                        ).coerceIn(1, 100),
-                    cursor =
-                        call.request.queryParameters["cursor"]
-                            ?.trim()
-                            ?.takeIf(String::isNotEmpty),
-                    reverse = call.request.queryParameters["reverse"]?.toBooleanStrictOrNull() ?: false,
+                repoApi.listRecords(
+                    ListRecordsRequest(
+                        repo = repo,
+                        collection = collection,
+                        limit =
+                            (
+                                call.request.queryParameters["limit"]?.toIntOrNull()
+                                    ?: studio.hypertext.atproto.pds.ListRecordsRequest.DEFAULT_PAGE_SIZE
+                            ).coerceIn(1, 100),
+                        cursor =
+                            call.request.queryParameters["cursor"]
+                                ?.trim()
+                                ?.takeIf(String::isNotEmpty),
+                        reverse = call.request.queryParameters["reverse"]?.toBooleanStrictOrNull() ?: false,
+                    ),
                 )
             val page = result.getOrNull()
             if (page != null) {
-                call.respond(HttpStatusCode.OK, ListRecordsResponse.fromPage(page))
+                call.respond(HttpStatusCode.OK, page)
                 return@get
             }
 
@@ -245,10 +236,10 @@ fun Route.xrpcRoutes(
         }
 
         post("/com.atproto.repo.createRecord") {
-            val repoStore =
-                repoRecordStore ?: return@post call.respond(
+            val repoApi =
+                repoService ?: return@post call.respond(
                     HttpStatusCode.NotImplemented,
-                    PdsErrorResponse("Unsupported", "Repo record store is not configured"),
+                    PdsErrorResponse("Unsupported", "Repo service is not configured"),
                 )
             val authenticatedAccount =
                 call.requireAuthenticatedAccount(
@@ -259,19 +250,29 @@ fun Route.xrpcRoutes(
                     oauthDpopVerifier = oauthDpopVerifier,
                     oauthNonceService = oauthNonceService,
                 ) ?: return@post
-            val request = call.receive<CreateRecordRequest>()
-            if (!ownsRepo(authenticatedAccount, request.repo.toString())) {
+            val wireRequest = call.receive<CreateRecordInput>()
+            val repo =
+                resolveRepoDid(identityService, wireRequest.repo)
+                    ?: return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        PdsErrorResponse("InvalidRequest", "Invalid repo"),
+                    )
+            if (!ownsRepo(authenticatedAccount, wireRequest.repo)) {
                 call.respond(HttpStatusCode.Forbidden, PdsErrorResponse("RepoMismatch", "Authenticated account does not own repo"))
                 return@post
             }
+            val request =
+                CreateRecordRequest(
+                    repo = repo,
+                    collection = wireRequest.collection,
+                    record = wireRequest.record,
+                    recordKey = wireRequest.recordKey,
+                    validate = wireRequest.validate,
+                    swapCommit = wireRequest.swapCommit,
+                )
 
             val result =
-                repoStore.createRecord(
-                    repo = request.repo,
-                    collection = request.collection,
-                    value = request.record,
-                    recordKey = request.recordKey,
-                )
+                repoApi.createRecord(request)
             val writeResult = result.getOrNull()
             if (writeResult != null) {
                 call.respond(HttpStatusCode.OK, writeResult)
@@ -282,10 +283,10 @@ fun Route.xrpcRoutes(
         }
 
         post("/com.atproto.repo.putRecord") {
-            val repoStore =
-                repoRecordStore ?: return@post call.respond(
+            val repoApi =
+                repoService ?: return@post call.respond(
                     HttpStatusCode.NotImplemented,
-                    PdsErrorResponse("Unsupported", "Repo record store is not configured"),
+                    PdsErrorResponse("Unsupported", "Repo service is not configured"),
                 )
             val authenticatedAccount =
                 call.requireAuthenticatedAccount(
@@ -296,19 +297,29 @@ fun Route.xrpcRoutes(
                     oauthDpopVerifier = oauthDpopVerifier,
                     oauthNonceService = oauthNonceService,
                 ) ?: return@post
-            val request = call.receive<PutRecordRequest>()
-            if (!ownsRepo(authenticatedAccount, request.repo.toString())) {
+            val wireRequest = call.receive<PutRecordInput>()
+            val repo =
+                resolveRepoDid(identityService, wireRequest.repo)
+                    ?: return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        PdsErrorResponse("InvalidRequest", "Invalid repo"),
+                    )
+            if (!ownsRepo(authenticatedAccount, wireRequest.repo)) {
                 call.respond(HttpStatusCode.Forbidden, PdsErrorResponse("RepoMismatch", "Authenticated account does not own repo"))
                 return@post
             }
-
-            val recordId =
-                RepoRecordId(
-                    repo = request.repo,
-                    collection = request.collection,
-                    recordKey = request.recordKey,
+            val request =
+                PutRecordRequest(
+                    repo = repo,
+                    collection = wireRequest.collection,
+                    recordKey = wireRequest.recordKey,
+                    record = wireRequest.record,
+                    validate = wireRequest.validate,
+                    swapRecord = wireRequest.swapRecord,
+                    swapCommit = wireRequest.swapCommit,
                 )
-            val result = repoStore.putRecord(recordId = recordId, value = request.record, swapRecord = request.swapRecord)
+
+            val result = repoApi.putRecord(request)
             val writeResult = result.getOrNull()
             if (writeResult != null) {
                 call.respond(HttpStatusCode.OK, writeResult)
@@ -319,10 +330,10 @@ fun Route.xrpcRoutes(
         }
 
         post("/com.atproto.repo.deleteRecord") {
-            val repoStore =
-                repoRecordStore ?: return@post call.respond(
+            val repoApi =
+                repoService ?: return@post call.respond(
                     HttpStatusCode.NotImplemented,
-                    PdsErrorResponse("Unsupported", "Repo record store is not configured"),
+                    PdsErrorResponse("Unsupported", "Repo service is not configured"),
                 )
             val authenticatedAccount =
                 call.requireAuthenticatedAccount(
@@ -333,19 +344,27 @@ fun Route.xrpcRoutes(
                     oauthDpopVerifier = oauthDpopVerifier,
                     oauthNonceService = oauthNonceService,
                 ) ?: return@post
-            val request = call.receive<DeleteRecordRequest>()
-            if (!ownsRepo(authenticatedAccount, request.repo.toString())) {
+            val wireRequest = call.receive<DeleteRecordInput>()
+            val repo =
+                resolveRepoDid(identityService, wireRequest.repo)
+                    ?: return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        PdsErrorResponse("InvalidRequest", "Invalid repo"),
+                    )
+            if (!ownsRepo(authenticatedAccount, wireRequest.repo)) {
                 call.respond(HttpStatusCode.Forbidden, PdsErrorResponse("RepoMismatch", "Authenticated account does not own repo"))
                 return@post
             }
-
-            val recordId =
-                RepoRecordId(
-                    repo = request.repo,
-                    collection = request.collection,
-                    recordKey = request.recordKey,
+            val request =
+                DeleteRecordRequest(
+                    repo = repo,
+                    collection = wireRequest.collection,
+                    recordKey = wireRequest.recordKey,
+                    swapRecord = wireRequest.swapRecord,
+                    swapCommit = wireRequest.swapCommit,
                 )
-            val result = repoStore.deleteRecord(recordId = recordId, swapRecord = request.swapRecord)
+
+            val result = repoApi.deleteRecord(request)
             if (result.isSuccess) {
                 call.respond(HttpStatusCode.OK, EmptyPdsResponse())
                 return@post
@@ -355,6 +374,39 @@ fun Route.xrpcRoutes(
         }
     }
 }
+
+@Serializable
+private data class CreateRecordInput(
+    val repo: String,
+    val collection: Nsid,
+    val record: JsonObject,
+    @SerialName("rkey")
+    val recordKey: RecordKey? = null,
+    val validate: Boolean? = null,
+    val swapCommit: String? = null,
+)
+
+@Serializable
+private data class PutRecordInput(
+    val repo: String,
+    val collection: Nsid,
+    @SerialName("rkey")
+    val recordKey: RecordKey,
+    val record: JsonObject,
+    val validate: Boolean? = null,
+    val swapRecord: String? = null,
+    val swapCommit: String? = null,
+)
+
+@Serializable
+private data class DeleteRecordInput(
+    val repo: String,
+    val collection: Nsid,
+    @SerialName("rkey")
+    val recordKey: RecordKey,
+    val swapRecord: String? = null,
+    val swapCommit: String? = null,
+)
 
 @OptIn(kotlin.uuid.ExperimentalUuidApi::class)
 private suspend fun io.ktor.server.application.ApplicationCall.requireAuthenticatedAccount(

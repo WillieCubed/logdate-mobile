@@ -93,7 +93,7 @@ public class DefaultRepoEngine(
     override suspend fun getRecord(recordId: RepoRecordId): Result<RepoRecord?> =
         runCatching {
             val snapshot = loadSnapshot(recordId.repo)
-            val cid = snapshot.tree.get(recordId.recordKey) ?: return@runCatching null
+            val cid = snapshot.tree.get(recordId.collection, recordId.recordKey) ?: return@runCatching null
             val block = blockStore.readBlock(cid).getOrThrow() ?: return@runCatching null
             RepoRecord(
                 uri = recordId.uri,
@@ -114,7 +114,7 @@ public class DefaultRepoEngine(
             val safeLimit = limit.coerceIn(1, MAX_PAGE_SIZE)
             val sortedEntries =
                 snapshot.tree
-                    .entries()
+                    .entries(collection)
                     .filter { entry ->
                         cursor == null ||
                             if (reverse) {
@@ -178,7 +178,7 @@ public class DefaultRepoEngine(
     ): Result<RepoWriteResult> =
         runCatching {
             val snapshot = loadSnapshot(recordId.repo)
-            val previousCid = snapshot.tree.get(recordId.recordKey)?.toString()
+            val previousCid = snapshot.tree.get(recordId.collection, recordId.recordKey)?.toString()
             if (swapRecord != null && previousCid != swapRecord) {
                 throw InvalidSwapException(expectedCid = previousCid, providedCid = swapRecord)
             }
@@ -187,7 +187,7 @@ public class DefaultRepoEngine(
             val recordCid = Cid.sha256(DAG_CBOR_CODEC, recordBytes)
             blockStore.writeBlock(recordId.repo, RepoBlock(recordCid, recordBytes)).getOrThrow()
 
-            val updatedTree = snapshot.tree.put(recordId.recordKey, recordCid)
+            val updatedTree = snapshot.tree.put(recordId.collection, recordId.recordKey, recordCid)
             val head = persistSnapshot(recordId.repo, updatedTree, snapshot.head)
             RepoWriteResult(
                 uri = recordId.uri,
@@ -202,11 +202,11 @@ public class DefaultRepoEngine(
     ): Result<Boolean> =
         runCatching {
             val snapshot = loadSnapshot(recordId.repo)
-            val previousCid = snapshot.tree.get(recordId.recordKey)?.toString() ?: return@runCatching false
+            val previousCid = snapshot.tree.get(recordId.collection, recordId.recordKey)?.toString() ?: return@runCatching false
             if (swapRecord != null && previousCid != swapRecord) {
                 throw InvalidSwapException(expectedCid = previousCid, providedCid = swapRecord)
             }
-            val updatedTree = snapshot.tree.remove(recordId.recordKey)
+            val updatedTree = snapshot.tree.remove(recordId.collection, recordId.recordKey)
             persistSnapshot(recordId.repo, updatedTree, snapshot.head)
             true
         }

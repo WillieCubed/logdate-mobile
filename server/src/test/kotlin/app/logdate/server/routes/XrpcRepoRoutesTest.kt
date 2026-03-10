@@ -220,8 +220,9 @@ class XrpcRepoRoutesTest {
                     "/xrpc/com.atproto.repo.listRecords" +
                         "?repo=brie.logdate.app&collection=studio.hypertext.logdate.content&cursor=not-a-number",
                 )
-            assertEquals(HttpStatusCode.BadRequest, listWithCursor.status)
-            assertTrue(listWithCursor.bodyAsText().contains("InvalidRequest"))
+            assertEquals(HttpStatusCode.OK, listWithCursor.status)
+            val cursorPayload = json.parseToJsonElement(listWithCursor.bodyAsText()).jsonObject
+            assertTrue(cursorPayload.containsKey("records"))
 
             val deleteWithSwap =
                 client.post("/xrpc/com.atproto.repo.deleteRecord") {

@@ -17,6 +17,41 @@ private const val DefaultAtprotoVersion = "0.1.0"
 private const val RepoUrl = "https://github.com/TheHypertextStudio/logdate-android"
 private const val OrgUrl = "https://thehypertext.studio"
 
+/**
+ * Convention plugin for publishable `shared/atproto-*` modules.
+ *
+ * This plugin exists to keep the standalone ATProto library artifacts consistent across modules.
+ * It centralizes the publication policy for the `studio.hypertext.atproto` artifact family instead
+ * of repeating the same `maven-publish`, Dokka, and signing configuration in every module.
+ *
+ * Applied behavior:
+ * - applies `org.jetbrains.dokka`, `maven-publish`, and `signing`
+ * - sets the default artifact group to `studio.hypertext.atproto`
+ * - sets the default artifact version to `0.1.0`
+ * - registers a `dokkaHtmlJar` task and attaches it to every Maven publication as the `javadoc`
+ *   artifact
+ * - adds shared POM metadata to every publication
+ * - optionally wires a remote `atproto` Maven repository
+ * - optionally enables in-memory PGP signing
+ *
+ * Property precedence is always:
+ * 1. Gradle property
+ * 2. environment variable
+ * 3. hard-coded default, when one exists
+ *
+ * Recognized overrides:
+ * - `atproto.group` or `ATPROTO_GROUP`
+ * - `atproto.version` or `ATPROTO_VERSION`
+ * - `atproto.publish.url` or `ATPROTO_PUBLISH_URL`
+ * - `atproto.publish.username` or `ATPROTO_PUBLISH_USERNAME`
+ * - `atproto.publish.password` or `ATPROTO_PUBLISH_PASSWORD`
+ * - `signingKeyId` or `SIGNING_KEY_ID`
+ * - `signingKey` or `SIGNING_KEY`
+ * - `signingPassword` or `SIGNING_PASSWORD`
+ *
+ * Signing is intentionally opt-in. If the key and password are not provided, the plugin still
+ * supports local and unsigned remote publication.
+ */
 class AtprotoPublishedModulePlugin : Plugin<Project> {
     override fun apply(project: Project) {
         with(project) {
@@ -44,6 +79,12 @@ class AtprotoPublishedModulePlugin : Plugin<Project> {
         }
     }
 
+    /**
+     * Adds the optional remote `atproto` Maven repository when a publish URL is configured.
+     *
+     * The repository is omitted entirely when no URL override is present, which keeps local builds
+     * and `publishToMavenLocal` flows working without release credentials.
+     */
     private fun Project.configureRepository(publishing: PublishingExtension) {
         val publishUrl = propertyOrEnv("atproto.publish.url", "ATPROTO_PUBLISH_URL") ?: return
         val username = propertyOrEnv("atproto.publish.username", "ATPROTO_PUBLISH_USERNAME")
@@ -70,6 +111,13 @@ class AtprotoPublishedModulePlugin : Plugin<Project> {
         )
     }
 
+    /**
+     * Applies shared publication metadata and documentation artifacts to every Maven publication.
+     *
+     * Kotlin Multiplatform creates multiple publications per module. This method keeps the root
+     * multiplatform, JVM, Android, and native publications aligned on the same metadata and
+     * attached Dokka HTML jar.
+     */
     private fun Project.configurePublications(
         publishing: PublishingExtension,
         dokkaHtmlJar: org.gradle.api.tasks.TaskProvider<Jar>,
@@ -116,6 +164,13 @@ class AtprotoPublishedModulePlugin : Plugin<Project> {
         )
     }
 
+    /**
+     * Enables in-memory PGP signing only when a usable signing key and password are configured.
+     *
+     * This keeps local developer flows frictionless while still supporting signed remote releases.
+     * The key ID is optional because Gradle can sign successfully with just the armored key and
+     * password.
+     */
     private fun Project.configureSigning() {
         val signingKeyId = propertyOrEnv("signingKeyId", "SIGNING_KEY_ID")
         val signingKey = propertyOrEnv("signingKey", "SIGNING_KEY")
@@ -129,11 +184,21 @@ class AtprotoPublishedModulePlugin : Plugin<Project> {
         }
     }
 
+    /**
+     * Returns the configured Gradle property when present, otherwise the paired environment
+     * variable.
+     */
     private fun Project.propertyOrEnv(
         propertyName: String,
         envName: String,
     ): String? = providers.gradleProperty(propertyName).orNull ?: providers.environmentVariable(envName).orNull
 
+    /**
+     * Appends a child XML node only when it does not already exist.
+     *
+     * The POM customization hooks may be invoked repeatedly by Gradle during publication
+     * configuration. This helper keeps the generated XML stable and avoids duplicate nodes.
+     */
     private fun Node.appendNodeIfMissing(name: String): Node =
         (get(name) as? List<*>)?.firstOrNull() as? Node ?: appendNode(name)
 }

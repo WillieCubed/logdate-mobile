@@ -14,7 +14,6 @@ import app.logdate.shared.model.sync.DeviceId
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import studio.hypertext.atproto.repo.InvalidRepoCursorException
 import studio.hypertext.atproto.repo.RepoRecordId
 import studio.hypertext.atproto.repo.UnsupportedCollectionException
 import studio.hypertext.atproto.syntax.Nsid
@@ -224,7 +223,7 @@ class AtprotoContentRecordStoreTest {
         }
 
     @Test
-    fun `unsupported collection and invalid cursor fail explicitly`() =
+    fun `unsupported collection fails and cursors remain opaque`() =
         kotlinx.coroutines.test.runTest {
             val accountRepository = InMemoryAccountRepository()
             val identityService = identityService(accountRepository)
@@ -248,18 +247,18 @@ class AtprotoContentRecordStoreTest {
                 store
                     .listRecords(
                         repo = repoDid,
-                        collection = Nsid.require("studio.hypertext.logdate.journal"),
+                        collection = Nsid.require("studio.hypertext.logdate.private"),
                     ).exceptionOrNull()
             assertIs<UnsupportedCollectionException>(unsupported)
 
-            val invalidCursor =
+            val opaqueCursorPage =
                 store
                     .listRecords(
                         repo = repoDid,
                         collection = AtprotoContentRecordStore.contentCollection,
                         cursor = "not-a-number",
-                    ).exceptionOrNull()
-            assertIs<InvalidRepoCursorException>(invalidCursor)
+                    ).getOrThrow()
+            assertTrue(opaqueCursorPage.records.isEmpty())
         }
 
     @Test

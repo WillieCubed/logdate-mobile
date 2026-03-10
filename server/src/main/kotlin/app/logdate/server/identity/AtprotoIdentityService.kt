@@ -24,6 +24,12 @@ class AtprotoIdentityService(
     val config: AtprotoIdentityConfig,
     private val plcIdentityService: PlcIdentityService = PlcIdentityService(signingKeyService = signingKeyService, config = config),
 ) : PdsIdentityService {
+    private var repoCollectionsResolver: suspend (String) -> List<Nsid> = { emptyList() }
+
+    fun setRepoCollectionsResolver(resolver: suspend (String) -> List<Nsid>) {
+        repoCollectionsResolver = resolver
+    }
+
     suspend fun ensureIdentity(account: Account): Account {
         val existingHandle = account.handle?.let(::canonicalizeHandle)
         val existingDid = account.did?.let(::canonicalizeDid)
@@ -111,7 +117,7 @@ class AtprotoIdentityService(
                 handle = requireNotNull(account.handle),
                 did = AtprotoDid.require(requireNotNull(account.did)),
                 didDoc = documentFor(account),
-                collections = listOf(Nsid.require("studio.hypertext.logdate.content")),
+                collections = repoCollectionsResolver(requireNotNull(account.did)),
                 handleIsCorrect = true,
             )
         }

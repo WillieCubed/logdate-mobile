@@ -4,6 +4,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.syntax.Nsid
@@ -116,7 +117,7 @@ class RepoEngineCoverageTest {
     @Test
     fun `tree root cid and repo commit defaults remain deterministic`() {
         val recordCid = Cid.sha256(codec = DAG_CBOR_CODEC, bytes = "entry".encodeToByteArray())
-        val tree = MerkleSearchTree.empty().put(RecordKey.require("entry-1"), recordCid)
+        val tree = MerkleSearchTree.empty().put(collection = collection, recordKey = RecordKey.require("entry-1"), cid = recordCid)
         val rootCid = tree.rootCid()
         val commit =
             RepoCommit(
@@ -130,6 +131,60 @@ class RepoEngineCoverageTest {
         assertEquals(Cid.sha256(DAG_CBOR_CODEC, DagCborCodec.encode(tree.toJsonElement())), rootCid)
         assertNull(commit.prev)
         assertEquals(1, commit.recordCount)
+    }
+
+    @Test
+    fun `repo engine keeps identical record keys isolated by collection`() {
+        val engine = DefaultRepoEngine(InMemoryRepoBlockStore(), fixedClock)
+        val alternateCollection = Nsid.require("studio.hypertext.logdate.journal")
+        val sharedRecordKey = RecordKey.require("shared-key")
+
+        runSuspend {
+            engine
+                .putRecord(
+                    recordId = RepoRecordId(repo = repo, collection = collection, recordKey = sharedRecordKey),
+                    value =
+                        buildJsonObject {
+                            put("\$type", collection.toString())
+                            put("text", "content")
+                        },
+                ).getOrThrow()
+        }
+        runSuspend {
+            engine
+                .putRecord(
+                    recordId = RepoRecordId(repo = repo, collection = alternateCollection, recordKey = sharedRecordKey),
+                    value =
+                        buildJsonObject {
+                            put("\$type", alternateCollection.toString())
+                            put("title", "journal")
+                        },
+                ).getOrThrow()
+        }
+
+        val content = runSuspend { engine.getRecord(RepoRecordId(repo, collection, sharedRecordKey)).getOrThrow() }
+        val journal = runSuspend { engine.getRecord(RepoRecordId(repo, alternateCollection, sharedRecordKey)).getOrThrow() }
+        val listedContent = runSuspend { engine.listRecords(repo, collection).getOrThrow() }
+        val listedJournal = runSuspend { engine.listRecords(repo, alternateCollection).getOrThrow() }
+
+        assertEquals(
+            "content",
+            content
+                ?.value
+                ?.get("text")
+                ?.jsonPrimitive
+                ?.content,
+        )
+        assertEquals(
+            "journal",
+            journal
+                ?.value
+                ?.get("title")
+                ?.jsonPrimitive
+                ?.content,
+        )
+        assertEquals(listOf(collection), listedContent.records.map { it.uri.collection!! })
+        assertEquals(listOf(alternateCollection), listedJournal.records.map { it.uri.collection!! })
     }
 
     @Test

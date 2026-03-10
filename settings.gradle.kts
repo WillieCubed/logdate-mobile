@@ -86,6 +86,7 @@ include(":shared:atproto-repo")
 include(":shared:atproto-plc")
 include(":shared:atproto-lexicon")
 include(":shared:atproto-pds")
+include(":shared:atproto-pds-runtime")
 include(":shared:config")
 include(":shared:model")
 // Server-specific modules

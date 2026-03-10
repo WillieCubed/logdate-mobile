@@ -1,7 +1,7 @@
 package app.logdate.server
 
 import app.logdate.SERVER_PORT
-import app.logdate.server.atproto.AtprotoContentRecordStore
+import app.logdate.server.atproto.LogDateRepoStore
 import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.AuthMetricsRegistry
@@ -58,6 +58,9 @@ import kotlinx.serialization.modules.SerializersModule
 import org.koin.ktor.ext.inject
 import org.koin.ktor.plugin.Koin
 import org.koin.logger.slf4jLogger
+import studio.hypertext.atproto.pds.DescribeServerResponse
+import studio.hypertext.atproto.pds.runtime.DefaultPdsRepoService
+import studio.hypertext.atproto.pds.runtime.StaticPdsDiscoveryService
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -121,7 +124,21 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     val oauthAccessTokenService: OAuthAccessTokenService by inject()
     val oauthAuthorizationService: OAuthAuthorizationService by inject()
     val webAuthnConfig: WebAuthnConfig by inject()
-    val atprotoContentRecordStore = AtprotoContentRecordStore(syncRepository = syncRepository, identityService = atprotoIdentityService)
+    val logDateRepoStore = LogDateRepoStore(syncRepository = syncRepository, identityService = atprotoIdentityService)
+    atprotoIdentityService.setRepoCollectionsResolver(logDateRepoStore::collectionsForDid)
+    val pdsRepoService = DefaultPdsRepoService(logDateRepoStore)
+    val pdsDiscoveryService =
+        StaticPdsDiscoveryService(
+            authorizationServerMetadata = oauthConfig.authorizationServerMetadata(),
+            protectedResourceMetadata = oauthConfig.protectedResourceMetadata(),
+            describeServerResponse =
+                DescribeServerResponse(
+                    did = atprotoIdentityService.config.serverDid,
+                    availableUserDomains = listOf(atprotoIdentityService.config.normalizedHandleDomain),
+                    inviteCodeRequired = false,
+                    phoneVerificationRequired = false,
+                ),
+        )
     val serverDescriptor =
         serverDescriptorConfig.toDescriptor(
             identityConfig = atprotoIdentityService.config,
@@ -185,6 +202,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
         oauthRoutes(
             config = oauthConfig,
             keyService = oauthKeyService,
+            discoveryService = pdsDiscoveryService,
             authorizationService = oauthAuthorizationService,
             accountRepository = accountRepository,
             tokenService = tokenService,
@@ -192,9 +210,10 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
         )
         xrpcRoutes(
             identityService = atprotoIdentityService,
+            discoveryService = pdsDiscoveryService,
             accountRepository = accountRepository,
             tokenService = tokenService,
-            repoRecordStore = atprotoContentRecordStore,
+            repoService = pdsRepoService,
             oauthAccessTokenService = oauthAccessTokenService,
             oauthDpopVerifier = oauthDpopVerifier,
             oauthNonceService = oauthNonceService,

@@ -1,0 +1,74 @@
+name: Publish ATProto Library
+
+on:
+  push:
+    tags:
+      - 'atproto-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Override ATPROTO_VERSION for this publish run'
+        required: false
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    env:
+      ATPROTO_PUBLISH_URL: ${{ secrets.ATPROTO_PUBLISH_URL }}
+      ATPROTO_PUBLISH_USERNAME: ${{ secrets.ATPROTO_PUBLISH_USERNAME }}
+      ATPROTO_PUBLISH_PASSWORD: ${{ secrets.ATPROTO_PUBLISH_PASSWORD }}
+      SIGNING_KEY_ID: ${{ secrets.SIGNING_KEY_ID }}
+      SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+      SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Resolve ATProto version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#atproto-v}"
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+
+          if [[ -n "${VERSION}" ]]; then
+            echo "ATPROTO_VERSION=${VERSION}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Validate publish credentials
+        shell: bash
+        run: |
+          for name in ATPROTO_PUBLISH_URL ATPROTO_PUBLISH_USERNAME ATPROTO_PUBLISH_PASSWORD SIGNING_KEY SIGNING_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "$name must be configured to publish the ATProto artifacts."
+              exit 1
+            fi
+          done
+
+      - name: Publish ATProto modules
+        run: >
+          ./gradlew
+          :shared:atproto-crypto:publishAllPublicationsToAtprotoRepository
+          :shared:atproto-syntax:publishAllPublicationsToAtprotoRepository
+          :shared:atproto-identity:publishAllPublicationsToAtprotoRepository
+          :shared:atproto-xrpc:publishAllPublicationsToAtprotoRepository
+          :shared:atproto-repo:publishAllPublicationsToAtprotoRepository
+          :shared:atproto-plc:publishAllPublicationsToAtprotoRepository
+          :shared:atproto-lexicon:publishAllPublicationsToAtprotoRepository
+          :shared:atproto-pds:publishAllPublicationsToAtprotoRepository
+          :shared:atproto-pds-runtime:publishAllPublicationsToAtprotoRepository

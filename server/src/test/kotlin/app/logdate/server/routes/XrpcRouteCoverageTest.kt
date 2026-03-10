@@ -50,6 +50,7 @@ import studio.hypertext.atproto.pds.ListRecordsResponse
 import studio.hypertext.atproto.pds.PdsErrorResponse
 import studio.hypertext.atproto.pds.PutRecordRequest
 import studio.hypertext.atproto.pds.ResolveHandleResponse
+import studio.hypertext.atproto.pds.runtime.DefaultPdsRepoService
 import studio.hypertext.atproto.repo.Cid
 import studio.hypertext.atproto.repo.RepoEngine
 import studio.hypertext.atproto.repo.RepoExport
@@ -413,7 +414,7 @@ class XrpcRouteCoverageTest {
                         identityService = identityService,
                         accountRepository = accountRepository,
                         tokenService = JwtTokenService("xrpc-route-coverage-secret"),
-                        repoRecordStore = StubRepoRecordStore(),
+                        repoService = DefaultPdsRepoService(StubRepoRecordStore()),
                     )
                 }
             }
@@ -996,7 +997,7 @@ class XrpcRouteCoverageTest {
                     identityService = identityService,
                     accountRepository = accountRepository,
                     tokenService = tokenService,
-                    repoRecordStore = repoRecordStore,
+                    repoService = DefaultPdsRepoService(repoRecordStore),
                     oauthAccessTokenService = oauthAccessTokenService,
                     oauthDpopVerifier = oauthDpopVerifier,
                     oauthNonceService = oauthNonceService,

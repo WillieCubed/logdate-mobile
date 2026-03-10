@@ -37,6 +37,31 @@ subprojects {
     }
 }
 
+val atprotoModulePaths =
+    listOf(
+        ":shared:atproto-crypto",
+        ":shared:atproto-syntax",
+        ":shared:atproto-identity",
+        ":shared:atproto-xrpc",
+        ":shared:atproto-repo",
+        ":shared:atproto-plc",
+        ":shared:atproto-lexicon",
+        ":shared:atproto-pds",
+        ":shared:atproto-pds-runtime",
+    )
+
+tasks.register("generateAtprotoDokka") {
+    group = "documentation"
+    description = "Generate Dokka HTML publications for every ATProto module."
+    dependsOn(atprotoModulePaths.map { "$it:dokkaGeneratePublicationHtml" })
+}
+
+tasks.register("publishAtprotoToMavenLocal") {
+    group = "publishing"
+    description = "Publish every ATProto module to the local Maven repository."
+    dependsOn(atprotoModulePaths.map { "$it:publishToMavenLocal" })
+}
+
 // Kover configuration for test coverage
 kover {
     reports {
