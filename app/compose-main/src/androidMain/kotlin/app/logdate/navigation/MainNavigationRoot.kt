@@ -99,6 +99,7 @@ import app.logdate.navigation.routes.core.switchToTab
 import app.logdate.navigation.routes.editorRoutes
 import app.logdate.navigation.routes.finishJournalCreation
 import app.logdate.navigation.routes.journalRoutes
+import app.logdate.navigation.routes.locationRoutes
 import app.logdate.navigation.routes.onboarding
 import app.logdate.navigation.routes.openAccountSettings
 import app.logdate.navigation.routes.openAdvancedSettings
@@ -108,6 +109,7 @@ import app.logdate.navigation.routes.openDevicesSettings
 import app.logdate.navigation.routes.openJournalDetail
 import app.logdate.navigation.routes.openJournalSettings
 import app.logdate.navigation.routes.openLocationSettings
+import app.logdate.navigation.routes.openLocationTimeline
 import app.logdate.navigation.routes.openPrivacySettings
 import app.logdate.navigation.routes.openProfile
 import app.logdate.navigation.routes.openSearch
@@ -539,10 +541,12 @@ fun MainNavigationRoot(mainAppNavigator: MainAppNavigator) {
                                 onOpenTimelineDetail = mainAppNavigator::openTimelineDetail,
                                 onCloseTimelineDetail = mainAppNavigator::goBack,
                                 onOpenSettings = mainAppNavigator::openSettings,
+                                onOpenLocationTimeline = mainAppNavigator::openLocationTimeline,
                                 onOpenSearch = mainAppNavigator::openSearch,
                                 homeViewModel = safeHomeViewModel,
                             )
                         }
+                        locationRoutes()
                         searchRoutes(
                             onBack = mainAppNavigator::goBack,
                             onNavigateToDay = mainAppNavigator::openTimelineDetail,
@@ -570,6 +574,7 @@ fun MainNavigationRoot(mainAppNavigator: MainAppNavigator) {
                             onNavigateToDevices = mainAppNavigator::openDevicesSettings,
                             onNavigateToDangerZone = mainAppNavigator::openDangerZoneSettings,
                             onNavigateToLocation = mainAppNavigator::openLocationSettings,
+                            onOpenLocationTimeline = mainAppNavigator::openLocationTimeline,
                             onNavigateToAdvanced = mainAppNavigator::openAdvancedSettings,
                         )
                         cloudAccountSetup(

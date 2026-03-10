@@ -2,6 +2,7 @@ package app.logdate.navigation
 
 import app.logdate.navigation.routes.core.EntryEditor
 import app.logdate.navigation.routes.core.JournalList
+import app.logdate.navigation.routes.core.LocationRoute
 import app.logdate.navigation.routes.core.NavigationStart
 import app.logdate.navigation.routes.core.OnboardingStart
 import app.logdate.navigation.routes.core.RewindList
@@ -203,6 +204,9 @@ class NavigationExtensionsTest {
     @Test
     fun `switchToTab cycles through all tabs correctly`() {
         val navigator = MainAppNavigator(TimelineListRoute)
+
+        navigator.switchToTab(HomeTab.LOCATION)
+        assertEquals(LocationRoute, navigator.backStack.last())
 
         navigator.switchToTab(HomeTab.JOURNALS)
         assertEquals(JournalList, navigator.backStack.last())

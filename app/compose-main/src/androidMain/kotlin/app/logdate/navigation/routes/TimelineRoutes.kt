@@ -42,6 +42,7 @@ fun EntryProviderScope<NavKey>.timelineRoutes(
     onOpenTimelineDetail: (day: LocalDate) -> Unit,
     onCloseTimelineDetail: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenLocationTimeline: () -> Unit,
     onOpenSearch: () -> Unit,
     homeViewModel: HomeViewModel,
 ) {
@@ -56,6 +57,7 @@ fun EntryProviderScope<NavKey>.timelineRoutes(
                 onOpenTimelineDetail(day)
             },
             onOpenSettings = onOpenSettings,
+            onOpenLocationTimeline = onOpenLocationTimeline,
             onOpenSearch = onOpenSearch,
             viewModel = homeViewModel,
         )
@@ -81,9 +83,6 @@ fun TimelineDetailScreen(
     viewModel: HomeViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
-    // Log the current UI state for debugging
-    println("TimelineDetailScreen UI state: selectedDay=${uiState.selectedDay}, selectedItem=${uiState.selectedItem}")
 
     // Use a safe fallback if selectedDay is null
     uiState.selectedDay?.let { selectedDay ->

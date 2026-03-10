@@ -10,11 +10,13 @@ import app.logdate.client.domain.timeline.GetTimelineBannerUseCase
 import app.logdate.client.domain.timeline.GetTimelineUseCase
 import app.logdate.client.domain.timeline.StreamingTimelineRequest
 import app.logdate.client.domain.timeline.TimelineBannerResult
+import app.logdate.client.domain.timeline.TimelinePlaceVisit
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.shared.model.Person
 import app.logdate.ui.audio.TranscriptionState
+import app.logdate.ui.location.PlaceUiState
 import app.logdate.ui.profiles.toUiState
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.HomeTimelineUiState
@@ -194,6 +196,7 @@ class TimelineViewModel(
                             date = day.date,
                             people = day.people.map(Person::toUiState),
                             events = day.events,
+                            placesVisited = day.placesVisited.map { place -> place.toUiState() },
                             notes = dayNotes.toUiState(),
                             isLoadingSummary = day.tldr.isEmpty(),
                             isLoadingPeople = day.people.isEmpty() && day.tldr.isEmpty(),
@@ -212,6 +215,7 @@ class TimelineViewModel(
                                     date = day.date,
                                     people = day.people.map(Person::toUiState),
                                     events = day.events,
+                                    placesVisited = day.placesVisited.map { place -> place.toUiState() },
                                     notes = notesForSelectedDay.toUiState(),
                                     isLoadingSummary = day.tldr.isEmpty(),
                                     isLoadingPeople = day.people.isEmpty() && day.tldr.isEmpty(),
@@ -229,6 +233,7 @@ class TimelineViewModel(
                                     date = day.date,
                                     people = day.people.map(Person::toUiState),
                                     events = day.events,
+                                    placesVisited = day.placesVisited.map { place -> place.toUiState() },
                                     notes = notesForSelectedDay.toUiState(),
                                     isLoadingSummary = day.tldr.isEmpty(),
                                     isLoadingPeople = day.people.isEmpty() && day.tldr.isEmpty(),
@@ -305,4 +310,12 @@ class TimelineViewModel(
     fun dismissSnackbar() {
         snackbarMessageState.value = null
     }
+
+    private fun TimelinePlaceVisit.toUiState(): PlaceUiState =
+        PlaceUiState(
+            id = id,
+            title = name,
+            latitude = latitude,
+            longitude = longitude,
+        )
 }

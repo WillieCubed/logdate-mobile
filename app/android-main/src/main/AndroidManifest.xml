@@ -38,7 +38,6 @@
 
         <activity
             android:name="app.logdate.client.MainActivity"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|mnc|colorMode|density|fontScale|fontWeightAdjustment|keyboard|layoutDirection|locale|mcc|navigation|smallestScreenSize|touchscreen|uiMode"
             android:exported="true"
             android:theme="@style/Theme.LogDate"
             android:enableOnBackInvokedCallback="true"
@@ -99,7 +98,6 @@
         
         <activity
             android:name="app.logdate.client.EditorActivity"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|mnc|colorMode|density|fontScale|fontWeightAdjustment|keyboard|layoutDirection|locale|mcc|navigation|smallestScreenSize|touchscreen|uiMode"
             android:exported="true"
             android:theme="@style/Theme.LogDate"
             android:enableOnBackInvokedCallback="true"

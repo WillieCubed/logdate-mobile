@@ -96,9 +96,11 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.outlined.Book
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -137,6 +139,7 @@ import app.logdate.navigation.routes.core.DevicesSettingsRoute
 import app.logdate.navigation.routes.core.EntryEditor
 import app.logdate.navigation.routes.core.JournalDetail
 import app.logdate.navigation.routes.core.JournalList
+import app.logdate.navigation.routes.core.LocationRoute
 import app.logdate.navigation.routes.core.LocationSettingsRoute
 import app.logdate.navigation.routes.core.NavigationStart
 import app.logdate.navigation.routes.core.OnboardingCompleteRoute
@@ -371,6 +374,12 @@ object RouteConfig {
                     return RouteClassification.TwoPaneDetail(timelineTab)
                 }
             }
+            JournalDetail::class -> {
+                if (previousRouteClass == JournalList::class) {
+                    val journalsTab = HomeTab.entries.first { it.route::class == JournalList::class }
+                    return RouteClassification.TwoPaneDetail(journalsTab)
+                }
+            }
         }
 
         // All other detail routes are full-screen
@@ -380,8 +389,7 @@ object RouteConfig {
     /**
      * Determines if a route should always be full-screen regardless of screen size.
      */
-    fun isAlwaysFullscreen(routeClass: KClass<out NavKey>?): Boolean =
-        routeClass == RewindDetailRoute::class || routeClass == JournalDetail::class
+    fun isAlwaysFullscreen(routeClass: KClass<out NavKey>?): Boolean = routeClass == RewindDetailRoute::class
 }
 
 /**
@@ -468,6 +476,7 @@ enum class HomeTab(
     val route: NavKey,
 ) {
     TIMELINE("Timeline", Icons.Filled.History, Icons.Outlined.History, TimelineListRoute),
+    LOCATION("Location", Icons.Filled.LocationOn, Icons.Outlined.LocationOn, LocationRoute),
     JOURNALS("Journals", Icons.Filled.Book, Icons.Outlined.Book, JournalList),
     REWIND("Rewind", Icons.Filled.DateRange, Icons.Outlined.DateRange, RewindList),
 }
@@ -627,7 +636,7 @@ class HomeScene<T : NavKey>(
                                 modifier =
                                     Modifier
                                         .weight(1f)
-                                        .widthIn(max = 360.dp)
+                                        .widthIn(min = 320.dp, max = 420.dp)
                                         .fillMaxHeight(),
                             ) {
                                 mainEntry.Content()

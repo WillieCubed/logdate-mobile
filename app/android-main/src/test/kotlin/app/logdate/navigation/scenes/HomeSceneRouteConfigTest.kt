@@ -1,6 +1,8 @@
 package app.logdate.navigation.scenes
 
 import app.logdate.navigation.routes.core.JournalDetail
+import app.logdate.navigation.routes.core.JournalList
+import app.logdate.navigation.routes.core.LocationRoute
 import app.logdate.navigation.routes.core.RewindDetailRoute
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
 import app.logdate.navigation.routes.core.TimelineDetail
@@ -29,6 +31,14 @@ class HomeSceneRouteConfigTest {
     }
 
     @Test
+    fun `classifyRoute returns MainTab for Location route`() {
+        val result = RouteConfig.classifyRoute(LocationRoute::class)
+
+        val mainTab = assertIs<RouteClassification.MainTab>(result)
+        assertEquals(HomeTab.LOCATION, mainTab.tab)
+    }
+
+    @Test
     fun `classifyRoute returns TwoPaneDetail for timeline detail with timeline parent`() {
         val result = RouteConfig.classifyRoute(
             TimelineDetail::class,
@@ -40,6 +50,17 @@ class HomeSceneRouteConfigTest {
     }
 
     @Test
+    fun `classifyRoute returns TwoPaneDetail for journal detail with journals parent`() {
+        val result = RouteConfig.classifyRoute(
+            JournalDetail::class,
+            previousRouteClass = JournalList::class,
+        )
+
+        val twoPane = assertIs<RouteClassification.TwoPaneDetail>(result)
+        assertEquals(HomeTab.JOURNALS, twoPane.parentTab)
+    }
+
+    @Test
     fun `classifyRoute returns FullscreenDetail for rewind detail`() {
         val result = RouteConfig.classifyRoute(RewindDetailRoute::class)
 
@@ -47,9 +68,9 @@ class HomeSceneRouteConfigTest {
     }
 
     @Test
-    fun `isAlwaysFullscreen returns true for rewind and journal detail`() {
+    fun `isAlwaysFullscreen returns true for rewind detail only`() {
         assertTrue(RouteConfig.isAlwaysFullscreen(RewindDetailRoute::class))
-        assertTrue(RouteConfig.isAlwaysFullscreen(JournalDetail::class))
+        assertFalse(RouteConfig.isAlwaysFullscreen(JournalDetail::class))
     }
 
     @Test

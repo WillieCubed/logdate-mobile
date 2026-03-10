@@ -127,6 +127,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onNavigateToDevices: () -> Unit,
     onNavigateToDangerZone: () -> Unit,
     onNavigateToLocation: () -> Unit,
+    onOpenLocationTimeline: () -> Unit,
     onNavigateToAdvanced: () -> Unit,
 ) {
     // Main settings overview screen (list pane)
@@ -150,7 +151,9 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     }
 
     // Profile screen (navigates away from settings context, no pane metadata)
-    routeEntry<ProfileRoute> { _ ->
+    routeEntry<ProfileRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
         ProfileScreen(
             onBack = onBack,
         )
@@ -225,6 +228,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     ) { _ ->
         LocationSettingsScreen(
             onBack = onBack,
+            onOpenLocationTimeline = onOpenLocationTimeline,
         )
     }
 

@@ -3,8 +3,8 @@ package app.logdate.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.feature.location.timeline.ui.LocationTimelineBottomSheet
@@ -28,17 +28,12 @@ fun TimelinePaneScreen(
     onNewEntry: () -> Unit,
     onOpenDay: (LocalDate) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenLocationTimeline: () -> Unit,
     onOpenSearch: () -> Unit = {},
     viewModel: HomeViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var showLocationTimeline by remember { mutableStateOf(false) }
-
-    // Location timeline bottom sheet
-    LocationTimelineBottomSheet(
-        isVisible = showLocationTimeline,
-        onDismiss = { showLocationTimeline = false },
-    )
+    var showLocationQuickPeek by rememberSaveable { mutableStateOf(false) }
 
     TimelinePane(
         uiState = TimelineUiState(items = uiState.items),
@@ -54,6 +49,20 @@ fun TimelinePaneScreen(
         },
         onSearchClick = onOpenSearch,
         onProfileClick = onOpenSettings,
-        onHistoryClick = { showLocationTimeline = true },
+        onHistoryClick = {
+            showLocationQuickPeek = true
+        },
     )
+
+    if (showLocationQuickPeek) {
+        LocationTimelineBottomSheet(
+            onDismissRequest = {
+                showLocationQuickPeek = false
+            },
+            onOpenFullTimeline = {
+                showLocationQuickPeek = false
+                onOpenLocationTimeline()
+            },
+        )
+    }
 }

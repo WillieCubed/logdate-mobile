@@ -43,6 +43,9 @@ data object OnboardingWelcomeBackRoute : NavKey
 data object TimelineListRoute : NavKey
 
 @Serializable
+data object LocationRoute : NavKey
+
+@Serializable
 data class TimelineDetail(
     val day: LocalDate,
 ) : NavKey

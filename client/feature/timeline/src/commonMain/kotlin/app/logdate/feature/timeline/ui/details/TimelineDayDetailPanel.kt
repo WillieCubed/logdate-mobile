@@ -50,6 +50,19 @@ fun TimelineDayDetailPanel(
     modifier: Modifier = Modifier,
 ) {
     val (summary, timestamp, people) = uiState
+    val resolvedVisitedLocations =
+        visitedLocations.ifEmpty {
+            uiState.placesVisited.mapNotNull { place ->
+                val latitude = place.latitude ?: return@mapNotNull null
+                val longitude = place.longitude ?: return@mapNotNull null
+                DayLocation(
+                    locationId = place.id,
+                    name = place.title,
+                    latitude = latitude,
+                    longitude = longitude,
+                )
+            }
+        }
 
     LaunchedEffect(uiState) {
         scrollState.scrollToTop()
@@ -113,10 +126,12 @@ fun TimelineDayDetailPanel(
 //                    onOpenEvent = onOpenEvent,
 //                )
 //            }
-            item(
-                contentType = "locations",
-            ) {
-                LocationsSection(locations = visitedLocations, DayLocation.Origin)
+            if (resolvedVisitedLocations.isNotEmpty()) {
+                item(
+                    contentType = "locations",
+                ) {
+                    LocationsSection(locations = resolvedVisitedLocations, DayLocation.Origin)
+                }
             }
         }
     }
