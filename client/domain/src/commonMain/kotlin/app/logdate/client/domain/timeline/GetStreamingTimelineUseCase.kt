@@ -98,7 +98,7 @@ class GetStreamingTimelineUseCase(
                     date = date,
                     people = emptyList(),
                     events = emptyList(),
-                    placesVisited = emptyList(),
+                    placesVisited = extractPlacesVisited(entries),
                     parts = emptyList(),
                 )
             }

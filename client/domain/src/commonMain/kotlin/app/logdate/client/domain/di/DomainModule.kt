@@ -74,6 +74,7 @@ val domainModule: Module =
                 journalContentRepository = get(),
                 logLocationUseCase = get(),
                 logCurrentLocationUseCase = get(),
+                settingsRepository = get(),
                 mediaManager = get(),
             )
         }

@@ -18,6 +18,9 @@ import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.networking.NetworkState
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.NoteCoordinates
+import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.repository.journals.NotePlace
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -230,6 +233,43 @@ class GetStreamingTimelineUseCaseTest {
 
             // Then - should have 2 days, not 4
             assertEquals(2, result.days.size, "Should group notes into 2 days")
+        }
+
+    @Test
+    fun `invoke should include semantic places in the recent timeline preview`() =
+        runTest {
+            val timestamp = Instant.parse("2025-01-15T10:00:00Z")
+            mockNotesRepository.recentNotes =
+                listOf(
+                    JournalNote.Text(
+                        uid = Uuid.random(),
+                        content = "Lunch at school",
+                        creationTimestamp = timestamp,
+                        lastUpdated = timestamp,
+                        location =
+                            NoteLocation(
+                                coordinates = NoteCoordinates(latitude = 34.0689, longitude = -118.4452),
+                                place =
+                                    NotePlace(
+                                        id = Uuid.random(),
+                                        name = "School",
+                                        latitude = 34.0689,
+                                        longitude = -118.4452,
+                                    ),
+                            ),
+                    ),
+                )
+
+            val result = useCase(StreamingTimelineRequest.RecentTimeline()).first()
+
+            assertEquals(1, result.days.size)
+            assertEquals(
+                listOf("School"),
+                result.days
+                    .first()
+                    .placesVisited
+                    .map { place -> place.name },
+            )
         }
 
     @Test

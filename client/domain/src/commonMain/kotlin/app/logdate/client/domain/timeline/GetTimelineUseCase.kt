@@ -4,12 +4,14 @@ import app.logdate.client.domain.entities.ExtractPeopleUseCase
 import app.logdate.client.intelligence.AIResult
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.shared.model.Person
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.transform
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.math.round
 import kotlin.time.Instant
 
 /**
@@ -83,9 +85,16 @@ data class TimelineDay(
     val date: LocalDate,
     val people: List<Person> = emptyList(),
     val events: List<String> = emptyList(), // TODO: Actually include events
-    val placesVisited: List<String> = emptyList(), // TODO: Actually include places visited
+    val placesVisited: List<TimelinePlaceVisit> = emptyList(),
     val parts: List<DayPart> = emptyList(),
 //    val mediaUris: List<MediaObjectUiState> = emptyList(), // TODO: Actually include media
+)
+
+data class TimelinePlaceVisit(
+    val id: String,
+    val name: String,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
 )
 
 data class DayPart(
@@ -153,6 +162,26 @@ class GetTimelineDayUseCase(
             start = entries.minOf { entry -> entry.creationTimestamp },
             end = entries.maxOf { it.creationTimestamp },
             people = people,
+            placesVisited = extractPlacesVisited(entries),
         )
     }
 }
+
+internal fun extractPlacesVisited(entries: List<JournalNote>): List<TimelinePlaceVisit> =
+    entries
+        .mapNotNull { note -> note.location?.toTimelinePlaceVisit() }
+        .distinctBy(TimelinePlaceVisit::id)
+
+private fun NoteLocation.toTimelinePlaceVisit(): TimelinePlaceVisit? {
+    val latitude = effectiveLatitude ?: return null
+    val longitude = effectiveLongitude ?: return null
+    val coordinateKey = "${roundCoordinate(latitude)},${roundCoordinate(longitude)}"
+    return TimelinePlaceVisit(
+        id = place?.id?.toString() ?: coordinateKey,
+        name = displayName ?: "${roundCoordinate(latitude)}, ${roundCoordinate(longitude)}",
+        latitude = latitude,
+        longitude = longitude,
+    )
+}
+
+private fun roundCoordinate(value: Double): Double = round(value * 10_000) / 10_000

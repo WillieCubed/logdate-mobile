@@ -18,6 +18,9 @@ import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.networking.NetworkState
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.NoteCoordinates
+import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.repository.journals.NotePlace
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -32,6 +35,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -188,6 +192,65 @@ class GetTimelineUseCaseTest {
             assertTrue(result.days[0].date >= result.days[1].date)
         }
 
+    @Test
+    fun `invoke should include distinct semantic places visited for the day`() =
+        runTest {
+            val timestamp = Instant.parse("2025-01-15T10:00:00Z")
+            val homeId = Uuid.random()
+            mockNotesRepository.allNotes =
+                listOf(
+                    createLocatedNote(
+                        content = "Breakfast at home",
+                        timestamp = timestamp,
+                        location =
+                            NoteLocation(
+                                coordinates = NoteCoordinates(latitude = 37.3317, longitude = -122.0301),
+                                place =
+                                    NotePlace(
+                                        id = homeId,
+                                        name = "Home",
+                                        latitude = 37.3317,
+                                        longitude = -122.0301,
+                                    ),
+                            ),
+                    ),
+                    createLocatedNote(
+                        content = "Back home again",
+                        timestamp = timestamp.plus(1.hours),
+                        location =
+                            NoteLocation(
+                                coordinates = NoteCoordinates(latitude = 37.3317, longitude = -122.0301),
+                                place =
+                                    NotePlace(
+                                        id = homeId,
+                                        name = "Home",
+                                        latitude = 37.3317,
+                                        longitude = -122.0301,
+                                    ),
+                            ),
+                    ),
+                )
+
+            val result = useCase().first()
+
+            assertEquals(1, result.days.size)
+            assertEquals(
+                1,
+                result.days
+                    .first()
+                    .placesVisited
+                    .size,
+            )
+            assertEquals(
+                "Home",
+                result.days
+                    .first()
+                    .placesVisited
+                    .first()
+                    .name,
+            )
+        }
+
     private fun createTestNote(
         content: String,
         timestamp: Instant,
@@ -196,6 +259,18 @@ class GetTimelineUseCaseTest {
         content = content,
         creationTimestamp = timestamp,
         lastUpdated = timestamp,
+    )
+
+    private fun createLocatedNote(
+        content: String,
+        timestamp: Instant,
+        location: NoteLocation,
+    ) = JournalNote.Text(
+        uid = Uuid.random(),
+        content = content,
+        creationTimestamp = timestamp,
+        lastUpdated = timestamp,
+        location = location,
     )
 
     private fun LocalDate.atStartOfDay() = this.atStartOfDayIn(TimeZone.currentSystemDefault())
