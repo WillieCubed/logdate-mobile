@@ -24,7 +24,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
@@ -52,8 +51,8 @@ import kotlin.uuid.Uuid
 /**
  * A Material You styled dropdown component to select multiple journals to associate an entry with.
  *
- * Renders a compact [FilterChip] when [LocalEditorIsCompact] is true (e.g. landscape phones),
- * and a full card otherwise.
+ * Renders a compact variant when [LocalEditorIsCompact] is true (e.g. landscape phones),
+ * using reduced padding and icon sizes while keeping the same visual language.
  *
  * @param availableJournals List of all available journals
  * @param selectedJournalIds List of currently selected journal IDs
@@ -68,7 +67,6 @@ fun JournalSelectorDropdown(
     onSelectionChanged: (List<Uuid>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val isCompact = LocalEditorIsCompact.current
     var expanded by remember { mutableStateOf(false) }
     val selectedCount = selectedJournalIds.size
 
@@ -77,24 +75,15 @@ fun JournalSelectorDropdown(
         onExpandedChange = { expanded = it },
         modifier = modifier,
     ) {
-        if (isCompact) {
-            CompactDropdownSelector(
-                selectedCount = selectedCount,
-                availableJournals = availableJournals,
-                selectedJournalIds = selectedJournalIds,
-                modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-            )
-        } else {
-            DropdownSelector(
-                selectedCount = selectedCount,
-                availableJournals = availableJournals,
-                selectedJournalIds = selectedJournalIds,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-            )
-        }
+        DropdownSelector(
+            selectedCount = selectedCount,
+            availableJournals = availableJournals,
+            selectedJournalIds = selectedJournalIds,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+        )
 
         DropdownContent(
             expanded = expanded,
@@ -108,62 +97,10 @@ fun JournalSelectorDropdown(
 }
 
 /**
- * Compact chip anchor for height-constrained screens (e.g. landscape phones).
- */
-@Suppress("ktlint:standard:function-naming")
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CompactDropdownSelector(
-    selectedCount: Int,
-    availableJournals: List<Journal>,
-    selectedJournalIds: List<Uuid>,
-    modifier: Modifier = Modifier,
-) {
-    val label =
-        when (selectedCount) {
-            0 -> "Select journal"
-            1 ->
-                availableJournals
-                    .find { it.id == selectedJournalIds.first() }
-                    ?.title
-                    ?: "Unknown"
-            else -> "$selectedCount journals"
-        }
-
-    FilterChip(
-        selected = selectedCount > 0,
-        onClick = {},
-        label = {
-            Text(
-                text = label,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-        leadingIcon = {
-            Icon(
-                Icons.AutoMirrored.Filled.MenuBook,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-            )
-        },
-        trailingIcon = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (selectedCount > 1) {
-                    Badge { Text(selectedCount.toString()) }
-                }
-                Icon(
-                    Icons.Default.ExpandMore,
-                    contentDescription = stringResource(Res.string.expand),
-                )
-            }
-        },
-        modifier = modifier,
-    )
-}
-
-/**
  * The selector card that displays the currently selected journals and triggers the dropdown.
+ *
+ * Automatically uses reduced padding and icon sizes on height-constrained screens
+ * (e.g. landscape phones) via [LocalEditorIsCompact].
  */
 @Suppress("ktlint:standard:function-naming")
 @Composable
@@ -173,6 +110,11 @@ private fun DropdownSelector(
     selectedJournalIds: List<Uuid>,
     modifier: Modifier = Modifier,
 ) {
+    val isCompact = LocalEditorIsCompact.current
+    val contentPadding = if (isCompact) 8.dp else 16.dp
+    val iconCircleSize = if (isCompact) 24.dp else 40.dp
+    val iconSize = if (isCompact) 14.dp else 20.dp
+
     Card(
         modifier = modifier,
         colors =
@@ -191,11 +133,36 @@ private fun DropdownSelector(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(contentPadding),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            JournalIcon(selectedCount = selectedCount)
+            Box(
+                modifier =
+                    Modifier
+                        .size(iconCircleSize)
+                        .clip(CircleShape)
+                        .background(
+                            if (selectedCount > 0) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.outline
+                            },
+                        ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.MenuBook,
+                    contentDescription = null,
+                    tint =
+                        if (selectedCount > 0) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    modifier = Modifier.size(iconSize),
+                )
+            }
 
             Spacer(Modifier.width(12.dp))
 
@@ -211,43 +178,6 @@ private fun DropdownSelector(
     }
 }
 
-/**
- * The journal icon displayed in the selector
- */
-@Suppress("ktlint:standard:function-naming")
-@Composable
-private fun JournalIcon(selectedCount: Int) {
-    Box(
-        modifier =
-            Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(
-                    if (selectedCount > 0) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.outline
-                    },
-                ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            Icons.AutoMirrored.Filled.MenuBook,
-            contentDescription = null,
-            tint =
-                if (selectedCount > 0) {
-                    MaterialTheme.colorScheme.onPrimary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            modifier = Modifier.size(20.dp),
-        )
-    }
-}
-
-/**
- * Text displaying information about the current journal selection
- */
 @Suppress("ktlint:standard:function-naming")
 @Composable
 private fun JournalSelectionText(
@@ -256,22 +186,26 @@ private fun JournalSelectionText(
     selectedJournalIds: List<Uuid>,
     modifier: Modifier = Modifier,
 ) {
+    val isCompact = LocalEditorIsCompact.current
     Column(modifier = modifier) {
         Text(
             text =
                 when (selectedCount) {
                     0 -> "Select journals"
                     1 -> {
-                        val journalName =
-                            availableJournals
-                                .find { it.id == selectedJournalIds.first() }
-                                ?.title
-                        journalName ?: "Unknown journal"
+                        availableJournals
+                            .find { it.id == selectedJournalIds.first() }
+                            ?.title
+                            ?: "Unknown journal"
                     }
-
                     else -> "Multiple journals"
                 },
-            style = MaterialTheme.typography.bodyLarge,
+            style =
+                if (isCompact) {
+                    MaterialTheme.typography.bodyMedium
+                } else {
+                    MaterialTheme.typography.bodyLarge
+                },
             fontWeight = if (selectedCount > 0) FontWeight.Medium else FontWeight.Normal,
             color =
                 if (selectedCount > 0) {
@@ -283,7 +217,7 @@ private fun JournalSelectionText(
             overflow = TextOverflow.Ellipsis,
         )
 
-        if (selectedCount > 1) {
+        if (selectedCount > 1 && !isCompact) {
             Text(
                 text = "$selectedCount journals selected",
                 style = MaterialTheme.typography.bodySmall,
@@ -293,16 +227,12 @@ private fun JournalSelectionText(
     }
 }
 
-/**
- * Displays indicator elements (badge and expand icon)
- */
 @Suppress("ktlint:standard:function-naming")
 @Composable
 private fun DropdownIndicators(selectedCount: Int) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Selection count badge
         if (selectedCount > 0) {
             Badge(
                 modifier = Modifier.padding(end = 8.dp),
@@ -316,7 +246,6 @@ private fun DropdownIndicators(selectedCount: Int) {
             }
         }
 
-        // Expand icon
         Icon(
             Icons.Default.ExpandMore,
             contentDescription = stringResource(Res.string.expand),
@@ -330,9 +259,6 @@ private fun DropdownIndicators(selectedCount: Int) {
     }
 }
 
-/**
- * The dropdown menu content showing available journals
- */
 @Suppress("ktlint:standard:function-naming")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -344,7 +270,6 @@ private fun DropdownContent(
     onSelectionChanged: (List<Uuid>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Use Material3 Surface for built-in elevation
     Surface(
         shape = RoundedCornerShape(12.dp),
         tonalElevation = 6.dp,
@@ -357,11 +282,9 @@ private fun DropdownContent(
             onDismissRequest = onDismissRequest,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            // Handle empty state
             if (availableJournals.isEmpty()) {
                 EmptyJournalItem()
             } else {
-                // Journal items
                 availableJournals.forEach { journal ->
                     val isSelected = selectedJournalIds.contains(journal.id)
                     JournalItem(
@@ -383,54 +306,33 @@ private fun DropdownContent(
     }
 }
 
-/**
- * Menu item for when no journals are available
- */
 @Suppress("ktlint:standard:function-naming")
 @Composable
 private fun EmptyJournalItem() {
     DropdownMenuItem(
         text = {
-            EmptyJournalItemContent()
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(4.dp),
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(end = 12.dp),
+                )
+                Text(
+                    "No journals available",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         },
-        onClick = { /* do nothing */ },
-        colors =
-            MenuDefaults.itemColors(
-                textColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
+        onClick = {},
+        colors = MenuDefaults.itemColors(textColor = MaterialTheme.colorScheme.onSurfaceVariant),
     )
 }
 
-/**
- * Content for the empty journal item
- */
-@Suppress("ktlint:standard:function-naming")
-@Composable
-private fun EmptyJournalItemContent() {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(4.dp),
-    ) {
-        Icon(
-            Icons.Default.Add,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(end = 12.dp),
-        )
-        Text(
-            "No journals available",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-/**
- * Menu item for each journal in the dropdown
- */
 @Suppress("ktlint:standard:function-naming")
 @Composable
 private fun JournalItem(
@@ -440,7 +342,51 @@ private fun JournalItem(
 ) {
     DropdownMenuItem(
         text = {
-            JournalItemContent(journal = journal, isSelected = isSelected)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(4.dp),
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isSelected) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                                },
+                            ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (isSelected) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+
+                Spacer(Modifier.width(Spacing.md))
+
+                Text(
+                    text = journal.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+                    color =
+                        if (isSelected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         },
         onClick = onClick,
         colors =
@@ -454,91 +400,4 @@ private fun JournalItem(
             ),
         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
     )
-}
-
-/**
- * Content for each journal item
- */
-@Suppress("ktlint:standard:function-naming")
-@Composable
-private fun JournalItemContent(
-    journal: Journal,
-    isSelected: Boolean,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(4.dp),
-    ) {
-        SelectionIndicator(isSelected = isSelected)
-
-        Spacer(Modifier.width(Spacing.md))
-
-        // Journal details
-        JournalDetails(
-            journal = journal,
-            isSelected = isSelected,
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-/**
- * Selection indicator for a journal item
- */
-@Suppress("ktlint:standard:function-naming")
-@Composable
-private fun SelectionIndicator(isSelected: Boolean) {
-    Box(
-        modifier =
-            Modifier
-                .size(24.dp)
-                .clip(CircleShape)
-                .background(
-                    if (isSelected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                    },
-                ),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (isSelected) {
-            Icon(
-                Icons.Default.Check,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(16.dp),
-            )
-        }
-    }
-}
-
-/**
- * Journal title display component
- */
-@Suppress("ktlint:standard:function-naming")
-@Composable
-private fun JournalDetails(
-    journal: Journal,
-    isSelected: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier) {
-        Text(
-            text = journal.title,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
-            color =
-                if (isSelected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
 }
