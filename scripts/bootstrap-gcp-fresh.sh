@@ -22,12 +22,71 @@ CLOUD_SQL_USER_NAME="${CLOUD_SQL_USER_NAME:-logdate}"
 DEPLOY_SOURCE_MODE="repo_vars"
 declare -a GITHUB_MANUAL_STEPS=()
 GITHUB_WIRING_STATUS="not_attempted"
+declare -a BILLING_ACCOUNT_IDS=()
+declare -a BILLING_ACCOUNT_NAMES=()
+declare -a ACCESSIBLE_PROJECT_IDS=()
+declare -a ACCESSIBLE_PROJECT_NAMES=()
+CURRENT_GCLOUD_PROJECT=""
+PROJECT_EXISTS="unknown"
+PROJECT_HAS_BILLING="unknown"
+PROJECT_BILLING_ACCOUNT=""
+
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+CYAN='\033[0;36m'
+NC='\033[0m'
 
 require_cmd() {
     if ! command -v "$1" >/dev/null 2>&1; then
         echo "Missing required command: $1"
         exit 1
     fi
+}
+
+log_step() {
+    printf '\n%b==>%b %s\n' "$CYAN" "$NC" "$1"
+}
+
+log_info() {
+    printf '%b[INFO]%b %s\n' "$GREEN" "$NC" "$1"
+}
+
+log_warn() {
+    printf '%b[WARN]%b %s\n' "$YELLOW" "$NC" "$1"
+}
+
+log_error() {
+    printf '%b[ERROR]%b %s\n' "$RED" "$NC" "$1"
+}
+
+print_usage() {
+    cat <<EOF
+Usage:
+  ./scripts/bootstrap-gcp-fresh.sh [options]
+
+Bootstrap a fresh first-party LogDate instance on GCP.
+
+Options:
+  --project-id ID         GCP project ID to create or reuse
+  --billing-account ID    GCP billing account ID
+  --region REGION         Cloud Run / Artifact Registry / Cloud SQL region
+  --instance-name NAME    Human-friendly instance seed used for defaults
+  --provider gcp          Only supported provider today
+  --yes                   Headless mode; fail instead of prompting
+  --help, -h              Show this help
+
+Interactive mode:
+  - Lets you select an existing GCP project or create a new one
+  - Lists open billing accounts and lets you pick by number
+  - Shows a config summary before provisioning starts
+  - Lets you edit key values instead of typing everything upfront
+
+Examples:
+  ./scripts/bootstrap-gcp-fresh.sh
+  ./scripts/bootstrap-gcp-fresh.sh --project-id my-logdate-prod --billing-account 000000-111111-222222
+  ./scripts/bootstrap-gcp-fresh.sh --yes --project-id my-logdate-prod --billing-account 000000-111111-222222
+EOF
 }
 
 detect_github_repo() {
@@ -72,41 +131,388 @@ default_project_id() {
 validate_project_id() {
     local project_id="$1"
     if [[ ! "$project_id" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]]; then
-        echo "Invalid GCP project ID: $project_id"
+        log_error "Invalid GCP project ID: $project_id"
         echo "Project IDs must be 6-30 chars, lowercase letters/digits/hyphens, start with a letter, and not end with a hyphen."
         exit 1
     fi
 }
 
-choose_billing_account() {
-    if [[ -n "$BILLING_ACCOUNT" ]]; then
+prompt_with_default() {
+    local var_name="$1" prompt_text="$2" default_value="${3:-}"
+    local input current_value
+    current_value="${!var_name:-$default_value}"
+    read -r -p "$prompt_text [${current_value}]: " input
+    printf -v "$var_name" '%s' "${input:-$current_value}"
+}
+
+normalize_gcloud_value() {
+    local value="$1"
+    case "$value" in
+        ""|"(unset)"|"None")
+            printf ''
+            ;;
+        *)
+            printf '%s' "$value"
+            ;;
+    esac
+}
+
+detect_current_gcloud_project() {
+    CURRENT_GCLOUD_PROJECT="$(normalize_gcloud_value "$(gcloud config get-value project 2>/dev/null || true)")"
+}
+
+load_accessible_projects() {
+    ACCESSIBLE_PROJECT_IDS=()
+    ACCESSIBLE_PROJECT_NAMES=()
+
+    local projects_output project_id project_name
+    projects_output="$(gcloud projects list --limit=10 --format='value(projectId,name)' 2>/dev/null || true)"
+    while IFS=$'\t' read -r project_id project_name; do
+        [[ -z "$project_id" ]] && continue
+        ACCESSIBLE_PROJECT_IDS+=("$project_id")
+        ACCESSIBLE_PROJECT_NAMES+=("${project_name:-$project_id}")
+    done <<< "$projects_output"
+
+    if [[ -n "$CURRENT_GCLOUD_PROJECT" ]]; then
+        local i found="false"
+        for i in "${!ACCESSIBLE_PROJECT_IDS[@]}"; do
+            if [[ "${ACCESSIBLE_PROJECT_IDS[$i]}" == "$CURRENT_GCLOUD_PROJECT" ]]; then
+                found="true"
+                break
+            fi
+        done
+        if [[ "$found" == "false" ]]; then
+            ACCESSIBLE_PROJECT_IDS=("$CURRENT_GCLOUD_PROJECT" "${ACCESSIBLE_PROJECT_IDS[@]}")
+            ACCESSIBLE_PROJECT_NAMES=("Current gcloud project" "${ACCESSIBLE_PROJECT_NAMES[@]}")
+        fi
+    fi
+}
+
+describe_project() {
+    local project_id="$1"
+    local i suffix=""
+    for i in "${!ACCESSIBLE_PROJECT_IDS[@]}"; do
+        if [[ "${ACCESSIBLE_PROJECT_IDS[$i]}" == "$project_id" ]]; then
+            if [[ "$project_id" == "$CURRENT_GCLOUD_PROJECT" && -n "$CURRENT_GCLOUD_PROJECT" ]]; then
+                suffix=" [current]"
+            fi
+            printf '%s (%s)%s' "${ACCESSIBLE_PROJECT_NAMES[$i]}" "$project_id" "$suffix"
+            return
+        fi
+    done
+    if [[ "$project_id" == "$CURRENT_GCLOUD_PROJECT" && -n "$CURRENT_GCLOUD_PROJECT" ]]; then
+        printf '%s [current]' "$project_id"
+        return
+    fi
+    printf '%s' "$project_id"
+}
+
+refresh_project_context() {
+    PROJECT_EXISTS="false"
+    PROJECT_HAS_BILLING="false"
+    PROJECT_BILLING_ACCOUNT=""
+
+    [[ -z "$PROJECT_ID" ]] && return
+
+    if gcloud projects describe "$PROJECT_ID" >/dev/null 2>&1; then
+        PROJECT_EXISTS="true"
+        local billing_info billing_enabled billing_account_name
+        billing_info="$(gcloud billing projects describe "$PROJECT_ID" --format='value(billingEnabled,billingAccountName)' 2>/dev/null || true)"
+        read -r billing_enabled billing_account_name <<< "$billing_info"
+        if [[ "$billing_enabled" == "True" || "$billing_enabled" == "true" || -n "$billing_account_name" ]]; then
+            PROJECT_HAS_BILLING="true"
+            PROJECT_BILLING_ACCOUNT="${billing_account_name#billingAccounts/}"
+        fi
+    fi
+}
+
+choose_project() {
+    if [[ -n "$PROJECT_ID" ]]; then
+        refresh_project_context
         return
     fi
 
-    local accounts
-    accounts="$(gcloud billing accounts list --filter='open=true' --format='value(name)' 2>/dev/null || true)"
-    local count
-    count="$(printf '%s\n' "$accounts" | sed '/^$/d' | wc -l | tr -d ' ')"
+    detect_current_gcloud_project
+    if [[ "$YES" == "true" ]]; then
+        if [[ -n "$CURRENT_GCLOUD_PROJECT" ]]; then
+            PROJECT_ID="$CURRENT_GCLOUD_PROJECT"
+            log_info "Using current gcloud project: $PROJECT_ID"
+        else
+            PROJECT_ID="$(default_project_id)"
+            log_info "No current gcloud project found. Creating a new project: $PROJECT_ID"
+        fi
+        refresh_project_context
+        return
+    fi
+
+    load_accessible_projects
+
+    echo "Select a GCP project:"
+    local option_count=0 i default_selection="" create_option manual_option
+    for i in "${!ACCESSIBLE_PROJECT_IDS[@]}"; do
+        option_count=$((option_count + 1))
+        local marker=""
+        if [[ "${ACCESSIBLE_PROJECT_IDS[$i]}" == "$CURRENT_GCLOUD_PROJECT" && -n "$CURRENT_GCLOUD_PROJECT" ]]; then
+            marker=" [current]"
+            default_selection="$option_count"
+        fi
+        printf '  %d) %s (%s)%s\n' "$option_count" "${ACCESSIBLE_PROJECT_NAMES[$i]}" "${ACCESSIBLE_PROJECT_IDS[$i]}" "$marker"
+    done
+    manual_option=$((option_count + 1))
+    create_option=$((option_count + 2))
+    echo "  ${manual_option}) Enter a different existing project ID"
+    echo "  ${create_option}) Create a new project"
+
+    if [[ -z "$default_selection" ]]; then
+        if (( option_count > 0 )); then
+            default_selection="1"
+        else
+            default_selection="$create_option"
+        fi
+    fi
+
+    local selection
+    while true; do
+        read -r -p "Project [default ${default_selection}]: " selection
+        selection="${selection:-$default_selection}"
+
+        if [[ "$selection" =~ ^[0-9]+$ ]] && (( selection >= 1 && selection <= option_count )); then
+            PROJECT_ID="${ACCESSIBLE_PROJECT_IDS[$((selection - 1))]}"
+            refresh_project_context
+            return
+        fi
+
+        if [[ "$selection" == "$manual_option" ]]; then
+            prompt_with_default PROJECT_ID "Existing project ID" "${CURRENT_GCLOUD_PROJECT:-}"
+            validate_project_id "$PROJECT_ID"
+            refresh_project_context
+            return
+        fi
+
+        if [[ "$selection" == "$create_option" ]]; then
+            PROJECT_ID="$(default_project_id)"
+            prompt_with_default PROJECT_ID "New project ID" "$PROJECT_ID"
+            validate_project_id "$PROJECT_ID"
+            PROJECT_EXISTS="false"
+            PROJECT_HAS_BILLING="false"
+            PROJECT_BILLING_ACCOUNT=""
+            return
+        fi
+
+        echo "Enter one of the listed numbers."
+    done
+}
+
+load_billing_accounts() {
+    BILLING_ACCOUNT_IDS=()
+    BILLING_ACCOUNT_NAMES=()
+
+    local accounts_output line full_id display_name account_id
+    accounts_output="$(gcloud billing accounts list --filter='open=true' --format='value(name,displayName)' 2>/dev/null || true)"
+    while IFS=$'\t' read -r full_id display_name; do
+        [[ -z "$full_id" ]] && continue
+        account_id="${full_id#billingAccounts/}"
+        BILLING_ACCOUNT_IDS+=("$account_id")
+        BILLING_ACCOUNT_NAMES+=("${display_name:-Unnamed billing account}")
+    done <<< "$accounts_output"
+}
+
+print_billing_account_options() {
+    local i
+    echo "Open billing accounts:"
+    for i in "${!BILLING_ACCOUNT_IDS[@]}"; do
+        printf '  %d) %s (%s)\n' "$((i + 1))" "${BILLING_ACCOUNT_NAMES[$i]}" "${BILLING_ACCOUNT_IDS[$i]}"
+    done
+}
+
+describe_billing_account() {
+    local account_id="$1"
+    local i
+    for i in "${!BILLING_ACCOUNT_IDS[@]}"; do
+        if [[ "${BILLING_ACCOUNT_IDS[$i]}" == "$account_id" ]]; then
+            printf '%s (%s)' "${BILLING_ACCOUNT_NAMES[$i]}" "$account_id"
+            return
+        fi
+    done
+    printf '%s' "$account_id"
+}
+
+choose_region() {
+    local common_regions=(
+        "us-central1"
+        "us-east1"
+        "us-west1"
+        "us-west2"
+        "europe-west1"
+    )
+
+    if [[ "$YES" == "true" ]]; then
+        return
+    fi
+
+    echo "Select a region:"
+    local i
+    for i in "${!common_regions[@]}"; do
+        local marker=""
+        if [[ "${common_regions[$i]}" == "$REGION" ]]; then
+            marker=" (Current)"
+        fi
+        printf '  %d) %s%s\n' "$((i + 1))" "${common_regions[$i]}" "$marker"
+    done
+    echo "  6) Enter a custom region"
+
+    local selection
+    while true; do
+        read -r -p "Region [1-6]: " selection
+        case "${selection:-1}" in
+            1|2|3|4|5)
+                REGION="${common_regions[$((selection - 1))]}"
+                return
+                ;;
+            6)
+                prompt_with_default REGION "Custom region" "$REGION"
+                return
+                ;;
+            *)
+                echo "Enter 1-6."
+                ;;
+        esac
+    done
+}
+
+show_configuration() {
+    load_billing_accounts
+    refresh_project_context
+    echo ""
+    echo "Bootstrap configuration:"
+    printf '  1) Project:             %s\n' "$(describe_project "$PROJECT_ID")"
+    if [[ "$PROJECT_EXISTS" == "true" ]]; then
+        printf '     Project mode:        Reuse existing project\n'
+    else
+        printf '     Project mode:        Create new project\n'
+    fi
+    if [[ "$PROJECT_HAS_BILLING" == "true" ]]; then
+        printf '  2) Billing account:     Reuse existing project billing (%s)\n' "$(describe_billing_account "${PROJECT_BILLING_ACCOUNT:-$BILLING_ACCOUNT}")"
+    else
+        printf '  2) Billing account:     %s\n' "$(describe_billing_account "$BILLING_ACCOUNT")"
+    fi
+    printf '  3) Region:              %s\n' "$REGION"
+    printf '  4) Service name:        %s\n' "$SERVICE_NAME"
+    printf '  5) Artifact repo:       %s\n' "$ARTIFACT_REGISTRY_REPO"
+    printf '  6) GitHub repo:         %s\n' "${GITHUB_REPO:-Not configured}"
+    printf '  7) State bucket:        %s\n' "${STATE_BUCKET}"
+    printf '  8) Cloud SQL instance:  %s\n' "${CLOUD_SQL_INSTANCE_NAME}"
+}
+
+review_configuration() {
+    if [[ "$YES" == "true" ]]; then
+        return
+    fi
+
+    while true; do
+        show_configuration
+        echo ""
+        read -r -p "Proceed with this configuration? [Y/e/n] " confirm
+        case "${confirm:-y}" in
+            y|Y)
+                return
+                ;;
+            e|E)
+                read -r -p "Edit field [1-8]: " field
+                case "$field" in
+                    1)
+                        PROJECT_ID=""
+                        choose_project
+                        if [[ -z "${TF_STATE_BUCKET:-}" ]]; then
+                            STATE_BUCKET="${PROJECT_ID}-tfstate"
+                        fi
+                        ;;
+                    2)
+                        choose_billing_account force
+                        ;;
+                    3)
+                        choose_region
+                        ;;
+                    4)
+                        prompt_with_default SERVICE_NAME "Service name" "$SERVICE_NAME"
+                        ;;
+                    5)
+                        prompt_with_default ARTIFACT_REGISTRY_REPO "Artifact Registry repo" "$ARTIFACT_REGISTRY_REPO"
+                        ;;
+                    6)
+                        prompt_with_default GITHUB_REPO "GitHub repo (owner/repo)" "${GITHUB_REPO:-}"
+                        ;;
+                    7)
+                        prompt_with_default STATE_BUCKET "Terraform state bucket" "$STATE_BUCKET"
+                        ;;
+                    8)
+                        prompt_with_default CLOUD_SQL_INSTANCE_NAME "Cloud SQL instance name" "$CLOUD_SQL_INSTANCE_NAME"
+                        ;;
+                    *)
+                        echo "Enter 1-8."
+                        ;;
+                esac
+                ;;
+            n|N)
+                echo "Aborted."
+                exit 1
+                ;;
+            *)
+                echo "Enter y, e, or n."
+                ;;
+        esac
+    done
+}
+
+choose_billing_account() {
+    if [[ -n "$BILLING_ACCOUNT" && "${1:-}" != "force" ]]; then
+        return
+    fi
+
+    load_billing_accounts
+    local count="${#BILLING_ACCOUNT_IDS[@]}"
+
+    if [[ "$count" == "0" ]]; then
+        log_error "No open billing accounts were found for your gcloud identity."
+        echo "Run 'gcloud billing accounts list --format=\"table(name,displayName,open)\"' to inspect available accounts."
+        echo "If you know the account ID already, rerun with --billing-account BILLING_ACCOUNT_ID."
+        exit 1
+    fi
 
     if [[ "$count" == "1" ]]; then
-        BILLING_ACCOUNT="$(printf '%s\n' "$accounts" | sed '/^$/d' | head -n 1)"
-        BILLING_ACCOUNT="${BILLING_ACCOUNT#billingAccounts/}"
+        BILLING_ACCOUNT="${BILLING_ACCOUNT_IDS[0]}"
+        log_info "Using billing account: $(describe_billing_account "$BILLING_ACCOUNT")"
         return
     fi
 
     if [[ "$YES" == "true" ]]; then
-        echo "Multiple or no open billing accounts found. Pass --billing-account in headless mode."
+        log_error "Multiple open billing accounts found."
+        print_billing_account_options
+        echo "Pass --billing-account in headless mode."
         exit 1
     fi
 
-    echo "Available billing accounts:"
-    printf '%s\n' "$accounts" | sed '/^$/d' | nl -w2 -s') '
-    read -r -p "Billing account ID: " BILLING_ACCOUNT
-    if [[ -z "$BILLING_ACCOUNT" ]]; then
-        echo "Billing account is required."
-        exit 1
-    fi
-    BILLING_ACCOUNT="${BILLING_ACCOUNT#billingAccounts/}"
+    print_billing_account_options
+    echo "Choose a number or paste an exact billing account ID."
+
+    local selection i
+    while true; do
+        read -r -p "Billing account [1-${count}]: " selection
+        selection="${selection:-1}"
+        if [[ "$selection" =~ ^[0-9]+$ ]] && (( selection >= 1 && selection <= count )); then
+            BILLING_ACCOUNT="${BILLING_ACCOUNT_IDS[$((selection - 1))]}"
+            return
+        fi
+
+        for i in "${!BILLING_ACCOUNT_IDS[@]}"; do
+            if [[ "${BILLING_ACCOUNT_IDS[$i]}" == "${selection#billingAccounts/}" ]]; then
+                BILLING_ACCOUNT="${BILLING_ACCOUNT_IDS[$i]}"
+                return
+            fi
+        done
+
+        echo "Enter a number from the list or an exact billing account ID."
+    done
 }
 
 gcloud_link_billing() {
@@ -386,15 +792,20 @@ while [[ $# -gt 0 ]]; do
             YES="true"
             shift
             ;;
+        --help|-h)
+            print_usage
+            exit 0
+            ;;
         *)
-            echo "Unknown argument: $1"
+            log_error "Unknown argument: $1"
+            print_usage
             exit 1
             ;;
     esac
 done
 
 if [[ "$PROVIDER" != "gcp" ]]; then
-    echo "Only --provider gcp is currently implemented."
+    log_error "Only --provider gcp is currently implemented."
     exit 1
 fi
 
@@ -404,17 +815,15 @@ require_cmd docker
 require_cmd openssl
 
 if ! gcloud auth print-access-token >/dev/null 2>&1; then
-    echo "gcloud auth is required. Run 'gcloud auth login' first."
+    log_error "gcloud auth is required. Run 'gcloud auth login' first."
     exit 1
 fi
 
 detect_github_repo
 
+choose_project
 if [[ -z "$INSTANCE_NAME" ]]; then
-    INSTANCE_NAME="$(sanitize_slug "logdate-${USER:-dev}-$(date +%y%m%d%H%M%S)")"
-fi
-if [[ -z "$PROJECT_ID" ]]; then
-    PROJECT_ID="$(default_project_id)"
+    INSTANCE_NAME="$(sanitize_slug "logdate-${PROJECT_ID:-${USER:-dev}}")"
 fi
 validate_project_id "$PROJECT_ID"
 if [[ -z "$STATE_BUCKET" ]]; then
@@ -428,16 +837,29 @@ if [[ -z "$IMAGE_TAG" ]]; then
     fi
 fi
 
-choose_billing_account
+if [[ "$PROJECT_EXISTS" == "true" && "$PROJECT_HAS_BILLING" == "true" ]]; then
+    BILLING_ACCOUNT="${PROJECT_BILLING_ACCOUNT:-$BILLING_ACCOUNT}"
+    load_billing_accounts
+    log_info "Reusing billing already attached to project: $(describe_billing_account "$BILLING_ACCOUNT")"
+else
+    choose_billing_account
+fi
+review_configuration
 
+log_step "Preparing GCP project"
 if ! gcloud projects describe "$PROJECT_ID" >/dev/null 2>&1; then
     gcloud projects create "$PROJECT_ID" --name="$PROJECT_ID" >/dev/null
 fi
 
-gcloud_link_billing "$PROJECT_ID" "$BILLING_ACCOUNT"
+if [[ "$PROJECT_EXISTS" == "true" && "$PROJECT_HAS_BILLING" == "true" ]]; then
+    log_info "Keeping existing billing attachment on project."
+else
+    gcloud_link_billing "$PROJECT_ID" "$BILLING_ACCOUNT"
+fi
 gcloud config set project "$PROJECT_ID" >/dev/null
 enable_bootstrap_apis "$PROJECT_ID"
 
+log_step "Preparing Terraform state"
 if ! gcloud storage buckets describe "gs://${STATE_BUCKET}" >/dev/null 2>&1; then
     gcloud storage buckets create "gs://${STATE_BUCKET}" \
         --project="$PROJECT_ID" \
@@ -455,10 +877,14 @@ MANIFEST_PATH="${INSTANCE_DIR}/instance-manifest.json"
 write_backend_config "$BACKEND_PATH"
 write_tfvars "$TFVARS_PATH"
 
+log_step "Provisioning infrastructure"
 terraform -chdir="$TF_DIR" init -reconfigure -backend-config="$BACKEND_PATH" >/dev/null
 terraform -chdir="$TF_DIR" apply -auto-approve -var-file="$TFVARS_PATH"
+
+log_step "Uploading runtime secrets"
 bootstrap_runtime_secrets
 
+log_step "Deploying Cloud Run service"
 CONFIG_PATH="$TFVARS_PATH" \
 CONFIG_MODE="full" \
 GCP_PROJECT_ID="$PROJECT_ID" \
@@ -489,6 +915,7 @@ WORKLOAD_IDENTITY_PROVIDER="$(terraform -chdir="$TF_DIR" output -raw workload_id
 GITHUB_SERVICE_ACCOUNT="$(terraform -chdir="$TF_DIR" output -raw github_deploy_service_account_email 2>/dev/null || true)"
 RUNTIME_SERVICE_ACCOUNT="$(terraform -chdir="$TF_DIR" output -raw runtime_service_account_email 2>/dev/null || true)"
 
+log_step "Configuring GitHub deploy metadata"
 maybe_set_github_secret "GCP_WORKLOAD_IDENTITY_PROVIDER" "$WORKLOAD_IDENTITY_PROVIDER"
 maybe_set_github_secret "GCP_SERVICE_ACCOUNT" "$GITHUB_SERVICE_ACCOUNT"
 maybe_set_github_variable "LOGDATE_DEPLOY_SOURCE" "$DEPLOY_SOURCE_MODE"
