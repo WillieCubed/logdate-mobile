@@ -4,19 +4,26 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.pds.AuthorizationServerMetadata
+import studio.hypertext.atproto.pds.BlobDownload
+import studio.hypertext.atproto.pds.BlobRef
+import studio.hypertext.atproto.pds.CidLink
 import studio.hypertext.atproto.pds.CreateRecordRequest
 import studio.hypertext.atproto.pds.DeleteRecordRequest
 import studio.hypertext.atproto.pds.DescribeServerResponse
+import studio.hypertext.atproto.pds.GetBlobRequest
 import studio.hypertext.atproto.pds.GetRecordRequest
 import studio.hypertext.atproto.pds.ListRecordsRequest
 import studio.hypertext.atproto.pds.ProtectedResourceMetadata
 import studio.hypertext.atproto.pds.PutRecordRequest
+import studio.hypertext.atproto.pds.UploadBlobRequest
+import studio.hypertext.atproto.repo.Cid
 import studio.hypertext.atproto.repo.DefaultRepoEngine
 import studio.hypertext.atproto.repo.InMemoryRepoBlockStore
 import studio.hypertext.atproto.repo.RepoRecordId
 import studio.hypertext.atproto.syntax.Nsid
 import studio.hypertext.atproto.syntax.RecordKey
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -137,5 +144,55 @@ class PdsRuntimeTest {
             assertEquals(listOf(created.cid), listed.records.mapNotNull { it.cid })
             assertTrue(deleted)
             assertNull(afterDelete)
+        }
+
+    @Test
+    fun `default blob service proxies blob uploads and downloads`() =
+        kotlinx.coroutines.test.runTest {
+            val cid = Cid.require("bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku")
+            val blobRef =
+                BlobRef(
+                    ref = CidLink(cid),
+                    mimeType = "image/jpeg",
+                    size = 3L,
+                )
+            val blobStore =
+                object : PdsBlobStore {
+                    override suspend fun putBlob(request: UploadBlobRequest): Result<BlobRef> {
+                        assertEquals(repo, request.repo)
+                        assertEquals("image/jpeg", request.contentType)
+                        assertContentEquals(byteArrayOf(1, 2, 3), request.bytes)
+                        return Result.success(blobRef)
+                    }
+
+                    override suspend fun getBlob(request: GetBlobRequest): Result<BlobDownload?> {
+                        assertEquals(repo, request.did)
+                        assertEquals(cid, request.cid)
+                        return Result.success(BlobDownload(contentType = "image/jpeg", bytes = byteArrayOf(1, 2, 3)))
+                    }
+                }
+            val service = DefaultPdsBlobService(blobStore)
+
+            val uploaded =
+                service
+                    .uploadBlob(
+                        UploadBlobRequest(
+                            repo = repo,
+                            contentType = "image/jpeg",
+                            bytes = byteArrayOf(1, 2, 3),
+                        ),
+                    ).getOrThrow()
+            val downloaded =
+                service
+                    .getBlob(
+                        GetBlobRequest(
+                            did = repo,
+                            cid = cid,
+                        ),
+                    ).getOrThrow()
+
+            assertEquals(blobRef, uploaded.blob)
+            assertEquals("image/jpeg", downloaded?.contentType)
+            assertContentEquals(byteArrayOf(1, 2, 3), downloaded?.bytes)
         }
 }

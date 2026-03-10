@@ -44,6 +44,11 @@ public value class Cid(
                     digest
             return Cid("$MULTIBASE_BASE32_PREFIX${encodeBase32(cidBytes)}")
         }
+
+        /**
+         * Creates a CID for raw blob bytes using the AT Protocol `raw` codec.
+         */
+        public fun rawSha256(bytes: ByteArray): Cid = sha256(codec = RAW_CODEC, bytes = bytes)
     }
 }
 
@@ -83,7 +88,8 @@ internal fun encodeBase32(bytes: ByteArray): String {
 }
 
 private const val CID_VERSION: Int = 1
-internal const val DAG_CBOR_CODEC: Int = 0x71
+public const val RAW_CODEC: Int = 0x55
+public const val DAG_CBOR_CODEC: Int = 0x71
 private const val SHA256_MULTIHASH_CODE: Int = 0x12
 private const val SHA256_DIGEST_SIZE: Int = 32
 private const val MULTIBASE_BASE32_PREFIX: Char = 'b'

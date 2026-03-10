@@ -23,6 +23,7 @@ class AccountModelsSerializationTest {
                 did = "did:web:u1.logdate.app",
                 handle = "u1.logdate.app",
                 signingKeyPublic = "zExampleKey",
+                plcRecoveryDidKey = "did:key:zRecoveryKey",
                 email = "u1@example.com",
                 emailVerified = true,
                 bio = "bio",
@@ -40,6 +41,7 @@ class AccountModelsSerializationTest {
         assertEquals("did:web:u1.logdate.app", decodedAccount.did)
         assertEquals("u1.logdate.app", decodedAccount.handle)
         assertEquals("zExampleKey", decodedAccount.signingKeyPublic)
+        assertEquals("did:key:zRecoveryKey", decodedAccount.plcRecoveryDidKey)
         assertEquals("UTC", decodedAccount.timezone)
         assertEquals("en-US", decodedAccount.locale)
 

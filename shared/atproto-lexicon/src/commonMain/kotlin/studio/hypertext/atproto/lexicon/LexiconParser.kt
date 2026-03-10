@@ -136,6 +136,7 @@ public object LexiconParser {
             "boolean" -> LexiconType.BOOLEAN
             "integer" -> LexiconType.INTEGER
             "array" -> LexiconType.ARRAY
+            "blob" -> LexiconType.BLOB
             "token" -> LexiconType.TOKEN
             "ref" -> LexiconType.REF
             else -> LexiconType.UNKNOWN

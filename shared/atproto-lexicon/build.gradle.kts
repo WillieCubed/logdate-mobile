@@ -23,6 +23,9 @@ val atprotoServerLexiconOutputDir =
 val atprotoRepoLexiconInputDir = layout.projectDirectory.dir("src/commonMain/resources/com/atproto/repo")
 val atprotoRepoLexiconOutputDir =
     layout.projectDirectory.dir("src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/com/atproto/repo")
+val atprotoSyncLexiconInputDir = layout.projectDirectory.dir("src/commonMain/resources/com/atproto/sync")
+val atprotoSyncLexiconOutputDir =
+    layout.projectDirectory.dir("src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/com/atproto/sync")
 
 fun registerLexiconCodegenTask(
     name: String,
@@ -75,6 +78,13 @@ registerLexiconCodegenTask(
     packageName = "studio.hypertext.atproto.lexicon.generated.com.atproto.repo",
 )
 
+registerLexiconCodegenTask(
+    name = "generateAtprotoSyncLexicons",
+    inputDir = atprotoSyncLexiconInputDir,
+    outputDir = atprotoSyncLexiconOutputDir,
+    packageName = "studio.hypertext.atproto.lexicon.generated.com.atproto.sync",
+)
+
 tasks.register("generateOfficialAtprotoLexicons") {
     group = "codegen"
     description = "Generate checked-in Kotlin models for the official AT Protocol lexicon documents used by this repo."
@@ -82,6 +92,7 @@ tasks.register("generateOfficialAtprotoLexicons") {
         "generateAtprotoIdentityLexicons",
         "generateAtprotoServerLexicons",
         "generateAtprotoRepoLexicons",
+        "generateAtprotoSyncLexicons",
     )
 }
 

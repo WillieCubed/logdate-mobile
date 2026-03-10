@@ -1,5 +1,6 @@
 package app.logdate.server
 
+import app.logdate.server.atproto.LogDatePdsBlobStore
 import app.logdate.server.atproto.LogDateRepoStore
 import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountRepository
@@ -16,6 +17,8 @@ import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.InMemorySigningKeyRepository
 import app.logdate.server.identity.SigningKeyService
+import app.logdate.server.logdate.InMemoryLogDateAtprotoBlobRepository
+import app.logdate.server.logdate.InMemoryLogDateBlobStorage
 import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
 import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
 import app.logdate.server.oauth.OAuthAccessTokenService
@@ -45,6 +48,7 @@ import io.ktor.server.testing.TestApplicationBuilder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import studio.hypertext.atproto.pds.DescribeServerResponse
+import studio.hypertext.atproto.pds.runtime.DefaultPdsBlobService
 import studio.hypertext.atproto.pds.runtime.DefaultPdsRepoService
 import studio.hypertext.atproto.pds.runtime.StaticPdsDiscoveryService
 import studio.hypertext.atproto.repo.InMemoryRepoBlockStore
@@ -91,6 +95,8 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
             config = atprotoIdentityConfig,
         )
     val repoBlockStore = InMemoryRepoBlockStore()
+    val blobStorage = InMemoryLogDateBlobStorage()
+    val atprotoBlobRepository = InMemoryLogDateAtprotoBlobRepository()
     val logDateCollectionsRepository =
         RepoBackedLogDateCollectionsRepository(
             accountRepository = accountRepository,
@@ -110,6 +116,14 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
     val oauthDpopVerifier = OAuthDpopVerifier()
     val oauthAccessTokenService = OAuthAccessTokenService(config = oauthConfig, keyService = oauthKeyService)
     val pdsRepoService = DefaultPdsRepoService(logDateRepoStore)
+    val pdsBlobService =
+        DefaultPdsBlobService(
+            LogDatePdsBlobStore(
+                identityService = atprotoIdentityService,
+                blobRepository = atprotoBlobRepository,
+                blobStorage = blobStorage,
+            ),
+        )
     val pdsDiscoveryService =
         StaticPdsDiscoveryService(
             authorizationServerMetadata = oauthConfig.authorizationServerMetadata(),
@@ -163,6 +177,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
                 accountRepository = accountRepository,
                 tokenService = tokenService,
                 repoService = pdsRepoService,
+                blobService = pdsBlobService,
                 oauthAccessTokenService = oauthAccessTokenService,
                 oauthDpopVerifier = oauthDpopVerifier,
                 oauthNonceService = oauthNonceService,

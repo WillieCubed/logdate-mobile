@@ -72,6 +72,7 @@ public enum class LexiconType {
     BOOLEAN,
     INTEGER,
     ARRAY,
+    BLOB,
     TOKEN,
     REF,
     UNKNOWN,

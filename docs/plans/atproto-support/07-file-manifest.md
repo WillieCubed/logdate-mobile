@@ -55,6 +55,8 @@ This manifest reflects the current AT Protocol implementation shape in the repo.
 - `shared/atproto-lexicon/src/commonMain/resources/com/atproto/repo/getRecord.json`
 - `shared/atproto-lexicon/src/commonMain/resources/com/atproto/repo/listRecords.json`
 - `shared/atproto-lexicon/src/commonMain/resources/com/atproto/repo/putRecord.json`
+- `shared/atproto-lexicon/src/commonMain/resources/com/atproto/repo/uploadBlob.json`
+- `shared/atproto-lexicon/src/commonMain/resources/com/atproto/sync/getBlob.json`
 - `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/com/atproto/identity/ResolveHandleLexicon.kt`
 - `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/com/atproto/server/DescribeServerLexicon.kt`
 - `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/com/atproto/repo/CreateRecordLexicon.kt`
@@ -64,10 +66,13 @@ This manifest reflects the current AT Protocol implementation shape in the repo.
 - `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/com/atproto/repo/GetRecordLexicon.kt`
 - `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/com/atproto/repo/ListRecordsLexicon.kt`
 - `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/com/atproto/repo/PutRecordLexicon.kt`
+- `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/com/atproto/repo/UploadBlobLexicon.kt`
+- `shared/atproto-lexicon/src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/com/atproto/sync/GetBlobLexicon.kt`
 
 ### PDS Contracts
 
 - `shared/atproto-pds/src/commonMain/kotlin/studio/hypertext/atproto/pds/DiscoveryModels.kt`
+- `shared/atproto-pds/src/commonMain/kotlin/studio/hypertext/atproto/pds/BlobModels.kt`
 - `shared/atproto-pds/src/commonMain/kotlin/studio/hypertext/atproto/pds/OAuthModels.kt`
 - `shared/atproto-pds/src/commonMain/kotlin/studio/hypertext/atproto/pds/RepoModels.kt`
 - `shared/atproto-pds/src/commonMain/kotlin/studio/hypertext/atproto/pds/Services.kt`
@@ -77,6 +82,8 @@ This manifest reflects the current AT Protocol implementation shape in the repo.
 
 - `shared/atproto-pds-runtime/src/commonMain/kotlin/studio/hypertext/atproto/pds/runtime/StaticPdsDiscoveryService.kt`
 - `shared/atproto-pds-runtime/src/commonMain/kotlin/studio/hypertext/atproto/pds/runtime/DefaultPdsRepoService.kt`
+- `shared/atproto-pds-runtime/src/commonMain/kotlin/studio/hypertext/atproto/pds/runtime/PdsBlobStore.kt`
+- `shared/atproto-pds-runtime/src/commonMain/kotlin/studio/hypertext/atproto/pds/runtime/DefaultPdsBlobService.kt`
 
 ### PLC
 
@@ -100,11 +107,16 @@ This manifest reflects the current AT Protocol implementation shape in the repo.
 
 - `server/src/main/kotlin/app/logdate/server/identity/AtprotoIdentityConfig.kt`
 - `server/src/main/kotlin/app/logdate/server/identity/AtprotoIdentityService.kt`
+- `server/src/main/kotlin/app/logdate/server/identity/IdentityLifecycleExceptions.kt`
+- `server/src/main/kotlin/app/logdate/server/identity/HostedPlcOperationRepository.kt`
 - `server/src/main/kotlin/app/logdate/server/identity/SigningKeyRepository.kt`
 - `server/src/main/kotlin/app/logdate/server/identity/SigningKeyService.kt`
 - `server/src/main/kotlin/app/logdate/server/identity/PlcIdentityService.kt`
+- `server/src/main/kotlin/app/logdate/server/database/PostgreSQLHostedPlcOperationRepository.kt`
 - `server/src/main/kotlin/app/logdate/server/database/PostgreSQLSigningKeyRepository.kt`
 - `server/src/main/resources/db/migration/V6__Add_atproto_identity.sql`
+- `server/src/main/resources/db/migration/V11__Add_hosted_plc_operations_table.sql`
+- `server/src/main/resources/db/migration/V12__Add_accounts_plc_recovery_did_key.sql`
 
 ## Server LogDate Boundaries
 
@@ -113,15 +125,19 @@ This manifest reflects the current AT Protocol implementation shape in the repo.
 - `server/src/main/kotlin/app/logdate/server/logdate/LogDateCollectionsMetadataStore.kt`
 - `server/src/main/kotlin/app/logdate/server/logdate/RepoBackedLogDateCollectionsRepository.kt`
 - `server/src/main/kotlin/app/logdate/server/logdate/LogDateBlobStorage.kt`
+- `server/src/main/kotlin/app/logdate/server/logdate/InMemoryLogDateBlobStorage.kt`
+- `server/src/main/kotlin/app/logdate/server/logdate/LogDateAtprotoBlobRepository.kt`
 - `server/src/main/kotlin/app/logdate/server/logdate/LogDateMediaRepository.kt`
 - `server/src/main/kotlin/app/logdate/server/logdate/LogDateBackupRepository.kt`
 - `server/src/main/kotlin/app/logdate/server/logdate/LogDateSyncAdapters.kt`
 - `server/src/main/kotlin/app/logdate/server/database/PostgreSQLLogDateCollectionsMetadataStore.kt`
+- `server/src/main/kotlin/app/logdate/server/database/PostgreSQLLogDateAtprotoBlobRepository.kt`
 - `server/src/main/kotlin/app/logdate/server/database/PostgreSQLLogDateMediaRepository.kt`
 - `server/src/main/kotlin/app/logdate/server/database/PostgreSQLLogDateBackupRepository.kt`
 - `server/src/main/kotlin/app/logdate/server/sync/GcsMediaStorage.kt`
 - `server/src/main/resources/db/migration/V8__Add_logdate_collection_repo_index.sql`
 - `server/src/main/resources/db/migration/V9__Add_logdate_media_and_backup_tables.sql`
+- `server/src/main/resources/db/migration/V10__Add_logdate_atproto_blob_table.sql`
 
 ## Server OAuth and PDS-Compatible Routes
 
@@ -138,6 +154,7 @@ This manifest reflects the current AT Protocol implementation shape in the repo.
 - `server/src/main/kotlin/app/logdate/server/routes/OAuthRoutes.kt`
 - `server/src/main/kotlin/app/logdate/server/routes/XrpcRoutes.kt`
 - `server/src/main/kotlin/app/logdate/server/atproto/AtprotoContentRecordStore.kt`
+- `server/src/main/kotlin/app/logdate/server/atproto/LogDatePdsBlobStore.kt`
 - `server/src/main/kotlin/app/logdate/server/atproto/LogDateRepoStore.kt`
 - `server/src/main/kotlin/app/logdate/server/atproto/SyntheticCid.kt`
 
@@ -202,13 +219,18 @@ This manifest reflects the current AT Protocol implementation shape in the repo.
 - `server/src/test/kotlin/app/logdate/server/logdate/RepoBackedLogDateCollectionsRepositoryTest.kt`
 - `server/src/test/kotlin/app/logdate/server/logdate/InMemoryLogDateMediaRepositoryTest.kt`
 - `server/src/test/kotlin/app/logdate/server/logdate/InMemoryLogDateBackupRepositoryTest.kt`
+- `server/src/test/kotlin/app/logdate/server/logdate/InMemoryLogDateAtprotoBlobRepositoryTest.kt`
 - `server/src/test/kotlin/app/logdate/server/logdate/SyncBackedLogDateCollectionsRepositoryTest.kt`
 - `server/src/test/kotlin/app/logdate/server/logdate/SyncBackedLogDateMediaRepositoryTest.kt`
 - `server/src/test/kotlin/app/logdate/server/logdate/SyncBackedLogDateBackupRepositoryTest.kt`
 - `server/src/test/kotlin/app/logdate/server/database/PostgreSQLLogDateCollectionsMetadataStoreTest.kt`
+- `server/src/test/kotlin/app/logdate/server/database/PostgreSQLLogDateAtprotoBlobRepositoryTest.kt`
+- `server/src/test/kotlin/app/logdate/server/database/PostgreSQLHostedPlcOperationRepositoryTest.kt`
 - `server/src/test/kotlin/app/logdate/server/database/PostgreSQLLogDateMediaRepositoryTest.kt`
 - `server/src/test/kotlin/app/logdate/server/database/PostgreSQLLogDateBackupRepositoryTest.kt`
+- `server/src/test/kotlin/app/logdate/server/atproto/LogDatePdsBlobStoreTest.kt`
 - `server/src/test/kotlin/app/logdate/server/sync/GcsMediaStorageTest.kt`
+- `server/src/test/kotlin/app/logdate/server/identity/InMemoryHostedPlcOperationRepositoryTest.kt`
 - `server/src/test/kotlin/app/logdate/server/routes/Identity*.kt`
 - `server/src/test/kotlin/app/logdate/server/routes/OAuthRoutesTest.kt`
 - `server/src/test/kotlin/app/logdate/server/routes/Xrpc*.kt`

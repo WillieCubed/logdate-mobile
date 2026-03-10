@@ -17,6 +17,7 @@ object AccountsTable : Table("accounts") {
     val did = varchar("did", 255).nullable().uniqueIndex()
     val handle = varchar("handle", 255).nullable().uniqueIndex()
     val signingKeyPublic = text("signing_key_public").nullable()
+    val plcRecoveryDidKey = text("plc_recovery_did_key").nullable()
     val email = varchar("email", 255).nullable()
     val emailVerified = bool("email_verified").default(false)
     val bio = text("bio").nullable()
@@ -40,6 +41,25 @@ object SigningKeysTable : Table("signing_keys") {
     val revokedAt = timestamp("revoked_at").nullable()
 
     override val primaryKey = PrimaryKey(id)
+}
+
+@OptIn(ExperimentalUuidApi::class)
+object HostedPlcOperationsTable : Table("hosted_plc_operations") {
+    val id = uuid("id").autoGenerate()
+    val accountId = uuid("account_id").references(AccountsTable.id)
+    val did = varchar("did", 255)
+    val cid = varchar("cid", 255).nullable()
+    val prevCid = varchar("prev_cid", 255).nullable()
+    val operationType = varchar("operation_type", 32)
+    val operationJson = text("operation_json")
+    val createdAt = timestamp("created_at")
+
+    override val primaryKey = PrimaryKey(id)
+
+    init {
+        index("idx_hosted_plc_operations_account_created", false, accountId, createdAt)
+        index("idx_hosted_plc_operations_did_created", false, did, createdAt)
+    }
 }
 
 @OptIn(ExperimentalUuidApi::class)
@@ -222,5 +242,21 @@ object LogDateBackupsTable : Table("logdate_backups") {
     init {
         index("idx_logdate_backups_user", false, userId)
         index("idx_logdate_backups_user_created_at", false, userId, createdAt)
+    }
+}
+
+object LogDateAtprotoBlobsTable : Table("logdate_atproto_blobs") {
+    val userId = uuid("user_id")
+    val cid = varchar("cid", 255)
+    val mimeType = varchar("mime_type", 128)
+    val sizeBytes = long("size_bytes")
+    val storagePath = text("storage_path")
+    val createdAt = long("created_at")
+
+    override val primaryKey = PrimaryKey(userId, cid)
+
+    init {
+        index("idx_logdate_atproto_blobs_user", false, userId)
+        index("idx_logdate_atproto_blobs_user_created_at", false, userId, createdAt)
     }
 }

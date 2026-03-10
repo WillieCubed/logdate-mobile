@@ -4,10 +4,13 @@ import app.logdate.server.auth.Account
 import app.logdate.server.auth.InMemoryAccountRepository
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.plc.PlcDirectoryClient
+import studio.hypertext.atproto.plc.PlcIndexedOperation
 import studio.hypertext.atproto.plc.PlcLogEntry
+import studio.hypertext.atproto.plc.PlcOperation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
@@ -19,6 +22,7 @@ class PlcIdentityServiceTest {
     fun `provisionHostedDid derives did plc identity and preserves atproto plc document fields`() =
         kotlinx.coroutines.test.runTest {
             val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
+            val operationRepository = InMemoryHostedPlcOperationRepository()
             val service =
                 PlcIdentityService(
                     signingKeyService = signingKeyService,
@@ -28,11 +32,23 @@ class PlcIdentityServiceTest {
                             pdsServiceEndpoint = "https://pds.logdate.app",
                             hostedAccountDidMethod = HostedAccountDidMethod.PLC,
                         ),
+                    hostedPlcOperationRepository = operationRepository,
                 )
             val accountId = Uuid.random()
+            val recoveryDidKey = didKeyFor(signingKeyService.ensureActiveKey(Uuid.random()).publicKeyMultibase)
 
-            val provisioned = service.provisionHostedDid(accountId = accountId, handle = "alice.logdate.app")
-            val repeated = service.provisionHostedDid(accountId = accountId, handle = "alice.logdate.app")
+            val provisioned =
+                service.provisionHostedDid(
+                    accountId = accountId,
+                    handle = "alice.logdate.app",
+                    recoveryDidKey = recoveryDidKey,
+                )
+            val repeated =
+                service.provisionHostedDid(
+                    accountId = accountId,
+                    handle = "alice.logdate.app",
+                    recoveryDidKey = recoveryDidKey,
+                )
 
             assertTrue(provisioned.did.startsWith("did:plc:"))
             assertEquals(provisioned.did, repeated.did)
@@ -47,14 +63,16 @@ class PlcIdentityServiceTest {
                 provisioned.publicKeyDidKey,
                 provisioned.operation.verificationMethods.getValue("atproto"),
             )
-            assertEquals(listOf(provisioned.publicKeyDidKey), provisioned.operation.rotationKeys)
+            assertEquals(listOf(provisioned.publicKeyDidKey, recoveryDidKey), provisioned.operation.rotationKeys)
             assertEquals(AtprotoDid.require(provisioned.did), service.documentFor(provisioned).id)
+            assertEquals(2, operationRepository.listByDid(provisioned.did).size)
+            assertEquals(null, operationRepository.listByDid(provisioned.did).first().cid)
         }
 
     @Test
     fun `provisionHostedDid publishes signed plc operation when publishing is enabled`() =
         kotlinx.coroutines.test.runTest {
-            val published = mutableListOf<Pair<String, PlcLogEntry>>()
+            val published = mutableListOf<PlcIndexedOperation>()
             val service =
                 PlcIdentityService(
                     signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek"),
@@ -71,7 +89,8 @@ class PlcIdentityServiceTest {
 
                             override suspend fun getOperationLog(did: AtprotoDid) = error("unused")
 
-                            override suspend fun getAuditLog(did: AtprotoDid) = error("unused")
+                            override suspend fun getAuditLog(did: AtprotoDid): Result<List<PlcIndexedOperation>> =
+                                Result.success(published.filter { it.did == did })
 
                             override suspend fun export(
                                 after: String?,
@@ -83,7 +102,14 @@ class PlcIdentityServiceTest {
                                 entry: PlcLogEntry,
                             ): Result<Unit> =
                                 runCatching {
-                                    published += did.toString() to entry
+                                    published +=
+                                        PlcIndexedOperation(
+                                            did = did,
+                                            operation = entry,
+                                            cid = "cid-${published.size + 1}",
+                                            nullified = false,
+                                            createdAt = "2026-03-09T00:00:00Z",
+                                        )
                                 }
                         },
                 )
@@ -91,8 +117,8 @@ class PlcIdentityServiceTest {
             val provisioned = service.provisionHostedDid(accountId = Uuid.random(), handle = "brie.logdate.app")
 
             assertEquals(1, published.size)
-            assertEquals(provisioned.did, published.single().first)
-            assertTrue(published.single().second.isSigned)
+            assertEquals(provisioned.did, published.single().did.toString())
+            assertTrue(published.single().operation.isSigned)
         }
 
     @Test
@@ -137,5 +163,152 @@ class PlcIdentityServiceTest {
             assertEquals("cora.logdate.app", hostedEnsured.handle)
             assertEquals("did:web:dana.logdate.app", existingEnsured.did)
             assertFalse(existingEnsured.did?.startsWith("did:plc:") == true)
+        }
+
+    @Test
+    fun `rotateHostedDid publishes plc update and activates next signing key`() =
+        kotlinx.coroutines.test.runTest {
+            val published = mutableMapOf<String, MutableList<PlcIndexedOperation>>()
+            val operationRepository = InMemoryHostedPlcOperationRepository()
+            val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
+            val service =
+                PlcIdentityService(
+                    signingKeyService = signingKeyService,
+                    config =
+                        AtprotoIdentityConfig(
+                            handleDomain = "logdate.app",
+                            pdsServiceEndpoint = "https://logdate.app",
+                            hostedAccountDidMethod = HostedAccountDidMethod.PLC,
+                            publishHostedPlcOperations = true,
+                        ),
+                    hostedPlcOperationRepository = operationRepository,
+                    plcDirectoryClient =
+                        object : PlcDirectoryClient {
+                            override suspend fun getDocument(did: AtprotoDid) = error("unused")
+
+                            override suspend fun getOperationLog(did: AtprotoDid) = error("unused")
+
+                            override suspend fun getAuditLog(did: AtprotoDid): Result<List<PlcIndexedOperation>> =
+                                Result.success(published[did.toString()].orEmpty())
+
+                            override suspend fun export(
+                                after: String?,
+                                count: Int?,
+                            ) = error("unused")
+
+                            override suspend fun submit(
+                                did: AtprotoDid,
+                                entry: PlcLogEntry,
+                            ): Result<Unit> =
+                                runCatching {
+                                    val operations = published.getOrPut(did.toString()) { mutableListOf() }
+                                    operations +=
+                                        PlcIndexedOperation(
+                                            did = did,
+                                            operation = entry,
+                                            cid = "cid-${operations.size + 1}",
+                                            nullified = false,
+                                            createdAt = "2026-03-09T00:00:00Z",
+                                        )
+                                }
+                        },
+                )
+            val accountId = Uuid.random()
+            val provisioned = service.provisionHostedDid(accountId = accountId, handle = "alice.logdate.app")
+            val recoveryDidKey = didKeyFor(signingKeyService.ensureActiveKey(Uuid.random()).publicKeyMultibase)
+
+            val rotated =
+                service.rotateHostedDid(
+                    accountId = accountId,
+                    did = AtprotoDid.require(provisioned.did),
+                    handle = "alice.logdate.app",
+                    recoveryDidKey = recoveryDidKey,
+                )
+            val active = signingKeyService.ensureActiveKey(accountId)
+            val update = published.getValue(provisioned.did).last().operation as PlcOperation
+
+            assertEquals(provisioned.did, rotated.did)
+            assertNotEquals(provisioned.publicKeyMultibase, rotated.publicKeyMultibase)
+            assertEquals(rotated.publicKeyMultibase, active.publicKeyMultibase)
+            assertEquals("cid-1", update.prev)
+            assertEquals(rotated.publicKeyDidKey, update.verificationMethods.getValue("atproto"))
+            assertEquals(listOf(rotated.publicKeyDidKey, recoveryDidKey), update.rotationKeys)
+            assertTrue(update.isSigned)
+            assertEquals(2, operationRepository.listByDid(provisioned.did).size)
+            assertEquals("cid-1", operationRepository.listByDid(provisioned.did).last().prevCid)
+            assertEquals("cid-2", operationRepository.listByDid(provisioned.did).last().cid)
+        }
+
+    @Test
+    fun `updateHostedRecoveryKey publishes plc update without rotating active signing key`() =
+        kotlinx.coroutines.test.runTest {
+            val published = mutableMapOf<String, MutableList<PlcIndexedOperation>>()
+            val operationRepository = InMemoryHostedPlcOperationRepository()
+            val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
+            val service =
+                PlcIdentityService(
+                    signingKeyService = signingKeyService,
+                    config =
+                        AtprotoIdentityConfig(
+                            handleDomain = "logdate.app",
+                            pdsServiceEndpoint = "https://logdate.app",
+                            hostedAccountDidMethod = HostedAccountDidMethod.PLC,
+                            publishHostedPlcOperations = true,
+                        ),
+                    hostedPlcOperationRepository = operationRepository,
+                    plcDirectoryClient =
+                        object : PlcDirectoryClient {
+                            override suspend fun getDocument(did: AtprotoDid) = error("unused")
+
+                            override suspend fun getOperationLog(did: AtprotoDid) = error("unused")
+
+                            override suspend fun getAuditLog(did: AtprotoDid): Result<List<PlcIndexedOperation>> =
+                                Result.success(published[did.toString()].orEmpty())
+
+                            override suspend fun export(
+                                after: String?,
+                                count: Int?,
+                            ) = error("unused")
+
+                            override suspend fun submit(
+                                did: AtprotoDid,
+                                entry: PlcLogEntry,
+                            ): Result<Unit> =
+                                runCatching {
+                                    val operations = published.getOrPut(did.toString()) { mutableListOf() }
+                                    operations +=
+                                        PlcIndexedOperation(
+                                            did = did,
+                                            operation = entry,
+                                            cid = "cid-${operations.size + 1}",
+                                            nullified = false,
+                                            createdAt = "2026-03-09T00:00:00Z",
+                                        )
+                                }
+                        },
+                )
+            val accountId = Uuid.random()
+            val provisioned = service.provisionHostedDid(accountId = accountId, handle = "alice.logdate.app")
+            val activeBefore = signingKeyService.ensureActiveKey(accountId)
+            val recoveryDidKey = didKeyFor(signingKeyService.ensureActiveKey(Uuid.random()).publicKeyMultibase)
+
+            val updated =
+                service.updateHostedRecoveryKey(
+                    accountId = accountId,
+                    did = AtprotoDid.require(provisioned.did),
+                    handle = "alice.logdate.app",
+                    recoveryDidKey = recoveryDidKey,
+                )
+            val activeAfter = signingKeyService.ensureActiveKey(accountId)
+            val update = published.getValue(provisioned.did).last().operation as PlcOperation
+
+            assertEquals(provisioned.did, updated.did)
+            assertEquals(recoveryDidKey, updated.recoveryDidKey)
+            assertEquals(activeBefore.id, activeAfter.id)
+            assertEquals("cid-1", update.prev)
+            assertEquals(provisioned.publicKeyDidKey, update.verificationMethods.getValue("atproto"))
+            assertEquals(listOf(provisioned.publicKeyDidKey, recoveryDidKey), update.rotationKeys)
+            assertEquals(2, operationRepository.listByDid(provisioned.did).size)
+            assertEquals("cid-2", operationRepository.listByDid(provisioned.did).last().cid)
         }
 }

@@ -78,6 +78,7 @@ class OfficialAtprotoLexiconJvmTest {
             document.id.toString().startsWith("com.atproto.identity.") -> "studio.hypertext.atproto.lexicon.generated.com.atproto.identity"
             document.id.toString().startsWith("com.atproto.server.") -> "studio.hypertext.atproto.lexicon.generated.com.atproto.server"
             document.id.toString().startsWith("com.atproto.repo.") -> "studio.hypertext.atproto.lexicon.generated.com.atproto.repo"
+            document.id.toString().startsWith("com.atproto.sync.") -> "studio.hypertext.atproto.lexicon.generated.com.atproto.sync"
             else -> error("Unsupported official ATProto lexicon package for ${document.id}")
         }
 
@@ -131,6 +132,8 @@ class OfficialAtprotoLexiconJvmTest {
                 OfficialLexiconEntry("com/atproto/repo/getRecord.json", "com/atproto/repo"),
                 OfficialLexiconEntry("com/atproto/repo/listRecords.json", "com/atproto/repo"),
                 OfficialLexiconEntry("com/atproto/repo/putRecord.json", "com/atproto/repo"),
+                OfficialLexiconEntry("com/atproto/repo/uploadBlob.json", "com/atproto/repo"),
+                OfficialLexiconEntry("com/atproto/sync/getBlob.json", "com/atproto/sync"),
             )
 
         val officialGenerationCases =
@@ -149,6 +152,11 @@ class OfficialAtprotoLexiconJvmTest {
                     inputPath = "com/atproto/repo",
                     outputPackagePath = "com/atproto/repo",
                     packageName = "studio.hypertext.atproto.lexicon.generated.com.atproto.repo",
+                ),
+                OfficialGenerationCase(
+                    inputPath = "com/atproto/sync",
+                    outputPackagePath = "com/atproto/sync",
+                    packageName = "studio.hypertext.atproto.lexicon.generated.com.atproto.sync",
                 ),
             )
     }

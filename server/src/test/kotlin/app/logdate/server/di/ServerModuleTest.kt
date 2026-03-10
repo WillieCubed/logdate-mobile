@@ -10,6 +10,8 @@ import app.logdate.server.auth.SessionManager
 import app.logdate.server.database.DatabaseConfig
 import app.logdate.server.database.PostgreSQLAccountIdentityRepository
 import app.logdate.server.database.PostgreSQLAccountRepository
+import app.logdate.server.database.PostgreSQLHostedPlcOperationRepository
+import app.logdate.server.database.PostgreSQLLogDateAtprotoBlobRepository
 import app.logdate.server.database.PostgreSQLLogDateBackupRepository
 import app.logdate.server.database.PostgreSQLLogDateCollectionsMetadataStore
 import app.logdate.server.database.PostgreSQLLogDateMediaRepository
@@ -17,10 +19,14 @@ import app.logdate.server.database.PostgreSQLPasskeyRepository
 import app.logdate.server.database.PostgreSQLRepoBlockStore
 import app.logdate.server.database.PostgreSQLSessionManager
 import app.logdate.server.identity.AtprotoIdentityConfig
+import app.logdate.server.identity.HostedPlcOperationRepository
+import app.logdate.server.identity.InMemoryHostedPlcOperationRepository
 import app.logdate.server.identity.PlcIdentityService
+import app.logdate.server.logdate.InMemoryLogDateAtprotoBlobRepository
 import app.logdate.server.logdate.InMemoryLogDateBackupRepository
 import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
 import app.logdate.server.logdate.InMemoryLogDateMediaRepository
+import app.logdate.server.logdate.LogDateAtprotoBlobRepository
 import app.logdate.server.logdate.LogDateBackupRepository
 import app.logdate.server.logdate.LogDateCollectionsMetadataStore
 import app.logdate.server.logdate.LogDateMediaRepository
@@ -80,6 +86,8 @@ class ServerModuleTest {
         assertIs<InMemoryLogDateCollectionsMetadataStore>(koin.get<LogDateCollectionsMetadataStore>())
         assertIs<InMemoryLogDateMediaRepository>(koin.get<LogDateMediaRepository>())
         assertIs<InMemoryLogDateBackupRepository>(koin.get<LogDateBackupRepository>())
+        assertIs<InMemoryLogDateAtprotoBlobRepository>(koin.get<LogDateAtprotoBlobRepository>())
+        assertIs<InMemoryHostedPlcOperationRepository>(koin.get<HostedPlcOperationRepository>())
         assertIs<WebAuthnPasskeyService>(koin.get<WebAuthnPasskeyService>())
         assertIs<GoogleIdTokenVerifier>(koin.get<GoogleIdTokenVerifier>())
         assertTrue(koin.get<WebAuthnPasskeyService>().relyingPartyId.isNotBlank())
@@ -102,6 +110,8 @@ class ServerModuleTest {
         assertIs<PostgreSQLLogDateCollectionsMetadataStore>(koin.get<LogDateCollectionsMetadataStore>())
         assertIs<PostgreSQLLogDateMediaRepository>(koin.get<LogDateMediaRepository>())
         assertIs<PostgreSQLLogDateBackupRepository>(koin.get<LogDateBackupRepository>())
+        assertIs<PostgreSQLLogDateAtprotoBlobRepository>(koin.get<LogDateAtprotoBlobRepository>())
+        assertIs<PostgreSQLHostedPlcOperationRepository>(koin.get<HostedPlcOperationRepository>())
         assertIs<WebAuthnPasskeyService>(koin.get<WebAuthnPasskeyService>())
     }
 

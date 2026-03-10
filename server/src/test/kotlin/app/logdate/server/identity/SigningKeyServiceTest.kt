@@ -6,6 +6,7 @@ import java.security.PrivateKey
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
@@ -57,6 +58,41 @@ class SigningKeyServiceTest {
             assertTrue(exported.salt.isNotBlank())
             assertTrue(exported.iv.isNotBlank())
             assertEquals("EC", decrypted.algorithm)
+        }
+
+    @Test
+    fun `prepared and imported signing keys can be activated safely`() =
+        kotlinx.coroutines.test.runTest {
+            val repository = InMemorySigningKeyRepository()
+            val service = SigningKeyService(repository, "test-kek")
+            val accountId = Uuid.random()
+            val first = service.ensureActiveKey(accountId)
+
+            val prepared = service.prepareKey(accountId)
+            val activated = service.activatePreparedKey(accountId, prepared)
+            val exported = service.exportActiveKey(accountId, "import-secret")
+            val imported = service.importActiveKey(accountId, exported, "import-secret")
+
+            assertNotEquals(first.id, prepared.id)
+            assertEquals(prepared.id, activated.id)
+            assertEquals(exported.publicKeyMultibase, imported.publicKeyMultibase)
+            assertEquals(imported.id, repository.findActiveByAccountId(accountId)?.id)
+        }
+
+    @Test
+    fun `importActiveKey rejects mismatched public did key metadata`() =
+        kotlinx.coroutines.test.runTest {
+            val service = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
+            val accountId = Uuid.random()
+            val exported = service.exportActiveKey(service.ensureActiveKey(accountId).accountId, "secret")
+
+            assertFailsWith<IllegalArgumentException> {
+                service.importActiveKey(
+                    accountId = accountId,
+                    exportedKey = exported.copy(publicKeyDidKey = "did:key:zDifferent"),
+                    passphrase = "secret",
+                )
+            }
         }
 
     @Test

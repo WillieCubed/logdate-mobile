@@ -2,6 +2,9 @@ package app.logdate.server.identity
 
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.InMemoryAccountRepository
+import studio.hypertext.atproto.plc.PlcDirectoryClient
+import studio.hypertext.atproto.plc.PlcIndexedOperation
+import studio.hypertext.atproto.plc.PlcLogEntry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -434,6 +437,292 @@ class AtprotoIdentityServiceTest {
                         did = "did:web:missing.logdate.app",
                     ),
                 )
+            }
+        }
+
+    @Test
+    fun `rotateSigningKey updates did web accounts and rejects unpublished hosted plc rotation`() =
+        kotlinx.coroutines.test.runTest {
+            val accountRepository = InMemoryAccountRepository()
+            val webService =
+                AtprotoIdentityService(
+                    accountRepository = accountRepository,
+                    signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek"),
+                    config =
+                        AtprotoIdentityConfig(
+                            handleDomain = "logdate.app",
+                            pdsServiceEndpoint = "https://logdate.app",
+                            hostedAccountDidMethod = HostedAccountDidMethod.WEB,
+                        ),
+                )
+            val webAccount =
+                accountRepository.save(
+                    Account(
+                        id = Uuid.random(),
+                        username = "rotate-web",
+                        displayName = "Rotate Web",
+                        createdAt = Clock.System.now(),
+                    ),
+                )
+            val ensuredWeb = webService.ensureIdentity(webAccount)
+
+            val rotated = webService.rotateSigningKey(ensuredWeb)
+
+            assertEquals("did:web:rotate-web.logdate.app", rotated.account.did)
+            assertNotNull(rotated.account.signingKeyPublic)
+            assertTrue(rotated.account.signingKeyPublic != rotated.previousPublicKeyMultibase)
+            assertEquals(rotated.account.signingKeyPublic, rotated.activeKey.publicKeyMultibase)
+
+            val plcRepository = InMemoryAccountRepository()
+            val plcService =
+                AtprotoIdentityService(
+                    accountRepository = plcRepository,
+                    signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek"),
+                    config = AtprotoIdentityConfig(handleDomain = "logdate.app", pdsServiceEndpoint = "https://logdate.app"),
+                )
+            val plcAccount =
+                plcRepository.save(
+                    Account(
+                        id = Uuid.random(),
+                        username = "rotate-plc",
+                        displayName = "Rotate PLC",
+                        createdAt = Clock.System.now(),
+                    ),
+                )
+            val ensuredPlc = plcService.ensureIdentity(plcAccount)
+
+            val error =
+                assertFailsWith<IdentityLifecycleConflictException> {
+                    plcService.rotateSigningKey(ensuredPlc)
+                }
+
+            assertTrue(error.message!!.contains("published PLC operations"))
+        }
+
+    @Test
+    fun `rotateSigningKey publishes hosted plc updates when configured and import restores matching active key`() =
+        kotlinx.coroutines.test.runTest {
+            val accountRepository = InMemoryAccountRepository()
+            val published = mutableMapOf<String, MutableList<PlcIndexedOperation>>()
+            val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
+            val plcIdentityService =
+                PlcIdentityService(
+                    signingKeyService = signingKeyService,
+                    config =
+                        AtprotoIdentityConfig(
+                            handleDomain = "logdate.app",
+                            pdsServiceEndpoint = "https://logdate.app",
+                            hostedAccountDidMethod = HostedAccountDidMethod.PLC,
+                            publishHostedPlcOperations = true,
+                        ),
+                    plcDirectoryClient =
+                        object : PlcDirectoryClient {
+                            override suspend fun getDocument(did: studio.hypertext.atproto.identity.AtprotoDid) = error("unused")
+
+                            override suspend fun getOperationLog(did: studio.hypertext.atproto.identity.AtprotoDid) = error("unused")
+
+                            override suspend fun getAuditLog(
+                                did: studio.hypertext.atproto.identity.AtprotoDid,
+                            ): Result<List<PlcIndexedOperation>> = Result.success(published[did.toString()].orEmpty())
+
+                            override suspend fun export(
+                                after: String?,
+                                count: Int?,
+                            ) = error("unused")
+
+                            override suspend fun submit(
+                                did: studio.hypertext.atproto.identity.AtprotoDid,
+                                entry: PlcLogEntry,
+                            ): Result<Unit> =
+                                runCatching {
+                                    val operations = published.getOrPut(did.toString()) { mutableListOf() }
+                                    operations +=
+                                        PlcIndexedOperation(
+                                            did = did,
+                                            operation = entry,
+                                            cid = "cid-${operations.size + 1}",
+                                            nullified = false,
+                                            createdAt = "2026-03-09T00:00:00Z",
+                                        )
+                                }
+                        },
+                )
+            val service =
+                AtprotoIdentityService(
+                    accountRepository = accountRepository,
+                    signingKeyService = signingKeyService,
+                    config =
+                        AtprotoIdentityConfig(
+                            handleDomain = "logdate.app",
+                            pdsServiceEndpoint = "https://logdate.app",
+                            publishHostedPlcOperations = true,
+                        ),
+                    plcIdentityService = plcIdentityService,
+                )
+            val account =
+                accountRepository.save(
+                    Account(
+                        id = Uuid.random(),
+                        username = "rotate-hosted",
+                        displayName = "Rotate Hosted",
+                        createdAt = Clock.System.now(),
+                    ),
+                )
+            val ensured = service.ensureIdentity(account)
+            val exported = signingKeyService.exportActiveKey(ensured.id, "secret")
+
+            val rotated = service.rotateSigningKey(ensured)
+            val imported =
+                service.importSigningKey(
+                    rotated.account,
+                    signingKeyService.exportActiveKey(rotated.account.id, "rotated"),
+                    "rotated",
+                )
+
+            assertTrue(rotated.account.did?.startsWith("did:plc:") == true)
+            assertNotNull(rotated.plcOperation)
+            assertTrue(published.getValue(requireNotNull(rotated.account.did)).size >= 2)
+            assertEquals(rotated.activeKey.publicKeyMultibase, imported.activeKey.publicKeyMultibase)
+            assertFailsWith<IdentityLifecycleConflictException> {
+                service.importSigningKey(rotated.account, exported, "secret")
+            }
+        }
+
+    @Test
+    fun `registerPlcRecoveryKey publishes hosted plc update and persists canonical did key`() =
+        kotlinx.coroutines.test.runTest {
+            val accountRepository = InMemoryAccountRepository()
+            val published = mutableMapOf<String, MutableList<PlcIndexedOperation>>()
+            val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
+            val plcIdentityService =
+                PlcIdentityService(
+                    signingKeyService = signingKeyService,
+                    config =
+                        AtprotoIdentityConfig(
+                            handleDomain = "logdate.app",
+                            pdsServiceEndpoint = "https://logdate.app",
+                            hostedAccountDidMethod = HostedAccountDidMethod.PLC,
+                            publishHostedPlcOperations = true,
+                        ),
+                    plcDirectoryClient =
+                        object : PlcDirectoryClient {
+                            override suspend fun getDocument(did: studio.hypertext.atproto.identity.AtprotoDid) = error("unused")
+
+                            override suspend fun getOperationLog(did: studio.hypertext.atproto.identity.AtprotoDid) = error("unused")
+
+                            override suspend fun getAuditLog(
+                                did: studio.hypertext.atproto.identity.AtprotoDid,
+                            ): Result<List<PlcIndexedOperation>> = Result.success(published[did.toString()].orEmpty())
+
+                            override suspend fun export(
+                                after: String?,
+                                count: Int?,
+                            ) = error("unused")
+
+                            override suspend fun submit(
+                                did: studio.hypertext.atproto.identity.AtprotoDid,
+                                entry: PlcLogEntry,
+                            ): Result<Unit> =
+                                runCatching {
+                                    val operations = published.getOrPut(did.toString()) { mutableListOf() }
+                                    operations +=
+                                        PlcIndexedOperation(
+                                            did = did,
+                                            operation = entry,
+                                            cid = "cid-${operations.size + 1}",
+                                            nullified = false,
+                                            createdAt = "2026-03-09T00:00:00Z",
+                                        )
+                                }
+                        },
+                )
+            val service =
+                AtprotoIdentityService(
+                    accountRepository = accountRepository,
+                    signingKeyService = signingKeyService,
+                    config =
+                        AtprotoIdentityConfig(
+                            handleDomain = "logdate.app",
+                            pdsServiceEndpoint = "https://logdate.app",
+                            publishHostedPlcOperations = true,
+                        ),
+                    plcIdentityService = plcIdentityService,
+                )
+            val account =
+                accountRepository.save(
+                    Account(
+                        id = Uuid.random(),
+                        username = "recoverable",
+                        displayName = "Recoverable",
+                        createdAt = Clock.System.now(),
+                    ),
+                )
+            val ensured = service.ensureIdentity(account)
+            val recoveryDidKey = didKeyFor(signingKeyService.ensureActiveKey(Uuid.random()).publicKeyMultibase)
+
+            val registered = service.registerPlcRecoveryKey(ensured, "  DID:KEY:${recoveryDidKey.removePrefix("did:key:")}  ")
+
+            assertEquals(recoveryDidKey, registered.recoveryDidKey)
+            assertEquals(recoveryDidKey, registered.account.plcRecoveryDidKey)
+            assertNotNull(registered.plcOperation)
+            assertEquals(
+                listOf("did:key:${registered.account.signingKeyPublic}", recoveryDidKey),
+                registered.plcOperation.rotationKeys,
+            )
+        }
+
+    @Test
+    fun `registerPlcRecoveryKey rejects invalid did key and did web identities`() =
+        kotlinx.coroutines.test.runTest {
+            val invalidService =
+                AtprotoIdentityService(
+                    accountRepository = InMemoryAccountRepository(),
+                    signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek"),
+                    config = AtprotoIdentityConfig(handleDomain = "logdate.app", pdsServiceEndpoint = "https://logdate.app"),
+                )
+            val invalidAccount =
+                invalidService.ensureIdentity(
+                    Account(
+                        id = Uuid.random(),
+                        username = "invalid-recovery",
+                        displayName = "Invalid Recovery",
+                        createdAt = Clock.System.now(),
+                    ),
+                )
+
+            assertFailsWith<IdentityLifecycleValidationException> {
+                invalidService.registerPlcRecoveryKey(invalidAccount, "not-a-did-key")
+            }
+
+            val webService =
+                AtprotoIdentityService(
+                    accountRepository = InMemoryAccountRepository(),
+                    signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek"),
+                    config =
+                        AtprotoIdentityConfig(
+                            handleDomain = "logdate.app",
+                            pdsServiceEndpoint = "https://logdate.app",
+                            hostedAccountDidMethod = HostedAccountDidMethod.WEB,
+                        ),
+                )
+            val webAccount =
+                webService.ensureIdentity(
+                    Account(
+                        id = Uuid.random(),
+                        username = "web-recovery",
+                        displayName = "Web Recovery",
+                        createdAt = Clock.System.now(),
+                    ),
+                )
+            val validRecoveryDidKey =
+                didKeyFor(
+                    SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
+                        .ensureActiveKey(Uuid.random())
+                        .publicKeyMultibase,
+                )
+
+            assertFailsWith<IdentityLifecycleConflictException> {
+                webService.registerPlcRecoveryKey(webAccount, validRecoveryDidKey)
             }
         }
 

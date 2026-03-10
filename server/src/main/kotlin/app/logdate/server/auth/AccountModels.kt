@@ -15,6 +15,7 @@ data class Account(
     val did: String? = null,
     val handle: String? = null,
     val signingKeyPublic: String? = null,
+    val plcRecoveryDidKey: String? = null,
     val email: String? = null,
     val emailVerified: Boolean = false,
     val bio: String? = null,

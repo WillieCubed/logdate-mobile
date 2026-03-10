@@ -58,6 +58,18 @@ class LexiconParserTest {
         assertTrue(generated.contains("val validationStatus: String?"))
     }
 
+    @Test
+    fun `parser reads blob field types and codegen stays deterministic`() {
+        val document = LexiconParser.parse(uploadBlobLexicon)
+        val outputSchema = assertNotNull(assertNotNull(document.definitions.getValue("main").output).schema)
+        val generated = LexiconCodegen.generate(document)
+
+        assertEquals(LexiconType.BLOB, outputSchema.properties.getValue("blob").type)
+        assertTrue(generated.contains("public object UploadBlobLexicon"))
+        assertTrue(generated.contains("public data class UploadBlobOutput("))
+        assertTrue(generated.contains("val blob: JsonElement"))
+    }
+
     private companion object {
         val resolveHandleLexicon: String =
             """
@@ -160,6 +172,32 @@ class LexiconParserTest {
                       "type": "object",
                       "properties": {
                         "record": { "type": "ref", "ref": "#missing" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            """.trimIndent()
+
+        val uploadBlobLexicon: String =
+            """
+            {
+              "lexicon": 1,
+              "id": "com.atproto.repo.uploadBlob",
+              "defs": {
+                "main": {
+                  "type": "procedure",
+                  "input": {
+                    "encoding": "*/*"
+                  },
+                  "output": {
+                    "encoding": "application/json",
+                    "schema": {
+                      "type": "object",
+                      "required": ["blob"],
+                      "properties": {
+                        "blob": { "type": "blob" }
                       }
                     }
                   }

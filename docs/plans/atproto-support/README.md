@@ -39,8 +39,8 @@ Passkeys authenticate a user **to** their custodian. DIDs identify the user **to
 | 3 | Complete for the current standalone authorization slice | OAuth 2.0 Authorization Server with passkey authentication and DPoP-bound access tokens | [OAuth + Passkeys](./04-oauth-passkey-integration.md) |
 | 4 | Partially complete | Hosted PLC provisioning plus future PLC update and recovery tooling | [Architecture](./01-architecture.md) |
 | 5 | Complete for the canonical collection slice | XRPC server endpoints backed by the shared library modules, shared discovery/repo runtime services, and a canonical repo-backed LogDate collections boundary for entries, journals, and associations | [Architecture](./01-architecture.md) |
-| 6 | Partially complete | LogDate-owned media and backup metadata repositories plus a generic blob service boundary so the remaining sync-facing routes stop depending on `SyncRepository` directly while the current production blob implementation remains GCS-backed | [Architecture](./01-architecture.md), [Migration Strategy](./06-migration-strategy.md) |
-| 7 | Pending | Identity lifecycle completion, broader interop hardening, and final compatibility cutover cleanup | [Architecture](./01-architecture.md), [Signing Keys](./05-signing-key-management.md) |
+| 6 | Partially complete | LogDate-owned media, backup, and ATProto blob metadata repositories plus a generic blob service boundary and ATProto blob routes so the remaining sync-facing routes stop depending on `SyncRepository` directly while the current production blob implementation remains GCS-backed | [Architecture](./01-architecture.md), [Migration Strategy](./06-migration-strategy.md) |
+| 7 | Partially complete | Identity lifecycle completion, broader interop hardening, and final compatibility cutover cleanup | [Architecture](./01-architecture.md), [Signing Keys](./05-signing-key-management.md) |
 
 ## Current Status
 
@@ -58,24 +58,52 @@ The repo now has a real standalone `studio.hypertext.atproto` library surface:
 - a canonical repo-backed LogDate collections boundary that stores `content`, `journal`, and `association` records in the shared repo engine while preserving LogDate-owned internal interfaces
 - first-class LogDate-owned media and backup metadata repositories with in-memory and PostgreSQL implementations wired into production
 - a generic LogDate blob service boundary with the current production implementation still backed by GCS
+- first-class LogDate-owned ATProto blob metadata persistence with in-memory and PostgreSQL implementations
+- `com.atproto.repo.uploadBlob` and `com.atproto.sync.getBlob` routes wired through the shared PDS blob contracts and the generic LogDate blob service boundary
+- checked-in official `com.atproto.sync.*` lexicon JSON documents plus deterministic generated Kotlin models for the blob download surface
 - sync routes now use those LogDate-owned repositories plus the generic blob service boundary instead of depending on sync records and media-specific GCS methods directly
+- first-party signing-key rotation and recovery import endpoints for the current active identity key
+- hosted PLC update operations for first-party key rotation when PLC publishing is enabled
+- first-class hosted PLC operation history persistence with in-memory and PostgreSQL implementations
+- first-party hosted PLC recovery-key registration for user-supplied `did:key` values, with the
+  registered recovery key carried into hosted PLC update operations
 
 The current backend ATProto support is deployable for the hosted identity, OAuth, XRPC, and canonical collection slice, but it is not yet a full independently deployed PDS product.
 
-## Next Tasks / Todos
+## Final Remaining Todo List
 
-These are the remaining ATProto tasks after the current canonical collection milestone. They are ordered by implementation priority:
+These are the remaining ATProto tasks that still need to land after the current canonical
+collection milestone. This list replaces the older vague “next tasks” bullets and is the
+authoritative backlog for the rest of the ATProto rollout.
 
-- Add ATProto blob-oriented route and service planning for the same media objects that power the first-party sync APIs.
-- Complete the migration from sync-owned compatibility storage to canonical repo/blob-backed storage for the remaining sync endpoints.
-- Expand lexicon/codegen coverage beyond the currently checked-in LogDate and official `com.atproto.*` surfaces already served.
-- Expand repo interoperability so CAR/MST/DAG-CBOR behavior is validated against external AT Protocol implementations, not only internal deterministic tests.
-- Harden the standalone PDS runtime and server deployment shape for multi-instance and release operation concerns.
-- Implement the remaining hosted identity lifecycle work:
-  - PLC update operations
-  - rotation and recovery key flows
-  - user-controlled signing-key export/import workflows beyond the current hosted genesis path
-- Remove transitional compatibility code once sync and ATProto surfaces both run on the final canonical boundaries.
+### Now
+
+1. Remove the remaining transitional sync-backed helpers and test harness wiring once the
+   repo-backed and LogDate-owned boundaries fully cover those scenarios.
+2. Expand signing-key import beyond “restore the currently published key” into full migration-safe
+   account recovery flows.
+3. Add user-facing hosted PLC recovery tooling on top of the persisted operation history:
+   operation-history read APIs, guided recovery state, and recovery/export UX.
+
+### Next
+
+1. Implement deterministic user-controlled PLC recovery-key derivation from the recovery phrase.
+2. Implement user-controlled PLC signing flows so hosted recovery does not depend only on a
+   server-published update path.
+3. Define and lock the final `studio.hypertext.logdate.*` lexicon family once the remaining blob
+   and compatibility cleanup work is complete.
+4. Unify first-party sync media objects and ATProto blob references behind the same final
+   LogDate-owned blob and metadata boundaries.
+
+### Hardening
+
+1. Expand lexicon/codegen coverage beyond the currently checked-in LogDate and official
+   `com.atproto.identity.*`, `com.atproto.server.*`, `com.atproto.repo.*`, and `com.atproto.sync.*`
+   surfaces that the server currently serves.
+2. Validate CAR, MST, DAG-CBOR, and blob behavior against external AT Protocol implementations,
+   not only internal deterministic tests.
+3. Harden the standalone PDS runtime and server deployment shape for multi-instance and release
+   operation concerns.
 
 ## Documents in This Plan
 
@@ -94,7 +122,6 @@ These are the remaining ATProto tasks after the current canonical collection mil
 These are future work that build on the current library core:
 
 - **Durable canonical repo persistence**, replacing the current sync-backed hydration adapter with a persistent block store
-- **A first-class blob service and ATProto blob semantics**, replacing the current GCS-specific storage implementation
 - **Broader protocol-surface lexicon/codegen support** beyond the current checked-in LogDate records and shared parser/runtime
 - **Federation** (firehose, relay, AppView)
 - **ActivityPub integration** (kept as separate parallel effort in `shared/activitypub`)
@@ -121,6 +148,7 @@ The identity layer is the prerequisite for all of these. Get identity right firs
 | `WebAuthnPasskeyService` | `server/src/.../passkeys/WebAuthnPasskeyService.kt` | Reused unchanged as authentication within OAuth |
 | `TokenService` | `server/src/.../auth/TokenService.kt` | Extended with DID-aware token generation |
 | `LogDateMediaRepository` / `LogDateBackupRepository` | `server/src/.../logdate/LogDateMediaRepository.kt`, `server/src/.../logdate/LogDateBackupRepository.kt` | LogDate-owned metadata boundaries with first-class in-memory implementations |
+| `LogDateAtprotoBlobRepository` | `server/src/.../logdate/LogDateAtprotoBlobRepository.kt` | LogDate-owned metadata boundary for ATProto blob lookup by user and CID |
 | `LogDateBlobStorage` / `GcsMediaStorage` | `server/src/.../logdate/LogDateBlobStorage.kt`, `server/src/.../sync/GcsMediaStorage.kt` | Generic blob service boundary plus the current GCS-backed production implementation |
 | `PostgreSQLLogDateMediaRepository` / `PostgreSQLLogDateBackupRepository` | `server/src/.../database/PostgreSQLLogDateMediaRepository.kt`, `server/src/.../database/PostgreSQLLogDateBackupRepository.kt` | Production metadata persistence for media and backups |
 | `AccountsTable` | `server/src/.../database/Tables.kt` | Extended with `did` and `signingKeyPublic` columns |

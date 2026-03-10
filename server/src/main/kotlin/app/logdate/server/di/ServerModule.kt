@@ -19,12 +19,16 @@ import app.logdate.server.database.AtprotoRepoBlocksTable
 import app.logdate.server.database.AtprotoRepoCommitsTable
 import app.logdate.server.database.AtprotoRepoHeadsTable
 import app.logdate.server.database.DatabaseConfig
+import app.logdate.server.database.HostedPlcOperationsTable
+import app.logdate.server.database.LogDateAtprotoBlobsTable
 import app.logdate.server.database.LogDateBackupsTable
 import app.logdate.server.database.LogDateCollectionRecordsTable
 import app.logdate.server.database.LogDateCollectionStatesTable
 import app.logdate.server.database.LogDateMediaRecordsTable
 import app.logdate.server.database.PostgreSQLAccountIdentityRepository
 import app.logdate.server.database.PostgreSQLAccountRepository
+import app.logdate.server.database.PostgreSQLHostedPlcOperationRepository
+import app.logdate.server.database.PostgreSQLLogDateAtprotoBlobRepository
 import app.logdate.server.database.PostgreSQLLogDateBackupRepository
 import app.logdate.server.database.PostgreSQLLogDateCollectionsMetadataStore
 import app.logdate.server.database.PostgreSQLLogDateMediaRepository
@@ -35,13 +39,17 @@ import app.logdate.server.database.PostgreSQLSigningKeyRepository
 import app.logdate.server.database.SigningKeysTable
 import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.AtprotoIdentityService
+import app.logdate.server.identity.HostedPlcOperationRepository
+import app.logdate.server.identity.InMemoryHostedPlcOperationRepository
 import app.logdate.server.identity.InMemorySigningKeyRepository
 import app.logdate.server.identity.PlcIdentityService
 import app.logdate.server.identity.SigningKeyRepository
 import app.logdate.server.identity.SigningKeyService
+import app.logdate.server.logdate.InMemoryLogDateAtprotoBlobRepository
 import app.logdate.server.logdate.InMemoryLogDateBackupRepository
 import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
 import app.logdate.server.logdate.InMemoryLogDateMediaRepository
+import app.logdate.server.logdate.LogDateAtprotoBlobRepository
 import app.logdate.server.logdate.LogDateBackupRepository
 import app.logdate.server.logdate.LogDateCollectionsMetadataStore
 import app.logdate.server.logdate.LogDateMediaRepository
@@ -96,6 +104,7 @@ fun initializeDatabase(): Boolean =
                     AccountIdentitiesTable,
                     AccountLinkEventsTable,
                     SigningKeysTable,
+                    HostedPlcOperationsTable,
                     AtprotoRepoHeadsTable,
                     AtprotoRepoBlocksTable,
                     AtprotoRepoBlockLinksTable,
@@ -104,6 +113,7 @@ fun initializeDatabase(): Boolean =
                     LogDateCollectionRecordsTable,
                     LogDateMediaRecordsTable,
                     LogDateBackupsTable,
+                    LogDateAtprotoBlobsTable,
                 )
             }
         } else {
@@ -190,6 +200,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
             PlcIdentityService(
                 signingKeyService = get(),
                 config = get(),
+                hostedPlcOperationRepository = get(),
                 plcDirectoryClient =
                     get<AtprotoIdentityConfig>()
                         .takeIf(AtprotoIdentityConfig::publishHostedPlcOperations)
@@ -239,6 +250,22 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                 PostgreSQLLogDateBackupRepository()
             } else {
                 InMemoryLogDateBackupRepository()
+            }
+        }
+
+        single<LogDateAtprotoBlobRepository> {
+            if (isDatabaseAvailable) {
+                PostgreSQLLogDateAtprotoBlobRepository()
+            } else {
+                InMemoryLogDateAtprotoBlobRepository()
+            }
+        }
+
+        single<HostedPlcOperationRepository> {
+            if (isDatabaseAvailable) {
+                PostgreSQLHostedPlcOperationRepository()
+            } else {
+                InMemoryHostedPlcOperationRepository()
             }
         }
 

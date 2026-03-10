@@ -2,6 +2,7 @@ package app.logdate.server.identity
 
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountRepository
+import studio.hypertext.atproto.crypto.Multikey
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.identity.DidDocument
 import studio.hypertext.atproto.identity.Service
@@ -9,6 +10,7 @@ import studio.hypertext.atproto.identity.VerificationMethod
 import studio.hypertext.atproto.pds.DescribeRepoResponse
 import studio.hypertext.atproto.pds.PdsIdentityService
 import studio.hypertext.atproto.pds.ResolveHandleResponse
+import studio.hypertext.atproto.plc.PlcOperation
 import studio.hypertext.atproto.syntax.Handle
 import studio.hypertext.atproto.syntax.Nsid
 import kotlin.uuid.ExperimentalUuidApi
@@ -33,23 +35,48 @@ class AtprotoIdentityService(
     suspend fun ensureIdentity(account: Account): Account {
         val existingHandle = account.handle?.let(::canonicalizeHandle)
         val existingDid = account.did?.let(::canonicalizeDid)
+        val existingRecoveryDidKey = account.plcRecoveryDidKey?.let(::canonicalizeDidKey)
         if (existingHandle != null && existingDid != null && account.signingKeyPublic != null) {
-            if (existingHandle == account.handle && existingDid == account.did) {
+            if (
+                existingHandle == account.handle &&
+                existingDid == account.did &&
+                existingRecoveryDidKey == account.plcRecoveryDidKey
+            ) {
                 return account
             }
-            return accountRepository.save(account.copy(handle = existingHandle, did = existingDid))
+            return accountRepository.save(
+                account.copy(
+                    handle = existingHandle,
+                    did = existingDid,
+                    plcRecoveryDidKey = existingRecoveryDidKey,
+                ),
+            )
         }
 
-        val handle = provisionedHandleFor(account.copy(handle = existingHandle, did = existingDid))
+        val normalizedAccount =
+            account.copy(
+                handle = existingHandle,
+                did = existingDid,
+                plcRecoveryDidKey = existingRecoveryDidKey,
+            )
+        val handle = provisionedHandleFor(normalizedAccount)
         val did =
             when (config.hostedAccountDidMethod) {
-                HostedAccountDidMethod.PLC -> plcIdentityService.provisionHostedDid(account.id, handle).did
+                HostedAccountDidMethod.PLC -> {
+                    val provisionedIdentity =
+                        plcIdentityService.provisionHostedDid(
+                            accountId = account.id,
+                            handle = handle,
+                            recoveryDidKey = existingRecoveryDidKey,
+                        )
+                    provisionedIdentity.did
+                }
                 HostedAccountDidMethod.WEB -> didForHandle(handle).toString()
             }
         val signingKey = account.signingKeyPublic ?: signingKeyService.ensureActiveKey(account.id).publicKeyMultibase
 
         return accountRepository.save(
-            account.copy(
+            normalizedAccount.copy(
                 did = did,
                 handle = handle,
                 signingKeyPublic = signingKey,
@@ -97,6 +124,116 @@ class AtprotoIdentityService(
     }
 
     fun didForHandle(handle: String): AtprotoDid = AtprotoDid.require("did:web:${requireNotNull(canonicalizeHandle(handle))}")
+
+    suspend fun rotateSigningKey(account: Account): RotatedIdentitySigningKey {
+        val ensured = ensureIdentity(account)
+        val did = requireNotNull(ensured.did)
+        val previousPublicKey = requireNotNull(ensured.signingKeyPublic)
+
+        return when {
+            did.startsWith("did:web:") -> {
+                val activeKey = signingKeyService.rotateKey(ensured.id)
+                val updatedAccount = accountRepository.save(ensured.copy(signingKeyPublic = activeKey.publicKeyMultibase))
+                RotatedIdentitySigningKey(
+                    account = updatedAccount,
+                    previousPublicKeyMultibase = previousPublicKey,
+                    activeKey = activeKey,
+                )
+            }
+
+            did.startsWith("did:plc:") -> {
+                val rotated =
+                    plcIdentityService.rotateHostedDid(
+                        accountId = ensured.id,
+                        did = AtprotoDid.require(did),
+                        handle = requireNotNull(ensured.handle),
+                        recoveryDidKey = ensured.plcRecoveryDidKey,
+                    )
+                val activeKey = signingKeyService.ensureActiveKey(ensured.id)
+                val updatedAccount = accountRepository.save(ensured.copy(signingKeyPublic = activeKey.publicKeyMultibase))
+                RotatedIdentitySigningKey(
+                    account = updatedAccount,
+                    previousPublicKeyMultibase = rotated.previousPublicKeyMultibase,
+                    activeKey = activeKey,
+                    plcOperation = rotated.operation,
+                )
+            }
+
+            else -> throw IdentityLifecycleConflictException("Signing key rotation is not supported for DID $did")
+        }
+    }
+
+    suspend fun importSigningKey(
+        account: Account,
+        exportedKey: SigningKeyService.ExportedSigningKey,
+        passphrase: String,
+    ): ImportedIdentitySigningKey {
+        val currentDid =
+            account.did
+                ?: throw IdentityLifecycleConflictException("Account identity must be provisioned before importing a signing key")
+        val currentHandle =
+            account.handle
+                ?: throw IdentityLifecycleConflictException("Account identity must be provisioned before importing a signing key")
+        val currentPublicKey =
+            account.signingKeyPublic
+                ?: throw IdentityLifecycleConflictException("Account identity must be provisioned before importing a signing key")
+        if (exportedKey.publicKeyMultibase != currentPublicKey) {
+            throw IdentityLifecycleConflictException("Imported signing key does not match the account's current public key")
+        }
+
+        val activeKey = signingKeyService.importActiveKey(account.id, exportedKey, passphrase)
+        val updatedAccount =
+            accountRepository.save(
+                account.copy(
+                    did = currentDid,
+                    handle = currentHandle,
+                    signingKeyPublic = activeKey.publicKeyMultibase,
+                ),
+            )
+        return ImportedIdentitySigningKey(
+            account = updatedAccount,
+            activeKey = activeKey,
+        )
+    }
+
+    suspend fun registerPlcRecoveryKey(
+        account: Account,
+        recoveryDidKey: String,
+    ): RegisteredPlcRecoveryKey {
+        val normalizedRecoveryDidKey =
+            canonicalizeDidKey(recoveryDidKey)
+                ?: throw IdentityLifecycleValidationException("Recovery key must be a valid did:key multikey value")
+        val ensured = ensureIdentity(account)
+        val did =
+            ensured.did
+                ?: throw IdentityLifecycleConflictException("Account identity must be provisioned before registering a PLC recovery key")
+        if (!did.startsWith("did:plc:")) {
+            throw IdentityLifecycleConflictException("PLC recovery keys are only supported for hosted did:plc identities")
+        }
+        if (!config.publishHostedPlcOperations) {
+            throw IdentityLifecycleConflictException("Hosted PLC recovery keys require published PLC operations")
+        }
+
+        val plcOperation =
+            if (ensured.plcRecoveryDidKey == normalizedRecoveryDidKey) {
+                null
+            } else {
+                val updatedRecoveryKey =
+                    plcIdentityService.updateHostedRecoveryKey(
+                        accountId = ensured.id,
+                        did = AtprotoDid.require(did),
+                        handle = requireNotNull(ensured.handle),
+                        recoveryDidKey = normalizedRecoveryDidKey,
+                    )
+                updatedRecoveryKey.operation
+            }
+        val updatedAccount = accountRepository.save(ensured.copy(plcRecoveryDidKey = normalizedRecoveryDidKey))
+        return RegisteredPlcRecoveryKey(
+            account = updatedAccount,
+            recoveryDidKey = normalizedRecoveryDidKey,
+            plcOperation = plcOperation,
+        )
+    }
 
     override suspend fun resolveHandle(handle: String): Result<ResolveHandleResponse?> =
         runCatching {
@@ -254,10 +391,47 @@ class AtprotoIdentityService(
         return AtprotoDid.parse(trimmed).getOrNull()?.toString()
     }
 
+    private fun canonicalizeDidKey(didKey: String): String? {
+        val trimmed = didKey.trim()
+        if (trimmed.isBlank()) {
+            return null
+        }
+        if (!trimmed.regionMatches(0, DID_KEY_PREFIX, 0, DID_KEY_PREFIX.length, ignoreCase = true)) {
+            return null
+        }
+        val suffix = trimmed.substring(DID_KEY_PREFIX.length)
+        if (suffix.isBlank()) {
+            return null
+        }
+        return runCatching {
+            Multikey.decode(suffix)
+            "$DID_KEY_PREFIX$suffix"
+        }.getOrNull()
+    }
+
     private companion object {
         private const val DEFAULT_HANDLE_LABEL = "user"
+        private const val DID_KEY_PREFIX = "did:key:"
         private const val MAX_HANDLE_LABEL_LENGTH = 63
         private const val HANDLE_COLLISION_SUFFIX_LENGTH = 8
         private val invalidLabelCharacterRegex = Regex("[^a-z0-9-]+")
     }
 }
+
+data class RotatedIdentitySigningKey(
+    val account: Account,
+    val previousPublicKeyMultibase: String,
+    val activeKey: StoredSigningKey,
+    val plcOperation: PlcOperation? = null,
+)
+
+data class ImportedIdentitySigningKey(
+    val account: Account,
+    val activeKey: StoredSigningKey,
+)
+
+data class RegisteredPlcRecoveryKey(
+    val account: Account,
+    val recoveryDidKey: String,
+    val plcOperation: PlcOperation? = null,
+)

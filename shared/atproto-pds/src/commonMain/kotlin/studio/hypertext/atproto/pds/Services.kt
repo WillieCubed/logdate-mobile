@@ -76,6 +76,21 @@ public interface PdsRepoService {
 }
 
 /**
+ * Blob-facing PDS service contract.
+ */
+public interface PdsBlobService {
+    /**
+     * Uploads a new blob for later repo record references.
+     */
+    public suspend fun uploadBlob(request: UploadBlobRequest): Result<UploadBlobResponse>
+
+    /**
+     * Returns a raw blob download for [request], or `null` when not found.
+     */
+    public suspend fun getBlob(request: GetBlobRequest): Result<BlobDownload?>
+}
+
+/**
  * OAuth-facing PDS service contract.
  */
 public interface PdsOAuthService {

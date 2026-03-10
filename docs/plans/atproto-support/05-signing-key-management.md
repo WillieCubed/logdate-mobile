@@ -79,6 +79,13 @@ When identity provisioning runs:
 2. creates a new active key
 3. updates the account’s public signing-key field through identity provisioning or persistence flows
 
+For first-party API usage, `POST /api/v1/identity/signing-key/rotate` now:
+
+1. authenticates the account with the existing bearer token
+2. rotates the active signing key
+3. publishes a hosted PLC update when the account uses `did:plc` and PLC publishing is enabled
+4. returns a new encrypted export bundle for the replacement key
+
 Historical rows remain available for auditing and future verification needs.
 
 ### Export
@@ -99,6 +106,18 @@ Historical rows remain available for auditing and future verification needs.
 
 The export response also includes the user DID and handle through the identity API route.
 
+### Import
+
+`importActiveKey(accountId, exportedKey, passphrase)`:
+
+1. decrypts the exported signing-key bundle with the supplied passphrase
+2. re-encrypts the private key with the server KEK
+3. replaces the active server-held key material for the account
+
+The first-party route `POST /api/v1/identity/signing-key/import` currently uses this in a
+conservative recovery mode: the imported public key must match the account’s currently published
+signing key. This avoids silently changing a `did:plc` identity without a signed PLC update.
+
 ## DID Document Relationship
 
 The public half of the active signing key is surfaced in the user DID Document as:
@@ -115,21 +134,28 @@ For hosted PLC identities, the same public key is also embedded in the PLC genes
 
 - provision a signing key for a hosted user
 - rotate the server-managed key
+- publish hosted PLC key-update operations during first-party rotation when PLC publishing is enabled
+- register a user-supplied hosted PLC recovery `did:key` and publish it into hosted PLC updates
 - publish the public key in the DID Document
 - export the active key in an encrypted bundle
+- restore the current active key from an exported bundle
 
 ### What LogDate cannot yet do
 
-- offer a full user-controlled PLC recovery-key flow
-- persist a signed PLC update history for later migration or recovery
+- derive a hosted PLC recovery key directly from the recovery phrase on-device
+- offer a full user-controlled PLC recovery-key signing flow
 - act as a completed AT Protocol repo commit signer for MST/CAR-based repo storage
 
 ## Current Limits
 
 - signing-key export is implemented
-- signing-key rotation is implemented at the service layer
-- user-controlled recovery-key derivation for PLC updates is not implemented yet
-- this document does not claim a full self-custody story beyond encrypted export of the server-managed active key
+- signing-key rotation is implemented at the service and first-party route layers
+- hosted PLC recovery-key registration is implemented for user-supplied `did:key` values
+- the current import route restores the currently published key; it does not yet handle arbitrary
+  cross-key migration for hosted `did:plc` identities
+- deterministic user-controlled recovery-key derivation for PLC updates is not implemented yet
+- this document does not claim a full self-custody story beyond encrypted export and same-key
+  recovery of the server-managed active key
 
 ## Relationship to Passkeys
 

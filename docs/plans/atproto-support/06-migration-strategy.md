@@ -52,6 +52,9 @@ New routes are added without removing existing ones:
 - OAuth discovery and auth endpoints
 - XRPC identity and repo routes
 - `POST /api/v1/identity/signing-key/export`
+- `POST /api/v1/identity/signing-key/rotate`
+- `POST /api/v1/identity/signing-key/import`
+- `POST /api/v1/identity/plc/recovery-key`
 
 The existing auth and sync endpoints remain intact.
 
@@ -121,8 +124,8 @@ Rolling back should not require inventing an invalid `did:web` shape.
 ## What Is Still Future Migration Work
 
 - durable OAuth storage
-- PLC update and recovery flows
-- user-controlled rotation keys
+- deterministic user-controlled PLC recovery-key flows
+- full signing-key migration beyond same-key recovery import
 - durable repo block-store persistence beyond the current sync-backed adapter
 - broader protocol-surface lexicon/codegen coverage
 - federation surfaces such as relay or firehose

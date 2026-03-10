@@ -1,6 +1,7 @@
 package app.logdate.server
 
 import app.logdate.SERVER_PORT
+import app.logdate.server.atproto.LogDatePdsBlobStore
 import app.logdate.server.atproto.LogDateRepoStore
 import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountRepository
@@ -12,6 +13,7 @@ import app.logdate.server.di.initializeDatabase
 import app.logdate.server.di.serverModule
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.SigningKeyService
+import app.logdate.server.logdate.LogDateAtprotoBlobRepository
 import app.logdate.server.logdate.LogDateBackupRepository
 import app.logdate.server.logdate.LogDateCollectionsMetadataStore
 import app.logdate.server.logdate.LogDateMediaRepository
@@ -63,6 +65,7 @@ import org.koin.ktor.ext.inject
 import org.koin.ktor.plugin.Koin
 import org.koin.logger.slf4jLogger
 import studio.hypertext.atproto.pds.DescribeServerResponse
+import studio.hypertext.atproto.pds.runtime.DefaultPdsBlobService
 import studio.hypertext.atproto.pds.runtime.DefaultPdsRepoService
 import studio.hypertext.atproto.pds.runtime.StaticPdsDiscoveryService
 import studio.hypertext.atproto.repo.RepoBlockStore
@@ -133,6 +136,8 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     val logDateCollectionsMetadataStore: LogDateCollectionsMetadataStore by inject()
     val logDateMediaRepository: LogDateMediaRepository by inject()
     val logDateBackupRepository: LogDateBackupRepository by inject()
+    val logDateAtprotoBlobRepository: LogDateAtprotoBlobRepository by inject()
+    val blobStorage = GcsMediaStorage.fromEnvironment()
     val logDateCollectionsRepository =
         RepoBackedLogDateCollectionsRepository(
             accountRepository = accountRepository,
@@ -148,6 +153,16 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
         )
     atprotoIdentityService.setRepoCollectionsResolver(logDateRepoStore::collectionsForDid)
     val pdsRepoService = DefaultPdsRepoService(logDateRepoStore)
+    val pdsBlobService =
+        blobStorage?.let { configuredStorage ->
+            DefaultPdsBlobService(
+                LogDatePdsBlobStore(
+                    identityService = atprotoIdentityService,
+                    blobRepository = logDateAtprotoBlobRepository,
+                    blobStorage = configuredStorage,
+                ),
+            )
+        }
     val pdsDiscoveryService =
         StaticPdsDiscoveryService(
             authorizationServerMetadata = oauthConfig.authorizationServerMetadata(),
@@ -235,13 +250,13 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
             accountRepository = accountRepository,
             tokenService = tokenService,
             repoService = pdsRepoService,
+            blobService = pdsBlobService,
             oauthAccessTokenService = oauthAccessTokenService,
             oauthDpopVerifier = oauthDpopVerifier,
             oauthNonceService = oauthNonceService,
         )
 
         route("/api/v1") {
-            val mediaStorage = GcsMediaStorage.fromEnvironment()
             serverInfoRoutes(serverDescriptor)
             authV1Routes(
                 accountRepository = accountRepository,
@@ -261,7 +276,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
             )
             syncRoutes(
                 tokenService = tokenService,
-                mediaStorage = mediaStorage,
+                mediaStorage = blobStorage,
                 metrics = syncMetrics,
                 collectionsRepository = logDateCollectionsRepository,
                 mediaRepository = logDateMediaRepository,

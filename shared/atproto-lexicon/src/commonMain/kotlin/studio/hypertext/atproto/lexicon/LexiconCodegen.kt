@@ -132,6 +132,7 @@ public object LexiconCodegen {
             LexiconType.BOOLEAN -> "Boolean"
             LexiconType.INTEGER -> "Long"
             LexiconType.ARRAY -> "List<${arrayElementType(requireNotNull(field.items))}>"
+            LexiconType.BLOB -> "JsonElement"
             LexiconType.REF -> className(requireNotNull(field.reference).documentId, requireNotNull(field.reference).definitionName)
             LexiconType.OBJECT, LexiconType.PARAMS, LexiconType.QUERY, LexiconType.PROCEDURE, LexiconType.UNKNOWN -> "JsonElement"
         }

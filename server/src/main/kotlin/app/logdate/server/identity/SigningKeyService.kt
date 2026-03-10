@@ -48,9 +48,25 @@ class SigningKeyService(
 
     suspend fun ensureActiveKey(accountId: Uuid): StoredSigningKey = repository.findActiveByAccountId(accountId) ?: createKey(accountId)
 
-    suspend fun rotateKey(accountId: Uuid): StoredSigningKey {
+    suspend fun rotateKey(accountId: Uuid): StoredSigningKey = activatePreparedKey(accountId, prepareKey(accountId))
+
+    suspend fun prepareKey(accountId: Uuid): StoredSigningKey {
+        val generated = generateKeyPair()
+        return buildStoredKey(
+            accountId = accountId,
+            algorithm = generated.algorithm,
+            publicKeyMultibase = generated.publicKeyMultibase,
+            privateKeyPkcs8 = generated.privateKeyPkcs8,
+        )
+    }
+
+    suspend fun activatePreparedKey(
+        accountId: Uuid,
+        preparedKey: StoredSigningKey,
+    ): StoredSigningKey {
+        require(preparedKey.accountId == accountId) { "Prepared signing key belongs to a different account" }
         repository.revokeActiveKeys(accountId)
-        return createKey(accountId)
+        return repository.save(preparedKey)
     }
 
     suspend fun exportActiveKey(
@@ -108,19 +124,60 @@ class SigningKeyService(
         return KeyFactory.getInstance("EC").generatePrivate(PKCS8EncodedKeySpec(privateKeyBytes))
     }
 
+    suspend fun importActiveKey(
+        accountId: Uuid,
+        exportedKey: ExportedSigningKey,
+        passphrase: String,
+    ): StoredSigningKey {
+        val privateKey =
+            try {
+                decryptExportedKey(exportedKey, passphrase)
+            } catch (exception: IllegalArgumentException) {
+                throw IdentityLifecycleValidationException("Invalid signing key import payload", exception)
+            } catch (exception: Exception) {
+                throw IdentityLifecycleValidationException("Unable to decrypt signing key import payload", exception)
+            }
+        require(exportedKey.publicKeyDidKey == didKeyFor(exportedKey.publicKeyMultibase)) {
+            "publicKeyDidKey must match publicKeyMultibase"
+        }
+        return activatePreparedKey(
+            accountId = accountId,
+            preparedKey =
+                buildStoredKey(
+                    accountId = accountId,
+                    algorithm = exportedKey.algorithm,
+                    publicKeyMultibase = exportedKey.publicKeyMultibase,
+                    privateKeyPkcs8 = privateKey.encoded,
+                ),
+        )
+    }
+
     private suspend fun createKey(accountId: Uuid): StoredSigningKey {
         val generated = generateKeyPair()
-        val stored =
-            StoredSigningKey(
-                id = Uuid.random(),
+        return repository.save(
+            buildStoredKey(
                 accountId = accountId,
                 algorithm = generated.algorithm,
                 publicKeyMultibase = generated.publicKeyMultibase,
-                privateKeyEncrypted = encryptPrivateKey(generated.privateKeyPkcs8),
-                createdAt = Clock.System.now(),
-            )
-        return repository.save(stored)
+                privateKeyPkcs8 = generated.privateKeyPkcs8,
+            ),
+        )
     }
+
+    private fun buildStoredKey(
+        accountId: Uuid,
+        algorithm: String,
+        publicKeyMultibase: String,
+        privateKeyPkcs8: ByteArray,
+    ): StoredSigningKey =
+        StoredSigningKey(
+            id = Uuid.random(),
+            accountId = accountId,
+            algorithm = algorithm,
+            publicKeyMultibase = publicKeyMultibase,
+            privateKeyEncrypted = encryptPrivateKey(privateKeyPkcs8),
+            createdAt = Clock.System.now(),
+        )
 
     private fun encryptPrivateKey(privateKeyPkcs8: ByteArray): String {
         val iv = ByteArray(GCM_IV_SIZE).also(secureRandom::nextBytes)
@@ -187,7 +244,7 @@ class SigningKeyService(
     }
 }
 
-private fun didKeyFor(publicKeyMultibase: String): String = "did:key:$publicKeyMultibase"
+internal fun didKeyFor(publicKeyMultibase: String): String = "did:key:$publicKeyMultibase"
 
 private fun BigInteger.toFixedWidth(width: Int): ByteArray {
     val encoded = toByteArray()

@@ -37,6 +37,7 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[did] = account.did
                     it[handle] = account.handle
                     it[signingKeyPublic] = account.signingKeyPublic
+                    it[plcRecoveryDidKey] = account.plcRecoveryDidKey
                     it[email] = account.email
                     it[emailVerified] = account.emailVerified
                     it[bio] = account.bio
@@ -54,6 +55,7 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[did] = account.did
                     it[handle] = account.handle
                     it[signingKeyPublic] = account.signingKeyPublic
+                    it[plcRecoveryDidKey] = account.plcRecoveryDidKey
                     it[email] = account.email
                     it[emailVerified] = account.emailVerified
                     it[bio] = account.bio
@@ -189,6 +191,7 @@ class PostgreSQLAccountRepository : AccountRepository {
             did = this[AccountsTable.did],
             handle = this[AccountsTable.handle],
             signingKeyPublic = this[AccountsTable.signingKeyPublic],
+            plcRecoveryDidKey = this[AccountsTable.plcRecoveryDidKey],
             email = this[AccountsTable.email],
             emailVerified = this[AccountsTable.emailVerified],
             bio = this[AccountsTable.bio],

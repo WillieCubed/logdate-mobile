@@ -77,6 +77,7 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
 ### P2.1 Account Schema and Models
 
 - `AccountsTable` stores `did`, `handle`, and `signingKeyPublic`.
+- `AccountsTable` can store a hosted PLC recovery `did:key` for accounts that register one.
 - `SigningKeysTable` stores per-account signing keys with revocation history.
 - Server account/auth models carry DID and handle fields.
 - Shared client-facing account models carry DID and handle fields.
@@ -204,7 +205,16 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
 - The production implementation still supports GCS-backed uploads, downloads, deletes, and signed URLs.
 - Test applications can provide in-memory or fake blob storage implementations without route-level GCS knowledge.
 
-### P6.3 Compatibility Preservation
+### P6.3 ATProto Blob Interoperability
+
+- `com.atproto.repo.uploadBlob` accepts authenticated raw binary uploads and returns a valid AT Protocol blob reference payload.
+- `com.atproto.sync.getBlob` returns the originally uploaded raw bytes for a valid DID + CID pair without requiring auth.
+- ATProto blob metadata persists through a first-class LogDate-owned repository interface rather than route-local or sync-table-only lookups.
+- The checked-in official lexicon/codegen set includes:
+  - `com.atproto.repo.uploadBlob`
+  - `com.atproto.sync.getBlob`
+
+### P6.4 Compatibility Preservation
 
 - Existing `/api/v1/media/*` behavior stays externally compatible for the first-party app.
 - Existing `/api/v1/backups/*` behavior stays externally compatible for the first-party app.
@@ -215,14 +225,19 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
 
 ### P7.1 Identity Lifecycle
 
-- PLC updates are supported for hosted identities.
-- Recovery-oriented signing-key rotation and export/import flows are supported.
-- User-facing recovery and migration tooling is no longer limited to hosted genesis.
+- Hosted PLC updates are supported for first-party signing-key rotation when PLC publishing is enabled.
+- First-party signing-key rotation returns a fresh encrypted export bundle for the new active key.
+- First-party signing-key import can restore the currently published signing key for an account.
+- Hosted PLC genesis and update operations are recorded locally for recovery and migration support.
+- First-party hosted PLC recovery-key registration accepts a user-supplied `did:key`, persists it,
+  and includes it in hosted PLC update operations when PLC publishing is enabled.
+- Deterministic recovery-key derivation from the recovery phrase, user-controlled PLC signing, and
+  full migration flows remain future work.
 
 ### P7.2 Interoperability Hardening
 
 - CAR/MST/DAG-CBOR behavior is validated against external AT Protocol implementations.
-- Checked-in lexicon/codegen coverage expands beyond the current `com.atproto.identity.*`, `com.atproto.server.*`, and `com.atproto.repo.*` set.
+- Checked-in lexicon/codegen coverage expands beyond the current `com.atproto.identity.*`, `com.atproto.server.*`, `com.atproto.repo.*`, and `com.atproto.sync.*` set.
 - Transitional compatibility code can be removed once sync and ATProto surfaces both use the final canonical boundaries.
 
 ## Explicit Non-Goals for This Plan Revision
