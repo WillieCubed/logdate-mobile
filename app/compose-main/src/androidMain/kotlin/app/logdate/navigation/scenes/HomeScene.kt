@@ -476,7 +476,7 @@ enum class HomeTab(
     val route: NavKey,
 ) {
     TIMELINE("Timeline", Icons.Filled.History, Icons.Outlined.History, TimelineListRoute),
-    LOCATION("Location", Icons.Filled.LocationOn, Icons.Outlined.LocationOn, LocationRoute),
+    LOCATION("Locations", Icons.Filled.LocationOn, Icons.Outlined.LocationOn, LocationRoute),
     JOURNALS("Journals", Icons.Filled.Book, Icons.Outlined.Book, JournalList),
     REWIND("Rewind", Icons.Filled.DateRange, Icons.Outlined.DateRange, RewindList),
 }

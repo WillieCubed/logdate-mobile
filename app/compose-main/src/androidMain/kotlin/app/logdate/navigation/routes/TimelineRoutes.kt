@@ -71,6 +71,7 @@ fun EntryProviderScope<NavKey>.timelineRoutes(
 
         TimelineDetailScreen(
             onClose = onCloseTimelineDetail,
+            onOpenLocations = onOpenLocationTimeline,
             viewModel = homeViewModel,
         )
     }
@@ -80,6 +81,7 @@ fun EntryProviderScope<NavKey>.timelineRoutes(
 @Composable
 fun TimelineDetailScreen(
     onClose: () -> Unit,
+    onOpenLocations: (() -> Unit)? = null,
     viewModel: HomeViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -89,6 +91,7 @@ fun TimelineDetailScreen(
         TimelineDayDetailPanel(
             uiState = selectedDay,
             onExit = onClose,
+            onOpenLocations = onOpenLocations,
         )
     } ?: TimelineDetailPlaceholder()
 }

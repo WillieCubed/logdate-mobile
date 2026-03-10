@@ -45,6 +45,7 @@ fun TimelineDayDetailPanel(
     events: List<DayEvent> = listOf(),
     onOpenEvent: (eventId: String) -> Unit = {},
     visitedLocations: List<DayLocation> = listOf(),
+    onOpenLocations: (() -> Unit)? = null,
     onOpenRewind: () -> Unit = {},
     scrollState: LazyListState = rememberLazyListState(),
     modifier: Modifier = Modifier,
@@ -130,7 +131,10 @@ fun TimelineDayDetailPanel(
                 item(
                     contentType = "locations",
                 ) {
-                    LocationsSection(locations = resolvedVisitedLocations, DayLocation.Origin)
+                    LocationsSection(
+                        locations = resolvedVisitedLocations,
+                        onOpenLocations = onOpenLocations,
+                    )
                 }
             }
         }

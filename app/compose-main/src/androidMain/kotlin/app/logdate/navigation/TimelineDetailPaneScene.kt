@@ -24,6 +24,7 @@ fun TimelineDetailPaneScene(
     onClose: () -> Unit = {},
     onNewEntry: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    onOpenLocationTimeline: (() -> Unit)? = null,
 ) {
     // We'll use real data from the view model rather than mock data
     // The uiState.selectedDay property will contain the day information
@@ -34,6 +35,7 @@ fun TimelineDetailPaneScene(
         TimelineDayDetailPanel(
             uiState = selectedDay,
             onExit = onClose,
+            onOpenLocations = onOpenLocationTimeline,
         )
     } ?: TimelineDetailPlaceholder()
 }
