@@ -158,7 +158,10 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
 
 ### P4.3 Current Limits
 
-- PLC update operations, user-controlled rotation keys, and migration/recovery tooling remain future work.
+- Hosted PLC update operations are supported for first-party signing-key rotation and recovery-key
+  registration when PLC publishing is enabled.
+- Deterministic recovery-key derivation from the recovery phrase and user-controlled PLC signing
+  remain future work.
 - No path-based `did:web` upgrade flow is considered valid.
 
 ## Phase 5: PDS-Compatible XRPC Slice
@@ -227,10 +230,22 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
 
 - Hosted PLC updates are supported for first-party signing-key rotation when PLC publishing is enabled.
 - First-party signing-key rotation returns a fresh encrypted export bundle for the new active key.
-- First-party signing-key import can restore the currently published signing key for an account.
+- First-party signing-key import can:
+  - restore the current active signing key for an account
+  - migrate a hosted `did:web` identity to a different exported signing key
+  - migrate a hosted `did:plc` identity to a different exported signing key when PLC publishing is enabled
 - Hosted PLC genesis and update operations are recorded locally for recovery and migration support.
 - First-party hosted PLC recovery-key registration accepts a user-supplied `did:key`, persists it,
   and includes it in hosted PLC update operations when PLC publishing is enabled.
+- `GET /api/v1/identity` returns first-party identity status including DID, handle, active signing
+  key, recovery key, and hosted PLC operation count.
+- `GET /api/v1/identity/plc/operations` returns stored hosted PLC operation history for the current
+  account when a hosted PLC identity exists.
+- The first-party settings surface exposes identity refresh, signing-key export, signing-key
+  rotation, signing-key import, recovery-key registration, and hosted PLC operation-history
+  visibility.
+- First-party onboarding recovery guidance points signed-in users at the AT Protocol identity
+  settings flow rather than a placeholder recovery screen.
 - Deterministic recovery-key derivation from the recovery phrase, user-controlled PLC signing, and
   full migration flows remain future work.
 

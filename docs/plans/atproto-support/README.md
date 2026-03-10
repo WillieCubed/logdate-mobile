@@ -37,10 +37,10 @@ Passkeys authenticate a user **to** their custodian. DIDs identify the user **to
 | 1 | Complete for the current standalone slice | Publishable Kotlin/KMP library modules: `shared/atproto-syntax`, `shared/atproto-identity`, `shared/atproto-xrpc`, `shared/atproto-crypto`, `shared/atproto-plc`, `shared/atproto-repo`, `shared/atproto-lexicon`, `shared/atproto-pds`, and `shared/atproto-pds-runtime`, plus shared publication tooling, aggregate Dokka/publish tasks, release workflow, and a standalone consumer sample | [Architecture](./01-architecture.md), [Acceptance Criteria](./03-acceptance-criteria.md) |
 | 2 | Complete for the current hosted identity slice | Server-side identity integration (signing keys, DID Documents, DID-aware account models) | [Architecture](./01-architecture.md), [Signing Keys](./05-signing-key-management.md) |
 | 3 | Complete for the current standalone authorization slice | OAuth 2.0 Authorization Server with passkey authentication and DPoP-bound access tokens | [OAuth + Passkeys](./04-oauth-passkey-integration.md) |
-| 4 | Partially complete | Hosted PLC provisioning plus future PLC update and recovery tooling | [Architecture](./01-architecture.md) |
+| 4 | Complete for the current hosted PLC slice | Hosted PLC provisioning, first-party hosted PLC update publication, operation-history persistence, and recovery-key registration for server-managed hosted identities | [Architecture](./01-architecture.md) |
 | 5 | Complete for the canonical collection slice | XRPC server endpoints backed by the shared library modules, shared discovery/repo runtime services, and a canonical repo-backed LogDate collections boundary for entries, journals, and associations | [Architecture](./01-architecture.md) |
-| 6 | Partially complete | LogDate-owned media, backup, and ATProto blob metadata repositories plus a generic blob service boundary and ATProto blob routes so the remaining sync-facing routes stop depending on `SyncRepository` directly while the current production blob implementation remains GCS-backed | [Architecture](./01-architecture.md), [Migration Strategy](./06-migration-strategy.md) |
-| 7 | Partially complete | Identity lifecycle completion, broader interop hardening, and final compatibility cutover cleanup | [Architecture](./01-architecture.md), [Signing Keys](./05-signing-key-management.md) |
+| 6 | Complete for the current blob and backup slice | LogDate-owned media, backup, and ATProto blob metadata repositories plus a generic blob service boundary and ATProto blob routes so the remaining sync-facing routes stop depending on `SyncRepository` directly while the current production blob implementation remains GCS-backed | [Architecture](./01-architecture.md), [Migration Strategy](./06-migration-strategy.md) |
+| 7 | Complete for the current first-party hosted recovery slice | Identity lifecycle completion for server-managed hosted identities, first-party identity status and PLC operation APIs, settings recovery/export UX, and the remaining hosted compatibility cutover work needed for the current deployable slice | [Architecture](./01-architecture.md), [Signing Keys](./05-signing-key-management.md) |
 
 ## Current Status
 
@@ -63,47 +63,42 @@ The repo now has a real standalone `studio.hypertext.atproto` library surface:
 - checked-in official `com.atproto.sync.*` lexicon JSON documents plus deterministic generated Kotlin models for the blob download surface
 - sync routes now use those LogDate-owned repositories plus the generic blob service boundary instead of depending on sync records and media-specific GCS methods directly
 - first-party signing-key rotation and recovery import endpoints for the current active identity key
+- migration-safe first-party signing-key import for hosted `did:web` identities and hosted `did:plc` identities when PLC publishing is enabled
 - hosted PLC update operations for first-party key rotation when PLC publishing is enabled
 - first-class hosted PLC operation history persistence with in-memory and PostgreSQL implementations
 - first-party hosted PLC recovery-key registration for user-supplied `did:key` values, with the
   registered recovery key carried into hosted PLC update operations
+- first-party identity status and hosted PLC operation-history APIs at `/api/v1/identity` and
+  `/api/v1/identity/plc/operations`
+- first-party AT Protocol identity settings UX for export, rotation, import, recovery-key
+  registration, and hosted PLC operation-history visibility
+- onboarding recovery guidance that sends signed-in users to the first-party AT Protocol identity
+  settings flow instead of a placeholder recovery screen
 
-The current backend ATProto support is deployable for the hosted identity, OAuth, XRPC, and canonical collection slice, but it is not yet a full independently deployed PDS product.
+The current backend ATProto support is deployable for the standalone library, hosted identity,
+OAuth, XRPC, canonical collection, blob, and first-party hosted recovery slices, but it is not yet
+a full independently deployed PDS product.
 
-## Final Remaining Todo List
+## Future Work Beyond the Current Hosted Slice
 
-These are the remaining ATProto tasks that still need to land after the current canonical
-collection milestone. This list replaces the older vague “next tasks” bullets and is the
-authoritative backlog for the rest of the ATProto rollout.
+These are not blockers for shipping the current hosted slice. They are the next ATProto
+investments after the currently deployed library, identity, repo, blob, and first-party recovery
+surfaces.
 
-### Now
-
-1. Remove the remaining transitional sync-backed helpers and test harness wiring once the
-   repo-backed and LogDate-owned boundaries fully cover those scenarios.
-2. Expand signing-key import beyond “restore the currently published key” into full migration-safe
-   account recovery flows.
-3. Add user-facing hosted PLC recovery tooling on top of the persisted operation history:
-   operation-history read APIs, guided recovery state, and recovery/export UX.
-
-### Next
-
-1. Implement deterministic user-controlled PLC recovery-key derivation from the recovery phrase.
-2. Implement user-controlled PLC signing flows so hosted recovery does not depend only on a
-   server-published update path.
-3. Define and lock the final `studio.hypertext.logdate.*` lexicon family once the remaining blob
-   and compatibility cleanup work is complete.
-4. Unify first-party sync media objects and ATProto blob references behind the same final
-   LogDate-owned blob and metadata boundaries.
-
-### Hardening
-
-1. Expand lexicon/codegen coverage beyond the currently checked-in LogDate and official
-   `com.atproto.identity.*`, `com.atproto.server.*`, `com.atproto.repo.*`, and `com.atproto.sync.*`
-   surfaces that the server currently serves.
-2. Validate CAR, MST, DAG-CBOR, and blob behavior against external AT Protocol implementations,
-   not only internal deterministic tests.
-3. Harden the standalone PDS runtime and server deployment shape for multi-instance and release
-   operation concerns.
+- Implement deterministic user-controlled PLC recovery-key derivation from the recovery phrase.
+- Implement user-controlled PLC signing flows so hosted recovery does not depend only on a
+  server-published update path.
+- Define and lock the final `studio.hypertext.logdate.*` lexicon family once the remaining blob
+  and compatibility cleanup work is complete.
+- Unify first-party sync media objects and ATProto blob references behind the same final
+  LogDate-owned blob and metadata boundaries.
+- Expand lexicon/codegen coverage beyond the currently checked-in LogDate and official
+  `com.atproto.identity.*`, `com.atproto.server.*`, `com.atproto.repo.*`, and `com.atproto.sync.*`
+  surfaces that the server currently serves.
+- Validate CAR, MST, DAG-CBOR, and blob behavior against external AT Protocol implementations,
+  not only internal deterministic tests.
+- Harden the standalone PDS runtime and server deployment shape for multi-instance and release
+  operation concerns.
 
 ## Documents in This Plan
 
@@ -119,15 +114,18 @@ authoritative backlog for the rest of the ATProto rollout.
 
 ## What This Plan Does NOT Cover (Yet)
 
-These are future work that build on the current library core:
+These are future work that build on the current hosted and library slices:
 
-- **Durable canonical repo persistence**, replacing the current sync-backed hydration adapter with a persistent block store
-- **Broader protocol-surface lexicon/codegen support** beyond the current checked-in LogDate records and shared parser/runtime
+- **User-controlled PLC recovery and migration flows** beyond the current first-party hosted
+  export/import and recovery-key registration surface
+- **Broader protocol-surface lexicon/codegen support** beyond the current checked-in LogDate
+  records and shared parser/runtime
+- **A full independently deployed PDS runtime shape** separated from LogDate’s current server
+  deployment surface
 - **Federation** (firehose, relay, AppView)
 - **ActivityPub integration** (kept as separate parallel effort in `shared/activitypub`)
-- **User-facing PLC recovery and migration tooling** beyond hosted genesis and key export
 
-The identity layer is the prerequisite for all of these. Get identity right first.
+The hosted identity layer is now in place for these future investments.
 
 ## Key Existing Code
 

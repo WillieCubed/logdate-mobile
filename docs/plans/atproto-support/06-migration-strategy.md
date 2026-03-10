@@ -6,7 +6,7 @@ This document describes the migration strategy for the currently implemented AT 
 
 - Existing LogDate auth and sync behavior must remain shippable on `main`.
 - AT Protocol identity fields are added without breaking current first-party clients.
-- Hosted multi-user users should default to `did:plc`.
+- Hosted multi-user accounts should default to `did:plc`.
 - Hostname-level `did:web` remains valid for dedicated deployments.
 - Path-based `did:web` is not migrated or supported.
 
@@ -51,23 +51,28 @@ New routes are added without removing existing ones:
 - `/.well-known/did.json`
 - OAuth discovery and auth endpoints
 - XRPC identity and repo routes
+- `GET /api/v1/identity`
 - `POST /api/v1/identity/signing-key/export`
 - `POST /api/v1/identity/signing-key/rotate`
 - `POST /api/v1/identity/signing-key/import`
 - `POST /api/v1/identity/plc/recovery-key`
+- `GET /api/v1/identity/plc/operations`
 
 The existing auth and sync endpoints remain intact.
 
-## Stage 5: Sync-Backed Multi-Collection Repo Adapter
+## Stage 5: Canonical Repo-Backed Collections Boundary
 
-The current PDS slice maps AT Protocol repo requests onto LogDate's existing sync-backed storage through `LogDateRepoStore`, which hydrates the shared repo engine and persists the resulting state back into the sync repository.
+The current PDS slice maps AT Protocol repo requests onto LogDate-owned collection repositories
+through `LogDateRepoStore`, with the canonical implementation backed by the shared repo engine plus
+LogDate metadata persistence.
 
 This means:
 
 - AT Protocol clients can read and write the currently exposed LogDate collections now
 - collection-aware repo behavior comes from the shared repo engine rather than route-local DTO logic
-- the existing sync storage remains the persistence layer behind that adapter for now
-- the final durable block-store MST/CAR migration is still future work
+- entries, journals, and associations persist through the canonical repo-backed
+  `LogDateCollectionsRepository`
+- compatibility sync endpoints can remain enabled without owning the canonical record shape
 
 ## Hosted DID Method Strategy
 
@@ -99,6 +104,14 @@ Use hostname-level `did:web` where that deployment model makes sense.
 - XRPC repo endpoints are additive
 - third-party clients can start integrating without breaking first-party clients
 
+## First-party recovery and lifecycle compatibility
+
+- the first-party app continues to use the bearer-JWT auth path for identity management
+- first-party recovery, export, rotation, import, and hosted PLC operation history are additive
+  settings flows
+- onboarding can point signed-in users at the AT Protocol identity settings flow without forcing an
+  OAuth or protocol-client migration
+
 ## Current non-persistent areas
 
 The current OAuth authorization service stores:
@@ -125,7 +138,7 @@ Rolling back should not require inventing an invalid `did:web` shape.
 
 - durable OAuth storage
 - deterministic user-controlled PLC recovery-key flows
-- full signing-key migration beyond same-key recovery import
-- durable repo block-store persistence beyond the current sync-backed adapter
+- user-controlled PLC signing flows
+- a fully standalone PDS deployment/runtime shape beyond the current LogDate server embedding
 - broader protocol-surface lexicon/codegen coverage
 - federation surfaces such as relay or firehose

@@ -2,6 +2,9 @@
 
 package app.logdate.feature.core.account
 
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -13,6 +16,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.feature.core.settings.ui.CustomServerInfoBottomSheet
 import app.logdate.feature.core.settings.ui.ServerPreset
 import app.logdate.shared.model.ServerDescriptor
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.atproto_recovery_guidance_body
+import logdate.client.feature.core.generated.resources.atproto_recovery_guidance_title
+import logdate.client.feature.core.generated.resources.dismiss
+import org.jetbrains.compose.resources.stringResource
 
 private const val FALLBACK_HANDLE_DOMAIN = "logdate.app"
 private const val FALLBACK_PRIVACY_POLICY_URL = "https://logdate.app/privacy"
@@ -29,6 +37,7 @@ fun CloudAccountOnboardingScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val uriHandler = LocalUriHandler.current
     val showCustomServerInfo = remember { mutableStateOf(false) }
+    val showRecoveryInfo = remember { mutableStateOf(false) }
     val serverPresentation =
         remember(uiState.serverSelectionState) {
             uiState.serverSelectionState.toPresentation()
@@ -40,6 +49,19 @@ fun CloudAccountOnboardingScreen(
             onUseCustomServer = {
                 viewModel.selectServerPreset(ServerPreset.CUSTOM)
                 showCustomServerInfo.value = false
+            },
+        )
+    }
+
+    if (showRecoveryInfo.value) {
+        AlertDialog(
+            onDismissRequest = { showRecoveryInfo.value = false },
+            title = { Text(stringResource(Res.string.atproto_recovery_guidance_title)) },
+            text = { Text(stringResource(Res.string.atproto_recovery_guidance_body)) },
+            confirmButton = {
+                TextButton(onClick = { showRecoveryInfo.value = false }) {
+                    Text(stringResource(Res.string.dismiss))
+                }
             },
         )
     }
@@ -71,7 +93,7 @@ fun CloudAccountOnboardingScreen(
         OnboardingStep.SignIn -> {
             CloudAccountSignInScreen(
                 onSignIn = viewModel::signInWithPasskey,
-                onAccountRecovery = { /* Account recovery not yet available */ },
+                onAccountRecovery = { showRecoveryInfo.value = true },
                 onPrivacyPolicy = serverPresentation.privacyPolicyUrl?.let { { uriHandler.openUri(it) } },
                 onTermsOfService = serverPresentation.termsOfServiceUrl?.let { { uriHandler.openUri(it) } },
                 onBack = viewModel::goToPreviousStep,

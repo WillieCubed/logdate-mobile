@@ -168,6 +168,24 @@ This manifest reflects the current AT Protocol implementation shape in the repo.
 - `client/networking/src/commonMain/kotlin/app/logdate/client/networking/PasskeyApiClient.kt`
 - `client/sync/src/commonMain/kotlin/app/logdate/client/sync/cloud/account/DefaultCloudAccountRepository.kt`
 
+## First-Party Identity Management Client
+
+- `client/repository/src/commonMain/kotlin/app/logdate/client/repository/account/AccountIdentityRepository.kt`
+- `client/networking/src/commonMain/kotlin/app/logdate/client/networking/IdentityApiClient.kt`
+- `client/networking/src/commonTest/kotlin/app/logdate/client/networking/IdentityApiClientTest.kt`
+- `client/networking/src/commonTest/kotlin/app/logdate/client/networking/TestConfigRepository.kt`
+- `client/data/src/commonMain/kotlin/app/logdate/client/data/account/DefaultAccountIdentityRepository.kt`
+- `client/data/src/commonMain/kotlin/app/logdate/client/data/account/StubAccountIdentityRepository.kt`
+- `client/data/src/commonTest/kotlin/app/logdate/client/data/account/DefaultAccountIdentityRepositoryTest.kt`
+- `client/data/src/androidMain/kotlin/app/logdate/client/data/di/DataModule.android.kt`
+- `client/data/src/desktopMain/kotlin/app/logdate/client/data/di/DataModule.desktop.kt`
+- `client/data/src/iosMain/kotlin/app/logdate/client/data/di/DataModule.ios.kt`
+- `client/feature/core/src/commonMain/kotlin/app/logdate/feature/core/settings/ui/AccountSettingsScreen.kt`
+- `client/feature/core/src/commonMain/kotlin/app/logdate/feature/core/settings/ui/AccountSettingsViewModel.kt`
+- `client/feature/core/src/commonMain/kotlin/app/logdate/feature/core/settings/ui/AtprotoIdentitySection.kt`
+- `client/feature/core/src/commonMain/kotlin/app/logdate/feature/core/account/CloudAccountOnboardingScreen.kt`
+- `client/feature/core/src/commonMain/composeResources/values/strings.xml`
+
 ## Wiring and Build Integration
 
 - `settings.gradle.kts`
@@ -234,3 +252,8 @@ This manifest reflects the current AT Protocol implementation shape in the repo.
 - `server/src/test/kotlin/app/logdate/server/routes/Identity*.kt`
 - `server/src/test/kotlin/app/logdate/server/routes/OAuthRoutesTest.kt`
 - `server/src/test/kotlin/app/logdate/server/routes/Xrpc*.kt`
+
+### First-party client identity flows
+
+- `client/networking/src/commonTest/kotlin/app/logdate/client/networking/IdentityApiClientTest.kt`
+- `client/data/src/commonTest/kotlin/app/logdate/client/data/account/DefaultAccountIdentityRepositoryTest.kt`

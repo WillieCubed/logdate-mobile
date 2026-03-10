@@ -71,6 +71,7 @@ actual val coreFeatureModule: Module =
                 get(),
                 get(),
                 get(),
+                get(),
             )
         }
         viewModel {

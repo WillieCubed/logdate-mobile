@@ -1,6 +1,5 @@
 package app.logdate.client.networking
 
-import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.BeginAccountCreationRequest
 import app.logdate.shared.model.BeginAuthenticationRequest
 import app.logdate.shared.model.CompleteAccountCreationRequest
@@ -18,9 +17,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -41,7 +37,7 @@ class PasskeyApiClientTest {
                 }
             }
 
-        val configRepository = MockConfigRepository()
+        val configRepository = TestConfigRepository()
         return PasskeyApiClient(httpClient, configRepository)
     }
 
@@ -243,28 +239,4 @@ class PasskeyApiClientTest {
             assertTrue(result.isSuccess)
             assertEquals("new-access", result.getOrThrow())
         }
-}
-
-private class MockConfigRepository : LogDateConfigRepository {
-    override val backendUrl: StateFlow<String> = MutableStateFlow("http://localhost")
-    override val apiVersion: StateFlow<String> = MutableStateFlow("v1")
-    override val apiBaseUrl: Flow<String> = MutableStateFlow("http://localhost/api/v1")
-    override val localServerAddress: StateFlow<String> = MutableStateFlow("localhost:8765")
-    override val serverDescriptor: StateFlow<app.logdate.shared.model.ServerDescriptor?> = MutableStateFlow(null)
-
-    override suspend fun updateBackendUrl(url: String) = Unit
-
-    override suspend fun updateApiVersion(version: String) = Unit
-
-    override suspend fun updateLocalServerAddress(address: String) = Unit
-
-    override suspend fun updateServerDescriptor(descriptor: app.logdate.shared.model.ServerDescriptor?) = Unit
-
-    override suspend fun resetToDefaults() = Unit
-
-    override fun getCurrentBackendUrl(): String = "http://localhost"
-
-    override fun getCurrentApiBaseUrl(): String = "http://localhost/api/v1"
-
-    override fun getCurrentServerDescriptor(): app.logdate.shared.model.ServerDescriptor? = null
 }

@@ -128,6 +128,16 @@ class SigningKeyService(
         accountId: Uuid,
         exportedKey: ExportedSigningKey,
         passphrase: String,
+    ): StoredSigningKey =
+        activatePreparedKey(
+            accountId = accountId,
+            preparedKey = prepareImportedKey(accountId, exportedKey, passphrase),
+        )
+
+    suspend fun prepareImportedKey(
+        accountId: Uuid,
+        exportedKey: ExportedSigningKey,
+        passphrase: String,
     ): StoredSigningKey {
         val privateKey =
             try {
@@ -140,15 +150,11 @@ class SigningKeyService(
         require(exportedKey.publicKeyDidKey == didKeyFor(exportedKey.publicKeyMultibase)) {
             "publicKeyDidKey must match publicKeyMultibase"
         }
-        return activatePreparedKey(
+        return buildStoredKey(
             accountId = accountId,
-            preparedKey =
-                buildStoredKey(
-                    accountId = accountId,
-                    algorithm = exportedKey.algorithm,
-                    publicKeyMultibase = exportedKey.publicKeyMultibase,
-                    privateKeyPkcs8 = privateKey.encoded,
-                ),
+            algorithm = exportedKey.algorithm,
+            publicKeyMultibase = exportedKey.publicKeyMultibase,
+            privateKeyPkcs8 = privateKey.encoded,
         )
     }
 

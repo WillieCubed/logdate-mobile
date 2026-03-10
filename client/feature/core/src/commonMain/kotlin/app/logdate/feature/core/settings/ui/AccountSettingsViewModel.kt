@@ -6,6 +6,9 @@ import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.domain.account.GetCurrentAccountUseCase
 import app.logdate.client.domain.profile.UpdateProfileUseCase
+import app.logdate.client.repository.account.AccountHostedPlcOperation
+import app.logdate.client.repository.account.AccountIdentityRepository
+import app.logdate.client.repository.account.AccountIdentityStatus
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.shared.model.LogDateAccount
@@ -19,12 +22,22 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlin.time.Instant
 
 data class AccountSettingsState(
     val userData: UserData,
     val currentAccount: LogDateAccount,
     val isAuthenticated: Boolean,
+)
+
+data class AccountIdentityState(
+    val isLoading: Boolean = false,
+    val status: AccountIdentityStatus? = null,
+    val operations: List<AccountHostedPlcOperation> = emptyList(),
+    val actionState: IdentityActionState = IdentityActionState.Idle,
+    val exportedKeyJson: String? = null,
 )
 
 sealed class ProfileUpdateState {
@@ -51,10 +64,27 @@ sealed class BirthdayUpdateState {
     ) : BirthdayUpdateState()
 }
 
+sealed class IdentityActionState {
+    data object Idle : IdentityActionState()
+
+    data class Working(
+        val label: String,
+    ) : IdentityActionState()
+
+    data class Success(
+        val message: String,
+    ) : IdentityActionState()
+
+    data class Error(
+        val message: String,
+    ) : IdentityActionState()
+}
+
 class AccountSettingsViewModel(
     private val userStateRepository: UserStateRepository,
     private val getCurrentAccountUseCase: GetCurrentAccountUseCase,
     private val updateProfileUseCase: UpdateProfileUseCase,
+    private val accountIdentityRepository: AccountIdentityRepository,
     private val passkeyAccountRepository: PasskeyAccountRepository,
     private val sessionStorage: SessionStorage,
     private val preferencesDataSource: LogdatePreferencesDataSource,
@@ -64,6 +94,15 @@ class AccountSettingsViewModel(
 
     private val _birthdayUpdateState = MutableStateFlow<BirthdayUpdateState>(BirthdayUpdateState.Idle)
     val birthdayUpdateState: StateFlow<BirthdayUpdateState> = _birthdayUpdateState
+
+    private val identityJson =
+        Json {
+            prettyPrint = true
+            encodeDefaults = true
+        }
+
+    private val _identityState = MutableStateFlow(AccountIdentityState())
+    val identityState: StateFlow<AccountIdentityState> = _identityState
 
     private val currentAccountFlow: Flow<LogDateAccount?> =
         flow {
@@ -96,6 +135,18 @@ class AccountSettingsViewModel(
                 isAuthenticated = false,
             ),
         )
+
+    init {
+        viewModelScope.launch {
+            sessionStorage.getSessionFlow().collect { session ->
+                if (session == null) {
+                    _identityState.value = AccountIdentityState()
+                } else {
+                    refreshIdentityState()
+                }
+            }
+        }
+    }
 
     fun updateProfile(
         displayName: String,
@@ -176,5 +227,136 @@ class AccountSettingsViewModel(
                 onError(e.message ?: "Failed to sign out")
             }
         }
+    }
+
+    fun refreshIdentityState() {
+        viewModelScope.launch {
+            loadIdentityState()
+        }
+    }
+
+    fun exportSigningKey(passphrase: String) {
+        performIdentityAction("Exporting signing key…") {
+            accountIdentityRepository.exportSigningKey(passphrase).map { payload ->
+                IdentityActionResult(
+                    message = "Signing key exported",
+                    exportedKeyJson = identityJson.encodeToString(payload.exportedKey),
+                )
+            }
+        }
+    }
+
+    fun rotateSigningKey(passphrase: String) {
+        performIdentityAction("Rotating signing key…") {
+            accountIdentityRepository.rotateSigningKey(passphrase).map { payload ->
+                IdentityActionResult(
+                    message = "Signing key rotated",
+                    exportedKeyJson = identityJson.encodeToString(payload.exportedKey),
+                )
+            }
+        }
+    }
+
+    fun importSigningKey(
+        passphrase: String,
+        exportedKeyJson: String,
+    ) {
+        performIdentityAction("Importing signing key…") {
+            accountIdentityRepository
+                .importSigningKey(
+                    passphrase = passphrase,
+                    exportedKeyJson = exportedKeyJson,
+                ).map {
+                    IdentityActionResult(message = "Signing key imported")
+                }
+        }
+    }
+
+    fun registerPlcRecoveryKey(recoveryDidKey: String) {
+        performIdentityAction("Registering PLC recovery key…") {
+            accountIdentityRepository.registerPlcRecoveryKey(recoveryDidKey).map {
+                IdentityActionResult(message = "PLC recovery key registered")
+            }
+        }
+    }
+
+    fun clearIdentityActionState() {
+        _identityState.value = _identityState.value.copy(actionState = IdentityActionState.Idle)
+    }
+
+    fun clearExportedKeyJson() {
+        _identityState.value = _identityState.value.copy(exportedKeyJson = null)
+    }
+
+    private fun performIdentityAction(
+        label: String,
+        action: suspend () -> Result<IdentityActionResult>,
+    ) {
+        viewModelScope.launch {
+            _identityState.value =
+                _identityState.value.copy(
+                    actionState = IdentityActionState.Working(label),
+                )
+            val result = action()
+            if (result.isSuccess) {
+                val actionResult = result.getOrThrow()
+                loadIdentityState(
+                    actionState = IdentityActionState.Success(actionResult.message),
+                    exportedKeyJson = actionResult.exportedKeyJson ?: _identityState.value.exportedKeyJson,
+                )
+            } else {
+                _identityState.value =
+                    _identityState.value.copy(
+                        actionState =
+                            IdentityActionState.Error(
+                                result.exceptionOrNull()?.message ?: "Identity action failed",
+                            ),
+                    )
+            }
+        }
+    }
+
+    private data class IdentityActionResult(
+        val message: String,
+        val exportedKeyJson: String? = null,
+    )
+
+    private suspend fun loadIdentityState(
+        actionState: IdentityActionState = IdentityActionState.Idle,
+        exportedKeyJson: String? = _identityState.value.exportedKeyJson,
+    ) {
+        _identityState.value =
+            _identityState.value.copy(
+                isLoading = true,
+                actionState = actionState,
+                exportedKeyJson = exportedKeyJson,
+            )
+
+        val statusResult = accountIdentityRepository.getIdentityStatus()
+        val operationsResult = accountIdentityRepository.getHostedPlcOperations()
+        _identityState.value =
+            when {
+                statusResult.isSuccess && operationsResult.isSuccess -> {
+                    _identityState.value.copy(
+                        isLoading = false,
+                        status = statusResult.getOrThrow(),
+                        operations = operationsResult.getOrThrow(),
+                        actionState = actionState,
+                        exportedKeyJson = exportedKeyJson,
+                    )
+                }
+
+                else -> {
+                    val message =
+                        statusResult.exceptionOrNull()?.message
+                            ?: operationsResult.exceptionOrNull()?.message
+                            ?: "Failed to load identity state"
+                    _identityState.value.copy(
+                        isLoading = false,
+                        actionState = IdentityActionState.Error(message),
+                        exportedKeyJson = exportedKeyJson,
+                    )
+                }
+            }
     }
 }

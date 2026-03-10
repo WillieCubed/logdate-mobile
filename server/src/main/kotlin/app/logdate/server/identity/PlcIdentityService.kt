@@ -129,6 +129,7 @@ class PlcIdentityService(
         did: AtprotoDid,
         handle: String,
         recoveryDidKey: String? = null,
+        preparedKey: StoredSigningKey? = null,
     ): RotatedPlcIdentity {
         if (!config.publishHostedPlcOperations) {
             throw IdentityLifecycleConflictException("Hosted PLC rotation requires published PLC operations")
@@ -137,7 +138,7 @@ class PlcIdentityService(
         require(did.method == "plc") { "Hosted PLC rotation requires a did:plc identity" }
 
         val currentKey = signingKeyService.ensureActiveKey(accountId)
-        val nextKey = signingKeyService.prepareKey(accountId)
+        val nextKey = preparedKey ?: signingKeyService.prepareKey(accountId)
         val latestIndexedOperation =
             plcClient
                 .getAuditLog(did)
@@ -186,6 +187,12 @@ class PlcIdentityService(
             operation = signedOperation,
         )
     }
+
+    suspend fun listStoredOperations(accountId: Uuid): List<StoredHostedPlcOperation> =
+        hostedPlcOperationRepository?.listByAccountId(accountId).orEmpty()
+
+    suspend fun listStoredOperations(did: AtprotoDid): List<StoredHostedPlcOperation> =
+        hostedPlcOperationRepository?.listByDid(did.toString()).orEmpty()
 
     /**
      * Publishes a hosted PLC update operation that adds or replaces the user-controlled recovery key.

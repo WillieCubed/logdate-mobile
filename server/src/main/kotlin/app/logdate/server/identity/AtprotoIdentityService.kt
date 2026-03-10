@@ -168,23 +168,49 @@ class AtprotoIdentityService(
         exportedKey: SigningKeyService.ExportedSigningKey,
         passphrase: String,
     ): ImportedIdentitySigningKey {
+        val ensured = ensureIdentity(account)
         val currentDid =
-            account.did
+            ensured.did
                 ?: throw IdentityLifecycleConflictException("Account identity must be provisioned before importing a signing key")
         val currentHandle =
-            account.handle
+            ensured.handle
                 ?: throw IdentityLifecycleConflictException("Account identity must be provisioned before importing a signing key")
         val currentPublicKey =
-            account.signingKeyPublic
+            ensured.signingKeyPublic
                 ?: throw IdentityLifecycleConflictException("Account identity must be provisioned before importing a signing key")
-        if (exportedKey.publicKeyMultibase != currentPublicKey) {
-            throw IdentityLifecycleConflictException("Imported signing key does not match the account's current public key")
-        }
 
-        val activeKey = signingKeyService.importActiveKey(account.id, exportedKey, passphrase)
+        val activeKey =
+            when {
+                exportedKey.publicKeyMultibase == currentPublicKey -> {
+                    signingKeyService.importActiveKey(ensured.id, exportedKey, passphrase)
+                }
+
+                currentDid.startsWith("did:web:") -> {
+                    signingKeyService.importActiveKey(ensured.id, exportedKey, passphrase)
+                }
+
+                currentDid.startsWith("did:plc:") -> {
+                    if (!config.publishHostedPlcOperations) {
+                        throw IdentityLifecycleConflictException("Hosted PLC recovery requires published PLC operations")
+                    }
+                    val preparedKey = signingKeyService.prepareImportedKey(ensured.id, exportedKey, passphrase)
+                    plcIdentityService
+                        .rotateHostedDid(
+                            accountId = ensured.id,
+                            did = AtprotoDid.require(currentDid),
+                            handle = currentHandle,
+                            recoveryDidKey = ensured.plcRecoveryDidKey,
+                            preparedKey = preparedKey,
+                        ).let { signingKeyService.ensureActiveKey(ensured.id) }
+                }
+
+                else -> {
+                    throw IdentityLifecycleConflictException("Signing key import is not supported for DID $currentDid")
+                }
+            }
         val updatedAccount =
             accountRepository.save(
-                account.copy(
+                ensured.copy(
                     did = currentDid,
                     handle = currentHandle,
                     signingKeyPublic = activeKey.publicKeyMultibase,
@@ -263,6 +289,39 @@ class AtprotoIdentityService(
         runCatching {
             findByDid(did.toString())?.let(::documentFor)
         }
+
+    suspend fun identityStatus(account: Account): IdentityStatus {
+        val ensured = ensureIdentity(account)
+        val did = requireNotNull(ensured.did)
+        val handle = requireNotNull(ensured.handle)
+        val signingKeyPublic = requireNotNull(ensured.signingKeyPublic)
+        val operations =
+            if (did.startsWith("did:plc:")) {
+                plcIdentityService.listStoredOperations(AtprotoDid.require(did))
+            } else {
+                emptyList()
+            }
+
+        return IdentityStatus(
+            did = did,
+            handle = handle,
+            signingKeyPublicMultibase = signingKeyPublic,
+            signingKeyDidKey = didKeyFor(signingKeyPublic),
+            plcRecoveryDidKey = ensured.plcRecoveryDidKey,
+            plcOperationCount = operations.size,
+        )
+    }
+
+    suspend fun hostedPlcOperations(account: Account): List<StoredHostedPlcOperation> {
+        val ensured = ensureIdentity(account)
+        val did =
+            ensured.did
+                ?: throw IdentityLifecycleConflictException("Account identity must be provisioned before listing PLC operations")
+        if (!did.startsWith("did:plc:")) {
+            return emptyList()
+        }
+        return plcIdentityService.listStoredOperations(AtprotoDid.require(did))
+    }
 
     fun documentFor(account: Account): DidDocument {
         val did = AtprotoDid.require(requireNotNull(account.did))
@@ -434,4 +493,13 @@ data class RegisteredPlcRecoveryKey(
     val account: Account,
     val recoveryDidKey: String,
     val plcOperation: PlcOperation? = null,
+)
+
+data class IdentityStatus(
+    val did: String,
+    val handle: String,
+    val signingKeyPublicMultibase: String,
+    val signingKeyDidKey: String,
+    val plcRecoveryDidKey: String?,
+    val plcOperationCount: Int,
 )

@@ -102,6 +102,7 @@ fun AccountSettingsScreen(
     val accountState by accountViewModel.state.collectAsState()
     val birthdayUpdateState by accountViewModel.birthdayUpdateState.collectAsState()
     val profileUpdateState by accountViewModel.profileUpdateState.collectAsState()
+    val identityState by accountViewModel.identityState.collectAsState()
     val privacyState by privacyViewModel.state.collectAsState()
     val isAuthenticated = accountState.isAuthenticated
     val onCreatePasskey =
@@ -125,6 +126,14 @@ fun AccountSettingsScreen(
         onSignOut = { onError -> accountViewModel.signOut(onError) },
         birthdayUpdateState = birthdayUpdateState,
         profileUpdateState = profileUpdateState,
+        identityState = identityState,
+        onRefreshIdentity = accountViewModel::refreshIdentityState,
+        onExportSigningKey = accountViewModel::exportSigningKey,
+        onRotateSigningKey = accountViewModel::rotateSigningKey,
+        onImportSigningKey = accountViewModel::importSigningKey,
+        onRegisterPlcRecoveryKey = accountViewModel::registerPlcRecoveryKey,
+        onClearIdentityActionState = accountViewModel::clearIdentityActionState,
+        onClearExportedKeyJson = accountViewModel::clearExportedKeyJson,
         onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
         onNavigateToSignIn = onNavigateToSignIn,
     )
@@ -146,6 +155,14 @@ fun AccountSettingsContent(
     onSignOut: (onError: (String) -> Unit) -> Unit,
     birthdayUpdateState: BirthdayUpdateState,
     profileUpdateState: ProfileUpdateState,
+    identityState: AccountIdentityState,
+    onRefreshIdentity: () -> Unit,
+    onExportSigningKey: (String) -> Unit,
+    onRotateSigningKey: (String) -> Unit,
+    onImportSigningKey: (String, String) -> Unit,
+    onRegisterPlcRecoveryKey: (String) -> Unit,
+    onClearIdentityActionState: () -> Unit,
+    onClearExportedKeyJson: () -> Unit,
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit = {},
 ) {
@@ -318,6 +335,22 @@ fun AccountSettingsContent(
                     )
                 }
 
+                if (isAuthenticated) {
+                    item {
+                        AtprotoIdentitySection(
+                            identityState = identityState,
+                            onRefresh = onRefreshIdentity,
+                            onExportSigningKey = onExportSigningKey,
+                            onRotateSigningKey = onRotateSigningKey,
+                            onImportSigningKey = onImportSigningKey,
+                            onRegisterPlcRecoveryKey = onRegisterPlcRecoveryKey,
+                            onClearIdentityActionState = onClearIdentityActionState,
+                            onClearExportedKeyJson = onClearExportedKeyJson,
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        )
+                    }
+                }
+
                 // Personal information
                 item {
                     Column(
@@ -475,5 +508,24 @@ private fun AccountSettingsScreenPreview() {
         onSignOut = { _ -> },
         birthdayUpdateState = BirthdayUpdateState.Idle,
         profileUpdateState = ProfileUpdateState.Idle,
+        identityState =
+            AccountIdentityState(
+                status =
+                    app.logdate.client.repository.account.AccountIdentityStatus(
+                        did = "did:plc:preview123",
+                        handle = "johndoe.logdate.app",
+                        signingKeyPublicMultibase = "zPreview",
+                        signingKeyDidKey = "did:key:zPreview",
+                        plcRecoveryDidKey = "did:key:zRecovery",
+                        plcOperationCount = 2,
+                    ),
+            ),
+        onRefreshIdentity = {},
+        onExportSigningKey = {},
+        onRotateSigningKey = {},
+        onImportSigningKey = { _, _ -> },
+        onRegisterPlcRecoveryKey = {},
+        onClearIdentityActionState = {},
+        onClearExportedKeyJson = {},
     )
 }

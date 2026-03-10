@@ -115,8 +115,17 @@ The export response also includes the user DID and handle through the identity A
 3. replaces the active server-held key material for the account
 
 The first-party route `POST /api/v1/identity/signing-key/import` currently uses this in a
-conservative recovery mode: the imported public key must match the account’s currently published
-signing key. This avoids silently changing a `did:plc` identity without a signed PLC update.
+deployment-safe recovery mode:
+
+1. if the imported public key already matches the account’s published key, the server restores the
+   encrypted private-key material directly
+2. if the account is a hosted `did:web`, the server can replace the active signing key and update
+   the published DID Document
+3. if the account is a hosted `did:plc` and PLC publishing is enabled, the server prepares the
+   imported key, publishes a hosted PLC update, and then activates the imported key
+
+This lets first-party recovery import handle migration-safe key changes without silently drifting a
+published identity.
 
 ## DID Document Relationship
 
@@ -139,6 +148,8 @@ For hosted PLC identities, the same public key is also embedded in the PLC genes
 - publish the public key in the DID Document
 - export the active key in an encrypted bundle
 - restore the current active key from an exported bundle
+- migrate a hosted `did:web` or hosted `did:plc` account to a different exported signing key when
+  the server can publish the matching public-identity update
 
 ### What LogDate cannot yet do
 
@@ -151,11 +162,12 @@ For hosted PLC identities, the same public key is also embedded in the PLC genes
 - signing-key export is implemented
 - signing-key rotation is implemented at the service and first-party route layers
 - hosted PLC recovery-key registration is implemented for user-supplied `did:key` values
-- the current import route restores the currently published key; it does not yet handle arbitrary
-  cross-key migration for hosted `did:plc` identities
+- the current import route can restore the current active hosted key and can perform migration-safe
+  cross-key import for hosted `did:web` and hosted `did:plc` identities when the matching public
+  identity update can be published
 - deterministic user-controlled recovery-key derivation for PLC updates is not implemented yet
-- this document does not claim a full self-custody story beyond encrypted export and same-key
-  recovery of the server-managed active key
+- this document does not claim a full self-custody story beyond encrypted export, server-managed
+  recovery-key registration, and server-published recovery of the active hosted identity key
 
 ## Relationship to Passkeys
 

@@ -19,6 +19,7 @@ import io.ktor.server.request.header
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import kotlinx.serialization.Serializable
@@ -99,6 +100,38 @@ data class RegisterPlcRecoveryKeyResponse(
     val data: RegisterPlcRecoveryKeyData,
 )
 
+@Serializable
+data class IdentityStatusData(
+    val did: String,
+    val handle: String,
+    val signingKeyPublicMultibase: String,
+    val signingKeyDidKey: String,
+    val plcRecoveryDidKey: String? = null,
+    val plcOperationCount: Int = 0,
+)
+
+@Serializable
+data class IdentityStatusResponse(
+    val success: Boolean,
+    val data: IdentityStatusData,
+)
+
+@Serializable
+data class HostedPlcOperationData(
+    val did: String,
+    val cid: String? = null,
+    val prevCid: String? = null,
+    val operationType: String,
+    val operationJson: String,
+    val createdAt: String,
+)
+
+@Serializable
+data class HostedPlcOperationsResponse(
+    val success: Boolean,
+    val data: List<HostedPlcOperationData>,
+)
+
 @OptIn(ExperimentalUuidApi::class)
 fun Route.identityApiRoutes(
     accountRepository: AccountRepository,
@@ -107,6 +140,47 @@ fun Route.identityApiRoutes(
     signingKeyService: SigningKeyService,
 ) {
     route("/identity") {
+        get {
+            val account =
+                resolveIdentityApiAccount(
+                    call = call,
+                    accountRepository = accountRepository,
+                    tokenService = tokenService,
+                ) ?: return@get
+
+            try {
+                val status = atprotoIdentityService.identityStatus(account)
+                call.respond(
+                    HttpStatusCode.OK,
+                    IdentityStatusResponse(
+                        success = true,
+                        data =
+                            IdentityStatusData(
+                                did = status.did,
+                                handle = status.handle,
+                                signingKeyPublicMultibase = status.signingKeyPublicMultibase,
+                                signingKeyDidKey = status.signingKeyDidKey,
+                                plcRecoveryDidKey = status.plcRecoveryDidKey,
+                                plcOperationCount = status.plcOperationCount,
+                            ),
+                    ),
+                )
+            } catch (error: IdentityLifecycleConflictException) {
+                call.respondIdentityApiError(
+                    HttpStatusCode.Conflict,
+                    "IDENTITY_STATUS_CONFLICT",
+                    error.message ?: "Identity status conflict",
+                )
+            } catch (error: Exception) {
+                Napier.e("Failed to load AT Protocol identity status", error)
+                call.respondIdentityApiError(
+                    HttpStatusCode.InternalServerError,
+                    "IDENTITY_STATUS_FAILED",
+                    "Failed to load identity status",
+                )
+            }
+        }
+
         post("/signing-key/export") {
             val account =
                 resolveIdentityApiAccount(
@@ -326,6 +400,49 @@ fun Route.identityApiRoutes(
                     HttpStatusCode.InternalServerError,
                     "PLC_RECOVERY_KEY_FAILED",
                     "Failed to register PLC recovery key",
+                )
+            }
+        }
+
+        get("/plc/operations") {
+            val account =
+                resolveIdentityApiAccount(
+                    call = call,
+                    accountRepository = accountRepository,
+                    tokenService = tokenService,
+                ) ?: return@get
+
+            try {
+                val operations = atprotoIdentityService.hostedPlcOperations(account)
+                call.respond(
+                    HttpStatusCode.OK,
+                    HostedPlcOperationsResponse(
+                        success = true,
+                        data =
+                            operations.map { operation ->
+                                HostedPlcOperationData(
+                                    did = operation.did,
+                                    cid = operation.cid,
+                                    prevCid = operation.prevCid,
+                                    operationType = operation.operationType,
+                                    operationJson = operation.operationJson,
+                                    createdAt = operation.createdAt.toString(),
+                                )
+                            },
+                    ),
+                )
+            } catch (error: IdentityLifecycleConflictException) {
+                call.respondIdentityApiError(
+                    HttpStatusCode.Conflict,
+                    "PLC_OPERATION_HISTORY_CONFLICT",
+                    error.message ?: "PLC operation history conflict",
+                )
+            } catch (error: Exception) {
+                Napier.e("Failed to load hosted PLC operation history", error)
+                call.respondIdentityApiError(
+                    HttpStatusCode.InternalServerError,
+                    "PLC_OPERATION_HISTORY_FAILED",
+                    "Failed to load PLC operation history",
                 )
             }
         }

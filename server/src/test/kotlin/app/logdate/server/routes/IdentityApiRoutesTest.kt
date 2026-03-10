@@ -12,6 +12,7 @@ import app.logdate.server.identity.InMemorySigningKeyRepository
 import app.logdate.server.identity.PlcIdentityService
 import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.identity.didKeyFor
+import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -29,8 +30,12 @@ import io.ktor.server.testing.testApplication
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.plc.PlcDirectoryClient
 import studio.hypertext.atproto.plc.PlcIndexedOperation
 import studio.hypertext.atproto.plc.PlcLogEntry
@@ -324,7 +329,7 @@ class IdentityApiRoutesTest {
         }
 
     @Test
-    fun `signing key import restores matching active key material and rejects mismatches`() =
+    fun `signing key import restores matching active key material and can migrate did web accounts to a different exported key`() =
         testApplication {
             val accountRepository = InMemoryAccountRepository()
             val env =
@@ -375,7 +380,7 @@ class IdentityApiRoutesTest {
                         ),
                     )
                 }
-            val conflict =
+            val migrated =
                 client.post("/api/v1/identity/signing-key/import") {
                     header(HttpHeaders.Authorization, "Bearer $firstToken")
                     contentType(ContentType.Application.Json)
@@ -391,12 +396,291 @@ class IdentityApiRoutesTest {
                 }
 
             assertEquals(HttpStatusCode.OK, success.status)
-            assertEquals(HttpStatusCode.Conflict, conflict.status)
+            assertEquals(HttpStatusCode.OK, migrated.status)
             val payload = json.decodeFromString<ImportSigningKeyResponse>(success.bodyAsText())
+            val migratedPayload = json.decodeFromString<ImportSigningKeyResponse>(migrated.bodyAsText())
             assertTrue(payload.success)
             assertEquals("importable.logdate.app", payload.data.handle)
             assertEquals("did:web:importable.logdate.app", payload.data.did)
             assertTrue(payload.data.publicKeyDidKey.startsWith("did:key:z"))
+            assertEquals("did:web:importable.logdate.app", migratedPayload.data.did)
+            assertEquals("importable.logdate.app", migratedPayload.data.handle)
+            assertEquals(mismatchedExport.publicKeyDidKey, migratedPayload.data.publicKeyDidKey)
+        }
+
+    @Test
+    fun `signing key import can migrate hosted plc accounts when published plc operations are enabled`() =
+        testApplication {
+            val accountRepository = InMemoryAccountRepository()
+            val tokenService = JwtTokenService("identity-api-route-secret")
+            val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
+            val hostedPlcOperationRepository = InMemoryHostedPlcOperationRepository()
+            val published = mutableMapOf<String, MutableList<PlcIndexedOperation>>()
+            val identityService =
+                AtprotoIdentityService(
+                    accountRepository = accountRepository,
+                    signingKeyService = signingKeyService,
+                    config =
+                        AtprotoIdentityConfig(
+                            handleDomain = "logdate.app",
+                            pdsServiceEndpoint = "https://logdate.app",
+                            publishHostedPlcOperations = true,
+                        ),
+                    plcIdentityService =
+                        PlcIdentityService(
+                            signingKeyService = signingKeyService,
+                            config =
+                                AtprotoIdentityConfig(
+                                    handleDomain = "logdate.app",
+                                    pdsServiceEndpoint = "https://logdate.app",
+                                    publishHostedPlcOperations = true,
+                                ),
+                            hostedPlcOperationRepository = hostedPlcOperationRepository,
+                            plcDirectoryClient =
+                                object : PlcDirectoryClient {
+                                    override suspend fun getDocument(did: AtprotoDid) = error("unused")
+
+                                    override suspend fun getOperationLog(did: AtprotoDid) = error("unused")
+
+                                    override suspend fun getAuditLog(did: AtprotoDid): Result<List<PlcIndexedOperation>> =
+                                        Result.success(published[did.toString()].orEmpty())
+
+                                    override suspend fun export(
+                                        after: String?,
+                                        count: Int?,
+                                    ) = error("unused")
+
+                                    override suspend fun submit(
+                                        did: AtprotoDid,
+                                        entry: PlcLogEntry,
+                                    ): Result<Unit> =
+                                        runCatching {
+                                            val operations = published.getOrPut(did.toString()) { mutableListOf() }
+                                            operations +=
+                                                PlcIndexedOperation(
+                                                    did = did,
+                                                    operation = entry,
+                                                    cid = "cid-${operations.size + 1}",
+                                                    nullified = false,
+                                                    createdAt = "2026-03-09T00:00:00Z",
+                                                )
+                                        }
+                                },
+                        ),
+                )
+            val account =
+                accountRepository.save(
+                    Account(
+                        id = Uuid.random(),
+                        username = "plc-import",
+                        displayName = "PLC Import",
+                        createdAt = Clock.System.now(),
+                    ),
+                )
+            val donor =
+                accountRepository.save(
+                    Account(
+                        id = Uuid.random(),
+                        username = "plc-donor",
+                        displayName = "PLC Donor",
+                        createdAt = Clock.System.now(),
+                    ),
+                )
+            val accessToken = tokenService.generateAccessToken(account.id.toString())
+            val donorEnsured = identityService.ensureIdentity(donor)
+            val donorExport = signingKeyService.exportActiveKey(donorEnsured.id, "donor-secret")
+
+            application {
+                install(ContentNegotiation) {
+                    json(json)
+                }
+                routing {
+                    route("/api/v1") {
+                        identityApiRoutes(
+                            accountRepository = accountRepository,
+                            tokenService = tokenService,
+                            atprotoIdentityService = identityService,
+                            signingKeyService = signingKeyService,
+                        )
+                    }
+                }
+            }
+
+            val response =
+                client.post("/api/v1/identity/signing-key/import") {
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        json.encodeToString(
+                            ImportSigningKeyRequest.serializer(),
+                            ImportSigningKeyRequest(
+                                passphrase = "donor-secret",
+                                exportedKey = donorExport,
+                            ),
+                        ),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val payload = json.decodeFromString<ImportSigningKeyResponse>(response.bodyAsText())
+            assertTrue(payload.success)
+            assertTrue(payload.data.did.startsWith("did:plc:"))
+            assertEquals("plc-import.logdate.app", payload.data.handle)
+            assertEquals(donorExport.publicKeyDidKey, payload.data.publicKeyDidKey)
+            assertTrue(hostedPlcOperationRepository.listByDid(payload.data.did).size >= 2)
+        }
+
+    @Test
+    fun `identity status and plc operation history return hosted recovery state`() =
+        testApplication {
+            val accountRepository = InMemoryAccountRepository()
+            val tokenService = JwtTokenService("identity-api-route-secret")
+            val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
+            val hostedPlcOperationRepository = InMemoryHostedPlcOperationRepository()
+            val published = mutableMapOf<String, MutableList<PlcIndexedOperation>>()
+            val identityService =
+                AtprotoIdentityService(
+                    accountRepository = accountRepository,
+                    signingKeyService = signingKeyService,
+                    config =
+                        AtprotoIdentityConfig(
+                            handleDomain = "logdate.app",
+                            pdsServiceEndpoint = "https://logdate.app",
+                            publishHostedPlcOperations = true,
+                        ),
+                    plcIdentityService =
+                        PlcIdentityService(
+                            signingKeyService = signingKeyService,
+                            config =
+                                AtprotoIdentityConfig(
+                                    handleDomain = "logdate.app",
+                                    pdsServiceEndpoint = "https://logdate.app",
+                                    publishHostedPlcOperations = true,
+                                ),
+                            hostedPlcOperationRepository = hostedPlcOperationRepository,
+                            plcDirectoryClient =
+                                object : PlcDirectoryClient {
+                                    override suspend fun getDocument(did: AtprotoDid) = error("unused")
+
+                                    override suspend fun getOperationLog(did: AtprotoDid) = error("unused")
+
+                                    override suspend fun getAuditLog(did: AtprotoDid): Result<List<PlcIndexedOperation>> =
+                                        Result.success(published[did.toString()].orEmpty())
+
+                                    override suspend fun export(
+                                        after: String?,
+                                        count: Int?,
+                                    ) = error("unused")
+
+                                    override suspend fun submit(
+                                        did: AtprotoDid,
+                                        entry: PlcLogEntry,
+                                    ): Result<Unit> =
+                                        runCatching {
+                                            val operations = published.getOrPut(did.toString()) { mutableListOf() }
+                                            operations +=
+                                                PlcIndexedOperation(
+                                                    did = did,
+                                                    operation = entry,
+                                                    cid = "cid-${operations.size + 1}",
+                                                    nullified = false,
+                                                    createdAt = "2026-03-09T00:00:00Z",
+                                                )
+                                        }
+                                },
+                        ),
+                )
+            val account =
+                accountRepository.save(
+                    Account(
+                        id = Uuid.random(),
+                        username = "history-user",
+                        displayName = "History User",
+                        createdAt = Clock.System.now(),
+                    ),
+                )
+            val accessToken = tokenService.generateAccessToken(account.id.toString())
+            val recoveryDidKey = didKeyFor(signingKeyService.ensureActiveKey(Uuid.random()).publicKeyMultibase)
+            val ensured = identityService.ensureIdentity(account)
+            identityService.registerPlcRecoveryKey(ensured, recoveryDidKey)
+
+            application {
+                install(ContentNegotiation) {
+                    json(json)
+                }
+                routing {
+                    route("/api/v1") {
+                        identityApiRoutes(
+                            accountRepository = accountRepository,
+                            tokenService = tokenService,
+                            atprotoIdentityService = identityService,
+                            signingKeyService = signingKeyService,
+                        )
+                    }
+                }
+            }
+
+            val statusResponse =
+                client.get("/api/v1/identity") {
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                }
+            val operationsResponse =
+                client.get("/api/v1/identity/plc/operations") {
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                }
+
+            assertEquals(HttpStatusCode.OK, statusResponse.status)
+            assertEquals(HttpStatusCode.OK, operationsResponse.status)
+
+            val statusJson = json.parseToJsonElement(statusResponse.bodyAsText()).jsonObject
+            val statusData = statusJson.getValue("data").jsonObject
+            assertEquals(true, statusJson.getValue("success").jsonPrimitive.boolean)
+            assertTrue(
+                statusData
+                    .getValue("did")
+                    .jsonPrimitive
+                    .content
+                    .startsWith("did:plc:"),
+            )
+            assertEquals(
+                "history-user.logdate.app",
+                statusData.getValue("handle").jsonPrimitive.content,
+            )
+            assertEquals(
+                recoveryDidKey,
+                statusData.getValue("plcRecoveryDidKey").jsonPrimitive.content,
+            )
+            assertTrue(
+                statusData
+                    .getValue("signingKeyDidKey")
+                    .jsonPrimitive
+                    .content
+                    .startsWith("did:key:z"),
+            )
+            assertEquals(2, statusData.getValue("plcOperationCount").jsonPrimitive.int)
+
+            val operationsJson = json.parseToJsonElement(operationsResponse.bodyAsText()).jsonObject
+            val operationsData = operationsJson.getValue("data").jsonArray
+            assertEquals(true, operationsJson.getValue("success").jsonPrimitive.boolean)
+            assertEquals(2, operationsData.size)
+            assertEquals(
+                "plc_operation",
+                operationsData
+                    .last()
+                    .jsonObject
+                    .getValue("operationType")
+                    .jsonPrimitive
+                    .content,
+            )
+            assertTrue(
+                operationsData
+                    .last()
+                    .jsonObject
+                    .getValue("operationJson")
+                    .jsonPrimitive
+                    .content
+                    .contains(recoveryDidKey),
+            )
         }
 
     @Test

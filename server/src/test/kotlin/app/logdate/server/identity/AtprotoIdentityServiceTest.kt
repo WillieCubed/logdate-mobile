@@ -500,7 +500,7 @@ class AtprotoIdentityServiceTest {
         }
 
     @Test
-    fun `rotateSigningKey publishes hosted plc updates when configured and import restores matching active key`() =
+    fun `rotateSigningKey publishes hosted plc updates when configured and import can migrate to a different exported key`() =
         kotlinx.coroutines.test.runTest {
             val accountRepository = InMemoryAccountRepository()
             val published = mutableMapOf<String, MutableList<PlcIndexedOperation>>()
@@ -569,7 +569,17 @@ class AtprotoIdentityServiceTest {
                     ),
                 )
             val ensured = service.ensureIdentity(account)
-            val exported = signingKeyService.exportActiveKey(ensured.id, "secret")
+            val otherAccount =
+                accountRepository.save(
+                    Account(
+                        id = Uuid.random(),
+                        username = "other-export",
+                        displayName = "Other Export",
+                        createdAt = Clock.System.now(),
+                    ),
+                )
+            val otherEnsured = service.ensureIdentity(otherAccount)
+            val migratedExport = signingKeyService.exportActiveKey(otherEnsured.id, "secret")
 
             val rotated = service.rotateSigningKey(ensured)
             val imported =
@@ -583,9 +593,67 @@ class AtprotoIdentityServiceTest {
             assertNotNull(rotated.plcOperation)
             assertTrue(published.getValue(requireNotNull(rotated.account.did)).size >= 2)
             assertEquals(rotated.activeKey.publicKeyMultibase, imported.activeKey.publicKeyMultibase)
-            assertFailsWith<IdentityLifecycleConflictException> {
-                service.importSigningKey(rotated.account, exported, "secret")
-            }
+            val migrated =
+                service.importSigningKey(
+                    rotated.account,
+                    migratedExport,
+                    "secret",
+                )
+
+            assertEquals(migratedExport.publicKeyMultibase, migrated.activeKey.publicKeyMultibase)
+            assertEquals(migratedExport.publicKeyMultibase, migrated.account.signingKeyPublic)
+            assertTrue(published.getValue(requireNotNull(rotated.account.did)).size >= 3)
+        }
+
+    @Test
+    fun `importSigningKey replaces did web signing keys with a different exported key`() =
+        kotlinx.coroutines.test.runTest {
+            val accountRepository = InMemoryAccountRepository()
+            val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
+            val service =
+                AtprotoIdentityService(
+                    accountRepository = accountRepository,
+                    signingKeyService = signingKeyService,
+                    config =
+                        AtprotoIdentityConfig(
+                            handleDomain = "logdate.app",
+                            pdsServiceEndpoint = "https://logdate.app",
+                            hostedAccountDidMethod = HostedAccountDidMethod.WEB,
+                        ),
+                )
+            val account =
+                accountRepository.save(
+                    Account(
+                        id = Uuid.random(),
+                        username = "web-import",
+                        displayName = "Web Import",
+                        createdAt = Clock.System.now(),
+                    ),
+                )
+            val donor =
+                accountRepository.save(
+                    Account(
+                        id = Uuid.random(),
+                        username = "web-donor",
+                        displayName = "Web Donor",
+                        createdAt = Clock.System.now(),
+                    ),
+                )
+            val ensured = service.ensureIdentity(account)
+            val donorEnsured = service.ensureIdentity(donor)
+            val donorExport = signingKeyService.exportActiveKey(donorEnsured.id, "donor-secret")
+
+            val imported =
+                service.importSigningKey(
+                    ensured,
+                    donorExport,
+                    "donor-secret",
+                )
+
+            assertEquals("did:web:web-import.logdate.app", imported.account.did)
+            assertEquals("web-import.logdate.app", imported.account.handle)
+            assertEquals(donorExport.publicKeyMultibase, imported.activeKey.publicKeyMultibase)
+            assertEquals(donorExport.publicKeyMultibase, imported.account.signingKeyPublic)
         }
 
     @Test
