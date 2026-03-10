@@ -76,14 +76,16 @@ class PasskeyApiClientTest {
                             """
                             {
                               "success": true,
-                              "data": {
-                                "sessionToken": "session123",
-                                "registrationOptions": {
-                                  "challenge": "challenge123",
-                                  "user": {"id": "u", "name": "newuser", "displayName": "New User"},
-                                  "timeout": 300000
+                                "data": {
+                                  "sessionToken": "session123",
+                                  "registrationOptions": {
+                                    "challenge": "challenge123",
+                                    "rpId": "logdate.app",
+                                    "rpName": "LogDate",
+                                    "user": {"id": "u", "name": "newuser", "displayName": "New User"},
+                                    "timeout": 300000
+                                  }
                                 }
-                              }
                             }
                             """.trimIndent(),
                         status = HttpStatusCode.OK,

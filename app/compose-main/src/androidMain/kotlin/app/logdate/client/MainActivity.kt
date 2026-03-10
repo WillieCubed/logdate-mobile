@@ -21,6 +21,11 @@ import androidx.navigation3.runtime.NavKey
 import app.logdate.client.database.DatabaseRecoveryController
 import app.logdate.client.database.DatabaseStartupMonitor
 import app.logdate.client.database.DatabaseStartupState
+import app.logdate.client.launch.LaunchBootstrapState
+import app.logdate.client.launch.LaunchStage
+import app.logdate.client.launch.LaunchStageSnapshot
+import app.logdate.client.launch.markCompleted
+import app.logdate.client.launch.reduceLaunchBootstrapState
 import app.logdate.client.media.audio.EXTRA_NAV_SOURCE
 import app.logdate.client.media.audio.EXTRA_NOTE_ID
 import app.logdate.client.media.audio.NAV_SOURCE_AUDIO_PLAYBACK
@@ -41,6 +46,7 @@ import app.logdate.feature.core.settings.updates.AppUpdateUiState
 import app.logdate.navigation.routes.core.NoteViewerRoute
 import io.github.aakira.napier.Napier
 import io.github.vinceglb.filekit.core.FileKit
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
@@ -70,9 +76,11 @@ class MainActivity : FragmentActivity() {
 
     private val viewModel by viewModel<AppViewModel>()
 
+    private var appUiState by mutableStateOf<GlobalAppUiState>(GlobalAppUiLoadingState)
     private var pendingNavKey by mutableStateOf<NavKey?>(null)
     private var databaseStartupState by mutableStateOf<DatabaseStartupState>(DatabaseStartupState.Ready)
     private var appUpdateUiState by mutableStateOf(AppUpdateUiState())
+    private var launchSnapshot by mutableStateOf(LaunchStageSnapshot())
     private var hasCheckedForAppUpdates by mutableStateOf(false)
 
     // Register the document picker for export functionality
@@ -112,6 +120,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         Napier.i("MainActivity onCreate: starting launch", tag = APP_LAUNCH_TAG)
+        markLaunchStage(LaunchStage.ActivityCreated)
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
 
@@ -136,16 +145,29 @@ class MainActivity : FragmentActivity() {
         setupMultiWindowSupport()
         Napier.i("MainActivity onCreate: multi-window support configured", tag = APP_LAUNCH_TAG)
 
-        // TODO: Maybe reconsider sealed class approach to uiState loading
-        var uiState: GlobalAppUiState by mutableStateOf(GlobalAppUiLoadingState)
+        lifecycleScope.launch {
+            delay(LAUNCH_WATCHDOG_TIMEOUT_MS)
+            launchSnapshot = launchSnapshot.copy(hasWatchdogExpired = true)
+            val launchState = reduceLaunchBootstrapState(launchSnapshot)
+            if (launchState is LaunchBootstrapState.SplashReleased) {
+                Napier.w(
+                    "MainActivity launch watchdog expired after ${LAUNCH_WATCHDOG_TIMEOUT_MS}ms; " +
+                        "releasing splash while waiting for ${LaunchStage.AppUiLoaded.analyticsName}; " +
+                        "last completed stage=${launchSnapshot.latestCompletedStage.analyticsName}",
+                    tag = APP_LAUNCH_TAG,
+                )
+            }
+        }
 
-        // Update the uiState
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
                     viewModel.uiState
                         .onEach { state ->
-                            uiState = state
+                            appUiState = state
+                            if (state is GlobalAppUiLoadedState) {
+                                markLaunchStage(LaunchStage.AppUiLoaded)
+                            }
                             maybeCheckForUpdates(state)
                         }.collect {}
                 }
@@ -153,6 +175,7 @@ class MainActivity : FragmentActivity() {
                     databaseStartupMonitor.state
                         .onEach { state ->
                             databaseStartupState = state
+                            markLaunchStage(LaunchStage.DatabaseStateObserved)
                             if (state is DatabaseStartupState.RecoveryRequired) {
                                 Napier.w(
                                     "MainActivity launch gate: recovery required (${state.reason})",
@@ -172,20 +195,21 @@ class MainActivity : FragmentActivity() {
         }
 
         splashScreen.setKeepOnScreenCondition {
-            uiState is GlobalAppUiLoadingState
+            currentLaunchBootstrapState() is LaunchBootstrapState.BlockingSplash
         }
 
         enableEdgeToEdge()
         pendingNavKey = resolveNavKey(intent)
 
         setContent {
-            val state = uiState
-            if (state is GlobalAppUiLoadedState) {
+            val state = appUiState as? GlobalAppUiLoadedState
+            if (state != null) {
                 MainActivityUiRoot(
                     appUiState = state,
                     onShowUnlockPrompt = viewModel::showNativeUnlockPrompt,
                     pendingNavKey = pendingNavKey,
                     onDeepLinkHandled = { pendingNavKey = null },
+                    onInitialNavigationReady = { markLaunchStage(LaunchStage.InitialNavigationReady) },
                     databaseStartupState = databaseStartupState,
                     onResetEncryptedStorage = ::resetEncryptedStorageAndRestart,
                     appUpdateUiState = appUpdateUiState,
@@ -195,8 +219,11 @@ class MainActivity : FragmentActivity() {
                         }
                     },
                 )
+            } else {
+                MainActivityLoadingRoot()
             }
         }
+        markLaunchStage(LaunchStage.ComposeAttached)
         Napier.i("MainActivity onCreate: Compose content attached", tag = APP_LAUNCH_TAG)
 
         // Handle the intent if this activity was launched with one
@@ -290,6 +317,17 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    private fun currentLaunchBootstrapState(): LaunchBootstrapState = reduceLaunchBootstrapState(launchSnapshot)
+
+    private fun markLaunchStage(stage: LaunchStage) {
+        val updatedSnapshot = launchSnapshot.markCompleted(stage)
+        if (updatedSnapshot == launchSnapshot) {
+            return
+        }
+        launchSnapshot = updatedSnapshot
+        Napier.i("MainActivity launch stage: ${stage.analyticsName}", tag = APP_LAUNCH_TAG)
+    }
+
 //    override fun onProvideAssistContent(assistContent: AssistContent) {
 //        super.onProvideAssistContent(assistContent)
 //        assistContent.apply {
@@ -332,3 +370,4 @@ fun AppAndroidPreview() {
 }
 
 private const val APP_LAUNCH_TAG = "LogDateAppLaunch"
+private const val LAUNCH_WATCHDOG_TIMEOUT_MS = 750L

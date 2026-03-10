@@ -52,7 +52,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
@@ -76,6 +75,7 @@ import androidx.navigation3.scene.SceneStrategyScope
 import androidx.navigation3.ui.NavDisplay
 import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.feature.journals.ui.detail.NoteViewerScreen
+import app.logdate.feature.timeline.ui.TimelineLoadingPlaceholder
 import app.logdate.navigation.routes.CloudAccountIntroRoute
 import app.logdate.navigation.routes.DisplayNameSelectionRoute
 import app.logdate.navigation.routes.PasskeyCreationRoute
@@ -504,10 +504,7 @@ fun MainNavigationRoot(mainAppNavigator: MainAppNavigator) {
                 entryProvider =
                     entryProvider {
                         routeEntry<NavigationStart> { _ ->
-                            // This is the initial entry, which can be used to stall the app during startup.
-                            Column(modifier = Modifier.fillMaxSize()) {
-                                // Placeholder content while the app is loading
-                            }
+                            TimelineLoadingPlaceholder(modifier = Modifier.fillMaxSize())
                         }
                         routeEntry<NoteViewerRoute> { route ->
                             NoteViewerScreen(

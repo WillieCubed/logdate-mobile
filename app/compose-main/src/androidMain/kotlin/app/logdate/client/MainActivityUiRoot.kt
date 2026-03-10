@@ -65,6 +65,7 @@ fun MainActivityUiRoot(
     onShowUnlockPrompt: () -> Unit,
     pendingNavKey: NavKey? = null,
     onDeepLinkHandled: () -> Unit = {},
+    onInitialNavigationReady: () -> Unit = {},
     databaseStartupState: DatabaseStartupState = DatabaseStartupState.Ready,
     onResetEncryptedStorage: () -> Unit = {},
     appUpdateUiState: AppUpdateUiState = AppUpdateUiState(),
@@ -73,6 +74,7 @@ fun MainActivityUiRoot(
 ) {
     var hasRequestedUnlock by remember { mutableStateOf(false) }
     var hasHandledInitialNavigation by remember { mutableStateOf(false) }
+    var hasReportedInitialNavigation by remember { mutableStateOf(false) }
     var showResetConfirmation by remember { mutableStateOf(false) }
     var hideRecoveryDialog by remember { mutableStateOf(false) }
     val appUpdateSnackbarHostState = remember { SnackbarHostState() }
@@ -87,6 +89,10 @@ fun MainActivityUiRoot(
         if (!appUiState.isOnboarded) {
 //        // Ensure that onboarding is completed before proceeding
             mainAppNavigator.startOnboarding()
+            if (!hasReportedInitialNavigation) {
+                hasReportedInitialNavigation = true
+                onInitialNavigationReady()
+            }
             return@LaunchedEffect
         }
         if (appUiState.requiresUnlock) {
@@ -109,6 +115,11 @@ fun MainActivityUiRoot(
                 mainAppNavigator.navigateHomeFromLaunch()
                 hasHandledInitialNavigation = true
             }
+        }
+
+        if (hasHandledInitialNavigation && !hasReportedInitialNavigation) {
+            hasReportedInitialNavigation = true
+            onInitialNavigationReady()
         }
     }
 

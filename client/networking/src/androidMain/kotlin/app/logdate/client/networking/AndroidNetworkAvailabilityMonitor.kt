@@ -4,14 +4,11 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import androidx.core.content.getSystemService
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.asStateFlow
 import kotlin.time.Clock
 
 /**
@@ -21,35 +18,46 @@ import kotlin.time.Clock
  */
 class AndroidNetworkAvailabilityMonitor(
     context: Context,
-    private val applicationScope: CoroutineScope = CoroutineScope(Dispatchers.IO),
 ) : NetworkAvailabilityMonitor {
-    private val networkState = MutableSharedFlow<NetworkState>()
     private val connectivityManager = context.getSystemService() as ConnectivityManager?
+    private val networkState = MutableStateFlow(currentNetworkState())
     private val connectivityCallback =
         object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 super.onAvailable(network)
-                applicationScope.launch {
-                    val newState = NetworkState.Connected(Clock.System.now())
-                    networkState.emit(newState)
-                }
+                refreshNetworkState()
+            }
+
+            override fun onCapabilitiesChanged(
+                network: Network,
+                networkCapabilities: NetworkCapabilities,
+            ) {
+                super.onCapabilitiesChanged(network, networkCapabilities)
+                refreshNetworkState()
             }
 
             override fun onUnavailable() {
-                applicationScope.launch {
-                    val newState = NetworkState.NotConnected(Clock.System.now())
-                    networkState.emit(newState)
-                }
+                refreshNetworkState()
             }
 
             override fun onLost(network: Network) {
                 super.onLost(network)
-                applicationScope.launch {
-                    val newState = NetworkState.NotConnected(Clock.System.now())
-                    networkState.emit(newState)
-                }
+                refreshNetworkState()
             }
         }
+
+    init {
+        val manager = connectivityManager
+        if (manager == null) {
+            Napier.w(tag = "NetworkAvailabilityMonitor", message = "ConnectivityManager is null")
+        } else {
+            runCatching {
+                manager.registerDefaultNetworkCallback(connectivityCallback)
+            }.onFailure { error ->
+                Napier.e("Failed to register default network callback", error, tag = "NetworkAvailabilityMonitor")
+            }
+        }
+    }
 
     override fun isNetworkAvailable(): Boolean {
         val manager = connectivityManager ?: return false
@@ -62,21 +70,18 @@ class AndroidNetworkAvailabilityMonitor(
     /**
      * Subscribes an observer to the network state.
      *
-     * @return A [SharedFlow] that is updated whenever
+     * The returned flow is hot and always has the latest known connectivity state.
      */
-    override fun observeNetwork(): SharedFlow<NetworkState> {
-        val networkRequest =
-            NetworkRequest
-                .Builder()
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-                .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR)
-                .build()
-        if (connectivityManager == null) {
-            Napier.w(tag = "NetworkAvailabilityMonitor", message = "ConnectivityManager is null")
-            return networkState
-        }
-        connectivityManager.registerNetworkCallback(networkRequest, connectivityCallback)
-        return networkState
+    override fun observeNetwork(): SharedFlow<NetworkState> = networkState.asStateFlow()
+
+    private fun refreshNetworkState() {
+        networkState.value = currentNetworkState()
     }
+
+    private fun currentNetworkState(): NetworkState =
+        if (isNetworkAvailable()) {
+            NetworkState.Connected(Clock.System.now())
+        } else {
+            NetworkState.NotConnected(Clock.System.now())
+        }
 }

@@ -329,7 +329,7 @@ object RouteConfig {
         // Use type-safe matching instead of string comparison
         when (route) {
             // Core navigation and startup
-            NavigationStart::class -> return RouteClassification.Excluded
+            NavigationStart::class -> return RouteClassification.MainTab(HomeTab.TIMELINE)
 
             // Onboarding flows - all should be excluded (handled by NavDisplay directly)
             OnboardingStart::class,
