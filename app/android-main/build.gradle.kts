@@ -1,6 +1,22 @@
 @file:Suppress("UnstableApiUsage")
 
 import com.android.build.api.dsl.ApplicationExtension
+import java.util.Properties
+
+val configProperties =
+    Properties().apply {
+        val propertiesFile = rootProject.file("local.properties")
+        if (propertiesFile.exists()) {
+            propertiesFile.inputStream().use(::load)
+        }
+    }
+
+val googleMapsApiKey =
+    providers
+        .environmentVariable("GOOGLE_MAPS_API_KEY")
+        .orElse(providers.gradleProperty("GOOGLE_MAPS_API_KEY"))
+        .orElse(configProperties.getProperty("GOOGLE_MAPS_API_KEY") ?: "")
+        .get()
 
 plugins {
     alias(libs.plugins.android.application)
@@ -29,6 +45,7 @@ extensions.configure<ApplicationExtension> {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders["googleMapsApiKey"] = googleMapsApiKey
     }
 
     buildTypes {
