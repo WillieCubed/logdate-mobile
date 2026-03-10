@@ -1,5 +1,3 @@
-@file:Suppress("ktlint:standard:function-naming")
-
 package app.logdate.feature.location.timeline.ui
 
 import androidx.compose.foundation.layout.Box
@@ -27,7 +25,7 @@ import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 
 @Composable
-internal actual fun LocationTimelineMap(
+internal actual fun locationTimelineMap(
     stops: List<LocationStopUiModel>,
     currentLocation: CurrentLocationUiModel?,
     selectedStopId: String?,

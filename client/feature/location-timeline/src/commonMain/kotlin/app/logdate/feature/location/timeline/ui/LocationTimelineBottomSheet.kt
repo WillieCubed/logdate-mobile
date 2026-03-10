@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -33,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.feature.location.timeline.ui.model.CurrentLocationUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationStopUiModel
+import app.logdate.feature.location.timeline.ui.model.LocationTimelineErrorUiState
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineUiState
 import logdate.client.feature.location.timeline.generated.resources.Res
 import logdate.client.feature.location.timeline.generated.resources.close
@@ -41,7 +41,7 @@ import logdate.client.feature.location.timeline.generated.resources.location_tim
 import logdate.client.feature.location.timeline.generated.resources.no_location_history_yet
 import logdate.client.feature.location.timeline.generated.resources.open_full_location_timeline
 import logdate.client.feature.location.timeline.generated.resources.recent_stops
-import logdate.client.feature.location.timeline.generated.resources.unable_to_load_location_timeline
+import logdate.client.feature.location.timeline.generated.resources.stayed_for_duration
 import logdate.client.feature.location.timeline.generated.resources.your_location_timeline_will_appear_here_as_you_move_around
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -56,28 +56,50 @@ fun LocationTimelineBottomSheet(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    LocationTimelineQuickPeekSheet(
+        uiState = uiState,
+        onDismissRequest = onDismissRequest,
+        onOpenFullTimeline = onOpenFullTimeline,
+        onSelectStop = viewModel::selectStop,
+        onRetry = viewModel::retry,
+        modifier = modifier,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LocationTimelineQuickPeekSheet(
+    uiState: LocationTimelineUiState,
+    onDismissRequest: () -> Unit,
+    onOpenFullTimeline: () -> Unit,
+    onSelectStop: (String) -> Unit,
+    onRetry: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         dragHandle = { BottomSheetDefaults.DragHandle() },
         modifier = modifier,
     ) {
-        LocationTimelineQuickPeekContent(
+        LocationTimelineQuickPeekSheetContent(
             uiState = uiState,
             onDismissRequest = onDismissRequest,
             onOpenFullTimeline = onOpenFullTimeline,
-            onSelectStop = viewModel::selectStop,
+            onSelectStop = onSelectStop,
+            onRetry = onRetry,
             modifier = Modifier.fillMaxWidth(),
         )
     }
 }
 
 @Composable
-private fun LocationTimelineQuickPeekContent(
+fun LocationTimelineQuickPeekSheetContent(
     uiState: LocationTimelineUiState,
     onDismissRequest: () -> Unit,
     onOpenFullTimeline: () -> Unit,
     onSelectStop: (String) -> Unit,
+    onRetry: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -93,7 +115,7 @@ private fun LocationTimelineQuickPeekContent(
         ) {
             Text(
                 text = stringResource(Res.string.location_timeline),
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
             )
@@ -108,7 +130,7 @@ private fun LocationTimelineQuickPeekContent(
 
         when (uiState) {
             is LocationTimelineUiState.Loading -> QuickPeekLoadingState()
-            is LocationTimelineUiState.Error -> QuickPeekErrorState(message = uiState.message)
+            is LocationTimelineUiState.Error -> QuickPeekErrorState(error = uiState.error, onRetry = onRetry)
             is LocationTimelineUiState.Success ->
                 QuickPeekSuccessState(
                     uiState = uiState,
@@ -139,26 +161,15 @@ private fun QuickPeekLoadingState() {
 }
 
 @Composable
-private fun QuickPeekErrorState(message: String) {
-    Card {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(
-                text = stringResource(Res.string.unable_to_load_location_timeline),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+private fun QuickPeekErrorState(
+    error: LocationTimelineErrorUiState,
+    onRetry: () -> Unit,
+) {
+    LocationTimelineErrorCard(
+        error = error,
+        onRetry = onRetry,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable
@@ -191,7 +202,7 @@ private fun QuickPeekSuccessState(
         return
     }
 
-    LocationTimelineMap(
+    locationTimelineMap(
         stops = previewStops,
         currentLocation = uiState.currentLocation,
         selectedStopId = uiState.selectedStopId,
@@ -292,9 +303,10 @@ private fun QuickPeekStopCard(
                 text = stop.timeRange,
                 style = MaterialTheme.typography.bodySmall,
             )
-            AssistChip(
-                onClick = onClick,
-                label = { Text(stop.sourceLabel) },
+            Text(
+                text = "${stop.sourceLabel} • ${stringResource(Res.string.stayed_for_duration, stop.duration)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

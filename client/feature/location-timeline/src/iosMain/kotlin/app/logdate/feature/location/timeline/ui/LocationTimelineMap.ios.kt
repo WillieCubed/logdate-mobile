@@ -1,5 +1,3 @@
-@file:Suppress("ktlint:standard:function-naming")
-
 package app.logdate.feature.location.timeline.ui
 
 import androidx.compose.foundation.layout.Box
@@ -13,7 +11,7 @@ import app.logdate.feature.location.timeline.ui.model.CurrentLocationUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationStopUiModel
 
 @Composable
-internal actual fun LocationTimelineMap(
+internal actual fun locationTimelineMap(
     stops: List<LocationStopUiModel>,
     currentLocation: CurrentLocationUiModel?,
     selectedStopId: String?,

@@ -13,10 +13,13 @@ import app.logdate.feature.location.timeline.ui.model.CurrentLocationUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationLabelSource
 import app.logdate.feature.location.timeline.ui.model.LocationStopUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineUiState
+import app.logdate.feature.location.timeline.ui.model.toLocationTimelineErrorUiState
 import app.logdate.shared.model.Location
 import app.logdate.util.localTime
 import app.logdate.util.toReadableDateShort
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,6 +35,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class LocationTimelineViewModel(
     private val observeLocationUseCase: ObserveLocationUseCase,
     private val observeLocationStopsUseCase: ObserveLocationStopsUseCase,
@@ -39,8 +43,19 @@ class LocationTimelineViewModel(
     private val deleteLocationRangeUseCase: DeleteLocationRangeUseCase,
     private val captureLocationForTimelineReviewUseCase: CaptureLocationForTimelineReviewUseCase,
 ) : ViewModel() {
+    private sealed interface ObservationState<out T> {
+        data class Value<T>(
+            val value: T,
+        ) : ObservationState<T>
+
+        data class Failure(
+            val throwable: Throwable,
+        ) : ObservationState<Nothing>
+    }
+
     private val _uiState = MutableStateFlow<LocationTimelineUiState>(LocationTimelineUiState.Loading)
     val uiState: StateFlow<LocationTimelineUiState> = _uiState.asStateFlow()
+    private var observeTimelineJob: Job? = null
 
     init {
         captureLocationForTimelineReview()
@@ -68,6 +83,11 @@ class LocationTimelineViewModel(
         }
     }
 
+    fun retry() {
+        _uiState.value = LocationTimelineUiState.Loading
+        observeTimeline()
+    }
+
     private fun captureLocationForTimelineReview() {
         viewModelScope.launch {
             runCatching {
@@ -79,30 +99,57 @@ class LocationTimelineViewModel(
     }
 
     private fun observeTimeline() {
-        viewModelScope.launch {
-            combine(
-                observeLocationUseCase()
-                    .mapLatest { it as Location? }
-                    .catch { error ->
-                        Napier.w("Failed to observe current location", error)
-                        emit(null)
-                    }.onStart { emit(null) },
-                observeLocationStopsUseCase()
-                    .catch { error ->
-                        Napier.w("Failed to observe location stops", error)
-                        emit(emptyList())
-                    },
-            ) { currentLocation, stops ->
-                currentLocation to stops
-            }.mapLatest { (currentLocation, stops) ->
-                buildSuccessState(currentLocation, stops)
-            }.catch { error ->
-                Napier.e("Failed to build location timeline", error)
-                emit(LocationTimelineUiState.Error(error.message ?: "Unable to load your location timeline."))
-            }.collect { state ->
-                _uiState.value = state
+        observeTimelineJob?.cancel()
+        observeTimelineJob =
+            viewModelScope.launch {
+                combine(
+                    observeLocationUseCase()
+                        .mapLatest<_, ObservationState<Location?>> { ObservationState.Value(it as Location?) }
+                        .catch { error ->
+                            Napier.w("Failed to observe current location", error)
+                            emit(ObservationState.Failure(error))
+                        }.onStart { emit(ObservationState.Value(null)) },
+                    observeLocationStopsUseCase()
+                        .mapLatest<_, ObservationState<List<LocationStop>>> { ObservationState.Value(it) }
+                        .catch { error ->
+                            Napier.w("Failed to observe location stops", error)
+                            emit(ObservationState.Failure(error))
+                        }.onStart { emit(ObservationState.Value(emptyList())) },
+                ) { currentLocation, stops ->
+                    buildUiState(currentLocation, stops)
+                }.catch { error ->
+                    Napier.e("Failed to build location timeline", error)
+                    emit(LocationTimelineUiState.Error(error.toLocationTimelineErrorUiState()))
+                }.collect { state ->
+                    _uiState.value = state
+                }
+            }
+    }
+
+    private suspend fun buildUiState(
+        currentLocationState: ObservationState<Location?>,
+        stopsState: ObservationState<List<LocationStop>>,
+    ): LocationTimelineUiState {
+        val currentLocation = (currentLocationState as? ObservationState.Value)?.value
+        val stops = (stopsState as? ObservationState.Value)?.value.orEmpty()
+
+        if (currentLocation == null && stops.isEmpty()) {
+            val fatalError =
+                when {
+                    stopsState is ObservationState.Failure -> stopsState.throwable
+                    currentLocationState is ObservationState.Failure -> currentLocationState.throwable
+                    else -> null
+                }
+
+            if (fatalError != null) {
+                return LocationTimelineUiState.Error(fatalError.toLocationTimelineErrorUiState())
             }
         }
+
+        return buildSuccessState(
+            currentLocation = currentLocation,
+            stops = stops,
+        )
     }
 
     private suspend fun buildSuccessState(
@@ -156,14 +203,14 @@ class LocationTimelineViewModel(
             is PlaceResolutionResult.UserDefinedPlace -> {
                 title = resolvedPlace.place.name
                 subtitle = formatCoordinates(location.latitude, location.longitude)
-                sourceLabel = "Saved"
+                sourceLabel = "Saved place"
                 source = LocationLabelSource.USER_DEFINED
             }
 
             is PlaceResolutionResult.ExternalSuggestion -> {
                 title = resolvedPlace.suggestion.name
                 subtitle = resolvedPlace.suggestion.address
-                sourceLabel = "Google"
+                sourceLabel = "Google Places"
                 source = LocationLabelSource.GOOGLE_PLACES
             }
 

@@ -6,7 +6,7 @@ sealed interface LocationTimelineUiState {
     data object Loading : LocationTimelineUiState
 
     data class Error(
-        val message: String,
+        val error: LocationTimelineErrorUiState,
     ) : LocationTimelineUiState
 
     data class Success(
@@ -18,6 +18,34 @@ sealed interface LocationTimelineUiState {
             get() = stops.firstOrNull { it.id == selectedStopId } ?: stops.firstOrNull()
     }
 }
+
+sealed interface LocationTimelineErrorUiState {
+    data object PermissionRequired : LocationTimelineErrorUiState
+
+    data object LocationServicesDisabled : LocationTimelineErrorUiState
+
+    data object TemporarilyUnavailable : LocationTimelineErrorUiState
+}
+
+internal fun Throwable.toLocationTimelineErrorUiState(): LocationTimelineErrorUiState =
+    when {
+        this::class.simpleName == "SecurityException" -> LocationTimelineErrorUiState.PermissionRequired
+        message?.contains("permission", ignoreCase = true) == true &&
+            message?.contains("location", ignoreCase = true) == true -> {
+            LocationTimelineErrorUiState.PermissionRequired
+        }
+        this is IllegalStateException &&
+            message?.contains("location", ignoreCase = true) == true -> {
+            LocationTimelineErrorUiState.LocationServicesDisabled
+        }
+        message?.contains("location disabled", ignoreCase = true) == true -> {
+            LocationTimelineErrorUiState.LocationServicesDisabled
+        }
+        message?.contains("location unavailable", ignoreCase = true) == true -> {
+            LocationTimelineErrorUiState.LocationServicesDisabled
+        }
+        else -> LocationTimelineErrorUiState.TemporarilyUnavailable
+    }
 
 enum class LocationLabelSource {
     USER_DEFINED,

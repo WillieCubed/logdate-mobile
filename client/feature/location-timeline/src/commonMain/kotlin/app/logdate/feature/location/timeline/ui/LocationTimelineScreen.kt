@@ -10,41 +10,64 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material3.AssistChip
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.logdate.client.permissions.rememberLocationPermissionState
 import app.logdate.feature.location.timeline.ui.model.LocationStopUiModel
+import app.logdate.feature.location.timeline.ui.model.LocationTimelineErrorUiState
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineUiState
 import logdate.client.feature.location.timeline.generated.resources.Res
+import logdate.client.feature.location.timeline.generated.resources.cancel
+import logdate.client.feature.location.timeline.generated.resources.delete_location
+import logdate.client.feature.location.timeline.generated.resources.delete_location_confirmation
+import logdate.client.feature.location.timeline.generated.resources.enable
+import logdate.client.feature.location.timeline.generated.resources.location_permission_required
+import logdate.client.feature.location.timeline.generated.resources.location_permission_required_description
+import logdate.client.feature.location.timeline.generated.resources.location_services_disabled
+import logdate.client.feature.location.timeline.generated.resources.location_services_disabled_description
 import logdate.client.feature.location.timeline.generated.resources.location_timeline
+import logdate.client.feature.location.timeline.generated.resources.locations_temporarily_unavailable_description
 import logdate.client.feature.location.timeline.generated.resources.no_location_history_yet
+import logdate.client.feature.location.timeline.generated.resources.samples_count
+import logdate.client.feature.location.timeline.generated.resources.stayed_for_duration
+import logdate.client.feature.location.timeline.generated.resources.try_again
 import logdate.client.feature.location.timeline.generated.resources.unable_to_load_location_timeline
 import logdate.client.feature.location.timeline.generated.resources.your_location_timeline_will_appear_here_as_you_move_around
 import org.jetbrains.compose.resources.stringResource
@@ -62,10 +85,7 @@ fun LocationTimelineScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = stringResource(Res.string.location_timeline),
-                        style = MaterialTheme.typography.headlineMedium,
-                    )
+                    Text(text = stringResource(Res.string.location_timeline))
                 },
             )
         },
@@ -75,6 +95,7 @@ fun LocationTimelineScreen(
             uiState = uiState,
             onSelectStop = viewModel::selectStop,
             onDeleteStop = viewModel::deleteStop,
+            onRetry = viewModel::retry,
             modifier =
                 Modifier
                     .fillMaxSize()
@@ -88,11 +109,12 @@ fun LocationTimelineContent(
     uiState: LocationTimelineUiState,
     onSelectStop: (String) -> Unit,
     onDeleteStop: (String) -> Unit,
+    onRetry: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     when (uiState) {
         is LocationTimelineUiState.Loading -> LoadingState(modifier)
-        is LocationTimelineUiState.Error -> ErrorState(uiState.message, modifier)
+        is LocationTimelineUiState.Error -> ErrorState(error = uiState.error, onRetry = onRetry, modifier = modifier)
         is LocationTimelineUiState.Success -> SuccessState(uiState, onSelectStop, onDeleteStop, modifier)
     }
 }
@@ -109,27 +131,102 @@ private fun LoadingState(modifier: Modifier = Modifier) {
 
 @Composable
 private fun ErrorState(
-    message: String,
+    error: LocationTimelineErrorUiState,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
+        LocationTimelineErrorCard(
+            error = error,
+            onRetry = onRetry,
+            modifier =
+                Modifier
+                    .widthIn(max = 420.dp)
+                    .padding(24.dp),
+        )
+    }
+}
+
+@Composable
+internal fun LocationTimelineErrorCard(
+    error: LocationTimelineErrorUiState,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val permissionState = rememberLocationPermissionState()
+
+    LaunchedEffect(error, permissionState.hasPermission) {
+        if (error == LocationTimelineErrorUiState.PermissionRequired && permissionState.hasPermission) {
+            onRetry()
+        }
+    }
+
+    val title: String
+    val description: String
+    val actionLabel: String
+    val action: () -> Unit
+
+    when (error) {
+        LocationTimelineErrorUiState.PermissionRequired -> {
+            title = stringResource(Res.string.location_permission_required)
+            description = stringResource(Res.string.location_permission_required_description)
+            actionLabel = stringResource(Res.string.enable)
+            action = permissionState.requestPermission
+        }
+
+        LocationTimelineErrorUiState.LocationServicesDisabled -> {
+            title = stringResource(Res.string.location_services_disabled)
+            description = stringResource(Res.string.location_services_disabled_description)
+            actionLabel = stringResource(Res.string.try_again)
+            action = onRetry
+        }
+
+        LocationTimelineErrorUiState.TemporarilyUnavailable -> {
+            title = stringResource(Res.string.unable_to_load_location_timeline)
+            description = stringResource(Res.string.locations_temporarily_unavailable_description)
+            actionLabel = stringResource(Res.string.try_again)
+            action = onRetry
+        }
+    }
+
+    Card(modifier = modifier) {
         Column(
-            modifier = Modifier.padding(24.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(56.dp)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest, MaterialTheme.shapes.large),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
             Text(
-                text = stringResource(Res.string.unable_to_load_location_timeline),
-                style = MaterialTheme.typography.headlineSmall,
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = message,
+                text = description,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            FilledTonalButton(onClick = action) {
+                Text(actionLabel)
+            }
         }
     }
 }
@@ -150,10 +247,8 @@ private fun SuccessState(
         val useTwoPane = maxWidth >= 840.dp
 
         if (useTwoPane) {
-            Row(
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                LocationTimelineMap(
+            Row(modifier = Modifier.fillMaxSize()) {
+                locationTimelineMap(
                     stops = uiState.stops,
                     currentLocation = uiState.currentLocation,
                     selectedStopId = uiState.selectedStopId,
@@ -164,7 +259,7 @@ private fun SuccessState(
                             .fillMaxSize()
                             .padding(16.dp),
                 )
-                Divider(modifier = Modifier.fillMaxSize().width(1.dp))
+                VerticalDivider(modifier = Modifier.fillMaxHeight())
                 StopsList(
                     stops = uiState.stops,
                     selectedStopId = uiState.selectedStop?.id,
@@ -178,7 +273,7 @@ private fun SuccessState(
             }
         } else {
             Column(modifier = Modifier.fillMaxSize()) {
-                LocationTimelineMap(
+                locationTimelineMap(
                     stops = uiState.stops,
                     currentLocation = uiState.currentLocation,
                     selectedStopId = uiState.selectedStopId,
@@ -189,7 +284,7 @@ private fun SuccessState(
                             .height(320.dp)
                             .padding(16.dp),
                 )
-                Divider()
+                HorizontalDivider()
                 StopsList(
                     stops = uiState.stops,
                     selectedStopId = uiState.selectedStop?.id,
@@ -236,6 +331,9 @@ private fun StopCard(
     onSelect: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    var showActions by remember(stop.id) { mutableStateOf(false) }
+    var showDeleteConfirmation by remember(stop.id) { mutableStateOf(false) }
+
     Card(
         onClick = onSelect,
         border =
@@ -272,24 +370,24 @@ private fun StopCard(
                     )
                 }
 
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = null)
-                }
-            }
+                Box {
+                    IconButton(onClick = { showActions = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = null)
+                    }
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AssistChip(
-                    onClick = onSelect,
-                    label = { Text(stop.sourceLabel) },
-                )
-                Text(
-                    text = "${stop.sampleCount} samples",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                    DropdownMenu(
+                        expanded = showActions,
+                        onDismissRequest = { showActions = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(Res.string.delete_location)) },
+                            onClick = {
+                                showActions = false
+                                showDeleteConfirmation = true
+                            },
+                        )
+                    }
+                }
             }
 
             Text(
@@ -297,11 +395,39 @@ private fun StopCard(
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
-                text = "Stayed ${stop.duration}",
+                text = stringResource(Res.string.stayed_for_duration, stop.duration),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Text(
+                text = "${stop.sourceLabel} • ${stringResource(Res.string.samples_count, stop.sampleCount)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
+    }
+
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text(stringResource(Res.string.delete_location)) },
+            text = { Text(stringResource(Res.string.delete_location_confirmation)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirmation = false
+                        onDelete()
+                    },
+                ) {
+                    Text(stringResource(Res.string.delete_location))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = false }) {
+                    Text(stringResource(Res.string.cancel))
+                }
+            },
+        )
     }
 }
 

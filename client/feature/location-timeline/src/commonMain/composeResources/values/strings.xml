@@ -1,18 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="cancel">Cancel</string>
     <string name="close">Close</string>
     <string name="current_location">Current Location</string>
     <string name="current_location_unavailable">Current location unavailable</string>
-    <string name="delete_location">Delete location</string>
+    <string name="delete_location">Delete stop</string>
+    <string name="delete_location_confirmation">This removes the recorded location samples for this stop.</string>
     <string name="enable">Enable</string>
     <string name="enable_location_access_to_see_your_current_location">Enable location access to see your current location</string>
-    <string name="location_timeline">Location Timeline</string>
+    <string name="location_permission_required">Location access required</string>
+    <string name="location_permission_required_description">Allow location access to see your current position and keep your places up to date.</string>
+    <string name="location_services_disabled">Location services unavailable</string>
+    <string name="location_services_disabled_description">Turn location services back on, then try again.</string>
+    <string name="location_timeline">Locations</string>
+    <string name="locations_temporarily_unavailable_description">Your saved places are still safe. Try again in a moment.</string>
     <string name="locations_will_appear_here_when_you_create_notes">Locations will appear here when you create notes</string>
-    <string name="no_location_history_yet">No location history yet</string>
-    <string name="open_full_location_timeline">Open full location timeline</string>
-    <string name="recent_stops">Recent stops</string>
-    <string name="unable_to_load_location_timeline">Unable to load location timeline</string>
-    <string name="your_location_timeline_will_appear_here_as_you_move_around">Your location timeline will appear here as you move around</string>
+    <string name="no_location_history_yet">No locations yet</string>
+    <string name="open_full_location_timeline">View all locations</string>
+    <string name="recent_stops">Recent places</string>
+    <string name="samples_count">%1$d samples</string>
+    <string name="try_again">Try again</string>
+    <string name="unable_to_load_location_timeline">Unable to load locations</string>
+    <string name="your_location_timeline_will_appear_here_as_you_move_around">Your recent places will appear here as you move around.</string>
     <string name="coordinates_label">Coordinates: %1$s</string>
     <string name="stayed_for_duration">Stayed for %1$s</string>
 </resources>
