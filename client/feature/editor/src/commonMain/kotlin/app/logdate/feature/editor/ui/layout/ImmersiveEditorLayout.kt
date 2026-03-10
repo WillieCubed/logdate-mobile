@@ -11,8 +11,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -20,8 +22,10 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -33,52 +37,31 @@ import app.logdate.ui.PlatformDimensions
 import app.logdate.ui.theme.Spacing
 import androidx.compose.ui.util.lerp as lerpFloat
 
+private val EXPANDED_BREAKPOINT = 840.dp
+private val SIDE_PANEL_WIDTH = 280.dp
+
 /**
  * A cross-platform immersive editor layout that provides a focused editing experience.
- * This component handles platform-specific screen dimensions and creates a responsive
- * layout optimized for content creation.
  *
- * Features:
- * - Dark overlay background for focused editing
- * - Responsive width constraints based on screen size
- * - IME (keyboard) insets handling
- * - Consistent aspect ratio for content
- * - Safe area insets support
+ * On compact and medium screens (< 840dp), or whenever an immersive block (camera,
+ * audio) is active, this renders a full-screen dark scrim with the editor content
+ * centered in a width-constrained column.
+ *
+ * On expanded screens (≥ 840dp) with no active immersive block, this switches to a
+ * surface-based two-column layout: a wide main editing area on the left and a
+ * context panel (journal selector, metadata) on the right. The dark scrim is removed
+ * so the editor feels like a native document editor rather than a modal dialog.
  *
  * @param isEditorFocused Whether the editor currently has input focus
- * @param topBarContent Content for the top action bar area (usually back button/navigation)
- * @param editorContent The main editor content that will be displayed in the card
- * @param bottomContent Content for the bottom bar (usually controls or metadata)
+ * @param topBarContent Content for the top action bar area (back button/navigation)
+ * @param editorContent The main editor content displayed in the central area
+ * @param bottomContent Context content (journal selector); shown at the bottom on narrow
+ *   screens and in the right-side panel on expanded screens
+ * @param isImmersiveBlockActive Whether a full-screen block (camera/audio) is active;
+ *   forces the dark scrim layout regardless of screen width
+ * @param immersiveExitProgress Float in [0, 1] driving chrome visibility on narrow layouts
+ *   (0 = fully immersive, 1 = normal). Unused in the expanded layout.
  * @param modifier Optional modifier for the root layout
- *
- * Example usage:
- * ```
- * ImmersiveEditorLayout(
- *     onNavigateBack = { navController.popBackStack() },
- *     isEditorFocused = editorFocusState,
- *     topBarContent = {
- *         FilledTonalIconButton(onClick = { navController.popBackStack() }) {
- *             Icon(
- *                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
- *                 contentDescription = stringResource(Res.string.back)
- *             )
- *         }
- *     },
- *     editorContent = {
- *         TextEditor(
- *             text = viewModel.text,
- *             onTextChange = viewModel::updateText,
- *             modifier = Modifier.fillMaxSize()
- *         )
- *     },
- *     bottomContent = {
- *         EditorControls(
- *             onSave = viewModel::saveEntry,
- *             onAddImage = viewModel::addImage
- *         )
- *     }
- * )
- * ```
  */
 @Suppress("ktlint:standard:function-naming")
 @Composable
@@ -91,10 +74,118 @@ fun ImmersiveEditorLayout(
     isImmersiveBlockActive: Boolean = false,
     immersiveExitProgress: Float = if (isImmersiveBlockActive) 0f else 1f,
 ) {
-    // Get screen width using the cross-platform PlatformDimensions utility
     val screenWidth = PlatformDimensions.getScreenWidth()
+    val useExpandedLayout = screenWidth >= EXPANDED_BREAKPOINT && !isImmersiveBlockActive
 
-    // Calculate responsive max width
+    if (useExpandedLayout) {
+        ExpandedEditorLayout(
+            modifier = modifier,
+            topBarContent = topBarContent,
+            editorContent = editorContent,
+            sideContent = bottomContent,
+        )
+    } else {
+        NarrowEditorLayout(
+            modifier = modifier,
+            isEditorFocused = isEditorFocused,
+            topBarContent = topBarContent,
+            editorContent = editorContent,
+            bottomContent = bottomContent,
+            isImmersiveBlockActive = isImmersiveBlockActive,
+            immersiveExitProgress = immersiveExitProgress,
+            screenWidth = screenWidth,
+        )
+    }
+}
+
+/**
+ * Expanded (tablet/desktop) editor layout.
+ *
+ * Uses the app surface background instead of a dark scrim. The writing area fills
+ * the available width minus the [SIDE_PANEL_WIDTH] context panel. The toolbar spans
+ * the full width above both panes.
+ */
+@Suppress("ktlint:standard:function-naming")
+@Composable
+private fun ExpandedEditorLayout(
+    topBarContent: @Composable () -> Unit,
+    editorContent: @Composable () -> Unit,
+    sideContent: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                .windowInsetsPadding(WindowInsets.statusBars),
+    ) {
+        // Full-width toolbar row
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            topBarContent()
+        }
+
+        // Two-pane body
+        Row(
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            // Main editor pane — grows to fill remaining horizontal space
+            Box(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .windowInsetsPadding(WindowInsets.ime),
+            ) {
+                editorContent()
+            }
+
+            // Vertical divider between editor and panel
+            HorizontalDivider(
+                modifier =
+                    Modifier
+                        .width(1.dp)
+                        .fillMaxHeight(),
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
+
+            // Context side panel
+            Column(
+                modifier =
+                    Modifier
+                        .width(SIDE_PANEL_WIDTH)
+                        .fillMaxHeight()
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                        .padding(horizontal = Spacing.xl, vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                sideContent()
+            }
+        }
+    }
+}
+
+/**
+ * Narrow (phone/medium, or any screen with an active immersive block) editor layout.
+ *
+ * Renders a full-screen dark scrim with editor content in a width-constrained
+ * centered column. All chrome (toolbar, bottom bar) animates via [immersiveExitProgress].
+ */
+@Suppress("ktlint:standard:function-naming")
+@Composable
+private fun NarrowEditorLayout(
+    isEditorFocused: Boolean,
+    topBarContent: @Composable () -> Unit,
+    editorContent: @Composable () -> Unit,
+    bottomContent: @Composable () -> Unit,
+    isImmersiveBlockActive: Boolean,
+    immersiveExitProgress: Float,
+    screenWidth: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+) {
     val maxWidth =
         remember(screenWidth) {
             when {
@@ -104,26 +195,19 @@ fun ImmersiveEditorLayout(
             }
         }
 
-    // Live status bar height — read once per composition, KMP-safe.
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
-    // Interpolate directly from immersiveExitProgress (0 = fully immersive, 1 = normal).
-    // The caller owns the animation — either gesture-scrubbed or time-animated — so this
-    // composable is a pure function of the progress value with no internal animation state.
     val topOffset = lerp(0.dp, statusBarTop + 40.dp, immersiveExitProgress)
     val horizontalPadding = lerp(0.dp, Spacing.sm, immersiveExitProgress)
     val innerTopPadding = lerp(0.dp, Spacing.sm, immersiveExitProgress)
     val scrimAlpha = lerpFloat(0.72f, 0.50f, immersiveExitProgress)
 
-    // Full-screen dark background — alpha tracks the same progress as the layout.
     Box(
         modifier =
             modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.scrim.copy(alpha = scrimAlpha)),
     ) {
-        // Editor content — in immersive mode fills the full screen (behind status bar and toolbar).
-        // In normal mode, slides down via topOffset to sit below the toolbar.
         Box(
             modifier =
                 Modifier
@@ -136,8 +220,6 @@ fun ImmersiveEditorLayout(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        // widthIn is unconditional — on small screens maxWidth == screenWidth.
-                        // The visual narrowing comes from the animated horizontal padding.
                         .widthIn(max = maxWidth)
                         .padding(horizontal = horizontalPadding)
                         .padding(top = innerTopPadding),
@@ -156,8 +238,6 @@ fun ImmersiveEditorLayout(
                     editorContent()
                 }
 
-                // expandVertically/shrinkVertically animate the layout space so the surrounding
-                // content doesn't snap when the bottom bar appears or disappears.
                 AnimatedVisibility(
                     visible = !isImmersiveBlockActive,
                     enter = fadeIn(tween(200)) + expandVertically(tween(300, easing = FastOutSlowInEasing)),
@@ -176,8 +256,6 @@ fun ImmersiveEditorLayout(
             }
         }
 
-        // Top bar — always a floating overlay so the back button remains accessible.
-        // In immersive mode this sits visually on top of the full-bleed content.
         Box(
             modifier =
                 Modifier
