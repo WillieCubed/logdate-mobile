@@ -5,6 +5,8 @@ import app.logdate.client.domain.location.LogCurrentLocationUseCase
 import app.logdate.client.domain.notes.AddNoteUseCase
 import app.logdate.client.domain.world.LogLocationUseCase
 import app.logdate.client.location.ClientLocationProvider
+import app.logdate.client.location.settings.LocationTrackingSettings
+import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
 import app.logdate.client.media.MediaPayload
@@ -167,6 +169,7 @@ class SaveEntryUseCaseTest {
             journalContentRepository = FakeJournalContentRepository(),
             logLocationUseCase = LogLocationUseCase(locationProvider, activityRepository),
             logCurrentLocationUseCase = LogCurrentLocationUseCase(locationProvider, locationHistoryRepository, retryWorker),
+            settingsRepository = FakeLocationTrackingSettingsRepository(),
             mediaManager = FakeMediaManager(),
         )
     }
@@ -285,6 +288,26 @@ class SaveEntryUseCaseTest {
             )
 
         override suspend fun saveMedia(payload: MediaPayload): String = "file://stub/${payload.fileName}"
+    }
+
+    private class FakeLocationTrackingSettingsRepository : LocationTrackingSettingsRepository {
+        private var settings = LocationTrackingSettings()
+
+        override suspend fun getSettings(): LocationTrackingSettings = settings
+
+        override fun observeSettings(): Flow<LocationTrackingSettings> = flowOf(settings)
+
+        override suspend fun updateSettings(settings: LocationTrackingSettings) {
+            this.settings = settings
+        }
+
+        override suspend fun setBackgroundTrackingEnabled(enabled: Boolean) {
+            settings = settings.copy(backgroundTrackingEnabled = enabled)
+        }
+
+        override suspend fun setTrackingInterval(intervalMinutes: Long) {
+            settings = settings.copy(trackingIntervalMinutes = intervalMinutes)
+        }
     }
 
     private class FakeLocationProvider : ClientLocationProvider {

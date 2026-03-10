@@ -4,6 +4,8 @@ import app.logdate.client.domain.location.LocationRetryWorker
 import app.logdate.client.domain.location.LogCurrentLocationUseCase
 import app.logdate.client.domain.world.LogLocationUseCase
 import app.logdate.client.location.ClientLocationProvider
+import app.logdate.client.location.settings.LocationTrackingSettings
+import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
 import app.logdate.client.media.MediaPayload
@@ -39,6 +41,7 @@ class AddNoteUseCaseTest {
     private lateinit var mockLogLocationUseCase: MockLogLocationUseCase
     private lateinit var mockLogCurrentLocationUseCase: MockLogCurrentLocationUseCase
     private lateinit var mockMediaManager: MockMediaManager
+    private lateinit var mockSettingsRepository: MockLocationTrackingSettingsRepository
     private lateinit var useCase: AddNoteUseCase
 
     @BeforeTest
@@ -48,6 +51,7 @@ class AddNoteUseCaseTest {
         mockLogLocationUseCase = MockLogLocationUseCase()
         mockLogCurrentLocationUseCase = MockLogCurrentLocationUseCase()
         mockMediaManager = MockMediaManager()
+        mockSettingsRepository = MockLocationTrackingSettingsRepository()
 
         useCase =
             AddNoteUseCase(
@@ -55,6 +59,7 @@ class AddNoteUseCaseTest {
                 journalContentRepository = mockJournalContentRepository,
                 logLocationUseCase = mockLogLocationUseCase.useCase,
                 logCurrentLocationUseCase = mockLogCurrentLocationUseCase.useCase,
+                settingsRepository = mockSettingsRepository,
                 mediaManager = mockMediaManager,
             )
     }
@@ -242,6 +247,18 @@ class AddNoteUseCaseTest {
             assertEquals(0, mockMediaManager.addedAttachments.size)
         }
 
+    @Test
+    fun `invoke skips location logging when journal tracking is disabled`() =
+        runTest {
+            val testNote = createTestNote()
+            mockSettingsRepository.settings = LocationTrackingSettings(autoTrackForJournalEntries = false)
+
+            useCase(notes = listOf(testNote))
+
+            assertEquals(0, mockLogLocationUseCase.loggedActivities)
+            assertEquals(0, mockLogCurrentLocationUseCase.loggedLocations)
+        }
+
     private fun createTestNote(content: String = "Test note content") =
         JournalNote.Text(
             uid = Uuid.random(),
@@ -317,6 +334,7 @@ class AddNoteUseCaseTest {
                     journalContentRepository = mockErrorContentRepo,
                     logLocationUseCase = mockLogLocationUseCase.useCase,
                     logCurrentLocationUseCase = mockLogCurrentLocationUseCase.useCase,
+                    settingsRepository = mockSettingsRepository,
                     mediaManager = mockMediaManager,
                 )
 
@@ -418,6 +436,8 @@ class AddNoteUseCaseTest {
         private val locationProvider = FakeLocationProvider()
         private val activityRepository = FakeActivityTimelineRepository()
         val useCase = LogLocationUseCase(locationProvider, activityRepository)
+        val loggedActivities: Int
+            get() = activityRepository.addedActivities
     }
 
     private class MockLogCurrentLocationUseCase {
@@ -430,6 +450,28 @@ class AddNoteUseCaseTest {
                 coroutineScope = CoroutineScope(Dispatchers.Unconfined),
             )
         val useCase = LogCurrentLocationUseCase(locationProvider, locationHistoryRepository, retryWorker)
+        val loggedLocations: Int
+            get() = locationHistoryRepository.loggedLocations
+    }
+
+    private class MockLocationTrackingSettingsRepository : LocationTrackingSettingsRepository {
+        var settings: LocationTrackingSettings = LocationTrackingSettings()
+
+        override suspend fun getSettings(): LocationTrackingSettings = settings
+
+        override fun observeSettings(): Flow<LocationTrackingSettings> = flowOf(settings)
+
+        override suspend fun updateSettings(settings: LocationTrackingSettings) {
+            this.settings = settings
+        }
+
+        override suspend fun setBackgroundTrackingEnabled(enabled: Boolean) {
+            settings = settings.copy(backgroundTrackingEnabled = enabled)
+        }
+
+        override suspend fun setTrackingInterval(intervalMinutes: Long) {
+            settings = settings.copy(trackingIntervalMinutes = intervalMinutes)
+        }
     }
 
     private class MockMediaManager : MediaManager {
@@ -478,6 +520,7 @@ class AddNoteUseCaseTest {
     }
 
     private class FakeActivityTimelineRepository : ActivityTimelineRepository {
+        var addedActivities: Int = 0
         private val location =
             Location(
                 latitude = 37.0,
@@ -490,7 +533,9 @@ class AddNoteUseCaseTest {
         override fun observeModelById(id: Uuid): Flow<ActivityTimelineItem> =
             flowOf(ActivityTimelineItem(timestamp = Clock.System.now(), uid = id, location = location))
 
-        override suspend fun addActivity(item: ActivityTimelineItem) {}
+        override suspend fun addActivity(item: ActivityTimelineItem) {
+            addedActivities += 1
+        }
 
         override suspend fun removeActivity(item: ActivityTimelineItem) {}
 
@@ -500,6 +545,8 @@ class AddNoteUseCaseTest {
     }
 
     private class FakeLocationHistoryRepository : LocationHistoryRepository {
+        var loggedLocations: Int = 0
+
         override suspend fun getAllLocationHistory(): List<LocationHistoryItem> = emptyList()
 
         override fun observeLocationHistory(): Flow<List<LocationHistoryItem>> = flowOf(emptyList())
@@ -521,7 +568,10 @@ class AddNoteUseCaseTest {
             deviceId: String,
             confidence: Float,
             isGenuine: Boolean,
-        ): Result<Unit> = Result.success(Unit)
+        ): Result<Unit> {
+            loggedLocations += 1
+            return Result.success(Unit)
+        }
 
         override suspend fun deleteLocationEntry(
             userId: String,

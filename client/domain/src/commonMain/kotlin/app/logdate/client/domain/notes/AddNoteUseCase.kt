@@ -2,6 +2,7 @@ package app.logdate.client.domain.notes
 
 import app.logdate.client.domain.location.LogCurrentLocationUseCase
 import app.logdate.client.domain.world.LogLocationUseCase
+import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.media.MediaManager
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
@@ -25,6 +26,7 @@ class AddNoteUseCase(
     private val journalContentRepository: JournalContentRepository,
     private val logLocationUseCase: LogLocationUseCase,
     private val logCurrentLocationUseCase: LogCurrentLocationUseCase,
+    private val settingsRepository: LocationTrackingSettingsRepository,
     private val mediaManager: MediaManager,
 ) {
     suspend operator fun invoke(
@@ -44,6 +46,7 @@ class AddNoteUseCase(
         journalIds: Array<out Uuid>,
         attachments: List<String> = emptyList(),
     ) = coroutineScope {
+        val shouldTrackLocation = runCatching { settingsRepository.getSettings().autoTrackForJournalEntries }.getOrDefault(true)
         val noteJobs =
             notes.map { note ->
                 async {
@@ -64,14 +67,16 @@ class AddNoteUseCase(
                         }
 
                         // Log current location when note is created
-                        try {
-                            logLocationUseCase() // For activity timeline
-                            // For location history with automatic retry
-                            logCurrentLocationUseCase(LogCurrentLocationUseCase.LocationLogRequest.LogLocation())
-                        } catch (e: Exception) {
-                            // Location logging shouldn't fail note creation
-                            // LogCurrentLocationUseCase handles retries automatically
-                            Napier.w("Failed to log location when creating note", e)
+                        if (shouldTrackLocation) {
+                            try {
+                                logLocationUseCase() // For activity timeline
+                                // For location history with automatic retry
+                                logCurrentLocationUseCase(LogCurrentLocationUseCase.LocationLogRequest.LogLocation())
+                            } catch (e: Exception) {
+                                // Location logging shouldn't fail note creation
+                                // LogCurrentLocationUseCase handles retries automatically
+                                Napier.w("Failed to log location when creating note", e)
+                            }
                         }
                     } catch (e: Exception) {
                         Napier.e("Failed to create note ${note.uid}", e)
