@@ -30,6 +30,7 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
 import app.logdate.client.domain.recommendation.HomeRecommendation
 import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
+import app.logdate.client.domain.timeline.TimelinePlaceVisit
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.feature.journals.ui.JournalClickCallback
 import app.logdate.feature.journals.ui.JournalsOverviewScreen
@@ -37,6 +38,7 @@ import app.logdate.feature.location.timeline.ui.LocationTimelineScreen
 import app.logdate.feature.rewind.ui.RewindOverviewScreen
 import app.logdate.shared.model.Person
 import app.logdate.ui.common.applyScreenStyles
+import app.logdate.ui.location.PlaceUiState
 import app.logdate.ui.profiles.toUiState
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.HomeTimelineUiState
@@ -227,6 +229,7 @@ class HomeViewModel(
                         date = day.date,
                         people = day.people.map(Person::toUiState),
                         events = day.events,
+                        placesVisited = day.placesVisited.map { place -> place.toUiState() },
                         isLoadingSummary = day.tldr.isEmpty(),
                         notes =
                             if (day.date == selectedDayDate) {
@@ -310,7 +313,6 @@ class HomeViewModel(
      * @param date The date of the day to select
      */
     fun selectDay(date: LocalDate) {
-        println("Selecting day: $date")
         selectedItemUiState.value =
             TimelineDaySelection.Selected(
                 id = date.toString(),
@@ -336,8 +338,6 @@ class HomeViewModel(
      * @param date The date to fetch notes for
      */
     fun fetchNotesForDate(date: LocalDate) {
-        println("Fetching notes for date: $date")
-
         io.github.aakira.napier.Napier.d(
             tag = "HomeViewModel",
             message = "EXPLICIT FETCH: Getting notes for date $date",
@@ -385,4 +385,12 @@ class HomeViewModel(
             }
         }
     }
+
+    private fun TimelinePlaceVisit.toUiState(): PlaceUiState =
+        PlaceUiState(
+            id = id,
+            title = name,
+            latitude = latitude,
+            longitude = longitude,
+        )
 }

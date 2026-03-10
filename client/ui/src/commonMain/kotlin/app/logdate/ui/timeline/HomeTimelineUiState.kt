@@ -23,7 +23,7 @@ data class TimelineDayUiState(
     val date: LocalDate = LocalDate.now(), // TODO: Don't use default value here
     val people: List<PersonUiState> = DEMO_PEOPLE,
     val events: List<String> = emptyList(), // TODO: Actually include events
-    val placesVisited: List<PlaceUiState> = DEMO_PLACES_VISITED, // TODO: Actually include places visited
+    val placesVisited: List<PlaceUiState> = emptyList(),
     val mediaUris: List<MediaObjectUiState> = emptyList(), // TODO: Actually include media
     val notes: List<NoteUiState> = emptyList(),
     val isLoadingSummary: Boolean = false,
@@ -43,13 +43,6 @@ enum class TimelineLoadingState {
     /** Error state */
     Error,
 }
-
-val DEMO_PLACES_VISITED =
-    listOf(
-        PlaceUiState(Uuid.random(), "Home"),
-        PlaceUiState(Uuid.random(), "Work"),
-        PlaceUiState(Uuid.random(), "Jamie's House"),
-    )
 
 val DEMO_PEOPLE =
     listOf(

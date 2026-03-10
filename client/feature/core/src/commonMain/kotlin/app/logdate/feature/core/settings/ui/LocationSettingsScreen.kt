@@ -31,7 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -82,11 +82,12 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun LocationSettingsScreen(
     onBack: () -> Unit,
+    onOpenLocationTimeline: () -> Unit,
     viewModel: LocationSettingsViewModel = koinViewModel(),
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var showLocationTimeline by remember { mutableStateOf(false) }
+    var showLocationQuickPeek by rememberSaveable { mutableStateOf(false) }
 
     LocationSettingsContent(
         settings = uiState.settings,
@@ -95,15 +96,23 @@ fun LocationSettingsScreen(
         onToggleJournalTracking = viewModel::toggleJournalTracking,
         onToggleTimelineTracking = viewModel::toggleTimelineTracking,
         onUpdateTrackingInterval = viewModel::updateTrackingInterval,
-        onShowLocationTimeline = { showLocationTimeline = true },
+        onShowLocationTimeline = {
+            showLocationQuickPeek = true
+        },
         modifier = modifier.applyScreenStyles(),
     )
 
-    // Location Timeline Bottom Sheet
-    LocationTimelineBottomSheet(
-        isVisible = showLocationTimeline,
-        onDismiss = { showLocationTimeline = false },
-    )
+    if (showLocationQuickPeek) {
+        LocationTimelineBottomSheet(
+            onDismissRequest = {
+                showLocationQuickPeek = false
+            },
+            onOpenFullTimeline = {
+                showLocationQuickPeek = false
+                onOpenLocationTimeline()
+            },
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -18,6 +19,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -37,6 +39,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.client.repository.search.SearchResultType
+import app.logdate.ui.adaptive.AdaptivePaneLayout
+import app.logdate.ui.adaptive.AdaptivePaneLayoutInfo
 import app.logdate.util.toReadableDateTimeShort
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -123,20 +127,36 @@ fun SearchScreenContent(
             )
         },
     ) { paddingValues ->
-        SearchResultsList(
-            results = searchResults,
-            onResultClick = { result ->
-                val date =
-                    result.created
-                        .toLocalDateTime(TimeZone.currentSystemDefault())
-                        .date
-                onNavigateToDay(date)
-            },
+        AdaptivePaneLayout(
             modifier =
                 Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
-        )
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            contentPadding = PaddingValues(16.dp),
+            supportingPaneBreakpoint = 700.dp,
+            supportingPaneWidth = 300.dp,
+            mainPaneMinWidth = 300.dp,
+            mainPaneMaxWidth = 760.dp,
+            supportingPane = { layoutInfo ->
+                SearchInsightsPane(
+                    query = query,
+                    results = searchResults,
+                    layoutInfo = layoutInfo,
+                )
+            },
+        ) {
+            SearchResultsList(
+                results = searchResults,
+                onResultClick = { result ->
+                    val date =
+                        result.created
+                            .toLocalDateTime(TimeZone.currentSystemDefault())
+                            .date
+                    onNavigateToDay(date)
+                },
+            )
+        }
     }
 }
 
@@ -161,6 +181,64 @@ private fun SearchResultsList(
                 SearchResultItem(
                     result = result,
                     onClick = { onResultClick(result) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchInsightsPane(
+    query: String,
+    results: List<SearchResult>,
+    layoutInfo: AdaptivePaneLayoutInfo,
+) {
+    val textResults = results.count { it.type == SearchResultType.TEXT_NOTE }
+    val voiceResults = results.count { it.type == SearchResultType.TRANSCRIPTION }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text =
+                    if (query.isBlank()) {
+                        "Search all memories"
+                    } else {
+                        "Search summary"
+                    },
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Text(
+                text =
+                    if (query.isBlank()) {
+                        "Use search to jump back into notes and voice memories without leaving your current session."
+                    } else {
+                        "${results.size} matching memories across your journal history."
+                    },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            HorizontalDivider()
+            Text(
+                text = "Layout: ${layoutInfo.widthClass.name.lowercase().replaceFirstChar(Char::uppercase)}",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = "Text notes: $textResults",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                text = "Voice notes: $voiceResults",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (query.isBlank()) {
+                Text(
+                    text = "Tip: open any result to jump straight back into that day in Timeline.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

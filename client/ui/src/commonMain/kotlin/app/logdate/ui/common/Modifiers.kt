@@ -1,9 +1,13 @@
 package app.logdate.ui.common
 
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
@@ -89,4 +93,7 @@ fun Modifier.applyScreenStyles(): Modifier =
 @Composable
 fun Modifier.applyStandardContentWidth(): Modifier =
     this
+        .fillMaxWidth()
+        .wrapContentWidth(Alignment.CenterHorizontally)
+        .widthIn(max = 720.dp)
         .padding(horizontal = 16.dp)

@@ -1,8 +1,8 @@
 package app.logdate.ui.location
 
-import kotlin.uuid.Uuid
-
 data class PlaceUiState(
-    val uid: Uuid,
+    val id: String,
     val title: String,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
 )

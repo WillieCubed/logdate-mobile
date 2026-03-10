@@ -7,10 +7,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -26,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.adaptive.AdaptivePaneLayout
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
@@ -70,26 +75,38 @@ fun OnboardingStartScreenContent(
     modifier: Modifier = Modifier,
     useLargerTextSizes: Boolean = false,
 ) {
-    Box(
+    AdaptivePaneLayout(
         modifier =
             modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.primary)
-                .padding(Spacing.lg),
+                .background(MaterialTheme.colorScheme.primary),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        contentPadding = PaddingValues(Spacing.lg),
+        supportingPaneBreakpoint = 760.dp,
+        supportingPaneWidth = 300.dp,
+        mainPaneMinWidth = 320.dp,
+        mainPaneMaxWidth = 520.dp,
+        supportingPane = {
+            OnboardingSupportPane(showLanding = showLanding)
+        },
     ) {
-        AnimatedContent(
-            showLanding,
-            label = "Main Content",
-            modifier = Modifier.align(Alignment.Center),
-        ) { target ->
-            if (target) {
-                OnboardingLandingContent(
-                    onGetStarted = onGetStarted,
-                    onStartFromBackup = onStartFromBackup,
-                    useLargerTextSizes = useLargerTextSizes,
-                )
-            } else {
-                OnboardingSplashContent()
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            AnimatedContent(
+                showLanding,
+                label = "Main Content",
+            ) { target ->
+                if (target) {
+                    OnboardingLandingContent(
+                        onGetStarted = onGetStarted,
+                        onStartFromBackup = onStartFromBackup,
+                        useLargerTextSizes = useLargerTextSizes,
+                    )
+                } else {
+                    OnboardingSplashContent()
+                }
             }
         }
     }
@@ -198,6 +215,41 @@ private fun OnboardingLandingContent(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingSupportPane(showLanding: Boolean) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                text = if (showLanding) "Built for every window" else "A journal that grows with you",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Text(
+                text =
+                    if (showLanding) {
+                        "LogDate stays calm and readable on phones, tablets, and larger windows so onboarding never feels stretched or lost."
+                    } else {
+                        "Start on the device in your hand and keep going when you have more room. Your memories should feel at home anywhere."
+                    },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Text(
+                text = "Private timeline\nShared journals\nSync when you want it",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
         }
     }
 }
