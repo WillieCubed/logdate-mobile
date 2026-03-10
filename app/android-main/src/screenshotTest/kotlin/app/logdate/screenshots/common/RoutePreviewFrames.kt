@@ -12,9 +12,11 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.outlined.Book
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -39,6 +41,7 @@ enum class RoutePreviewTab(
     val unselectedIcon: ImageVector,
 ) {
     TIMELINE("Timeline", Icons.Filled.History, Icons.Outlined.History),
+    LOCATION("Locations", Icons.Filled.LocationOn, Icons.Outlined.LocationOn),
     JOURNALS("Journals", Icons.Filled.Book, Icons.Outlined.Book),
     REWIND("Rewind", Icons.Filled.DateRange, Icons.Outlined.DateRange),
 }

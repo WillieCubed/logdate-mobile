@@ -1,0 +1,330 @@
+package app.logdate.screenshots.components.editor
+
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
+import app.logdate.feature.editor.audio.model.AudioPalette
+import app.logdate.feature.editor.ui.MainEditorContent
+import app.logdate.feature.editor.ui.audio.ActiveRecordingDisplay
+import app.logdate.feature.editor.ui.audio.AudioRecordingControls
+import app.logdate.feature.editor.ui.audio.expansion.SpatialExpandedAudioBlock
+import app.logdate.feature.editor.ui.camera.CameraCapturePreviewContent
+import app.logdate.feature.editor.ui.camera.CameraCapturePreviewState
+import app.logdate.feature.editor.ui.camera.CapturedMediaType
+import app.logdate.feature.editor.ui.common.NoteEditorToolbar
+import app.logdate.feature.editor.ui.content.EditorBottomContent
+import app.logdate.feature.editor.ui.content.EmptyEditorStateContent
+import app.logdate.feature.editor.ui.editor.ImageBlockUiState
+import app.logdate.feature.editor.ui.editor.RecordingState
+import app.logdate.feature.editor.ui.editor.TextBlockUiState
+import app.logdate.feature.editor.ui.editor.VideoBlockUiState
+import app.logdate.feature.editor.ui.image.ImageBlockEditor
+import app.logdate.feature.editor.ui.image.ImagePickerPreviewContent
+import app.logdate.feature.editor.ui.image.ImagePickerPreviewState
+import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
+import app.logdate.feature.editor.ui.state.BlocksUiState
+import app.logdate.feature.editor.ui.text.TextBlockContent
+import app.logdate.feature.editor.ui.video.VideoBlockEditor
+import app.logdate.feature.editor.ui.video.VideoPickerPreviewContent
+import app.logdate.screenshots.common.ScreenshotTestData
+import app.logdate.screenshots.common.ScreenshotTestData.PHONE
+import app.logdate.screenshots.common.ScreenshotTheme
+import com.android.tools.screenshot.PreviewTest
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
+import kotlin.uuid.Uuid
+
+private const val SAMPLE_IMAGE_URI = "android.resource://co.reasonabletech.logdate/mipmap/ic_launcher"
+private const val SAMPLE_VIDEO_URI = "preview://editor/video"
+
+private val mockPalette = AudioPalette(
+    waveformGradientStart = 0xFFE8A044,
+    waveformGradientEnd = 0xFFD4603A,
+    playedFillColor = 0xFFE8A044,
+    accentColor = 0xFFE8A044,
+    immersiveBackground = 0xFF1A0F05,
+)
+
+private val mockCreatedAt = Instant.fromEpochMilliseconds(1_740_000_000_000L)
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun EditorMode_Picker() {
+    ScreenshotTheme {
+        EmptyEditorStateContent(
+            onStartTextBlock = {},
+            onStartPhotoBlock = {},
+            onStartAudioBlock = {},
+            onStartCameraBlock = {},
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun EditorMode_TextFocused() {
+    EditorModeFrame {
+        TextBlockContent(
+            block =
+                TextBlockUiState(
+                    content = "Shipped the editor transition cleanup today. The reverse motion finally feels coherent.",
+                ),
+            onTextChanged = {},
+            onFocused = {},
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun EditorMode_ImagePickerLoaded() {
+    EditorModeFrame {
+        ImagePickerPreviewContent(
+            state = ImagePickerPreviewState.Loaded(sampleImageUri = SAMPLE_IMAGE_URI, itemCount = 12),
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun EditorMode_ImagePickerPermission() {
+    EditorModeFrame {
+        ImagePickerPreviewContent(
+            state = ImagePickerPreviewState.PermissionRequired(permanentlyDenied = false),
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun EditorMode_ImageFocused() {
+    EditorModeFrame {
+        ImageBlockEditor(
+            block =
+                ImageBlockUiState(
+                    uri = SAMPLE_IMAGE_URI,
+                    caption = "Late-night desk setup",
+                ),
+            onBlockUpdated = {},
+            onDeleteRequested = {},
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun EditorMode_AudioIdle() {
+    EditorModeFrame {
+        AudioRecordingControls(
+            recordingState = RecordingState.INACTIVE,
+            audioLevels = emptyList(),
+            recordingDuration = 0.seconds,
+            onStartRecording = {},
+            onStopRecording = {},
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun EditorMode_AudioRecording() {
+    EditorModeFrame {
+        ActiveRecordingDisplay(
+            audioLevels = ScreenshotTestData.mockAudioLevels,
+            recordingDuration = 1.minutes + 45.seconds,
+            onRestart = {},
+            onPause = {},
+            onFinish = {},
+            isPaused = false,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun EditorMode_AudioPlayback() {
+    EditorModeFrame {
+        SpatialExpandedAudioBlock(
+            amplitudes = ScreenshotTestData.mockAmplitudes,
+            progress = 0.42f,
+            isPlaying = true,
+            palette = mockPalette,
+            durationMs = 185_000L,
+            createdAt = mockCreatedAt,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun EditorMode_CameraCapture() {
+    EditorModeFrame(isImmersiveBlockActive = true) {
+        CameraCapturePreviewContent(
+            state = CameraCapturePreviewState.LiveCapture,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun EditorMode_CameraPermission() {
+    EditorModeFrame {
+        CameraCapturePreviewContent(
+            state = CameraCapturePreviewState.PermissionRequired,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun EditorMode_CameraReviewPhoto() {
+    EditorModeFrame(isImmersiveBlockActive = true) {
+        CameraCapturePreviewContent(
+            state =
+                CameraCapturePreviewState.Review(
+                    uri = SAMPLE_IMAGE_URI,
+                    mediaType = CapturedMediaType.PHOTO,
+                ),
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun EditorMode_CameraReviewVideo() {
+    EditorModeFrame(isImmersiveBlockActive = true) {
+        CameraCapturePreviewContent(
+            state =
+                CameraCapturePreviewState.Review(
+                    uri = SAMPLE_IMAGE_URI,
+                    mediaType = CapturedMediaType.VIDEO,
+                ),
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun EditorMode_VideoPicker() {
+    EditorModeFrame {
+        VideoPickerPreviewContent(
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun EditorMode_VideoFocused() {
+    EditorModeFrame {
+        VideoBlockEditor(
+            block =
+                VideoBlockUiState(
+                    uri = SAMPLE_VIDEO_URI,
+                    caption = "Golden hour commute",
+                    durationMs = 84_000L,
+                ),
+            onBlockUpdated = {},
+            onDeleteRequested = {},
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun EditorMode_ListMixedContent() {
+    ScreenshotTheme {
+        MainEditorContent(
+            uiState = previewListUiState(),
+            shouldReturnToPickerOnBack = false,
+            onDismissExpanded = {},
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@Composable
+private fun EditorModeFrame(
+    isImmersiveBlockActive: Boolean = false,
+    content: @Composable () -> Unit,
+) {
+    ScreenshotTheme {
+        ImmersiveEditorLayout(
+            isEditorFocused = true,
+            isImmersiveBlockActive = isImmersiveBlockActive,
+            topBarContent = {
+                NoteEditorToolbar(
+                    onBack = {},
+                    onSave = {},
+                    onShowDrafts = {},
+                    actionsVisible = !isImmersiveBlockActive,
+                )
+            },
+            editorContent = content,
+            bottomContent = {
+                EditorBottomContent(
+                    availableJournals = ScreenshotTestData.sampleJournals,
+                    selectedJournalIds = listOf(ScreenshotTestData.sampleJournal.id),
+                    onJournalSelectionChanged = {},
+                )
+            },
+        )
+    }
+}
+
+private fun previewListUiState() =
+    BlocksUiState(
+        blocks =
+            listOf(
+                TextBlockUiState(
+                    id = Uuid.parse("00000000-0000-0000-0000-000000000101"),
+                    content = "Wrapped the gallery picker in a calmer in-editor surface.",
+                ),
+                ImageBlockUiState(
+                    id = Uuid.parse("00000000-0000-0000-0000-000000000102"),
+                    uri = SAMPLE_IMAGE_URI,
+                    caption = "Workspace",
+                ),
+                TextBlockUiState(
+                    id = Uuid.parse("00000000-0000-0000-0000-000000000103"),
+                    content = "Need to tighten the camera review controls next.",
+                ),
+            ),
+        expandedBlockId = null,
+        availableJournals = ScreenshotTestData.sampleJournals,
+        selectedJournalIds = listOf(ScreenshotTestData.sampleJournal.id),
+        onBlockFocused = {},
+        onJournalSelectionChanged = {},
+        onUpdateBlock = {},
+        onCreateBlock = { _, _ -> error("Not used in screenshots") },
+        onDeleteBlock = {},
+    )
