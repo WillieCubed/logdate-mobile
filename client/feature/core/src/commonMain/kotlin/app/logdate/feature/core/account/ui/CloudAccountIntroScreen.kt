@@ -3,34 +3,29 @@
 package app.logdate.feature.core.account.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import app.logdate.ui.adaptive.AdaptivePaneLayout
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.`continue`
 import logdate.client.feature.core.generated.resources.logdate_cloud
@@ -79,25 +74,23 @@ fun CloudAccountIntroContent(
     modifier: Modifier = Modifier,
 ) {
     Scaffold { paddingValues ->
-        AdaptivePaneLayout(
+        Box(
             modifier =
-                modifier.padding(paddingValues),
-            contentWindowInsets = WindowInsets(0, 0, 0, 0),
-            contentPadding = PaddingValues(24.dp),
-            supportingPaneBreakpoint = 760.dp,
-            supportingPaneWidth = 300.dp,
-            mainPaneMinWidth = 320.dp,
-            mainPaneMaxWidth = 520.dp,
-            supportingPane = {
-                CloudAccountSupportingPane()
-            },
+                modifier
+                    .fillMaxWidth()
+                    .padding(paddingValues)
+                    .padding(24.dp),
+            contentAlignment = Alignment.TopCenter,
         ) {
             CloudAccountIntroBody(
                 isFromOnboarding = isFromOnboarding,
                 onContinue = onContinue,
                 onSkip = onSkip,
                 onBack = onBack,
-                modifier = modifier,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 520.dp),
             )
         }
     }
@@ -114,7 +107,7 @@ private fun CloudAccountIntroBody(
     Column(
         modifier =
             modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -178,35 +171,6 @@ private fun CloudAccountIntroBody(
             ) {
                 Text(stringResource(Res.string.not_now))
             }
-        }
-    }
-}
-
-@Composable
-private fun CloudAccountSupportingPane() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-    ) {
-        Column(
-            modifier = Modifier.padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(
-                text = "Why add LogDate Cloud?",
-                style = MaterialTheme.typography.titleLarge,
-            )
-            Text(
-                text =
-                    "Large-screen and multi-window workflows work best when your journals and memories stay available " +
-                        "across the devices you use throughout the day.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = "Passkeys only\nOffline-first access\nPrivate encrypted sync",
-                style = MaterialTheme.typography.titleMedium,
-            )
         }
     }
 }

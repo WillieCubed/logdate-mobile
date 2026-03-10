@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -28,7 +29,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -56,7 +56,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
-import app.logdate.ui.adaptive.AdaptivePaneLayout
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import logdate.client.feature.journal.generated.resources.*
@@ -213,71 +212,67 @@ fun JournalDetailScreenContent(
             ) { paddingValues ->
                 val listState = rememberLazyListState()
 
-                AdaptivePaneLayout(
+                Box(
                     modifier =
                         Modifier
                             .fillMaxSize()
                             .padding(paddingValues),
-                    contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                    contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
-                    mainPaneMaxWidth = 760.dp,
-                    supportingPaneBreakpoint = 960.dp,
-                    supportingPane = {
-                        JournalDetailSupportPane(
-                            uiState = uiState,
-                            onToggleSortOrder = onToggleSortOrder,
-                            onNavigateToShare = { onNavigateToShare(uiState.journalId) },
-                            onNavigateToSettings = { onNavigateToSettings(uiState.journalId) },
-                            onRequestDelete = onRequestDelete,
-                        )
-                    },
+                    contentAlignment = Alignment.TopCenter,
                 ) {
-                    if (uiState.entries.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(stringResource(Res.string.no_entries_in_this_journal_yet))
-                        }
-                    } else {
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                        ) {
-                            Row(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = Spacing.sm),
-                                horizontalArrangement = Arrangement.End,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    text =
-                                        if (uiState.sortOrder == SortOrder.NEWEST_FIRST) {
-                                            "Newest first"
-                                        } else {
-                                            "Oldest first"
-                                        },
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-
-                            LazyColumn(
-                                state = listState,
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+                                .widthIn(max = 760.dp),
+                    ) {
+                        if (uiState.entries.isEmpty()) {
+                            Box(
                                 modifier = Modifier.fillMaxSize(),
-                                contentPadding =
-                                    PaddingValues(
-                                        bottom = Spacing.xl,
-                                    ),
-                                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                                contentAlignment = Alignment.Center,
                             ) {
-                                items(uiState.entries) { entry ->
-                                    JournalEntryItem(
-                                        content = entry.content,
-                                        timestamp = entry.timestamp,
-                                        onClick = { onNavigateToNoteDetail(entry.id) },
+                                Text(stringResource(Res.string.no_entries_in_this_journal_yet))
+                            }
+                        } else {
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                            ) {
+                                Row(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = Spacing.sm),
+                                    horizontalArrangement = Arrangement.End,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text =
+                                            if (uiState.sortOrder == SortOrder.NEWEST_FIRST) {
+                                                "Newest first"
+                                            } else {
+                                                "Oldest first"
+                                            },
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
+                                }
+
+                                LazyColumn(
+                                    state = listState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding =
+                                        PaddingValues(
+                                            bottom = Spacing.xl,
+                                        ),
+                                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                                ) {
+                                    items(uiState.entries) { entry ->
+                                        JournalEntryItem(
+                                            content = entry.content,
+                                            timestamp = entry.timestamp,
+                                            onClick = { onNavigateToNoteDetail(entry.id) },
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -289,76 +284,6 @@ fun JournalDetailScreenContent(
                 DeleteConfirmationDialog(
                     onDismissRequest = onDismissDeleteConfirmation,
                     onConfirmation = onConfirmDelete,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun JournalDetailSupportPane(
-    uiState: JournalDetailUiState.Success,
-    onToggleSortOrder: () -> Unit,
-    onNavigateToShare: () -> Unit,
-    onNavigateToSettings: () -> Unit,
-    onRequestDelete: () -> Unit,
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
-            Text(
-                text = uiState.title,
-                style = MaterialTheme.typography.titleLarge,
-            )
-            Text(
-                text = "${uiState.entries.size} entries",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-                text =
-                    if (uiState.sortOrder == SortOrder.NEWEST_FIRST) {
-                        "Currently sorted by newest entries first."
-                    } else {
-                        "Currently sorted by oldest entries first."
-                    },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Button(
-                onClick = onToggleSortOrder,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    text =
-                        if (uiState.sortOrder == SortOrder.NEWEST_FIRST) {
-                            "Show oldest first"
-                        } else {
-                            "Show newest first"
-                        },
-                )
-            }
-            TextButton(
-                onClick = onNavigateToShare,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(text = stringResource(Res.string.share_journal_2))
-            }
-            TextButton(
-                onClick = onNavigateToSettings,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(text = stringResource(Res.string.journal_settings_2))
-            }
-            TextButton(
-                onClick = onRequestDelete,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    text = stringResource(Res.string.delete_journal_2),
-                    color = MaterialTheme.colorScheme.error,
                 )
             }
         }

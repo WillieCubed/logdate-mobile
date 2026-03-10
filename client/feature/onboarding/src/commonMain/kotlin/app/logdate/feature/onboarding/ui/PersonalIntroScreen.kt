@@ -17,10 +17,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,8 +33,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -63,7 +59,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import app.logdate.ui.adaptive.AdaptivePaneLayout
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
 import logdate.client.feature.onboarding.generated.resources.*
@@ -135,22 +130,15 @@ fun PersonalIntroContent(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    AdaptivePaneLayout(
+    Box(
         modifier = modifier,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        contentPadding = PaddingValues(horizontal = Spacing.lg),
-        supportingPaneBreakpoint = 760.dp,
-        supportingPaneWidth = 300.dp,
-        mainPaneMinWidth = 320.dp,
-        mainPaneMaxWidth = 520.dp,
-        supportingPane = {
-            PersonalIntroSupportPane(uiState = uiState)
-        },
+        contentAlignment = Alignment.TopCenter,
     ) {
         Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = Spacing.lg)
                     .verticalScroll(rememberScrollState())
                     .widthIn(max = 500.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -243,45 +231,6 @@ fun PersonalIntroContent(
                         )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun PersonalIntroSupportPane(uiState: PersonalIntroUiState) {
-    val headline =
-        when (uiState.currentStep) {
-            PersonalIntroStep.Name -> "Start with something simple"
-            PersonalIntroStep.Bio -> "Add enough context to feel personal"
-            PersonalIntroStep.LlmResponse -> "Your introduction is almost ready"
-        }
-    val body =
-        when (uiState.currentStep) {
-            PersonalIntroStep.Name ->
-                "A short name or nickname is enough. This helps LogDate make the rest of onboarding feel more personal without adding friction."
-            PersonalIntroStep.Bio ->
-                "A few words about your routines, relationships, or interests gives LogDate enough context to shape the experience around you."
-            PersonalIntroStep.LlmResponse ->
-                "Once your response is ready, LogDate saves it and uses it to personalize the rest of your setup."
-        }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-    ) {
-        Column(
-            modifier = Modifier.padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(
-                text = headline,
-                style = MaterialTheme.typography.titleLarge,
-            )
-            Text(
-                text = body,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }
