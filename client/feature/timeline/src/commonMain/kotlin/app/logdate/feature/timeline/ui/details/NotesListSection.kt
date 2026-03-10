@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.common.noteDragSource
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.ImageNoteUiState
@@ -69,7 +70,7 @@ private fun TextNoteSnippet(uiState: TextNoteUiState) {
         Surface(
             shape = MaterialTheme.shapes.small,
             color = MaterialTheme.colorScheme.surfaceContainerLow,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().noteDragSource(uiState.text),
         ) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(Spacing.xs),

@@ -340,6 +340,23 @@ class EntryEditorViewModel(
     }
 
     /**
+     * Appends a new text block populated with [text] to the current entry.
+     *
+     * Unlike [setInitialTextContent], this works regardless of whether the editor
+     * already has content, making it suitable for drag-and-drop text drops.
+     */
+    fun appendTextBlock(text: String) {
+        if (text.isBlank()) return
+        val newBlock = TextBlockUiState(content = text)
+        mutableEditorState.update { state ->
+            state.copy(
+                blocks = state.blocks + newBlock,
+                isModified = true,
+            )
+        }
+    }
+
+    /**
      * Removes a block from the entry.
      * Also clears the expanded block ID if the deleted block was currently expanded.
      */

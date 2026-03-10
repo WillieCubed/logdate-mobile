@@ -36,6 +36,7 @@ import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.feature.editor.ui.editor.rememberEditorAutoSave
 import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
 import app.logdate.feature.editor.ui.state.rememberBlocksUiState
+import app.logdate.ui.common.noteDropTarget
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -154,7 +155,7 @@ fun EntryEditorContent(
     }
 
     ImmersiveEditorLayout(
-        modifier = modifier,
+        modifier = modifier.noteDropTarget { viewModel.appendTextBlock(it) },
         isEditorFocused = editorState.expandedBlockId != null,
         isImmersiveBlockActive = isImmersiveBlockActive,
         immersiveExitProgress = chromeProgress.value,

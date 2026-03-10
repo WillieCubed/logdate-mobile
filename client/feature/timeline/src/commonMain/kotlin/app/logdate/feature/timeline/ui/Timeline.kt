@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.ui.common.noteDragSource
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.TimelineLine
 import app.logdate.util.toReadableDateShort
@@ -353,6 +354,7 @@ private fun TimelineContentItem(
                                         lineBreak = MaterialTheme.typography.bodyMedium.lineBreak,
                                     ),
                             ),
+                        modifier = Modifier.noteDragSource(item.content),
                     )
 //                    Text(
 //                        item.content,
