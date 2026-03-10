@@ -59,10 +59,10 @@ package app.logdate.navigation.scenes
  *
  * Screen Size Adaptations:
  *
- * The system adapts to three screen size categories:
- * - Small (<600dp): Bottom navigation, single-pane content
- * - Medium (600dp-1240dp): Side navigation rail, single-pane content
- * - Large (≥1240dp): Side navigation rail, two-pane content (where supported)
+ * The system adapts to three screen size categories (Material3 WindowSizeClass breakpoints):
+ * - Compact (<600dp): Bottom navigation, single-pane content
+ * - Medium (600dp–840dp): Side navigation rail, single-pane content
+ * - Expanded (≥840dp): Side navigation rail, two-pane content (where supported)
  *
  * Integration with Navigation 3:
  *
@@ -186,8 +186,8 @@ private const val FAB_TO_EDITOR_SHARED_ELEMENT_KEY = "fab_to_editor"
  * Timeline List     | Any            | MainTab         | HomeScene       | Yes (Bottom Nav/Rail)
  * Journal List      | Any            | MainTab         | HomeScene       | Yes (Bottom Nav/Rail)
  * Rewind List       | Any            | MainTab         | HomeScene       | Yes (Bottom Nav/Rail)
- * Timeline Detail   | Large (≥1240dp)| TwoPaneDetail   | HomeScene       | Yes (Two-pane with rail)
- * Timeline Detail   | Small/Medium   | TwoPaneDetail   | HomeScene       | No (Detail only)
+ * Timeline Detail   | Expanded (≥840dp)| TwoPaneDetail  | HomeScene       | Yes (Two-pane with rail)
+ * Timeline Detail   | Compact/Medium | TwoPaneDetail   | HomeScene       | No (Detail only)
  * Rewind Detail     | Any            | FullscreenDetail| FullscreenScene | No (Immersive)
  * Journal Detail    | Any            | FullscreenDetail| FullscreenScene | No (Immersive)
  * Settings          | Any            | Excluded        | (SettingsStrategy)| Strategy-dependent
@@ -239,7 +239,7 @@ sealed class RouteClassification {
      * with both main and detail content visible.
      *
      * On smaller screens, these routes display as full-screen details with hidden navigation.
-     * On larger screens (≥1240dp), they display side-by-side with their parent tab.
+     * On expanded screens (≥840dp), they display side-by-side with their parent tab.
      *
      * Examples: Timeline day details that can show alongside the timeline list.
      *
@@ -489,11 +489,11 @@ enum class HomeTab(
  *    - On larger screens (≥600dp): Side navigation rail
  *
  * 2. Content Layout:
- *    - On smaller screens (<600dp): Single-pane content that shows either:
+ *    - On compact screens (<600dp): Single-pane content that shows either:
  *      a) Main content (list/overview screens) when no detail is selected
  *      b) Full-screen detail content when a detail item is selected
- *    - On larger screens (≥600dp and <1240dp): Side rail + single content pane
- *    - On extra-large screens (≥1240dp): Side rail + two content panes (main + detail)
+ *    - On medium screens (600dp–840dp): Side rail + single content pane
+ *    - On expanded screens (≥840dp): Side rail + two content panes (main + detail)
  *
  * 3. Special Cases:
  *    - Journal details always show in full-screen mode regardless of screen size
@@ -543,13 +543,13 @@ class HomeScene<T : NavKey>(
      *      * FAB in standard bottom-right position (only shown on main screens)
      *      * Detail views replace main views completely
      *
-     *    - Medium screens (≥600dp width, <1240dp width):
+     *    - Medium screens (600dp–840dp width):
      *      * Side navigation rail (only shown on main screens, hidden on detail screens)
      *      * Single content pane
      *      * FAB at bottom of navigation rail
      *      * Detail views replace main views
      *
-     *    - Large screens (≥1240dp width):
+     *    - Expanded screens (≥840dp width):
      *      * Side navigation rail (always shown)
      *      * Two content panes side-by-side (main + detail)
      *      * FAB at bottom of navigation rail
@@ -786,9 +786,9 @@ class FullscreenScene<T : NavKey>(
  * - **Excluded routes** → `null` (handled by other strategies or NavDisplay)
  *
  * ### 3. Adaptive Layout Decisions
- * - **Small screens** (<600dp): Bottom navigation, single-pane content
- * - **Medium screens** (600dp-1240dp): Side rail, single-pane content
- * - **Large screens** (≥1240dp): Side rail, two-pane content (where supported)
+ * - **Compact screens** (<600dp): Bottom navigation, single-pane content
+ * - **Medium screens** (600dp–840dp): Side rail, single-pane content
+ * - **Expanded screens** (≥840dp): Side rail, two-pane content (where supported)
  *
  * ### 4. Entry Management Patterns
  * Different scene configurations require different entry management:
