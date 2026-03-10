@@ -25,12 +25,13 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import app.logdate.ui.PlatformDimensions
@@ -52,7 +53,6 @@ private val SIDE_PANEL_WIDTH = 280.dp
  * context panel (journal selector, metadata) on the right. The dark scrim is removed
  * so the editor feels like a native document editor rather than a modal dialog.
  *
- * @param isEditorFocused Whether the editor currently has input focus
  * @param topBarContent Content for the top action bar area (back button/navigation)
  * @param editorContent The main editor content displayed in the central area
  * @param bottomContent Context content (journal selector); shown at the bottom on narrow
@@ -66,7 +66,6 @@ private val SIDE_PANEL_WIDTH = 280.dp
 @Suppress("ktlint:standard:function-naming")
 @Composable
 fun ImmersiveEditorLayout(
-    isEditorFocused: Boolean,
     topBarContent: @Composable () -> Unit,
     editorContent: @Composable () -> Unit,
     bottomContent: @Composable () -> Unit,
@@ -87,7 +86,6 @@ fun ImmersiveEditorLayout(
     } else {
         NarrowEditorLayout(
             modifier = modifier,
-            isEditorFocused = isEditorFocused,
             topBarContent = topBarContent,
             editorContent = editorContent,
             bottomContent = bottomContent,
@@ -144,13 +142,7 @@ private fun ExpandedEditorLayout(
             }
 
             // Vertical divider between editor and panel
-            HorizontalDivider(
-                modifier =
-                    Modifier
-                        .width(1.dp)
-                        .fillMaxHeight(),
-                color = MaterialTheme.colorScheme.outlineVariant,
-            )
+            VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
             // Context side panel
             Column(
@@ -177,13 +169,12 @@ private fun ExpandedEditorLayout(
 @Suppress("ktlint:standard:function-naming")
 @Composable
 private fun NarrowEditorLayout(
-    isEditorFocused: Boolean,
     topBarContent: @Composable () -> Unit,
     editorContent: @Composable () -> Unit,
     bottomContent: @Composable () -> Unit,
     isImmersiveBlockActive: Boolean,
     immersiveExitProgress: Float,
-    screenWidth: androidx.compose.ui.unit.Dp,
+    screenWidth: Dp,
     modifier: Modifier = Modifier,
 ) {
     val maxWidth =

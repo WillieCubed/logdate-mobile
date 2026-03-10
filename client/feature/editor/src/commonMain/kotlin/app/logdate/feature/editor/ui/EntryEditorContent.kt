@@ -156,7 +156,6 @@ fun EntryEditorContent(
 
     ImmersiveEditorLayout(
         modifier = modifier.noteDropTarget { viewModel.appendTextBlock(it) },
-        isEditorFocused = editorState.expandedBlockId != null,
         isImmersiveBlockActive = isImmersiveBlockActive,
         immersiveExitProgress = chromeProgress.value,
         topBarContent = {
