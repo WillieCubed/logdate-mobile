@@ -1,15 +1,17 @@
 package app.logdate.server.logdate
 
-import app.logdate.server.sync.MediaRecord
-import app.logdate.server.sync.SyncRepository
 import app.logdate.shared.model.sync.DeviceId
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.absoluteValue
+import kotlin.random.Random
 
 /**
  * LogDate-owned media metadata record.
  *
- * This remains compatible with the existing sync APIs while removing direct route dependence on
- * [SyncRepository].
+ * This remains compatible with the existing sync APIs while keeping the server's internal
+ * language focused on LogDate media concepts rather than sync persistence details.
  */
 data class LogDateMedia(
     val mediaId: String,
@@ -50,62 +52,64 @@ interface LogDateMediaRepository {
 }
 
 /**
- * Transitional media metadata implementation backed by the existing sync repository.
+ * In-memory media metadata implementation for tests and non-database server runs.
  */
-class SyncBackedLogDateMediaRepository(
-    private val syncRepository: SyncRepository,
-) : LogDateMediaRepository {
+class InMemoryLogDateMediaRepository : LogDateMediaRepository {
+    private val rows = ConcurrentHashMap<UUID, ConcurrentHashMap<String, StoredLogDateMedia>>()
+    private val versions = ConcurrentHashMap<UUID, AtomicLong>()
+
     override fun upsertMedia(
         userId: UUID,
         media: LogDateMedia,
-    ): LogDateMedia = syncRepository.upsertMedia(userId, media.toSyncRecord()).toLogDateMedia()
+    ): LogDateMedia {
+        val mediaId = media.mediaId.ifBlank { "media-${Random.nextLong().absoluteValue}" }
+        val version = nextVersion(userId)
+        val stored =
+            media.copy(
+                mediaId = mediaId,
+                userId = userId,
+                version = version,
+            )
+        rowsForUser(userId)[mediaId] = StoredLogDateMedia(media = stored, deletedAt = null)
+        return stored
+    }
 
     override fun getMedia(
         userId: UUID,
         mediaId: String,
-    ): LogDateMedia? = syncRepository.getMedia(userId, mediaId)?.toLogDateMedia()
+    ): LogDateMedia? =
+        rowsForUser(userId)[mediaId]
+            ?.takeIf { it.deletedAt == null }
+            ?.media
 
     override fun deleteMedia(
         userId: UUID,
         mediaId: String,
         deletedAt: Long,
     ) {
-        syncRepository.deleteMedia(userId, mediaId, deletedAt)
+        val existing = rowsForUser(userId)[mediaId] ?: return
+        rowsForUser(userId)[mediaId] =
+            StoredLogDateMedia(
+                media = existing.media.copy(version = nextVersion(userId)),
+                deletedAt = deletedAt,
+            )
+    }
+
+    private fun rowsForUser(userId: UUID): ConcurrentHashMap<String, StoredLogDateMedia> = rows.getOrPut(userId) { ConcurrentHashMap() }
+
+    private fun nextVersion(userId: UUID): Long {
+        val counter = versions.getOrPut(userId) { AtomicLong(System.currentTimeMillis()) }
+        val candidate = System.currentTimeMillis()
+        return counter.updateAndGet { previous ->
+            when {
+                candidate > previous -> candidate
+                else -> previous + 1L
+            }
+        }
     }
 }
 
-private fun LogDateMedia.toSyncRecord(): MediaRecord =
-    MediaRecord(
-        mediaId = mediaId,
-        contentId = contentId,
-        userId = userId,
-        fileName = fileName,
-        mimeType = mimeType,
-        sizeBytes = sizeBytes,
-        data = data,
-        storagePath = storagePath,
-        createdAt = createdAt,
-        serverVersion = version,
-        deviceId = deviceId,
-        encryptionVersion = encryptionVersion,
-        encryptionKeyId = encryptionKeyId,
-        encryptionMode = encryptionMode,
-    )
-
-private fun MediaRecord.toLogDateMedia(): LogDateMedia =
-    LogDateMedia(
-        mediaId = mediaId,
-        contentId = contentId,
-        userId = userId,
-        fileName = fileName,
-        mimeType = mimeType,
-        sizeBytes = sizeBytes,
-        data = data,
-        storagePath = storagePath,
-        createdAt = createdAt,
-        version = serverVersion,
-        deviceId = deviceId,
-        encryptionVersion = encryptionVersion,
-        encryptionKeyId = encryptionKeyId,
-        encryptionMode = encryptionMode,
-    )
+private data class StoredLogDateMedia(
+    val media: LogDateMedia,
+    val deletedAt: Long?,
+)

@@ -1,8 +1,7 @@
 package app.logdate.server.logdate
 
-import app.logdate.server.sync.BackupRecord
-import app.logdate.server.sync.SyncRepository
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * LogDate-owned encrypted backup metadata.
@@ -40,49 +39,36 @@ interface LogDateBackupRepository {
 }
 
 /**
- * Transitional backup metadata implementation backed by the existing sync repository.
+ * In-memory backup metadata implementation for tests and non-database server runs.
  */
-class SyncBackedLogDateBackupRepository(
-    private val syncRepository: SyncRepository,
-) : LogDateBackupRepository {
+class InMemoryLogDateBackupRepository : LogDateBackupRepository {
+    private val rows = ConcurrentHashMap<UUID, ConcurrentHashMap<UUID, LogDateBackup>>()
+
     override fun createBackup(
         userId: UUID,
         backup: LogDateBackup,
-    ): LogDateBackup = syncRepository.createBackupRecord(userId, backup.toSyncRecord()).toLogDateBackup()
+    ): LogDateBackup {
+        val stored = backup.copy(userId = userId)
+        rowsForUser(userId)[stored.id] = stored
+        return stored
+    }
 
     override fun getBackup(
         userId: UUID,
         id: UUID,
-    ): LogDateBackup? = syncRepository.getBackupRecord(userId, id)?.toLogDateBackup()
+    ): LogDateBackup? = rowsForUser(userId)[id]
 
-    override fun listBackups(userId: UUID): List<LogDateBackup> = syncRepository.listBackups(userId).map(BackupRecord::toLogDateBackup)
+    override fun listBackups(userId: UUID): List<LogDateBackup> =
+        rowsForUser(userId)
+            .values
+            .sortedByDescending(LogDateBackup::createdAt)
 
     override fun deleteBackup(
         userId: UUID,
         id: UUID,
     ) {
-        syncRepository.deleteBackup(userId, id)
+        rowsForUser(userId).remove(id)
     }
+
+    private fun rowsForUser(userId: UUID): ConcurrentHashMap<UUID, LogDateBackup> = rows.getOrPut(userId) { ConcurrentHashMap() }
 }
-
-private fun LogDateBackup.toSyncRecord(): BackupRecord =
-    BackupRecord(
-        id = id,
-        userId = userId,
-        deviceId = deviceId,
-        manifest = manifest,
-        storagePath = storagePath,
-        createdAt = createdAt,
-        sizeBytes = sizeBytes,
-    )
-
-private fun BackupRecord.toLogDateBackup(): LogDateBackup =
-    LogDateBackup(
-        id = id,
-        userId = userId,
-        deviceId = deviceId,
-        manifest = manifest,
-        storagePath = storagePath,
-        createdAt = createdAt,
-        sizeBytes = sizeBytes,
-    )

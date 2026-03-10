@@ -185,7 +185,7 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
   - `studio.hypertext.logdate.association`
 - The backing store is `LogDateRepoStore`, which uses the shared repo engine for collection-aware reads, writes, cursors, and export semantics.
 - Entries, journals, and associations now persist through a canonical repo-backed `LogDateCollectionsRepository` implementation plus a metadata index for versions, tombstones, and change feeds.
-- Media metadata and encrypted backup metadata still live behind sync-owned interfaces today and remain the next boundary cutover.
+- Media metadata and encrypted backup metadata now persist through first-class LogDate-owned repository interfaces and are no longer constructed from `SyncRepository` in production wiring.
 
 ## Phase 6: Media, Blob, and Backup Boundary Cutover
 
@@ -194,6 +194,8 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
 - Media metadata moves behind a LogDate-owned repository interface instead of route code calling `SyncRepository` directly.
 - Backup metadata moves behind a LogDate-owned repository interface instead of route code calling `SyncRepository` directly.
 - Sync routes depend on LogDate-owned media and backup interfaces rather than the sync repository implementation.
+- Production wiring injects first-class media and backup repository implementations rather than constructing them from the sync repository.
+- The repo includes in-memory and PostgreSQL implementations for both media and backup metadata repositories.
 
 ### P6.2 Blob Storage Boundary
 
@@ -206,6 +208,7 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
 - Existing `/api/v1/media/*` behavior stays externally compatible for the first-party app.
 - Existing `/api/v1/backups/*` behavior stays externally compatible for the first-party app.
 - The cutover does not reintroduce ATProto-specific types into LogDate’s internal route and repository contracts.
+- Transitional sync-backed metadata adapters may remain as compatibility helpers until every remaining test and compatibility path is updated to the final repository interfaces.
 
 ## Phase 7: Final Hardening and Lifecycle Completion
 

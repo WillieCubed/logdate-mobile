@@ -3,15 +3,15 @@ package app.logdate.server.routes
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.configureSyncTestApp
 import app.logdate.server.crypto.PayloadPrefixes
+import app.logdate.server.logdate.LogDateBackup
+import app.logdate.server.logdate.LogDateMedia
 import app.logdate.server.routes.support.associationDeleteBody
 import app.logdate.server.routes.support.associationUploadBody
 import app.logdate.server.routes.support.backupMultipartWithFields
 import app.logdate.server.routes.support.contentUploadBody
 import app.logdate.server.routes.support.journalUploadBody
 import app.logdate.server.routes.support.mediaMultipartWithFields
-import app.logdate.server.sync.BackupRecord
 import app.logdate.server.sync.GcsMediaStorage
-import app.logdate.server.sync.MediaRecord
 import app.logdate.shared.model.sync.DeviceId
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
@@ -156,7 +156,7 @@ class SyncRoutesEdgeCasesTest {
 
             val envNoStorage = configureSyncTestApp()
             val authNoStorage = authHeader(envNoStorage.tokenService, userId)
-            envNoStorage.repository.upsertMedia(
+            envNoStorage.mediaRepository.upsertMedia(
                 userId,
                 mediaRecord(
                     userId = userId,
@@ -185,7 +185,7 @@ class SyncRoutesEdgeCasesTest {
             val env = configureSyncTestApp(mediaStorage = storage)
             val auth = authHeader(env.tokenService, userId)
 
-            env.repository.upsertMedia(
+            env.mediaRepository.upsertMedia(
                 userId,
                 mediaRecord(
                     userId = userId,
@@ -193,7 +193,7 @@ class SyncRoutesEdgeCasesTest {
                     storagePath = "missing-path",
                 ),
             )
-            env.repository.upsertMedia(
+            env.mediaRepository.upsertMedia(
                 userId,
                 mediaRecord(
                     userId = userId,
@@ -201,7 +201,7 @@ class SyncRoutesEdgeCasesTest {
                     storagePath = "invalid-cipher-path",
                 ),
             )
-            env.repository.upsertMedia(
+            env.mediaRepository.upsertMedia(
                 userId,
                 mediaRecord(
                     userId = userId,
@@ -261,7 +261,7 @@ class SyncRoutesEdgeCasesTest {
             assertEquals(HttpStatusCode.BadRequest, missingBinaryId.status)
 
             val backupMissing = UUID.randomUUID()
-            env.repository.createBackupRecord(userId, backupRecord(userId, backupMissing, "backup-missing"))
+            env.backupRepository.createBackup(userId, backupRecord(userId, backupMissing, "backup-missing"))
             val missingBinary =
                 client.get("/api/v1/backups/$backupMissing/binary") {
                     header(HttpHeaders.Authorization, auth)
@@ -269,7 +269,7 @@ class SyncRoutesEdgeCasesTest {
             assertEquals(HttpStatusCode.NotFound, missingBinary.status)
 
             val backupBadCipher = UUID.randomUUID()
-            env.repository.createBackupRecord(userId, backupRecord(userId, backupBadCipher, "backup-bad-cipher"))
+            env.backupRepository.createBackup(userId, backupRecord(userId, backupBadCipher, "backup-bad-cipher"))
             val decryptFail =
                 client.get("/api/v1/backups/$backupBadCipher/binary") {
                     header(HttpHeaders.Authorization, auth)
@@ -343,8 +343,8 @@ class SyncRoutesEdgeCasesTest {
         userId: UUID,
         mediaId: String,
         storagePath: String?,
-    ): MediaRecord =
-        MediaRecord(
+    ): LogDateMedia =
+        LogDateMedia(
             mediaId = mediaId,
             contentId = "content-$mediaId",
             userId = userId,
@@ -354,7 +354,7 @@ class SyncRoutesEdgeCasesTest {
             data = byteArrayOf(1, 2, 3),
             storagePath = storagePath,
             createdAt = 1L,
-            serverVersion = 1L,
+            version = 1L,
             deviceId = DeviceId("dev-1"),
         )
 
@@ -362,8 +362,8 @@ class SyncRoutesEdgeCasesTest {
         userId: UUID,
         id: UUID,
         storagePath: String,
-    ): BackupRecord =
-        BackupRecord(
+    ): LogDateBackup =
+        LogDateBackup(
             id = id,
             userId = userId,
             deviceId = "dev-1",

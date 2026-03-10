@@ -19,11 +19,15 @@ import app.logdate.server.database.AtprotoRepoBlocksTable
 import app.logdate.server.database.AtprotoRepoCommitsTable
 import app.logdate.server.database.AtprotoRepoHeadsTable
 import app.logdate.server.database.DatabaseConfig
+import app.logdate.server.database.LogDateBackupsTable
 import app.logdate.server.database.LogDateCollectionRecordsTable
 import app.logdate.server.database.LogDateCollectionStatesTable
+import app.logdate.server.database.LogDateMediaRecordsTable
 import app.logdate.server.database.PostgreSQLAccountIdentityRepository
 import app.logdate.server.database.PostgreSQLAccountRepository
+import app.logdate.server.database.PostgreSQLLogDateBackupRepository
 import app.logdate.server.database.PostgreSQLLogDateCollectionsMetadataStore
+import app.logdate.server.database.PostgreSQLLogDateMediaRepository
 import app.logdate.server.database.PostgreSQLPasskeyRepository
 import app.logdate.server.database.PostgreSQLRepoBlockStore
 import app.logdate.server.database.PostgreSQLSessionManager
@@ -35,8 +39,12 @@ import app.logdate.server.identity.InMemorySigningKeyRepository
 import app.logdate.server.identity.PlcIdentityService
 import app.logdate.server.identity.SigningKeyRepository
 import app.logdate.server.identity.SigningKeyService
+import app.logdate.server.logdate.InMemoryLogDateBackupRepository
 import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
+import app.logdate.server.logdate.InMemoryLogDateMediaRepository
+import app.logdate.server.logdate.LogDateBackupRepository
 import app.logdate.server.logdate.LogDateCollectionsMetadataStore
+import app.logdate.server.logdate.LogDateMediaRepository
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthAuthorizationService
 import app.logdate.server.oauth.OAuthClientMetadataResolver
@@ -94,6 +102,8 @@ fun initializeDatabase(): Boolean =
                     AtprotoRepoCommitsTable,
                     LogDateCollectionStatesTable,
                     LogDateCollectionRecordsTable,
+                    LogDateMediaRecordsTable,
+                    LogDateBackupsTable,
                 )
             }
         } else {
@@ -213,6 +223,22 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                 PostgreSQLLogDateCollectionsMetadataStore()
             } else {
                 InMemoryLogDateCollectionsMetadataStore()
+            }
+        }
+
+        single<LogDateMediaRepository> {
+            if (isDatabaseAvailable) {
+                PostgreSQLLogDateMediaRepository()
+            } else {
+                InMemoryLogDateMediaRepository()
+            }
+        }
+
+        single<LogDateBackupRepository> {
+            if (isDatabaseAvailable) {
+                PostgreSQLLogDateBackupRepository()
+            } else {
+                InMemoryLogDateBackupRepository()
             }
         }
 

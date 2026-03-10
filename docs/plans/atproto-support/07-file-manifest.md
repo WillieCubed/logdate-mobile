@@ -117,7 +117,10 @@ This manifest reflects the current AT Protocol implementation shape in the repo.
 - `server/src/main/kotlin/app/logdate/server/logdate/LogDateBackupRepository.kt`
 - `server/src/main/kotlin/app/logdate/server/logdate/LogDateSyncAdapters.kt`
 - `server/src/main/kotlin/app/logdate/server/database/PostgreSQLLogDateCollectionsMetadataStore.kt`
+- `server/src/main/kotlin/app/logdate/server/database/PostgreSQLLogDateMediaRepository.kt`
+- `server/src/main/kotlin/app/logdate/server/database/PostgreSQLLogDateBackupRepository.kt`
 - `server/src/main/resources/db/migration/V8__Add_logdate_collection_repo_index.sql`
+- `server/src/main/resources/db/migration/V9__Add_logdate_media_and_backup_tables.sql`
 
 ## Server OAuth and PDS-Compatible Routes
 
@@ -196,10 +199,14 @@ This manifest reflects the current AT Protocol implementation shape in the repo.
 - `server/src/test/kotlin/app/logdate/server/oauth/...`
 - `server/src/test/kotlin/app/logdate/server/atproto/...`
 - `server/src/test/kotlin/app/logdate/server/logdate/RepoBackedLogDateCollectionsRepositoryTest.kt`
+- `server/src/test/kotlin/app/logdate/server/logdate/InMemoryLogDateMediaRepositoryTest.kt`
+- `server/src/test/kotlin/app/logdate/server/logdate/InMemoryLogDateBackupRepositoryTest.kt`
 - `server/src/test/kotlin/app/logdate/server/logdate/SyncBackedLogDateCollectionsRepositoryTest.kt`
 - `server/src/test/kotlin/app/logdate/server/logdate/SyncBackedLogDateMediaRepositoryTest.kt`
 - `server/src/test/kotlin/app/logdate/server/logdate/SyncBackedLogDateBackupRepositoryTest.kt`
 - `server/src/test/kotlin/app/logdate/server/database/PostgreSQLLogDateCollectionsMetadataStoreTest.kt`
+- `server/src/test/kotlin/app/logdate/server/database/PostgreSQLLogDateMediaRepositoryTest.kt`
+- `server/src/test/kotlin/app/logdate/server/database/PostgreSQLLogDateBackupRepositoryTest.kt`
 - `server/src/test/kotlin/app/logdate/server/routes/Identity*.kt`
 - `server/src/test/kotlin/app/logdate/server/routes/OAuthRoutesTest.kt`
 - `server/src/test/kotlin/app/logdate/server/routes/Xrpc*.kt`

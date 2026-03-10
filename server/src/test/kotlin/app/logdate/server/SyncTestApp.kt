@@ -6,10 +6,10 @@ import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.InMemorySigningKeyRepository
 import app.logdate.server.identity.SigningKeyService
+import app.logdate.server.logdate.InMemoryLogDateBackupRepository
 import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
+import app.logdate.server.logdate.InMemoryLogDateMediaRepository
 import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
-import app.logdate.server.logdate.asLogDateBackupRepository
-import app.logdate.server.logdate.asLogDateMediaRepository
 import app.logdate.server.routes.syncRoutes
 import app.logdate.server.sync.GcsMediaStorage
 import app.logdate.server.sync.InMemorySyncRepository
@@ -31,6 +31,8 @@ import kotlin.uuid.Uuid
 data class SyncTestEnvironment(
     val tokenService: JwtTokenService,
     val repository: InMemorySyncRepository,
+    val mediaRepository: InMemoryLogDateMediaRepository,
+    val backupRepository: InMemoryLogDateBackupRepository,
     val metrics: SyncMetricsRegistry,
 )
 
@@ -56,6 +58,8 @@ fun TestApplicationBuilder.configureSyncTestApp(
             blockStore = InMemoryRepoBlockStore(),
             metadataStore = InMemoryLogDateCollectionsMetadataStore(),
         )
+    val mediaRepository = InMemoryLogDateMediaRepository()
+    val backupRepository = InMemoryLogDateBackupRepository()
     val json =
         Json {
             prettyPrint = true
@@ -79,12 +83,12 @@ fun TestApplicationBuilder.configureSyncTestApp(
                     metrics = metrics,
                     mediaAccessPolicy = mediaAccessPolicy,
                     collectionsRepository = collectionsRepository,
-                    mediaRepository = repository.asLogDateMediaRepository(),
-                    backupRepository = repository.asLogDateBackupRepository(),
+                    mediaRepository = mediaRepository,
+                    backupRepository = backupRepository,
                 )
             }
         }
     }
 
-    return SyncTestEnvironment(tokenService, repository, metrics)
+    return SyncTestEnvironment(tokenService, repository, mediaRepository, backupRepository, metrics)
 }

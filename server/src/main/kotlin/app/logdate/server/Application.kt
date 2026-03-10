@@ -12,10 +12,10 @@ import app.logdate.server.di.initializeDatabase
 import app.logdate.server.di.serverModule
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.SigningKeyService
+import app.logdate.server.logdate.LogDateBackupRepository
 import app.logdate.server.logdate.LogDateCollectionsMetadataStore
+import app.logdate.server.logdate.LogDateMediaRepository
 import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
-import app.logdate.server.logdate.asLogDateBackupRepository
-import app.logdate.server.logdate.asLogDateMediaRepository
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthAuthorizationService
 import app.logdate.server.oauth.OAuthConfig
@@ -131,6 +131,8 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     val webAuthnConfig: WebAuthnConfig by inject()
     val repoBlockStore: RepoBlockStore by inject()
     val logDateCollectionsMetadataStore: LogDateCollectionsMetadataStore by inject()
+    val logDateMediaRepository: LogDateMediaRepository by inject()
+    val logDateBackupRepository: LogDateBackupRepository by inject()
     val logDateCollectionsRepository =
         RepoBackedLogDateCollectionsRepository(
             accountRepository = accountRepository,
@@ -138,8 +140,6 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
             blockStore = repoBlockStore,
             metadataStore = logDateCollectionsMetadataStore,
         )
-    val logDateMediaRepository = syncRepository.asLogDateMediaRepository()
-    val logDateBackupRepository = syncRepository.asLogDateBackupRepository()
     val logDateRepoStore =
         LogDateRepoStore(
             collectionsRepository = logDateCollectionsRepository,

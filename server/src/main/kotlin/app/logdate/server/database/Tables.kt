@@ -180,3 +180,47 @@ object LogDateCollectionRecordsTable : Table("logdate_collection_records") {
         )
     }
 }
+
+object LogDateMediaRecordsTable : Table("logdate_media_records") {
+    val userId = uuid("user_id")
+    val mediaId = varchar("media_id", 128)
+    val contentId = varchar("content_id", 128)
+    val fileName = varchar("file_name", 256)
+    val mimeType = varchar("mime_type", 128)
+    val sizeBytes = long("size_bytes")
+    val data = binary("data")
+    val storagePath = text("storage_path").nullable()
+    val createdAt = long("created_at")
+    val version = long("version")
+    val deviceId = varchar("device_id", 128)
+    val deleted = bool("deleted").default(false)
+    val deletedAt = long("deleted_at").nullable()
+    val encryptionVersion = integer("encryption_version").nullable()
+    val encryptionKeyId = varchar("encryption_key_id", 128).nullable()
+    val encryptionMode = varchar("encryption_mode", 16).nullable()
+
+    override val primaryKey = PrimaryKey(userId, mediaId)
+
+    init {
+        index("idx_logdate_media_records_user", false, userId)
+        index("idx_logdate_media_records_user_content", false, userId, contentId)
+        index("idx_logdate_media_records_user_deleted", false, userId, deleted)
+    }
+}
+
+object LogDateBackupsTable : Table("logdate_backups") {
+    val id = uuid("id")
+    val userId = uuid("user_id")
+    val deviceId = varchar("device_id", 128)
+    val manifest = text("manifest")
+    val storagePath = text("storage_path")
+    val createdAt = long("created_at")
+    val sizeBytes = long("size_bytes")
+
+    override val primaryKey = PrimaryKey(id)
+
+    init {
+        index("idx_logdate_backups_user", false, userId)
+        index("idx_logdate_backups_user_created_at", false, userId, createdAt)
+    }
+}
