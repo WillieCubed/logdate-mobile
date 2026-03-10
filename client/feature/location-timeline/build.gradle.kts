@@ -50,6 +50,7 @@ kotlin {
             implementation(projects.client.repository)
             implementation(projects.client.location)
             implementation(projects.client.permissions)
+            implementation(projects.client.util)
 
             // Compose
             implementation(libs.compose.runtime)
@@ -63,6 +64,7 @@ kotlin {
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.napier)
 
             // Koin
             implementation(project.dependencies.platform(libs.koin.bom))
@@ -76,6 +78,9 @@ kotlin {
             // Architecture
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.lifecycle.runtime.compose)
+        }
+        androidMain.dependencies {
+            implementation(libs.google.maps.compose)
         }
     }
 }

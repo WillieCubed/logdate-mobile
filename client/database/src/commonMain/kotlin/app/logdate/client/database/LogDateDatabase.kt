@@ -23,6 +23,7 @@ import app.logdate.client.database.dao.TextNoteDao
 import app.logdate.client.database.dao.TranscriptionDao
 import app.logdate.client.database.dao.UserDevicesDao
 import app.logdate.client.database.dao.UserMediaDao
+import app.logdate.client.database.dao.UserPlaceDao
 import app.logdate.client.database.dao.VideoNoteDao
 import app.logdate.client.database.dao.journals.JournalContentDao
 import app.logdate.client.database.dao.maintenance.IntegrityDao
@@ -40,6 +41,7 @@ import app.logdate.client.database.entities.StorageMetadataEntity
 import app.logdate.client.database.entities.TextNoteEntity
 import app.logdate.client.database.entities.TranscriptionEntity
 import app.logdate.client.database.entities.UserDeviceEntity
+import app.logdate.client.database.entities.UserPlaceEntity
 import app.logdate.client.database.entities.VideoNoteEntity
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.database.entities.media.IndexedImageEntity
@@ -67,6 +69,7 @@ import app.logdate.client.database.migrations.MIGRATION_20_21
 import app.logdate.client.database.migrations.MIGRATION_21_22
 import app.logdate.client.database.migrations.MIGRATION_22_23
 import app.logdate.client.database.migrations.MIGRATION_23_24
+import app.logdate.client.database.migrations.MIGRATION_24_25
 import app.logdate.client.database.migrations.MIGRATION_2_3
 import app.logdate.client.database.migrations.MIGRATION_3_4
 import app.logdate.client.database.migrations.MIGRATION_4_5
@@ -116,8 +119,9 @@ import kotlinx.coroutines.IO
         // Others
         TranscriptionEntity::class,
         PlaceEntity::class,
+        UserPlaceEntity::class,
     ],
-    version = 24, // Scope sync metadata by server origin
+    version = 25, // Add offline user place persistence
     exportSchema = true,
 )
 @TypeConverters(
@@ -166,6 +170,8 @@ abstract class LogDateDatabase : RoomDatabase() {
     abstract fun integrityDao(): IntegrityDao
 
     abstract fun placeDao(): PlaceDao
+
+    abstract fun userPlaceDao(): UserPlaceDao
 }
 
 /**
@@ -225,6 +231,7 @@ fun getRoomDatabase(
                 MIGRATION_21_22,
                 MIGRATION_22_23,
                 MIGRATION_23_24,
+                MIGRATION_24_25,
             ).fallbackToDestructiveMigration(destroyTablesOnUpgrade)
             .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)
             .setQueryCoroutineContext(dispatcher)

@@ -2,12 +2,13 @@ package app.logdate.client.data.notes
 
 import app.logdate.client.database.entities.AudioNoteEntity
 import app.logdate.client.database.entities.ImageNoteEntity
+import app.logdate.client.database.entities.PlaceEntity
 import app.logdate.client.database.entities.TextNoteEntity
 import app.logdate.client.database.entities.VideoNoteEntity
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
-import kotlin.uuid.Uuid
+import app.logdate.client.repository.journals.NotePlace
 
 /**
  * Converts entity location fields to a NoteLocation domain model.
@@ -18,10 +19,10 @@ private fun mapLocation(
     longitude: Double?,
     altitude: Double?,
     accuracy: Float?,
-    placeId: Uuid?,
+    place: NotePlace?,
 ): NoteLocation? {
     // If we have no coordinates and no place reference, return null
-    if (latitude == null && longitude == null && placeId == null) {
+    if (latitude == null && longitude == null && place == null) {
         return null
     }
 
@@ -37,24 +38,20 @@ private fun mapLocation(
             null
         }
 
-    // TODO: Load place from PlaceDao when place_id is present
-    // For now, we only support coordinates. Place loading will be added
-    // when we implement the PlaceRepository.
-
     return NoteLocation(
         coordinates = coordinates,
-        place = null,
+        place = place,
     )
 }
 
-fun TextNoteEntity.toModel() =
+fun TextNoteEntity.toModel(place: NotePlace? = null) =
     JournalNote.Text(
         uid = uid,
         content = content,
         creationTimestamp = created,
         lastUpdated = lastUpdated,
         syncVersion = syncVersion,
-        location = mapLocation(latitude, longitude, altitude, locationAccuracy, placeId),
+        location = mapLocation(latitude, longitude, altitude, locationAccuracy, place),
     )
 
 fun JournalNote.Text.toEntity() =
@@ -71,14 +68,14 @@ fun JournalNote.Text.toEntity() =
         placeId = location?.place?.id,
     )
 
-fun ImageNoteEntity.toModel() =
+fun ImageNoteEntity.toModel(place: NotePlace? = null) =
     JournalNote.Image(
         uid = uid,
         mediaRef = contentUri,
         creationTimestamp = created,
         lastUpdated = lastUpdated,
         syncVersion = syncVersion,
-        location = mapLocation(latitude, longitude, altitude, locationAccuracy, placeId),
+        location = mapLocation(latitude, longitude, altitude, locationAccuracy, place),
     )
 
 fun JournalNote.Image.toEntity() =
@@ -95,14 +92,14 @@ fun JournalNote.Image.toEntity() =
         placeId = location?.place?.id,
     )
 
-fun VideoNoteEntity.toModel() =
+fun VideoNoteEntity.toModel(place: NotePlace? = null) =
     JournalNote.Video(
         uid = uid,
         mediaRef = contentUri,
         creationTimestamp = created,
         lastUpdated = lastUpdated,
         syncVersion = syncVersion,
-        location = mapLocation(latitude, longitude, altitude, locationAccuracy, placeId),
+        location = mapLocation(latitude, longitude, altitude, locationAccuracy, place),
     )
 
 fun JournalNote.Video.toEntity() =
@@ -119,7 +116,7 @@ fun JournalNote.Video.toEntity() =
         placeId = location?.place?.id,
     )
 
-fun AudioNoteEntity.toModel(): JournalNote.Audio =
+fun AudioNoteEntity.toModel(place: NotePlace? = null): JournalNote.Audio =
     JournalNote.Audio(
         uid = uid,
         mediaRef = contentUri,
@@ -127,7 +124,7 @@ fun AudioNoteEntity.toModel(): JournalNote.Audio =
         creationTimestamp = created,
         lastUpdated = lastUpdated,
         syncVersion = syncVersion,
-        location = mapLocation(latitude, longitude, altitude, locationAccuracy, placeId),
+        location = mapLocation(latitude, longitude, altitude, locationAccuracy, place),
     )
 
 fun JournalNote.Audio.toEntity() =
@@ -143,4 +140,12 @@ fun JournalNote.Audio.toEntity() =
         altitude = location?.coordinates?.altitude,
         locationAccuracy = location?.coordinates?.accuracy,
         placeId = location?.place?.id,
+    )
+
+internal fun PlaceEntity.toNotePlace() =
+    NotePlace(
+        id = id,
+        name = name,
+        latitude = latitude,
+        longitude = longitude,
     )

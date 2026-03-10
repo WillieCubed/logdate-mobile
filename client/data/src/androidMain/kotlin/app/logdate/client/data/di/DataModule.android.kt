@@ -12,11 +12,12 @@ import app.logdate.client.data.journals.RemoteJournalDataSource
 import app.logdate.client.data.location.OfflineFirstLocationHistoryRepository
 import app.logdate.client.data.maintenance.DataIntegrityService
 import app.logdate.client.data.media.OfflineIndexedMediaRepository
+import app.logdate.client.data.notes.DatabaseNotePlaceResolver
 import app.logdate.client.data.notes.OfflineFirstJournalNotesRepository
 import app.logdate.client.data.notes.drafts.AndroidLocalEntryDraftStore
 import app.logdate.client.data.notes.drafts.LocalEntryDraftStore
 import app.logdate.client.data.notes.drafts.OfflineFirstEntryDraftRepository
-import app.logdate.client.data.places.StubUserPlacesRepository
+import app.logdate.client.data.places.OfflineFirstUserPlacesRepository
 import app.logdate.client.data.profile.OfflineFirstProfileRepository
 import app.logdate.client.data.quota.StubRemoteQuotaDataSource
 import app.logdate.client.data.rewind.DefaultRewindGenerationManager
@@ -98,10 +99,12 @@ actual val dataModule: Module =
                 get(), // videoNoteDao
                 get(), // journalContentDao
                 get(), // journalRepository
+                get(), // notePlaceResolver
                 syncManagerProvider = { get() },
                 syncMetadataService = get(),
             )
         }
+        single { DatabaseNotePlaceResolver(get()) }
         single<JournalContentRepository> {
             OfflineFirstJournalContentRepository(
                 get(),
@@ -128,7 +131,7 @@ actual val dataModule: Module =
         single<LocationHistoryRepository> { OfflineFirstLocationHistoryRepository(get()) }
 
         // Places
-        single<UserPlacesRepository> { StubUserPlacesRepository() }
+        single<UserPlacesRepository> { OfflineFirstUserPlacesRepository(get()) }
 
         // Profile
         single<ProfileRepository> { OfflineFirstProfileRepository(get()) }

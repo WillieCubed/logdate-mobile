@@ -1,11 +1,14 @@
 package app.logdate.client.domain.di
 
+import app.logdate.client.domain.location.CaptureLocationForTimelineReviewUseCase
 import app.logdate.client.domain.location.DeleteLocationEntryUseCase
+import app.logdate.client.domain.location.DeleteLocationRangeUseCase
 import app.logdate.client.domain.location.GetLocationHistoryUseCase
 import app.logdate.client.domain.location.LocationRetryWorker
 import app.logdate.client.domain.location.LogCurrentLocationUseCase
 import app.logdate.client.domain.location.ObserveLocationHistoryUseCase
 import app.logdate.client.domain.location.ObserveLocationRetryStatusUseCase
+import app.logdate.client.domain.location.ObserveLocationStopsUseCase
 import app.logdate.client.domain.world.GetLocationUseCase
 import app.logdate.client.domain.world.LogLocationUseCase
 import app.logdate.client.domain.world.ObserveLocationUseCase
@@ -21,7 +24,9 @@ val locationDomainModule: Module =
         // Location History
         factory { GetLocationHistoryUseCase(get()) }
         factory { DeleteLocationEntryUseCase(get()) }
+        factory { DeleteLocationRangeUseCase(get()) }
         factory { ObserveLocationHistoryUseCase(get()) }
+        factory { ObserveLocationStopsUseCase(get()) }
 
         // World
         factory { GetLocationUseCase(get()) }
@@ -31,5 +36,6 @@ val locationDomainModule: Module =
         // Location retry system
         single { LocationRetryWorker(get(), get(), get()) }
         factory { LogCurrentLocationUseCase(get(), get(), get()) }
+        factory { CaptureLocationForTimelineReviewUseCase(get(), get()) }
         factory { ObserveLocationRetryStatusUseCase(get()) }
     }

@@ -26,4 +26,6 @@ val daosModule: Module =
         single { get<LogDateDatabase>().searchDao() }
         single { get<LogDateDatabase>().syncMetadataDao() }
         single { get<LogDateDatabase>().integrityDao() }
+        single { get<LogDateDatabase>().placeDao() }
+        single { get<LogDateDatabase>().userPlaceDao() }
     }

@@ -5,11 +5,16 @@ import app.logdate.client.database.dao.ImageNoteDao
 import app.logdate.client.database.dao.TextNoteDao
 import app.logdate.client.database.dao.VideoNoteDao
 import app.logdate.client.database.dao.journals.JournalContentDao
+import app.logdate.client.database.entities.AudioNoteEntity
+import app.logdate.client.database.entities.ImageNoteEntity
+import app.logdate.client.database.entities.TextNoteEntity
+import app.logdate.client.database.entities.VideoNoteEntity
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.repository.journals.ExportableJournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.journals.NotePlace
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.sync.NoOpSyncManager
 import app.logdate.client.sync.SyncManager
@@ -23,6 +28,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -41,6 +47,7 @@ class OfflineFirstJournalNotesRepository(
     private val videoNoteDao: VideoNoteDao,
     private val journalContentDao: JournalContentDao,
     private val journalRepository: JournalRepository,
+    private val notePlaceResolver: NotePlaceResolver = EmptyNotePlaceResolver,
     private val syncManagerProvider: () -> SyncManager = { NoOpSyncManager },
     private val syncMetadataService: SyncMetadataService,
     private val syncScope: CoroutineScope = CoroutineScope(Dispatchers.Default),
@@ -48,16 +55,15 @@ class OfflineFirstJournalNotesRepository(
     ExportableJournalContentRepository,
     SyncableJournalNotesRepository {
     override val allNotesObserved: Flow<List<JournalNote>> =
-        textNoteDao.getAllNotes().combine(
-            imageNoteDao
-                .getAllNotes()
-                .combine(audioNoteDao.getAllNotes()) { imageNotes, audioNotes ->
-                    imageNotes.map { it.toModel() } + audioNotes.map { it.toModel() }
-                }.combine(videoNoteDao.getAllNotes()) { imageAndAudioNotes, videoNotes ->
-                    imageAndAudioNotes + videoNotes.map { it.toModel() }
-                },
-        ) { textNotes, otherNotes ->
-            textNotes.map { it.toModel() } + otherNotes
+        notePlaceResolver.observeAll().combine(
+            observeNoteBuckets(
+                textFlow = textNoteDao.getAllNotes(),
+                imageFlow = imageNoteDao.getAllNotes(),
+                audioFlow = audioNoteDao.getAllNotes(),
+                videoFlow = videoNoteDao.getAllNotes(),
+            ),
+        ) { placeLookup, buckets ->
+            buckets.toNotes(placeLookup)
         }
 
     override fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> {
@@ -76,20 +82,16 @@ class OfflineFirstJournalNotesRepository(
         val startMillis = start.toEpochMilliseconds()
         val endMillis = end.toEpochMilliseconds()
 
-        return textNoteDao
-            .getNotesInRange(startMillis, endMillis)
-            .combine(
-                imageNoteDao
-                    .getNotesInRange(startMillis, endMillis)
-                    .combine(audioNoteDao.getNotesInRange(startMillis, endMillis)) { imageNotes, audioNotes ->
-                        imageNotes.map { it.toModel() } + audioNotes.map { it.toModel() }
-                    }.combine(videoNoteDao.getNotesInRange(startMillis, endMillis)) { imageAndAudioNotes, videoNotes ->
-                        imageAndAudioNotes + videoNotes.map { it.toModel() }
-                    },
-            ) { textNotes, otherNotes ->
-                val result = textNotes.map { it.toModel() } + otherNotes
-                result
-            }
+        return notePlaceResolver.observeAll().combine(
+            observeNoteBuckets(
+                textFlow = textNoteDao.getNotesInRange(startMillis, endMillis),
+                imageFlow = imageNoteDao.getNotesInRange(startMillis, endMillis),
+                audioFlow = audioNoteDao.getNotesInRange(startMillis, endMillis),
+                videoFlow = videoNoteDao.getNotesInRange(startMillis, endMillis),
+            ),
+        ) { placeLookup, buckets ->
+            buckets.toNotes(placeLookup)
+        }
     }
 
     override fun observeNotesPage(
@@ -97,22 +99,12 @@ class OfflineFirstJournalNotesRepository(
         offset: Int,
     ): Flow<List<JournalNote>> {
         // Since AudioNoteDao and VideoNoteDao don't have getNotesPage, handle pagination in memory.
-        return textNoteDao
-            .getAllNotes()
-            .combine(imageNoteDao.getAllNotes()) { textNotes, imageNotes ->
-                val textModels = textNotes.map { it.toModel() }
-                val imageModels = imageNotes.map { it.toModel() }
-                textModels + imageModels
-            }.combine(audioNoteDao.getAllNotes()) { initialNotes, audioNotes ->
-                val audioModels = audioNotes.map { it.toModel() }
-                initialNotes + audioModels
-            }.combine(videoNoteDao.getAllNotes()) { initialNotes, videoNotes ->
-                val videoModels = videoNotes.map { it.toModel() }
-                (initialNotes + videoModels)
-                    .sortedByDescending { it.creationTimestamp }
-                    .drop(offset)
-                    .take(pageSize)
-            }
+        return allNotesObserved.map { notes ->
+            notes
+                .sortedByDescending { it.creationTimestamp }
+                .drop(offset)
+                .take(pageSize)
+        }
     }
 
     override fun observeNotesStream(pageSize: Int): Flow<List<JournalNote>> =
@@ -121,28 +113,42 @@ class OfflineFirstJournalNotesRepository(
         allNotesObserved
 
     override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> =
-        textNoteDao
-            .getRecentNotes(limit)
-            .combine(
-                imageNoteDao
-                    .getRecentNotes(limit)
-                    .combine(audioNoteDao.getRecentNotes(limit)) { imageNotes, audioNotes ->
-                        imageNotes.map { it.toModel() } + audioNotes.map { it.toModel() }
-                    }.combine(videoNoteDao.getRecentNotes(limit)) { imageAndAudioNotes, videoNotes ->
-                        imageAndAudioNotes + videoNotes.map { it.toModel() }
-                    },
-            ) { textNotes, otherNotes ->
-                (textNotes.map { it.toModel() } + otherNotes)
-                    .sortedByDescending { it.creationTimestamp }
-                    .take(limit)
-            }
+        notePlaceResolver.observeAll().combine(
+            observeNoteBuckets(
+                textFlow = textNoteDao.getRecentNotes(limit),
+                imageFlow = imageNoteDao.getRecentNotes(limit),
+                audioFlow = audioNoteDao.getRecentNotes(limit),
+                videoFlow = videoNoteDao.getRecentNotes(limit),
+            ),
+        ) { placeLookup, buckets ->
+            buckets
+                .toNotes(placeLookup)
+                .sortedByDescending { it.creationTimestamp }
+                .take(limit)
+        }
 
     override suspend fun getNoteById(noteId: Uuid): JournalNote? {
         // Try each note type DAO until we find the note
-        runCatching { textNoteDao.getNoteOneOff(noteId).toModel() }.getOrNull()?.let { return it }
-        runCatching { imageNoteDao.getNoteOneOff(noteId).toModel() }.getOrNull()?.let { return it }
-        runCatching { audioNoteDao.getNoteOneOff(noteId).toModel() }.getOrNull()?.let { return it }
-        runCatching { videoNoteDao.getNoteOneOff(noteId).toModel() }.getOrNull()?.let { return it }
+        runCatching {
+            textNoteDao.getNoteOneOff(noteId).let { note ->
+                note.toModel(note.placeId?.let { placeId -> notePlaceResolver.get(placeId) })
+            }
+        }.getOrNull()?.let { return it }
+        runCatching {
+            imageNoteDao.getNoteOneOff(noteId).let { note ->
+                note.toModel(note.placeId?.let { placeId -> notePlaceResolver.get(placeId) })
+            }
+        }.getOrNull()?.let { return it }
+        runCatching {
+            audioNoteDao.getNoteOneOff(noteId).let { note ->
+                note.toModel(note.placeId?.let { placeId -> notePlaceResolver.get(placeId) })
+            }
+        }.getOrNull()?.let { return it }
+        runCatching {
+            videoNoteDao.getNoteOneOff(noteId).let { note ->
+                note.toModel(note.placeId?.let { placeId -> notePlaceResolver.get(placeId) })
+            }
+        }.getOrNull()?.let { return it }
         return null
     }
 
@@ -315,6 +321,39 @@ class OfflineFirstJournalNotesRepository(
             is JournalNote.Audio -> audioNoteDao.updateSyncMetadata(note.uid, syncVersion, syncedAt)
             is JournalNote.Video -> videoNoteDao.updateSyncMetadata(note.uid, syncVersion, syncedAt)
         }
+    }
+
+    private fun observeNoteBuckets(
+        textFlow: Flow<List<TextNoteEntity>>,
+        imageFlow: Flow<List<ImageNoteEntity>>,
+        audioFlow: Flow<List<AudioNoteEntity>>,
+        videoFlow: Flow<List<VideoNoteEntity>>,
+    ): Flow<NoteBuckets> =
+        textFlow
+            .combine(imageFlow) { textNotes, imageNotes ->
+                textNotes to imageNotes
+            }.combine(audioFlow) { textAndImageNotes, audioNotes ->
+                Triple(textAndImageNotes.first, textAndImageNotes.second, audioNotes)
+            }.combine(videoFlow) { textImageAndAudioNotes, videoNotes ->
+                NoteBuckets(
+                    textNotes = textImageAndAudioNotes.first,
+                    imageNotes = textImageAndAudioNotes.second,
+                    audioNotes = textImageAndAudioNotes.third,
+                    videoNotes = videoNotes,
+                )
+            }
+
+    private data class NoteBuckets(
+        val textNotes: List<TextNoteEntity>,
+        val imageNotes: List<ImageNoteEntity>,
+        val audioNotes: List<AudioNoteEntity>,
+        val videoNotes: List<VideoNoteEntity>,
+    ) {
+        fun toNotes(placeLookup: Map<Uuid, NotePlace>): List<JournalNote> =
+            textNotes.map { it.toModel(it.placeId?.let(placeLookup::get)) } +
+                imageNotes.map { it.toModel(it.placeId?.let(placeLookup::get)) } +
+                audioNotes.map { it.toModel(it.placeId?.let(placeLookup::get)) } +
+                videoNotes.map { it.toModel(it.placeId?.let(placeLookup::get)) }
     }
 
     override suspend fun updateMediaRef(

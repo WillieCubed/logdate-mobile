@@ -1,231 +1,220 @@
-@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
-
 package app.logdate.feature.location.timeline.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.logdate.client.domain.location.DeleteLocationEntryUseCase
-import app.logdate.client.domain.location.GetLocationHistoryUseCase
-import app.logdate.client.domain.location.ObserveLocationHistoryUseCase
+import app.logdate.client.domain.location.CaptureLocationForTimelineReviewUseCase
+import app.logdate.client.domain.location.DeleteLocationRangeUseCase
+import app.logdate.client.domain.location.LocationStop
+import app.logdate.client.domain.location.ObserveLocationStopsUseCase
 import app.logdate.client.domain.places.PlaceResolutionResult
 import app.logdate.client.domain.places.ResolveLocationToPlaceUseCase
-import app.logdate.client.domain.world.GetLocationUseCase
 import app.logdate.client.domain.world.ObserveLocationUseCase
-import app.logdate.client.repository.location.LocationHistoryItem
-import app.logdate.feature.location.timeline.ui.model.LocationTimelineItem
+import app.logdate.feature.location.timeline.ui.model.CurrentLocationUiModel
+import app.logdate.feature.location.timeline.ui.model.LocationLabelSource
+import app.logdate.feature.location.timeline.ui.model.LocationStopUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineUiState
 import app.logdate.shared.model.Location
-import kotlinx.coroutines.flow.*
+import app.logdate.util.localTime
+import app.logdate.util.toReadableDateShort
+import io.github.aakira.napier.Napier
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
-import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
-/**
- * ViewModel for the location timeline screen.
- */
 class LocationTimelineViewModel(
-    private val getLocationUseCase: GetLocationUseCase,
     private val observeLocationUseCase: ObserveLocationUseCase,
+    private val observeLocationStopsUseCase: ObserveLocationStopsUseCase,
     private val resolveLocationToPlaceUseCase: ResolveLocationToPlaceUseCase,
-    private val getLocationHistoryUseCase: GetLocationHistoryUseCase,
-    private val observeLocationHistoryUseCase: ObserveLocationHistoryUseCase,
-    private val deleteLocationEntryUseCase: DeleteLocationEntryUseCase,
+    private val deleteLocationRangeUseCase: DeleteLocationRangeUseCase,
+    private val captureLocationForTimelineReviewUseCase: CaptureLocationForTimelineReviewUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<LocationTimelineUiState>(LocationTimelineUiState.Loading)
     val uiState: StateFlow<LocationTimelineUiState> = _uiState.asStateFlow()
 
     init {
-        loadLocationTimeline()
+        captureLocationForTimelineReview()
+        observeTimeline()
     }
 
-    /**
-     * Refreshes the location timeline data.
-     * Useful when permissions are granted or user manually refreshes.
-     */
-    fun refreshData() {
-        loadLocationTimeline()
+    fun selectStop(stopId: String) {
+        val state = _uiState.value
+        if (state is LocationTimelineUiState.Success) {
+            _uiState.value = state.copy(selectedStopId = stopId)
+        }
     }
 
-    private fun loadLocationTimeline() {
-        // Combine current location and location history into a single flow
+    fun deleteStop(stopId: String) {
+        val state = _uiState.value as? LocationTimelineUiState.Success ?: return
+        val stop = state.stops.firstOrNull { it.id == stopId } ?: return
+
         viewModelScope.launch {
-            try {
-                // Start by showing loading state
-                _uiState.value = LocationTimelineUiState.Loading
-
-                // Combine current location and location history
-                combine(
-                    observeLocationUseCase()
-                        .map { location -> location as Location? }
-                        .catch { exception ->
-                            // Log the error but keep the flow alive
-                            println("LocationTimelineViewModel: Error observing location - ${exception.message}")
-                            emit(null)
-                        }.onStart { emit(null) }, // Start with null so we show loading state initially
-                    observeLocationHistoryUseCase()
-                        .catch { exception ->
-                            println("LocationTimelineViewModel: Error observing location history - ${exception.message}")
-                            emit(emptyList())
-                        },
-                ) { currentLocation, locationHistory ->
-                    val currentLocationItem =
-                        currentLocation?.let { location ->
-                            try {
-                                val placeResult = resolveLocationToPlaceUseCase(location)
-                                locationToTimelineItem(location, placeResult, isCurrentLocation = true)
-                            } catch (e: Exception) {
-                                null
-                            }
-                        }
-
-                    val historyItems =
-                        locationHistory.map { historyItem ->
-                            historyItemToTimelineItem(historyItem)
-                        }
-
-                    LocationTimelineUiState.Success(
-                        currentLocation = currentLocationItem,
-                        locationHistory = historyItems,
-                    )
-                }.collect { newState ->
-                    _uiState.value = newState
-                }
-            } catch (e: Exception) {
-                _uiState.value =
-                    LocationTimelineUiState.Error(
-                        message = e.message ?: "Unknown error occurred",
-                    )
+            deleteLocationRangeUseCase(
+                startTime = stop.startTime,
+                endTime = stop.endTime + 1.milliseconds,
+            ).onFailure { error ->
+                Napier.e("Failed to delete location stop ${stop.id}", error)
             }
         }
     }
 
-    fun deleteLocationEntry(locationId: String) {
+    private fun captureLocationForTimelineReview() {
         viewModelScope.launch {
-            try {
-                // Parse the locationId to extract userId, deviceId, and timestamp
-                // Format: "userId:deviceId:timestamp"
-                val parts = locationId.split(":")
-                if (parts.size == 3) {
-                    val userId = parts[0]
-                    val deviceId = parts[1]
-                    val timestamp = Instant.fromEpochMilliseconds(parts[2].toLong())
-
-                    deleteLocationEntryUseCase(userId, deviceId, timestamp)
-                }
-            } catch (e: Exception) {
-                // Handle deletion errors - could show a snackbar or error message
+            runCatching {
+                captureLocationForTimelineReviewUseCase()
+            }.onFailure { error ->
+                Napier.w("Failed to capture location for timeline review", error)
             }
         }
     }
 
-    private fun locationToTimelineItem(
-        location: Location,
-        placeResult: PlaceResolutionResult,
-        isCurrentLocation: Boolean = false,
-    ): LocationTimelineItem {
-        val now = Clock.System.now()
-        val placeName =
-            when (placeResult) {
-                is PlaceResolutionResult.UserDefinedPlace -> placeResult.place.name
-                is PlaceResolutionResult.ExternalSuggestion -> placeResult.suggestion.name
-                is PlaceResolutionResult.UnknownLocation -> "Unknown Location"
+    private fun observeTimeline() {
+        viewModelScope.launch {
+            combine(
+                observeLocationUseCase()
+                    .mapLatest { it as Location? }
+                    .catch { error ->
+                        Napier.w("Failed to observe current location", error)
+                        emit(null)
+                    }.onStart { emit(null) },
+                observeLocationStopsUseCase()
+                    .catch { error ->
+                        Napier.w("Failed to observe location stops", error)
+                        emit(emptyList())
+                    },
+            ) { currentLocation, stops ->
+                currentLocation to stops
+            }.mapLatest { (currentLocation, stops) ->
+                buildSuccessState(currentLocation, stops)
+            }.catch { error ->
+                Napier.e("Failed to build location timeline", error)
+                emit(LocationTimelineUiState.Error(error.message ?: "Unable to load your location timeline."))
+            }.collect { state ->
+                _uiState.value = state
+            }
+        }
+    }
+
+    private suspend fun buildSuccessState(
+        currentLocation: Location?,
+        stops: List<LocationStop>,
+    ): LocationTimelineUiState {
+        val mappedStops = stops.map { stop -> stop.toUiModel() }
+        val mappedCurrentLocation = currentLocation?.toCurrentLocationUiModel()
+        val existingSelection = (_uiState.value as? LocationTimelineUiState.Success)?.selectedStopId
+        val selectedStopId =
+            mappedStops.firstOrNull { it.id == existingSelection }?.id ?: mappedStops.firstOrNull()?.id
+
+        return LocationTimelineUiState.Success(
+            currentLocation = mappedCurrentLocation,
+            stops = mappedStops,
+            selectedStopId = selectedStopId,
+        )
+    }
+
+    private suspend fun Location.toCurrentLocationUiModel(): CurrentLocationUiModel {
+        val resolvedPlace = resolveLocationToPlaceUseCase(this)
+        val title =
+            when (resolvedPlace) {
+                is PlaceResolutionResult.UserDefinedPlace -> resolvedPlace.place.name
+                is PlaceResolutionResult.ExternalSuggestion -> resolvedPlace.suggestion.name
+                is PlaceResolutionResult.UnknownLocation -> "Current location"
+            }
+        val subtitle =
+            when (resolvedPlace) {
+                is PlaceResolutionResult.ExternalSuggestion -> resolvedPlace.suggestion.address
+                is PlaceResolutionResult.UserDefinedPlace -> formatCoordinates(latitude, longitude)
+                is PlaceResolutionResult.UnknownLocation -> formatCoordinates(latitude, longitude)
             }
 
-        val address =
-            when (placeResult) {
-                is PlaceResolutionResult.ExternalSuggestion -> placeResult.suggestion.address
-                else -> "${location.latitude}, ${location.longitude}"
+        return CurrentLocationUiModel(
+            title = title,
+            subtitle = subtitle,
+            latitude = latitude,
+            longitude = longitude,
+        )
+    }
+
+    private suspend fun LocationStop.toUiModel(): LocationStopUiModel {
+        val resolvedPlace = resolveLocationToPlaceUseCase(location)
+        val title: String
+        val subtitle: String
+        val sourceLabel: String
+        val source: LocationLabelSource
+
+        when (resolvedPlace) {
+            is PlaceResolutionResult.UserDefinedPlace -> {
+                title = resolvedPlace.place.name
+                subtitle = formatCoordinates(location.latitude, location.longitude)
+                sourceLabel = "Saved"
+                source = LocationLabelSource.USER_DEFINED
             }
 
-        return LocationTimelineItem(
-            id = if (isCurrentLocation) "current_location" else "current_${now.toEpochMilliseconds()}",
-            placeName = placeName,
-            address = address,
+            is PlaceResolutionResult.ExternalSuggestion -> {
+                title = resolvedPlace.suggestion.name
+                subtitle = resolvedPlace.suggestion.address
+                sourceLabel = "Google"
+                source = LocationLabelSource.GOOGLE_PLACES
+            }
+
+            is PlaceResolutionResult.UnknownLocation -> {
+                title = "Pinned location"
+                subtitle = formatCoordinates(location.latitude, location.longitude)
+                sourceLabel = "Coordinates"
+                source = LocationLabelSource.COORDINATES
+            }
+        }
+
+        return LocationStopUiModel(
+            id = id,
+            title = title,
+            subtitle = subtitle,
             latitude = location.latitude,
             longitude = location.longitude,
-            timestamp = now.toEpochMilliseconds(),
-            timeAgo = if (isCurrentLocation) "Now" else formatTimeAgo(now),
-            isCurrentLocation = isCurrentLocation,
+            startedAt = startTime.localTime,
+            endedAt = endTime.localTime,
+            timeRange = formatTimeRange(startTime, endTime),
+            duration = formatDuration(duration),
+            sourceLabel = sourceLabel,
+            source = source,
+            sampleCount = sampleCount,
+            startTime = startTime,
+            endTime = endTime,
         )
     }
 
-    private suspend fun historyItemToTimelineItem(historyItem: LocationHistoryItem): LocationTimelineItem {
-        val placeResult = resolveLocationToPlaceUseCase(historyItem.location)
-
-        val placeName =
-            when (placeResult) {
-                is PlaceResolutionResult.UserDefinedPlace -> placeResult.place.name
-                is PlaceResolutionResult.ExternalSuggestion -> placeResult.suggestion.name
-                is PlaceResolutionResult.UnknownLocation -> "Unknown Location"
-            }
-
-        val address =
-            when (placeResult) {
-                is PlaceResolutionResult.ExternalSuggestion -> placeResult.suggestion.address
-                else -> "${historyItem.location.latitude}, ${historyItem.location.longitude}"
-            }
-
-        return LocationTimelineItem(
-            id = "${historyItem.userId}:${historyItem.deviceId}:${historyItem.timestamp.toEpochMilliseconds()}",
-            placeName = placeName,
-            address = address,
-            latitude = historyItem.location.latitude,
-            longitude = historyItem.location.longitude,
-            timestamp = historyItem.timestamp.toEpochMilliseconds(),
-            timeAgo = formatTimeAgo(historyItem.timestamp),
-            isCurrentLocation = false,
-        )
-    }
-
-    private fun formatTimeAgo(timestamp: Instant): String {
-        val now = Clock.System.now()
-        val duration = now - timestamp
-
-        return when {
-            duration < 1.minutes -> "Just now"
-            duration < 1.hours -> "${duration.inWholeMinutes}m ago"
-            duration < 1.days -> "${duration.inWholeHours}h ago"
-            else -> "${duration.inWholeDays}d ago"
+    private fun formatTimeRange(
+        startTime: Instant,
+        endTime: Instant,
+    ): String {
+        val sameDay = startTime.toReadableDateShort() == endTime.toReadableDateShort()
+        return if (sameDay) {
+            "${startTime.localTime} - ${endTime.localTime}"
+        } else {
+            "${startTime.toReadableDateShort()}, ${startTime.localTime} - ${endTime.toReadableDateShort()}, ${endTime.localTime}"
         }
     }
 
-    // TODO: Remove this mock data when real location history is implemented
-    private fun generateMockLocationHistory(): List<LocationTimelineItem> {
-        val now = Clock.System.now()
-        return listOf(
-            LocationTimelineItem(
-                id = "1",
-                placeName = "Home",
-                address = "123 Main St, Anytown",
-                latitude = 37.7749,
-                longitude = -122.4194,
-                timestamp = (now - 2.hours).toEpochMilliseconds(),
-                timeAgo = "2h ago",
-                duration = "8h 30m",
-            ),
-            LocationTimelineItem(
-                id = "2",
-                placeName = "Coffee Shop",
-                address = "456 Oak Ave, Anytown",
-                latitude = 37.7849,
-                longitude = -122.4094,
-                timestamp = (now - 4.hours).toEpochMilliseconds(),
-                timeAgo = "4h ago",
-                duration = "1h 15m",
-            ),
-            LocationTimelineItem(
-                id = "3",
-                placeName = "Work",
-                address = "789 Business Blvd, Anytown",
-                latitude = 37.7649,
-                longitude = -122.4294,
-                timestamp = (now - 1.days).toEpochMilliseconds(),
-                timeAgo = "1d ago",
-                duration = "9h 45m",
-            ),
-        )
-    }
+    private fun formatDuration(duration: Duration): String =
+        when {
+            duration >= 1.days -> "${duration.inWholeDays}d ${duration.inWholeHours % 24}h"
+            duration >= 1.hours -> "${duration.inWholeHours}h ${duration.inWholeMinutes % 60}m"
+            duration >= 1.minutes -> "${duration.inWholeMinutes}m"
+            else -> "<1m"
+        }
+
+    private fun formatCoordinates(
+        latitude: Double,
+        longitude: Double,
+    ): String = "${formatCoordinateValue(latitude)}, ${formatCoordinateValue(longitude)}"
 }

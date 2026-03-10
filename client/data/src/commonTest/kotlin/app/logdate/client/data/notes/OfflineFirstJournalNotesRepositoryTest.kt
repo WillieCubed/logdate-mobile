@@ -11,8 +11,13 @@ import app.logdate.client.data.fakes.FakeVideoNoteDao
 import app.logdate.client.database.entities.JournalEntity
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.NoteCoordinates
+import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.repository.journals.NotePlace
 import app.logdate.shared.model.Journal
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -58,17 +63,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         syncManager = FakeSyncManager()
         syncMetadataService = FakeSyncMetadataService()
 
-        repository =
-            OfflineFirstJournalNotesRepository(
-                textNoteDao = textNoteDao,
-                imageNoteDao = imageNoteDao,
-                audioNoteDao = FakeAudioNoteDao(),
-                videoNoteDao = videoNoteDao,
-                journalContentDao = journalContentDao,
-                journalRepository = journalRepository,
-                syncManagerProvider = { syncManager },
-                syncMetadataService = syncMetadataService,
-            )
+        repository = createRepository()
     }
 
     @AfterTest
@@ -324,6 +319,34 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
+    fun allNotesObserved_hydratesSemanticPlaceFromResolver() =
+        runTest {
+            val place =
+                NotePlace(
+                    id = Uuid.random(),
+                    name = "Home",
+                    latitude = 37.3317,
+                    longitude = -122.0301,
+                )
+            repository = createRepository(FakeNotePlaceResolver(place))
+
+            val textNote =
+                createTestTextNote().copy(
+                    location =
+                        NoteLocation(
+                            coordinates = NoteCoordinates(latitude = 37.3317, longitude = -122.0301),
+                            place = place,
+                        ),
+                )
+            textNoteDao.addNote(textNote.toEntity())
+
+            val observedNote = repository.allNotesObserved.first().single() as JournalNote.Text
+
+            assertEquals("Home", observedNote.location?.displayName)
+            assertEquals(place.id, observedNote.location?.place?.id)
+        }
+
+    @Test
     fun removeFromJournal_removesNoteJournalLink() =
         runTest {
             val journal = createTestJournal()
@@ -389,4 +412,27 @@ class OfflineFirstJournalNotesRepositoryTest {
             created = created,
             lastUpdated = lastUpdated,
         )
+
+    private fun createRepository(notePlaceResolver: NotePlaceResolver = EmptyNotePlaceResolver) =
+        OfflineFirstJournalNotesRepository(
+            textNoteDao = textNoteDao,
+            imageNoteDao = imageNoteDao,
+            audioNoteDao = FakeAudioNoteDao(),
+            videoNoteDao = videoNoteDao,
+            journalContentDao = journalContentDao,
+            journalRepository = journalRepository,
+            notePlaceResolver = notePlaceResolver,
+            syncManagerProvider = { syncManager },
+            syncMetadataService = syncMetadataService,
+        )
+
+    private class FakeNotePlaceResolver(
+        private val places: Map<Uuid, NotePlace>,
+    ) : NotePlaceResolver {
+        constructor(vararg places: NotePlace) : this(places.associateBy(NotePlace::id))
+
+        override suspend fun get(placeId: Uuid): NotePlace? = places[placeId]
+
+        override fun observeAll(): Flow<Map<Uuid, NotePlace>> = flowOf(places)
+    }
 }
