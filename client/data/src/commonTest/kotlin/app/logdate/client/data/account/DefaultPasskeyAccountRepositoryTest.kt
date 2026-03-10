@@ -609,6 +609,8 @@ class DefaultPasskeyAccountRepositoryTest {
                     registrationOptions =
                         PasskeyRegistrationOptions(
                             challenge = "challenge123",
+                            rpId = "logdate.app",
+                            rpName = "LogDate",
                             user =
                                 PasskeyUser(
                                     id = "user123",
@@ -809,15 +811,22 @@ class DefaultPasskeyAccountRepositoryTest {
 
         override suspend fun updateTokens(
             username: String,
+            backendUrl: String,
             accessToken: String,
             refreshToken: String,
         ): Result<Unit> = updateTokensResponse
 
-        override suspend fun removeAccount(username: String): Result<Unit> = Result.success(Unit)
+        override suspend fun removeAccount(
+            username: String,
+            backendUrl: String,
+        ): Result<Unit> = Result.success(Unit)
 
         override suspend fun getStoredAccounts(): Result<List<PlatformAccountInfo>> = Result.success(emptyList())
 
-        override suspend fun getTokens(username: String): Result<TokenPair?> =
+        override suspend fun getTokens(
+            username: String,
+            backendUrl: String,
+        ): Result<TokenPair?> =
             Result.success(
                 TokenPair(
                     accessToken = "access_token_123",

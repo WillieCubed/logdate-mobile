@@ -13,6 +13,7 @@ import app.logdate.client.data.location.OfflineFirstLocationHistoryRepository
 import app.logdate.client.data.maintenance.DataIntegrityService
 import app.logdate.client.data.media.OfflineIndexedMediaRepository
 import app.logdate.client.data.notes.DatabaseNotePlaceResolver
+import app.logdate.client.data.notes.NotePlaceResolver
 import app.logdate.client.data.notes.OfflineFirstJournalNotesRepository
 import app.logdate.client.data.notes.drafts.DesktopLocalEntryDraftStore
 import app.logdate.client.data.notes.drafts.LocalEntryDraftStore
@@ -101,7 +102,7 @@ actual val dataModule: Module =
                 syncMetadataService = get(),
             )
         }
-        single { DatabaseNotePlaceResolver(get()) }
+        single<NotePlaceResolver> { DatabaseNotePlaceResolver(get()) }
         single<JournalContentRepository> {
             OfflineFirstJournalContentRepository(
                 get(),
