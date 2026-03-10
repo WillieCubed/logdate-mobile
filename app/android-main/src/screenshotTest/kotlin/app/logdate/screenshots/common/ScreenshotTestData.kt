@@ -14,8 +14,17 @@ object ScreenshotTestData {
     /** Tablet device spec for adaptive layout screenshots. */
     const val TABLET = "spec:width=1280dp,height=800dp"
 
+    /** Portrait tablet device spec for adaptive layout screenshots. */
+    const val TABLET_PORTRAIT = "spec:width=800dp,height=1280dp"
+
     /** Landscape phone device spec for adaptive layout screenshots. */
     const val PHONE_LANDSCAPE = "spec:width=891dp,height=411dp"
+
+    /** Medium-width split-window spec used for adaptive regression coverage. */
+    const val SPLIT_MEDIUM = "spec:width=700dp,height=900dp"
+
+    /** Desktop-style freeform window spec used for large-screen audits. */
+    const val DESKTOP_WINDOW = "spec:width=1440dp,height=900dp"
 
     private val baseTimestamp = Instant.fromEpochMilliseconds(1_740_000_000_000L) // ~Feb 2025
 

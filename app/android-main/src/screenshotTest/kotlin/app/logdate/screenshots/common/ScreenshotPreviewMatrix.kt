@@ -1,9 +1,12 @@
 package app.logdate.screenshots.common
 
 import androidx.compose.ui.tooling.preview.Preview
+import app.logdate.screenshots.common.ScreenshotTestData.DESKTOP_WINDOW
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE_LANDSCAPE
+import app.logdate.screenshots.common.ScreenshotTestData.SPLIT_MEDIUM
 import app.logdate.screenshots.common.ScreenshotTestData.TABLET
+import app.logdate.screenshots.common.ScreenshotTestData.TABLET_PORTRAIT
 
 /**
  * Standard screenshot preview matrix for route and screen coverage.
@@ -24,3 +27,12 @@ import app.logdate.screenshots.common.ScreenshotTestData.TABLET
 @Preview(name = "Landscape", showBackground = true, device = PHONE_LANDSCAPE)
 @Preview(name = "Tablet", showBackground = true, device = TABLET)
 annotation class ScreenshotPreviewMatrix
+
+/**
+ * Focused large-screen preview matrix for adaptive regression coverage.
+ */
+@Preview(name = "Split Medium", showBackground = true, device = SPLIT_MEDIUM)
+@Preview(name = "Tablet Landscape", showBackground = true, device = TABLET)
+@Preview(name = "Tablet Portrait", showBackground = true, device = TABLET_PORTRAIT)
+@Preview(name = "Desktop Window", showBackground = true, device = DESKTOP_WINDOW)
+annotation class LargeScreenAuditPreviewMatrix
