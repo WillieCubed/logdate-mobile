@@ -149,3 +149,34 @@ object AtprotoRepoCommitsTable : Table("atproto_repo_commits") {
         index("idx_atproto_repo_commits_repo_revision", false, repoDid, revision)
     }
 }
+
+object LogDateCollectionStatesTable : Table("logdate_collection_states") {
+    val userId = uuid("user_id")
+    val repoDid = varchar("repo_did", 255)
+    val lastVersion = long("last_version")
+    val updatedAt = timestamp("updated_at")
+
+    override val primaryKey = PrimaryKey(userId)
+}
+
+object LogDateCollectionRecordsTable : Table("logdate_collection_records") {
+    val userId = uuid("user_id")
+    val collection = varchar("collection", 32)
+    val recordKey = varchar("record_key", 255)
+    val serverVersion = long("server_version")
+    val deleted = bool("deleted").default(false)
+    val deletedAt = long("deleted_at").nullable()
+
+    override val primaryKey = PrimaryKey(userId, collection, recordKey)
+
+    init {
+        index(
+            "idx_logdate_collection_records_user_collection_deleted_version",
+            false,
+            userId,
+            collection,
+            deleted,
+            serverVersion,
+        )
+    }
+}

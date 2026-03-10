@@ -20,7 +20,7 @@ import java.util.UUID
 class SyncBackedLogDateCollectionsRepository(
     private val syncRepository: SyncRepository,
 ) : LogDateCollectionsRepository {
-    override fun status(userId: UUID): LogDateCollectionsStatus =
+    override suspend fun status(userId: UUID): LogDateCollectionsStatus =
         syncRepository.status(userId).let { status ->
             LogDateCollectionsStatus(
                 entryCount = status.contentCount,
@@ -30,9 +30,13 @@ class SyncBackedLogDateCollectionsRepository(
             )
         }
 
-    override fun listEntries(userId: UUID): List<LogDateEntry> = loadAllEntries(userId = userId, changes = syncRepository::contentChanges)
+    override suspend fun listEntries(userId: UUID): List<LogDateEntry> =
+        loadAllEntries(
+            userId = userId,
+            changes = syncRepository::contentChanges,
+        )
 
-    override fun upsertEntry(
+    override suspend fun upsertEntry(
         userId: UUID,
         entry: LogDateEntry,
     ): LogDateEntry =
@@ -53,12 +57,12 @@ class SyncBackedLogDateCollectionsRepository(
                     ),
             ).toEntry()
 
-    override fun getEntry(
+    override suspend fun getEntry(
         userId: UUID,
         id: String,
     ): LogDateEntry? = syncRepository.getContent(userId = userId, id = id)?.toEntry()
 
-    override fun deleteEntry(
+    override suspend fun deleteEntry(
         userId: UUID,
         id: String,
         deletedAt: Long,
@@ -66,7 +70,7 @@ class SyncBackedLogDateCollectionsRepository(
         syncRepository.deleteContent(userId = userId, id = id, deletedAt = deletedAt)
     }
 
-    override fun entryChanges(
+    override suspend fun entryChanges(
         userId: UUID,
         since: Long,
         limit: Int,
@@ -75,10 +79,10 @@ class SyncBackedLogDateCollectionsRepository(
             .contentChanges(userId = userId, since = since, limit = limit)
             .toEntryChanges()
 
-    override fun listJournals(userId: UUID): List<LogDateJournal> =
+    override suspend fun listJournals(userId: UUID): List<LogDateJournal> =
         loadAllJournals(userId = userId, changes = syncRepository::journalChanges)
 
-    override fun upsertJournal(
+    override suspend fun upsertJournal(
         userId: UUID,
         journal: LogDateJournal,
     ): LogDateJournal =
@@ -97,12 +101,12 @@ class SyncBackedLogDateCollectionsRepository(
                     ),
             ).toJournal()
 
-    override fun getJournal(
+    override suspend fun getJournal(
         userId: UUID,
         id: String,
     ): LogDateJournal? = syncRepository.getJournal(userId = userId, id = id)?.toJournal()
 
-    override fun deleteJournal(
+    override suspend fun deleteJournal(
         userId: UUID,
         id: String,
         deletedAt: Long,
@@ -110,7 +114,7 @@ class SyncBackedLogDateCollectionsRepository(
         syncRepository.deleteJournal(userId = userId, id = id, deletedAt = deletedAt)
     }
 
-    override fun journalChanges(
+    override suspend fun journalChanges(
         userId: UUID,
         since: Long,
         limit: Int,
@@ -119,10 +123,10 @@ class SyncBackedLogDateCollectionsRepository(
             .journalChanges(userId = userId, since = since, limit = limit)
             .toJournalChanges()
 
-    override fun listAssociations(userId: UUID): List<LogDateAssociation> =
+    override suspend fun listAssociations(userId: UUID): List<LogDateAssociation> =
         loadAllAssociations(userId = userId, changes = syncRepository::associationChanges)
 
-    override fun upsertAssociations(
+    override suspend fun upsertAssociations(
         userId: UUID,
         associations: List<LogDateAssociation>,
     ): List<LogDateAssociation> {
@@ -146,7 +150,7 @@ class SyncBackedLogDateCollectionsRepository(
         }
     }
 
-    override fun deleteAssociations(
+    override suspend fun deleteAssociations(
         userId: UUID,
         associations: List<LogDateAssociationRef>,
         deletedAt: Long,
@@ -161,7 +165,7 @@ class SyncBackedLogDateCollectionsRepository(
         )
     }
 
-    override fun associationChanges(
+    override suspend fun associationChanges(
         userId: UUID,
         since: Long,
         limit: Int,
@@ -169,6 +173,19 @@ class SyncBackedLogDateCollectionsRepository(
         syncRepository
             .associationChanges(userId = userId, since = since, limit = limit)
             .toAssociationChanges()
+
+    override suspend fun purgeTombstones(
+        userId: UUID,
+        olderThan: Long,
+    ): LogDateCollectionsPurgeResult =
+        syncRepository.purgeTombstones(userId = userId, olderThan = olderThan).let { result ->
+            LogDateCollectionsPurgeResult(
+                entryPurged = result.contentPurged,
+                journalPurged = result.journalPurged,
+                associationPurged = result.associationPurged,
+                cutoff = result.cutoff,
+            )
+        }
 }
 
 private fun ContentRecord.toEntry(): LogDateEntry =

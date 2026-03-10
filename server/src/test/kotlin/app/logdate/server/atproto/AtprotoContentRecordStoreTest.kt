@@ -8,12 +8,14 @@ import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.InMemorySigningKeyRepository
 import app.logdate.server.identity.SigningKeyService
-import app.logdate.server.sync.ContentRecord
-import app.logdate.server.sync.InMemorySyncRepository
+import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
+import app.logdate.server.logdate.LogDateEntry
+import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
 import app.logdate.shared.model.sync.DeviceId
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import studio.hypertext.atproto.repo.InMemoryRepoBlockStore
 import studio.hypertext.atproto.repo.RepoRecordId
 import studio.hypertext.atproto.repo.UnsupportedCollectionException
 import studio.hypertext.atproto.syntax.Nsid
@@ -36,7 +38,6 @@ class AtprotoContentRecordStoreTest {
     fun `collectionsForDid reflects whether content exists`() =
         kotlinx.coroutines.test.runTest {
             val accountRepository = InMemoryAccountRepository()
-            val syncRepository = InMemorySyncRepository()
             val identityService = identityService(accountRepository)
             val account =
                 identityService.ensureIdentity(
@@ -49,22 +50,23 @@ class AtprotoContentRecordStoreTest {
                         ),
                     ),
                 )
-            val store = AtprotoContentRecordStore(syncRepository = syncRepository, identityService = identityService)
+            val context = canonicalStore(accountRepository, identityService)
+            val store = context.store
 
             assertTrue(store.collectionsForDid(account.did!!).isEmpty())
 
-            syncRepository.upsertContent(
+            context.collectionsRepository.upsertEntry(
                 userId = account.id.toJavaUUID(),
-                record =
-                    ContentRecord(
+                entry =
+                    LogDateEntry(
                         id = "entry-1",
                         type = "TEXT",
                         content = "hello",
                         mediaUri = null,
-                        durationMs = 0,
+                        durationMs = 0L,
                         createdAt = 1L,
                         lastUpdated = 1L,
-                        serverVersion = 0L,
+                        version = 0L,
                         deviceId = DeviceId("device-a"),
                     ),
             )
@@ -91,7 +93,7 @@ class AtprotoContentRecordStoreTest {
             val repoDid =
                 studio.hypertext.atproto.identity.AtprotoDid
                     .require(account.did!!)
-            val store = AtprotoContentRecordStore(syncRepository = InMemorySyncRepository(), identityService = identityService)
+            val store = canonicalStore(accountRepository, identityService).store
             val created =
                 store
                     .createRecord(
@@ -161,7 +163,7 @@ class AtprotoContentRecordStoreTest {
             val repoDid =
                 studio.hypertext.atproto.identity.AtprotoDid
                     .require(account.did!!)
-            val store = AtprotoContentRecordStore(syncRepository = InMemorySyncRepository(), identityService = identityService)
+            val store = canonicalStore(accountRepository, identityService).store
             val recordId =
                 RepoRecordId(
                     repo = repoDid,
@@ -241,7 +243,7 @@ class AtprotoContentRecordStoreTest {
             val repoDid =
                 studio.hypertext.atproto.identity.AtprotoDid
                     .require(account.did!!)
-            val store = AtprotoContentRecordStore(syncRepository = InMemorySyncRepository(), identityService = identityService)
+            val store = canonicalStore(accountRepository, identityService).store
 
             val unsupported =
                 store
@@ -265,7 +267,6 @@ class AtprotoContentRecordStoreTest {
     fun `listRecords supports reverse pagination and createRecord generates record keys`() =
         kotlinx.coroutines.test.runTest {
             val accountRepository = InMemoryAccountRepository()
-            val syncRepository = InMemorySyncRepository()
             val identityService = identityService(accountRepository)
             val account =
                 identityService.ensureIdentity(
@@ -281,51 +282,52 @@ class AtprotoContentRecordStoreTest {
             val repoDid =
                 studio.hypertext.atproto.identity.AtprotoDid
                     .require(account.did!!)
-            val store = AtprotoContentRecordStore(syncRepository = syncRepository, identityService = identityService)
+            val context = canonicalStore(accountRepository, identityService)
+            val store = context.store
             val userId = account.id.toJavaUUID()
 
-            syncRepository.upsertContent(
+            context.collectionsRepository.upsertEntry(
                 userId = userId,
-                record =
-                    ContentRecord(
+                entry =
+                    LogDateEntry(
                         id = "entry-1",
                         type = "TEXT",
                         content = "first",
                         mediaUri = null,
-                        durationMs = 0,
+                        durationMs = 0L,
                         createdAt = 1L,
                         lastUpdated = 1L,
-                        serverVersion = 1L,
+                        version = 0L,
                         deviceId = DeviceId("device-a"),
                     ),
             )
-            syncRepository.upsertContent(
+            context.collectionsRepository.upsertEntry(
                 userId = userId,
-                record =
-                    ContentRecord(
+                entry =
+                    LogDateEntry(
                         id = "entry-2",
                         type = "TEXT",
                         content = "second",
                         mediaUri = null,
-                        durationMs = 0,
+                        durationMs = 0L,
                         createdAt = 2L,
                         lastUpdated = 2L,
-                        serverVersion = 2L,
+                        version = 0L,
                         deviceId = DeviceId("device-a"),
                     ),
             )
-            syncRepository.upsertContent(
+            context.collectionsRepository.upsertEntry(
                 userId = userId,
-                record =
-                    ContentRecord(
+                entry =
+                    LogDateEntry(
                         id = "entry-3",
                         type = "TEXT",
                         content = "third",
                         mediaUri = null,
-                        durationMs = 0,
+                        durationMs = 0L,
                         createdAt = 3L,
                         lastUpdated = 3L,
-                        serverVersion = 3L,
+                        version = 0L,
                         deviceId = DeviceId("device-a"),
                     ),
             )
@@ -373,7 +375,6 @@ class AtprotoContentRecordStoreTest {
     fun `ascending pagination and delete swap failures cover repo store interface paths`() =
         kotlinx.coroutines.test.runTest {
             val accountRepository = InMemoryAccountRepository()
-            val syncRepository = InMemorySyncRepository()
             val identityService = identityService(accountRepository)
             val account =
                 identityService.ensureIdentity(
@@ -390,7 +391,7 @@ class AtprotoContentRecordStoreTest {
                 studio.hypertext.atproto.identity.AtprotoDid
                     .require(account.did!!)
             val store: studio.hypertext.atproto.repo.RepoRecordStore =
-                AtprotoContentRecordStore(syncRepository = syncRepository, identityService = identityService)
+                canonicalStore(accountRepository, identityService).store
 
             store
                 .createRecord(
@@ -466,7 +467,6 @@ class AtprotoContentRecordStoreTest {
     fun `record store preserves existing values and surfaces unknown repo errors`() =
         kotlinx.coroutines.test.runTest {
             val accountRepository = InMemoryAccountRepository()
-            val syncRepository = InMemorySyncRepository()
             val identityService = identityService(accountRepository)
             val account =
                 identityService.ensureIdentity(
@@ -479,7 +479,7 @@ class AtprotoContentRecordStoreTest {
                         ),
                     ),
                 )
-            val store = AtprotoContentRecordStore(syncRepository = syncRepository, identityService = identityService)
+            val store = canonicalStore(accountRepository, identityService).store
             val recordId =
                 RepoRecordId(
                     repo =
@@ -565,7 +565,7 @@ class AtprotoContentRecordStoreTest {
             val repoDid =
                 studio.hypertext.atproto.identity.AtprotoDid
                     .require(account.did!!)
-            val store = AtprotoContentRecordStore(syncRepository = InMemorySyncRepository(), identityService = identityService)
+            val store = canonicalStore(accountRepository, identityService).store
             val writeResult =
                 store
                     .createRecord(
@@ -607,6 +607,29 @@ class AtprotoContentRecordStoreTest {
             config = AtprotoIdentityConfig(handleDomain = "logdate.app", pdsServiceEndpoint = "https://logdate.app"),
         )
 
+    private fun canonicalStore(
+        accountRepository: AccountRepository,
+        identityService: AtprotoIdentityService,
+    ): CanonicalStoreContext {
+        val blockStore = InMemoryRepoBlockStore()
+        val collectionsRepository =
+            RepoBackedLogDateCollectionsRepository(
+                accountRepository = accountRepository,
+                identityService = identityService,
+                blockStore = blockStore,
+                metadataStore = InMemoryLogDateCollectionsMetadataStore(),
+            )
+        return CanonicalStoreContext(
+            collectionsRepository = collectionsRepository,
+            store =
+                AtprotoContentRecordStore(
+                    collectionsRepository = collectionsRepository,
+                    identityService = identityService,
+                    blockStore = blockStore,
+                ),
+        )
+    }
+
     private class YieldingAccountRepository(
         private val delegate: InMemoryAccountRepository = InMemoryAccountRepository(),
     ) : AccountRepository by delegate {
@@ -621,3 +644,8 @@ class AtprotoContentRecordStoreTest {
         vararg parameterTypes: Class<*>,
     ): Method = getDeclaredMethod(name, *parameterTypes)
 }
+
+private data class CanonicalStoreContext(
+    val collectionsRepository: RepoBackedLogDateCollectionsRepository,
+    val store: AtprotoContentRecordStore,
+)

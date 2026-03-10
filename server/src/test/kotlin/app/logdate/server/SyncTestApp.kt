@@ -1,6 +1,13 @@
 package app.logdate.server
 
+import app.logdate.server.auth.InMemoryAccountRepository
 import app.logdate.server.auth.JwtTokenService
+import app.logdate.server.identity.AtprotoIdentityConfig
+import app.logdate.server.identity.AtprotoIdentityService
+import app.logdate.server.identity.InMemorySigningKeyRepository
+import app.logdate.server.identity.SigningKeyService
+import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
+import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
 import app.logdate.server.routes.syncRoutes
 import app.logdate.server.sync.GcsMediaStorage
 import app.logdate.server.sync.InMemorySyncRepository
@@ -15,6 +22,7 @@ import io.ktor.server.routing.routing
 import io.ktor.server.testing.TestApplicationBuilder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
+import studio.hypertext.atproto.repo.InMemoryRepoBlockStore
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -32,6 +40,20 @@ fun TestApplicationBuilder.configureSyncTestApp(
     mediaStorage: GcsMediaStorage? = null,
     mediaAccessPolicy: MediaAccessPolicy = MediaAccessPolicy(useSignedUrls = false, signedUrlTtlHours = 1),
 ): SyncTestEnvironment {
+    val accountRepository = InMemoryAccountRepository()
+    val atprotoIdentityService =
+        AtprotoIdentityService(
+            accountRepository = accountRepository,
+            signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "sync-test-kek"),
+            config = AtprotoIdentityConfig(handleDomain = "logdate.app", pdsServiceEndpoint = "https://logdate.app"),
+        )
+    val collectionsRepository =
+        RepoBackedLogDateCollectionsRepository(
+            accountRepository = accountRepository,
+            identityService = atprotoIdentityService,
+            blockStore = InMemoryRepoBlockStore(),
+            metadataStore = InMemoryLogDateCollectionsMetadataStore(),
+        )
     val json =
         Json {
             prettyPrint = true
@@ -55,6 +77,7 @@ fun TestApplicationBuilder.configureSyncTestApp(
                     mediaStorage = mediaStorage,
                     metrics = metrics,
                     mediaAccessPolicy = mediaAccessPolicy,
+                    collectionsRepository = collectionsRepository,
                 )
             }
         }

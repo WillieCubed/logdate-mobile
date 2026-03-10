@@ -15,7 +15,6 @@ import app.logdate.server.sync.GcsMediaStorage
 import app.logdate.server.sync.MediaAccessPolicy
 import app.logdate.server.sync.MediaRecord
 import app.logdate.server.sync.SyncMetricsRegistry
-import app.logdate.server.sync.SyncPurgeResult
 import app.logdate.server.sync.SyncRepository
 import app.logdate.shared.model.sync.AssociationChange
 import app.logdate.shared.model.sync.AssociationChangesResponse
@@ -137,16 +136,6 @@ private suspend fun ApplicationCall.respondMissingMultipartField(field: String) 
         error("VALIDATION_ERROR", "Missing required multipart field: $field"),
     )
 }
-
-private fun SyncPurgeResult.toResponse(retentionDaysApplied: Long): SyncPurgeResponse =
-    SyncPurgeResponse(
-        contentPurged = contentPurged,
-        journalPurged = journalPurged,
-        associationPurged = associationPurged,
-        mediaPurged = mediaPurged,
-        cutoff = cutoff,
-        retentionDaysApplied = retentionDaysApplied,
-    )
 
 private fun LogDateEntry.toContentChange(): ContentChange =
     ContentChange(
@@ -1320,8 +1309,17 @@ fun Route.syncRoutes(
                     }
                     val safeRetentionDays = retentionDays.coerceAtMost(3650L)
                     val cutoff = System.currentTimeMillis() - (safeRetentionDays * MILLIS_PER_DAY)
-                    val result = repository.purgeTombstones(userId, cutoff)
-                    call.respond(result.toResponse(retentionDaysApplied = safeRetentionDays))
+                    val result = collectionsRepository.purgeTombstones(userId, cutoff)
+                    call.respond(
+                        SyncPurgeResponse(
+                            contentPurged = result.entryPurged,
+                            journalPurged = result.journalPurged,
+                            associationPurged = result.associationPurged,
+                            mediaPurged = 0,
+                            cutoff = result.cutoff,
+                            retentionDaysApplied = safeRetentionDays,
+                        ),
+                    )
                     success = true
                 } finally {
                     metrics.recordOperation(METRIC_SYNC_PURGE, System.currentTimeMillis() - start, success)

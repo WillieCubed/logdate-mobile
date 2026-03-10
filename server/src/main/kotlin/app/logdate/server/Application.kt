@@ -12,7 +12,8 @@ import app.logdate.server.di.initializeDatabase
 import app.logdate.server.di.serverModule
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.SigningKeyService
-import app.logdate.server.logdate.SyncBackedLogDateCollectionsRepository
+import app.logdate.server.logdate.LogDateCollectionsMetadataStore
+import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthAuthorizationService
 import app.logdate.server.oauth.OAuthConfig
@@ -127,7 +128,14 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     val oauthAuthorizationService: OAuthAuthorizationService by inject()
     val webAuthnConfig: WebAuthnConfig by inject()
     val repoBlockStore: RepoBlockStore by inject()
-    val logDateCollectionsRepository = SyncBackedLogDateCollectionsRepository(syncRepository)
+    val logDateCollectionsMetadataStore: LogDateCollectionsMetadataStore by inject()
+    val logDateCollectionsRepository =
+        RepoBackedLogDateCollectionsRepository(
+            accountRepository = accountRepository,
+            identityService = atprotoIdentityService,
+            blockStore = repoBlockStore,
+            metadataStore = logDateCollectionsMetadataStore,
+        )
     val logDateRepoStore =
         LogDateRepoStore(
             collectionsRepository = logDateCollectionsRepository,

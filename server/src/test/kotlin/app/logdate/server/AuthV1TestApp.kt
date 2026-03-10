@@ -16,7 +16,8 @@ import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.InMemorySigningKeyRepository
 import app.logdate.server.identity.SigningKeyService
-import app.logdate.server.logdate.SyncBackedLogDateCollectionsRepository
+import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
+import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthAuthorizationService
 import app.logdate.server.oauth.OAuthClientMetadataResolver
@@ -89,12 +90,19 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
             signingKeyService = signingKeyService,
             config = atprotoIdentityConfig,
         )
-    val logDateCollectionsRepository = SyncBackedLogDateCollectionsRepository(syncRepository)
+    val repoBlockStore = InMemoryRepoBlockStore()
+    val logDateCollectionsRepository =
+        RepoBackedLogDateCollectionsRepository(
+            accountRepository = accountRepository,
+            identityService = atprotoIdentityService,
+            blockStore = repoBlockStore,
+            metadataStore = InMemoryLogDateCollectionsMetadataStore(),
+        )
     val logDateRepoStore =
         LogDateRepoStore(
             collectionsRepository = logDateCollectionsRepository,
             identityService = atprotoIdentityService,
-            blockStore = InMemoryRepoBlockStore(),
+            blockStore = repoBlockStore,
         )
     atprotoIdentityService.setRepoCollectionsResolver(logDateRepoStore::collectionsForDid)
     val oauthKeyService = OAuthKeyService()

@@ -10,11 +10,14 @@ import app.logdate.server.auth.SessionManager
 import app.logdate.server.database.DatabaseConfig
 import app.logdate.server.database.PostgreSQLAccountIdentityRepository
 import app.logdate.server.database.PostgreSQLAccountRepository
+import app.logdate.server.database.PostgreSQLLogDateCollectionsMetadataStore
 import app.logdate.server.database.PostgreSQLPasskeyRepository
 import app.logdate.server.database.PostgreSQLRepoBlockStore
 import app.logdate.server.database.PostgreSQLSessionManager
 import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.PlcIdentityService
+import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
+import app.logdate.server.logdate.LogDateCollectionsMetadataStore
 import app.logdate.server.passkeys.InMemoryPasskeyRepository
 import app.logdate.server.passkeys.PasskeyRepository
 import app.logdate.server.passkeys.WebAuthnPasskeyService
@@ -68,6 +71,7 @@ class ServerModuleTest {
         assertIs<InMemorySessionManager>(koin.get<SessionManager>())
         assertIs<InMemorySyncRepository>(koin.get<SyncRepository>())
         assertIs<InMemoryRepoBlockStore>(koin.get<RepoBlockStore>())
+        assertIs<InMemoryLogDateCollectionsMetadataStore>(koin.get<LogDateCollectionsMetadataStore>())
         assertIs<WebAuthnPasskeyService>(koin.get<WebAuthnPasskeyService>())
         assertIs<GoogleIdTokenVerifier>(koin.get<GoogleIdTokenVerifier>())
         assertTrue(koin.get<WebAuthnPasskeyService>().relyingPartyId.isNotBlank())
@@ -87,6 +91,7 @@ class ServerModuleTest {
         assertIs<PostgreSQLSessionManager>(koin.get<SessionManager>())
         assertIs<DbSyncRepository>(koin.get<SyncRepository>())
         assertIs<PostgreSQLRepoBlockStore>(koin.get<RepoBlockStore>())
+        assertIs<PostgreSQLLogDateCollectionsMetadataStore>(koin.get<LogDateCollectionsMetadataStore>())
         assertIs<WebAuthnPasskeyService>(koin.get<WebAuthnPasskeyService>())
     }
 

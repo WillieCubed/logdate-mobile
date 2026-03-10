@@ -46,6 +46,13 @@ data class LogDateCollectionsStatus(
     val lastTimestamp: Long,
 )
 
+data class LogDateCollectionsPurgeResult(
+    val entryPurged: Int,
+    val journalPurged: Int,
+    val associationPurged: Int,
+    val cutoff: Long,
+)
+
 data class LogDateChangeSet<T, D>(
     val changes: List<T>,
     val deletions: List<D>,
@@ -80,72 +87,77 @@ data class LogDateAssociationDeletion(
  * internal persistence language.
  */
 interface LogDateCollectionsRepository {
-    fun status(userId: UUID): LogDateCollectionsStatus
+    suspend fun status(userId: UUID): LogDateCollectionsStatus
 
-    fun listEntries(userId: UUID): List<LogDateEntry>
+    suspend fun listEntries(userId: UUID): List<LogDateEntry>
 
-    fun upsertEntry(
+    suspend fun upsertEntry(
         userId: UUID,
         entry: LogDateEntry,
     ): LogDateEntry
 
-    fun getEntry(
+    suspend fun getEntry(
         userId: UUID,
         id: String,
     ): LogDateEntry?
 
-    fun deleteEntry(
+    suspend fun deleteEntry(
         userId: UUID,
         id: String,
         deletedAt: Long,
     )
 
-    fun entryChanges(
+    suspend fun entryChanges(
         userId: UUID,
         since: Long,
         limit: Int,
     ): LogDateChangeSet<LogDateEntry, LogDateEntryDeletion>
 
-    fun listJournals(userId: UUID): List<LogDateJournal>
+    suspend fun listJournals(userId: UUID): List<LogDateJournal>
 
-    fun upsertJournal(
+    suspend fun upsertJournal(
         userId: UUID,
         journal: LogDateJournal,
     ): LogDateJournal
 
-    fun getJournal(
+    suspend fun getJournal(
         userId: UUID,
         id: String,
     ): LogDateJournal?
 
-    fun deleteJournal(
+    suspend fun deleteJournal(
         userId: UUID,
         id: String,
         deletedAt: Long,
     )
 
-    fun journalChanges(
+    suspend fun journalChanges(
         userId: UUID,
         since: Long,
         limit: Int,
     ): LogDateChangeSet<LogDateJournal, LogDateJournalDeletion>
 
-    fun listAssociations(userId: UUID): List<LogDateAssociation>
+    suspend fun listAssociations(userId: UUID): List<LogDateAssociation>
 
-    fun upsertAssociations(
+    suspend fun upsertAssociations(
         userId: UUID,
         associations: List<LogDateAssociation>,
     ): List<LogDateAssociation>
 
-    fun deleteAssociations(
+    suspend fun deleteAssociations(
         userId: UUID,
         associations: List<LogDateAssociationRef>,
         deletedAt: Long,
     )
 
-    fun associationChanges(
+    suspend fun associationChanges(
         userId: UUID,
         since: Long,
         limit: Int,
     ): LogDateChangeSet<LogDateAssociation, LogDateAssociationDeletion>
+
+    suspend fun purgeTombstones(
+        userId: UUID,
+        olderThan: Long,
+    ): LogDateCollectionsPurgeResult
 }
