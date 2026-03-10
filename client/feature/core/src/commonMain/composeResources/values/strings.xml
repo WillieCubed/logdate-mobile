@@ -130,7 +130,7 @@
     <string name="location_privacy">Location Privacy</string>
     <string name="location_services">Location Services</string>
     <string name="location_settings">Location Settings</string>
-    <string name="location_timeline">Location Timeline</string>
+    <string name="location_timeline">Locations</string>
     <string name="logdate_cloud">LogDate Cloud</string>
     <string name="logdate_cloud_settings_description">Use the hosted LogDate service.</string>
     <string name="logdate_uses_activitypub_the_same_technology_that_powers_mastodon_pixelfed_and_other_social_networks_this_means_you_can_interact_with_a_global_community_while_keeping_control_of_your_data">LogDate uses ActivityPub, the same technology that powers Mastodon, Pixelfed, and other social networks. This means you can interact with a global community while keeping control of your data.</string>
@@ -336,8 +336,8 @@
     <string name="location_update_frequency">Update Frequency: %1$d minutes</string>
     <string name="text_120_min">120 min</string>
     <string name="location_tracking_battery_note">Note: More frequent updates use more battery. The minimum interval is 15 minutes due to system limitations.</string>
-    <string name="view_location_timeline">View Location Timeline</string>
-    <string name="location_timeline_description">See your location history and current location</string>
+    <string name="view_location_timeline">View Locations</string>
+    <string name="location_timeline_description">See your saved places and recent movement</string>
     <string name="location_data_stored_on_device">Location data is stored on your device</string>
     <string name="location_data_privacy_note">Your location data is only stored locally on your device. If you enable cloud sync, your location data will be encrypted before being sent to the cloud.</string>
     <string name="passkey_stored_on_device">Stored on %1$s • Last used %2$s</string>
