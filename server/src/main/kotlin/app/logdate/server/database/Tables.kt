@@ -104,3 +104,48 @@ object SessionsTable : Table("sessions") {
 
     override val primaryKey = PrimaryKey(id)
 }
+
+object AtprotoRepoHeadsTable : Table("atproto_repo_heads") {
+    val repoDid = varchar("repo_did", 255)
+    val rootCid = varchar("root_cid", 255)
+    val commitCid = varchar("commit_cid", 255)
+    val revision = long("revision")
+    val updatedAt = timestamp("updated_at")
+
+    override val primaryKey = PrimaryKey(repoDid)
+}
+
+object AtprotoRepoBlocksTable : Table("atproto_repo_blocks") {
+    val cid = varchar("cid", 255)
+    val bytes = binary("bytes")
+
+    override val primaryKey = PrimaryKey(cid)
+}
+
+object AtprotoRepoBlockLinksTable : Table("atproto_repo_block_links") {
+    val repoDid = varchar("repo_did", 255)
+    val cid = varchar("cid", 255).references(AtprotoRepoBlocksTable.cid)
+
+    override val primaryKey = PrimaryKey(repoDid, cid)
+
+    init {
+        index("idx_atproto_repo_block_links_repo", false, repoDid)
+    }
+}
+
+object AtprotoRepoCommitsTable : Table("atproto_repo_commits") {
+    val repoDid = varchar("repo_did", 255)
+    val revision = long("revision")
+    val cid = varchar("cid", 255)
+    val rootCid = varchar("root_cid", 255)
+    val prevCid = varchar("prev_cid", 255).nullable()
+    val createdAtEpochMillis = long("created_at_epoch_millis")
+    val recordCount = integer("record_count")
+    val signature = text("signature")
+
+    override val primaryKey = PrimaryKey(repoDid, revision)
+
+    init {
+        index("idx_atproto_repo_commits_repo_revision", false, repoDid, revision)
+    }
+}

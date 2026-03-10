@@ -14,10 +14,15 @@ import app.logdate.server.auth.SessionManager
 import app.logdate.server.database.AccountIdentitiesTable
 import app.logdate.server.database.AccountLinkEventsTable
 import app.logdate.server.database.AccountsTable
+import app.logdate.server.database.AtprotoRepoBlockLinksTable
+import app.logdate.server.database.AtprotoRepoBlocksTable
+import app.logdate.server.database.AtprotoRepoCommitsTable
+import app.logdate.server.database.AtprotoRepoHeadsTable
 import app.logdate.server.database.DatabaseConfig
 import app.logdate.server.database.PostgreSQLAccountIdentityRepository
 import app.logdate.server.database.PostgreSQLAccountRepository
 import app.logdate.server.database.PostgreSQLPasskeyRepository
+import app.logdate.server.database.PostgreSQLRepoBlockStore
 import app.logdate.server.database.PostgreSQLSessionManager
 import app.logdate.server.database.PostgreSQLSigningKeyRepository
 import app.logdate.server.database.SigningKeysTable
@@ -54,6 +59,8 @@ import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.koin.dsl.module
 import studio.hypertext.atproto.plc.KtorPlcDirectoryClient
+import studio.hypertext.atproto.repo.InMemoryRepoBlockStore
+import studio.hypertext.atproto.repo.RepoBlockStore
 
 /**
  * Initializes the database connection and tables.
@@ -76,6 +83,10 @@ fun initializeDatabase(): Boolean =
                     AccountIdentitiesTable,
                     AccountLinkEventsTable,
                     SigningKeysTable,
+                    AtprotoRepoHeadsTable,
+                    AtprotoRepoBlocksTable,
+                    AtprotoRepoBlockLinksTable,
+                    AtprotoRepoCommitsTable,
                 )
             }
         } else {
@@ -184,6 +195,10 @@ fun serverModule(isDatabaseAvailable: Boolean) =
 
         single<SyncRepository> {
             if (isDatabaseAvailable) DbSyncRepository() else InMemorySyncRepository()
+        }
+
+        single<RepoBlockStore> {
+            if (isDatabaseAvailable) PostgreSQLRepoBlockStore() else InMemoryRepoBlockStore()
         }
 
         single { SyncMetricsRegistry() }

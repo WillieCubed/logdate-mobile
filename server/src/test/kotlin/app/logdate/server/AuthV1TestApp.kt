@@ -16,6 +16,7 @@ import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.InMemorySigningKeyRepository
 import app.logdate.server.identity.SigningKeyService
+import app.logdate.server.logdate.SyncBackedLogDateCollectionsRepository
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthAuthorizationService
 import app.logdate.server.oauth.OAuthClientMetadataResolver
@@ -45,6 +46,7 @@ import kotlinx.serialization.modules.SerializersModule
 import studio.hypertext.atproto.pds.DescribeServerResponse
 import studio.hypertext.atproto.pds.runtime.DefaultPdsRepoService
 import studio.hypertext.atproto.pds.runtime.StaticPdsDiscoveryService
+import studio.hypertext.atproto.repo.InMemoryRepoBlockStore
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -87,7 +89,13 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
             signingKeyService = signingKeyService,
             config = atprotoIdentityConfig,
         )
-    val logDateRepoStore = LogDateRepoStore(syncRepository = syncRepository, identityService = atprotoIdentityService)
+    val logDateCollectionsRepository = SyncBackedLogDateCollectionsRepository(syncRepository)
+    val logDateRepoStore =
+        LogDateRepoStore(
+            collectionsRepository = logDateCollectionsRepository,
+            identityService = atprotoIdentityService,
+            blockStore = InMemoryRepoBlockStore(),
+        )
     atprotoIdentityService.setRepoCollectionsResolver(logDateRepoStore::collectionsForDid)
     val oauthKeyService = OAuthKeyService()
     val oauthNonceService = OAuthNonceService()

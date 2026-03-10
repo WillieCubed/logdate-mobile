@@ -30,6 +30,11 @@ public interface RepoBlockStore {
     ): Result<Unit>
 
     /**
+     * Clears [repo]'s head, block associations, and commit history.
+     */
+    public suspend fun clearRepo(repo: AtprotoDid): Result<Unit>
+
+    /**
      * Lists blocks currently associated with [repo].
      */
     public suspend fun listBlocks(repo: AtprotoDid): Result<List<RepoBlock>>
@@ -77,6 +82,16 @@ public class InMemoryRepoBlockStore : RepoBlockStore {
             run {
                 blocks[block.cid] = block
                 repoBlocks.getOrPut(repo) { linkedSetOf() }.add(block.cid)
+                Unit
+            },
+        )
+
+    override suspend fun clearRepo(repo: AtprotoDid): Result<Unit> =
+        Result.success(
+            run {
+                heads.remove(repo)
+                repoBlocks.remove(repo)
+                commits.remove(repo)
                 Unit
             },
         )

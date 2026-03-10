@@ -4,10 +4,12 @@ package app.logdate.server.atproto
 
 import app.logdate.server.database.toJavaUUID
 import app.logdate.server.identity.AtprotoIdentityService
-import app.logdate.server.sync.AssociationKey
-import app.logdate.server.sync.AssociationRecord
-import app.logdate.server.sync.ContentRecord
-import app.logdate.server.sync.JournalRecord
+import app.logdate.server.logdate.LogDateAssociation
+import app.logdate.server.logdate.LogDateAssociationRef
+import app.logdate.server.logdate.LogDateCollectionsRepository
+import app.logdate.server.logdate.LogDateEntry
+import app.logdate.server.logdate.LogDateJournal
+import app.logdate.server.logdate.SyncBackedLogDateCollectionsRepository
 import app.logdate.server.sync.SyncRepository
 import app.logdate.shared.model.sync.DeviceId
 import kotlinx.serialization.json.JsonNull
@@ -20,6 +22,7 @@ import kotlinx.serialization.json.put
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.repo.DefaultRepoEngine
 import studio.hypertext.atproto.repo.InMemoryRepoBlockStore
+import studio.hypertext.atproto.repo.RepoBlockStore
 import studio.hypertext.atproto.repo.RepoEngine
 import studio.hypertext.atproto.repo.RepoExport
 import studio.hypertext.atproto.repo.RepoHead
@@ -32,6 +35,8 @@ import studio.hypertext.atproto.repo.SignedRepoCommit
 import studio.hypertext.atproto.repo.UnsupportedCollectionException
 import studio.hypertext.atproto.syntax.Nsid
 import studio.hypertext.atproto.syntax.RecordKey
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -43,21 +48,31 @@ import kotlin.uuid.Uuid
  * resulting record state back into LogDate's sync tables.
  */
 class LogDateRepoStore(
-    private val syncRepository: SyncRepository,
+    private val collectionsRepository: LogDateCollectionsRepository,
     private val identityService: AtprotoIdentityService,
+    private val blockStore: RepoBlockStore = InMemoryRepoBlockStore(),
 ) : RepoEngine {
+    constructor(
+        syncRepository: SyncRepository,
+        identityService: AtprotoIdentityService,
+        blockStore: RepoBlockStore = InMemoryRepoBlockStore(),
+    ) : this(
+        collectionsRepository = SyncBackedLogDateCollectionsRepository(syncRepository),
+        identityService = identityService,
+        blockStore = blockStore,
+    )
+
     suspend fun collectionsForDid(did: String): List<Nsid> {
         val account = requireNotNull(identityService.findByDid(did)) { "Unknown repo DID: $did" }
         val userId = account.id.toJavaUUID()
         return supportedCollections
-            .filter { definition -> definition.loadRecords(userId, AtprotoDid.require(account.did!!), syncRepository).isNotEmpty() }
+            .filter { definition -> definition.loadRecords(userId, AtprotoDid.require(account.did!!), collectionsRepository).isNotEmpty() }
             .map(LogDateCollection::nsid)
     }
 
     override suspend fun getRecord(recordId: RepoRecordId): Result<RepoRecord?> =
         runCatching {
-            val repo = hydrateRepo(recordId.repo)
-            repo.engine.getRecord(recordId).getOrThrow()
+            synchronizeRepo(recordId.repo).engine.getRecord(recordId).getOrThrow()
         }
 
     override suspend fun listRecords(
@@ -69,8 +84,8 @@ class LogDateRepoStore(
     ): Result<RepoListPage> =
         runCatching {
             requireSupportedCollection(collection)
-            val hydrated = hydrateRepo(repo)
-            hydrated.engine
+            synchronizeRepo(repo)
+                .engine
                 .listRecords(
                     repo = repo,
                     collection = collection,
@@ -88,10 +103,10 @@ class LogDateRepoStore(
     ): Result<RepoWriteResult> =
         runCatching {
             val definition = requireSupportedCollection(collection)
-            val hydrated = hydrateRepo(repo)
+            val preview = previewRepo(repo)
             val resolvedRecordKey = recordKey ?: definition.generatedRecordKey(value)
             val provisionalWrite =
-                hydrated.engine
+                preview.engine
                     .createRecord(
                         repo = repo,
                         collection = collection,
@@ -105,11 +120,11 @@ class LogDateRepoStore(
                     recordKey = requireNotNull(provisionalWrite.uri.recordKey),
                 )
             persistRecord(
-                userId = hydrated.userId,
+                userId = preview.userId,
                 recordId = persistedRecordId,
                 value = value,
             )
-            val persisted = requireNotNull(hydrateRepo(repo).engine.getRecord(persistedRecordId).getOrThrow())
+            val persisted = requireNotNull(synchronizeRepo(repo).engine.getRecord(persistedRecordId).getOrThrow())
             RepoWriteResult(
                 uri = persisted.uri,
                 cid = requireNotNull(persisted.cid),
@@ -124,14 +139,14 @@ class LogDateRepoStore(
     ): Result<RepoWriteResult> =
         runCatching {
             requireSupportedCollection(recordId.collection)
-            val hydrated = hydrateRepo(recordId.repo)
-            hydrated.engine.putRecord(recordId = recordId, value = value, swapRecord = swapRecord).getOrThrow()
+            val preview = previewRepo(recordId.repo)
+            preview.engine.putRecord(recordId = recordId, value = value, swapRecord = swapRecord).getOrThrow()
             persistRecord(
-                userId = hydrated.userId,
+                userId = preview.userId,
                 recordId = recordId,
                 value = value,
             )
-            val persisted = requireNotNull(hydrateRepo(recordId.repo).engine.getRecord(recordId).getOrThrow())
+            val persisted = requireNotNull(synchronizeRepo(recordId.repo).engine.getRecord(recordId).getOrThrow())
             RepoWriteResult(
                 uri = persisted.uri,
                 cid = requireNotNull(persisted.cid),
@@ -145,22 +160,27 @@ class LogDateRepoStore(
     ): Result<Boolean> =
         runCatching {
             val definition = requireSupportedCollection(recordId.collection)
-            val hydrated = hydrateRepo(recordId.repo)
+            val preview = previewRepo(recordId.repo)
             val deleted =
-                hydrated.engine
+                preview.engine
                     .deleteRecord(
                         recordId = recordId,
                         swapRecord = swapRecord,
                     ).getOrThrow()
             if (deleted) {
-                definition.delete(syncRepository = syncRepository, userId = hydrated.userId, recordId = recordId)
+                definition.delete(
+                    collectionsRepository = collectionsRepository,
+                    userId = preview.userId,
+                    recordId = recordId,
+                )
             }
+            synchronizeRepo(recordId.repo)
             deleted
         }
 
     override suspend fun loadHead(repo: AtprotoDid): Result<RepoHead?> =
         runCatching {
-            hydrateRepo(repo).engine.loadHead(repo).getOrThrow()
+            synchronizeRepo(repo).engine.loadHead(repo).getOrThrow()
         }
 
     override suspend fun listCommits(
@@ -168,25 +188,25 @@ class LogDateRepoStore(
         limit: Int,
     ): Result<List<SignedRepoCommit>> =
         runCatching {
-            hydrateRepo(repo).engine.listCommits(repo = repo, limit = limit).getOrThrow()
+            synchronizeRepo(repo).engine.listCommits(repo = repo, limit = limit).getOrThrow()
         }
 
     override suspend fun export(repo: AtprotoDid): Result<RepoExport> =
         runCatching {
-            hydrateRepo(repo).engine.export(repo).getOrThrow()
+            synchronizeRepo(repo).engine.export(repo).getOrThrow()
         }
 
     override suspend fun import(export: RepoExport): Result<RepoHead> =
         Result.failure(UnsupportedOperationException("LogDate sync-backed repo engine does not support imports"))
 
-    private suspend fun hydrateRepo(repo: AtprotoDid): HydratedRepo {
+    private suspend fun previewRepo(repo: AtprotoDid): HydratedRepo {
         val account = requireNotNull(identityService.findByDid(repo.toString())) { "Unknown repo DID: $repo" }
         val userId = account.id.toJavaUUID()
-        val engine = DefaultRepoEngine(InMemoryRepoBlockStore())
+        val engine = DefaultRepoEngine(InMemoryRepoBlockStore(), MIRROR_CLOCK)
 
         supportedCollections
             .flatMap { definition ->
-                definition.loadRecords(userId = userId, repo = repo, syncRepository = syncRepository)
+                definition.loadRecords(userId = userId, repo = repo, collectionsRepository = collectionsRepository)
             }.sortedWith(
                 compareBy<LogDateRepoRecord>({ it.recordId.collection.toString() }, { it.recordId.recordKey.toString() }),
             ).forEach { record ->
@@ -194,6 +214,24 @@ class LogDateRepoStore(
             }
 
         return HydratedRepo(userId = userId, engine = engine)
+    }
+
+    private suspend fun synchronizeRepo(repo: AtprotoDid): HydratedRepo {
+        val preview = previewRepo(repo)
+        val mirrorEngine = DefaultRepoEngine(blockStore, MIRROR_CLOCK)
+        val mirroredHead = mirrorEngine.loadHead(repo).getOrThrow()
+        val previewHead = preview.engine.loadHead(repo).getOrThrow()
+
+        when {
+            previewHead == null && mirroredHead != null -> blockStore.clearRepo(repo).getOrThrow()
+            previewHead != null && previewHead != mirroredHead -> {
+                val export = preview.engine.export(repo).getOrThrow()
+                blockStore.clearRepo(repo).getOrThrow()
+                mirrorEngine.import(export).getOrThrow()
+            }
+        }
+
+        return HydratedRepo(userId = preview.userId, engine = mirrorEngine)
     }
 
     private fun requireSupportedCollection(collection: Nsid): LogDateCollection =
@@ -206,7 +244,7 @@ class LogDateRepoStore(
         value: JsonObject,
     ) {
         requireSupportedCollection(recordId.collection).upsert(
-            syncRepository = syncRepository,
+            collectionsRepository = collectionsRepository,
             userId = userId,
             recordId = recordId,
             value = value,
@@ -217,6 +255,10 @@ class LogDateRepoStore(
         val contentCollection: Nsid = Nsid.require("studio.hypertext.logdate.content")
         val journalCollection: Nsid = Nsid.require("studio.hypertext.logdate.journal")
         val associationCollection: Nsid = Nsid.require("studio.hypertext.logdate.association")
+        private val MIRROR_CLOCK: Clock =
+            object : Clock {
+                override fun now(): Instant = Instant.fromEpochMilliseconds(0)
+            }
 
         private val supportedCollections: List<LogDateCollection> =
             listOf(
@@ -245,18 +287,18 @@ private sealed class LogDateCollection(
     abstract fun loadRecords(
         userId: java.util.UUID,
         repo: AtprotoDid,
-        syncRepository: SyncRepository,
+        collectionsRepository: LogDateCollectionsRepository,
     ): List<LogDateRepoRecord>
 
     abstract fun upsert(
-        syncRepository: SyncRepository,
+        collectionsRepository: LogDateCollectionsRepository,
         userId: java.util.UUID,
         recordId: RepoRecordId,
         value: JsonObject,
     )
 
     abstract fun delete(
-        syncRepository: SyncRepository,
+        collectionsRepository: LogDateCollectionsRepository,
         userId: java.util.UUID,
         recordId: RepoRecordId,
     )
@@ -268,9 +310,9 @@ private object ContentLogDateCollection : LogDateCollection(LogDateRepoStore.con
     override fun loadRecords(
         userId: java.util.UUID,
         repo: AtprotoDid,
-        syncRepository: SyncRepository,
+        collectionsRepository: LogDateCollectionsRepository,
     ): List<LogDateRepoRecord> =
-        loadAllContent(userId = userId, syncRepository = syncRepository).map { record ->
+        collectionsRepository.listEntries(userId = userId).map { record ->
             val recordId =
                 RepoRecordId(
                     repo = repo,
@@ -281,16 +323,16 @@ private object ContentLogDateCollection : LogDateCollection(LogDateRepoStore.con
         }
 
     override fun upsert(
-        syncRepository: SyncRepository,
+        collectionsRepository: LogDateCollectionsRepository,
         userId: java.util.UUID,
         recordId: RepoRecordId,
         value: JsonObject,
     ) {
         requireMatchingType(value = value, collection = nsid)
-        val existing = syncRepository.getContent(userId, recordId.recordKey.toString())
+        val existing = collectionsRepository.getEntry(userId, recordId.recordKey.toString())
         val now = System.currentTimeMillis()
         val record =
-            ContentRecord(
+            LogDateEntry(
                 id = requireMatchingId(recordId = recordId, value = value, fieldName = "id"),
                 type = value.stringValue("type") ?: existing?.type ?: DEFAULT_CONTENT_TYPE,
                 content = if (value.containsKey("content")) value.nullableStringValue("content") else existing?.content,
@@ -298,7 +340,7 @@ private object ContentLogDateCollection : LogDateCollection(LogDateRepoStore.con
                 durationMs = value.longValue("durationMs") ?: existing?.durationMs ?: DEFAULT_DURATION_MS,
                 createdAt = value.longValue("createdAt") ?: existing?.createdAt ?: now,
                 lastUpdated = value.longValue("lastUpdated") ?: now,
-                serverVersion = existing?.serverVersion ?: 0L,
+                version = existing?.version ?: 0L,
                 deviceId =
                     value.deviceIdOrDefault(
                         if (value.containsKey("deviceId")) {
@@ -308,22 +350,22 @@ private object ContentLogDateCollection : LogDateCollection(LogDateRepoStore.con
                         },
                     ),
             )
-        syncRepository.upsertContent(userId = userId, record = record)
+        collectionsRepository.upsertEntry(userId = userId, entry = record)
     }
 
     override fun delete(
-        syncRepository: SyncRepository,
+        collectionsRepository: LogDateCollectionsRepository,
         userId: java.util.UUID,
         recordId: RepoRecordId,
     ) {
-        syncRepository.deleteContent(
+        collectionsRepository.deleteEntry(
             userId = userId,
             id = recordId.recordKey.toString(),
             deletedAt = System.currentTimeMillis(),
         )
     }
 
-    private fun ContentRecord.toJson(): JsonObject =
+    private fun LogDateEntry.toJson(): JsonObject =
         buildJsonObject {
             put(TYPE_FIELD_NAME, nsid.toString())
             put("id", id)
@@ -351,9 +393,9 @@ private object JournalLogDateCollection : LogDateCollection(LogDateRepoStore.jou
     override fun loadRecords(
         userId: java.util.UUID,
         repo: AtprotoDid,
-        syncRepository: SyncRepository,
+        collectionsRepository: LogDateCollectionsRepository,
     ): List<LogDateRepoRecord> =
-        loadAllJournals(userId = userId, syncRepository = syncRepository).map { record ->
+        collectionsRepository.listJournals(userId = userId).map { record ->
             val recordId =
                 RepoRecordId(
                     repo = repo,
@@ -364,22 +406,22 @@ private object JournalLogDateCollection : LogDateCollection(LogDateRepoStore.jou
         }
 
     override fun upsert(
-        syncRepository: SyncRepository,
+        collectionsRepository: LogDateCollectionsRepository,
         userId: java.util.UUID,
         recordId: RepoRecordId,
         value: JsonObject,
     ) {
         requireMatchingType(value = value, collection = nsid)
-        val existing = syncRepository.getJournal(userId, recordId.recordKey.toString())
+        val existing = collectionsRepository.getJournal(userId, recordId.recordKey.toString())
         val now = System.currentTimeMillis()
         val record =
-            JournalRecord(
+            LogDateJournal(
                 id = requireMatchingId(recordId = recordId, value = value, fieldName = "id"),
                 title = value.stringValue("title") ?: existing?.title ?: "",
                 description = value.stringValue("description") ?: existing?.description ?: "",
                 createdAt = value.longValue("createdAt") ?: existing?.createdAt ?: now,
                 lastUpdated = value.longValue("lastUpdated") ?: now,
-                serverVersion = existing?.serverVersion ?: 0L,
+                version = existing?.version ?: 0L,
                 deviceId =
                     value.deviceIdOrDefault(
                         if (value.containsKey("deviceId")) {
@@ -389,22 +431,22 @@ private object JournalLogDateCollection : LogDateCollection(LogDateRepoStore.jou
                         },
                     ),
             )
-        syncRepository.upsertJournal(userId = userId, record = record)
+        collectionsRepository.upsertJournal(userId = userId, journal = record)
     }
 
     override fun delete(
-        syncRepository: SyncRepository,
+        collectionsRepository: LogDateCollectionsRepository,
         userId: java.util.UUID,
         recordId: RepoRecordId,
     ) {
-        syncRepository.deleteJournal(
+        collectionsRepository.deleteJournal(
             userId = userId,
             id = recordId.recordKey.toString(),
             deletedAt = System.currentTimeMillis(),
         )
     }
 
-    private fun JournalRecord.toJson(): JsonObject =
+    private fun LogDateJournal.toJson(): JsonObject =
         buildJsonObject {
             put(TYPE_FIELD_NAME, nsid.toString())
             put("id", id)
@@ -422,20 +464,20 @@ private object AssociationLogDateCollection : LogDateCollection(LogDateRepoStore
     override fun loadRecords(
         userId: java.util.UUID,
         repo: AtprotoDid,
-        syncRepository: SyncRepository,
+        collectionsRepository: LogDateCollectionsRepository,
     ): List<LogDateRepoRecord> =
-        loadAllAssociations(userId = userId, syncRepository = syncRepository).map { record ->
+        collectionsRepository.listAssociations(userId = userId).map { record ->
             val recordId =
                 RepoRecordId(
                     repo = repo,
                     collection = nsid,
-                    recordKey = associationRecordKey(record.journalId, record.contentId),
+                    recordKey = associationRecordKey(record.journalId, record.entryId),
                 )
             LogDateRepoRecord(recordId = recordId, value = record.toJson())
         }
 
     override fun upsert(
-        syncRepository: SyncRepository,
+        collectionsRepository: LogDateCollectionsRepository,
         userId: java.util.UUID,
         recordId: RepoRecordId,
         value: JsonObject,
@@ -447,15 +489,15 @@ private object AssociationLogDateCollection : LogDateCollection(LogDateRepoStore
         require(expectedKey == recordId.recordKey) { "Association record key must match journalId/contentId" }
 
         val existing =
-            loadAllAssociations(userId = userId, syncRepository = syncRepository).firstOrNull {
-                it.journalId == journalId && it.contentId == contentId
+            collectionsRepository.listAssociations(userId = userId).firstOrNull {
+                it.journalId == journalId && it.entryId == contentId
             }
         val record =
-            AssociationRecord(
+            LogDateAssociation(
                 journalId = journalId,
-                contentId = contentId,
+                entryId = contentId,
                 createdAt = value.longValue("createdAt") ?: existing?.createdAt ?: System.currentTimeMillis(),
-                serverVersion = existing?.serverVersion ?: 0L,
+                version = existing?.version ?: 0L,
                 deviceId =
                     value.deviceIdOrDefault(
                         if (value.containsKey("deviceId")) {
@@ -465,32 +507,32 @@ private object AssociationLogDateCollection : LogDateCollection(LogDateRepoStore
                         },
                     ),
             )
-        syncRepository.upsertAssociations(userId = userId, records = listOf(record))
+        collectionsRepository.upsertAssociations(userId = userId, associations = listOf(record))
     }
 
     override fun delete(
-        syncRepository: SyncRepository,
+        collectionsRepository: LogDateCollectionsRepository,
         userId: java.util.UUID,
         recordId: RepoRecordId,
     ) {
-        syncRepository.deleteAssociations(
+        collectionsRepository.deleteAssociations(
             userId = userId,
-            keys =
+            associations =
                 listOf(
-                    AssociationKey(
+                    LogDateAssociationRef(
                         journalId = journalIdFromRecordKey(recordId.recordKey),
-                        contentId = contentIdFromRecordKey(recordId.recordKey),
+                        entryId = contentIdFromRecordKey(recordId.recordKey),
                     ),
                 ),
             deletedAt = System.currentTimeMillis(),
         )
     }
 
-    private fun AssociationRecord.toJson(): JsonObject =
+    private fun LogDateAssociation.toJson(): JsonObject =
         buildJsonObject {
             put(TYPE_FIELD_NAME, nsid.toString())
             put("journalId", journalId)
-            put("contentId", contentId)
+            put("contentId", entryId)
             put("createdAt", createdAt)
             put("deviceId", deviceId.value)
         }
@@ -550,61 +592,6 @@ private fun JsonObject.deviceIdOrDefault(default: DeviceId?): DeviceId =
         default ?: DeviceId.UNKNOWN
     }
 
-private fun loadAllContent(
-    userId: java.util.UUID,
-    syncRepository: SyncRepository,
-): List<ContentRecord> {
-    val records = linkedMapOf<String, ContentRecord>()
-    var since = 0L
-    do {
-        val changeSet = syncRepository.contentChanges(userId = userId, since = since, limit = CHANGE_PAGE_SIZE)
-        changeSet.changes.forEach { records[it.id] = it }
-        changeSet.deletions.forEach { records.remove(it.id) }
-        if (changeSet.lastTimestamp <= since) {
-            break
-        }
-        since = changeSet.lastTimestamp
-    } while (changeSet.hasMore)
-    return records.values.toList()
-}
-
-private fun loadAllJournals(
-    userId: java.util.UUID,
-    syncRepository: SyncRepository,
-): List<JournalRecord> {
-    val records = linkedMapOf<String, JournalRecord>()
-    var since = 0L
-    do {
-        val changeSet = syncRepository.journalChanges(userId = userId, since = since, limit = CHANGE_PAGE_SIZE)
-        changeSet.changes.forEach { records[it.id] = it }
-        changeSet.deletions.forEach { records.remove(it.id) }
-        if (changeSet.lastTimestamp <= since) {
-            break
-        }
-        since = changeSet.lastTimestamp
-    } while (changeSet.hasMore)
-    return records.values.toList()
-}
-
-private fun loadAllAssociations(
-    userId: java.util.UUID,
-    syncRepository: SyncRepository,
-): List<AssociationRecord> {
-    val records = linkedMapOf<AssociationKey, AssociationRecord>()
-    var since = 0L
-    do {
-        val changeSet = syncRepository.associationChanges(userId = userId, since = since, limit = CHANGE_PAGE_SIZE)
-        changeSet.changes.forEach { records[AssociationKey(it.journalId, it.contentId)] = it }
-        changeSet.deletions.forEach { records.remove(it.key) }
-        if (changeSet.lastTimestamp <= since) {
-            break
-        }
-        since = changeSet.lastTimestamp
-    } while (changeSet.hasMore)
-    return records.values.toList()
-}
-
-private const val CHANGE_PAGE_SIZE = 100
 private const val DEFAULT_CONTENT_TYPE = "TEXT"
 private const val DEFAULT_DURATION_MS = 0L
 private const val TYPE_FIELD_NAME = "\$type"

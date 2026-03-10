@@ -2,14 +2,16 @@ package app.logdate.server.routes
 
 import app.logdate.server.auth.TokenService
 import app.logdate.server.crypto.EncryptionService
+import app.logdate.server.logdate.LogDateAssociation
+import app.logdate.server.logdate.LogDateAssociationRef
+import app.logdate.server.logdate.LogDateCollectionsRepository
+import app.logdate.server.logdate.LogDateEntry
+import app.logdate.server.logdate.LogDateJournal
+import app.logdate.server.logdate.SyncBackedLogDateCollectionsRepository
 import app.logdate.server.responses.error
 import app.logdate.server.responses.simpleSuccess
-import app.logdate.server.sync.AssociationKey
-import app.logdate.server.sync.AssociationRecord
 import app.logdate.server.sync.BackupRecord
-import app.logdate.server.sync.ContentRecord
 import app.logdate.server.sync.GcsMediaStorage
-import app.logdate.server.sync.JournalRecord
 import app.logdate.server.sync.MediaAccessPolicy
 import app.logdate.server.sync.MediaRecord
 import app.logdate.server.sync.SyncMetricsRegistry
@@ -144,6 +146,39 @@ private fun SyncPurgeResult.toResponse(retentionDaysApplied: Long): SyncPurgeRes
         mediaPurged = mediaPurged,
         cutoff = cutoff,
         retentionDaysApplied = retentionDaysApplied,
+    )
+
+private fun LogDateEntry.toContentChange(): ContentChange =
+    ContentChange(
+        id = id,
+        type = type,
+        content = content,
+        mediaUri = mediaUri,
+        durationMs = durationMs ?: 0L,
+        createdAt = createdAt,
+        lastUpdated = lastUpdated,
+        serverVersion = version,
+        isDeleted = false,
+    )
+
+private fun LogDateJournal.toJournalChange(): JournalChange =
+    JournalChange(
+        id = id,
+        title = title,
+        description = description,
+        createdAt = createdAt,
+        lastUpdated = lastUpdated,
+        serverVersion = version,
+        isDeleted = false,
+    )
+
+private fun LogDateAssociation.toAssociationChange(): AssociationChange =
+    AssociationChange(
+        journalId = journalId,
+        contentId = entryId,
+        createdAt = createdAt,
+        serverVersion = version,
+        isDeleted = false,
     )
 
 private suspend fun ApplicationCall.receiveMediaMultipartUpload(): ParsedMediaMultipartUpload? {
@@ -361,6 +396,7 @@ fun Route.syncRoutes(
     metrics: SyncMetricsRegistry,
     mediaAccessPolicy: MediaAccessPolicy = MediaAccessPolicy.fromEnvironment(),
     encryptionService: EncryptionService = EncryptionService.fromEnvironment(),
+    collectionsRepository: LogDateCollectionsRepository = SyncBackedLogDateCollectionsRepository(repository),
 ) {
     route("") {
         // High-level status (used by smoke tests)
@@ -369,10 +405,10 @@ fun Route.syncRoutes(
             var success = false
             try {
                 val userId = extractUserId(call, tokenService) ?: return@get
-                val status = repository.status(userId)
+                val status = collectionsRepository.status(userId)
                 val snapshot =
                     SyncStatusSnapshot(
-                        contentCount = status.contentCount,
+                        contentCount = status.entryCount,
                         journalCount = status.journalCount,
                         associationCount = status.associationCount,
                         lastTimestamp = status.lastTimestamp,
@@ -432,27 +468,28 @@ fun Route.syncRoutes(
                             error("VALIDATION_ERROR", "Request body id must match path contentId"),
                         )
                     }
-                    val wasCreated = repository.getContent(userId, contentId) == null
+                    val wasCreated = collectionsRepository.getEntry(userId, contentId) == null
                     Napier.d("Content upsert for user $userId: $contentId")
                     val stored =
-                        repository.upsertContent(
-                            userId,
-                            ContentRecord(
-                                id = contentId,
-                                type = req.type,
-                                content = req.content,
-                                mediaUri = req.mediaUri,
-                                durationMs = req.durationMs,
-                                createdAt = req.createdAt,
-                                lastUpdated = req.lastUpdated,
-                                serverVersion = 0L,
-                                deviceId = req.deviceId,
-                            ),
+                        collectionsRepository.upsertEntry(
+                            userId = userId,
+                            entry =
+                                LogDateEntry(
+                                    id = contentId,
+                                    type = req.type,
+                                    content = req.content,
+                                    mediaUri = req.mediaUri,
+                                    durationMs = req.durationMs,
+                                    createdAt = req.createdAt,
+                                    lastUpdated = req.lastUpdated,
+                                    version = 0L,
+                                    deviceId = req.deviceId,
+                                ),
                         )
                     val response =
                         ContentUploadResponse(
                             id = stored.id,
-                            serverVersion = stored.serverVersion,
+                            serverVersion = stored.version,
                             uploadedAt = stored.lastUpdated,
                         )
                     if (wasCreated) {
@@ -486,21 +523,8 @@ fun Route.syncRoutes(
 
                     val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_SYNC_PAGE_SIZE
                     val pageSize = limit.coerceIn(1, MAX_SYNC_PAGE_SIZE)
-                    val changeSet = repository.contentChanges(userId, since, pageSize)
-                    val changes =
-                        changeSet.changes.map {
-                            ContentChange(
-                                id = it.id,
-                                type = it.type,
-                                content = it.content,
-                                mediaUri = it.mediaUri,
-                                durationMs = it.durationMs ?: 0,
-                                createdAt = it.createdAt,
-                                lastUpdated = it.lastUpdated,
-                                serverVersion = it.serverVersion,
-                                isDeleted = false,
-                            )
-                        }
+                    val changeSet = collectionsRepository.entryChanges(userId, since, pageSize)
+                    val changes = changeSet.changes.map(LogDateEntry::toContentChange)
                     val deletions = changeSet.deletions.map { ContentDeletion(id = it.id, deletedAt = it.deletedAt) }
                     call.respond(ContentChangesResponse(changes, deletions, changeSet.lastTimestamp, changeSet.hasMore))
                     success = true
@@ -516,21 +540,9 @@ fun Route.syncRoutes(
                     val userId = extractUserId(call, tokenService) ?: return@get
                     val contentId = call.requiredPathParam("contentId")
                     val record =
-                        repository.getContent(userId, contentId)
+                        collectionsRepository.getEntry(userId, contentId)
                             ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Content not found"))
-                    call.respond(
-                        ContentChange(
-                            id = record.id,
-                            type = record.type,
-                            content = record.content,
-                            mediaUri = record.mediaUri,
-                            durationMs = record.durationMs ?: 0,
-                            createdAt = record.createdAt,
-                            lastUpdated = record.lastUpdated,
-                            serverVersion = record.serverVersion,
-                            isDeleted = false,
-                        ),
-                    )
+                    call.respond(record.toContentChange())
                     success = true
                 } finally {
                     metrics.recordOperation(METRIC_CONTENT_CHANGES, System.currentTimeMillis() - start, success)
@@ -544,16 +556,16 @@ fun Route.syncRoutes(
                     val userId = extractUserId(call, tokenService) ?: return@patch
                     val contentId = call.requiredPathParam("contentId")
                     val req = call.receive<ContentUpdateRequest>()
-                    val existing = repository.getContent(userId, contentId)
+                    val existing = collectionsRepository.getEntry(userId, contentId)
                     when (val constraint = req.versionConstraint) {
                         is VersionConstraint.Known -> {
-                            if (existing != null && existing.serverVersion > constraint.serverVersion) {
+                            if (existing != null && existing.version > constraint.serverVersion) {
                                 metrics.recordConflict()
                                 return@patch call.respond(
                                     HttpStatusCode.Conflict,
                                     error(
                                         "CONFLICT",
-                                        "Server has a newer version (${constraint.serverVersion} < ${existing.serverVersion})",
+                                        "Server has a newer version (${constraint.serverVersion} < ${existing.version})",
                                     ),
                                 )
                             }
@@ -561,21 +573,22 @@ fun Route.syncRoutes(
                         VersionConstraint.None -> Unit
                     }
                     val updated =
-                        repository.upsertContent(
-                            userId,
-                            ContentRecord(
-                                id = contentId,
-                                type = existing?.type ?: "TEXT",
-                                content = req.content ?: existing?.content,
-                                mediaUri = req.mediaUri ?: existing?.mediaUri,
-                                durationMs = req.durationMs,
-                                createdAt = existing?.createdAt ?: System.currentTimeMillis(),
-                                lastUpdated = req.lastUpdated,
-                                serverVersion = existing?.serverVersion ?: 0L,
-                                deviceId = req.deviceId,
-                            ),
+                        collectionsRepository.upsertEntry(
+                            userId = userId,
+                            entry =
+                                LogDateEntry(
+                                    id = contentId,
+                                    type = existing?.type ?: "TEXT",
+                                    content = req.content ?: existing?.content,
+                                    mediaUri = req.mediaUri ?: existing?.mediaUri,
+                                    durationMs = req.durationMs,
+                                    createdAt = existing?.createdAt ?: System.currentTimeMillis(),
+                                    lastUpdated = req.lastUpdated,
+                                    version = existing?.version ?: 0L,
+                                    deviceId = req.deviceId,
+                                ),
                         )
-                    call.respond(ContentUpdateResponse(contentId, updated.serverVersion, updated.lastUpdated))
+                    call.respond(ContentUpdateResponse(contentId, updated.version, updated.lastUpdated))
                     success = true
                 } finally {
                     metrics.recordOperation(METRIC_CONTENT_UPDATE, System.currentTimeMillis() - start, success)
@@ -589,7 +602,7 @@ fun Route.syncRoutes(
                     val userId = extractUserId(call, tokenService) ?: return@delete
                     val contentId = call.requiredPathParam("contentId")
                     val deletedAt = System.currentTimeMillis()
-                    repository.deleteContent(userId, contentId, deletedAt)
+                    collectionsRepository.deleteEntry(userId, contentId, deletedAt)
                     call.respond(HttpStatusCode.NoContent)
                     success = true
                 } finally {
@@ -613,22 +626,23 @@ fun Route.syncRoutes(
                             error("VALIDATION_ERROR", "Request body id must match path journalId"),
                         )
                     }
-                    val wasCreated = repository.getJournal(userId, journalId) == null
+                    val wasCreated = collectionsRepository.getJournal(userId, journalId) == null
                     Napier.d("Journal upsert for user $userId: $journalId")
                     val stored =
-                        repository.upsertJournal(
-                            userId,
-                            JournalRecord(
-                                id = journalId,
-                                title = req.title,
-                                description = req.description,
-                                createdAt = req.createdAt,
-                                lastUpdated = req.lastUpdated,
-                                serverVersion = 0L,
-                                deviceId = req.deviceId,
-                            ),
+                        collectionsRepository.upsertJournal(
+                            userId = userId,
+                            journal =
+                                LogDateJournal(
+                                    id = journalId,
+                                    title = req.title,
+                                    description = req.description,
+                                    createdAt = req.createdAt,
+                                    lastUpdated = req.lastUpdated,
+                                    version = 0L,
+                                    deviceId = req.deviceId,
+                                ),
                         )
-                    val response = JournalUploadResponse(journalId, stored.serverVersion, stored.lastUpdated)
+                    val response = JournalUploadResponse(journalId, stored.version, stored.lastUpdated)
                     if (wasCreated) {
                         call.response.headers.append(HttpHeaders.Location, "/api/v1/journals/$journalId")
                         call.respond(HttpStatusCode.Created, response)
@@ -659,19 +673,8 @@ fun Route.syncRoutes(
                         }
                     val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_SYNC_PAGE_SIZE
                     val pageSize = limit.coerceIn(1, MAX_SYNC_PAGE_SIZE)
-                    val changeSet = repository.journalChanges(userId, since, pageSize)
-                    val changes =
-                        changeSet.changes.map {
-                            JournalChange(
-                                id = it.id,
-                                title = it.title,
-                                description = it.description,
-                                createdAt = it.createdAt,
-                                lastUpdated = it.lastUpdated,
-                                serverVersion = it.serverVersion,
-                                isDeleted = false,
-                            )
-                        }
+                    val changeSet = collectionsRepository.journalChanges(userId, since, pageSize)
+                    val changes = changeSet.changes.map(LogDateJournal::toJournalChange)
                     val deletions = changeSet.deletions.map { JournalDeletion(id = it.id, deletedAt = it.deletedAt) }
                     call.respond(JournalChangesResponse(changes, deletions, changeSet.lastTimestamp, changeSet.hasMore))
                     success = true
@@ -687,19 +690,9 @@ fun Route.syncRoutes(
                     val userId = extractUserId(call, tokenService) ?: return@get
                     val journalId = call.requiredPathParam("journalId")
                     val record =
-                        repository.getJournal(userId, journalId)
+                        collectionsRepository.getJournal(userId, journalId)
                             ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Journal not found"))
-                    call.respond(
-                        JournalChange(
-                            id = record.id,
-                            title = record.title,
-                            description = record.description,
-                            createdAt = record.createdAt,
-                            lastUpdated = record.lastUpdated,
-                            serverVersion = record.serverVersion,
-                            isDeleted = false,
-                        ),
-                    )
+                    call.respond(record.toJournalChange())
                     success = true
                 } finally {
                     metrics.recordOperation(METRIC_JOURNAL_CHANGES, System.currentTimeMillis() - start, success)
@@ -713,16 +706,16 @@ fun Route.syncRoutes(
                     val userId = extractUserId(call, tokenService) ?: return@patch
                     val journalId = call.requiredPathParam("journalId")
                     val req = call.receive<JournalUpdateRequest>()
-                    val existing = repository.getJournal(userId, journalId)
+                    val existing = collectionsRepository.getJournal(userId, journalId)
                     when (val constraint = req.versionConstraint) {
                         is VersionConstraint.Known -> {
-                            if (existing != null && existing.serverVersion > constraint.serverVersion) {
+                            if (existing != null && existing.version > constraint.serverVersion) {
                                 metrics.recordConflict()
                                 return@patch call.respond(
                                     HttpStatusCode.Conflict,
                                     error(
                                         "CONFLICT",
-                                        "Server has a newer version (${constraint.serverVersion} < ${existing.serverVersion})",
+                                        "Server has a newer version (${constraint.serverVersion} < ${existing.version})",
                                     ),
                                 )
                             }
@@ -731,19 +724,20 @@ fun Route.syncRoutes(
                     }
                     val updatedAt = System.currentTimeMillis()
                     val stored =
-                        repository.upsertJournal(
-                            userId,
-                            JournalRecord(
-                                id = journalId,
-                                title = req.title ?: existing?.title.orEmpty(),
-                                description = req.description ?: existing?.description.orEmpty(),
-                                createdAt = existing?.createdAt ?: updatedAt,
-                                lastUpdated = req.lastUpdated,
-                                serverVersion = existing?.serverVersion ?: 0L,
-                                deviceId = req.deviceId,
-                            ),
+                        collectionsRepository.upsertJournal(
+                            userId = userId,
+                            journal =
+                                LogDateJournal(
+                                    id = journalId,
+                                    title = req.title ?: existing?.title.orEmpty(),
+                                    description = req.description ?: existing?.description.orEmpty(),
+                                    createdAt = existing?.createdAt ?: updatedAt,
+                                    lastUpdated = req.lastUpdated,
+                                    version = existing?.version ?: 0L,
+                                    deviceId = req.deviceId,
+                                ),
                         )
-                    call.respond(JournalUpdateResponse(journalId, stored.serverVersion, stored.lastUpdated))
+                    call.respond(JournalUpdateResponse(journalId, stored.version, stored.lastUpdated))
                     success = true
                 } finally {
                     metrics.recordOperation(METRIC_JOURNAL_UPDATE, System.currentTimeMillis() - start, success)
@@ -757,7 +751,7 @@ fun Route.syncRoutes(
                     val userId = extractUserId(call, tokenService) ?: return@delete
                     val journalId = call.requiredPathParam("journalId")
                     val deletedAt = System.currentTimeMillis()
-                    repository.deleteJournal(userId, journalId, deletedAt)
+                    collectionsRepository.deleteJournal(userId, journalId, deletedAt)
                     call.respond(HttpStatusCode.NoContent)
                     success = true
                 } finally {
@@ -775,17 +769,18 @@ fun Route.syncRoutes(
                     val userId = extractUserId(call, tokenService) ?: return@put
                     val req = call.receive<AssociationUploadRequest>()
                     val uploadedAt = System.currentTimeMillis()
-                    repository.upsertAssociations(
-                        userId,
-                        req.associations.map {
-                            AssociationRecord(
-                                journalId = it.journalId,
-                                contentId = it.contentId,
-                                createdAt = it.createdAt,
-                                serverVersion = 0L,
-                                deviceId = it.deviceId,
-                            )
-                        },
+                    collectionsRepository.upsertAssociations(
+                        userId = userId,
+                        associations =
+                            req.associations.map {
+                                LogDateAssociation(
+                                    journalId = it.journalId,
+                                    entryId = it.contentId,
+                                    createdAt = it.createdAt,
+                                    version = 0L,
+                                    deviceId = it.deviceId,
+                                )
+                            },
                     )
                     call.respond(AssociationUploadResponse(req.associations.size, uploadedAt))
                     success = true
@@ -812,22 +807,13 @@ fun Route.syncRoutes(
                         }
                     val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_SYNC_PAGE_SIZE
                     val pageSize = limit.coerceIn(1, MAX_SYNC_PAGE_SIZE)
-                    val changeSet = repository.associationChanges(userId, since, pageSize)
-                    val changes =
-                        changeSet.changes.map {
-                            AssociationChange(
-                                journalId = it.journalId,
-                                contentId = it.contentId,
-                                createdAt = it.createdAt,
-                                serverVersion = it.serverVersion,
-                                isDeleted = false,
-                            )
-                        }
+                    val changeSet = collectionsRepository.associationChanges(userId, since, pageSize)
+                    val changes = changeSet.changes.map(LogDateAssociation::toAssociationChange)
                     val deletions =
                         changeSet.deletions.map {
                             AssociationDeletion(
-                                journalId = it.key.journalId,
-                                contentId = it.key.contentId,
+                                journalId = it.association.journalId,
+                                contentId = it.association.entryId,
                                 deletedAt = it.deletedAt,
                             )
                         }
@@ -848,17 +834,18 @@ fun Route.syncRoutes(
                     val journalId = call.requiredPathParam("journalId")
                     val contentId = call.requiredPathParam("contentId")
                     val req = call.receive<AssociationLinkUpsertRequest>()
-                    repository.upsertAssociations(
-                        userId,
-                        listOf(
-                            AssociationRecord(
-                                journalId = journalId,
-                                contentId = contentId,
-                                createdAt = req.createdAt,
-                                serverVersion = 0L,
-                                deviceId = req.deviceId,
+                    collectionsRepository.upsertAssociations(
+                        userId = userId,
+                        associations =
+                            listOf(
+                                LogDateAssociation(
+                                    journalId = journalId,
+                                    entryId = contentId,
+                                    createdAt = req.createdAt,
+                                    version = 0L,
+                                    deviceId = req.deviceId,
+                                ),
                             ),
-                        ),
                     )
                     call.respond(HttpStatusCode.NoContent)
                     success = true
@@ -875,7 +862,11 @@ fun Route.syncRoutes(
                     val journalId = call.requiredPathParam("journalId")
                     val contentId = call.requiredPathParam("contentId")
                     val deletedAt = System.currentTimeMillis()
-                    repository.deleteAssociations(userId, listOf(AssociationKey(journalId, contentId)), deletedAt)
+                    collectionsRepository.deleteAssociations(
+                        userId,
+                        listOf(LogDateAssociationRef(journalId, contentId)),
+                        deletedAt,
+                    )
                     call.respond(HttpStatusCode.NoContent)
                     success = true
                 } finally {
@@ -890,9 +881,9 @@ fun Route.syncRoutes(
                     val userId = extractUserId(call, tokenService) ?: return@delete
                     val req = call.receive<AssociationDeleteRequest>()
                     val deletedAt = System.currentTimeMillis()
-                    repository.deleteAssociations(
+                    collectionsRepository.deleteAssociations(
                         userId,
-                        req.associations.map { AssociationKey(it.journalId, it.contentId) },
+                        req.associations.map { LogDateAssociationRef(it.journalId, it.contentId) },
                         deletedAt,
                     )
                     call.respond(HttpStatusCode.NoContent)

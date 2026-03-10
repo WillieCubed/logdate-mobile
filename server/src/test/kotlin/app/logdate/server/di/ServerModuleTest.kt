@@ -11,6 +11,7 @@ import app.logdate.server.database.DatabaseConfig
 import app.logdate.server.database.PostgreSQLAccountIdentityRepository
 import app.logdate.server.database.PostgreSQLAccountRepository
 import app.logdate.server.database.PostgreSQLPasskeyRepository
+import app.logdate.server.database.PostgreSQLRepoBlockStore
 import app.logdate.server.database.PostgreSQLSessionManager
 import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.PlcIdentityService
@@ -31,6 +32,8 @@ import org.koin.core.context.stopKoin
 import org.koin.core.logger.EmptyLogger
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
+import studio.hypertext.atproto.repo.InMemoryRepoBlockStore
+import studio.hypertext.atproto.repo.RepoBlockStore
 import javax.sql.DataSource
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -64,6 +67,7 @@ class ServerModuleTest {
         assertIs<InMemoryPasskeyRepository>(koin.get<PasskeyRepository>())
         assertIs<InMemorySessionManager>(koin.get<SessionManager>())
         assertIs<InMemorySyncRepository>(koin.get<SyncRepository>())
+        assertIs<InMemoryRepoBlockStore>(koin.get<RepoBlockStore>())
         assertIs<WebAuthnPasskeyService>(koin.get<WebAuthnPasskeyService>())
         assertIs<GoogleIdTokenVerifier>(koin.get<GoogleIdTokenVerifier>())
         assertTrue(koin.get<WebAuthnPasskeyService>().relyingPartyId.isNotBlank())
@@ -82,6 +86,7 @@ class ServerModuleTest {
         assertIs<PostgreSQLPasskeyRepository>(koin.get<PasskeyRepository>())
         assertIs<PostgreSQLSessionManager>(koin.get<SessionManager>())
         assertIs<DbSyncRepository>(koin.get<SyncRepository>())
+        assertIs<PostgreSQLRepoBlockStore>(koin.get<RepoBlockStore>())
         assertIs<WebAuthnPasskeyService>(koin.get<WebAuthnPasskeyService>())
     }
 

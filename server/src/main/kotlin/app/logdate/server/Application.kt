@@ -12,6 +12,7 @@ import app.logdate.server.di.initializeDatabase
 import app.logdate.server.di.serverModule
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.SigningKeyService
+import app.logdate.server.logdate.SyncBackedLogDateCollectionsRepository
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthAuthorizationService
 import app.logdate.server.oauth.OAuthConfig
@@ -61,6 +62,7 @@ import org.koin.logger.slf4jLogger
 import studio.hypertext.atproto.pds.DescribeServerResponse
 import studio.hypertext.atproto.pds.runtime.DefaultPdsRepoService
 import studio.hypertext.atproto.pds.runtime.StaticPdsDiscoveryService
+import studio.hypertext.atproto.repo.RepoBlockStore
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -124,7 +126,14 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     val oauthAccessTokenService: OAuthAccessTokenService by inject()
     val oauthAuthorizationService: OAuthAuthorizationService by inject()
     val webAuthnConfig: WebAuthnConfig by inject()
-    val logDateRepoStore = LogDateRepoStore(syncRepository = syncRepository, identityService = atprotoIdentityService)
+    val repoBlockStore: RepoBlockStore by inject()
+    val logDateCollectionsRepository = SyncBackedLogDateCollectionsRepository(syncRepository)
+    val logDateRepoStore =
+        LogDateRepoStore(
+            collectionsRepository = logDateCollectionsRepository,
+            identityService = atprotoIdentityService,
+            blockStore = repoBlockStore,
+        )
     atprotoIdentityService.setRepoCollectionsResolver(logDateRepoStore::collectionsForDid)
     val pdsRepoService = DefaultPdsRepoService(logDateRepoStore)
     val pdsDiscoveryService =
@@ -238,7 +247,13 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
                 atprotoIdentityService = atprotoIdentityService,
                 signingKeyService = signingKeyService,
             )
-            syncRoutes(syncRepository, tokenService, mediaStorage, syncMetrics)
+            syncRoutes(
+                repository = syncRepository,
+                tokenService = tokenService,
+                mediaStorage = mediaStorage,
+                metrics = syncMetrics,
+                collectionsRepository = logDateCollectionsRepository,
+            )
         }
     }
 }
