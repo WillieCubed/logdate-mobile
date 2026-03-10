@@ -36,12 +36,12 @@ public object LexiconValidator {
         if (document.lexicon != 1) {
             issues += LexiconValidationIssue(path = document.id.toString(), message = "Only lexicon version 1 is supported")
         }
-        if (document.definitions[MAIN_DEFINITION_NAME] == null) {
-            issues += LexiconValidationIssue(path = "${document.id}#defs", message = "Lexicon must define #main")
+        if (document.definitions.isEmpty()) {
+            issues += LexiconValidationIssue(path = "${document.id}#defs", message = "Lexicon must define at least one definition")
         }
 
         document.definitions.values.forEach { definition ->
-            if (definition.type == LexiconType.OBJECT) {
+            if (definition.type.isObjectLike()) {
                 definition.required.forEach { requiredField ->
                     if (requiredField !in definition.properties) {
                         issues +=
@@ -58,12 +58,40 @@ public object LexiconValidator {
                 field =
                     LexiconField(
                         type = definition.type,
+                        properties = definition.properties,
                         items = definition.items,
                         reference = definition.reference,
                     ),
                 registry = registry,
                 issues = issues,
             )
+            definition.parameters?.let { parameters ->
+                validateField(
+                    owner = document,
+                    path = "${document.id}#${definition.name}.parameters",
+                    field = parameters,
+                    registry = registry,
+                    issues = issues,
+                )
+            }
+            definition.input?.schema?.let { schema ->
+                validateField(
+                    owner = document,
+                    path = "${document.id}#${definition.name}.input",
+                    field = schema,
+                    registry = registry,
+                    issues = issues,
+                )
+            }
+            definition.output?.schema?.let { schema ->
+                validateField(
+                    owner = document,
+                    path = "${document.id}#${definition.name}.output",
+                    field = schema,
+                    registry = registry,
+                    issues = issues,
+                )
+            }
             definition.properties.forEach { (name, property) ->
                 validateField(
                     owner = document,
@@ -114,7 +142,21 @@ public object LexiconValidator {
                 }
             }
 
-            else -> Unit
+            else -> {
+                if (field.type.isObjectLike()) {
+                    field.properties.forEach { (name, property) ->
+                        validateField(
+                            owner = owner,
+                            path = "$path.$name",
+                            field = property,
+                            registry = registry,
+                            issues = issues,
+                        )
+                    }
+                }
+            }
         }
     }
+
+    private fun LexiconType.isObjectLike(): Boolean = this == LexiconType.OBJECT || this == LexiconType.PARAMS
 }

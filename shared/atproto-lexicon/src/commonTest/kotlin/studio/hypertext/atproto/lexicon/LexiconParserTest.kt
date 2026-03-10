@@ -3,40 +3,33 @@ package studio.hypertext.atproto.lexicon
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LexiconParserTest {
     @Test
-    fun `parser reads object definitions refs and arrays`() {
-        val document = LexiconParser.parse(sampleLexicon)
+    fun `parser reads query params and output schemas`() {
+        val document = LexiconParser.parse(resolveHandleLexicon)
+        val mainDefinition = document.definitions.getValue("main")
+        val parameters = assertNotNull(mainDefinition.parameters)
+        val outputSchema = assertNotNull(assertNotNull(mainDefinition.output).schema)
 
         assertEquals(1, document.lexicon)
-        assertEquals("com.atproto.repo.createRecord", document.id.toString())
-        assertEquals(LexiconType.OBJECT, document.definitions.getValue("main").type)
-        assertEquals(
-            LexiconType.REF,
-            document.definitions
-                .getValue("main")
-                .properties
-                .getValue("record")
-                .type,
-        )
-        assertEquals(
-            LexiconType.ARRAY,
-            document.definitions
-                .getValue("main")
-                .properties
-                .getValue("tags")
-                .type,
-        )
+        assertEquals("com.atproto.identity.resolveHandle", document.id.toString())
+        assertEquals(LexiconType.QUERY, mainDefinition.type)
+        assertEquals(LexiconType.PARAMS, parameters.type)
+        assertEquals(LexiconType.STRING, parameters.properties.getValue("handle").type)
+        assertEquals(LexiconType.OBJECT, outputSchema.type)
     }
 
     @Test
-    fun `validator resolves local refs and flags invalid refs`() {
-        val validDocument = LexiconParser.parse(sampleLexicon)
+    fun `validator resolves local and cross document refs through query and procedure schemas`() {
+        val defs = LexiconParser.parse(repoDefsLexicon)
+        val validDocument = LexiconParser.parse(createRecordLexicon)
         val invalidDocument = LexiconParser.parse(invalidRefLexicon)
+        val registry = LexiconRegistry(listOf(defs))
 
-        val validResult = LexiconValidator.validate(validDocument)
+        val validResult = LexiconValidator.validate(validDocument, registry)
         val invalidResult = LexiconValidator.validate(invalidDocument)
 
         assertTrue(validResult.isValid)
@@ -50,68 +43,103 @@ class LexiconParserTest {
     }
 
     @Test
-    fun `registry resolves cross document refs`() {
-        val base = LexiconParser.parse(sampleLexicon)
-        val external =
-            LexiconParser.parse(
-                """
-                {
-                  "lexicon": 1,
-                  "id": "com.atproto.server.describeServer",
-                  "defs": {
-                    "main": {
-                      "type": "object",
-                      "properties": {
-                        "repo": { "type": "ref", "ref": "com.atproto.repo.createRecord#record" }
-                      }
-                    }
-                  }
-                }
-                """.trimIndent(),
-            )
-        val registry = LexiconRegistry(listOf(base))
-
-        val result = LexiconValidator.validate(external, registry)
-
-        assertTrue(result.isValid)
-    }
-
-    @Test
-    fun `codegen is deterministic and uses typed fields`() {
-        val document = LexiconParser.parse(sampleLexicon)
+    fun `codegen emits params input output and cross document ref types`() {
+        val document = LexiconParser.parse(createRecordLexicon)
 
         val generated = LexiconCodegen.generate(document)
 
         assertEquals(generated, LexiconCodegen.generate(document))
         assertTrue(generated.contains("public object CreateRecordLexicon"))
-        assertTrue(generated.contains("public data class CreateRecord("))
+        assertTrue(generated.contains("public data class CreateRecordInput("))
+        assertTrue(generated.contains("public data class CreateRecordOutput("))
         assertTrue(generated.contains("val repo: String"))
-        assertTrue(generated.contains("val record: CreateRecordRecord?"))
-        assertTrue(generated.contains("val tags: List<String?>?"))
+        assertTrue(generated.contains("val record: JsonElement"))
+        assertTrue(generated.contains("val commit: DefsCommitMeta?"))
+        assertTrue(generated.contains("val validationStatus: String?"))
     }
 
     private companion object {
-        val sampleLexicon: String =
+        val resolveHandleLexicon: String =
+            """
+            {
+              "lexicon": 1,
+              "id": "com.atproto.identity.resolveHandle",
+              "defs": {
+                "main": {
+                  "type": "query",
+                  "parameters": {
+                    "type": "params",
+                    "required": ["handle"],
+                    "properties": {
+                      "handle": { "type": "string" }
+                    }
+                  },
+                  "output": {
+                    "encoding": "application/json",
+                    "schema": {
+                      "type": "object",
+                      "required": ["did"],
+                      "properties": {
+                        "did": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            """.trimIndent()
+
+        val repoDefsLexicon: String =
+            """
+            {
+              "lexicon": 1,
+              "id": "com.atproto.repo.defs",
+              "defs": {
+                "commitMeta": {
+                  "type": "object",
+                  "required": ["cid", "rev"],
+                  "properties": {
+                    "cid": { "type": "string" },
+                    "rev": { "type": "string" }
+                  }
+                }
+              }
+            }
+            """.trimIndent()
+
+        val createRecordLexicon: String =
             """
             {
               "lexicon": 1,
               "id": "com.atproto.repo.createRecord",
               "defs": {
                 "main": {
-                  "type": "object",
-                  "required": ["repo"],
-                  "properties": {
-                    "repo": { "type": "string" },
-                    "record": { "type": "ref", "ref": "#record" },
-                    "tags": { "type": "array", "items": { "type": "string" } }
-                  }
-                },
-                "record": {
-                  "type": "object",
-                  "required": ["text"],
-                  "properties": {
-                    "text": { "type": "string" },
-                    "private": { "type": "boolean" }
+                  "type": "procedure",
+                  "input": {
+                    "encoding": "application/json",
+                    "schema": {
+                      "type": "object",
+                      "required": ["repo", "collection", "record"],
+                      "properties": {
+                        "repo": { "type": "string" },
+                        "collection": { "type": "string" },
+                        "rkey": { "type": "string" },
+                        "record": { "type": "unknown" }
+                      }
+                    }
+                  },
+                  "output": {
+                    "encoding": "application/json",
+                    "schema": {
+                      "type": "object",
+                      "required": ["uri", "cid"],
+                      "properties": {
+                        "uri": { "type": "string" },
+                        "cid": { "type": "string" },
+                        "commit": { "type": "ref", "ref": "com.atproto.repo.defs#commitMeta" },
+                        "validationStatus": { "type": "string", "knownValues": ["valid", "unknown"] }
+                      }
+                    }
                   }
                 }
               }
@@ -125,9 +153,15 @@ class LexiconParserTest {
               "id": "com.atproto.repo.invalidRecord",
               "defs": {
                 "main": {
-                  "type": "object",
-                  "properties": {
-                    "record": { "type": "ref", "ref": "#missing" }
+                  "type": "query",
+                  "output": {
+                    "encoding": "application/json",
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "record": { "type": "ref", "ref": "#missing" }
+                      }
+                    }
                   }
                 }
               }

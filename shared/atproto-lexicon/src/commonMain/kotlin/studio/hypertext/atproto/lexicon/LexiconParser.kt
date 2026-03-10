@@ -46,33 +46,32 @@ public object LexiconParser {
         source: JsonObject,
     ): LexiconDefinition {
         val type = source.lexiconType()
-        val required =
-            source["required"]
-                ?.jsonArray
-                ?.mapNotNull { it.jsonPrimitive.contentOrNull }
-                ?.toSet()
-                .orEmpty()
-        val properties =
-            source["properties"]
-                ?.jsonObject
-                ?.entries
-                ?.associate { (propertyName, propertySource) ->
-                    propertyName to
-                        parseField(
-                            owner = owner,
-                            source = propertySource.jsonObject,
-                            required = propertyName in required,
-                        )
-                }.orEmpty()
+        val required = source.stringSet("required")
+        val nullable = source.stringSet("nullable")
+        val properties = parseProperties(owner = owner, source = source, required = required, nullable = nullable)
         return LexiconDefinition(
             name = name,
             type = type,
             description = source["description"]?.jsonPrimitive?.contentOrNull,
             required = required,
+            nullable = nullable,
             properties = properties,
             items = source["items"]?.jsonObject?.let { parseField(owner = owner, source = it) },
             reference = source["ref"]?.jsonPrimitive?.contentOrNull?.let { LexiconReference.parse(owner, it) },
             knownValues = source.enumValues(),
+            parameters = source["parameters"]?.jsonObject?.let { parseField(owner = owner, source = it) },
+            input = source["input"]?.jsonObject?.let { parseBody(owner = owner, source = it) },
+            output = source["output"]?.jsonObject?.let { parseBody(owner = owner, source = it) },
+            errors =
+                source["errors"]
+                    ?.jsonArray
+                    ?.map { error ->
+                        val errorObject = error.jsonObject
+                        LexiconError(
+                            name = requireNotNull(errorObject["name"]?.jsonPrimitive?.contentOrNull) { "lexicon error name is required" },
+                            description = errorObject["description"]?.jsonPrimitive?.contentOrNull,
+                        )
+                    }.orEmpty(),
         )
     }
 
@@ -80,19 +79,59 @@ public object LexiconParser {
         owner: Nsid,
         source: JsonObject,
         required: Boolean = false,
+        nullable: Boolean = false,
     ): LexiconField =
         LexiconField(
             type = source.lexiconType(),
             description = source["description"]?.jsonPrimitive?.contentOrNull,
             required = required,
+            nullable = nullable,
+            properties =
+                parseProperties(
+                    owner = owner,
+                    source = source,
+                    required = source.stringSet("required"),
+                    nullable = source.stringSet("nullable"),
+                ),
             items = source["items"]?.jsonObject?.let { parseField(owner = owner, source = it) },
             reference = source["ref"]?.jsonPrimitive?.contentOrNull?.let { LexiconReference.parse(owner, it) },
             knownValues = source.enumValues(),
         )
 
+    private fun parseProperties(
+        owner: Nsid,
+        source: JsonObject,
+        required: Set<String>,
+        nullable: Set<String>,
+    ): Map<String, LexiconField> =
+        source["properties"]
+            ?.jsonObject
+            ?.entries
+            ?.associate { (propertyName, propertySource) ->
+                propertyName to
+                    parseField(
+                        owner = owner,
+                        source = propertySource.jsonObject,
+                        required = propertyName in required,
+                        nullable = propertyName in nullable,
+                    )
+            }.orEmpty()
+
+    private fun parseBody(
+        owner: Nsid,
+        source: JsonObject,
+    ): LexiconBody =
+        LexiconBody(
+            encoding = requireNotNull(source["encoding"]?.jsonPrimitive?.contentOrNull) { "lexicon body encoding is required" },
+            schema = source["schema"]?.jsonObject?.let { parseField(owner = owner, source = it) },
+        )
+
     private fun JsonObject.lexiconType(): LexiconType =
         when (this["type"]?.jsonPrimitive?.contentOrNull?.trim()) {
             "object" -> LexiconType.OBJECT
+            "query" -> LexiconType.QUERY
+            "procedure" -> LexiconType.PROCEDURE
+            "params" -> LexiconType.PARAMS
             "string" -> LexiconType.STRING
             "boolean" -> LexiconType.BOOLEAN
             "integer" -> LexiconType.INTEGER
@@ -103,8 +142,21 @@ public object LexiconParser {
         }
 
     private fun JsonObject.enumValues(): List<String> =
-        (this["enum"] as? JsonArray)
-            ?.mapNotNull { element ->
+        (
+            (this["enum"] as? JsonArray)?.mapNotNull { element ->
                 (element as? JsonPrimitive)?.contentOrNull
-            }.orEmpty()
+            } ?: emptyList()
+        ) +
+            (
+                (this["knownValues"] as? JsonArray)?.mapNotNull { element ->
+                    (element as? JsonPrimitive)?.contentOrNull
+                } ?: emptyList()
+            )
+
+    private fun JsonObject.stringSet(key: String): Set<String> =
+        this[key]
+            ?.jsonArray
+            ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+            ?.toSet()
+            .orEmpty()
 }

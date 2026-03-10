@@ -19,10 +19,15 @@ public data class LexiconDefinition(
     val type: LexiconType,
     val description: String? = null,
     val required: Set<String> = emptySet(),
+    val nullable: Set<String> = emptySet(),
     val properties: Map<String, LexiconField> = emptyMap(),
     val items: LexiconField? = null,
     val reference: LexiconReference? = null,
     val knownValues: List<String> = emptyList(),
+    val parameters: LexiconField? = null,
+    val input: LexiconBody? = null,
+    val output: LexiconBody? = null,
+    val errors: List<LexiconError> = emptyList(),
 )
 
 /**
@@ -32,9 +37,27 @@ public data class LexiconField(
     val type: LexiconType,
     val description: String? = null,
     val required: Boolean = false,
+    val nullable: Boolean = false,
+    val properties: Map<String, LexiconField> = emptyMap(),
     val items: LexiconField? = null,
     val reference: LexiconReference? = null,
     val knownValues: List<String> = emptyList(),
+)
+
+/**
+ * Parsed query/procedure input or output body.
+ */
+public data class LexiconBody(
+    val encoding: String,
+    val schema: LexiconField? = null,
+)
+
+/**
+ * Parsed error declaration for queries and procedures.
+ */
+public data class LexiconError(
+    val name: String,
+    val description: String? = null,
 )
 
 /**
@@ -42,6 +65,9 @@ public data class LexiconField(
  */
 public enum class LexiconType {
     OBJECT,
+    QUERY,
+    PROCEDURE,
+    PARAMS,
     STRING,
     BOOLEAN,
     INTEGER,
