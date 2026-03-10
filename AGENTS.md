@@ -73,7 +73,7 @@ Each commit should read like a changelog entry — a single, distinct change tha
 
 Because every commit lands on `main`, every commit must leave the app in a shippable state. If the feature isn't ready for users, it must be behind a feature flag. A commit that breaks `main` is unacceptable regardless of how correct the code is.
 
-For staging safety and commit mechanics, see [git guidelines](./docs/reference/standards/git-guidelines.md).
+For staging safety and commit mechanics, see [`docs/reference/standards/git-guidelines.md`](./docs/reference/standards/git-guidelines.md).
 
 ## Non-Negotiable Principles
 
@@ -89,13 +89,11 @@ Never claim success with unresolved errors. Never lie by omission. Always check 
 
 Commits are changelog entries. Think in terms of features, not layers. Scope to the feature the user interacts with, not the internal module that happens to contain the code. Generic scopes like "client" or "domain" are not valid — pick the specific feature scope.
 
+Use [`docs/reference/standards/commit-messages.md`](./docs/reference/standards/commit-messages.md) as the source of truth for commit message structure and detail. Follow that guide when writing commit messages.
+
 - `feat` and `fix` are reserved for changes that affect end-user behavior. If the user wouldn't notice the difference, use `refactor`, `chore`, or `docs` instead.
 - Write `feat` commits as if consumed by the general public. The test: "Can I do something different because of this?"
 - Focus on behavior, not implementation. Capitalize proper nouns (API, Kotlin, Android, Compose, Gradle, etc.).
-
-**Good**: `feat(editor): add voice recording playback controls`
-**Bad**: `feat(editor): implement MediaPlayer service layer with coroutine scope`
-**Bad**: `fix(infra): enable Android resources for KMP modules` (use `chore` — build config, not user-facing)
 
 ### Minimal, Focused Changes
 
@@ -105,10 +103,10 @@ Keep modifications focused on the task. Don't add comments that restate code. Do
 
 | Topic | Location |
 |-------|----------|
-| Build commands | `./run help` |
-| Commit message format | `docs/reference/standards/commit-messages.md` |
-| Valid commit scopes | `allowed-scopes.txt` and `docs/reference/standards/commit-scopes.md` |
-| Git workflow & safety | `docs/reference/standards/git-guidelines.md` |
+| Build commands | [`./run help`](./run) |
+| Commit message format | [`docs/reference/standards/commit-messages.md`](./docs/reference/standards/commit-messages.md) |
+| Valid commit scopes | [`allowed-scopes.txt`](./allowed-scopes.txt) and [`docs/reference/standards/commit-scopes.md`](./docs/reference/standards/commit-scopes.md) |
+| Git workflow & safety | [`docs/reference/standards/git-guidelines.md`](./docs/reference/standards/git-guidelines.md) |
 
 ## Code Conventions
 
