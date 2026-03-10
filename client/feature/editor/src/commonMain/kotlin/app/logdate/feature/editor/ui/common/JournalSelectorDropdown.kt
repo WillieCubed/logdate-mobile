@@ -24,6 +24,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
@@ -40,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.editor.ui.layout.LocalEditorIsCompact
 import app.logdate.shared.model.Journal
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.editor.generated.resources.Res
@@ -49,6 +51,9 @@ import kotlin.uuid.Uuid
 
 /**
  * A Material You styled dropdown component to select multiple journals to associate an entry with.
+ *
+ * Renders a compact [FilterChip] when [LocalEditorIsCompact] is true (e.g. landscape phones),
+ * and a full card otherwise.
  *
  * @param availableJournals List of all available journals
  * @param selectedJournalIds List of currently selected journal IDs
@@ -63,6 +68,7 @@ fun JournalSelectorDropdown(
     onSelectionChanged: (List<Uuid>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val isCompact = LocalEditorIsCompact.current
     var expanded by remember { mutableStateOf(false) }
     val selectedCount = selectedJournalIds.size
 
@@ -71,15 +77,24 @@ fun JournalSelectorDropdown(
         onExpandedChange = { expanded = it },
         modifier = modifier,
     ) {
-        DropdownSelector(
-            selectedCount = selectedCount,
-            availableJournals = availableJournals,
-            selectedJournalIds = selectedJournalIds,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-        )
+        if (isCompact) {
+            CompactDropdownSelector(
+                selectedCount = selectedCount,
+                availableJournals = availableJournals,
+                selectedJournalIds = selectedJournalIds,
+                modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+            )
+        } else {
+            DropdownSelector(
+                selectedCount = selectedCount,
+                availableJournals = availableJournals,
+                selectedJournalIds = selectedJournalIds,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+            )
+        }
 
         DropdownContent(
             expanded = expanded,
@@ -90,6 +105,61 @@ fun JournalSelectorDropdown(
             modifier = Modifier.fillMaxWidth(),
         )
     }
+}
+
+/**
+ * Compact chip anchor for height-constrained screens (e.g. landscape phones).
+ */
+@Suppress("ktlint:standard:function-naming")
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CompactDropdownSelector(
+    selectedCount: Int,
+    availableJournals: List<Journal>,
+    selectedJournalIds: List<Uuid>,
+    modifier: Modifier = Modifier,
+) {
+    val label =
+        when (selectedCount) {
+            0 -> "Select journal"
+            1 ->
+                availableJournals
+                    .find { it.id == selectedJournalIds.first() }
+                    ?.title
+                    ?: "Unknown"
+            else -> "$selectedCount journals"
+        }
+
+    FilterChip(
+        selected = selectedCount > 0,
+        onClick = {},
+        label = {
+            Text(
+                text = label,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        leadingIcon = {
+            Icon(
+                Icons.AutoMirrored.Filled.MenuBook,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+            )
+        },
+        trailingIcon = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (selectedCount > 1) {
+                    Badge { Text(selectedCount.toString()) }
+                }
+                Icon(
+                    Icons.Default.ExpandMore,
+                    contentDescription = stringResource(Res.string.expand),
+                )
+            }
+        },
+        modifier = modifier,
+    )
 }
 
 /**

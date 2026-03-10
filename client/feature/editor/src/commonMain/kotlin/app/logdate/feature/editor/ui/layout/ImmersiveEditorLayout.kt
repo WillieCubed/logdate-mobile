@@ -24,12 +24,21 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import app.logdate.ui.theme.Spacing
 import androidx.compose.ui.util.lerp as lerpFloat
+
+/**
+ * Signals to editor components nested anywhere beneath [ImmersiveEditorLayout] that the
+ * available vertical space is too small to render full-size controls. Components should
+ * switch to compact variants (e.g. chip instead of card) when this is `true`.
+ */
+internal val LocalEditorIsCompact = compositionLocalOf { false }
 
 /**
  * A cross-platform immersive editor layout that provides a focused editing experience.
@@ -62,6 +71,8 @@ fun ImmersiveEditorLayout(
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val containerWidth = maxWidth
+        // Landscape phones are typically 360–430dp tall; portrait phones start at 667dp.
+        val isCompact = maxHeight < 500.dp
         val maxEditorWidth =
             when {
                 containerWidth < 600.dp -> containerWidth
@@ -75,73 +86,75 @@ fun ImmersiveEditorLayout(
         val innerTopPadding = lerp(0.dp, Spacing.sm, immersiveExitProgress)
         val scrimAlpha = lerpFloat(0.72f, 0.50f, immersiveExitProgress)
 
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = scrimAlpha)),
-        ) {
+        CompositionLocalProvider(LocalEditorIsCompact provides isCompact) {
             Box(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .padding(top = topOffset)
-                        .windowInsetsPadding(WindowInsets.ime),
-                contentAlignment = Alignment.Center,
+                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = scrimAlpha)),
             ) {
-                Column(
+                Box(
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .widthIn(max = maxEditorWidth)
-                            .padding(horizontal = horizontalPadding)
-                            .padding(top = innerTopPadding),
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                            .padding(top = topOffset)
+                            .windowInsetsPadding(WindowInsets.ime),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Box(
+                    Column(
                         modifier =
                             Modifier
-                                .fillMaxWidth()
-                                .weight(1f)
-                                .then(
-                                    if (!isImmersiveBlockActive) {
-                                        Modifier.heightIn(min = 300.dp)
-                                    } else {
-                                        Modifier
-                                    },
-                                ),
-                    ) {
-                        editorContent()
-                    }
-
-                    AnimatedVisibility(
-                        visible = !isImmersiveBlockActive,
-                        enter = fadeIn(tween(200)) + expandVertically(tween(300, easing = FastOutSlowInEasing)),
-                        exit = fadeOut(tween(150)) + shrinkVertically(tween(300, easing = FastOutSlowInEasing)),
+                                .fillMaxSize()
+                                .widthIn(max = maxEditorWidth)
+                                .padding(horizontal = horizontalPadding)
+                                .padding(top = innerTopPadding),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Box(
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .windowInsetsPadding(WindowInsets.navigationBars)
-                                    .padding(top = Spacing.sm, bottom = Spacing.md),
+                                    .weight(1f)
+                                    .then(
+                                        if (!isImmersiveBlockActive) {
+                                            Modifier.heightIn(min = 300.dp)
+                                        } else {
+                                            Modifier
+                                        },
+                                    ),
                         ) {
-                            bottomContent()
+                            editorContent()
+                        }
+
+                        AnimatedVisibility(
+                            visible = !isImmersiveBlockActive,
+                            enter = fadeIn(tween(200)) + expandVertically(tween(300, easing = FastOutSlowInEasing)),
+                            exit = fadeOut(tween(150)) + shrinkVertically(tween(300, easing = FastOutSlowInEasing)),
+                        ) {
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .windowInsetsPadding(WindowInsets.navigationBars)
+                                        .padding(top = Spacing.sm, bottom = Spacing.md),
+                            ) {
+                                bottomContent()
+                            }
                         }
                     }
                 }
-            }
 
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.TopStart)
-                        .windowInsetsPadding(WindowInsets.statusBars),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                topBarContent()
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.TopStart)
+                            .windowInsetsPadding(WindowInsets.statusBars),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    topBarContent()
+                }
             }
-        }
+        } // CompositionLocalProvider
     }
 }
