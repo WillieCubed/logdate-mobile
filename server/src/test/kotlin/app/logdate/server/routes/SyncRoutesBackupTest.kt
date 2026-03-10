@@ -83,9 +83,16 @@ class SyncRoutesBackupTest {
             assertEquals(payload.size.toLong(), uploadResp.sizeBytes)
 
             // Verify storage was called with encrypted data (LDBK1 prefix)
-            assertTrue(mockHarness.uploadedPayload.captured.size > payload.size, "Encrypted data should be larger than plaintext")
             assertTrue(
-                String(mockHarness.uploadedPayload.captured.copyOfRange(0, 5), Charsets.UTF_8) == "LDBK1",
+                mockHarness.uploadedRequest.captured.bytes.size > payload.size,
+                "Encrypted data should be larger than plaintext",
+            )
+            assertTrue(
+                String(
+                    mockHarness.uploadedRequest.captured.bytes
+                        .copyOfRange(0, 5),
+                    Charsets.UTF_8,
+                ) == "LDBK1",
                 "Uploaded data should have LDBK1 prefix",
             )
 

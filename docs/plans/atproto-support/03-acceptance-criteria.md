@@ -200,6 +200,7 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
 ### P6.2 Blob Storage Boundary
 
 - Media and backup binary object operations move behind a LogDate-owned storage interface rather than routes depending directly on `GcsMediaStorage`.
+- The storage interface exposes generic blob put/get/delete operations rather than only media-specific upload methods.
 - The production implementation still supports GCS-backed uploads, downloads, deletes, and signed URLs.
 - Test applications can provide in-memory or fake blob storage implementations without route-level GCS knowledge.
 

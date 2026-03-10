@@ -3,6 +3,7 @@ package app.logdate.server.routes.sync
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.crypto.EncryptionService
 import app.logdate.server.crypto.ProcessedPayload
+import app.logdate.server.logdate.LogDateBlobNamespace
 import app.logdate.server.logdate.asLogDateBackupRepository
 import app.logdate.server.logdate.asLogDateCollectionsRepository
 import app.logdate.server.logdate.asLogDateMediaRepository
@@ -45,10 +46,12 @@ class SyncMediaAndBackupLifecycleTest {
             val tokenService = JwtTokenService("sync-binary-secret")
             val storage = mockk<GcsMediaStorage>()
 
-            every { storage.uploadMedia(any(), any(), any(), any(), any()) } throws IllegalStateException("media-upload-fail")
-            every { storage.uploadBackup(any(), any(), any()) } returns "users/u/backups/b.enc"
-            every { storage.downloadMedia(any()) } returns null
-            every { storage.deleteMedia(any()) } returns true
+            every {
+                storage.putBlob(match { it.namespace == LogDateBlobNamespace.MEDIA })
+            } throws IllegalStateException("media-upload-fail")
+            every { storage.putBlob(match { it.namespace == LogDateBlobNamespace.BACKUP }) } returns "users/u/backups/b.enc"
+            every { storage.getBlob(any()) } returns null
+            every { storage.deleteBlob(any()) } returns true
             every { storage.getSignedDownloadUrl(any(), any()) } returns "https://signed.example/object"
 
             application {
@@ -122,7 +125,7 @@ class SyncMediaAndBackupLifecycleTest {
             every { encryptionService.processBackupUpload(any(), any(), any()) } throws IllegalStateException("enc backup")
             every { encryptionService.processMediaDownload(any(), any()) } answers { firstArg() }
             every { encryptionService.processBackupDownload(any(), any()) } answers { firstArg() }
-            every { storage.uploadBackup(any(), any(), any()) } returns "users/u/backups/b.enc"
+            every { storage.putBlob(match { it.namespace == LogDateBlobNamespace.BACKUP }) } returns "users/u/backups/b.enc"
             every { storage.getSignedDownloadUrl(any(), any()) } returns "https://signed.example/object"
 
             application {
@@ -273,7 +276,7 @@ class SyncMediaAndBackupLifecycleTest {
             every { encryptionService.processMediaDownload(any(), any()) } answers { firstArg() }
             every { encryptionService.processBackupUpload(any(), any(), any()) } returns ProcessedPayload(byteArrayOf(1), true)
             every { encryptionService.processBackupDownload(any(), any()) } returns byteArrayOf(1)
-            every { storage.uploadMedia(any(), any(), any(), any(), any()) } returns "users/u/media/m1/photo.jpg"
+            every { storage.putBlob(match { it.namespace == LogDateBlobNamespace.MEDIA }) } returns "users/u/media/m1/photo.jpg"
 
             application {
                 install(ContentNegotiation) { json() }

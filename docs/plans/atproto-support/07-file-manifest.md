@@ -119,6 +119,7 @@ This manifest reflects the current AT Protocol implementation shape in the repo.
 - `server/src/main/kotlin/app/logdate/server/database/PostgreSQLLogDateCollectionsMetadataStore.kt`
 - `server/src/main/kotlin/app/logdate/server/database/PostgreSQLLogDateMediaRepository.kt`
 - `server/src/main/kotlin/app/logdate/server/database/PostgreSQLLogDateBackupRepository.kt`
+- `server/src/main/kotlin/app/logdate/server/sync/GcsMediaStorage.kt`
 - `server/src/main/resources/db/migration/V8__Add_logdate_collection_repo_index.sql`
 - `server/src/main/resources/db/migration/V9__Add_logdate_media_and_backup_tables.sql`
 
@@ -207,6 +208,7 @@ This manifest reflects the current AT Protocol implementation shape in the repo.
 - `server/src/test/kotlin/app/logdate/server/database/PostgreSQLLogDateCollectionsMetadataStoreTest.kt`
 - `server/src/test/kotlin/app/logdate/server/database/PostgreSQLLogDateMediaRepositoryTest.kt`
 - `server/src/test/kotlin/app/logdate/server/database/PostgreSQLLogDateBackupRepositoryTest.kt`
+- `server/src/test/kotlin/app/logdate/server/sync/GcsMediaStorageTest.kt`
 - `server/src/test/kotlin/app/logdate/server/routes/Identity*.kt`
 - `server/src/test/kotlin/app/logdate/server/routes/OAuthRoutesTest.kt`
 - `server/src/test/kotlin/app/logdate/server/routes/Xrpc*.kt`

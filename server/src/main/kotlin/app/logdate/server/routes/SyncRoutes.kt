@@ -6,7 +6,9 @@ import app.logdate.server.logdate.LogDateAssociation
 import app.logdate.server.logdate.LogDateAssociationRef
 import app.logdate.server.logdate.LogDateBackup
 import app.logdate.server.logdate.LogDateBackupRepository
+import app.logdate.server.logdate.LogDateBlobNamespace
 import app.logdate.server.logdate.LogDateBlobStorage
+import app.logdate.server.logdate.LogDateBlobWriteRequest
 import app.logdate.server.logdate.LogDateCollectionsRepository
 import app.logdate.server.logdate.LogDateEntry
 import app.logdate.server.logdate.LogDateJournal
@@ -916,12 +918,15 @@ fun Route.syncRoutes(
                     val storagePath =
                         if (mediaStorage != null) {
                             runCatching {
-                                mediaStorage.uploadMedia(
-                                    userId = userId,
-                                    mediaId = UUID.fromString(mediaId),
-                                    fileName = req.fileName,
-                                    mimeType = req.mimeType,
-                                    data = encryptedPayload.data,
+                                mediaStorage.putBlob(
+                                    LogDateBlobWriteRequest(
+                                        ownerId = userId,
+                                        namespace = LogDateBlobNamespace.MEDIA,
+                                        blobId = mediaId,
+                                        fileName = req.fileName,
+                                        contentType = req.mimeType,
+                                        bytes = encryptedPayload.data,
+                                    ),
                                 )
                             }.getOrElse { error ->
                                 Napier.e("Failed to upload media to external storage", error)
@@ -1033,7 +1038,7 @@ fun Route.syncRoutes(
                                         HttpStatusCode.InternalServerError,
                                         error("MEDIA_STORAGE_UNAVAILABLE", "Media storage not configured"),
                                     )
-                            storage.downloadMedia(record.storagePath)
+                            storage.getBlob(record.storagePath)
                                 ?: return@get call.respond(
                                     HttpStatusCode.NotFound,
                                     error("NOT_FOUND", "Media not found"),
@@ -1077,7 +1082,7 @@ fun Route.syncRoutes(
                     val mediaId = call.requiredPathParam("mediaId")
                     val record = mediaRepository.getMedia(userId, mediaId)
                     if (record != null) {
-                        record.storagePath?.let { mediaStorage?.deleteMedia(it) }
+                        record.storagePath?.let { mediaStorage?.deleteBlob(it) }
                         mediaRepository.deleteMedia(userId, mediaId, System.currentTimeMillis())
                     }
                     call.respond(HttpStatusCode.NoContent)
@@ -1127,7 +1132,17 @@ fun Route.syncRoutes(
                             )
                         }
 
-                    val storagePath = storage.uploadBackup(userId, backupId, encryptedData)
+                    val storagePath =
+                        storage.putBlob(
+                            LogDateBlobWriteRequest(
+                                ownerId = userId,
+                                namespace = LogDateBlobNamespace.BACKUP,
+                                blobId = backupId.toString(),
+                                fileName = null,
+                                contentType = "application/octet-stream",
+                                bytes = encryptedData,
+                            ),
+                        )
 
                     val record =
                         backupRepository.createBackup(
@@ -1245,7 +1260,7 @@ fun Route.syncRoutes(
                         )
 
                     val encryptedData =
-                        storage.downloadMedia(record.storagePath)
+                        storage.getBlob(record.storagePath)
                             ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Backup file not found"))
 
                     val decryptedData =
@@ -1282,7 +1297,7 @@ fun Route.syncRoutes(
 
                     val record = backupRepository.getBackup(userId, backupId)
                     if (record != null) {
-                        mediaStorage?.deleteMedia(record.storagePath)
+                        mediaStorage?.deleteBlob(record.storagePath)
                         backupRepository.deleteBackup(userId, backupId)
                     }
 

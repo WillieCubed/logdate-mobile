@@ -178,9 +178,9 @@ class SyncRoutesEdgeCasesTest {
         testApplication {
             val userId = UUID.randomUUID()
             val storage = mockk<GcsMediaStorage>()
-            every { storage.downloadMedia("missing-path") } returns null
-            every { storage.downloadMedia("invalid-cipher-path") } returns (PayloadPrefixes.SERVER_MEDIA + byteArrayOf(1, 2, 3))
-            every { storage.deleteMedia(any()) } returns true
+            every { storage.getBlob("missing-path") } returns null
+            every { storage.getBlob("invalid-cipher-path") } returns (PayloadPrefixes.SERVER_MEDIA + byteArrayOf(1, 2, 3))
+            every { storage.deleteBlob(any()) } returns true
 
             val env = configureSyncTestApp(mediaStorage = storage)
             val auth = authHeader(env.tokenService, userId)
@@ -241,9 +241,9 @@ class SyncRoutesEdgeCasesTest {
         testApplication {
             val userId = UUID.randomUUID()
             val storage = mockk<GcsMediaStorage>()
-            every { storage.downloadMedia("backup-missing") } returns null
-            every { storage.downloadMedia("backup-bad-cipher") } returns (PayloadPrefixes.SERVER_BACKUP + byteArrayOf(1, 2, 3))
-            every { storage.deleteMedia(any()) } returns true
+            every { storage.getBlob("backup-missing") } returns null
+            every { storage.getBlob("backup-bad-cipher") } returns (PayloadPrefixes.SERVER_BACKUP + byteArrayOf(1, 2, 3))
+            every { storage.deleteBlob(any()) } returns true
 
             val env = configureSyncTestApp(mediaStorage = storage)
             val auth = authHeader(env.tokenService, userId)

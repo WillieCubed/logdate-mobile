@@ -1,13 +1,14 @@
 package app.logdate.server.sync
 
+import app.logdate.server.logdate.LogDateBlobNamespace
 import app.logdate.server.logdate.LogDateBlobStorage
+import app.logdate.server.logdate.LogDateBlobWriteRequest
 import com.google.cloud.storage.BlobId
 import com.google.cloud.storage.BlobInfo
 import com.google.cloud.storage.Storage
 import com.google.cloud.storage.StorageOptions
 import io.github.aakira.napier.Napier
 import java.net.URL
-import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 /**
@@ -26,27 +27,16 @@ class GcsMediaStorage(
             .service,
 ) : LogDateBlobStorage {
     /**
-     * Upload media file to GCS.
-     * @param userId The owner's user ID
-     * @param mediaId Unique identifier for this media file
-     * @param fileName Original filename
-     * @param mimeType Content type (e.g., "image/jpeg")
-     * @param data File contents as ByteArray
-     * @return The storage path for database storage (users/{userId}/media/{mediaId}/{filename})
+     * Upload a LogDate blob into the configured GCS bucket.
      */
-    override fun uploadMedia(
-        userId: UUID,
-        mediaId: UUID,
-        fileName: String,
-        mimeType: String,
-        data: ByteArray,
-    ): String {
-        val storagePath = buildStoragePath(userId, mediaId, fileName)
+    override fun putBlob(request: LogDateBlobWriteRequest): String {
+        val storagePath = buildStoragePath(request)
+        val label = request.namespace.errorLabel()
         val blobId = BlobId.of(bucketName, storagePath)
         val blobInfo =
             BlobInfo
                 .newBuilder(blobId)
-                .setContentType(mimeType)
+                .setContentType(request.contentType)
                 .build()
 
         try {
@@ -56,44 +46,12 @@ class GcsMediaStorage(
                 } else {
                     emptyArray()
                 }
-            storage.create(blobInfo, data, *options)
-            Napier.d("Uploaded media to GCS: $storagePath (${data.size} bytes)")
+            storage.create(blobInfo, request.bytes, *options)
+            Napier.d("Uploaded $label to GCS: $storagePath (${request.bytes.size} bytes)")
             return storagePath
         } catch (e: Exception) {
-            Napier.e("Failed to upload media to GCS: $storagePath", e)
-            throw MediaStorageException("Failed to upload media", e)
-        }
-    }
-
-    /**
-     * Upload encrypted backup to GCS.
-     */
-    override fun uploadBackup(
-        userId: UUID,
-        backupId: UUID,
-        data: ByteArray,
-    ): String {
-        val storagePath = "users/$userId/backups/$backupId.enc"
-        val blobId = BlobId.of(bucketName, storagePath)
-        val blobInfo =
-            BlobInfo
-                .newBuilder(blobId)
-                .setContentType("application/octet-stream")
-                .build()
-
-        try {
-            val options =
-                if (kmsKeyName != null) {
-                    arrayOf(Storage.BlobTargetOption.kmsKeyName(kmsKeyName))
-                } else {
-                    emptyArray()
-                }
-            storage.create(blobInfo, data, *options)
-            Napier.d("Uploaded backup to GCS: $storagePath (${data.size} bytes)")
-            return storagePath
-        } catch (e: Exception) {
-            Napier.e("Failed to upload backup to GCS: $storagePath", e)
-            throw MediaStorageException("Failed to upload backup", e)
+            Napier.e("Failed to upload $label to GCS: $storagePath", e)
+            throw MediaStorageException("Failed to upload $label", e)
         }
     }
 
@@ -128,12 +86,12 @@ class GcsMediaStorage(
      * @param storagePath The GCS storage path
      * @return File contents as ByteArray, or null if not found
      */
-    override fun downloadMedia(storagePath: String): ByteArray? {
+    override fun getBlob(storagePath: String): ByteArray? {
         val blobId = BlobId.of(bucketName, storagePath)
         return try {
             storage.readAllBytes(blobId)
         } catch (e: Exception) {
-            Napier.e("Failed to download media from GCS: $storagePath", e)
+            Napier.e("Failed to download blob from GCS: $storagePath", e)
             null
         }
     }
@@ -143,18 +101,18 @@ class GcsMediaStorage(
      * @param storagePath The GCS storage path
      * @return true if deleted successfully, false otherwise
      */
-    override fun deleteMedia(storagePath: String): Boolean {
+    override fun deleteBlob(storagePath: String): Boolean {
         val blobId = BlobId.of(bucketName, storagePath)
         return try {
             val deleted = storage.delete(blobId)
             if (deleted) {
-                Napier.d("Deleted media from GCS: $storagePath")
+                Napier.d("Deleted blob from GCS: $storagePath")
             } else {
-                Napier.w("Media not found in GCS: $storagePath")
+                Napier.w("Blob not found in GCS: $storagePath")
             }
             deleted
         } catch (e: Exception) {
-            Napier.e("Failed to delete media from GCS: $storagePath", e)
+            Napier.e("Failed to delete blob from GCS: $storagePath", e)
             false
         }
     }
@@ -173,19 +131,22 @@ class GcsMediaStorage(
         }
     }
 
-    private fun buildStoragePath(
-        userId: UUID,
-        mediaId: UUID,
-        fileName: String,
-    ): String {
-        // Sanitize filename to prevent path traversal
-        val sanitizedFileName =
-            fileName
-                .replace("..", "")
-                .replace("/", "_")
-                .replace("\\", "_")
-        return "users/$userId/media/$mediaId/$sanitizedFileName"
-    }
+    private fun buildStoragePath(request: LogDateBlobWriteRequest): String =
+        when (request.namespace) {
+            LogDateBlobNamespace.MEDIA -> {
+                val fileName = requireNotNull(request.fileName) { "Media blobs require a file name" }
+                val sanitizedFileName =
+                    fileName
+                        .replace("..", "")
+                        .replace("/", "_")
+                        .replace("\\", "_")
+                "users/${request.ownerId}/media/${request.blobId}/$sanitizedFileName"
+            }
+
+            LogDateBlobNamespace.BACKUP -> "users/${request.ownerId}/backups/${request.blobId}.enc"
+
+            LogDateBlobNamespace.ATPROTO -> "users/${request.ownerId}/atproto/blobs/${request.blobId}"
+        }
 
     companion object {
         /**
@@ -200,6 +161,13 @@ class GcsMediaStorage(
         }
     }
 }
+
+private fun LogDateBlobNamespace.errorLabel(): String =
+    when (this) {
+        LogDateBlobNamespace.MEDIA -> "media"
+        LogDateBlobNamespace.BACKUP -> "backup"
+        LogDateBlobNamespace.ATPROTO -> "blob"
+    }
 
 /**
  * Exception thrown when media storage operations fail.
