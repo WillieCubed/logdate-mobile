@@ -8,6 +8,8 @@ import app.logdate.server.identity.InMemorySigningKeyRepository
 import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
 import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
+import app.logdate.server.logdate.asLogDateBackupRepository
+import app.logdate.server.logdate.asLogDateMediaRepository
 import app.logdate.server.routes.syncRoutes
 import app.logdate.server.sync.GcsMediaStorage
 import app.logdate.server.sync.InMemorySyncRepository
@@ -72,12 +74,13 @@ fun TestApplicationBuilder.configureSyncTestApp(
         routing {
             route("/api/v1") {
                 syncRoutes(
-                    repository = repository,
                     tokenService = tokenService,
                     mediaStorage = mediaStorage,
                     metrics = metrics,
                     mediaAccessPolicy = mediaAccessPolicy,
                     collectionsRepository = collectionsRepository,
+                    mediaRepository = repository.asLogDateMediaRepository(),
+                    backupRepository = repository.asLogDateBackupRepository(),
                 )
             }
         }

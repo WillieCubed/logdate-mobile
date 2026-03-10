@@ -1,5 +1,6 @@
 package app.logdate.server.sync
 
+import app.logdate.server.logdate.LogDateBlobStorage
 import com.google.cloud.storage.BlobId
 import com.google.cloud.storage.BlobInfo
 import com.google.cloud.storage.Storage
@@ -23,7 +24,7 @@ class GcsMediaStorage(
             .apply { projectId?.let { setProjectId(it) } }
             .build()
             .service,
-) {
+) : LogDateBlobStorage {
     /**
      * Upload media file to GCS.
      * @param userId The owner's user ID
@@ -33,7 +34,7 @@ class GcsMediaStorage(
      * @param data File contents as ByteArray
      * @return The storage path for database storage (users/{userId}/media/{mediaId}/{filename})
      */
-    fun uploadMedia(
+    override fun uploadMedia(
         userId: UUID,
         mediaId: UUID,
         fileName: String,
@@ -67,7 +68,7 @@ class GcsMediaStorage(
     /**
      * Upload encrypted backup to GCS.
      */
-    fun uploadBackup(
+    override fun uploadBackup(
         userId: UUID,
         backupId: UUID,
         data: ByteArray,
@@ -102,9 +103,9 @@ class GcsMediaStorage(
      * @param expirationHours How long the URL should be valid (default: 1 hour)
      * @return Signed URL for downloading the media file
      */
-    fun getSignedDownloadUrl(
+    override fun getSignedDownloadUrl(
         storagePath: String,
-        expirationHours: Long = 1,
+        expirationHours: Long,
     ): String {
         val blobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, storagePath)).build()
         return try {
@@ -127,7 +128,7 @@ class GcsMediaStorage(
      * @param storagePath The GCS storage path
      * @return File contents as ByteArray, or null if not found
      */
-    fun downloadMedia(storagePath: String): ByteArray? {
+    override fun downloadMedia(storagePath: String): ByteArray? {
         val blobId = BlobId.of(bucketName, storagePath)
         return try {
             storage.readAllBytes(blobId)
@@ -142,7 +143,7 @@ class GcsMediaStorage(
      * @param storagePath The GCS storage path
      * @return true if deleted successfully, false otherwise
      */
-    fun deleteMedia(storagePath: String): Boolean {
+    override fun deleteMedia(storagePath: String): Boolean {
         val blobId = BlobId.of(bucketName, storagePath)
         return try {
             val deleted = storage.delete(blobId)

@@ -1,6 +1,9 @@
 package app.logdate.server.routes
 
 import app.logdate.server.auth.JwtTokenService
+import app.logdate.server.logdate.asLogDateBackupRepository
+import app.logdate.server.logdate.asLogDateCollectionsRepository
+import app.logdate.server.logdate.asLogDateMediaRepository
 import app.logdate.server.routes.support.backupUploadMultipartContent
 import app.logdate.server.routes.support.createBackupStorageMock
 import app.logdate.server.sync.BackupRecord
@@ -46,10 +49,12 @@ class SyncRoutesBackupTest {
                 routing {
                     route("/api/v1") {
                         syncRoutes(
-                            repository = repository,
                             tokenService = jwtService,
                             mediaStorage = mockStorage,
                             metrics = SyncMetricsRegistry(),
+                            collectionsRepository = repository.asLogDateCollectionsRepository(),
+                            mediaRepository = repository.asLogDateMediaRepository(),
+                            backupRepository = repository.asLogDateBackupRepository(),
                         )
                     }
                 }
@@ -115,10 +120,12 @@ class SyncRoutesBackupTest {
                 routing {
                     route("/api/v1") {
                         syncRoutes(
-                            repository = repository,
                             tokenService = jwtService,
                             mediaStorage = null,
                             metrics = SyncMetricsRegistry(),
+                            collectionsRepository = repository.asLogDateCollectionsRepository(),
+                            mediaRepository = repository.asLogDateMediaRepository(),
+                            backupRepository = repository.asLogDateBackupRepository(),
                         )
                     }
                 }
@@ -166,10 +173,12 @@ class SyncRoutesBackupTest {
                 routing {
                     route("/api/v1") {
                         syncRoutes(
-                            repository = repository,
                             tokenService = jwtService,
                             mediaStorage = null,
                             metrics = SyncMetricsRegistry(),
+                            collectionsRepository = repository.asLogDateCollectionsRepository(),
+                            mediaRepository = repository.asLogDateMediaRepository(),
+                            backupRepository = repository.asLogDateBackupRepository(),
                         )
                     }
                 }

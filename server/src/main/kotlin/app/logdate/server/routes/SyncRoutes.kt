@@ -4,18 +4,18 @@ import app.logdate.server.auth.TokenService
 import app.logdate.server.crypto.EncryptionService
 import app.logdate.server.logdate.LogDateAssociation
 import app.logdate.server.logdate.LogDateAssociationRef
+import app.logdate.server.logdate.LogDateBackup
+import app.logdate.server.logdate.LogDateBackupRepository
+import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateCollectionsRepository
 import app.logdate.server.logdate.LogDateEntry
 import app.logdate.server.logdate.LogDateJournal
-import app.logdate.server.logdate.SyncBackedLogDateCollectionsRepository
+import app.logdate.server.logdate.LogDateMedia
+import app.logdate.server.logdate.LogDateMediaRepository
 import app.logdate.server.responses.error
 import app.logdate.server.responses.simpleSuccess
-import app.logdate.server.sync.BackupRecord
-import app.logdate.server.sync.GcsMediaStorage
 import app.logdate.server.sync.MediaAccessPolicy
-import app.logdate.server.sync.MediaRecord
 import app.logdate.server.sync.SyncMetricsRegistry
-import app.logdate.server.sync.SyncRepository
 import app.logdate.shared.model.sync.AssociationChange
 import app.logdate.shared.model.sync.AssociationChangesResponse
 import app.logdate.shared.model.sync.AssociationDeleteRequest
@@ -379,13 +379,14 @@ private fun ApplicationCall.requiredPathParam(name: String): String =
  * All endpoints require a valid Bearer token and scope data by user ID.
  */
 fun Route.syncRoutes(
-    repository: SyncRepository,
     tokenService: TokenService? = null,
-    mediaStorage: GcsMediaStorage? = null,
+    mediaStorage: LogDateBlobStorage? = null,
     metrics: SyncMetricsRegistry,
     mediaAccessPolicy: MediaAccessPolicy = MediaAccessPolicy.fromEnvironment(),
     encryptionService: EncryptionService = EncryptionService.fromEnvironment(),
-    collectionsRepository: LogDateCollectionsRepository = SyncBackedLogDateCollectionsRepository(repository),
+    collectionsRepository: LogDateCollectionsRepository,
+    mediaRepository: LogDateMediaRepository,
+    backupRepository: LogDateBackupRepository,
 ) {
     route("") {
         // High-level status (used by smoke tests)
@@ -933,9 +934,9 @@ fun Route.syncRoutes(
                             null
                         }
                     val stored =
-                        repository.upsertMedia(
+                        mediaRepository.upsertMedia(
                             userId,
-                            MediaRecord(
+                            LogDateMedia(
                                 mediaId = mediaId,
                                 contentId = req.contentId,
                                 userId = userId,
@@ -945,7 +946,7 @@ fun Route.syncRoutes(
                                 data = if (storagePath == null) encryptedPayload.data else ByteArray(0),
                                 storagePath = storagePath,
                                 createdAt = System.currentTimeMillis(),
-                                serverVersion = 0L,
+                                version = 0L,
                                 deviceId = DeviceId(req.deviceId),
                                 encryptionVersion = 1,
                                 encryptionKeyId = "default",
@@ -989,7 +990,7 @@ fun Route.syncRoutes(
                     val userId = extractUserId(call, tokenService) ?: return@get
                     val mediaId = call.requiredPathParam("mediaId")
                     val record =
-                        repository.getMedia(userId, mediaId)
+                        mediaRepository.getMedia(userId, mediaId)
                             ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Media not found"))
 
                     call.respond(
@@ -1021,7 +1022,7 @@ fun Route.syncRoutes(
                     val userId = extractUserId(call, tokenService) ?: return@get
                     val mediaId = call.requiredPathParam("mediaId")
                     val record =
-                        repository.getMedia(userId, mediaId)
+                        mediaRepository.getMedia(userId, mediaId)
                             ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Media not found"))
 
                     val encryptedPayload =
@@ -1074,10 +1075,10 @@ fun Route.syncRoutes(
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@delete
                     val mediaId = call.requiredPathParam("mediaId")
-                    val record = repository.getMedia(userId, mediaId)
+                    val record = mediaRepository.getMedia(userId, mediaId)
                     if (record != null) {
                         record.storagePath?.let { mediaStorage?.deleteMedia(it) }
-                        repository.deleteMedia(userId, mediaId, System.currentTimeMillis())
+                        mediaRepository.deleteMedia(userId, mediaId, System.currentTimeMillis())
                     }
                     call.respond(HttpStatusCode.NoContent)
                     success = true
@@ -1129,9 +1130,9 @@ fun Route.syncRoutes(
                     val storagePath = storage.uploadBackup(userId, backupId, encryptedData)
 
                     val record =
-                        repository.createBackupRecord(
+                        backupRepository.createBackup(
                             userId,
-                            BackupRecord(
+                            LogDateBackup(
                                 id = backupId,
                                 userId = userId,
                                 deviceId = req.deviceId,
@@ -1165,7 +1166,7 @@ fun Route.syncRoutes(
                 var success = false
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@get
-                    val backups = repository.listBackups(userId)
+                    val backups = backupRepository.listBackups(userId)
                     call.respond(
                         BackupListResponse(
                             backups.map {
@@ -1201,7 +1202,7 @@ fun Route.syncRoutes(
                             )
 
                     val record =
-                        repository.getBackupRecord(userId, backupId)
+                        backupRepository.getBackup(userId, backupId)
                             ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Backup not found"))
                     call.respond(
                         BackupInfoResponse(
@@ -1234,7 +1235,7 @@ fun Route.syncRoutes(
                             )
 
                     val record =
-                        repository.getBackupRecord(userId, backupId)
+                        backupRepository.getBackup(userId, backupId)
                             ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Backup not found"))
 
                     val storage =
@@ -1279,10 +1280,10 @@ fun Route.syncRoutes(
                                 error("INVALID_ID", "Invalid backupId"),
                             )
 
-                    val record = repository.getBackupRecord(userId, backupId)
+                    val record = backupRepository.getBackup(userId, backupId)
                     if (record != null) {
                         mediaStorage?.deleteMedia(record.storagePath)
-                        repository.deleteBackup(userId, backupId)
+                        backupRepository.deleteBackup(userId, backupId)
                     }
 
                     call.respond(HttpStatusCode.NoContent)
@@ -1343,8 +1344,8 @@ private fun buildMediaDownloadUrl(
 
 private fun resolveMediaDownloadUrl(
     call: ApplicationCall,
-    record: MediaRecord,
-    mediaStorage: GcsMediaStorage?,
+    record: LogDateMedia,
+    mediaStorage: LogDateBlobStorage?,
     accessPolicy: MediaAccessPolicy,
 ): String {
     if (accessPolicy.useSignedUrls && mediaStorage != null && record.storagePath != null) {
@@ -1360,8 +1361,8 @@ private fun resolveMediaDownloadUrl(
 
 private fun resolveBackupDownloadUrl(
     call: ApplicationCall,
-    record: BackupRecord,
-    mediaStorage: GcsMediaStorage?,
+    record: LogDateBackup,
+    mediaStorage: LogDateBlobStorage?,
     accessPolicy: MediaAccessPolicy,
 ): String {
     if (accessPolicy.useSignedUrls && mediaStorage != null) {

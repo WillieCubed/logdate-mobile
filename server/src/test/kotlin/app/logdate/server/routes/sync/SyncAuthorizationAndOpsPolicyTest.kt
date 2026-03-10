@@ -1,6 +1,9 @@
 package app.logdate.server.routes.sync
 
 import app.logdate.server.auth.JwtTokenService
+import app.logdate.server.logdate.asLogDateBackupRepository
+import app.logdate.server.logdate.asLogDateCollectionsRepository
+import app.logdate.server.logdate.asLogDateMediaRepository
 import app.logdate.server.routes.support.authHeader
 import app.logdate.server.routes.syncRoutes
 import app.logdate.server.sync.InMemorySyncRepository
@@ -27,22 +30,28 @@ class SyncAuthorizationAndOpsPolicyTest {
         testApplication {
             val tokenService = JwtTokenService("sync-policy-secret")
             val malformedAccountIdToken = tokenService.generateAccessToken("not-a-uuid")
+            val syncRepository = InMemorySyncRepository()
+            val defaultSyncRepository = InMemorySyncRepository()
 
             application {
                 install(ContentNegotiation) { json() }
                 routing {
                     route("/api/v1") {
                         syncRoutes(
-                            repository = InMemorySyncRepository(),
                             tokenService = tokenService,
                             mediaStorage = null,
                             metrics = SyncMetricsRegistry(),
+                            collectionsRepository = syncRepository.asLogDateCollectionsRepository(),
+                            mediaRepository = syncRepository.asLogDateMediaRepository(),
+                            backupRepository = syncRepository.asLogDateBackupRepository(),
                         )
                     }
                     route("/api/v1/defaults") {
                         syncRoutes(
-                            repository = InMemorySyncRepository(),
                             metrics = SyncMetricsRegistry(),
+                            collectionsRepository = defaultSyncRepository.asLogDateCollectionsRepository(),
+                            mediaRepository = defaultSyncRepository.asLogDateMediaRepository(),
+                            backupRepository = defaultSyncRepository.asLogDateBackupRepository(),
                         )
                     }
                 }
@@ -67,15 +76,18 @@ class SyncAuthorizationAndOpsPolicyTest {
     fun `sync tombstone purge endpoint clamps excessive retention values`() =
         testApplication {
             val tokenService = JwtTokenService("sync-policy-secret")
+            val repository = InMemorySyncRepository()
             application {
                 install(ContentNegotiation) { json() }
                 routing {
                     route("/api/v1") {
                         syncRoutes(
-                            repository = InMemorySyncRepository(),
                             tokenService = tokenService,
                             mediaStorage = null,
                             metrics = SyncMetricsRegistry(),
+                            collectionsRepository = repository.asLogDateCollectionsRepository(),
+                            mediaRepository = repository.asLogDateMediaRepository(),
+                            backupRepository = repository.asLogDateBackupRepository(),
                         )
                     }
                 }

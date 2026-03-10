@@ -1,6 +1,9 @@
 package app.logdate.server.routes.support
 
 import app.logdate.server.auth.JwtTokenService
+import app.logdate.server.logdate.asLogDateBackupRepository
+import app.logdate.server.logdate.asLogDateCollectionsRepository
+import app.logdate.server.logdate.asLogDateMediaRepository
 import app.logdate.server.routes.syncRoutes
 import app.logdate.server.sync.InMemorySyncRepository
 import app.logdate.server.sync.SyncMetricsRegistry
@@ -14,15 +17,18 @@ import java.util.UUID
 
 fun ApplicationTestBuilder.configureInMemorySyncApp(secret: String = "sync-test-secret"): JwtTokenService {
     val tokenService = JwtTokenService(secret)
+    val repository = InMemorySyncRepository()
     application {
         install(ContentNegotiation) { json() }
         routing {
             route("/api/v1") {
                 syncRoutes(
-                    repository = InMemorySyncRepository(),
                     tokenService = tokenService,
                     mediaStorage = null,
                     metrics = SyncMetricsRegistry(),
+                    collectionsRepository = repository.asLogDateCollectionsRepository(),
+                    mediaRepository = repository.asLogDateMediaRepository(),
+                    backupRepository = repository.asLogDateBackupRepository(),
                 )
             }
         }

@@ -2,6 +2,9 @@ package app.logdate.server.routes
 
 import app.logdate.server.auth.StubTokenService
 import app.logdate.server.crypto.PayloadPrefixes
+import app.logdate.server.logdate.asLogDateBackupRepository
+import app.logdate.server.logdate.asLogDateCollectionsRepository
+import app.logdate.server.logdate.asLogDateMediaRepository
 import app.logdate.server.routes.support.mediaUploadMultipartContent
 import app.logdate.server.sync.InMemorySyncRepository
 import app.logdate.server.sync.MediaAccessPolicy
@@ -49,11 +52,13 @@ class SyncRoutesMediaEncryptionTest {
                 routing {
                     route("/api/v1") {
                         syncRoutes(
-                            repository = repository,
                             tokenService = tokenService,
                             mediaStorage = null,
                             metrics = metrics,
                             mediaAccessPolicy = MediaAccessPolicy(useSignedUrls = false, signedUrlTtlHours = 1),
+                            collectionsRepository = repository.asLogDateCollectionsRepository(),
+                            mediaRepository = repository.asLogDateMediaRepository(),
+                            backupRepository = repository.asLogDateBackupRepository(),
                         )
                     }
                 }
@@ -107,11 +112,13 @@ class SyncRoutesMediaEncryptionTest {
                 routing {
                     route("/api/v1") {
                         syncRoutes(
-                            repository = repository,
                             tokenService = tokenService,
                             mediaStorage = null,
                             metrics = metrics,
                             mediaAccessPolicy = MediaAccessPolicy(useSignedUrls = false, signedUrlTtlHours = 1),
+                            collectionsRepository = repository.asLogDateCollectionsRepository(),
+                            mediaRepository = repository.asLogDateMediaRepository(),
+                            backupRepository = repository.asLogDateBackupRepository(),
                         )
                     }
                 }

@@ -184,13 +184,47 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
   - `studio.hypertext.logdate.journal`
   - `studio.hypertext.logdate.association`
 - The backing store is `LogDateRepoStore`, which uses the shared repo engine for collection-aware reads, writes, cursors, and export semantics.
-- Persistence is still sync-backed today, not the final durable MST/CAR block-store implementation.
+- Entries, journals, and associations now persist through a canonical repo-backed `LogDateCollectionsRepository` implementation plus a metadata index for versions, tombstones, and change feeds.
+- Media metadata and encrypted backup metadata still live behind sync-owned interfaces today and remain the next boundary cutover.
+
+## Phase 6: Media, Blob, and Backup Boundary Cutover
+
+### P6.1 Internal Metadata Boundaries
+
+- Media metadata moves behind a LogDate-owned repository interface instead of route code calling `SyncRepository` directly.
+- Backup metadata moves behind a LogDate-owned repository interface instead of route code calling `SyncRepository` directly.
+- Sync routes depend on LogDate-owned media and backup interfaces rather than the sync repository implementation.
+
+### P6.2 Blob Storage Boundary
+
+- Media and backup binary object operations move behind a LogDate-owned storage interface rather than routes depending directly on `GcsMediaStorage`.
+- The production implementation still supports GCS-backed uploads, downloads, deletes, and signed URLs.
+- Test applications can provide in-memory or fake blob storage implementations without route-level GCS knowledge.
+
+### P6.3 Compatibility Preservation
+
+- Existing `/api/v1/media/*` behavior stays externally compatible for the first-party app.
+- Existing `/api/v1/backups/*` behavior stays externally compatible for the first-party app.
+- The cutover does not reintroduce ATProto-specific types into LogDate’s internal route and repository contracts.
+
+## Phase 7: Final Hardening and Lifecycle Completion
+
+### P7.1 Identity Lifecycle
+
+- PLC updates are supported for hosted identities.
+- Recovery-oriented signing-key rotation and export/import flows are supported.
+- User-facing recovery and migration tooling is no longer limited to hosted genesis.
+
+### P7.2 Interoperability Hardening
+
+- CAR/MST/DAG-CBOR behavior is validated against external AT Protocol implementations.
+- Checked-in lexicon/codegen coverage expands beyond the current `com.atproto.identity.*`, `com.atproto.server.*`, and `com.atproto.repo.*` set.
+- Transitional compatibility code can be removed once sync and ATProto surfaces both use the final canonical boundaries.
 
 ## Explicit Non-Goals for This Plan Revision
 
 - Path-based `did:web`
 - Replacing the first-party LogDate auth flow
-- Full externally verified AT Protocol repo interoperability and durable canonical repo persistence
-- Relay, firehose, or AppView federation
-- Full protocol-surface lexicon code generation
-- User-facing PLC recovery and migration flows beyond hosted genesis support
+- Federation, relay, firehose, or AppView work in this milestone
+- Full protocol-surface lexicon code generation in one pass
+- A one-shot removal of every sync compatibility endpoint before the blob and backup boundaries are ready

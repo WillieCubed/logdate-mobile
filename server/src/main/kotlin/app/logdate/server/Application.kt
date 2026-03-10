@@ -14,6 +14,8 @@ import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.logdate.LogDateCollectionsMetadataStore
 import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
+import app.logdate.server.logdate.asLogDateBackupRepository
+import app.logdate.server.logdate.asLogDateMediaRepository
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthAuthorizationService
 import app.logdate.server.oauth.OAuthConfig
@@ -136,6 +138,8 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
             blockStore = repoBlockStore,
             metadataStore = logDateCollectionsMetadataStore,
         )
+    val logDateMediaRepository = syncRepository.asLogDateMediaRepository()
+    val logDateBackupRepository = syncRepository.asLogDateBackupRepository()
     val logDateRepoStore =
         LogDateRepoStore(
             collectionsRepository = logDateCollectionsRepository,
@@ -256,11 +260,12 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
                 signingKeyService = signingKeyService,
             )
             syncRoutes(
-                repository = syncRepository,
                 tokenService = tokenService,
                 mediaStorage = mediaStorage,
                 metrics = syncMetrics,
                 collectionsRepository = logDateCollectionsRepository,
+                mediaRepository = logDateMediaRepository,
+                backupRepository = logDateBackupRepository,
             )
         }
     }

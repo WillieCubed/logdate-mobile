@@ -38,7 +38,9 @@ Passkeys authenticate a user **to** their custodian. DIDs identify the user **to
 | 2 | Complete for the current hosted identity slice | Server-side identity integration (signing keys, DID Documents, DID-aware account models) | [Architecture](./01-architecture.md), [Signing Keys](./05-signing-key-management.md) |
 | 3 | Complete for the current standalone authorization slice | OAuth 2.0 Authorization Server with passkey authentication and DPoP-bound access tokens | [OAuth + Passkeys](./04-oauth-passkey-integration.md) |
 | 4 | Partially complete | Hosted PLC provisioning plus future PLC update and recovery tooling | [Architecture](./01-architecture.md) |
-| 5 | Complete for the compatibility PDS slice | XRPC server endpoints backed by the shared library modules, shared discovery/repo runtime services, and a sync-backed multi-collection LogDate repo adapter | [Architecture](./01-architecture.md) |
+| 5 | Complete for the canonical collection slice | XRPC server endpoints backed by the shared library modules, shared discovery/repo runtime services, and a canonical repo-backed LogDate collections boundary for entries, journals, and associations | [Architecture](./01-architecture.md) |
+| 6 | Partially complete | LogDate-owned media/blob and backup boundaries so the remaining sync-facing routes stop depending on `SyncRepository` and `GcsMediaStorage` directly | [Architecture](./01-architecture.md), [Migration Strategy](./06-migration-strategy.md) |
+| 7 | Pending | Identity lifecycle completion, broader interop hardening, and final compatibility cutover cleanup | [Architecture](./01-architecture.md), [Signing Keys](./05-signing-key-management.md) |
 
 ## Current Status
 
@@ -53,20 +55,29 @@ The repo now has a real standalone `studio.hypertext.atproto` library surface:
 - checked-in official `com.atproto.identity.*`, `com.atproto.server.*`, and `com.atproto.repo.*` lexicon JSON documents plus deterministic generated Kotlin models for the currently served protocol surface
 - a standalone consumer sample in `samples/atproto-consumer` that builds against `mavenLocal()` artifacts instead of project dependencies
 - server identity, OAuth, and XRPC slices consuming the shared library contracts instead of duplicating route-local ATProto DTOs
-- a sync-backed multi-collection repo adapter that surfaces `content`, `journal`, and `association` collections through shared repo engine semantics
+- a canonical repo-backed LogDate collections boundary that stores `content`, `journal`, and `association` records in the shared repo engine while preserving LogDate-owned internal interfaces
+- sync routes now use LogDate-owned media and backup metadata repositories plus a blob storage boundary instead of depending on sync records and `GcsMediaStorage` directly
+- media and backup metadata are still backed by transitional sync implementations behind those new interfaces, which is the next persistence cutover
 
-The current backend ATProto support is still intentionally a hosted compatibility slice, not a full independently deployed PDS product.
+The current backend ATProto support is deployable for the hosted identity, OAuth, XRPC, and canonical collection slice, but it is not yet a full independently deployed PDS product.
 
 ## Next Tasks / Todos
 
-These are the remaining ATProto tasks after the current library and compatibility-PDS milestone:
+These are the remaining ATProto tasks after the current canonical collection milestone. They are ordered by implementation priority:
 
-- Expand lexicon/codegen coverage beyond the currently checked-in LogDate and official `com.atproto.*` surfaces we already consume.
+- Replace the sync-backed media metadata implementation behind the new LogDate-owned media repository boundary.
+- Replace the sync-backed backup metadata implementation behind the new LogDate-owned backup repository boundary.
+- Replace the current GCS-only blob implementation with a first-class blob service abstraction that can back both sync media and ATProto blob semantics.
+- Add ATProto blob-oriented route and service planning for the same media objects that power the first-party sync APIs.
+- Complete the migration from sync-owned compatibility storage to canonical repo/blob-backed storage for the remaining sync endpoints.
+- Expand lexicon/codegen coverage beyond the currently checked-in LogDate and official `com.atproto.*` surfaces already served.
 - Expand repo interoperability so CAR/MST/DAG-CBOR behavior is validated against external AT Protocol implementations, not only internal deterministic tests.
-- Replace the current sync-backed hydration adapter with durable canonical repo block-store persistence.
-- Expand the checked-in lexicon/codegen set from the current LogDate records to the broader protocol surface we consume.
-- Migrate the remaining legacy sync/auth compatibility layers onto the canonical repo model now that LogDate lexicons exist.
-- Implement the remaining hosted identity lifecycle work: PLC updates, recovery flows, and user-controlled export/import tooling beyond hosted genesis support.
+- Harden the standalone PDS runtime and server deployment shape for multi-instance and release operation concerns.
+- Implement the remaining hosted identity lifecycle work:
+  - PLC update operations
+  - rotation and recovery key flows
+  - user-controlled signing-key export/import workflows beyond the current hosted genesis path
+- Remove transitional compatibility code once sync and ATProto surfaces both run on the final canonical boundaries.
 
 ## Documents in This Plan
 
@@ -85,6 +96,7 @@ These are the remaining ATProto tasks after the current library and compatibilit
 These are future work that build on the current library core:
 
 - **Durable canonical repo persistence**, replacing the current sync-backed hydration adapter with a persistent block store
+- **Canonical blob/media and backup boundaries** replacing the remaining sync-owned route dependencies
 - **Broader protocol-surface lexicon/codegen support** beyond the current checked-in LogDate records and shared parser/runtime
 - **Federation** (firehose, relay, AppView)
 - **ActivityPub integration** (kept as separate parallel effort in `shared/activitypub`)

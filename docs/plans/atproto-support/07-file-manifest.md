@@ -106,6 +106,19 @@ This manifest reflects the current AT Protocol implementation shape in the repo.
 - `server/src/main/kotlin/app/logdate/server/database/PostgreSQLSigningKeyRepository.kt`
 - `server/src/main/resources/db/migration/V6__Add_atproto_identity.sql`
 
+## Server LogDate Boundaries
+
+- `server/src/main/kotlin/app/logdate/server/logdate/LogDateCollectionsRepository.kt`
+- `server/src/main/kotlin/app/logdate/server/logdate/LogDateCollectionRecords.kt`
+- `server/src/main/kotlin/app/logdate/server/logdate/LogDateCollectionsMetadataStore.kt`
+- `server/src/main/kotlin/app/logdate/server/logdate/RepoBackedLogDateCollectionsRepository.kt`
+- `server/src/main/kotlin/app/logdate/server/logdate/LogDateBlobStorage.kt`
+- `server/src/main/kotlin/app/logdate/server/logdate/LogDateMediaRepository.kt`
+- `server/src/main/kotlin/app/logdate/server/logdate/LogDateBackupRepository.kt`
+- `server/src/main/kotlin/app/logdate/server/logdate/LogDateSyncAdapters.kt`
+- `server/src/main/kotlin/app/logdate/server/database/PostgreSQLLogDateCollectionsMetadataStore.kt`
+- `server/src/main/resources/db/migration/V8__Add_logdate_collection_repo_index.sql`
+
 ## Server OAuth and PDS-Compatible Routes
 
 - `server/src/main/kotlin/app/logdate/server/oauth/OAuthConfig.kt`
@@ -182,6 +195,11 @@ This manifest reflects the current AT Protocol implementation shape in the repo.
 - `server/src/test/kotlin/app/logdate/server/identity/...`
 - `server/src/test/kotlin/app/logdate/server/oauth/...`
 - `server/src/test/kotlin/app/logdate/server/atproto/...`
+- `server/src/test/kotlin/app/logdate/server/logdate/RepoBackedLogDateCollectionsRepositoryTest.kt`
+- `server/src/test/kotlin/app/logdate/server/logdate/SyncBackedLogDateCollectionsRepositoryTest.kt`
+- `server/src/test/kotlin/app/logdate/server/logdate/SyncBackedLogDateMediaRepositoryTest.kt`
+- `server/src/test/kotlin/app/logdate/server/logdate/SyncBackedLogDateBackupRepositoryTest.kt`
+- `server/src/test/kotlin/app/logdate/server/database/PostgreSQLLogDateCollectionsMetadataStoreTest.kt`
 - `server/src/test/kotlin/app/logdate/server/routes/Identity*.kt`
 - `server/src/test/kotlin/app/logdate/server/routes/OAuthRoutesTest.kt`
 - `server/src/test/kotlin/app/logdate/server/routes/Xrpc*.kt`

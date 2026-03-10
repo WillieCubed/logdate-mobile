@@ -3,6 +3,9 @@ package app.logdate.server.routes.sync
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.crypto.EncryptionService
 import app.logdate.server.crypto.ProcessedPayload
+import app.logdate.server.logdate.asLogDateBackupRepository
+import app.logdate.server.logdate.asLogDateCollectionsRepository
+import app.logdate.server.logdate.asLogDateMediaRepository
 import app.logdate.server.routes.support.backupMultipartWithFields
 import app.logdate.server.routes.support.mediaMultipartWithFields
 import app.logdate.server.routes.syncRoutes
@@ -53,11 +56,13 @@ class SyncMediaAndBackupLifecycleTest {
                 routing {
                     route("/api/v1") {
                         syncRoutes(
-                            repository = repository,
                             tokenService = tokenService,
                             mediaStorage = storage,
                             metrics = SyncMetricsRegistry(),
                             mediaAccessPolicy = MediaAccessPolicy(useSignedUrls = true, signedUrlTtlHours = 1),
+                            collectionsRepository = repository.asLogDateCollectionsRepository(),
+                            mediaRepository = repository.asLogDateMediaRepository(),
+                            backupRepository = repository.asLogDateBackupRepository(),
                         )
                     }
                 }
@@ -125,12 +130,14 @@ class SyncMediaAndBackupLifecycleTest {
                 routing {
                     route("/api/v1") {
                         syncRoutes(
-                            repository = repository,
                             tokenService = tokenService,
                             mediaStorage = storage,
                             metrics = SyncMetricsRegistry(),
                             mediaAccessPolicy = MediaAccessPolicy(useSignedUrls = true, signedUrlTtlHours = 1),
                             encryptionService = encryptionService,
+                            collectionsRepository = repository.asLogDateCollectionsRepository(),
+                            mediaRepository = repository.asLogDateMediaRepository(),
+                            backupRepository = repository.asLogDateBackupRepository(),
                         )
                     }
                 }
@@ -273,11 +280,13 @@ class SyncMediaAndBackupLifecycleTest {
                 routing {
                     route("/api/v1") {
                         syncRoutes(
-                            repository = repository,
                             tokenService = tokenService,
                             mediaStorage = storage,
                             metrics = SyncMetricsRegistry(),
                             encryptionService = encryptionService,
+                            collectionsRepository = repository.asLogDateCollectionsRepository(),
+                            mediaRepository = repository.asLogDateMediaRepository(),
+                            backupRepository = repository.asLogDateBackupRepository(),
                         )
                     }
                 }

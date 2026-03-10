@@ -2,6 +2,9 @@ package app.logdate.server.routes
 
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.auth.TokenService
+import app.logdate.server.logdate.asLogDateBackupRepository
+import app.logdate.server.logdate.asLogDateCollectionsRepository
+import app.logdate.server.logdate.asLogDateMediaRepository
 import app.logdate.server.routes.support.backupMultipartWithFields
 import app.logdate.server.routes.support.mediaMultipartWithFields
 import app.logdate.server.sync.BackupRecord
@@ -215,11 +218,13 @@ class SyncRoutesValidationTest {
                 routing {
                     route("/api/v1") {
                         syncRoutes(
-                            repository = repository,
                             tokenService = tokenService,
                             mediaStorage = mediaStorage,
                             metrics = SyncMetricsRegistry(),
                             mediaAccessPolicy = MediaAccessPolicy(useSignedUrls = true, signedUrlTtlHours = 1),
+                            collectionsRepository = repository.asLogDateCollectionsRepository(),
+                            mediaRepository = repository.asLogDateMediaRepository(),
+                            backupRepository = repository.asLogDateBackupRepository(),
                         )
                     }
                 }
@@ -257,10 +262,12 @@ class SyncRoutesValidationTest {
             routing {
                 route("/api/v1") {
                     syncRoutes(
-                        repository = repository,
                         tokenService = tokenService,
                         mediaStorage = mediaStorage,
                         metrics = SyncMetricsRegistry(),
+                        collectionsRepository = repository.asLogDateCollectionsRepository(),
+                        mediaRepository = repository.asLogDateMediaRepository(),
+                        backupRepository = repository.asLogDateBackupRepository(),
                     )
                 }
             }
