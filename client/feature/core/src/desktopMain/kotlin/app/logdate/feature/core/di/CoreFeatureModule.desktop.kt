@@ -90,7 +90,14 @@ actual val coreFeatureModule: Module =
                 get(),
             )
         }
-        viewModel { HomeViewModel(get(), get(), get()) }
+        viewModel {
+            HomeViewModel(
+                getStreamingTimelineUseCase = get(),
+                getTimelinePageUseCase = get(),
+                notesRepository = get(),
+                getHomeRecommendation = get(),
+            )
+        }
         viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get()) }
         // TODO(desktop): Wire location settings UX and platform permissions; keep settings storage available for now.
         viewModel { LocationSettingsViewModel(get()) }

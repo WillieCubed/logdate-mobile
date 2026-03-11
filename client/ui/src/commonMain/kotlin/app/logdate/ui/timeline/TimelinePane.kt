@@ -46,6 +46,9 @@ import kotlin.time.Instant
 data class TimelineUiState(
     val items: List<TimelineDayUiState> = emptyList(),
     val loadingState: TimelineLoadingState = TimelineLoadingState.Loaded,
+    val isLoadingMore: Boolean = false,
+    val hasMoreOlderContent: Boolean = false,
+    val appendError: String? = null,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,6 +58,7 @@ fun TimelinePane(
     onNewEntry: () -> Unit,
     onShareMemory: (memoryId: String) -> Unit,
     onOpenDay: (LocalDate) -> Unit,
+    onLoadMoreOlder: () -> Unit = {},
     timelineSuggestion: TimelineSuggestionBlock? = null,
     listState: LazyListState = rememberLazyListState(),
     onSearchClick: () -> Unit = {},
@@ -101,7 +105,11 @@ fun TimelinePane(
             TimelineList(
                 items = uiState.items,
                 loadingState = uiState.loadingState,
+                isLoadingMore = uiState.isLoadingMore,
+                hasMoreOlderContent = uiState.hasMoreOlderContent,
+                appendError = uiState.appendError,
                 onOpenDay = onOpenDay,
+                onLoadMoreOlder = onLoadMoreOlder,
                 timelineSuggestion = timelineSuggestion,
                 onAddToMemory = onAddToMemory,
                 onShare = onShareMemory,

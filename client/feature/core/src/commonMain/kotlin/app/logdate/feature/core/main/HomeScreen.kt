@@ -30,9 +30,15 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
 import app.logdate.client.domain.recommendation.HomeRecommendation
 import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
+import app.logdate.client.domain.timeline.GetTimelinePageUseCase
+import app.logdate.client.domain.timeline.StreamingTimelineRequest
+import app.logdate.client.domain.timeline.Timeline
 import app.logdate.client.domain.timeline.TimelineDay
+import app.logdate.client.domain.timeline.TimelinePage
+import app.logdate.client.domain.timeline.TimelinePageRequest
 import app.logdate.client.domain.timeline.TimelinePlaceVisit
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.feature.journals.ui.JournalClickCallback
 import app.logdate.feature.journals.ui.JournalsOverviewScreen
 import app.logdate.feature.location.timeline.ui.LocationTimelineScreen
@@ -53,12 +59,16 @@ import app.logdate.ui.timeline.TimelineSuggestionBlock
 import app.logdate.ui.timeline.TimelineUiState
 import app.logdate.ui.timeline.VideoNoteUiState
 import app.logdate.ui.timeline.createTimelineDayUiState
+import io.github.aakira.napier.Napier
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
@@ -97,10 +107,18 @@ fun HomeScreen(
             HomeRouteDestination.Timeline -> {
                 val uiState by viewModel.uiState.collectAsStateWithLifecycle()
                 TimelinePane(
-                    uiState = TimelineUiState(items = uiState.items, loadingState = uiState.loadingState),
+                    uiState =
+                        TimelineUiState(
+                            items = uiState.items,
+                            loadingState = uiState.loadingState,
+                            isLoadingMore = uiState.isLoadingMore,
+                            hasMoreOlderContent = uiState.hasMoreOlderContent,
+                            appendError = uiState.appendError,
+                        ),
                     onNewEntry = onNewEntry,
                     onShareMemory = {},
                     onOpenDay = { date -> viewModel.selectDay(date) },
+                    onLoadMoreOlder = viewModel::loadMoreOlder,
                     onProfileClick = onOpenSettings,
                     timelineSuggestion = uiState.timelineSuggestion,
                     // onHistoryClick handled in TimelinePaneScreen
@@ -205,30 +223,88 @@ internal fun HomeScaffoldWrapper(
  * display at the top of the timeline.
  */
 class HomeViewModel(
-    private val getStreamingTimelineUseCase: GetStreamingTimelineUseCase,
-    private val notesRepository: app.logdate.client.repository.journals.JournalNotesRepository,
+    private val recentTimelineFlow: Flow<Timeline>,
+    private val loadTimelinePage: suspend (TimelinePageRequest) -> TimelinePage,
+    private val notesRepository: JournalNotesRepository,
     private val getHomeRecommendation: GetHomeRecommendationUseCase,
 ) : ViewModel() {
+    companion object {
+        private const val RECENT_TIMELINE_PAGE_SIZE = 50
+        private const val APPEND_ERROR_MESSAGE = "Couldn't load older entries."
+    }
+
+    constructor(
+        getStreamingTimelineUseCase: GetStreamingTimelineUseCase,
+        getTimelinePageUseCase: GetTimelinePageUseCase,
+        notesRepository: JournalNotesRepository,
+        getHomeRecommendation: GetHomeRecommendationUseCase,
+    ) : this(
+        recentTimelineFlow =
+            getStreamingTimelineUseCase(
+                StreamingTimelineRequest.RecentTimeline(
+                    pageSize = RECENT_TIMELINE_PAGE_SIZE,
+                ),
+            ),
+        loadTimelinePage = { request -> getTimelinePageUseCase(request) },
+        notesRepository = notesRepository,
+        getHomeRecommendation = getHomeRecommendation,
+    )
+
     private val selectedItemUiState =
         MutableStateFlow<TimelineDaySelection>(TimelineDaySelection.NotSelected)
 
     private val selectedNotes = MutableStateFlow(emptyList<JournalNote>())
     private val selectedDayFlow = MutableStateFlow<LocalDate?>(null)
+    private val loadedTimelineDays = MutableStateFlow<List<TimelineDay>>(emptyList())
+    private val isLoadingMore = MutableStateFlow(false)
+    private val appendError = MutableStateFlow<String?>(null)
 
-    val uiState: StateFlow<HomeTimelineUiState> =
+    private val timelineInputs =
         combine(
-            getStreamingTimelineUseCase(),
+            loadedTimelineDays,
+            notesRepository.allNotesObserved,
             selectedNotes,
             selectedItemUiState,
             selectedDayFlow,
+        ) { timelineDays, allNotes, notes, selection, selectedDayDate ->
+            HomeTimelineInputs(
+                timelineDays = timelineDays,
+                allNotes = allNotes,
+                selectedNotes = notes,
+                selection = selection,
+                selectedDayDate = selectedDayDate,
+            )
+        }
+
+    init {
+        viewModelScope.launch {
+            recentTimelineFlow.collect { timeline ->
+                loadedTimelineDays.value =
+                    if (timeline.days.isEmpty()) {
+                        emptyList()
+                    } else {
+                        mergeRecentTimelineDays(
+                            existing = loadedTimelineDays.value,
+                            recent = timeline.days,
+                        )
+                    }
+            }
+        }
+    }
+
+    val uiState: StateFlow<HomeTimelineUiState> =
+        combine(
+            timelineInputs,
             getHomeRecommendation(),
-        ) { timeline, notes, selection, selectedDayDate, recommendation ->
+            isLoadingMore,
+            appendError,
+        ) { inputs, recommendation, isLoadingMoreOlder, appendOlderError ->
             val items =
-                timeline.days.map { day ->
+                inputs.timelineDays.map { day ->
                     day.toUiState(
                         overrideNotes =
-                            if (day.date == selectedDayDate && notes.isNotEmpty()) {
-                                notes
+                            if (day.date == inputs.selectedDayDate && inputs.selectedNotes.isNotEmpty()) {
+                                inputs.selectedNotes
                             } else {
                                 day.entries
                             },
@@ -237,19 +313,25 @@ class HomeViewModel(
 
             // Determine the selected day based on the current selection state
             val selectedDay =
-                when (selection) {
+                when (inputs.selection) {
                     is TimelineDaySelection.Selected -> {
-                        items.find { it.date == selection.day }
+                        items.find { it.date == inputs.selection.day }
                     }
                     is TimelineDaySelection.DateSelected -> {
-                        items.find { it.date == selection.date }
+                        items.find { it.date == inputs.selection.date }
                     }
                     TimelineDaySelection.NotSelected -> null
                 }
 
+            val oldestLoadedTimestamp = inputs.timelineDays.oldestLoadedTimestamp()
+            val hasMoreOlderContent =
+                oldestLoadedTimestamp?.let { cursor ->
+                    inputs.allNotes.any { note -> note.creationTimestamp < cursor }
+                } ?: false
+
             HomeTimelineUiState(
                 items = items,
-                selectedItem = selection,
+                selectedItem = inputs.selection,
                 selectedDay = selectedDay,
                 showEmptyState = items.isEmpty(),
                 timelineSuggestion =
@@ -268,10 +350,20 @@ class HomeViewModel(
                             )
                         HomeRecommendation.None -> null
                     },
-                isLoading = false,
+                isLoading = items.isEmpty(),
+                isLoadingMore = isLoadingMoreOlder,
+                hasMoreOlderContent = hasMoreOlderContent,
+                appendError = appendOlderError,
                 loadingState = if (items.isEmpty()) TimelineLoadingState.InitialLoading else TimelineLoadingState.Loaded,
             )
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeTimelineUiState())
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            HomeTimelineUiState(
+                isLoading = true,
+                loadingState = TimelineLoadingState.InitialLoading,
+            ),
+        )
 
     /**
      * Selects a timeline day for detailed viewing.
@@ -298,13 +390,50 @@ class HomeViewModel(
         selectedDayFlow.value = null
     }
 
+    fun loadMoreOlder() {
+        if (isLoadingMore.value) {
+            return
+        }
+
+        val oldestLoadedTimestamp = loadedTimelineDays.value.oldestLoadedTimestamp() ?: return
+        if (!uiState.value.hasMoreOlderContent) {
+            return
+        }
+
+        viewModelScope.launch {
+            isLoadingMore.value = true
+            appendError.value = null
+
+            try {
+                val olderPage =
+                    loadTimelinePage(
+                        TimelinePageRequest(
+                            beforeExclusive = oldestLoadedTimestamp,
+                            pageSize = RECENT_TIMELINE_PAGE_SIZE,
+                        ),
+                    )
+
+                if (olderPage.days.isNotEmpty()) {
+                    loadedTimelineDays.update { existing ->
+                        mergeTimelineDays(existing = existing, incoming = olderPage.days)
+                    }
+                }
+            } catch (error: Exception) {
+                Napier.e("Failed to load older timeline history", error)
+                appendError.value = APPEND_ERROR_MESSAGE
+            } finally {
+                isLoadingMore.value = false
+            }
+        }
+    }
+
     /**
      * Fetches notes for a specific date.
      *
      * @param date The date to fetch notes for
      */
     fun fetchNotesForDate(date: LocalDate) {
-        io.github.aakira.napier.Napier.d(
+        Napier.d(
             tag = "HomeViewModel",
             message = "EXPLICIT FETCH: Getting notes for date $date",
         )
@@ -320,7 +449,7 @@ class HomeViewModel(
                 // Direct repository call for simplicity
                 val notes = notesRepository.observeNotesInRange(startInstant, endInstant).first()
 
-                io.github.aakira.napier.Napier.d(
+                Napier.d(
                     tag = "HomeViewModel",
                     message =
                         "EXPLICIT FETCH RESULT: Found ${notes.size} notes for $date: " +
@@ -333,7 +462,7 @@ class HomeViewModel(
                 // Log audio notes specifically
                 val audioNotes = notes.filterIsInstance<JournalNote.Audio>()
                 if (audioNotes.isNotEmpty()) {
-                    io.github.aakira.napier.Napier.d(
+                    Napier.d(
                         tag = "HomeViewModel",
                         message =
                             "AUDIO NOTES IN FETCH: ${audioNotes.size} audio notes for date $date - " +
@@ -345,8 +474,7 @@ class HomeViewModel(
                 // Update the selected notes state
                 selectedNotes.value = notes
             } catch (e: Exception) {
-                io.github.aakira.napier.Napier
-                    .e("Failed to fetch notes for date $date", e)
+                Napier.e("Failed to fetch notes for date $date", e)
                 selectedNotes.value = emptyList()
             }
         }
@@ -403,3 +531,46 @@ class HomeViewModel(
             }
         }
 }
+
+private fun mergeRecentTimelineDays(
+    existing: List<TimelineDay>,
+    recent: List<TimelineDay>,
+): List<TimelineDay> {
+    if (recent.isEmpty()) {
+        return emptyList()
+    }
+
+    val oldestRecentDate = recent.minOf(TimelineDay::date)
+    val retainedExistingDays =
+        existing.filter { day ->
+            day.date < oldestRecentDate || recent.any { recentDay -> recentDay.date == day.date }
+        }
+
+    return mergeTimelineDays(existing = retainedExistingDays, incoming = recent)
+}
+
+private fun mergeTimelineDays(
+    existing: List<TimelineDay>,
+    incoming: List<TimelineDay>,
+): List<TimelineDay> {
+    val daysByDate = LinkedHashMap<LocalDate, TimelineDay>()
+
+    existing.sortedByDescending(TimelineDay::date).forEach { day ->
+        daysByDate[day.date] = day
+    }
+    incoming.sortedByDescending(TimelineDay::date).forEach { day ->
+        daysByDate[day.date] = day
+    }
+
+    return daysByDate.values.sortedByDescending(TimelineDay::date)
+}
+
+private fun List<TimelineDay>.oldestLoadedTimestamp() = flatMap(TimelineDay::entries).minOfOrNull { note -> note.creationTimestamp }
+
+private data class HomeTimelineInputs(
+    val timelineDays: List<TimelineDay>,
+    val allNotes: List<JournalNote>,
+    val selectedNotes: List<JournalNote>,
+    val selection: TimelineDaySelection,
+    val selectedDayDate: LocalDate?,
+)

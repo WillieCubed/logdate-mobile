@@ -36,7 +36,14 @@ fun TimelinePaneScreen(
     var showLocationQuickPeek by rememberSaveable { mutableStateOf(false) }
 
     TimelinePane(
-        uiState = TimelineUiState(items = uiState.items, loadingState = uiState.loadingState),
+        uiState =
+            TimelineUiState(
+                items = uiState.items,
+                loadingState = uiState.loadingState,
+                isLoadingMore = uiState.isLoadingMore,
+                hasMoreOlderContent = uiState.hasMoreOlderContent,
+                appendError = uiState.appendError,
+            ),
         onNewEntry = onNewEntry,
         onShareMemory = {},
         onOpenDay = { date ->
@@ -49,6 +56,8 @@ fun TimelinePaneScreen(
         },
         onSearchClick = onOpenSearch,
         onProfileClick = onOpenSettings,
+        onLoadMoreOlder = viewModel::loadMoreOlder,
+        timelineSuggestion = uiState.timelineSuggestion,
         onHistoryClick = {
             showLocationQuickPeek = true
         },

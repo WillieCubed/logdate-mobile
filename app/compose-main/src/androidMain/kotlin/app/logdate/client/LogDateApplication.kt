@@ -4,10 +4,12 @@ package app.logdate.client
 
 import android.app.Application
 import android.util.Log
+import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.di.initializeKoin
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
 import org.koin.core.component.KoinComponent
+import org.koin.core.component.get
 
 /**
  * Application class for the LogDate Android app.
@@ -24,6 +26,11 @@ class LogdateApplication :
         Napier.base(DebugAntilog())
         initializeKoin()
         Log.i(APP_STARTUP_TAG, "Application onCreate: Koin initialized")
+        runCatching {
+            get<LocationTrackingManager>().startTracking()
+        }.onFailure { error ->
+            Napier.w("Failed to start location tracking manager on app startup", error)
+        }
     }
 }
 

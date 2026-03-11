@@ -40,19 +40,24 @@ import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.atproto_derive_plc_recovery_key
+import logdate.client.feature.core.generated.resources.atproto_derived_plc_recovery_key
 import logdate.client.feature.core.generated.resources.atproto_did
 import logdate.client.feature.core.generated.resources.atproto_handle
 import logdate.client.feature.core.generated.resources.atproto_identity
 import logdate.client.feature.core.generated.resources.atproto_identity_export_bundle
 import logdate.client.feature.core.generated.resources.atproto_identity_loading
 import logdate.client.feature.core.generated.resources.atproto_import_signing_key
+import logdate.client.feature.core.generated.resources.atproto_import_signing_key_with_recovery
 import logdate.client.feature.core.generated.resources.atproto_no_plc_operations
 import logdate.client.feature.core.generated.resources.atproto_not_registered
 import logdate.client.feature.core.generated.resources.atproto_operation_history
 import logdate.client.feature.core.generated.resources.atproto_passphrase
 import logdate.client.feature.core.generated.resources.atproto_plc_operation_count
 import logdate.client.feature.core.generated.resources.atproto_plc_recovery_key
+import logdate.client.feature.core.generated.resources.atproto_recovery_phrase
 import logdate.client.feature.core.generated.resources.atproto_refresh_identity
+import logdate.client.feature.core.generated.resources.atproto_register_derived_plc_recovery_key
 import logdate.client.feature.core.generated.resources.atproto_register_plc_recovery_key
 import logdate.client.feature.core.generated.resources.atproto_rotate_signing_key
 import logdate.client.feature.core.generated.resources.atproto_signing_key
@@ -72,14 +77,20 @@ fun AtprotoIdentitySection(
     onExportSigningKey: (String) -> Unit,
     onRotateSigningKey: (String) -> Unit,
     onImportSigningKey: (String, String) -> Unit,
+    onImportSigningKeyWithRecovery: (String, String, String) -> Unit,
+    onDerivePlcRecoveryKey: (String) -> Unit,
     onRegisterPlcRecoveryKey: (String) -> Unit,
+    onRegisterDerivedPlcRecoveryKey: () -> Unit,
     onClearIdentityActionState: () -> Unit,
     onClearExportedKeyJson: () -> Unit,
+    onClearDerivedRecoveryDidKey: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var showExportDialog by remember { mutableStateOf(false) }
     var showRotateDialog by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
+    var showRecoveryImportDialog by remember { mutableStateOf(false) }
+    var showDeriveRecoveryKeyDialog by remember { mutableStateOf(false) }
     var showRecoveryKeyDialog by remember { mutableStateOf(false) }
 
     Column(
@@ -170,6 +181,20 @@ fun AtprotoIdentitySection(
                     }
 
                     OutlinedButton(
+                        onClick = { showRecoveryImportDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(Res.string.atproto_import_signing_key_with_recovery))
+                    }
+
+                    OutlinedButton(
+                        onClick = { showDeriveRecoveryKeyDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(Res.string.atproto_derive_plc_recovery_key))
+                    }
+
+                    OutlinedButton(
                         onClick = { showRecoveryKeyDialog = true },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
@@ -193,6 +218,33 @@ fun AtprotoIdentitySection(
                             modifier = Modifier.fillMaxWidth(),
                         )
                         TextButton(onClick = onClearExportedKeyJson) {
+                            Text(stringResource(Res.string.dismiss))
+                        }
+                    }
+                }
+
+                identityState.derivedRecoveryDidKey?.let { derivedRecoveryDidKey ->
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.atproto_derived_plc_recovery_key),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        OutlinedTextField(
+                            value = derivedRecoveryDidKey,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text(stringResource(Res.string.atproto_plc_recovery_key)) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedButton(
+                            onClick = onRegisterDerivedPlcRecoveryKey,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(stringResource(Res.string.atproto_register_derived_plc_recovery_key))
+                        }
+                        TextButton(onClick = onClearDerivedRecoveryDidKey) {
                             Text(stringResource(Res.string.dismiss))
                         }
                     }
@@ -263,10 +315,36 @@ fun AtprotoIdentitySection(
 
     if (showImportDialog) {
         ImportSigningKeyDialog(
+            title = stringResource(Res.string.atproto_import_signing_key),
             onDismiss = { showImportDialog = false },
-            onConfirm = { passphrase, exportedKeyJson ->
+            onConfirm = { passphrase, exportedKeyJson, _ ->
                 onImportSigningKey(passphrase, exportedKeyJson)
                 showImportDialog = false
+            },
+        )
+    }
+
+    if (showRecoveryImportDialog) {
+        ImportSigningKeyDialog(
+            title = stringResource(Res.string.atproto_import_signing_key_with_recovery),
+            requireRecoveryPhrase = true,
+            onDismiss = { showRecoveryImportDialog = false },
+            onConfirm = { passphrase, exportedKeyJson, recoveryPhrase ->
+                recoveryPhrase?.let { phrase ->
+                    onImportSigningKeyWithRecovery(passphrase, exportedKeyJson, phrase)
+                }
+                showRecoveryImportDialog = false
+            },
+        )
+    }
+
+    if (showDeriveRecoveryKeyDialog) {
+        RecoveryPhraseDialog(
+            title = stringResource(Res.string.atproto_derive_plc_recovery_key),
+            onDismiss = { showDeriveRecoveryKeyDialog = false },
+            onConfirm = { recoveryPhrase ->
+                onDerivePlcRecoveryKey(recoveryPhrase)
+                showDeriveRecoveryKeyDialog = false
             },
         )
     }
@@ -382,15 +460,18 @@ private fun PassphraseDialog(
 
 @Composable
 private fun ImportSigningKeyDialog(
+    title: String,
+    requireRecoveryPhrase: Boolean = false,
     onDismiss: () -> Unit,
-    onConfirm: (String, String) -> Unit,
+    onConfirm: (String, String, String?) -> Unit,
 ) {
     var passphrase by remember { mutableStateOf("") }
     var exportedKeyJson by remember { mutableStateOf("") }
+    var recoveryPhrase by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(Res.string.atproto_import_signing_key)) },
+        title = { Text(title) },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -415,12 +496,60 @@ private fun ImportSigningKeyDialog(
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 6,
                 )
+                if (requireRecoveryPhrase) {
+                    OutlinedTextField(
+                        value = recoveryPhrase,
+                        onValueChange = { recoveryPhrase = it },
+                        label = { Text(stringResource(Res.string.atproto_recovery_phrase)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                    )
+                }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(passphrase, exportedKeyJson) },
-                enabled = passphrase.isNotBlank() && exportedKeyJson.isNotBlank(),
+                onClick = { onConfirm(passphrase, exportedKeyJson, recoveryPhrase.takeIf { it.isNotBlank() }) },
+                enabled =
+                    passphrase.isNotBlank() &&
+                        exportedKeyJson.isNotBlank() &&
+                        (!requireRecoveryPhrase || recoveryPhrase.isNotBlank()),
+            ) {
+                Text(stringResource(Res.string.confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(Res.string.cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun RecoveryPhraseDialog(
+    title: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var recoveryPhrase by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            OutlinedTextField(
+                value = recoveryPhrase,
+                onValueChange = { recoveryPhrase = it },
+                label = { Text(stringResource(Res.string.atproto_recovery_phrase)) },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(recoveryPhrase) },
+                enabled = recoveryPhrase.isNotBlank(),
             ) {
                 Text(stringResource(Res.string.confirm))
             }
