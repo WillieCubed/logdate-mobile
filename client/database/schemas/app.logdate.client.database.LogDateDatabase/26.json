@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 25,
-    "identityHash": "e2d216ed701c5dc773774eae0283778c",
+    "version": 26,
+    "identityHash": "f47db8d22709eb7ecdb813b77d6e9228",
     "entities": [
       {
         "tableName": "text_notes",
@@ -564,8 +564,14 @@
       },
       {
         "tableName": "location_logs",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`user_id` TEXT NOT NULL, `device_id` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `confidence` REAL NOT NULL, `is_genuine` INTEGER NOT NULL, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `altitude` REAL NOT NULL, PRIMARY KEY(`user_id`, `device_id`, `timestamp`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sample_id` TEXT NOT NULL, `user_id` TEXT NOT NULL, `device_id` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `logged_at` INTEGER NOT NULL, `confidence` REAL NOT NULL, `is_genuine` INTEGER NOT NULL, `capture_pipeline` TEXT NOT NULL, `capture_source` TEXT NOT NULL, `accuracy_meters` REAL, `speed_meters_per_second` REAL, `bearing_degrees` REAL, `is_mock` INTEGER NOT NULL, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `altitude` REAL NOT NULL, PRIMARY KEY(`sample_id`))",
         "fields": [
+          {
+            "fieldPath": "sampleId",
+            "columnName": "sample_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
           {
             "fieldPath": "userId",
             "columnName": "user_id",
@@ -585,6 +591,12 @@
             "notNull": true
           },
           {
+            "fieldPath": "loggedAt",
+            "columnName": "logged_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
             "fieldPath": "confidence",
             "columnName": "confidence",
             "affinity": "REAL",
@@ -593,6 +605,39 @@
           {
             "fieldPath": "isGenuine",
             "columnName": "is_genuine",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "capturePipeline",
+            "columnName": "capture_pipeline",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "captureSource",
+            "columnName": "capture_source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "accuracyMeters",
+            "columnName": "accuracy_meters",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "speedMetersPerSecond",
+            "columnName": "speed_meters_per_second",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "bearingDegrees",
+            "columnName": "bearing_degrees",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "isMock",
+            "columnName": "is_mock",
             "affinity": "INTEGER",
             "notNull": true
           },
@@ -618,9 +663,7 @@
         "primaryKey": {
           "autoGenerate": false,
           "columnNames": [
-            "user_id",
-            "device_id",
-            "timestamp"
+            "sample_id"
           ]
         }
       },
@@ -1739,7 +1782,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e2d216ed701c5dc773774eae0283778c')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f47db8d22709eb7ecdb813b77d6e9228')"
     ]
   }
 }

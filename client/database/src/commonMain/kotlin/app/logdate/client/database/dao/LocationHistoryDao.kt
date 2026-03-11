@@ -32,7 +32,11 @@ interface LocationHistoryDao {
         endTime: Instant,
     ): List<LocationLogEntity>
 
-    @Query("SELECT * FROM location_logs WHERE user_id = :userId AND device_id = :deviceId AND timestamp = :timestamp")
+    @Query(
+        "SELECT * FROM location_logs " +
+            "WHERE user_id = :userId AND device_id = :deviceId AND timestamp = :timestamp " +
+            "ORDER BY logged_at DESC LIMIT 1",
+    )
     suspend fun getLocationById(
         userId: String,
         deviceId: String,

@@ -8,10 +8,13 @@ import androidx.test.platform.app.InstrumentationRegistry
 import app.logdate.client.database.entities.JournalEntity
 import app.logdate.client.database.entities.TextNoteEntity
 import app.logdate.client.database.migrations.AppDatabaseMigrations
+import app.logdate.client.database.migrations.MIGRATION_25_26
+import app.logdate.client.database.migrations.MIGRATION_26_27
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
@@ -312,5 +315,90 @@ class DatabaseMigrationIntegrationTest {
         } finally {
             database.close()
         }
+    }
+
+    @Test
+    fun testMigrationFrom25To26BackfillsLocationSampleMetadata() {
+        var db =
+            helper.createDatabase(testDatabaseName, 25).apply {
+                execSQL(
+                    """
+                    INSERT INTO location_logs (
+                        user_id,
+                        device_id,
+                        timestamp,
+                        latitude,
+                        longitude,
+                        altitude,
+                        confidence,
+                        is_genuine
+                    ) VALUES (
+                        'user-1',
+                        'device-1',
+                        1710000000000,
+                        37.7749,
+                        -122.4194,
+                        12.0,
+                        0.9,
+                        1
+                    )
+                    """.trimIndent(),
+                )
+                close()
+            }
+
+        db = helper.runMigrationsAndValidate(testDatabaseName, 26, true, MIGRATION_25_26)
+
+        val cursor =
+            db.query(
+                """
+                SELECT sample_id, logged_at, capture_pipeline, capture_source, is_mock
+                FROM location_logs
+                WHERE user_id = 'user-1' AND device_id = 'device-1'
+                """.trimIndent(),
+            )
+
+        assertTrue(cursor.moveToFirst())
+        assertEquals("user-1:device-1:1710000000000", cursor.getString(cursor.getColumnIndexOrThrow("sample_id")))
+        assertEquals(1710000000000, cursor.getLong(cursor.getColumnIndexOrThrow("logged_at")))
+        assertEquals("LEGACY", cursor.getString(cursor.getColumnIndexOrThrow("capture_pipeline")))
+        assertEquals("BACKGROUND_PERIODIC", cursor.getString(cursor.getColumnIndexOrThrow("capture_source")))
+        assertEquals(0, cursor.getInt(cursor.getColumnIndexOrThrow("is_mock")))
+        cursor.close()
+
+        val indexCursor =
+            db.query(
+                """
+                SELECT name
+                FROM sqlite_master
+                WHERE type = 'index' AND name = 'index_location_logs_timestamp'
+                """.trimIndent(),
+            )
+
+        assertFalse(indexCursor.moveToFirst())
+        indexCursor.close()
+    }
+
+    @Test
+    fun testMigrationFrom26To27RemovesUnexpectedLocationTimestampIndex() {
+        var db =
+            helper.createDatabase(testDatabaseName, 26).apply {
+                execSQL("CREATE INDEX IF NOT EXISTS index_location_logs_timestamp ON location_logs(timestamp)")
+                close()
+            }
+
+        db = helper.runMigrationsAndValidate(testDatabaseName, 27, true, MIGRATION_26_27)
+
+        val cursor =
+            db.query(
+                """
+                SELECT name
+                FROM sqlite_master
+                WHERE type = 'index' AND name = 'index_location_logs_timestamp'
+                """.trimIndent(),
+            )
+
+        assertFalse(cursor.moveToFirst())
+        cursor.close()
     }
 }

@@ -70,6 +70,8 @@ import app.logdate.client.database.migrations.MIGRATION_21_22
 import app.logdate.client.database.migrations.MIGRATION_22_23
 import app.logdate.client.database.migrations.MIGRATION_23_24
 import app.logdate.client.database.migrations.MIGRATION_24_25
+import app.logdate.client.database.migrations.MIGRATION_25_26
+import app.logdate.client.database.migrations.MIGRATION_26_27
 import app.logdate.client.database.migrations.MIGRATION_2_3
 import app.logdate.client.database.migrations.MIGRATION_3_4
 import app.logdate.client.database.migrations.MIGRATION_4_5
@@ -121,7 +123,7 @@ import kotlinx.coroutines.IO
         PlaceEntity::class,
         UserPlaceEntity::class,
     ],
-    version = 25, // Add offline user place persistence
+    version = 27, // Repair location sample metadata migration
     exportSchema = true,
 )
 @TypeConverters(
@@ -232,6 +234,8 @@ fun getRoomDatabase(
                 MIGRATION_22_23,
                 MIGRATION_23_24,
                 MIGRATION_24_25,
+                MIGRATION_25_26,
+                MIGRATION_26_27,
             ).fallbackToDestructiveMigration(destroyTablesOnUpgrade)
             .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)
             .setQueryCoroutineContext(dispatcher)

@@ -3,6 +3,7 @@ package app.logdate.client.database.entities
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
+import androidx.room.PrimaryKey
 import kotlin.time.Instant
 
 /**
@@ -18,11 +19,11 @@ import kotlin.time.Instant
  * This data should not be used as a source of truth for a user's location but can be used to
  * approximate a user's location at a given time.
  */
-@Entity(
-    tableName = "location_logs",
-    primaryKeys = ["user_id", "device_id", "timestamp"],
-)
+@Entity(tableName = "location_logs")
 data class LocationLogEntity(
+    @PrimaryKey
+    @ColumnInfo(name = "sample_id")
+    val sampleId: String,
     /**
      * The user that created this log.
      */
@@ -40,6 +41,11 @@ data class LocationLogEntity(
      */
     val timestamp: Instant,
     /**
+     * When this log was persisted locally.
+     */
+    @ColumnInfo(name = "logged_at")
+    val loggedAt: Instant,
+    /**
      * The location of the user when this log was created.
      */
     @Embedded
@@ -56,6 +62,27 @@ data class LocationLogEntity(
      */
     @ColumnInfo(name = "is_genuine")
     val isGenuine: Boolean,
+    /**
+     * The capture pipeline responsible for this sample.
+     */
+    @ColumnInfo(name = "capture_pipeline")
+    val capturePipeline: String,
+    /**
+     * The trigger source that produced this sample.
+     */
+    @ColumnInfo(name = "capture_source")
+    val captureSource: String,
+    /**
+     * Best-known horizontal accuracy for this sample, if available.
+     */
+    @ColumnInfo(name = "accuracy_meters")
+    val accuracyMeters: Float? = null,
+    @ColumnInfo(name = "speed_meters_per_second")
+    val speedMetersPerSecond: Float? = null,
+    @ColumnInfo(name = "bearing_degrees")
+    val bearingDegrees: Float? = null,
+    @ColumnInfo(name = "is_mock")
+    val isMock: Boolean = false,
 )
 
 /**
