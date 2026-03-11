@@ -6,11 +6,18 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.put
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * Deterministic subset DAG-CBOR encoder and decoder for repo primitives.
  */
+@OptIn(ExperimentalEncodingApi::class)
 public object DagCborCodec {
     /**
      * Encodes [element] into deterministic DAG-CBOR bytes.
@@ -22,9 +29,48 @@ public object DagCborCodec {
      */
     public fun decode(bytes: ByteArray): JsonElement = Decoder(bytes).decodeElement()
 
+    internal fun link(cid: Cid): JsonObject =
+        buildJsonObject {
+            put(LINK_KEY, cid.toString())
+        }
+
+    internal fun bytes(bytes: ByteArray): JsonObject =
+        buildJsonObject {
+            put(BYTES_KEY, Base64.UrlSafe.encode(bytes).trimEnd('='))
+        }
+
+    internal fun linkOrNull(element: JsonElement?): Cid? {
+        val objectValue = element as? JsonObject ?: return null
+        if (objectValue.size != 1) {
+            return null
+        }
+        return objectValue[LINK_KEY]
+            ?.jsonPrimitive
+            ?.contentOrNull
+            ?.let(Cid::require)
+    }
+
+    internal fun bytesOrNull(element: JsonElement?): ByteArray? {
+        val objectValue = element as? JsonObject ?: return null
+        if (objectValue.size != 1) {
+            return null
+        }
+        val encoded =
+            objectValue[BYTES_KEY]
+                ?.jsonPrimitive
+                ?.contentOrNull
+                ?: return null
+        return Base64.UrlSafe.decode(encoded.padBase64Url())
+    }
+
     private fun encodeJsonElement(element: JsonElement): ByteArray =
         when (element) {
-            is JsonObject -> encodeMap(element)
+            is JsonObject ->
+                when {
+                    linkOrNull(element) != null -> encodeLink(requireNotNull(linkOrNull(element)))
+                    bytesOrNull(element) != null -> encodeByteString(requireNotNull(bytesOrNull(element)))
+                    else -> encodeMap(element)
+                }
             is JsonArray -> encodeArray(element)
             JsonNull -> byteArrayOf(NULL_SIMPLE_VALUE)
             is JsonPrimitive -> encodePrimitive(element)
@@ -45,6 +91,11 @@ public object DagCborCodec {
 
     private fun encodeArray(array: JsonArray): ByteArray =
         encodeHead(MAJOR_TYPE_ARRAY, array.size.toLong()) + array.map(::encodeJsonElement).flatten()
+
+    private fun encodeByteString(bytes: ByteArray): ByteArray = encodeHead(MAJOR_TYPE_BYTE_STRING, bytes.size.toLong()) + bytes
+
+    private fun encodeLink(cid: Cid): ByteArray =
+        encodeHead(MAJOR_TYPE_TAG, CID_LINK_TAG) + encodeByteString(byteArrayOf(CID_LINK_LEAD_BYTE) + cid.toBytes())
 
     private fun encodePrimitive(primitive: JsonPrimitive): ByteArray =
         when {
@@ -111,6 +162,7 @@ public object DagCborCodec {
             return when (majorType) {
                 MAJOR_TYPE_UNSIGNED_INT -> JsonPrimitive(readLength(info))
                 MAJOR_TYPE_NEGATIVE_INT -> JsonPrimitive(-(readLength(info) + 1))
+                MAJOR_TYPE_BYTE_STRING -> bytes(readBytes(readLength(info).toInt()))
                 MAJOR_TYPE_TEXT -> JsonPrimitive(readText(readLength(info).toInt()))
                 MAJOR_TYPE_ARRAY -> {
                     val size = readLength(info).toInt()
@@ -127,6 +179,22 @@ public object DagCborCodec {
                             }
                         }
                     JsonObject(entries)
+                }
+
+                MAJOR_TYPE_TAG -> {
+                    val tag = readLength(info)
+                    when (tag) {
+                        CID_LINK_TAG -> {
+                            val tagged = decodeElement()
+                            val encodedCid = bytesOrNull(tagged) ?: error("CID link tag must wrap a byte string")
+                            require(encodedCid.isNotEmpty() && encodedCid.first() == CID_LINK_LEAD_BYTE) {
+                                "CID link payload must begin with 0x00"
+                            }
+                            link(Cid.fromBytes(encodedCid.copyOfRange(1, encodedCid.size)))
+                        }
+
+                        else -> error("Unsupported DAG-CBOR tag $tag")
+                    }
                 }
 
                 MAJOR_TYPE_SIMPLE ->
@@ -160,9 +228,14 @@ public object DagCborCodec {
         }
 
         private fun readText(length: Int): String {
+            val bytes = readBytes(length)
+            return bytes.decodeToString()
+        }
+
+        private fun readBytes(length: Int): ByteArray {
             val end = cursor + length
             require(end <= bytes.size) { "Unexpected end of DAG-CBOR input" }
-            val result = bytes.copyOfRange(cursor, end).decodeToString()
+            val result = bytes.copyOfRange(cursor, end)
             cursor = end
             return result
         }
@@ -177,9 +250,11 @@ public object DagCborCodec {
 private const val MAJOR_TYPE_SHIFT: Int = 5
 private const val MAJOR_TYPE_UNSIGNED_INT: Int = 0
 private const val MAJOR_TYPE_NEGATIVE_INT: Int = 1
+private const val MAJOR_TYPE_BYTE_STRING: Int = 2
 private const val MAJOR_TYPE_TEXT: Int = 3
 private const val MAJOR_TYPE_ARRAY: Int = 4
 private const val MAJOR_TYPE_MAP: Int = 5
+private const val MAJOR_TYPE_TAG: Int = 6
 private const val MAJOR_TYPE_SIMPLE: Int = 7
 private const val INFO_MASK: Int = 0x1f
 private const val SMALL_VALUE_THRESHOLD: Long = 24L
@@ -195,3 +270,9 @@ private const val BYTE_MASK: Long = 0xff
 private const val UBYTE_MAX: Long = 0xff
 private const val USHORT_MAX: Long = 0xffff
 private const val UINT_MAX: Long = 0xffff_ffff
+private const val CID_LINK_TAG: Long = 42L
+private const val CID_LINK_LEAD_BYTE: Byte = 0x00
+private const val LINK_KEY: String = "\$link"
+private const val BYTES_KEY: String = "\$bytes"
+
+private fun String.padBase64Url(): String = this + "=".repeat((4 - length % 4) % 4)
