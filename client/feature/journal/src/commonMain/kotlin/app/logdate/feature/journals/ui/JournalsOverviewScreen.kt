@@ -8,10 +8,12 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -123,21 +125,30 @@ fun JournalListPanel(
                 NoJournalsScreen()
             } else {
 //                JournalList(state.journals, onOpenJournal, modifier)
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.lg, Alignment.CenterVertically),
-                ) {
-                    JournalCoverFlowCarousel(
-                        journals = journals,
-                        onOpenJournal = onOpenJournal,
-                        onCreateJournal = onCreateJournal,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    TextButton(
-                        onClick = onBrowseJournals,
-                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    val reservedForButton = 56.dp + Spacing.lg
+                    val carouselMaxHeight = (maxHeight - reservedForButton).coerceAtLeast(220.dp)
+
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.lg, Alignment.CenterVertically),
                     ) {
-                        Text(text = stringResource(Res.string.action_browse_journals))
+                        JournalCoverFlowCarousel(
+                            journals = journals,
+                            onOpenJournal = onOpenJournal,
+                            onCreateJournal = onCreateJournal,
+                            maxCardHeight = carouselMaxHeight,
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = carouselMaxHeight),
+                        )
+                        TextButton(
+                            onClick = onBrowseJournals,
+                            modifier = Modifier.align(Alignment.CenterHorizontally),
+                        ) {
+                            Text(text = stringResource(Res.string.action_browse_journals))
+                        }
                     }
                 }
             }

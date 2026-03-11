@@ -23,8 +23,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.shared.model.Journal
+import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.theme.Spacing
 import kotlin.math.abs
 import kotlin.time.Clock
@@ -39,6 +41,7 @@ fun JournalCoverFlowCarousel(
     journals: List<JournalListItemUiState>,
     onOpenJournal: JournalClickCallback,
     onCreateJournal: () -> Unit,
+    maxCardHeight: Dp = Dp.Unspecified,
     modifier: Modifier = Modifier,
 ) {
     if (journals.isEmpty()) {
@@ -48,7 +51,21 @@ fun JournalCoverFlowCarousel(
     val listState = rememberLazyListState()
 
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-        val carouselCardWidth = (maxWidth * 0.52f).coerceIn(168.dp, 208.dp)
+        val cardMinWidth = 132.dp
+        val cardMaxWidth = 208.dp
+        val maxCardScale = 1.15f
+
+        val widthFromViewport = (maxWidth * 0.52f).coerceIn(cardMinWidth, cardMaxWidth)
+        val widthFromHeight =
+            if (maxCardHeight.isSpecified) {
+                val verticalPadding = Spacing.sm * 2
+                val baseCardHeight =
+                    ((maxCardHeight - verticalPadding).coerceAtLeast(1.dp) / maxCardScale)
+                (baseCardHeight * AspectRatios.JOURNAL_COVER).coerceIn(cardMinWidth, cardMaxWidth)
+            } else {
+                cardMaxWidth
+            }
+        val carouselCardWidth = minOf(widthFromViewport, widthFromHeight)
         val horizontalContentPadding = (maxWidth * 0.08f).coerceIn(Spacing.md, Spacing.xl)
 
         // Continuously scale cards based on proximity to the viewport center.
@@ -64,7 +81,7 @@ fun JournalCoverFlowCarousel(
                     val normalizedDistance = (abs(itemCenter - viewportCenter) / viewportHalfWidth).coerceIn(0f, 1f)
                     val proximity = 1f - normalizedDistance
                     val easedProximity = proximity * proximity
-                    val scale = 0.88f + (1.15f - 0.88f) * easedProximity
+                    val scale = 0.88f + (maxCardScale - 0.88f) * easedProximity
 
                     itemInfo.index to scale
                 }
