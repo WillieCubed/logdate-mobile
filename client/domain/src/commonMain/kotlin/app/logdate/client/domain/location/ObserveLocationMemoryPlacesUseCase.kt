@@ -3,19 +3,23 @@ package app.logdate.client.domain.location
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.NoteType
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
 import kotlin.math.round
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class ObserveLocationMemoryPlacesUseCase(
     private val notesRepository: JournalNotesRepository,
     private val clock: Clock = Clock.System,
+    private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
 ) {
     operator fun invoke(filter: LocationMemoryTimeFilter): Flow<List<LocationMemoryPlace>> =
         notesRepository.allNotesObserved.map { notes ->
@@ -45,16 +49,7 @@ class ObserveLocationMemoryPlacesUseCase(
     private fun JournalNote.isWithin(
         filter: LocationMemoryTimeFilter,
         now: Instant,
-    ): Boolean =
-        when (filter) {
-            LocationMemoryTimeFilter.Last30Days -> creationTimestamp >= now - 30.days
-            LocationMemoryTimeFilter.Last90Days -> creationTimestamp >= now - 90.days
-            LocationMemoryTimeFilter.YearToDate -> {
-                val currentYear = now.toLocalDateTime(TimeZone.currentSystemDefault()).year
-                creationTimestamp.toLocalDateTime(TimeZone.currentSystemDefault()).year == currentYear
-            }
-            LocationMemoryTimeFilter.AllTime -> true
-        }
+    ): Boolean = filter.contains(creationTimestamp, now, timeZone)
 
     private fun JournalNote.locationGroupKey(): String {
         val location = requireNotNull(location)
@@ -108,11 +103,86 @@ class ObserveLocationMemoryPlacesUseCase(
     private fun roundCoordinate(value: Double): Double = round(value * 10_000) / 10_000
 }
 
-enum class LocationMemoryTimeFilter {
-    Last30Days,
-    Last90Days,
-    YearToDate,
-    AllTime,
+sealed class LocationMemoryTimeFilter {
+    data object Last30Days : LocationMemoryTimeFilter()
+
+    data object Last90Days : LocationMemoryTimeFilter()
+
+    data object YearToDate : LocationMemoryTimeFilter()
+
+    data object AllTime : LocationMemoryTimeFilter()
+
+    data class Custom(
+        val startInclusive: LocalDate? = null,
+        val endInclusive: LocalDate? = null,
+    ) : LocationMemoryTimeFilter() {
+        init {
+            require(startInclusive == null || endInclusive == null || startInclusive <= endInclusive) {
+                "Custom location memory range start must be on or before end."
+            }
+        }
+    }
+
+    companion object {
+        val Presets: List<LocationMemoryTimeFilter> =
+            listOf(
+                Last30Days,
+                Last90Days,
+                YearToDate,
+                AllTime,
+            )
+    }
+}
+
+internal fun LocationMemoryTimeFilter.contains(
+    timestamp: Instant,
+    now: Instant,
+    timeZone: TimeZone,
+): Boolean {
+    val noteDate = timestamp.toLocalDateTime(timeZone).date
+    val currentDate = now.toLocalDateTime(timeZone).date
+
+    return when (val filter: Any = this) {
+        LocationMemoryTimeFilter.Last30Days ->
+            noteDate.isWithin(
+                startInclusive = currentDate.minus(DatePeriod(days = 29)),
+                endInclusive = currentDate,
+            )
+
+        LocationMemoryTimeFilter.Last90Days ->
+            noteDate.isWithin(
+                startInclusive = currentDate.minus(DatePeriod(days = 89)),
+                endInclusive = currentDate,
+            )
+
+        LocationMemoryTimeFilter.YearToDate ->
+            noteDate.isWithin(
+                startInclusive = LocalDate(currentDate.year, 1, 1),
+                endInclusive = currentDate,
+            )
+
+        LocationMemoryTimeFilter.AllTime -> true
+
+        is LocationMemoryTimeFilter.Custom ->
+            noteDate.isWithin(
+                startInclusive = filter.startInclusive,
+                endInclusive = filter.endInclusive,
+            )
+
+        else -> {
+            Napier.w("Unexpected location memory filter encountered while matching notes: $filter")
+            true
+        }
+    }
+}
+
+private fun LocalDate.isWithin(
+    startInclusive: LocalDate?,
+    endInclusive: LocalDate?,
+): Boolean {
+    val isAfterStart = startInclusive == null || this >= startInclusive
+    val isBeforeEnd = endInclusive == null || this <= endInclusive
+    return isAfterStart && isBeforeEnd
 }
 
 data class LocationMemoryPlace(

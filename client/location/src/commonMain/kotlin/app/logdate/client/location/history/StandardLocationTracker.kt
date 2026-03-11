@@ -1,8 +1,11 @@
 package app.logdate.client.location.history
 
 import app.logdate.client.location.ClientLocationProvider
+import app.logdate.client.repository.location.LocationCapturePipeline
+import app.logdate.client.repository.location.LocationCaptureSource
 import app.logdate.client.repository.location.LocationHistoryItem
 import app.logdate.client.repository.location.LocationHistoryRepository
+import app.logdate.client.repository.location.LocationLogRecord
 import app.logdate.shared.model.Location
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
@@ -11,6 +14,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.plus
+import kotlin.time.Clock
 import kotlin.time.Instant
 
 /**
@@ -67,25 +71,50 @@ class StandardLocationTracker(
         try {
             val confidence = metadata["confidence"] as? Float ?: 1.0f
             val isGenuine = metadata["isGenuine"] as? Boolean ?: true
-
-            val result =
-                locationHistoryRepository.logLocation(
-                    location = location,
+            val capturePipeline = metadata["capturePipeline"] as? LocationCapturePipeline ?: LocationCapturePipeline.LEGACY
+            val captureSource = metadata["captureSource"] as? LocationCaptureSource ?: LocationCaptureSource.MANUAL
+            val accuracyMeters = metadata["accuracyMeters"] as? Float
+            val speedMetersPerSecond = metadata["speedMetersPerSecond"] as? Float
+            val bearingDegrees = metadata["bearingDegrees"] as? Float
+            val isMock = metadata["isMock"] as? Boolean ?: false
+            val loggedAt = metadata["loggedAt"] as? Instant ?: Clock.System.now()
+            val record =
+                LocationLogRecord(
                     userId = userId,
                     deviceId = deviceId,
+                    timestamp = timestamp,
+                    loggedAt = loggedAt,
+                    location = location,
                     confidence = confidence,
                     isGenuine = isGenuine,
+                    capturePipeline = capturePipeline,
+                    captureSource = captureSource,
+                    accuracyMeters = accuracyMeters,
+                    speedMetersPerSecond = speedMetersPerSecond,
+                    bearingDegrees = bearingDegrees,
+                    isMock = isMock,
                 )
+
+            val result =
+                locationHistoryRepository.logLocation(record)
 
             if (result.isSuccess) {
                 val historyItem =
                     LocationHistoryItem(
+                        sampleId = record.sampleId,
                         userId = userId,
                         deviceId = deviceId,
                         timestamp = timestamp,
+                        loggedAt = record.loggedAt,
                         location = location,
                         confidence = confidence,
                         isGenuine = isGenuine,
+                        capturePipeline = capturePipeline,
+                        captureSource = captureSource,
+                        accuracyMeters = accuracyMeters,
+                        speedMetersPerSecond = speedMetersPerSecond,
+                        bearingDegrees = bearingDegrees,
+                        isMock = isMock,
                     )
                 Result.success(historyItem)
             } else {

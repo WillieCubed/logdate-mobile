@@ -1,0 +1,112 @@
+package app.logdate.client.location.tracking
+
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import app.logdate.client.location.history.LocationTracker
+import app.logdate.client.repository.location.LocationCapturePipeline
+import app.logdate.client.repository.location.LocationCaptureSource
+import app.logdate.shared.model.AltitudeUnit
+import app.logdate.shared.model.Location
+import app.logdate.shared.model.LocationAltitude
+import com.google.android.gms.location.LocationAvailability
+import com.google.android.gms.location.LocationResult
+import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
+import kotlin.time.Clock
+import kotlin.time.Instant
+import android.location.Location as AndroidLocation
+
+class OptimizedBackgroundLocationReceiver :
+    BroadcastReceiver(),
+    KoinComponent {
+    private val locationTracker: LocationTracker by inject()
+
+    override fun onReceive(
+        context: Context,
+        intent: Intent,
+    ) {
+        if (intent.action != OPTIMIZED_BACKGROUND_LOCATION_UPDATE_ACTION) {
+            return
+        }
+
+        val locationResult = LocationResult.extractResult(intent)
+        if (locationResult == null) {
+            val availability = LocationAvailability.extractLocationAvailability(intent)
+            if (availability?.isLocationAvailable == false) {
+                Napier.d("Passive background location update arrived without an available location fix")
+            }
+            return
+        }
+
+        val pendingResult = goAsync()
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            try {
+                locationResult.locations.forEach { androidLocation ->
+                    logPassiveLocation(androidLocation)
+                }
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+
+    private suspend fun logPassiveLocation(androidLocation: AndroidLocation) {
+        val observedAt =
+            if (androidLocation.time > 0) {
+                Instant.fromEpochMilliseconds(androidLocation.time)
+            } else {
+                Clock.System.now()
+            }
+
+        locationTracker
+            .logLocation(
+                location = androidLocation.toLogDateLocation(),
+                timestamp = observedAt,
+                metadata = androidLocation.toMetadata(),
+            ).onFailure { error ->
+                Napier.w("Failed to persist passive background location update", error)
+            }
+    }
+
+    private fun isMock(location: AndroidLocation): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            location.isMock
+        } else {
+            false
+        }
+
+    private fun AndroidLocation.toLogDateLocation(): Location =
+        Location(
+            latitude = latitude,
+            longitude = longitude,
+            altitude =
+                LocationAltitude(
+                    value = if (hasAltitude()) altitude else 0.0,
+                    units = AltitudeUnit.METERS,
+                ),
+        )
+
+    private fun AndroidLocation.toMetadata(): Map<String, Any> =
+        buildMap {
+            put("loggedAt", Clock.System.now())
+            put("capturePipeline", LocationCapturePipeline.OPTIMIZED_BACKGROUND)
+            put("captureSource", LocationCaptureSource.PASSIVE_UPDATE)
+            if (this@toMetadata.hasAccuracy()) {
+                put("accuracyMeters", this@toMetadata.accuracy)
+            }
+            if (this@toMetadata.hasSpeed()) {
+                put("speedMetersPerSecond", this@toMetadata.speed)
+            }
+            if (this@toMetadata.hasBearing()) {
+                put("bearingDegrees", this@toMetadata.bearing)
+            }
+            put("isMock", isMock(this@toMetadata))
+        }
+}

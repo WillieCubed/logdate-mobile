@@ -29,5 +29,21 @@ interface LocationTrackingSettingsRepository {
     /**
      * Update the tracking interval.
      */
-    suspend fun setTrackingInterval(intervalMinutes: Long)
+    suspend fun setTrackingInterval(intervalMinutes: Long) {
+        updateSettings(getSettings().copy(minimumPersistIntervalMinutes = intervalMinutes))
+    }
+
+    /**
+     * Update the active capture mode.
+     */
+    suspend fun setCaptureMode(mode: LocationCaptureMode) {
+        updateSettings(getSettings().copy(captureMode = mode))
+    }
+
+    /**
+     * Update whether optional server assists are enabled.
+     */
+    suspend fun setServerAssistEnabled(enabled: Boolean) {
+        updateSettings(getSettings().copy(serverAssistEnabled = enabled))
+    }
 }

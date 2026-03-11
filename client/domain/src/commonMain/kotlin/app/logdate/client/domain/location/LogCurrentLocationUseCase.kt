@@ -1,7 +1,10 @@
 package app.logdate.client.domain.location
 
 import app.logdate.client.location.ClientLocationProvider
+import app.logdate.client.repository.location.LocationCapturePipeline
+import app.logdate.client.repository.location.LocationCaptureSource
 import app.logdate.client.repository.location.LocationHistoryRepository
+import app.logdate.client.repository.location.LocationLogRecord
 import kotlin.time.Clock
 
 /**
@@ -26,34 +29,31 @@ class LogCurrentLocationUseCase(
         when (request) {
             is LocationLogRequest.LogLocation -> {
                 try {
-                    // First, try to log immediately
                     val location = locationProvider.getCurrentLocation()
-                    val result =
-                        locationHistoryRepository.logLocation(
-                            location = location,
+                    val now = Clock.System.now()
+                    val record =
+                        LocationLogRecord(
                             userId = request.userId,
                             deviceId = request.deviceId,
+                            timestamp = now,
+                            loggedAt = now,
+                            location = location,
                             confidence = 1.0f,
                             isGenuine = true,
+                            capturePipeline = request.capturePipeline,
+                            captureSource = request.captureSource,
                         )
+                    val result =
+                        locationHistoryRepository.logLocation(record)
 
                     if (result.isSuccess) {
-                        // Success on first try
                         LocationLogResult.LogSuccess
                     } else {
-                        // Failed - schedule background retry
-                        scheduleBackgroundRetry(request.userId, request.deviceId)
-                        // Return success since we've handled the failure gracefully
+                        scheduleBackgroundRetry(record)
                         LocationLogResult.LogSuccess
                     }
                 } catch (e: Exception) {
-                    // Handle any unexpected errors by scheduling retry
-                    try {
-                        scheduleBackgroundRetry(request.userId, request.deviceId)
-                        LocationLogResult.LogSuccess
-                    } catch (retryError: Exception) {
-                        LocationLogResult.LogFailure(retryError)
-                    }
+                    LocationLogResult.LogFailure(e)
                 }
             }
             is LocationLogRequest.GetRetryStatus -> {
@@ -66,33 +66,19 @@ class LogCurrentLocationUseCase(
             }
         }
 
-    private suspend fun scheduleBackgroundRetry(
-        userId: String,
-        deviceId: String,
-    ) {
-        try {
-            // Get current location for the retry
-            val location = locationProvider.getCurrentLocation()
-            val timestamp = Clock.System.now()
-
-            // Schedule background retry
-            locationRetryWorker.scheduleRetry(
-                location = location,
-                userId = userId,
-                deviceId = deviceId,
-                originalTimestamp = timestamp,
-                attemptNumber = 1,
-            )
-        } catch (e: Exception) {
-            // If we can't even get the location, we can't schedule a retry
-            throw e
-        }
+    private fun scheduleBackgroundRetry(record: LocationLogRecord) {
+        locationRetryWorker.scheduleRetry(
+            record = record,
+            attemptNumber = 1,
+        )
     }
 
     sealed class LocationLogRequest {
         data class LogLocation(
             val userId: String = "user_1",
             val deviceId: String = "device_1",
+            val capturePipeline: LocationCapturePipeline = LocationCapturePipeline.LEGACY,
+            val captureSource: LocationCaptureSource = LocationCaptureSource.MANUAL,
         ) : LocationLogRequest()
 
         object GetRetryStatus : LocationLogRequest()

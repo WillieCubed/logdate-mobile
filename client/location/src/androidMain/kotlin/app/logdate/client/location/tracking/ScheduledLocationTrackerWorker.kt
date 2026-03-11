@@ -5,6 +5,10 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import app.logdate.client.location.ClientLocationProvider
 import app.logdate.client.location.history.LocationTracker
+import app.logdate.client.location.settings.LocationCaptureMode
+import app.logdate.client.location.settings.LocationTrackingSettingsRepository
+import app.logdate.client.repository.location.LocationCapturePipeline
+import app.logdate.client.repository.location.LocationCaptureSource
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeout
@@ -22,6 +26,7 @@ class ScheduledLocationTrackerWorker(
     KoinComponent {
     private val locationProvider: ClientLocationProvider by inject()
     private val locationTracker: LocationTracker by inject()
+    private val settingsRepository: LocationTrackingSettingsRepository by inject()
 
     override suspend fun doWork(): Result {
         Napier.i("ScheduledLocationTrackerWorker: Starting scheduled location tracking")
@@ -36,9 +41,23 @@ class ScheduledLocationTrackerWorker(
                     withTimeout(30.seconds) {
                         locationProvider.getCurrentLocation()
                     }
+                val settings = settingsRepository.getSettings()
+                val pipeline =
+                    if (settings.captureMode == LocationCaptureMode.EXPERIMENT_MIRRORED) {
+                        LocationCapturePipeline.OPTIMIZED_BACKGROUND
+                    } else {
+                        LocationCapturePipeline.LEGACY
+                    }
 
                 Napier.i("ScheduledLocationTrackerWorker: Got location: $location")
-                locationTracker.logLocation(location)
+                locationTracker.logLocation(
+                    location = location,
+                    metadata =
+                        mapOf(
+                            "capturePipeline" to pipeline,
+                            "captureSource" to LocationCaptureSource.BACKGROUND_PERIODIC,
+                        ),
+                )
                 return Result.success()
             } catch (e: Exception) {
                 Napier.w("ScheduledLocationTrackerWorker: Failed to get location within timeout", e)

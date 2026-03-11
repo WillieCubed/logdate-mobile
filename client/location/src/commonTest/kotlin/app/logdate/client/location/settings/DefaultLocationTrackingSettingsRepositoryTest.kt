@@ -1,0 +1,159 @@
+package app.logdate.client.location.settings
+
+import app.logdate.client.datastore.KeyValueStorage
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+class DefaultLocationTrackingSettingsRepositoryTest {
+    @Test
+    fun `getSettings clamps interval and falls back on unknown capture mode`() =
+        runTest {
+            val storage = InMemoryKeyValueStorage()
+            storage.putLong("location_tracking_interval_minutes", 1)
+            storage.putString("location_capture_mode", "NOT_A_REAL_MODE")
+
+            val repository = DefaultLocationTrackingSettingsRepository(storage)
+
+            val settings = repository.getSettings()
+
+            assertEquals(2, settings.minimumPersistIntervalMinutes)
+            assertEquals(LocationCaptureMode.STABLE, settings.captureMode)
+            assertFalse(settings.backgroundTrackingEnabled)
+        }
+
+    @Test
+    fun `updateSettings persists mirrored experiment values`() =
+        runTest {
+            val storage = InMemoryKeyValueStorage()
+            val repository = DefaultLocationTrackingSettingsRepository(storage)
+
+            repository.updateSettings(
+                LocationTrackingSettings(
+                    backgroundTrackingEnabled = true,
+                    minimumPersistIntervalMinutes = 5,
+                    captureMode = LocationCaptureMode.EXPERIMENT_MIRRORED,
+                    serverAssistEnabled = true,
+                    autoTrackForJournalEntries = false,
+                    autoTrackForTimelineReview = false,
+                ),
+            )
+
+            val settings = repository.getSettings()
+
+            assertTrue(settings.backgroundTrackingEnabled)
+            assertEquals(5, settings.minimumPersistIntervalMinutes)
+            assertEquals(LocationCaptureMode.EXPERIMENT_MIRRORED, settings.captureMode)
+            assertTrue(settings.serverAssistEnabled)
+            assertFalse(settings.autoTrackForJournalEntries)
+            assertFalse(settings.autoTrackForTimelineReview)
+        }
+}
+
+private class InMemoryKeyValueStorage : KeyValueStorage {
+    private val values = mutableMapOf<String, Any?>()
+    private val state = MutableStateFlow<Map<String, Any?>>(emptyMap())
+
+    override suspend fun getString(key: String): String? = values[key] as? String
+
+    override fun getStringSync(key: String): String? = values[key] as? String
+
+    override suspend fun putString(
+        key: String,
+        value: String,
+    ) {
+        values[key] = value
+        state.value = values.toMap()
+    }
+
+    override suspend fun getBoolean(
+        key: String,
+        defaultValue: Boolean,
+    ): Boolean = values[key] as? Boolean ?: defaultValue
+
+    override suspend fun putBoolean(
+        key: String,
+        value: Boolean,
+    ) {
+        values[key] = value
+        state.value = values.toMap()
+    }
+
+    override suspend fun getInt(
+        key: String,
+        defaultValue: Int,
+    ): Int = values[key] as? Int ?: defaultValue
+
+    override suspend fun putInt(
+        key: String,
+        value: Int,
+    ) {
+        values[key] = value
+        state.value = values.toMap()
+    }
+
+    override suspend fun getLong(
+        key: String,
+        defaultValue: Long,
+    ): Long = values[key] as? Long ?: defaultValue
+
+    override suspend fun putLong(
+        key: String,
+        value: Long,
+    ) {
+        values[key] = value
+        state.value = values.toMap()
+    }
+
+    override suspend fun getFloat(
+        key: String,
+        defaultValue: Float,
+    ): Float = values[key] as? Float ?: defaultValue
+
+    override suspend fun putFloat(
+        key: String,
+        value: Float,
+    ) {
+        values[key] = value
+        state.value = values.toMap()
+    }
+
+    override suspend fun remove(key: String) {
+        values.remove(key)
+        state.value = values.toMap()
+    }
+
+    override suspend fun contains(key: String): Boolean = values.containsKey(key)
+
+    override suspend fun clear() {
+        values.clear()
+        state.value = emptyMap()
+    }
+
+    override fun observeString(key: String): Flow<String?> = state.map { it[key] as? String }
+
+    override fun observeBoolean(
+        key: String,
+        defaultValue: Boolean,
+    ): Flow<Boolean> = state.map { it[key] as? Boolean ?: defaultValue }
+
+    override fun observeInt(
+        key: String,
+        defaultValue: Int,
+    ): Flow<Int> = state.map { it[key] as? Int ?: defaultValue }
+
+    override fun observeLong(
+        key: String,
+        defaultValue: Long,
+    ): Flow<Long> = state.map { it[key] as? Long ?: defaultValue }
+
+    override fun observeFloat(
+        key: String,
+        defaultValue: Float,
+    ): Flow<Float> = state.map { it[key] as? Float ?: defaultValue }
+}

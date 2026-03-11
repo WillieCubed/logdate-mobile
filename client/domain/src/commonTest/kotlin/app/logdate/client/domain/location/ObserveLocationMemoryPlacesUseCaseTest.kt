@@ -10,8 +10,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -51,6 +54,7 @@ class ObserveLocationMemoryPlacesUseCaseTest {
                 ObserveLocationMemoryPlacesUseCase(
                     notesRepository = repository,
                     clock = fixedClock(now),
+                    timeZone = TimeZone.UTC,
                 ).invoke(LocationMemoryTimeFilter.Last30Days).first()
 
             assertEquals(1, result.size)
@@ -105,6 +109,7 @@ class ObserveLocationMemoryPlacesUseCaseTest {
                 ObserveLocationMemoryPlacesUseCase(
                     notesRepository = repository,
                     clock = fixedClock(now),
+                    timeZone = TimeZone.UTC,
                 ).invoke(LocationMemoryTimeFilter.Last30Days).first()
 
             assertEquals(1, result.size)
@@ -144,6 +149,7 @@ class ObserveLocationMemoryPlacesUseCaseTest {
                 ObserveLocationMemoryPlacesUseCase(
                     notesRepository = repository,
                     clock = fixedClock(now),
+                    timeZone = TimeZone.UTC,
                 ).invoke(LocationMemoryTimeFilter.Last30Days).first()
 
             assertEquals(1, result.size)
@@ -201,10 +207,97 @@ class ObserveLocationMemoryPlacesUseCaseTest {
                 ObserveLocationMemoryPlacesUseCase(
                     notesRepository = repository,
                     clock = fixedClock(now),
+                    timeZone = TimeZone.UTC,
                 ).invoke(LocationMemoryTimeFilter.Last30Days).first()
 
             assertEquals(listOf("Downtown", "Beach"), result.map { it.semanticName })
         }
+
+    @Test
+    fun `custom range supports arbitrary inclusive day windows`() =
+        runTest {
+            val now = Instant.parse("2026-03-10T12:00:00Z")
+            val repository =
+                FakeJournalNotesRepository(
+                    notes =
+                        listOf(
+                            textNote(
+                                createdAt = Instant.parse("2026-03-03T08:00:00Z"),
+                                text = "Early week memory",
+                                location = coordinateLocation(37.77, -122.42),
+                            ),
+                            textNote(
+                                createdAt = Instant.parse("2026-03-05T18:30:00Z"),
+                                text = "Midweek memory",
+                                location = coordinateLocation(37.77, -122.42),
+                            ),
+                            textNote(
+                                createdAt = Instant.parse("2026-03-07T09:15:00Z"),
+                                text = "Weekend memory",
+                                location = coordinateLocation(37.77, -122.42),
+                            ),
+                        ),
+                )
+
+            val result =
+                ObserveLocationMemoryPlacesUseCase(
+                    notesRepository = repository,
+                    clock = fixedClock(now),
+                    timeZone = TimeZone.UTC,
+                ).invoke(
+                    LocationMemoryTimeFilter.Custom(
+                        startInclusive = LocalDate(2026, 3, 4),
+                        endInclusive = LocalDate(2026, 3, 6),
+                    ),
+                ).first()
+
+            assertEquals(1, result.size)
+            assertEquals(listOf("Midweek memory"), result.first().memories.map { it.preview })
+        }
+
+    @Test
+    fun `custom range supports open ended bounds`() =
+        runTest {
+            val now = Instant.parse("2026-03-10T12:00:00Z")
+            val repository =
+                FakeJournalNotesRepository(
+                    notes =
+                        listOf(
+                            textNote(
+                                createdAt = Instant.parse("2026-02-28T23:00:00Z"),
+                                text = "Before window",
+                                location = coordinateLocation(37.77, -122.42),
+                            ),
+                            textNote(
+                                createdAt = Instant.parse("2026-03-05T08:00:00Z"),
+                                text = "Inside window",
+                                location = coordinateLocation(37.77, -122.42),
+                            ),
+                        ),
+                )
+
+            val result =
+                ObserveLocationMemoryPlacesUseCase(
+                    notesRepository = repository,
+                    clock = fixedClock(now),
+                    timeZone = TimeZone.UTC,
+                ).invoke(
+                    LocationMemoryTimeFilter.Custom(startInclusive = LocalDate(2026, 3, 1)),
+                ).first()
+
+            assertEquals(1, result.size)
+            assertEquals(listOf("Inside window"), result.first().memories.map { it.preview })
+        }
+
+    @Test
+    fun `custom range rejects end before start`() {
+        assertFailsWith<IllegalArgumentException> {
+            LocationMemoryTimeFilter.Custom(
+                startInclusive = LocalDate(2026, 3, 10),
+                endInclusive = LocalDate(2026, 3, 9),
+            )
+        }
+    }
 
     private fun textNote(
         createdAt: Instant,
@@ -221,6 +314,17 @@ class ObserveLocationMemoryPlacesUseCaseTest {
         object : Clock {
             override fun now(): Instant = now
         }
+
+    private fun coordinateLocation(
+        latitude: Double,
+        longitude: Double,
+    ) = NoteLocation(
+        coordinates =
+            NoteCoordinates(
+                latitude = latitude,
+                longitude = longitude,
+            ),
+    )
 
     private class FakeJournalNotesRepository(
         notes: List<JournalNote>,

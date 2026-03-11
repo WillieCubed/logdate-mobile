@@ -2,7 +2,7 @@ package app.logdate.client.domain.location
 
 import app.logdate.client.location.ClientLocationProvider
 import app.logdate.client.repository.location.LocationHistoryRepository
-import app.logdate.shared.model.Location
+import app.logdate.client.repository.location.LocationLogRecord
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -40,19 +40,13 @@ class LocationRetryWorker(
      * Schedules a location logging operation for retry with exponential backoff.
      */
     fun scheduleRetry(
-        location: Location,
-        userId: String,
-        deviceId: String,
-        originalTimestamp: Instant,
+        record: LocationLogRecord,
         attemptNumber: Int = 1,
     ) {
         val pendingLog =
             PendingLocationLog(
-                id = generateLogId(userId, deviceId, originalTimestamp),
-                location = location,
-                userId = userId,
-                deviceId = deviceId,
-                originalTimestamp = originalTimestamp,
+                id = generateLogId(record.userId, record.deviceId, record.timestamp),
+                record = record,
                 attemptNumber = attemptNumber,
                 scheduledTime = Clock.System.now(),
             )
@@ -76,13 +70,10 @@ class LocationRetryWorker(
                     // Attempt to log the location directly using repository
                     val result =
                         try {
-                            val location = locationProvider.getCurrentLocation()
                             locationHistoryRepository.logLocation(
-                                location = location,
-                                userId = pendingLog.userId,
-                                deviceId = pendingLog.deviceId,
-                                confidence = 1.0f,
-                                isGenuine = true,
+                                pendingLog.record.copy(
+                                    loggedAt = Clock.System.now(),
+                                ),
                             )
                         } catch (e: Exception) {
                             Result.failure(e)
@@ -172,10 +163,7 @@ class LocationRetryWorker(
  */
 data class PendingLocationLog(
     val id: String,
-    val location: Location,
-    val userId: String,
-    val deviceId: String,
-    val originalTimestamp: Instant,
+    val record: LocationLogRecord,
     val attemptNumber: Int,
     val scheduledTime: Instant,
 )

@@ -3,8 +3,10 @@ package app.logdate.client.domain.location
 import app.logdate.client.location.ClientLocationProvider
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
+import app.logdate.client.repository.location.LocationCaptureSource
 import app.logdate.client.repository.location.LocationHistoryItem
 import app.logdate.client.repository.location.LocationHistoryRepository
+import app.logdate.client.repository.location.LocationLogRecord
 import app.logdate.shared.model.AltitudeUnit
 import app.logdate.shared.model.Location
 import app.logdate.shared.model.LocationAltitude
@@ -54,6 +56,7 @@ class CaptureLocationForTimelineReviewUseCaseTest {
             useCase()
 
             assertEquals(1, repository.loggedLocations)
+            assertEquals(LocationCaptureSource.TIMELINE_REVIEW, repository.lastRecord?.captureSource)
         }
 
     private fun buildLogCurrentLocationUseCase(repository: FakeLocationHistoryRepository): LogCurrentLocationUseCase {
@@ -86,7 +89,7 @@ class CaptureLocationForTimelineReviewUseCaseTest {
         }
 
         override suspend fun setTrackingInterval(intervalMinutes: Long) {
-            settings = settings.copy(trackingIntervalMinutes = intervalMinutes)
+            settings = settings.copy(minimumPersistIntervalMinutes = intervalMinutes)
         }
     }
 
@@ -107,6 +110,7 @@ class CaptureLocationForTimelineReviewUseCaseTest {
 
     private class FakeLocationHistoryRepository : LocationHistoryRepository {
         var loggedLocations: Int = 0
+        var lastRecord: LocationLogRecord? = null
 
         override suspend fun getAllLocationHistory(): List<LocationHistoryItem> = emptyList()
 
@@ -131,6 +135,12 @@ class CaptureLocationForTimelineReviewUseCaseTest {
             isGenuine: Boolean,
         ): Result<Unit> {
             loggedLocations += 1
+            return Result.success(Unit)
+        }
+
+        override suspend fun logLocation(record: LocationLogRecord): Result<Unit> {
+            loggedLocations += 1
+            lastRecord = record
             return Result.success(Unit)
         }
 

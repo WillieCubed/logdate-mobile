@@ -2,6 +2,7 @@ package app.logdate.client.domain.location
 
 import app.logdate.client.repository.location.LocationHistoryItem
 import app.logdate.client.repository.location.LocationHistoryRepository
+import app.logdate.client.repository.location.LocationLogRecord
 import app.logdate.shared.model.AltitudeUnit
 import app.logdate.shared.model.Location
 import app.logdate.shared.model.LocationAltitude
@@ -37,6 +38,8 @@ class ObserveLocationStopsUseCaseTest {
             assertEquals(3, result.first().sampleCount)
             assertEquals(baseTime, result.first().startTime)
             assertEquals(baseTime + 10.minutes, result.first().endTime)
+            assertEquals(LocationStopEvidenceKind.STAY, result.first().evidenceKind)
+            assertEquals(true, result.first().hasReliableDuration)
         }
 
     @Test
@@ -59,6 +62,7 @@ class ObserveLocationStopsUseCaseTest {
             assertEquals(2, result.size)
             assertEquals(baseTime + 45.minutes, result.first().startTime)
             assertEquals(2, result.last().sampleCount)
+            assertEquals(LocationStopEvidenceKind.OBSERVATION, result.first().evidenceKind)
         }
 
     @Test
@@ -80,12 +84,46 @@ class ObserveLocationStopsUseCaseTest {
             assertEquals(2, result.size)
             assertEquals(1, result.first().sampleCount)
             assertEquals(1, result.last().sampleCount)
+            assertEquals(LocationStopEvidenceKind.OBSERVATION, result.first().evidenceKind)
+            assertEquals(false, result.first().hasReliableDuration)
+        }
+
+    @Test
+    fun `invoke excludes timeline review captures from activity stops`() =
+        runTest {
+            val baseTime = Instant.fromEpochMilliseconds(1_000)
+            val repository =
+                FakeLocationHistoryRepository(
+                    listOf(
+                        historyItem(
+                            timestamp = baseTime,
+                            latitude = 37.7749,
+                            longitude = -122.4194,
+                            captureSource = app.logdate.client.repository.location.LocationCaptureSource.TIMELINE_REVIEW,
+                        ),
+                        historyItem(
+                            timestamp = baseTime + 2.minutes,
+                            latitude = 37.7750,
+                            longitude = -122.4195,
+                        ),
+                    ),
+                )
+
+            val useCase = ObserveLocationStopsUseCase(ObserveLocationHistoryUseCase(repository))
+
+            val result = useCase().first()
+
+            assertEquals(1, result.size)
+            assertEquals(1, result.first().sampleCount)
+            assertEquals(LocationStopEvidenceKind.OBSERVATION, result.first().evidenceKind)
         }
 
     private fun historyItem(
         timestamp: Instant,
         latitude: Double,
         longitude: Double,
+        captureSource: app.logdate.client.repository.location.LocationCaptureSource =
+            app.logdate.client.repository.location.LocationCaptureSource.BACKGROUND_PERIODIC,
     ) = LocationHistoryItem(
         userId = "user",
         deviceId = "device",
@@ -98,6 +136,7 @@ class ObserveLocationStopsUseCaseTest {
             ),
         confidence = 1.0f,
         isGenuine = true,
+        captureSource = captureSource,
     )
 
     private class FakeLocationHistoryRepository(
@@ -127,6 +166,8 @@ class ObserveLocationStopsUseCaseTest {
             confidence: Float,
             isGenuine: Boolean,
         ): Result<Unit> = Result.success(Unit)
+
+        override suspend fun logLocation(record: LocationLogRecord): Result<Unit> = Result.success(Unit)
 
         override suspend fun deleteLocationEntry(
             userId: String,

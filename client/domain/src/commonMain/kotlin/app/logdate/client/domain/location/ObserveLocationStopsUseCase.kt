@@ -1,5 +1,6 @@
 package app.logdate.client.domain.location
 
+import app.logdate.client.repository.location.LocationCaptureSource
 import app.logdate.client.repository.location.LocationHistoryItem
 import app.logdate.shared.model.AltitudeUnit
 import app.logdate.shared.model.Location
@@ -19,17 +20,19 @@ import kotlin.time.Duration.Companion.minutes
  */
 class ObserveLocationStopsUseCase(
     private val observeLocationHistoryUseCase: ObserveLocationHistoryUseCase,
-    private val stopRadiusMeters: Double = 100.0,
-    private val maxGapBetweenSamples: Duration = 30.minutes,
+    private val stopRadiusMeters: Double = 75.0,
+    private val maxGapBetweenSamples: Duration = 10.minutes,
 ) {
     operator fun invoke(): Flow<List<LocationStop>> = observeLocationHistoryUseCase().map(::aggregateStops)
 
     internal fun aggregateStops(history: List<LocationHistoryItem>): List<LocationStop> {
-        if (history.isEmpty()) {
+        val activityHistory = history.filter { item -> item.countsTowardActivityStops() }
+
+        if (activityHistory.isEmpty()) {
             return emptyList()
         }
 
-        val sortedHistory = history.sortedBy { it.timestamp }
+        val sortedHistory = activityHistory.sortedBy { it.timestamp }
         val groupedStops = mutableListOf<List<LocationHistoryItem>>()
         var currentGroup = mutableListOf(sortedHistory.first())
 
@@ -65,6 +68,17 @@ class ObserveLocationStopsUseCase(
         val altitude = group.map { it.location.altitude.value }.average()
         val first = group.first()
         val last = group.last()
+        val maxInternalGap =
+            group
+                .zipWithNext { previous, current -> current.timestamp - previous.timestamp }
+                .maxOrNull() ?: Duration.ZERO
+        val hasReliableDuration = group.size >= 2 && maxInternalGap <= maxGapBetweenSamples
+        val evidenceKind =
+            if (hasReliableDuration) {
+                LocationStopEvidenceKind.STAY
+            } else {
+                LocationStopEvidenceKind.OBSERVATION
+            }
 
         return LocationStop(
             id = "${first.userId}:${first.deviceId}:${first.timestamp.toEpochMilliseconds()}:${last.timestamp.toEpochMilliseconds()}",
@@ -77,6 +91,10 @@ class ObserveLocationStopsUseCase(
             startTime = first.timestamp,
             endTime = last.timestamp,
             sampleCount = group.size,
+            maxInternalGap = maxInternalGap,
+            hasReliableDuration = hasReliableDuration,
+            evidenceKind = evidenceKind,
+            primaryPipeline = first.capturePipeline,
         )
     }
 
@@ -96,4 +114,8 @@ class ObserveLocationStopsUseCase(
         val c = 2 * atan2(sqrt(a), sqrt(1 - a))
         return earthRadius * c
     }
+
+    private fun LocationHistoryItem.countsTowardActivityStops(): Boolean =
+        captureSource != LocationCaptureSource.TIMELINE_REVIEW &&
+            captureSource != LocationCaptureSource.JOURNAL_ENTRY
 }

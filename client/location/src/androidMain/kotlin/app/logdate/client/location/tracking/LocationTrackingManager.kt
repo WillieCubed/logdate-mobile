@@ -1,5 +1,7 @@
 package app.logdate.client.location.tracking
 
+import android.content.Context
+import app.logdate.client.location.settings.LocationCaptureMode
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import io.github.aakira.napier.Napier
@@ -14,7 +16,9 @@ import kotlinx.coroutines.launch
  * This handles starting and stopping scheduled location tracking based on user preferences.
  */
 class LocationTrackingManager(
+    private val context: Context,
     private val scheduledLocationTrackingService: ScheduledLocationTrackingService,
+    private val optimizedBackgroundLocationRegistrar: OptimizedBackgroundLocationRegistrar,
     private val locationTrackingSettingsRepository: LocationTrackingSettingsRepository,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -40,13 +44,24 @@ class LocationTrackingManager(
     private fun applyTrackingSettings(settings: LocationTrackingSettings) {
         Napier.i("Applying location tracking settings: $settings")
 
-        if (settings.backgroundTrackingEnabled) {
-            scheduledLocationTrackingService.startScheduledTracking(
-                intervalMinutes = settings.trackingIntervalMinutes,
-                replaceExisting = true,
-            )
-        } else {
+        if (!settings.backgroundTrackingEnabled) {
             scheduledLocationTrackingService.stopScheduledTracking()
+            optimizedBackgroundLocationRegistrar.stop()
+            context.stopDetailedLocationTrackingService()
+            return
+        }
+
+        scheduledLocationTrackingService.startScheduledTracking(
+            intervalMinutes = settings.minimumPersistIntervalMinutes,
+            replaceExisting = true,
+        )
+
+        if (settings.captureMode == LocationCaptureMode.EXPERIMENT_MIRRORED) {
+            optimizedBackgroundLocationRegistrar.start(settings.minimumPersistIntervalMinutes)
+            context.startDetailedLocationTrackingService()
+        } else {
+            optimizedBackgroundLocationRegistrar.stop()
+            context.stopDetailedLocationTrackingService()
         }
     }
 
@@ -55,13 +70,7 @@ class LocationTrackingManager(
      */
     fun startTracking() {
         scope.launch {
-            val settings = locationTrackingSettingsRepository.getSettings()
-            if (settings.backgroundTrackingEnabled) {
-                scheduledLocationTrackingService.startScheduledTracking(
-                    intervalMinutes = settings.trackingIntervalMinutes,
-                    replaceExisting = false,
-                )
-            }
+            applyTrackingSettings(locationTrackingSettingsRepository.getSettings())
         }
     }
 
@@ -69,11 +78,8 @@ class LocationTrackingManager(
      * Explicitly stop location tracking (usually called when the app is being destroyed).
      */
     fun stopTracking() {
-        scope.launch {
-            val settings = locationTrackingSettingsRepository.getSettings()
-            if (!settings.backgroundTrackingEnabled) {
-                scheduledLocationTrackingService.stopScheduledTracking()
-            }
-        }
+        scheduledLocationTrackingService.stopScheduledTracking()
+        optimizedBackgroundLocationRegistrar.stop()
+        context.stopDetailedLocationTrackingService()
     }
 }

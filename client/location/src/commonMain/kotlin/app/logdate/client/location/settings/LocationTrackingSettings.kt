@@ -12,10 +12,17 @@ data class LocationTrackingSettings(
      */
     val backgroundTrackingEnabled: Boolean = false,
     /**
-     * Interval between location updates in minutes.
-     * Minimum value is 15 minutes due to Android WorkManager constraints.
+     * Minimum interval between persisted activity samples in minutes.
      */
-    val trackingIntervalMinutes: Long = 30,
+    val minimumPersistIntervalMinutes: Long = 30,
+    /**
+     * Capture mode for background activity experiments.
+     */
+    val captureMode: LocationCaptureMode = LocationCaptureMode.STABLE,
+    /**
+     * Whether optional server nudges are enabled for the optimized background path.
+     */
+    val serverAssistEnabled: Boolean = false,
     /**
      * Whether to automatically track location when creating journal entries.
      */
@@ -24,4 +31,16 @@ data class LocationTrackingSettings(
      * Whether to automatically track location when reviewing the timeline.
      */
     val autoTrackForTimelineReview: Boolean = true,
-)
+) {
+    /**
+     * Compatibility alias for older callers that still read the pre-experiment name.
+     */
+    val trackingIntervalMinutes: Long
+        get() = minimumPersistIntervalMinutes
+}
+
+@Serializable
+enum class LocationCaptureMode {
+    STABLE,
+    EXPERIMENT_MIRRORED,
+}

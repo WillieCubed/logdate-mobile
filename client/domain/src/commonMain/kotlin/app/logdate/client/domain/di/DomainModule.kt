@@ -41,6 +41,7 @@ import app.logdate.client.domain.timeline.GetMediaUrisUseCase
 import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
 import app.logdate.client.domain.timeline.GetTimelineBannerUseCase
 import app.logdate.client.domain.timeline.GetTimelineDayUseCase
+import app.logdate.client.domain.timeline.GetTimelinePageUseCase
 import app.logdate.client.domain.timeline.GetTimelineUseCase
 import app.logdate.client.domain.timeline.SummarizeJournalEntriesUseCase
 import app.logdate.client.repository.media.IndexedMediaRepository
@@ -114,6 +115,7 @@ val domainModule: Module =
         factory { GetMediaUrisUseCase(get()) }
         factory { GetTimelineUseCase(get(), get()) }
         factory { GetStreamingTimelineUseCase(get(), get()) }
+        factory { GetTimelinePageUseCase(get()) }
         factory { GetTimelineDayUseCase(get(), get(), get()) }
         factory { GetTimelineBannerUseCase(get(), get()) }
         factory { SummarizeJournalEntriesUseCase(get()) }

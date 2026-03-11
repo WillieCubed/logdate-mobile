@@ -306,7 +306,7 @@ class SaveEntryUseCaseTest {
         }
 
         override suspend fun setTrackingInterval(intervalMinutes: Long) {
-            settings = settings.copy(trackingIntervalMinutes = intervalMinutes)
+            settings = settings.copy(minimumPersistIntervalMinutes = intervalMinutes)
         }
     }
 

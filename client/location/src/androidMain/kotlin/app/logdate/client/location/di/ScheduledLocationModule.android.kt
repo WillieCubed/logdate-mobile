@@ -1,6 +1,7 @@
 package app.logdate.client.location.di
 
 import app.logdate.client.location.tracking.LocationTrackingManager
+import app.logdate.client.location.tracking.OptimizedBackgroundLocationRegistrar
 import app.logdate.client.location.tracking.ScheduledLocationTrackerWorker
 import app.logdate.client.location.tracking.ScheduledLocationTrackingService
 import org.koin.android.ext.koin.androidContext
@@ -14,5 +15,6 @@ val scheduledLocationModule =
     module {
         workerOf(::ScheduledLocationTrackerWorker)
         single { ScheduledLocationTrackingService(androidContext()) }
-        single { LocationTrackingManager(get(), get()) }
+        single { OptimizedBackgroundLocationRegistrar(androidContext()) }
+        single { LocationTrackingManager(androidContext(), get(), get(), get()) }
     }

@@ -7,6 +7,7 @@ import app.logdate.client.media.MediaManager
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.location.LocationCaptureSource
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -71,7 +72,11 @@ class AddNoteUseCase(
                             try {
                                 logLocationUseCase() // For activity timeline
                                 // For location history with automatic retry
-                                logCurrentLocationUseCase(LogCurrentLocationUseCase.LocationLogRequest.LogLocation())
+                                logCurrentLocationUseCase(
+                                    LogCurrentLocationUseCase.LocationLogRequest.LogLocation(
+                                        captureSource = LocationCaptureSource.JOURNAL_ENTRY,
+                                    ),
+                                )
                             } catch (e: Exception) {
                                 // Location logging shouldn't fail note creation
                                 // LogCurrentLocationUseCase handles retries automatically

@@ -3,6 +3,7 @@ package app.logdate.client.repository.location
 import app.logdate.shared.model.Location
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /**
  * Repository for managing location history and logging.
@@ -53,6 +54,18 @@ interface LocationHistoryRepository {
     ): Result<Unit>
 
     /**
+     * Logs a rich location sample with capture metadata.
+     */
+    suspend fun logLocation(record: LocationLogRecord): Result<Unit> =
+        logLocation(
+            location = record.location,
+            userId = record.userId,
+            deviceId = record.deviceId,
+            confidence = record.confidence,
+            isGenuine = record.isGenuine,
+        )
+
+    /**
      * Deletes a specific location entry.
      */
     suspend fun deleteLocationEntry(
@@ -75,14 +88,58 @@ interface LocationHistoryRepository {
     suspend fun getLocationCount(): Int
 }
 
+enum class LocationCapturePipeline {
+    LEGACY,
+    OPTIMIZED_BACKGROUND,
+    HIGH_DETAIL,
+}
+
+enum class LocationCaptureSource {
+    BACKGROUND_PERIODIC,
+    PASSIVE_UPDATE,
+    ACTIVITY_TRANSITION,
+    GEOFENCE_TRANSITION,
+    SERVER_NUDGE,
+    FOREGROUND_STREAM,
+    JOURNAL_ENTRY,
+    TIMELINE_REVIEW,
+    MANUAL,
+    RETRY,
+}
+
+data class LocationLogRecord(
+    val sampleId: String = Uuid.random().toString(),
+    val userId: String,
+    val deviceId: String,
+    val timestamp: Instant,
+    val loggedAt: Instant,
+    val location: Location,
+    val confidence: Float,
+    val isGenuine: Boolean,
+    val capturePipeline: LocationCapturePipeline = LocationCapturePipeline.LEGACY,
+    val captureSource: LocationCaptureSource = LocationCaptureSource.BACKGROUND_PERIODIC,
+    val accuracyMeters: Float? = null,
+    val speedMetersPerSecond: Float? = null,
+    val bearingDegrees: Float? = null,
+    val isMock: Boolean = false,
+)
+
 /**
  * Domain model for location history item.
  */
 data class LocationHistoryItem(
+    val sampleId: String = Uuid.random().toString(),
     val userId: String,
     val deviceId: String,
     val timestamp: Instant,
+    val loggedAt: Instant = timestamp,
     val location: Location,
     val confidence: Float,
     val isGenuine: Boolean,
+    val capturePipeline: LocationCapturePipeline = LocationCapturePipeline.LEGACY,
+    val captureSource: LocationCaptureSource = LocationCaptureSource.BACKGROUND_PERIODIC,
+    val accuracyMeters: Float? = null,
+    val speedMetersPerSecond: Float? = null,
+    val bearingDegrees: Float? = null,
+    val isMock: Boolean = false,
 )
