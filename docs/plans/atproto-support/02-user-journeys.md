@@ -8,7 +8,7 @@ These journeys describe the current target architecture and the shipped AT Proto
 - Hostname-level `did:web` remains supported for dedicated or custom-domain deployments.
 - The first-party LogDate app keeps its existing bearer-JWT auth path.
 - Third-party AT Protocol clients use OAuth 2.0 with DPoP.
-- The current repo-backed XRPC write path is a compatibility adapter over LogDate content records, not the final MST/CAR repo implementation.
+- The current repo-backed XRPC write path persists through the canonical MST/CAR repo engine behind LogDate-owned repository interfaces.
 
 ## Journey 1: Hosted User Signs Up and Receives a Portable Identity
 

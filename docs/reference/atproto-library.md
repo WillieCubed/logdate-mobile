@@ -134,9 +134,9 @@ Run it after publishing the ATProto modules locally:
 
 ## Not Yet Complete
 
-- Full CAR/MST interoperability with external AT Protocol implementations
 - Lexicon code generation for the full protocol surface
 - A durable standalone PDS deployment story outside this repository's `server` module
-- Durable repo block-store persistence instead of the current sync-backed hydration adapter
 
-Until those pieces land, treat the current library as a strong standalone core rather than a full end-to-end AT Protocol SDK.
+The current library is a strong standalone core for syntax, identity, repo, PDS contracts/runtime,
+and hosted-PDS server consumption. The remaining work is broader protocol surface and packaging,
+not the core repo/CAR/MST implementation.
