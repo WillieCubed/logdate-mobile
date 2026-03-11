@@ -53,7 +53,14 @@ fun JournalCoverFlowCarousel(
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val cardMinWidth = 132.dp
         val cardMaxWidth = 208.dp
-        val maxCardScale = 1.15f
+        val heightScaleFactor =
+            if (maxCardHeight != Dp.Unspecified) {
+                (maxCardHeight.value / 420f).coerceIn(0f, 1f)
+            } else {
+                1f
+            }
+        val maxCardScale = 1.04f + (0.11f * heightScaleFactor)
+        val minCardScale = 0.88f + (0.04f * (1f - heightScaleFactor))
 
         val widthFromViewport = (maxWidth * 0.52f).coerceIn(cardMinWidth, cardMaxWidth)
         val widthFromHeight =
@@ -81,7 +88,7 @@ fun JournalCoverFlowCarousel(
                     val normalizedDistance = (abs(itemCenter - viewportCenter) / viewportHalfWidth).coerceIn(0f, 1f)
                     val proximity = 1f - normalizedDistance
                     val easedProximity = proximity * proximity
-                    val scale = 0.88f + (maxCardScale - 0.88f) * easedProximity
+                    val scale = minCardScale + (maxCardScale - minCardScale) * easedProximity
 
                     itemInfo.index to scale
                 }
@@ -92,7 +99,7 @@ fun JournalCoverFlowCarousel(
             state = listState,
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md, Alignment.CenterHorizontally),
             contentPadding =
                 PaddingValues(
                     horizontal = horizontalContentPadding,
@@ -100,7 +107,7 @@ fun JournalCoverFlowCarousel(
                 ),
         ) {
             itemsIndexed(journals) { index, item ->
-                val targetScale = scaleByIndex[index] ?: 0.88f
+                val targetScale = scaleByIndex[index] ?: minCardScale
 
                 val scale by animateFloatAsState(
                     targetValue = targetScale,
