@@ -1,6 +1,7 @@
 package app.logdate.client.location.places
 
 import android.content.Context
+import android.content.pm.PackageManager
 import app.logdate.client.location.BuildConfig
 import app.logdate.shared.model.Location
 import com.google.android.gms.maps.model.LatLng
@@ -17,10 +18,11 @@ class GooglePlacesExternalPlacesProvider(
     private val apiKey: String = BuildConfig.GOOGLE_MAPS_API_KEY,
 ) : ExternalPlacesProvider {
     private var hasLoggedMissingApiKey = false
+    private val resolvedApiKey: String by lazy(::resolveApiKey)
     private val placesClient: PlacesClient? by lazy(::createPlacesClientOrNull)
 
     override suspend fun searchNearbyPlaces(location: Location): List<PlaceSuggestion> {
-        if (apiKey.isBlank()) {
+        if (resolvedApiKey.isBlank()) {
             logMissingApiKeyOnce()
             return emptyList()
         }
@@ -69,14 +71,14 @@ class GooglePlacesExternalPlacesProvider(
     }
 
     private fun createPlacesClientOrNull(): PlacesClient? {
-        if (apiKey.isBlank()) {
+        if (resolvedApiKey.isBlank()) {
             logMissingApiKeyOnce()
             return null
         }
 
         return runCatching {
             if (!Places.isInitialized()) {
-                Places.initializeWithNewPlacesApiEnabled(context.applicationContext, apiKey)
+                Places.initializeWithNewPlacesApiEnabled(context.applicationContext, resolvedApiKey)
             }
             Places.createClient(context.applicationContext)
         }.onFailure { error ->
@@ -84,10 +86,47 @@ class GooglePlacesExternalPlacesProvider(
         }.getOrNull()
     }
 
+    private fun resolveApiKey(): String =
+        selectResolvedGoogleMapsApiKey(
+            explicitApiKey = apiKey,
+            manifestApiKey = context.readGoogleMapsManifestApiKey(),
+            googleServicesApiKey = context.readGoogleServicesApiKey(),
+        )
+
     private fun logMissingApiKeyOnce() {
         if (!hasLoggedMissingApiKey) {
-            Napier.w("GOOGLE_MAPS_API_KEY is not configured; semantic external place lookup is disabled.")
+            Napier.w("No Google Maps/Places API key is available; semantic external place lookup is disabled.")
             hasLoggedMissingApiKey = true
         }
     }
 }
+
+private fun Context.readGoogleServicesApiKey(): String = readStringResource("google_api_key")
+
+private fun Context.readGoogleMapsManifestApiKey(): String? =
+    runCatching {
+        val metaData =
+            packageManager
+                .getApplicationInfo(packageName, PackageManager.GET_META_DATA)
+                .metaData
+
+        val resourceId = metaData?.getInt("com.google.android.geo.API_KEY") ?: 0
+        when {
+            resourceId != 0 -> readStringResource(resourceId).ifBlank { null }
+            else -> metaData?.getString("com.google.android.geo.API_KEY")?.ifBlank { null }
+        }
+    }.getOrNull()
+
+private fun Context.readStringResource(name: String): String {
+    val resourceId = resources.getIdentifier(name, "string", packageName)
+    return readStringResource(resourceId)
+}
+
+private fun Context.readStringResource(resourceId: Int): String =
+    if (resourceId == 0) {
+        ""
+    } else {
+        runCatching {
+            getString(resourceId)
+        }.getOrDefault("")
+    }

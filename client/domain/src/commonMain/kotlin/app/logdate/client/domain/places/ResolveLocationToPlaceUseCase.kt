@@ -4,6 +4,7 @@ import app.logdate.client.location.places.ExternalPlacesProvider
 import app.logdate.client.repository.places.UserPlacesRepository
 import app.logdate.shared.model.Location
 import app.logdate.shared.model.Place
+import io.github.aakira.napier.Napier
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -23,7 +24,12 @@ class ResolveLocationToPlaceUseCase(
 ) {
     suspend operator fun invoke(location: Location): PlaceResolutionResult {
         // First, check user-defined places
-        val userPlace = findMatchingUserPlace(location)
+        val userPlace =
+            runCatching {
+                findMatchingUserPlace(location)
+            }.onFailure { error ->
+                Napier.w("Failed to resolve nearby user place", error)
+            }.getOrNull()
         if (userPlace != null) {
             return PlaceResolutionResult.UserDefinedPlace(userPlace)
         }
@@ -33,6 +39,7 @@ class ResolveLocationToPlaceUseCase(
             try {
                 externalPlacesProvider.searchNearbyPlaces(location)
             } catch (e: Exception) {
+                Napier.w("Failed to resolve nearby external place", e)
                 emptyList()
             }
 

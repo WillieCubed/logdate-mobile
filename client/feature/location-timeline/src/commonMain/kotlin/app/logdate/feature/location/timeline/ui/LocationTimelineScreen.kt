@@ -2,6 +2,9 @@
 
 package app.logdate.feature.location.timeline.ui
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -18,7 +21,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
@@ -40,12 +45,14 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -245,6 +252,7 @@ private fun SuccessState(
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val useTwoPane = maxWidth >= 840.dp
+        val stopsListState = rememberLazyListState()
 
         if (useTwoPane) {
             Row(modifier = Modifier.fillMaxSize()) {
@@ -265,6 +273,7 @@ private fun SuccessState(
                     selectedStopId = uiState.selectedStop?.id,
                     onSelectStop = onSelectStop,
                     onDeleteStop = onDeleteStop,
+                    listState = stopsListState,
                     modifier =
                         Modifier
                             .widthIn(min = 320.dp, max = 420.dp)
@@ -272,6 +281,32 @@ private fun SuccessState(
                 )
             }
         } else {
+            val expandedMapHeight = 320.dp
+            val collapsedMapHeight = 148.dp
+            val collapseRange = expandedMapHeight - collapsedMapHeight
+            val collapseRangePx = with(LocalDensity.current) { collapseRange.toPx() }
+            val mapHeightTarget by remember(stopsListState, collapseRange, collapseRangePx) {
+                derivedStateOf {
+                    val collapseFraction =
+                        when {
+                            stopsListState.firstVisibleItemIndex > 0 -> 1f
+                            collapseRangePx <= 0f -> 0f
+                            else -> (stopsListState.firstVisibleItemScrollOffset / collapseRangePx).coerceIn(0f, 1f)
+                        }
+
+                    expandedMapHeight - (collapseRange * collapseFraction)
+                }
+            }
+            val animatedMapHeight by animateDpAsState(
+                targetValue = mapHeightTarget,
+                animationSpec =
+                    spring(
+                        dampingRatio = 0.92f,
+                        stiffness = Spring.StiffnessMediumLow,
+                    ),
+                label = "LocationTimelineMapHeight",
+            )
+
             Column(modifier = Modifier.fillMaxSize()) {
                 locationTimelineMap(
                     stops = uiState.stops,
@@ -281,7 +316,7 @@ private fun SuccessState(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .height(320.dp)
+                            .height(animatedMapHeight)
                             .padding(16.dp),
                 )
                 HorizontalDivider()
@@ -290,6 +325,7 @@ private fun SuccessState(
                     selectedStopId = uiState.selectedStop?.id,
                     onSelectStop = onSelectStop,
                     onDeleteStop = onDeleteStop,
+                    listState = stopsListState,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -303,10 +339,12 @@ private fun StopsList(
     selectedStopId: String?,
     onSelectStop: (String) -> Unit,
     onDeleteStop: (String) -> Unit,
+    listState: LazyListState,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {

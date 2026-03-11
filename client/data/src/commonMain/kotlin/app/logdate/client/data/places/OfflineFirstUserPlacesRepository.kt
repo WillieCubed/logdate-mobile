@@ -7,6 +7,11 @@ import app.logdate.shared.model.Place
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlin.math.PI
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -24,7 +29,35 @@ class OfflineFirstUserPlacesRepository(
         latitude: Double,
         longitude: Double,
         radiusMeters: Double,
-    ): List<Place> = userPlaceDao.getPlacesNear(latitude, longitude, radiusMeters).map { place -> place.toModel() }
+    ): List<Place> {
+        val latitudeDelta = radiusMeters / METERS_PER_DEGREE_LATITUDE
+        val longitudeScale = cos(latitude * PI / 180.0).let { scale -> if (scale == 0.0) 0.000001 else scale }
+        val longitudeDelta = radiusMeters / (METERS_PER_DEGREE_LATITUDE * longitudeScale)
+
+        return userPlaceDao
+            .getPlacesInBoundingBox(
+                minLatitude = latitude - latitudeDelta,
+                maxLatitude = latitude + latitudeDelta,
+                minLongitude = longitude - longitudeDelta,
+                maxLongitude = longitude + longitudeDelta,
+            ).map { place ->
+                place.toModel()
+            }.filter { place ->
+                calculateDistanceMeters(
+                    lat1 = latitude,
+                    lon1 = longitude,
+                    lat2 = place.latitude,
+                    lon2 = place.longitude,
+                ) <= radiusMeters
+            }.sortedBy { place ->
+                calculateDistanceMeters(
+                    lat1 = latitude,
+                    lon1 = longitude,
+                    lat2 = place.latitude,
+                    lon2 = place.longitude,
+                )
+            }
+    }
 
     override suspend fun getPlaceById(placeId: String): Place? = userPlaceDao.getPlaceById(placeId)?.toModel()
 
@@ -83,4 +116,25 @@ class OfflineFirstUserPlacesRepository(
     private fun Place.asUserDefinedPlace(): Place.UserDefined =
         this as? Place.UserDefined
             ?: error("UserPlacesRepository only supports Place.UserDefined instances")
+
+    private fun calculateDistanceMeters(
+        lat1: Double,
+        lon1: Double,
+        lat2: Double,
+        lon2: Double,
+    ): Double {
+        val earthRadius = 6371000.0
+        val dLat = (lat2 - lat1) * PI / 180
+        val dLon = (lon2 - lon1) * PI / 180
+        val a =
+            sin(dLat / 2) * sin(dLat / 2) +
+                cos(lat1 * PI / 180) * cos(lat2 * PI / 180) *
+                sin(dLon / 2) * sin(dLon / 2)
+        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+        return earthRadius * c
+    }
+
+    private companion object {
+        const val METERS_PER_DEGREE_LATITUDE = 111_320.0
+    }
 }

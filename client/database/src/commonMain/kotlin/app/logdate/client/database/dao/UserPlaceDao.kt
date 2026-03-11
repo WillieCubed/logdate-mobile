@@ -22,27 +22,17 @@ interface UserPlaceDao {
 
     @Query(
         """
-        SELECT * FROM user_places 
-        WHERE (
-            6371000 * acos(
-                cos(radians(:latitude)) * cos(radians(latitude)) * 
-                cos(radians(longitude) - radians(:longitude)) + 
-                sin(radians(:latitude)) * sin(radians(latitude))
-            )
-        ) <= :radiusMeters
-        ORDER BY (
-            6371000 * acos(
-                cos(radians(:latitude)) * cos(radians(latitude)) * 
-                cos(radians(longitude) - radians(:longitude)) + 
-                sin(radians(:latitude)) * sin(radians(latitude))
-            )
-        ) ASC
+        SELECT * FROM user_places
+        WHERE latitude BETWEEN :minLatitude AND :maxLatitude
+        AND longitude BETWEEN :minLongitude AND :maxLongitude
+        ORDER BY name ASC
     """,
     )
-    suspend fun getPlacesNear(
-        latitude: Double,
-        longitude: Double,
-        radiusMeters: Double,
+    suspend fun getPlacesInBoundingBox(
+        minLatitude: Double,
+        maxLatitude: Double,
+        minLongitude: Double,
+        maxLongitude: Double,
     ): List<UserPlaceEntity>
 
     @Query("SELECT * FROM user_places WHERE name LIKE '%' || :query || '%' ORDER BY name ASC")
