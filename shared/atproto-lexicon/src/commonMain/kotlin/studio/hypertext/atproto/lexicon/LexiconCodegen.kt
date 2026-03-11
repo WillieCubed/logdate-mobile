@@ -78,11 +78,15 @@ public object LexiconCodegen {
         return buildString {
             appendLine("package $packageName")
             appendLine()
-            appendLine("import kotlinx.serialization.Serializable")
+            if (generatedClasses.isNotEmpty()) {
+                appendLine("import kotlinx.serialization.Serializable")
+            }
             if (needsJsonElement) {
                 appendLine("import kotlinx.serialization.json.JsonElement")
             }
-            appendLine()
+            if (generatedClasses.isNotEmpty() || needsJsonElement) {
+                appendLine()
+            }
             appendLine("public object ${documentClassName}Lexicon {")
             appendLine("    public const val ID: String = \"${document.id}\"")
             appendLine("}")

@@ -11,17 +11,22 @@ import studio.hypertext.atproto.pds.CreateRecordRequest
 import studio.hypertext.atproto.pds.DeleteRecordRequest
 import studio.hypertext.atproto.pds.DescribeServerResponse
 import studio.hypertext.atproto.pds.GetBlobRequest
+import studio.hypertext.atproto.pds.GetLatestCommitRequest
 import studio.hypertext.atproto.pds.GetRecordRequest
+import studio.hypertext.atproto.pds.GetRepoRequest
+import studio.hypertext.atproto.pds.GetRepoStatusRequest
 import studio.hypertext.atproto.pds.ListRecordsRequest
 import studio.hypertext.atproto.pds.ProtectedResourceMetadata
 import studio.hypertext.atproto.pds.PutRecordRequest
 import studio.hypertext.atproto.pds.UploadBlobRequest
+import studio.hypertext.atproto.repo.CarCodec
 import studio.hypertext.atproto.repo.Cid
 import studio.hypertext.atproto.repo.DefaultRepoEngine
 import studio.hypertext.atproto.repo.InMemoryRepoBlockStore
 import studio.hypertext.atproto.repo.RepoRecordId
 import studio.hypertext.atproto.syntax.Nsid
 import studio.hypertext.atproto.syntax.RecordKey
+import studio.hypertext.atproto.syntax.Tid
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -47,9 +52,12 @@ class PdsRuntimeTest {
                 response_types_supported = listOf("code"),
                 grant_types_supported = listOf("authorization_code"),
                 code_challenge_methods_supported = listOf("S256"),
-                token_endpoint_auth_methods_supported = listOf("none"),
+                token_endpoint_auth_methods_supported = listOf("none", "private_key_jwt"),
+                token_endpoint_auth_signing_alg_values_supported = listOf("ES256"),
                 dpop_signing_alg_values_supported = listOf("ES256"),
                 scopes_supported = listOf("atproto"),
+                authorization_response_iss_parameter_supported = true,
+                require_pushed_authorization_requests = true,
                 client_id_metadata_document_supported = true,
             )
         val protected = ProtectedResourceMetadata(resource = "https://logdate.app", authorization_servers = listOf("https://logdate.app"))
@@ -194,5 +202,57 @@ class PdsRuntimeTest {
             assertEquals(blobRef, uploaded.blob)
             assertEquals("image/jpeg", downloaded?.contentType)
             assertContentEquals(byteArrayOf(1, 2, 3), downloaded?.bytes)
+        }
+
+    @Test
+    fun `default sync service exports repo bytes and reports latest commit state`() =
+        kotlinx.coroutines.test.runTest {
+            val repoStore = DefaultRepoEngine(InMemoryRepoBlockStore())
+            val syncService = DefaultPdsSyncService(repoStore)
+            val record =
+                buildJsonObject {
+                    put("\$type", collection.toString())
+                    put("content", "hello")
+                }
+
+            val firstWrite =
+                repoStore
+                    .createRecord(
+                        repo = repo,
+                        collection = collection,
+                        value = record,
+                        recordKey = recordKey,
+                    ).getOrThrow()
+            val firstHead = requireNotNull(repoStore.loadHead(repo).getOrThrow())
+            repoStore
+                .putRecord(
+                    recordId =
+                        RepoRecordId(
+                            repo = repo,
+                            collection = collection,
+                            recordKey = RecordKey.require("entry-2"),
+                        ),
+                    value =
+                        buildJsonObject {
+                            put("\$type", collection.toString())
+                            put("content", "second")
+                        },
+                ).getOrThrow()
+
+            val export = syncService.getRepo(GetRepoRequest(did = repo, since = Tid.fromLong(firstHead.revision))).getOrThrow()
+            val latestCommit = syncService.getLatestCommit(GetLatestCommitRequest(did = repo)).getOrThrow()
+            val repoStatus = syncService.getRepoStatus(GetRepoStatusRequest(did = repo)).getOrThrow()
+            val exportRepo = CarCodec.read(requireNotNull(export).bytes)
+
+            assertEquals(DefaultPdsSyncService.CAR_CONTENT_TYPE, export.contentType)
+            assertEquals(repo, exportRepo.repo)
+            assertEquals(listOf(2L), exportRepo.commits.map { it.commit.revision })
+            assertTrue(exportRepo.blocks.none { block -> block.cid.toString() == firstWrite.cid })
+            assertNotNull(latestCommit)
+            assertEquals(2L, latestCommit.rev.toLong())
+            assertNotNull(repoStatus)
+            assertTrue(repoStatus.active)
+            assertEquals(repo, repoStatus.did)
+            assertEquals(2L, repoStatus.rev?.toLong())
         }
 }

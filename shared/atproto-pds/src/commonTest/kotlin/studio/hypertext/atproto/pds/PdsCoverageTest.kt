@@ -10,6 +10,7 @@ import studio.hypertext.atproto.repo.RepoRecord
 import studio.hypertext.atproto.syntax.AtUri
 import studio.hypertext.atproto.syntax.Nsid
 import studio.hypertext.atproto.syntax.RecordKey
+import studio.hypertext.atproto.syntax.Tid
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -45,9 +46,12 @@ class PdsCoverageTest {
                 response_types_supported = listOf("code"),
                 grant_types_supported = listOf("authorization_code", "refresh_token"),
                 code_challenge_methods_supported = listOf("S256"),
-                token_endpoint_auth_methods_supported = listOf("none"),
+                token_endpoint_auth_methods_supported = listOf("none", "private_key_jwt"),
+                token_endpoint_auth_signing_alg_values_supported = listOf("ES256"),
                 dpop_signing_alg_values_supported = listOf("ES256"),
                 scopes_supported = listOf("atproto"),
+                authorization_response_iss_parameter_supported = true,
+                require_pushed_authorization_requests = true,
                 client_id_metadata_document_supported = true,
             )
         val protectedResourceMetadata =
@@ -442,5 +446,127 @@ class PdsCoverageTest {
         assertTrue(encodedCreateRecord.contains("\"record\":{\"text\":\"hello\"}"))
         assertTrue(encodedCreateRecord.contains("\"rkey\":null"))
         assertTrue(encodedCreateRecord.contains("\"validate\":null"))
+    }
+
+    @Test
+    fun `session and sync models preserve standard wire fields`() {
+        val createAccountRequest =
+            CreateAccountRequest(
+                email = "alice@example.com",
+                handle = "alice.logdate.app",
+                password = "pass123",
+                recoveryKey = "did:key:zAliceRecovery",
+            )
+        val createSessionRequest =
+            CreateSessionRequest(
+                identifier = "alice@example.com",
+                password = "pass123",
+                allowTakendown = false,
+            )
+        val sessionInfo =
+            SessionInfoResponse(
+                handle = "alice.logdate.app",
+                did = repoDid,
+                didDoc = didDocument,
+                email = "alice@example.com",
+                emailConfirmed = true,
+                active = true,
+            )
+        val sessionResponse =
+            SessionResponse(
+                accessJwt = "access-jwt",
+                refreshJwt = "refresh-jwt",
+                handle = "alice.logdate.app",
+                did = repoDid,
+                didDoc = didDocument,
+                email = "alice@example.com",
+                emailConfirmed = true,
+                active = true,
+            )
+        val repoRequest = GetRepoRequest(did = repoDid, since = Tid.fromLong(5L))
+        val latestCommitRequest = GetLatestCommitRequest(did = repoDid)
+        val latestCommitResponse =
+            GetLatestCommitResponse(
+                cid =
+                    studio.hypertext.atproto.repo.Cid
+                        .require("bafyreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"),
+                rev = Tid.fromLong(7L),
+            )
+        val repoStatusRequest = GetRepoStatusRequest(did = repoDid)
+        val repoStatusResponse =
+            GetRepoStatusResponse(
+                did = repoDid,
+                active = true,
+                rev = Tid.fromLong(7L),
+            )
+
+        assertEquals(
+            createAccountRequest,
+            json.decodeFromString(
+                CreateAccountRequest.serializer(),
+                json.encodeToString(CreateAccountRequest.serializer(), createAccountRequest),
+            ),
+        )
+        assertEquals(
+            createSessionRequest,
+            json.decodeFromString(
+                CreateSessionRequest.serializer(),
+                json.encodeToString(CreateSessionRequest.serializer(), createSessionRequest),
+            ),
+        )
+        assertEquals(
+            sessionInfo,
+            json.decodeFromString(
+                SessionInfoResponse.serializer(),
+                json.encodeToString(SessionInfoResponse.serializer(), sessionInfo),
+            ),
+        )
+        assertEquals(
+            sessionResponse,
+            json.decodeFromString(
+                SessionResponse.serializer(),
+                json.encodeToString(SessionResponse.serializer(), sessionResponse),
+            ),
+        )
+        assertEquals(
+            repoRequest,
+            json.decodeFromString(
+                GetRepoRequest.serializer(),
+                json.encodeToString(GetRepoRequest.serializer(), repoRequest),
+            ),
+        )
+        assertEquals(
+            latestCommitRequest,
+            json.decodeFromString(
+                GetLatestCommitRequest.serializer(),
+                json.encodeToString(GetLatestCommitRequest.serializer(), latestCommitRequest),
+            ),
+        )
+        assertEquals(
+            latestCommitResponse,
+            json.decodeFromString(
+                GetLatestCommitResponse.serializer(),
+                json.encodeToString(GetLatestCommitResponse.serializer(), latestCommitResponse),
+            ),
+        )
+        assertEquals(
+            repoStatusRequest,
+            json.decodeFromString(
+                GetRepoStatusRequest.serializer(),
+                json.encodeToString(GetRepoStatusRequest.serializer(), repoStatusRequest),
+            ),
+        )
+        assertEquals(
+            repoStatusResponse,
+            json.decodeFromString(
+                GetRepoStatusResponse.serializer(),
+                json.encodeToString(GetRepoStatusResponse.serializer(), repoStatusResponse),
+            ),
+        )
+        assertEquals("alice.logdate.app", sessionInfo.handle)
+        assertEquals("refresh-jwt", sessionResponse.refreshJwt)
+        assertEquals(5L, repoRequest.since?.toLong())
+        assertEquals(7L, latestCommitResponse.rev.toLong())
+        assertEquals(true, repoStatusResponse.active)
     }
 }

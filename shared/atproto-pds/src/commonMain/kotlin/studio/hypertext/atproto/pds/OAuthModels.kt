@@ -16,6 +16,8 @@ public data class PushedAuthorizationRequest(
     val codeChallengeMethod: String,
     val state: String? = null,
     val loginHint: String? = null,
+    val clientAssertionType: String? = null,
+    val clientAssertion: String? = null,
     val dpopProof: String,
     val htu: String,
 )
@@ -75,6 +77,8 @@ public data class AuthorizationCodeTokenRequest(
     val redirectUri: String,
     val clientId: String,
     val codeVerifier: String,
+    val clientAssertionType: String? = null,
+    val clientAssertion: String? = null,
     val dpopProof: String,
     val htu: String,
 )
@@ -86,6 +90,8 @@ public data class AuthorizationCodeTokenRequest(
 public data class RefreshTokenGrantRequest(
     val refreshToken: String,
     val clientId: String,
+    val clientAssertionType: String? = null,
+    val clientAssertion: String? = null,
     val dpopProof: String,
     val htu: String,
 )
@@ -97,6 +103,8 @@ public data class RefreshTokenGrantRequest(
 public data class OAuthRevokeRequest(
     val refreshToken: String,
     val clientId: String,
+    val clientAssertionType: String? = null,
+    val clientAssertion: String? = null,
     val dpopProof: String,
     val htu: String,
 )

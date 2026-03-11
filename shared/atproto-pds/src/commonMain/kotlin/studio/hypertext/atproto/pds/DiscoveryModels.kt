@@ -20,8 +20,12 @@ public data class AuthorizationServerMetadata(
     val grant_types_supported: List<String>,
     val code_challenge_methods_supported: List<String>,
     val token_endpoint_auth_methods_supported: List<String>,
+    val token_endpoint_auth_signing_alg_values_supported: List<String>,
     val dpop_signing_alg_values_supported: List<String>,
     val scopes_supported: List<String>,
+    val authorization_response_iss_parameter_supported: Boolean,
+    val require_pushed_authorization_requests: Boolean,
+    val require_request_uri_registration: Boolean = true,
     val client_id_metadata_document_supported: Boolean,
 )
 

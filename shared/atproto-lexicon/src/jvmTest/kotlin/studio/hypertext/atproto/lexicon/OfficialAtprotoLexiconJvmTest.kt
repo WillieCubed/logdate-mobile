@@ -124,7 +124,12 @@ class OfficialAtprotoLexiconJvmTest {
         val officialLexicons =
             listOf(
                 OfficialLexiconEntry("com/atproto/identity/resolveHandle.json", "com/atproto/identity"),
+                OfficialLexiconEntry("com/atproto/server/createAccount.json", "com/atproto/server"),
+                OfficialLexiconEntry("com/atproto/server/createSession.json", "com/atproto/server"),
+                OfficialLexiconEntry("com/atproto/server/deleteSession.json", "com/atproto/server"),
                 OfficialLexiconEntry("com/atproto/server/describeServer.json", "com/atproto/server"),
+                OfficialLexiconEntry("com/atproto/server/getSession.json", "com/atproto/server"),
+                OfficialLexiconEntry("com/atproto/server/refreshSession.json", "com/atproto/server"),
                 OfficialLexiconEntry("com/atproto/repo/createRecord.json", "com/atproto/repo"),
                 OfficialLexiconEntry("com/atproto/repo/defs.json", "com/atproto/repo"),
                 OfficialLexiconEntry("com/atproto/repo/deleteRecord.json", "com/atproto/repo"),
@@ -134,6 +139,9 @@ class OfficialAtprotoLexiconJvmTest {
                 OfficialLexiconEntry("com/atproto/repo/putRecord.json", "com/atproto/repo"),
                 OfficialLexiconEntry("com/atproto/repo/uploadBlob.json", "com/atproto/repo"),
                 OfficialLexiconEntry("com/atproto/sync/getBlob.json", "com/atproto/sync"),
+                OfficialLexiconEntry("com/atproto/sync/getLatestCommit.json", "com/atproto/sync"),
+                OfficialLexiconEntry("com/atproto/sync/getRepo.json", "com/atproto/sync"),
+                OfficialLexiconEntry("com/atproto/sync/getRepoStatus.json", "com/atproto/sync"),
             )
 
         val officialGenerationCases =

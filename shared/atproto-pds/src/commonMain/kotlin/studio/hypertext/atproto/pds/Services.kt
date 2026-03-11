@@ -46,6 +46,36 @@ public interface PdsIdentityService {
 }
 
 /**
+ * Account and session-facing PDS service contract.
+ */
+public interface PdsSessionService {
+    /**
+     * Creates a new hosted account and returns an authenticated session.
+     */
+    public suspend fun createAccount(request: CreateAccountRequest): Result<SessionResponse>
+
+    /**
+     * Creates a standard AT Protocol session for an existing account.
+     */
+    public suspend fun createSession(request: CreateSessionRequest): Result<SessionResponse>
+
+    /**
+     * Returns the authenticated account session identified by [accessJwt].
+     */
+    public suspend fun getSession(accessJwt: String): Result<SessionInfoResponse>
+
+    /**
+     * Refreshes the session identified by [refreshJwt].
+     */
+    public suspend fun refreshSession(refreshJwt: String): Result<SessionResponse>
+
+    /**
+     * Deletes the session identified by [refreshJwt].
+     */
+    public suspend fun deleteSession(refreshJwt: String): Result<Unit>
+}
+
+/**
  * Repo-facing PDS service contract.
  */
 public interface PdsRepoService {
@@ -73,6 +103,26 @@ public interface PdsRepoService {
      * Deletes a record.
      */
     public suspend fun deleteRecord(request: DeleteRecordRequest): Result<Boolean>
+}
+
+/**
+ * Sync/export-facing PDS service contract.
+ */
+public interface PdsSyncService {
+    /**
+     * Exports a repository as a CAR payload.
+     */
+    public suspend fun getRepo(request: GetRepoRequest): Result<RepoExportResponse?>
+
+    /**
+     * Returns the latest commit metadata for [request].
+     */
+    public suspend fun getLatestCommit(request: GetLatestCommitRequest): Result<GetLatestCommitResponse?>
+
+    /**
+     * Returns the hosting status for [request].
+     */
+    public suspend fun getRepoStatus(request: GetRepoStatusRequest): Result<GetRepoStatusResponse?>
 }
 
 /**
@@ -112,17 +162,17 @@ public interface PdsOAuthService {
     /**
      * Exchanges an authorization code for tokens.
      */
-    public fun exchangeAuthorizationCode(request: AuthorizationCodeTokenRequest): Result<OAuthTokenResponse>
+    public suspend fun exchangeAuthorizationCode(request: AuthorizationCodeTokenRequest): Result<OAuthTokenResponse>
 
     /**
      * Exchanges a refresh token for a new token pair.
      */
-    public fun exchangeRefreshToken(request: RefreshTokenGrantRequest): Result<OAuthTokenResponse>
+    public suspend fun exchangeRefreshToken(request: RefreshTokenGrantRequest): Result<OAuthTokenResponse>
 
     /**
      * Revokes a refresh token.
      */
-    public fun revokeRefreshToken(request: OAuthRevokeRequest): Result<Unit>
+    public suspend fun revokeRefreshToken(request: OAuthRevokeRequest): Result<Unit>
 
     /**
      * Returns the current DPoP nonce value.
