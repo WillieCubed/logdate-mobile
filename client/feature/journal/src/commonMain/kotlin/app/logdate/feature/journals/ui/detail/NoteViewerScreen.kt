@@ -97,21 +97,7 @@ fun NoteViewerScreen(
                 onGoBack = onGoBack,
                 modifier = modifier,
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    Text(
-                        text = stringResource(Res.string.image),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    AsyncImage(
-                        model = state.mediaRef,
-                        contentDescription = stringResource(Res.string.image_note),
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = Spacing.xxl * 4),
-                        contentScale = ContentScale.Crop,
-                    )
-                }
+                NoteViewerImageContent(mediaRef = state.mediaRef)
             }
         }
         is NoteViewerUiState.VideoContent -> {
@@ -120,21 +106,51 @@ fun NoteViewerScreen(
                 onGoBack = onGoBack,
                 modifier = modifier,
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    Text(
-                        text = stringResource(Res.string.video),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    VideoPlayerContent(
-                        uri = state.mediaRef,
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = Spacing.xxl * 4),
-                    )
-                }
+                NoteViewerVideoContent(mediaRef = state.mediaRef)
             }
         }
+    }
+}
+
+@Composable
+fun NoteViewerImageContent(
+    mediaRef: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Text(
+            text = stringResource(Res.string.image),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        AsyncImage(
+            model = mediaRef,
+            contentDescription = stringResource(Res.string.image_note),
+            modifier =
+                modifier
+                    .fillMaxWidth()
+                    .heightIn(min = Spacing.xxl * 4),
+            contentScale = ContentScale.Crop,
+        )
+    }
+}
+
+@Composable
+fun NoteViewerVideoContent(
+    mediaRef: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Text(
+            text = stringResource(Res.string.video),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        VideoPlayerContent(
+            uri = mediaRef,
+            modifier =
+                modifier
+                    .fillMaxWidth()
+                    .heightIn(min = Spacing.xxl * 4),
+        )
     }
 }
 
@@ -188,7 +204,6 @@ fun NoteViewerScaffoldContent(
         }
 
     ImmersiveEditorLayout(
-        isEditorFocused = false,
         topBarContent = {
             NoteViewerToolbar(onGoBack = onGoBack)
         },
