@@ -84,13 +84,17 @@ package app.logdate.navigation.scenes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Book
@@ -107,6 +111,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
@@ -124,7 +130,9 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.scene.SceneStrategyScope
+import androidx.window.core.layout.WindowSizeClass.Companion.HEIGHT_DP_MEDIUM_LOWER_BOUND
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
+import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
 import app.logdate.navigation.LocalSharedTransitionScope
 import app.logdate.navigation.routes.AccountCreationCompletionRoute
 import app.logdate.navigation.routes.CloudAccountIntroRoute
@@ -157,6 +165,7 @@ import app.logdate.navigation.routes.core.TimelineListRoute
 import app.logdate.navigation.routes.routeClass
 import logdate.app.composemain.generated.resources.Res
 import logdate.app.composemain.generated.resources.new_entry
+import logdate.app.composemain.generated.resources.select_an_entry_to_view_details
 import org.jetbrains.compose.resources.stringResource
 import kotlin.reflect.KClass
 
@@ -581,11 +590,22 @@ class HomeScene<T : NavKey>(
     private fun HomeSceneContent() {
         val adaptiveInfo = currentWindowAdaptiveInfo()
         val windowSizeClass = adaptiveInfo.windowSizeClass
+
+        // Detect landscape phone: compact height with at least medium width
+        val isLandscapeCompact =
+            !windowSizeClass.isHeightAtLeastBreakpoint(HEIGHT_DP_MEDIUM_LOWER_BOUND) &&
+                windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_MEDIUM_LOWER_BOUND)
+
         val useTwoPane =
-            windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND) && detailEntry != null
+            (windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND) || isLandscapeCompact) &&
+                detailEntry != null
+
+        // Show two-pane layout even without a detail entry in landscape (with placeholder)
+        val showTwoPaneLayout = useTwoPane || (isLandscapeCompact && detailEntry == null && selectedTab == HomeTab.TIMELINE)
 
         // Check if we're on a detail-only view (no main entry showing)
-        val isDetailOnlyView = !useTwoPane && detailEntry != null
+        // In landscape, always show the rail, so never detail-only
+        val isDetailOnlyView = !useTwoPane && !isLandscapeCompact && detailEntry != null
 
         // Create a SnackbarHostState
         val snackbarHostState = remember { SnackbarHostState() }
@@ -594,86 +614,117 @@ class HomeScene<T : NavKey>(
         Scaffold(
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        ) { paddingValues ->
-            // Use NavigationSuiteScaffold for automatic adaptive navigation
-            NavigationSuiteScaffold(
-                layoutType =
-                    if (isDetailOnlyView) {
-                        // Hide navigation when showing detail-only views
-                        NavigationSuiteType.None
-                    } else {
-                        // Let NavigationSuiteScaffold automatically choose based on screen size
-                        // (Bottom bar for small screens, Rail for medium/large)
-                        NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(adaptiveInfo)
-                    },
-                navigationSuiteItems = {
-                    HomeTab.entries.forEach { tab ->
-                        item(
-                            selected = selectedTab == tab,
-                            onClick = { onTabSelected(tab) },
-                            icon = {
-                                Icon(
-                                    imageVector = if (selectedTab == tab) tab.selectedIcon else tab.unselectedIcon,
-                                    contentDescription = tab.title,
-                                )
-                            },
-                            label = { androidx.compose.material3.Text(tab.title) },
-                        )
-                    }
-                },
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        ) {
+            // Override surface color so all inner Scaffolds inherit surfaceContainer
+            MaterialTheme(
+                colorScheme = MaterialTheme.colorScheme.copy(surface = MaterialTheme.colorScheme.surfaceContainer),
             ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .padding(paddingValues)
-                            .fillMaxSize(),
-                ) {
-                    if (useTwoPane) {
-                        // Two-pane layout (large screens with both main and detail content)
-                        Row(modifier = Modifier.fillMaxSize()) {
-                            // Left content
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .weight(1f)
-                                        .widthIn(min = 320.dp, max = 420.dp)
-                                        .fillMaxHeight(),
-                            ) {
-                                mainEntry.Content()
-                            }
-
-                            // Detail pane
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight(),
-                            ) {
-                                detailEntry.Content()
-                            }
+                // Use NavigationSuiteScaffold for automatic adaptive navigation
+                NavigationSuiteScaffold(
+                    layoutType =
+                        if (isDetailOnlyView) {
+                            // Hide navigation when showing detail-only views
+                            NavigationSuiteType.None
+                        } else if (isLandscapeCompact) {
+                            // Force navigation rail in landscape mobile
+                            NavigationSuiteType.NavigationRail
+                        } else {
+                            // Let NavigationSuiteScaffold automatically choose based on screen size
+                            // (Bottom bar for small screens, Rail for medium/large)
+                            NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(adaptiveInfo)
+                        },
+                    navigationSuiteItems = {
+                        HomeTab.entries.forEach { tab ->
+                            item(
+                                selected = selectedTab == tab,
+                                onClick = { onTabSelected(tab) },
+                                icon = {
+                                    Icon(
+                                        imageVector = if (selectedTab == tab) tab.selectedIcon else tab.unselectedIcon,
+                                        contentDescription = tab.title,
+                                    )
+                                },
+                                label = { androidx.compose.material3.Text(tab.title) },
+                            )
                         }
-                    } else {
-                        // Single-pane layout (smaller screens or journal details)
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            if (detailEntry != null) {
-                                // If there's a detail entry but we're in single pane mode,
-                                // show only the detail entry (fullscreen)
-                                detailEntry.Content()
-                            } else {
-                                // Otherwise show the main entry
-                                mainEntry.Content()
-                            }
-
-                            // Show FAB only when not in detail-only view
-                            if (!isDetailOnlyView) {
-                                SharedElementFAB(
-                                    onClick = onNewEntry,
-                                    contentDescription = stringResource(Res.string.new_entry),
+                    },
+                ) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize(),
+                    ) {
+                        if (showTwoPaneLayout) {
+                            // Two-pane layout (large screens or landscape mobile)
+                            val panelShape = MaterialTheme.shapes.extraLarge
+                            Row(
+                                modifier =
+                                    Modifier
+                                        .fillMaxSize()
+                                        .statusBarsPadding()
+                                        .padding(horizontal = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                // Left content
+                                Surface(
                                     modifier =
                                         Modifier
-                                            .align(Alignment.BottomEnd)
-                                            .padding(16.dp),
-                                )
+                                            .weight(1f)
+                                            .widthIn(min = 320.dp, max = 420.dp)
+                                            .fillMaxHeight()
+                                            .padding(bottom = 8.dp),
+                                    shape = panelShape,
+                                    color = MaterialTheme.colorScheme.surface,
+                                ) {
+                                    mainEntry.Content()
+                                }
+
+                                // Detail pane (or placeholder)
+                                Surface(
+                                    modifier =
+                                        Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                            .padding(bottom = 8.dp),
+                                    shape = panelShape,
+                                    color = MaterialTheme.colorScheme.surface,
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier.fillMaxSize(),
+                                    ) {
+                                        if (detailEntry != null) {
+                                            detailEntry.Content()
+                                        } else {
+                                            DetailPlaceholder()
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            // Single-pane layout (smaller screens or journal details)
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                if (detailEntry != null) {
+                                    // If there's a detail entry but we're in single pane mode,
+                                    // show only the detail entry (fullscreen)
+                                    detailEntry.Content()
+                                } else {
+                                    // Otherwise show the main entry
+                                    mainEntry.Content()
+                                }
+
+                                // Show FAB only when not in detail-only view
+                                if (!isDetailOnlyView) {
+                                    SharedElementFAB(
+                                        onClick = onNewEntry,
+                                        contentDescription = stringResource(Res.string.new_entry),
+                                        modifier =
+                                            Modifier
+                                                .align(Alignment.BottomEnd)
+                                                .padding(16.dp),
+                                    )
+                                }
                             }
                         }
                     }
@@ -973,5 +1024,29 @@ private fun SharedElementFAB(
             contentDescription = contentDescription,
             modifier = Modifier.size(24.dp),
         )
+    }
+}
+
+@Suppress("ktlint:standard:function-naming")
+@Composable
+private fun DetailPlaceholder() {
+    Surface(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = stringResource(Res.string.select_an_entry_to_view_details),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }

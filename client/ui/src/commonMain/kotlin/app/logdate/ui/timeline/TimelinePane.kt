@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -82,10 +83,9 @@ fun TimelinePane(
         }
     }
 
-    // This is likely causing nested scaffold padding issues.
-    // We need to either avoid the nested Scaffold or avoid applying the padding
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TimelineTopAppBar(
                 scrollBehavior = scrollBehavior,
@@ -95,7 +95,6 @@ fun TimelinePane(
             )
         },
     ) { paddingValues ->
-        // Only apply horizontal padding to avoid compounding top padding with parent scaffolds
         Box(
             modifier =
                 Modifier
