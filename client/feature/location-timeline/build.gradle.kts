@@ -32,15 +32,20 @@ kotlin {
         }
     }
 
-    iosArm64()
-    iosSimulatorArm64()
+    listOf(
+        iosArm64(),
+        iosSimulatorArm64(),
+    )
 
-    jvm()
+    jvm("desktop")
 
     sourceSets {
         all {
             languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
             compilerOptions.freeCompilerArgs.set(listOf("-Xexpect-actual-classes"))
+        }
+        val desktopMain by getting {
+            kotlin.srcDir("src/jvmMain/kotlin")
         }
         commonMain.dependencies {
             // Project dependencies

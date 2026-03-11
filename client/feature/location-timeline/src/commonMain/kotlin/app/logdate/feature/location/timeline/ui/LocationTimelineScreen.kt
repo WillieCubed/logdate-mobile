@@ -521,16 +521,19 @@ private fun PlacesFilterRow(
 
 @Composable
 private fun FilterLabel(filter: LocationMemoryTimeFilter): String =
-    when (val activeFilter: Any = filter) {
-        LocationMemoryTimeFilter.Last30Days -> stringResource(Res.string.last_30_days)
-        LocationMemoryTimeFilter.Last90Days -> stringResource(Res.string.last_90_days)
-        LocationMemoryTimeFilter.YearToDate -> stringResource(Res.string.year_to_date)
-        LocationMemoryTimeFilter.AllTime -> stringResource(Res.string.all_time)
-        is LocationMemoryTimeFilter.Custom -> stringResource(Res.string.custom_range)
-        else -> {
-            Napier.w("Unexpected location filter shown in UI: $activeFilter")
-            stringResource(Res.string.custom_range)
-        }
+    if (filter == LocationMemoryTimeFilter.Last30Days) {
+        stringResource(Res.string.last_30_days)
+    } else if (filter == LocationMemoryTimeFilter.Last90Days) {
+        stringResource(Res.string.last_90_days)
+    } else if (filter == LocationMemoryTimeFilter.YearToDate) {
+        stringResource(Res.string.year_to_date)
+    } else if (filter == LocationMemoryTimeFilter.AllTime) {
+        stringResource(Res.string.all_time)
+    } else if (filter is LocationMemoryTimeFilter.Custom) {
+        stringResource(Res.string.custom_range)
+    } else {
+        Napier.w("Unexpected location filter shown in UI: $filter")
+        stringResource(Res.string.custom_range)
     }
 
 @Composable
