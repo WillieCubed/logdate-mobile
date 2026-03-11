@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.navigation3.runtime.NavKey
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlinx.datetime.LocalDate
 import kotlin.uuid.Uuid
 
@@ -253,6 +254,93 @@ class OnBackHandlerLogicTest {
         val backStack = mutableStateListOf<NavKey>(TimelineListRoute)
 
         simulateOnBack(backStack)
+
+        assertEquals(1, backStack.size)
+        assertEquals(TimelineListRoute, backStack.first())
+    }
+
+    // switchToTab tests
+
+    /**
+     * Replicates the switchToTab logic from NavigationExtensions for testing.
+     * This mirrors the actual implementation to verify behavior without Compose.
+     */
+    private fun simulateSwitchToTab(backStack: MutableList<NavKey>, tab: HomeTab) {
+        val existingTabIndex = backStack.indexOfFirst { it == tab.route }
+
+        if (existingTabIndex >= 0) {
+            // Tab already in stack — pop everything after it
+            if (existingTabIndex < backStack.size - 1) {
+                while (backStack.size > existingTabIndex + 1) {
+                    backStack.removeLastOrNull()
+                }
+            }
+        } else {
+            val currentEntry = backStack.lastOrNull()
+            val isCurrentEntryMainTab = currentEntry != null && HomeTab.entries.any { it.route == currentEntry }
+
+            if (isCurrentEntryMainTab && backStack.size > 0) {
+                // Replace the current tab
+                val otherMainTabsIndices = backStack.mapIndexedNotNull { index, entry ->
+                    if (entry != currentEntry && HomeTab.entries.any { it.route == entry }) index else null
+                }
+                backStack.removeLastOrNull()
+                backStack.add(tab.route)
+                otherMainTabsIndices.sortedDescending().forEach { index ->
+                    if (index < backStack.size) backStack.removeAt(index)
+                }
+            } else {
+                // Current top is not a main tab — clear and set new tab
+                backStack.clear()
+                backStack.add(tab.route)
+            }
+        }
+    }
+
+    @Test
+    fun `switchToTab from detail does not orphan detail view`() {
+        // Scenario: on tablet, viewing timeline detail in two-pane mode, then switch to Journals
+        val backStack = mutableStateListOf<NavKey>(
+            TimelineListRoute,
+            TimelineDetail(LocalDate(2026, 3, 10)),
+        )
+
+        simulateSwitchToTab(backStack, HomeTab.JOURNALS)
+
+        // Should have only the new tab, no orphaned detail
+        assertEquals(1, backStack.size)
+        assertEquals(JournalList, backStack.first())
+        assertFalse(backStack.any { it is TimelineDetail })
+    }
+
+    @Test
+    fun `switchToTab replaces current tab when top is a main tab`() {
+        val backStack = mutableStateListOf<NavKey>(TimelineListRoute)
+
+        simulateSwitchToTab(backStack, HomeTab.JOURNALS)
+
+        assertEquals(1, backStack.size)
+        assertEquals(JournalList, backStack.first())
+    }
+
+    @Test
+    fun `switchToTab does nothing when target tab is already on top`() {
+        val backStack = mutableStateListOf<NavKey>(TimelineListRoute)
+
+        simulateSwitchToTab(backStack, HomeTab.TIMELINE)
+
+        assertEquals(1, backStack.size)
+        assertEquals(TimelineListRoute, backStack.first())
+    }
+
+    @Test
+    fun `switchToTab pops to existing tab removing entries above it`() {
+        val backStack = mutableStateListOf<NavKey>(
+            TimelineListRoute,
+            TimelineDetail(LocalDate(2026, 3, 10)),
+        )
+
+        simulateSwitchToTab(backStack, HomeTab.TIMELINE)
 
         assertEquals(1, backStack.size)
         assertEquals(TimelineListRoute, backStack.first())
