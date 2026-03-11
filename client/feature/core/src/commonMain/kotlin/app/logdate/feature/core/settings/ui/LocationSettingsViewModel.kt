@@ -4,6 +4,7 @@ package app.logdate.feature.core.settings.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.location.settings.LocationCaptureMode
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import io.github.aakira.napier.Napier
@@ -117,6 +118,36 @@ class LocationSettingsViewModel(
             } catch (e: Exception) {
                 Napier.e("Failed to update tracking interval", e)
                 errorMessageState.value = "Failed to update interval: ${e.message}"
+            }
+        }
+    }
+
+    fun toggleMirroredExperiment(enabled: Boolean) {
+        viewModelScope.launch {
+            try {
+                settingsRepository.setCaptureMode(
+                    if (enabled) {
+                        LocationCaptureMode.EXPERIMENT_MIRRORED
+                    } else {
+                        LocationCaptureMode.STABLE
+                    },
+                )
+                Napier.i("Mirrored experiment set to: $enabled")
+            } catch (e: Exception) {
+                Napier.e("Failed to update mirrored experiment", e)
+                errorMessageState.value = "Failed to update experiment: ${e.message}"
+            }
+        }
+    }
+
+    fun toggleServerAssist(enabled: Boolean) {
+        viewModelScope.launch {
+            try {
+                settingsRepository.setServerAssistEnabled(enabled)
+                Napier.i("Server assist set to: $enabled")
+            } catch (e: Exception) {
+                Napier.e("Failed to update server assist", e)
+                errorMessageState.value = "Failed to update server assist: ${e.message}"
             }
         }
     }

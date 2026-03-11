@@ -38,6 +38,7 @@ data class AccountIdentityState(
     val operations: List<AccountHostedPlcOperation> = emptyList(),
     val actionState: IdentityActionState = IdentityActionState.Idle,
     val exportedKeyJson: String? = null,
+    val derivedRecoveryDidKey: String? = null,
 )
 
 sealed class ProfileUpdateState {
@@ -272,6 +273,36 @@ class AccountSettingsViewModel(
         }
     }
 
+    fun importSigningKeyWithRecovery(
+        passphrase: String,
+        exportedKeyJson: String,
+        recoveryPhrase: String,
+    ) {
+        performIdentityAction("Importing signing key with recovery phrase…") {
+            accountIdentityRepository
+                .importSigningKeyWithRecovery(
+                    passphrase = passphrase,
+                    exportedKeyJson = exportedKeyJson,
+                    recoveryPhrase = recoveryPhrase,
+                ).map {
+                    IdentityActionResult(message = "Signing key imported with recovery phrase")
+                }
+        }
+    }
+
+    fun derivePlcRecoveryKey(recoveryPhrase: String) {
+        performIdentityAction("Deriving PLC recovery key…") {
+            accountIdentityRepository
+                .derivePlcRecoveryDidKey(recoveryPhrase)
+                .map { derived ->
+                    IdentityActionResult(
+                        message = "PLC recovery key derived",
+                        derivedRecoveryDidKey = derived.recoveryDidKey,
+                    )
+                }
+        }
+    }
+
     fun registerPlcRecoveryKey(recoveryDidKey: String) {
         performIdentityAction("Registering PLC recovery key…") {
             accountIdentityRepository.registerPlcRecoveryKey(recoveryDidKey).map {
@@ -280,12 +311,28 @@ class AccountSettingsViewModel(
         }
     }
 
+    fun registerDerivedPlcRecoveryKey() {
+        val recoveryDidKey = _identityState.value.derivedRecoveryDidKey
+        if (recoveryDidKey.isNullOrBlank()) {
+            _identityState.value =
+                _identityState.value.copy(
+                    actionState = IdentityActionState.Error("Derive a PLC recovery key first"),
+                )
+            return
+        }
+        registerPlcRecoveryKey(recoveryDidKey)
+    }
+
     fun clearIdentityActionState() {
         _identityState.value = _identityState.value.copy(actionState = IdentityActionState.Idle)
     }
 
     fun clearExportedKeyJson() {
         _identityState.value = _identityState.value.copy(exportedKeyJson = null)
+    }
+
+    fun clearDerivedRecoveryDidKey() {
+        _identityState.value = _identityState.value.copy(derivedRecoveryDidKey = null)
     }
 
     private fun performIdentityAction(
@@ -303,6 +350,7 @@ class AccountSettingsViewModel(
                 loadIdentityState(
                     actionState = IdentityActionState.Success(actionResult.message),
                     exportedKeyJson = actionResult.exportedKeyJson ?: _identityState.value.exportedKeyJson,
+                    derivedRecoveryDidKey = actionResult.derivedRecoveryDidKey ?: _identityState.value.derivedRecoveryDidKey,
                 )
             } else {
                 _identityState.value =
@@ -319,17 +367,20 @@ class AccountSettingsViewModel(
     private data class IdentityActionResult(
         val message: String,
         val exportedKeyJson: String? = null,
+        val derivedRecoveryDidKey: String? = null,
     )
 
     private suspend fun loadIdentityState(
         actionState: IdentityActionState = IdentityActionState.Idle,
         exportedKeyJson: String? = _identityState.value.exportedKeyJson,
+        derivedRecoveryDidKey: String? = _identityState.value.derivedRecoveryDidKey,
     ) {
         _identityState.value =
             _identityState.value.copy(
                 isLoading = true,
                 actionState = actionState,
                 exportedKeyJson = exportedKeyJson,
+                derivedRecoveryDidKey = derivedRecoveryDidKey,
             )
 
         val statusResult = accountIdentityRepository.getIdentityStatus()
@@ -343,6 +394,7 @@ class AccountSettingsViewModel(
                         operations = operationsResult.getOrThrow(),
                         actionState = actionState,
                         exportedKeyJson = exportedKeyJson,
+                        derivedRecoveryDidKey = derivedRecoveryDidKey,
                     )
                 }
 
@@ -355,6 +407,7 @@ class AccountSettingsViewModel(
                         isLoading = false,
                         actionState = IdentityActionState.Error(message),
                         exportedKeyJson = exportedKeyJson,
+                        derivedRecoveryDidKey = derivedRecoveryDidKey,
                     )
                 }
             }

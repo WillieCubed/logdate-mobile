@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
+import app.logdate.client.location.settings.LocationCaptureMode
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.feature.location.timeline.ui.LocationTimelineBottomSheet
 import app.logdate.ui.common.DefaultSettingsContentContainer
@@ -44,11 +45,16 @@ import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.advanced
 import logdate.client.feature.core.generated.resources.back
+import logdate.client.feature.core.generated.resources.location_capture_experiment
+import logdate.client.feature.core.generated.resources.location_capture_experiment_description
 import logdate.client.feature.core.generated.resources.location_data_privacy_note
 import logdate.client.feature.core.generated.resources.location_data_stored_on_device
 import logdate.client.feature.core.generated.resources.location_enable_background_tracking
 import logdate.client.feature.core.generated.resources.location_enable_background_tracking_description
+import logdate.client.feature.core.generated.resources.location_server_assist
+import logdate.client.feature.core.generated.resources.location_server_assist_description
 import logdate.client.feature.core.generated.resources.location_services
 import logdate.client.feature.core.generated.resources.location_settings
 import logdate.client.feature.core.generated.resources.location_timeline
@@ -59,10 +65,6 @@ import logdate.client.feature.core.generated.resources.location_track_timeline_r
 import logdate.client.feature.core.generated.resources.location_track_timeline_review_description
 import logdate.client.feature.core.generated.resources.location_tracking_battery_note
 import logdate.client.feature.core.generated.resources.location_update_frequency
-import logdate.client.feature.core.generated.resources.text_120_min
-import logdate.client.feature.core.generated.resources.text_15_min
-import logdate.client.feature.core.generated.resources.text_30_min
-import logdate.client.feature.core.generated.resources.text_60_min
 import logdate.client.feature.core.generated.resources.tracking_interval
 import logdate.client.feature.core.generated.resources.view_location_timeline
 import logdate.client.feature.core.generated.resources.view_timeline
@@ -96,6 +98,8 @@ fun LocationSettingsScreen(
         onToggleJournalTracking = viewModel::toggleJournalTracking,
         onToggleTimelineTracking = viewModel::toggleTimelineTracking,
         onUpdateTrackingInterval = viewModel::updateTrackingInterval,
+        onToggleMirroredExperiment = viewModel::toggleMirroredExperiment,
+        onToggleServerAssist = viewModel::toggleServerAssist,
         onShowLocationTimeline = {
             showLocationQuickPeek = true
         },
@@ -124,10 +128,16 @@ fun LocationSettingsContent(
     onToggleJournalTracking: (Boolean) -> Unit,
     onToggleTimelineTracking: (Boolean) -> Unit,
     onUpdateTrackingInterval: (Long) -> Unit,
+    onToggleMirroredExperiment: (Boolean) -> Unit = {},
+    onToggleServerAssist: (Boolean) -> Unit = {},
     onShowLocationTimeline: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val mirroredExperimentEnabled = settings.captureMode == LocationCaptureMode.EXPERIMENT_MIRRORED
+    val intervalOptions = listOf(2L, 5L, 10L, 15L, 30L, 60L, 120L)
+    val selectedIntervalIndex =
+        intervalOptions.indexOfLast { option -> option <= settings.minimumPersistIntervalMinutes }.coerceAtLeast(0)
 
     Scaffold(
         modifier =
@@ -214,45 +224,25 @@ fun LocationSettingsContent(
                                         verticalArrangement = Arrangement.spacedBy(Spacing.md),
                                     ) {
                                         Text(
-                                            text = stringResource(Res.string.location_update_frequency, settings.trackingIntervalMinutes),
+                                            text =
+                                                stringResource(
+                                                    Res.string.location_update_frequency,
+                                                    settings.minimumPersistIntervalMinutes,
+                                                ),
                                             style = MaterialTheme.typography.bodyLarge,
                                         )
 
-                                        // Calculate the step value for the current interval
-                                        // 15 minutes = step 0, 30 minutes = step 1, etc.
-                                        val stepValue =
-                                            ((settings.trackingIntervalMinutes - 15) / 15f).coerceIn(
-                                                0f,
-                                                7f,
-                                            )
-
-                                        // Use steps parameter for discrete slider with 15-minute intervals
-                                        // From 15 to 120 minutes in 15-minute steps = 8 steps (0 to 7)
                                         Slider(
-                                            value = stepValue,
+                                            value = selectedIntervalIndex.toFloat(),
                                             onValueChange = { newValue ->
-                                                // Convert from step value to minutes (15-120)
-                                                val step = newValue.toInt()
-                                                val minutes = 15 + (step * 15)
-                                                onUpdateTrackingInterval(minutes.toLong())
+                                                val step = newValue.toInt().coerceIn(0, intervalOptions.lastIndex)
+                                                val minutes = intervalOptions[step]
+                                                onUpdateTrackingInterval(minutes)
                                             },
-                                            valueRange = 0f..7f,
-                                            steps = 6, // 8 positions (0-7) means 7 spaces, so 6 steps
+                                            valueRange = 0f..intervalOptions.lastIndex.toFloat(),
+                                            steps = intervalOptions.size - 2,
                                             modifier = Modifier.fillMaxWidth(),
                                         )
-
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                        ) {
-                                            Text(stringResource(Res.string.text_15_min), style = MaterialTheme.typography.labelMedium)
-                                            Text(stringResource(Res.string.text_30_min), style = MaterialTheme.typography.labelMedium)
-                                            Text(stringResource(Res.string.text_60_min), style = MaterialTheme.typography.labelMedium)
-                                            Text(
-                                                stringResource(Res.string.text_120_min),
-                                                style = MaterialTheme.typography.labelMedium,
-                                            )
-                                        }
 
                                         Text(
                                             stringResource(Res.string.location_tracking_battery_note),
@@ -261,6 +251,39 @@ fun LocationSettingsContent(
                                         )
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+
+                if (settings.backgroundTrackingEnabled) {
+                    item {
+                        Column(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = Spacing.lg),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        ) {
+                            Text(
+                                text = stringResource(Res.string.advanced),
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(vertical = Spacing.sm),
+                            )
+
+                            MaterialContainer {
+                                ToggleSettingsItem(
+                                    title = stringResource(Res.string.location_capture_experiment),
+                                    description = stringResource(Res.string.location_capture_experiment_description),
+                                    checked = mirroredExperimentEnabled,
+                                    onCheckedChange = onToggleMirroredExperiment,
+                                )
+                                ToggleSettingsItem(
+                                    title = stringResource(Res.string.location_server_assist),
+                                    description = stringResource(Res.string.location_server_assist_description),
+                                    checked = settings.serverAssistEnabled,
+                                    onCheckedChange = onToggleServerAssist,
+                                )
                             }
                         }
                     }
