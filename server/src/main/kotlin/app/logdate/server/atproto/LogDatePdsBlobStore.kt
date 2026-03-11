@@ -5,10 +5,10 @@ package app.logdate.server.atproto
 import app.logdate.server.database.toJavaUUID
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.logdate.LogDateAtprotoBlob
-import app.logdate.server.logdate.LogDateAtprotoBlobRepository
 import app.logdate.server.logdate.LogDateBlobNamespace
 import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateBlobWriteRequest
+import app.logdate.server.logdate.LogDateMediaBlobRepository
 import studio.hypertext.atproto.pds.BlobDownload
 import studio.hypertext.atproto.pds.BlobRef
 import studio.hypertext.atproto.pds.CidLink
@@ -25,7 +25,7 @@ import kotlin.uuid.ExperimentalUuidApi
  */
 class LogDatePdsBlobStore(
     private val identityService: AtprotoIdentityService,
-    private val blobRepository: LogDateAtprotoBlobRepository,
+    private val mediaBlobRepository: LogDateMediaBlobRepository,
     private val blobStorage: LogDateBlobStorage,
 ) : PdsBlobStore {
     override suspend fun putBlob(request: UploadBlobRequest): Result<BlobRef> =
@@ -43,7 +43,7 @@ class LogDatePdsBlobStore(
                         bytes = request.bytes,
                     ),
                 )
-            blobRepository.upsertBlob(
+            mediaBlobRepository.upsertAtprotoBlob(
                 userId = userId,
                 blob =
                     LogDateAtprotoBlob(
@@ -66,7 +66,7 @@ class LogDatePdsBlobStore(
         runCatching {
             val account = identityService.findByDid(request.did.toString()) ?: return@runCatching null
             val blob =
-                blobRepository.getBlob(
+                mediaBlobRepository.getAtprotoBlob(
                     userId = account.id.toJavaUUID(),
                     cid = request.cid.toString(),
                 ) ?: return@runCatching null

@@ -23,6 +23,8 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -83,6 +85,35 @@ data class ImportSigningKeyResponse(
 )
 
 @Serializable
+data class PrepareRecoverySigningKeyImportRequest(
+    val passphrase: String,
+    val exportedKey: SigningKeyService.ExportedSigningKey,
+)
+
+@Serializable
+data class PrepareRecoverySigningKeyImportData(
+    val did: String,
+    val handle: String,
+    val recoveryDidKey: String,
+    val nextPublicKeyDidKey: String,
+    val unsignedOperationJson: String,
+    val signingPayloadBase64Url: String,
+)
+
+@Serializable
+data class PrepareRecoverySigningKeyImportResponse(
+    val success: Boolean,
+    val data: PrepareRecoverySigningKeyImportData,
+)
+
+@Serializable
+data class CompleteRecoverySigningKeyImportRequest(
+    val passphrase: String,
+    val exportedKey: SigningKeyService.ExportedSigningKey,
+    val signature: String,
+)
+
+@Serializable
 data class RegisterPlcRecoveryKeyRequest(
     val recoveryDidKey: String,
 )
@@ -139,6 +170,12 @@ fun Route.identityApiRoutes(
     atprotoIdentityService: AtprotoIdentityService,
     signingKeyService: SigningKeyService,
 ) {
+    val plcJson =
+        Json {
+            encodeDefaults = true
+            explicitNulls = true
+        }
+
     route("/identity") {
         get {
             val account =
@@ -340,6 +377,127 @@ fun Route.identityApiRoutes(
                     HttpStatusCode.InternalServerError,
                     "SIGNING_KEY_IMPORT_FAILED",
                     "Failed to import signing key",
+                )
+            }
+        }
+
+        post("/signing-key/import/recovery/prepare") {
+            val account =
+                resolveIdentityApiAccount(
+                    call = call,
+                    accountRepository = accountRepository,
+                    tokenService = tokenService,
+                ) ?: return@post
+
+            try {
+                val request = call.receive<PrepareRecoverySigningKeyImportRequest>()
+                if (request.passphrase.isBlank()) {
+                    call.respondIdentityApiError(HttpStatusCode.BadRequest, "PASSPHRASE_REQUIRED", "Passphrase is required")
+                    return@post
+                }
+
+                val prepared =
+                    atprotoIdentityService.prepareRecoverySigningKeyImport(
+                        account = account,
+                        exportedKey = request.exportedKey,
+                        passphrase = request.passphrase,
+                    )
+
+                call.respond(
+                    HttpStatusCode.OK,
+                    PrepareRecoverySigningKeyImportResponse(
+                        success = true,
+                        data =
+                            PrepareRecoverySigningKeyImportData(
+                                did = prepared.did,
+                                handle = prepared.handle,
+                                recoveryDidKey = prepared.recoveryDidKey,
+                                nextPublicKeyDidKey = prepared.nextSigningKeyDidKey,
+                                unsignedOperationJson = plcJson.encodeToString(prepared.unsignedOperation),
+                                signingPayloadBase64Url = prepared.signingPayloadBase64Url,
+                            ),
+                    ),
+                )
+            } catch (error: IdentityLifecycleValidationException) {
+                call.respondIdentityApiError(
+                    HttpStatusCode.BadRequest,
+                    "SIGNING_KEY_RECOVERY_PREPARE_INVALID",
+                    error.message ?: "Invalid signing key recovery request",
+                )
+            } catch (error: IdentityLifecycleConflictException) {
+                call.respondIdentityApiError(
+                    HttpStatusCode.Conflict,
+                    "SIGNING_KEY_RECOVERY_PREPARE_CONFLICT",
+                    error.message ?: "Signing key recovery preparation conflict",
+                )
+            } catch (error: Exception) {
+                Napier.e("Failed to prepare AT Protocol signing key recovery import", error)
+                call.respondIdentityApiError(
+                    HttpStatusCode.InternalServerError,
+                    "SIGNING_KEY_RECOVERY_PREPARE_FAILED",
+                    "Failed to prepare signing key recovery import",
+                )
+            }
+        }
+
+        post("/signing-key/import/recovery/complete") {
+            val account =
+                resolveIdentityApiAccount(
+                    call = call,
+                    accountRepository = accountRepository,
+                    tokenService = tokenService,
+                ) ?: return@post
+
+            try {
+                val request = call.receive<CompleteRecoverySigningKeyImportRequest>()
+                if (request.passphrase.isBlank()) {
+                    call.respondIdentityApiError(HttpStatusCode.BadRequest, "PASSPHRASE_REQUIRED", "Passphrase is required")
+                    return@post
+                }
+                if (request.signature.isBlank()) {
+                    call.respondIdentityApiError(HttpStatusCode.BadRequest, "SIGNATURE_REQUIRED", "Recovery signature is required")
+                    return@post
+                }
+
+                val imported =
+                    atprotoIdentityService.importSigningKeyWithRecovery(
+                        account = account,
+                        exportedKey = request.exportedKey,
+                        passphrase = request.passphrase,
+                        recoverySignature = request.signature,
+                    )
+                val updatedAccount = imported.account
+
+                call.respond(
+                    HttpStatusCode.OK,
+                    ImportSigningKeyResponse(
+                        success = true,
+                        data =
+                            ImportSigningKeyData(
+                                did = requireNotNull(updatedAccount.did),
+                                handle = requireNotNull(updatedAccount.handle),
+                                publicKeyDidKey = didKeyFor(imported.activeKey.publicKeyMultibase),
+                            ),
+                    ),
+                )
+            } catch (error: IdentityLifecycleValidationException) {
+                call.respondIdentityApiError(
+                    HttpStatusCode.BadRequest,
+                    "SIGNING_KEY_RECOVERY_INVALID",
+                    error.message ?: "Invalid signing key recovery request",
+                )
+            } catch (error: IdentityLifecycleConflictException) {
+                call.respondIdentityApiError(
+                    HttpStatusCode.Conflict,
+                    "SIGNING_KEY_RECOVERY_CONFLICT",
+                    error.message ?: "Signing key recovery conflict",
+                )
+            } catch (error: Exception) {
+                Napier.e("Failed to complete AT Protocol signing key recovery import", error)
+                call.respondIdentityApiError(
+                    HttpStatusCode.InternalServerError,
+                    "SIGNING_KEY_RECOVERY_FAILED",
+                    "Failed to complete signing key recovery import",
                 )
             }
         }

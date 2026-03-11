@@ -2,11 +2,15 @@ package app.logdate.server.identity
 
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.InMemoryAccountRepository
+import studio.hypertext.atproto.crypto.EcCurve
+import studio.hypertext.atproto.crypto.EcKeySupport
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.plc.PlcDirectoryClient
 import studio.hypertext.atproto.plc.PlcIndexedOperation
 import studio.hypertext.atproto.plc.PlcLogEntry
 import studio.hypertext.atproto.plc.PlcOperation
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -16,7 +20,7 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
+@OptIn(ExperimentalUuidApi::class, ExperimentalEncodingApi::class)
 class PlcIdentityServiceTest {
     @Test
     fun `provisionHostedDid derives did plc identity and preserves atproto plc document fields`() =
@@ -309,6 +313,93 @@ class PlcIdentityServiceTest {
             assertEquals(provisioned.publicKeyDidKey, update.verificationMethods.getValue("atproto"))
             assertEquals(listOf(provisioned.publicKeyDidKey, recoveryDidKey), update.rotationKeys)
             assertEquals(2, operationRepository.listByDid(provisioned.did).size)
+            assertEquals("cid-2", operationRepository.listByDid(provisioned.did).last().cid)
+        }
+
+    @Test
+    fun `prepareHostedRecoveryImport builds canonical payload and publishClientSignedRecoveryImport verifies signature`() =
+        kotlinx.coroutines.test.runTest {
+            val published = mutableMapOf<String, MutableList<PlcIndexedOperation>>()
+            val operationRepository = InMemoryHostedPlcOperationRepository()
+            val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
+            val service =
+                PlcIdentityService(
+                    signingKeyService = signingKeyService,
+                    config =
+                        AtprotoIdentityConfig(
+                            handleDomain = "logdate.app",
+                            pdsServiceEndpoint = "https://logdate.app",
+                            hostedAccountDidMethod = HostedAccountDidMethod.PLC,
+                            publishHostedPlcOperations = true,
+                        ),
+                    hostedPlcOperationRepository = operationRepository,
+                    plcDirectoryClient =
+                        object : PlcDirectoryClient {
+                            override suspend fun getDocument(did: AtprotoDid) = error("unused")
+
+                            override suspend fun getOperationLog(did: AtprotoDid) = error("unused")
+
+                            override suspend fun getAuditLog(did: AtprotoDid): Result<List<PlcIndexedOperation>> =
+                                Result.success(published[did.toString()].orEmpty())
+
+                            override suspend fun export(
+                                after: String?,
+                                count: Int?,
+                            ) = error("unused")
+
+                            override suspend fun submit(
+                                did: AtprotoDid,
+                                entry: PlcLogEntry,
+                            ): Result<Unit> =
+                                runCatching {
+                                    val operations = published.getOrPut(did.toString()) { mutableListOf() }
+                                    operations +=
+                                        PlcIndexedOperation(
+                                            did = did,
+                                            operation = entry,
+                                            cid = "cid-${operations.size + 1}",
+                                            nullified = false,
+                                            createdAt = "2026-03-09T00:00:00Z",
+                                        )
+                                }
+                        },
+                )
+            val accountId = Uuid.random()
+            val provisioned = service.provisionHostedDid(accountId = accountId, handle = "alice.logdate.app")
+            val recoveryKey = signingKeyService.generateKeyPair(curve = EcCurve.P256)
+            val recoveryDidKey = didKeyFor(recoveryKey.publicKeyMultibase)
+            val prepared =
+                service.prepareHostedRecoveryImport(
+                    accountId = accountId,
+                    did = AtprotoDid.require(provisioned.did),
+                    handle = "alice.logdate.app",
+                    recoveryDidKey = recoveryDidKey,
+                    nextSigningKeyDidKey = "did:key:zNextSigning",
+                )
+            val signature =
+                Base64.UrlSafe
+                    .encode(
+                        EcKeySupport.signSha256(
+                            privateKey = EcKeySupport.decodePrivateKey(recoveryKey.privateKeyPkcs8),
+                            curve = EcCurve.P256,
+                            payload = prepared.signingPayload,
+                        ),
+                    ).trimEnd('=')
+
+            val signed =
+                service.publishClientSignedRecoveryImport(
+                    accountId = accountId,
+                    did = AtprotoDid.require(provisioned.did),
+                    recoveryDidKey = recoveryDidKey,
+                    preparedOperation = prepared,
+                    signature = signature,
+                )
+
+            assertEquals("cid-1", prepared.unsignedOperation.prev)
+            assertEquals("did:key:zNextSigning", prepared.nextSigningKeyDidKey)
+            assertEquals("did:key:zNextSigning", signed.verificationMethods.getValue("atproto"))
+            assertEquals(listOf("did:key:zNextSigning", recoveryDidKey), signed.rotationKeys)
+            assertTrue(signed.isSigned)
             assertEquals("cid-2", operationRepository.listByDid(provisioned.did).last().cid)
         }
 }

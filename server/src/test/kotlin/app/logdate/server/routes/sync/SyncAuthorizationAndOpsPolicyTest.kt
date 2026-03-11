@@ -3,6 +3,7 @@ package app.logdate.server.routes.sync
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.logdate.asLogDateBackupRepository
 import app.logdate.server.logdate.asLogDateCollectionsRepository
+import app.logdate.server.logdate.asLogDateMediaBlobRepository
 import app.logdate.server.logdate.asLogDateMediaRepository
 import app.logdate.server.routes.support.authHeader
 import app.logdate.server.routes.syncRoutes
@@ -42,7 +43,7 @@ class SyncAuthorizationAndOpsPolicyTest {
                             mediaStorage = null,
                             metrics = SyncMetricsRegistry(),
                             collectionsRepository = syncRepository.asLogDateCollectionsRepository(),
-                            mediaRepository = syncRepository.asLogDateMediaRepository(),
+                            mediaBlobRepository = syncRepository.asLogDateMediaRepository().asLogDateMediaBlobRepository(),
                             backupRepository = syncRepository.asLogDateBackupRepository(),
                         )
                     }
@@ -50,7 +51,7 @@ class SyncAuthorizationAndOpsPolicyTest {
                         syncRoutes(
                             metrics = SyncMetricsRegistry(),
                             collectionsRepository = defaultSyncRepository.asLogDateCollectionsRepository(),
-                            mediaRepository = defaultSyncRepository.asLogDateMediaRepository(),
+                            mediaBlobRepository = defaultSyncRepository.asLogDateMediaRepository().asLogDateMediaBlobRepository(),
                             backupRepository = defaultSyncRepository.asLogDateBackupRepository(),
                         )
                     }
@@ -86,7 +87,7 @@ class SyncAuthorizationAndOpsPolicyTest {
                             mediaStorage = null,
                             metrics = SyncMetricsRegistry(),
                             collectionsRepository = repository.asLogDateCollectionsRepository(),
-                            mediaRepository = repository.asLogDateMediaRepository(),
+                            mediaBlobRepository = repository.asLogDateMediaRepository().asLogDateMediaBlobRepository(),
                             backupRepository = repository.asLogDateBackupRepository(),
                         )
                     }

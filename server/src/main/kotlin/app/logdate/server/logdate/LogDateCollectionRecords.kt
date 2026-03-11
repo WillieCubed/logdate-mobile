@@ -14,6 +14,8 @@ import studio.hypertext.atproto.repo.UnsupportedCollectionException
 import studio.hypertext.atproto.syntax.Nsid
 import studio.hypertext.atproto.syntax.RecordKey
 
+internal val ENTRY_LEXICON_NSID: Nsid = Nsid.require("studio.hypertext.logdate.entry")
+
 internal enum class LogDateCollectionKind(
     val storageName: String,
     val nsid: Nsid,
@@ -97,6 +99,22 @@ internal fun LogDateEntry.toRepoJson(): JsonObject =
             put("mediaUri", mediaUri)
         } else {
             put("mediaUri", JsonNull)
+        }
+        put("durationMs", durationMs ?: DEFAULT_DURATION_MS)
+        put("createdAt", createdAt)
+        put("lastUpdated", lastUpdated)
+        put("deviceId", deviceId.value)
+    }
+
+internal fun LogDateEntry.toEntryRepoJson(): JsonObject =
+    buildJsonObject {
+        put(TYPE_FIELD_NAME, ENTRY_LEXICON_NSID.toString())
+        put("id", id)
+        put("type", type)
+        if (content != null) {
+            put("content", content)
+        } else {
+            put("content", JsonNull)
         }
         put("durationMs", durationMs ?: DEFAULT_DURATION_MS)
         put("createdAt", createdAt)

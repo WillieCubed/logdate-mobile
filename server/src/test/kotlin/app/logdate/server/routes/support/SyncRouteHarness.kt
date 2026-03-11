@@ -3,6 +3,7 @@ package app.logdate.server.routes.support
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.logdate.asLogDateBackupRepository
 import app.logdate.server.logdate.asLogDateCollectionsRepository
+import app.logdate.server.logdate.asLogDateMediaBlobRepository
 import app.logdate.server.logdate.asLogDateMediaRepository
 import app.logdate.server.routes.syncRoutes
 import app.logdate.server.sync.InMemorySyncRepository
@@ -27,7 +28,7 @@ fun ApplicationTestBuilder.configureInMemorySyncApp(secret: String = "sync-test-
                     mediaStorage = null,
                     metrics = SyncMetricsRegistry(),
                     collectionsRepository = repository.asLogDateCollectionsRepository(),
-                    mediaRepository = repository.asLogDateMediaRepository(),
+                    mediaBlobRepository = repository.asLogDateMediaRepository().asLogDateMediaBlobRepository(),
                     backupRepository = repository.asLogDateBackupRepository(),
                 )
             }

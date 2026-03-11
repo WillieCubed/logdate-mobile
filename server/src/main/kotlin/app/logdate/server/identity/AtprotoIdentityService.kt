@@ -11,15 +11,18 @@ import studio.hypertext.atproto.pds.DescribeRepoResponse
 import studio.hypertext.atproto.pds.PdsIdentityService
 import studio.hypertext.atproto.pds.ResolveHandleResponse
 import studio.hypertext.atproto.plc.PlcOperation
+import studio.hypertext.atproto.plc.PlcUnsignedOperation
 import studio.hypertext.atproto.syntax.Handle
 import studio.hypertext.atproto.syntax.Nsid
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
  * Provisions and resolves AT Protocol identity data for LogDate accounts.
  */
-@OptIn(ExperimentalUuidApi::class)
+@OptIn(ExperimentalUuidApi::class, ExperimentalEncodingApi::class)
 class AtprotoIdentityService(
     private val accountRepository: AccountRepository,
     private val signingKeyService: SigningKeyService,
@@ -208,6 +211,94 @@ class AtprotoIdentityService(
                     throw IdentityLifecycleConflictException("Signing key import is not supported for DID $currentDid")
                 }
             }
+        val updatedAccount =
+            accountRepository.save(
+                ensured.copy(
+                    did = currentDid,
+                    handle = currentHandle,
+                    signingKeyPublic = activeKey.publicKeyMultibase,
+                ),
+            )
+        return ImportedIdentitySigningKey(
+            account = updatedAccount,
+            activeKey = activeKey,
+        )
+    }
+
+    suspend fun prepareRecoverySigningKeyImport(
+        account: Account,
+        exportedKey: SigningKeyService.ExportedSigningKey,
+        passphrase: String,
+    ): PreparedRecoverySigningKeyImport {
+        val ensured = ensureIdentity(account)
+        val currentDid =
+            ensured.did
+                ?: throw IdentityLifecycleConflictException("Account identity must be provisioned before importing a signing key")
+        val currentHandle =
+            ensured.handle
+                ?: throw IdentityLifecycleConflictException("Account identity must be provisioned before importing a signing key")
+        val recoveryDidKey =
+            ensured.plcRecoveryDidKey
+                ?: throw IdentityLifecycleConflictException("A PLC recovery key must be registered before recovery import")
+        require(currentDid.startsWith("did:plc:")) { "Hosted PLC recovery import is only supported for did:plc identities" }
+        require(config.publishHostedPlcOperations) { "Hosted PLC recovery import requires published PLC operations" }
+
+        val preparedKey = signingKeyService.prepareImportedKey(ensured.id, exportedKey, passphrase)
+        val nextSigningKeyDidKey = didKeyFor(preparedKey.publicKeyMultibase)
+        val preparedOperation =
+            plcIdentityService.prepareHostedRecoveryImport(
+                accountId = ensured.id,
+                did = AtprotoDid.require(currentDid),
+                handle = currentHandle,
+                recoveryDidKey = recoveryDidKey,
+                nextSigningKeyDidKey = nextSigningKeyDidKey,
+            )
+        return PreparedRecoverySigningKeyImport(
+            did = currentDid,
+            handle = currentHandle,
+            recoveryDidKey = recoveryDidKey,
+            nextSigningKeyDidKey = nextSigningKeyDidKey,
+            unsignedOperation = preparedOperation.unsignedOperation,
+            signingPayloadBase64Url = Base64.UrlSafe.encode(preparedOperation.signingPayload).trimEnd('='),
+        )
+    }
+
+    suspend fun importSigningKeyWithRecovery(
+        account: Account,
+        exportedKey: SigningKeyService.ExportedSigningKey,
+        passphrase: String,
+        recoverySignature: String,
+    ): ImportedIdentitySigningKey {
+        val ensured = ensureIdentity(account)
+        val currentDid =
+            ensured.did
+                ?: throw IdentityLifecycleConflictException("Account identity must be provisioned before importing a signing key")
+        val currentHandle =
+            ensured.handle
+                ?: throw IdentityLifecycleConflictException("Account identity must be provisioned before importing a signing key")
+        val recoveryDidKey =
+            ensured.plcRecoveryDidKey
+                ?: throw IdentityLifecycleConflictException("A PLC recovery key must be registered before recovery import")
+        require(currentDid.startsWith("did:plc:")) { "Hosted PLC recovery import is only supported for did:plc identities" }
+        require(config.publishHostedPlcOperations) { "Hosted PLC recovery import requires published PLC operations" }
+
+        val preparedKey = signingKeyService.prepareImportedKey(ensured.id, exportedKey, passphrase)
+        val preparedOperation =
+            plcIdentityService.prepareHostedRecoveryImport(
+                accountId = ensured.id,
+                did = AtprotoDid.require(currentDid),
+                handle = currentHandle,
+                recoveryDidKey = recoveryDidKey,
+                nextSigningKeyDidKey = didKeyFor(preparedKey.publicKeyMultibase),
+            )
+        plcIdentityService.publishClientSignedRecoveryImport(
+            accountId = ensured.id,
+            did = AtprotoDid.require(currentDid),
+            recoveryDidKey = recoveryDidKey,
+            preparedOperation = preparedOperation,
+            signature = recoverySignature,
+        )
+        val activeKey = signingKeyService.activatePreparedKey(ensured.id, preparedKey)
         val updatedAccount =
             accountRepository.save(
                 ensured.copy(
@@ -487,6 +578,15 @@ data class RotatedIdentitySigningKey(
 data class ImportedIdentitySigningKey(
     val account: Account,
     val activeKey: StoredSigningKey,
+)
+
+data class PreparedRecoverySigningKeyImport(
+    val did: String,
+    val handle: String,
+    val recoveryDidKey: String,
+    val nextSigningKeyDidKey: String,
+    val unsignedOperation: PlcUnsignedOperation,
+    val signingPayloadBase64Url: String,
 )
 
 data class RegisteredPlcRecoveryKey(

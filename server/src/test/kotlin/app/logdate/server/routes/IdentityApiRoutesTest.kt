@@ -35,10 +35,14 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import studio.hypertext.atproto.crypto.EcCurve
+import studio.hypertext.atproto.crypto.EcKeySupport
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.plc.PlcDirectoryClient
 import studio.hypertext.atproto.plc.PlcIndexedOperation
 import studio.hypertext.atproto.plc.PlcLogEntry
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -47,7 +51,7 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
+@OptIn(ExperimentalUuidApi::class, ExperimentalEncodingApi::class)
 class IdentityApiRoutesTest {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -531,6 +535,158 @@ class IdentityApiRoutesTest {
         }
 
     @Test
+    fun `recovery signing key import prepare and complete flow accepts a client signed plc operation`() =
+        testApplication {
+            val accountRepository = InMemoryAccountRepository()
+            val tokenService = JwtTokenService("identity-api-route-secret")
+            val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
+            val hostedPlcOperationRepository = InMemoryHostedPlcOperationRepository()
+            val published = mutableMapOf<String, MutableList<PlcIndexedOperation>>()
+            val identityService =
+                AtprotoIdentityService(
+                    accountRepository = accountRepository,
+                    signingKeyService = signingKeyService,
+                    config =
+                        AtprotoIdentityConfig(
+                            handleDomain = "logdate.app",
+                            pdsServiceEndpoint = "https://logdate.app",
+                            publishHostedPlcOperations = true,
+                        ),
+                    plcIdentityService =
+                        PlcIdentityService(
+                            signingKeyService = signingKeyService,
+                            config =
+                                AtprotoIdentityConfig(
+                                    handleDomain = "logdate.app",
+                                    pdsServiceEndpoint = "https://logdate.app",
+                                    publishHostedPlcOperations = true,
+                                ),
+                            hostedPlcOperationRepository = hostedPlcOperationRepository,
+                            plcDirectoryClient =
+                                object : PlcDirectoryClient {
+                                    override suspend fun getDocument(did: AtprotoDid) = error("unused")
+
+                                    override suspend fun getOperationLog(did: AtprotoDid) = error("unused")
+
+                                    override suspend fun getAuditLog(did: AtprotoDid): Result<List<PlcIndexedOperation>> =
+                                        Result.success(published[did.toString()].orEmpty())
+
+                                    override suspend fun export(
+                                        after: String?,
+                                        count: Int?,
+                                    ) = error("unused")
+
+                                    override suspend fun submit(
+                                        did: AtprotoDid,
+                                        entry: PlcLogEntry,
+                                    ): Result<Unit> =
+                                        runCatching {
+                                            val operations = published.getOrPut(did.toString()) { mutableListOf() }
+                                            operations +=
+                                                PlcIndexedOperation(
+                                                    did = did,
+                                                    operation = entry,
+                                                    cid = "cid-${operations.size + 1}",
+                                                    nullified = false,
+                                                    createdAt = "2026-03-09T00:00:00Z",
+                                                )
+                                        }
+                                },
+                        ),
+                )
+            val account =
+                accountRepository.save(
+                    Account(
+                        id = Uuid.random(),
+                        username = "recovery-import",
+                        displayName = "Recovery Import",
+                        createdAt = Clock.System.now(),
+                    ),
+                )
+            val donor =
+                accountRepository.save(
+                    Account(
+                        id = Uuid.random(),
+                        username = "recovery-donor",
+                        displayName = "Recovery Donor",
+                        createdAt = Clock.System.now(),
+                    ),
+                )
+            val accessToken = tokenService.generateAccessToken(account.id.toString())
+            val ensured = identityService.ensureIdentity(account)
+            val recoveryKey = signingKeyService.generateKeyPair(curve = EcCurve.P256)
+            val recoveryDidKey = didKeyFor(recoveryKey.publicKeyMultibase)
+            identityService.registerPlcRecoveryKey(ensured, recoveryDidKey)
+            val donorEnsured = identityService.ensureIdentity(donor)
+            val donorExport = signingKeyService.exportActiveKey(donorEnsured.id, "donor-secret")
+
+            application {
+                install(ContentNegotiation) {
+                    json(json)
+                }
+                routing {
+                    route("/api/v1") {
+                        identityApiRoutes(
+                            accountRepository = accountRepository,
+                            tokenService = tokenService,
+                            atprotoIdentityService = identityService,
+                            signingKeyService = signingKeyService,
+                        )
+                    }
+                }
+            }
+
+            val prepareResponse =
+                client.post("/api/v1/identity/signing-key/import/recovery/prepare") {
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        json.encodeToString(
+                            PrepareRecoverySigningKeyImportRequest.serializer(),
+                            PrepareRecoverySigningKeyImportRequest(
+                                passphrase = "donor-secret",
+                                exportedKey = donorExport,
+                            ),
+                        ),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.OK, prepareResponse.status)
+            val prepared = json.decodeFromString<PrepareRecoverySigningKeyImportResponse>(prepareResponse.bodyAsText())
+            val signature =
+                Base64.UrlSafe
+                    .encode(
+                        EcKeySupport.signSha256(
+                            privateKey = EcKeySupport.decodePrivateKey(recoveryKey.privateKeyPkcs8),
+                            curve = EcCurve.P256,
+                            payload = decodeBase64Url(prepared.data.signingPayloadBase64Url),
+                        ),
+                    ).trimEnd('=')
+
+            val completeResponse =
+                client.post("/api/v1/identity/signing-key/import/recovery/complete") {
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        json.encodeToString(
+                            CompleteRecoverySigningKeyImportRequest.serializer(),
+                            CompleteRecoverySigningKeyImportRequest(
+                                passphrase = "donor-secret",
+                                exportedKey = donorExport,
+                                signature = signature,
+                            ),
+                        ),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.OK, completeResponse.status)
+            val payload = json.decodeFromString<ImportSigningKeyResponse>(completeResponse.bodyAsText())
+            assertEquals(recoveryDidKey, prepared.data.recoveryDidKey)
+            assertEquals(donorExport.publicKeyDidKey, prepared.data.nextPublicKeyDidKey)
+            assertEquals(donorExport.publicKeyDidKey, payload.data.publicKeyDidKey)
+        }
+
+    @Test
     fun `identity status and plc operation history return hosted recovery state`() =
         testApplication {
             val accountRepository = InMemoryAccountRepository()
@@ -937,5 +1093,10 @@ class IdentityApiRoutesTest {
         assertEquals(recoveryKeyRequest, json.decodeFromString(RegisterPlcRecoveryKeyRequest.serializer(), recoveryKeyRequestJson))
         assertEquals(recoveryKeyData, json.decodeFromString(RegisterPlcRecoveryKeyData.serializer(), recoveryKeyDataJson))
         assertEquals(exportedKey, json.decodeFromString(SigningKeyService.ExportedSigningKey.serializer(), exportedKeyJson))
+    }
+
+    private fun decodeBase64Url(value: String): ByteArray {
+        val padding = "=".repeat((4 - value.length % 4) % 4)
+        return Base64.UrlSafe.decode(value + padding)
     }
 }

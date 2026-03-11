@@ -16,6 +16,7 @@ import app.logdate.server.di.initializeDatabase
 import app.logdate.server.di.serverModule
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.SigningKeyService
+import app.logdate.server.logdate.CompositeLogDateMediaBlobRepository
 import app.logdate.server.logdate.LogDateAtprotoBlobRepository
 import app.logdate.server.logdate.LogDateBackupRepository
 import app.logdate.server.logdate.LogDateCollectionsMetadataStore
@@ -144,6 +145,11 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     val logDateMediaRepository: LogDateMediaRepository by inject()
     val logDateBackupRepository: LogDateBackupRepository by inject()
     val logDateAtprotoBlobRepository: LogDateAtprotoBlobRepository by inject()
+    val logDateMediaBlobRepository =
+        CompositeLogDateMediaBlobRepository(
+            mediaRepository = logDateMediaRepository,
+            atprotoBlobRepository = logDateAtprotoBlobRepository,
+        )
     val blobStorage = GcsMediaStorage.fromEnvironment()
     val logDateCollectionsRepository =
         RepoBackedLogDateCollectionsRepository(
@@ -169,7 +175,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
             DefaultPdsBlobService(
                 LogDatePdsBlobStore(
                     identityService = atprotoIdentityService,
-                    blobRepository = logDateAtprotoBlobRepository,
+                    mediaBlobRepository = logDateMediaBlobRepository,
                     blobStorage = configuredStorage,
                 ),
             )
@@ -293,7 +299,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
                 mediaStorage = blobStorage,
                 metrics = syncMetrics,
                 collectionsRepository = logDateCollectionsRepository,
-                mediaRepository = logDateMediaRepository,
+                mediaBlobRepository = logDateMediaBlobRepository,
                 backupRepository = logDateBackupRepository,
             )
         }

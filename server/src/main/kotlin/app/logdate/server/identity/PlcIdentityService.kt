@@ -12,7 +12,6 @@ import studio.hypertext.atproto.plc.PlcDirectoryClient
 import studio.hypertext.atproto.plc.PlcEncoding
 import studio.hypertext.atproto.plc.PlcOperation
 import studio.hypertext.atproto.plc.PlcOperations
-import studio.hypertext.atproto.plc.PlcService
 import studio.hypertext.atproto.plc.PlcUnsignedOperation
 import studio.hypertext.atproto.syntax.Handle
 import kotlin.io.encoding.Base64
@@ -145,22 +144,13 @@ class PlcIdentityService(
                 .getOrThrow()
                 .lastOrNull { !it.nullified }
                 ?: throw IdentityLifecycleConflictException("No PLC audit log entry exists for $did")
-        val normalizedHandle = Handle.require(handle.trim().trim('.').lowercase()).toString()
         val nextPublicKeyDidKey = didKeyFor(nextKey.publicKeyMultibase)
         val unsignedOperation =
-            PlcUnsignedOperation(
-                prev = latestIndexedOperation.cid,
-                services =
-                    mapOf(
-                        "atproto_pds" to
-                            PlcService(
-                                type = "AtprotoPersonalDataServer",
-                                endpoint = config.pdsServiceEndpoint,
-                            ),
-                    ),
-                alsoKnownAs = listOf("at://$normalizedHandle"),
-                rotationKeys = listOfNotNull(nextPublicKeyDidKey, recoveryDidKey).distinct(),
-                verificationMethods = mapOf("atproto" to nextPublicKeyDidKey),
+            buildHostedAtprotoUpdate(
+                prevCid = latestIndexedOperation.cid,
+                handle = handle,
+                signingKeyDidKey = nextPublicKeyDidKey,
+                recoveryDidKey = recoveryDidKey,
             )
         val signedOperation =
             unsignedOperation.signed(
@@ -221,21 +211,12 @@ class PlcIdentityService(
                 .getOrThrow()
                 .lastOrNull { !it.nullified }
                 ?: throw IdentityLifecycleConflictException("No PLC audit log entry exists for $did")
-        val normalizedHandle = Handle.require(handle.trim().trim('.').lowercase()).toString()
         val unsignedOperation =
-            PlcUnsignedOperation(
-                prev = latestIndexedOperation.cid,
-                services =
-                    mapOf(
-                        "atproto_pds" to
-                            PlcService(
-                                type = "AtprotoPersonalDataServer",
-                                endpoint = config.pdsServiceEndpoint,
-                            ),
-                    ),
-                alsoKnownAs = listOf("at://$normalizedHandle"),
-                rotationKeys = listOf(activePublicKeyDidKey, recoveryDidKey).distinct(),
-                verificationMethods = mapOf("atproto" to activePublicKeyDidKey),
+            buildHostedAtprotoUpdate(
+                prevCid = latestIndexedOperation.cid,
+                handle = handle,
+                signingKeyDidKey = activePublicKeyDidKey,
+                recoveryDidKey = recoveryDidKey,
             )
         val signedOperation =
             unsignedOperation.signed(
@@ -262,6 +243,74 @@ class PlcIdentityService(
             recoveryDidKey = recoveryDidKey,
             operation = signedOperation,
         )
+    }
+
+    suspend fun prepareHostedRecoveryImport(
+        accountId: Uuid,
+        did: AtprotoDid,
+        handle: String,
+        recoveryDidKey: String,
+        nextSigningKeyDidKey: String,
+    ): PreparedPlcRecoveryOperation {
+        if (!config.publishHostedPlcOperations) {
+            throw IdentityLifecycleConflictException("Hosted PLC recovery import requires published PLC operations")
+        }
+        val plcClient = plcDirectoryClient ?: throw IdentityLifecycleConflictException("PLC publishing requires a PLC directory client")
+        require(did.method == "plc") { "Hosted PLC recovery import requires a did:plc identity" }
+
+        val latestIndexedOperation =
+            plcClient
+                .getAuditLog(did)
+                .getOrThrow()
+                .lastOrNull { !it.nullified }
+                ?: throw IdentityLifecycleConflictException("No PLC audit log entry exists for $did")
+        val unsignedOperation =
+            buildHostedAtprotoUpdate(
+                prevCid = latestIndexedOperation.cid,
+                handle = handle,
+                signingKeyDidKey = nextSigningKeyDidKey,
+                recoveryDidKey = recoveryDidKey,
+            )
+
+        return PreparedPlcRecoveryOperation(
+            did = did.toString(),
+            recoveryDidKey = recoveryDidKey,
+            nextSigningKeyDidKey = nextSigningKeyDidKey,
+            unsignedOperation = unsignedOperation,
+            signingPayload = PlcEncoding.encodeUnsigned(unsignedOperation),
+        )
+    }
+
+    suspend fun publishClientSignedRecoveryImport(
+        accountId: Uuid,
+        did: AtprotoDid,
+        recoveryDidKey: String,
+        preparedOperation: PreparedPlcRecoveryOperation,
+        signature: String,
+    ): PlcOperation {
+        if (!config.publishHostedPlcOperations) {
+            throw IdentityLifecycleConflictException("Hosted PLC recovery import requires published PLC operations")
+        }
+        val plcClient = plcDirectoryClient ?: throw IdentityLifecycleConflictException("PLC publishing requires a PLC directory client")
+        require(did.method == "plc") { "Hosted PLC recovery import requires a did:plc identity" }
+        require(preparedOperation.did == did.toString()) { "Prepared PLC recovery import belongs to a different DID" }
+        require(preparedOperation.recoveryDidKey == recoveryDidKey) { "Prepared PLC recovery import belongs to a different recovery key" }
+        verifyRecoverySignature(
+            recoveryDidKey = recoveryDidKey,
+            payload = preparedOperation.signingPayload,
+            signature = signature,
+        )
+
+        val signedOperation = preparedOperation.unsignedOperation.signed(signature)
+        plcClient.submit(did, signedOperation).getOrThrow()
+        val resolvedCid = resolvePublishedCid(did, signedOperation)
+        persistHostedOperation(
+            accountId = accountId,
+            did = did,
+            operation = signedOperation,
+            resolvedCid = resolvedCid,
+        )
+        return signedOperation
     }
 
     private suspend fun resolvePublishedCid(
@@ -297,6 +346,20 @@ class PlcIdentityService(
         )
     }
 
+    private fun buildHostedAtprotoUpdate(
+        prevCid: String,
+        handle: String,
+        signingKeyDidKey: String,
+        recoveryDidKey: String?,
+    ): PlcUnsignedOperation =
+        PlcOperations.atprotoUpdate(
+            prevCid = prevCid,
+            handle = Handle.require(handle.trim().trim('.').lowercase()).toString(),
+            pdsServiceEndpoint = config.pdsServiceEndpoint,
+            signingKeyDidKey = signingKeyDidKey,
+            rotationKeys = listOfNotNull(signingKeyDidKey, recoveryDidKey).distinct(),
+        )
+
     private fun signOperation(
         payload: ByteArray,
         privateKey: java.security.PrivateKey,
@@ -306,7 +369,36 @@ class PlcIdentityService(
             .encode(EcKeySupport.signSha256(privateKey = privateKey, curve = curve, payload = payload))
             .trimEnd('=')
 
-    companion object {
+    private fun verifyRecoverySignature(
+        recoveryDidKey: String,
+        payload: ByteArray,
+        signature: String,
+    ) {
+        val multikey = recoveryDidKey.removePrefix(DID_KEY_PREFIX)
+        val decoded = EcKeySupport.decodePublicKey(multikey)
+        require(
+            EcKeySupport.verifySha256(
+                publicKey = decoded.publicKey,
+                curve = decoded.curve,
+                payload = payload,
+                signature = decodeBase64Url(signature),
+            ),
+        ) { "Client PLC recovery signature is invalid" }
+    }
+
+    private fun decodeBase64Url(value: String): ByteArray {
+        val normalized =
+            when (value.length % 4) {
+                0 -> value
+                2 -> "$value=="
+                3 -> "$value="
+                else -> throw IllegalArgumentException("Invalid base64url value")
+            }
+        return Base64.UrlSafe.decode(normalized)
+    }
+
+    private companion object {
+        private const val DID_KEY_PREFIX: String = "did:key:"
     }
 }
 
@@ -338,4 +430,15 @@ data class UpdatedPlcRecoveryKey(
     val did: String,
     val recoveryDidKey: String,
     val operation: PlcOperation,
+)
+
+/**
+ * Unsigned hosted PLC recovery import payload that a first-party client can sign locally.
+ */
+data class PreparedPlcRecoveryOperation(
+    val did: String,
+    val recoveryDidKey: String,
+    val nextSigningKeyDidKey: String,
+    val unsignedOperation: PlcUnsignedOperation,
+    val signingPayload: ByteArray,
 )

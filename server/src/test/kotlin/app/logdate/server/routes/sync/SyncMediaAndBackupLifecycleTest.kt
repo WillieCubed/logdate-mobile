@@ -6,6 +6,7 @@ import app.logdate.server.crypto.ProcessedPayload
 import app.logdate.server.logdate.LogDateBlobNamespace
 import app.logdate.server.logdate.asLogDateBackupRepository
 import app.logdate.server.logdate.asLogDateCollectionsRepository
+import app.logdate.server.logdate.asLogDateMediaBlobRepository
 import app.logdate.server.logdate.asLogDateMediaRepository
 import app.logdate.server.routes.support.backupMultipartWithFields
 import app.logdate.server.routes.support.mediaMultipartWithFields
@@ -64,7 +65,7 @@ class SyncMediaAndBackupLifecycleTest {
                             metrics = SyncMetricsRegistry(),
                             mediaAccessPolicy = MediaAccessPolicy(useSignedUrls = true, signedUrlTtlHours = 1),
                             collectionsRepository = repository.asLogDateCollectionsRepository(),
-                            mediaRepository = repository.asLogDateMediaRepository(),
+                            mediaBlobRepository = repository.asLogDateMediaRepository().asLogDateMediaBlobRepository(),
                             backupRepository = repository.asLogDateBackupRepository(),
                         )
                     }
@@ -139,7 +140,7 @@ class SyncMediaAndBackupLifecycleTest {
                             mediaAccessPolicy = MediaAccessPolicy(useSignedUrls = true, signedUrlTtlHours = 1),
                             encryptionService = encryptionService,
                             collectionsRepository = repository.asLogDateCollectionsRepository(),
-                            mediaRepository = repository.asLogDateMediaRepository(),
+                            mediaBlobRepository = repository.asLogDateMediaRepository().asLogDateMediaBlobRepository(),
                             backupRepository = repository.asLogDateBackupRepository(),
                         )
                     }
@@ -288,7 +289,7 @@ class SyncMediaAndBackupLifecycleTest {
                             metrics = SyncMetricsRegistry(),
                             encryptionService = encryptionService,
                             collectionsRepository = repository.asLogDateCollectionsRepository(),
-                            mediaRepository = repository.asLogDateMediaRepository(),
+                            mediaBlobRepository = repository.asLogDateMediaRepository().asLogDateMediaBlobRepository(),
                             backupRepository = repository.asLogDateBackupRepository(),
                         )
                     }

@@ -4,6 +4,7 @@ import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.auth.TokenService
 import app.logdate.server.logdate.asLogDateBackupRepository
 import app.logdate.server.logdate.asLogDateCollectionsRepository
+import app.logdate.server.logdate.asLogDateMediaBlobRepository
 import app.logdate.server.logdate.asLogDateMediaRepository
 import app.logdate.server.routes.support.backupMultipartWithFields
 import app.logdate.server.routes.support.mediaMultipartWithFields
@@ -223,7 +224,7 @@ class SyncRoutesValidationTest {
                             metrics = SyncMetricsRegistry(),
                             mediaAccessPolicy = MediaAccessPolicy(useSignedUrls = true, signedUrlTtlHours = 1),
                             collectionsRepository = repository.asLogDateCollectionsRepository(),
-                            mediaRepository = repository.asLogDateMediaRepository(),
+                            mediaBlobRepository = repository.asLogDateMediaRepository().asLogDateMediaBlobRepository(),
                             backupRepository = repository.asLogDateBackupRepository(),
                         )
                     }
@@ -266,7 +267,7 @@ class SyncRoutesValidationTest {
                         mediaStorage = mediaStorage,
                         metrics = SyncMetricsRegistry(),
                         collectionsRepository = repository.asLogDateCollectionsRepository(),
-                        mediaRepository = repository.asLogDateMediaRepository(),
+                        mediaBlobRepository = repository.asLogDateMediaRepository().asLogDateMediaBlobRepository(),
                         backupRepository = repository.asLogDateBackupRepository(),
                     )
                 }

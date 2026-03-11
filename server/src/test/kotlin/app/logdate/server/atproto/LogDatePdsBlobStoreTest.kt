@@ -6,8 +6,10 @@ import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.InMemorySigningKeyRepository
 import app.logdate.server.identity.SigningKeyService
+import app.logdate.server.logdate.CompositeLogDateMediaBlobRepository
 import app.logdate.server.logdate.InMemoryLogDateAtprotoBlobRepository
 import app.logdate.server.logdate.InMemoryLogDateBlobStorage
+import app.logdate.server.logdate.InMemoryLogDateMediaRepository
 import kotlinx.coroutines.runBlocking
 import studio.hypertext.atproto.pds.GetBlobRequest
 import studio.hypertext.atproto.pds.UploadBlobRequest
@@ -47,7 +49,11 @@ class LogDatePdsBlobStoreTest {
             val store =
                 LogDatePdsBlobStore(
                     identityService = identityService,
-                    blobRepository = InMemoryLogDateAtprotoBlobRepository(),
+                    mediaBlobRepository =
+                        CompositeLogDateMediaBlobRepository(
+                            mediaRepository = InMemoryLogDateMediaRepository(),
+                            atprotoBlobRepository = InMemoryLogDateAtprotoBlobRepository(),
+                        ),
                     blobStorage = InMemoryLogDateBlobStorage(),
                 )
 

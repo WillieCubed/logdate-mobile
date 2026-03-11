@@ -8,6 +8,7 @@ import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.logdate.DEFAULT_CONTENT_TYPE
 import app.logdate.server.logdate.DEFAULT_DURATION_MS
+import app.logdate.server.logdate.ENTRY_LEXICON_NSID
 import app.logdate.server.logdate.LogDateAssociation
 import app.logdate.server.logdate.LogDateAssociationRef
 import app.logdate.server.logdate.LogDateCollectionKind
@@ -23,8 +24,12 @@ import app.logdate.server.logdate.nullableStringValue
 import app.logdate.server.logdate.requireMatchingId
 import app.logdate.server.logdate.requireMatchingType
 import app.logdate.server.logdate.stringValue
+import app.logdate.server.logdate.toEntryRepoJson
 import kotlinx.serialization.json.JsonObject
 import studio.hypertext.atproto.identity.AtprotoDid
+import studio.hypertext.atproto.repo.Cid
+import studio.hypertext.atproto.repo.DAG_CBOR_CODEC
+import studio.hypertext.atproto.repo.DagCborCodec
 import studio.hypertext.atproto.repo.DefaultRepoEngine
 import studio.hypertext.atproto.repo.InvalidSwapException
 import studio.hypertext.atproto.repo.RepoBlockStore
@@ -69,7 +74,14 @@ class LogDateRepoStore(
     override suspend fun getRecord(recordId: RepoRecordId): Result<RepoRecord?> =
         runCatching {
             requireKnownRepo(recordId.repo)
-            canonicalEngine.getRecord(recordId).getOrThrow()
+            if (recordId.collection == entryCollection) {
+                entryAliasRecord(
+                    repo = recordId.repo,
+                    recordKey = recordId.recordKey,
+                )
+            } else {
+                canonicalEngine.getRecord(recordId).getOrThrow()
+            }
         }
 
     override suspend fun listRecords(
@@ -82,14 +94,23 @@ class LogDateRepoStore(
         runCatching {
             requireKnownRepo(repo)
             requireSupportedCollection(collection)
-            canonicalEngine
-                .listRecords(
+            if (collection == entryCollection) {
+                listEntryAliasRecords(
                     repo = repo,
-                    collection = collection,
                     limit = limit,
                     cursor = cursor,
                     reverse = reverse,
-                ).getOrThrow()
+                )
+            } else {
+                canonicalEngine
+                    .listRecords(
+                        repo = repo,
+                        collection = collection,
+                        limit = limit,
+                        cursor = cursor,
+                        reverse = reverse,
+                    ).getOrThrow()
+            }
         }
 
     override suspend fun createRecord(
@@ -104,7 +125,11 @@ class LogDateRepoStore(
             val resolvedRecordKey = recordKey ?: definition.generatedRecordKey(value)
             val recordId = RepoRecordId(repo = repo, collection = collection, recordKey = resolvedRecordKey)
             definition.upsert(collectionsRepository = collectionsRepository, userId = userId, recordId = recordId, value = value)
-            persistedWrite(recordId)
+            if (collection == entryCollection) {
+                requireNotNull(entryAliasRecord(repo, resolvedRecordKey)).toWriteResult()
+            } else {
+                persistedWrite(recordId)
+            }
         }
 
     override suspend fun putRecord(
@@ -114,7 +139,12 @@ class LogDateRepoStore(
     ): Result<RepoWriteResult> =
         runCatching {
             val definition = requireSupportedCollection(recordId.collection)
-            val existingCid = canonicalEngine.getRecord(recordId).getOrThrow()?.cid
+            val existingCid =
+                if (recordId.collection == entryCollection) {
+                    entryAliasRecord(recordId.repo, recordId.recordKey)?.cid
+                } else {
+                    canonicalEngine.getRecord(recordId).getOrThrow()?.cid
+                }
             if (swapRecord != null && existingCid != swapRecord) {
                 throw InvalidSwapException(expectedCid = existingCid, providedCid = swapRecord)
             }
@@ -124,7 +154,11 @@ class LogDateRepoStore(
                 recordId = recordId,
                 value = value,
             )
-            persistedWrite(recordId)
+            if (recordId.collection == entryCollection) {
+                requireNotNull(entryAliasRecord(recordId.repo, recordId.recordKey)).toWriteResult()
+            } else {
+                persistedWrite(recordId)
+            }
         }
 
     override suspend fun deleteRecord(
@@ -134,7 +168,12 @@ class LogDateRepoStore(
         runCatching {
             val userId = resolveUserId(recordId.repo)
             val definition = requireSupportedCollection(recordId.collection)
-            val existingCid = canonicalEngine.getRecord(recordId).getOrThrow()?.cid ?: return@runCatching false
+            val existingCid =
+                if (recordId.collection == entryCollection) {
+                    entryAliasRecord(recordId.repo, recordId.recordKey)?.cid
+                } else {
+                    canonicalEngine.getRecord(recordId).getOrThrow()?.cid
+                } ?: return@runCatching false
             if (swapRecord != null && existingCid != swapRecord) {
                 throw InvalidSwapException(expectedCid = existingCid, providedCid = swapRecord)
             }
@@ -195,7 +234,79 @@ class LogDateRepoStore(
         )
     }
 
+    private suspend fun entryAliasRecord(
+        repo: AtprotoDid,
+        recordKey: RecordKey,
+    ): RepoRecord? {
+        val userId = resolveUserId(repo)
+        val entry = collectionsRepository.getEntry(userId, recordKey.toString()) ?: return null
+        val value = entry.toEntryRepoJson()
+        return RepoRecord(
+            uri = RepoRecordId(repo = repo, collection = entryCollection, recordKey = recordKey).uri,
+            cid = syntheticCid(value),
+            value = value,
+        )
+    }
+
+    private suspend fun listEntryAliasRecords(
+        repo: AtprotoDid,
+        limit: Int,
+        cursor: String?,
+        reverse: Boolean,
+    ): RepoListPage {
+        val userId = resolveUserId(repo)
+        val safeLimit = limit.coerceIn(1, 100)
+        val sortedEntries =
+            collectionsRepository
+                .listEntries(userId)
+                .filter { entry ->
+                    cursor == null ||
+                        if (reverse) {
+                            entry.id < cursor
+                        } else {
+                            entry.id > cursor
+                        }
+                }.let { entries ->
+                    if (reverse) {
+                        entries.sortedByDescending(LogDateEntry::id)
+                    } else {
+                        entries.sortedBy(LogDateEntry::id)
+                    }
+                }
+        val pageEntries = sortedEntries.take(safeLimit)
+        return RepoListPage(
+            records =
+                pageEntries.map { entry ->
+                    val value = entry.toEntryRepoJson()
+                    RepoRecord(
+                        uri =
+                            RepoRecordId(
+                                repo = repo,
+                                collection = entryCollection,
+                                recordKey = RecordKey.require(entry.id),
+                            ).uri,
+                        cid = syntheticCid(value),
+                        value = value,
+                    )
+                },
+            cursor = pageEntries.lastOrNull()?.id?.takeIf { sortedEntries.size > pageEntries.size },
+        )
+    }
+
+    private fun RepoRecord.toWriteResult(): RepoWriteResult =
+        RepoWriteResult(
+            uri = uri,
+            cid = requireNotNull(cid),
+            validationStatus = RepoValidationStatus.UNKNOWN,
+        )
+
+    private fun syntheticCid(value: JsonObject): String =
+        Cid
+            .sha256(DAG_CBOR_CODEC, DagCborCodec.encode(value))
+            .toString()
+
     companion object {
+        val entryCollection: Nsid = ENTRY_LEXICON_NSID
         val contentCollection: Nsid = LogDateCollectionKind.ENTRY.nsid
         val journalCollection: Nsid = LogDateCollectionKind.JOURNAL.nsid
         val associationCollection: Nsid = LogDateCollectionKind.ASSOCIATION.nsid
@@ -203,6 +314,7 @@ class LogDateRepoStore(
         private val supportedCollections: List<LogDateCollectionAdapter> =
             listOf(
                 ContentCollectionAdapter,
+                EntryCollectionAdapter,
                 JournalCollectionAdapter,
                 AssociationCollectionAdapter,
             )
@@ -285,6 +397,43 @@ private object ContentCollectionAdapter : LogDateCollectionAdapter(LogDateRepoSt
             userId = userId,
             id = recordId.recordKey.toString(),
             deletedAt = System.currentTimeMillis(),
+        )
+    }
+}
+
+private object EntryCollectionAdapter : LogDateCollectionAdapter(LogDateRepoStore.entryCollection) {
+    override fun generatedRecordKey(value: JsonObject): RecordKey =
+        value.stringValue("id")?.let(RecordKey::require) ?: generatedRecordKey("entry")
+
+    override suspend fun hasRecords(
+        userId: java.util.UUID,
+        collectionsRepository: LogDateCollectionsRepository,
+    ): Boolean = collectionsRepository.listEntries(userId).isNotEmpty()
+
+    override suspend fun upsert(
+        collectionsRepository: LogDateCollectionsRepository,
+        userId: java.util.UUID,
+        recordId: RepoRecordId,
+        value: JsonObject,
+    ) {
+        requireMatchingType(value = value, collection = nsid)
+        ContentCollectionAdapter.upsert(
+            collectionsRepository = collectionsRepository,
+            userId = userId,
+            recordId = recordId.copy(collection = LogDateRepoStore.contentCollection),
+            value = value,
+        )
+    }
+
+    override suspend fun delete(
+        collectionsRepository: LogDateCollectionsRepository,
+        userId: java.util.UUID,
+        recordId: RepoRecordId,
+    ) {
+        ContentCollectionAdapter.delete(
+            collectionsRepository = collectionsRepository,
+            userId = userId,
+            recordId = recordId.copy(collection = LogDateRepoStore.contentCollection),
         )
     }
 }

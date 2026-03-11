@@ -71,7 +71,13 @@ class AtprotoContentRecordStoreTest {
                     ),
             )
 
-            assertEquals(listOf(AtprotoContentRecordStore.contentCollection), store.collectionsForDid(account.did))
+            assertEquals(
+                listOf(
+                    AtprotoContentRecordStore.contentCollection,
+                    LogDateRepoStore.entryCollection,
+                ),
+                store.collectionsForDid(account.did),
+            )
         }
 
     @Test

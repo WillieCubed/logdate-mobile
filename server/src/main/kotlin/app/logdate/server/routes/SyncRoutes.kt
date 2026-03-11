@@ -13,7 +13,7 @@ import app.logdate.server.logdate.LogDateCollectionsRepository
 import app.logdate.server.logdate.LogDateEntry
 import app.logdate.server.logdate.LogDateJournal
 import app.logdate.server.logdate.LogDateMedia
-import app.logdate.server.logdate.LogDateMediaRepository
+import app.logdate.server.logdate.LogDateMediaBlobRepository
 import app.logdate.server.responses.error
 import app.logdate.server.responses.simpleSuccess
 import app.logdate.server.sync.MediaAccessPolicy
@@ -387,7 +387,7 @@ fun Route.syncRoutes(
     mediaAccessPolicy: MediaAccessPolicy = MediaAccessPolicy.fromEnvironment(),
     encryptionService: EncryptionService = EncryptionService.fromEnvironment(),
     collectionsRepository: LogDateCollectionsRepository,
-    mediaRepository: LogDateMediaRepository,
+    mediaBlobRepository: LogDateMediaBlobRepository,
     backupRepository: LogDateBackupRepository,
 ) {
     route("") {
@@ -939,7 +939,7 @@ fun Route.syncRoutes(
                             null
                         }
                     val stored =
-                        mediaRepository.upsertMedia(
+                        mediaBlobRepository.upsertMedia(
                             userId,
                             LogDateMedia(
                                 mediaId = mediaId,
@@ -995,7 +995,7 @@ fun Route.syncRoutes(
                     val userId = extractUserId(call, tokenService) ?: return@get
                     val mediaId = call.requiredPathParam("mediaId")
                     val record =
-                        mediaRepository.getMedia(userId, mediaId)
+                        mediaBlobRepository.getMedia(userId, mediaId)
                             ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Media not found"))
 
                     call.respond(
@@ -1027,7 +1027,7 @@ fun Route.syncRoutes(
                     val userId = extractUserId(call, tokenService) ?: return@get
                     val mediaId = call.requiredPathParam("mediaId")
                     val record =
-                        mediaRepository.getMedia(userId, mediaId)
+                        mediaBlobRepository.getMedia(userId, mediaId)
                             ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Media not found"))
 
                     val encryptedPayload =
@@ -1080,10 +1080,10 @@ fun Route.syncRoutes(
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@delete
                     val mediaId = call.requiredPathParam("mediaId")
-                    val record = mediaRepository.getMedia(userId, mediaId)
+                    val record = mediaBlobRepository.getMedia(userId, mediaId)
                     if (record != null) {
                         record.storagePath?.let { mediaStorage?.deleteBlob(it) }
-                        mediaRepository.deleteMedia(userId, mediaId, System.currentTimeMillis())
+                        mediaBlobRepository.deleteMedia(userId, mediaId, System.currentTimeMillis())
                     }
                     call.respond(HttpStatusCode.NoContent)
                     success = true
