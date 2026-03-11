@@ -511,6 +511,7 @@ fun MainNavigationRoot(mainAppNavigator: MainAppNavigator) {
                             NoteViewerScreen(
                                 noteId = route.id,
                                 onGoBack = mainAppNavigator::goBack,
+                                onOpenLocationTimeline = mainAppNavigator::openLocationTimeline,
                             )
                         }
                         onboarding(
@@ -544,7 +545,11 @@ fun MainNavigationRoot(mainAppNavigator: MainAppNavigator) {
                                 homeViewModel = safeHomeViewModel,
                             )
                         }
-                        locationRoutes()
+                        locationRoutes(
+                            onOpenNote = { noteId ->
+                                mainAppNavigator.backStack.add(NoteViewerRoute(noteId))
+                            },
+                        )
                         searchRoutes(
                             onBack = mainAppNavigator::goBack,
                             onNavigateToDay = mainAppNavigator::openTimelineDetail,

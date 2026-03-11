@@ -3,9 +3,13 @@ package app.logdate.screenshots.components.home_timeline
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import app.logdate.client.domain.location.LocationMemoryTimeFilter
 import app.logdate.feature.location.timeline.ui.LocationTimelineContent
 import app.logdate.feature.location.timeline.ui.model.CurrentLocationUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationLabelSource
+import app.logdate.feature.location.timeline.ui.model.LocationMemoryKind
+import app.logdate.feature.location.timeline.ui.model.LocationMemoryPreviewUiModel
+import app.logdate.feature.location.timeline.ui.model.LocationPlaceUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationStopUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineErrorUiState
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineUiState
@@ -14,6 +18,7 @@ import app.logdate.screenshots.common.ScreenshotTheme
 import app.logdate.ui.maps.LocalGoogleMapsAvailabilityOverride
 import com.android.tools.screenshot.PreviewTest
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 internal val sampleCurrentLocation =
     CurrentLocationUiModel(
@@ -58,23 +63,94 @@ internal val sampleStops = listOf(
     ),
 )
 
+internal val samplePlaces = listOf(
+    LocationPlaceUiModel(
+        id = "place-1",
+        title = "Golden Gate Park",
+        subtitle = "2 memories · San Francisco, CA",
+        latitude = 37.7749,
+        longitude = -122.4194,
+        lastVisitedLabel = "Visited today",
+        memoryCount = 2,
+        sourceLabel = "Google Places",
+        source = LocationLabelSource.GOOGLE_PLACES,
+        memories =
+            listOf(
+                LocationMemoryPreviewUiModel(
+                    noteId = Uuid.parse("00000000-0000-0000-0000-000000000111"),
+                    title = "Afternoon walk",
+                    subtitle = "Text memory",
+                    timestamp = Instant.fromEpochMilliseconds(1_740_002_700_000L),
+                    latitude = 37.7749,
+                    longitude = -122.4194,
+                    kind = LocationMemoryKind.TEXT,
+                ),
+                LocationMemoryPreviewUiModel(
+                    noteId = Uuid.parse("00000000-0000-0000-0000-000000000112"),
+                    title = "Park snapshot",
+                    subtitle = "Photo memory",
+                    timestamp = Instant.fromEpochMilliseconds(1_740_001_800_000L),
+                    latitude = 37.7749,
+                    longitude = -122.4194,
+                    kind = LocationMemoryKind.PHOTO,
+                ),
+            ),
+        relatedStops = listOf(sampleStops.first()),
+    ),
+    LocationPlaceUiModel(
+        id = "place-2",
+        title = "Home",
+        subtitle = "1 memory · San Francisco, CA",
+        latitude = 37.7694,
+        longitude = -122.4862,
+        lastVisitedLabel = "Visited yesterday",
+        memoryCount = 1,
+        sourceLabel = "Saved place",
+        source = LocationLabelSource.USER_DEFINED,
+        memories =
+            listOf(
+                LocationMemoryPreviewUiModel(
+                    noteId = Uuid.parse("00000000-0000-0000-0000-000000000113"),
+                    title = "Quiet evening",
+                    subtitle = "Audio memory",
+                    timestamp = Instant.fromEpochMilliseconds(1_739_995_400_000L),
+                    latitude = 37.7694,
+                    longitude = -122.4862,
+                    kind = LocationMemoryKind.AUDIO,
+                ),
+            ),
+        relatedStops = listOf(sampleStops.last()),
+    ),
+)
+
 internal val sampleLocationSuccessState =
     LocationTimelineUiState.Success(
         currentLocation = sampleCurrentLocation,
-        stops = sampleStops,
+        selectedFilter = LocationMemoryTimeFilter.Last30Days,
+        places = samplePlaces,
+        visiblePlaces = samplePlaces,
+        recentStops = sampleStops,
+        selectedPlaceId = samplePlaces.first().id,
+        canLoadMorePlaces = true,
     )
 
 internal val sampleLocationSelectedState =
     LocationTimelineUiState.Success(
         currentLocation = sampleCurrentLocation,
-        stops = sampleStops,
-        selectedStopId = sampleStops.last().id,
+        selectedFilter = LocationMemoryTimeFilter.Last30Days,
+        places = samplePlaces,
+        visiblePlaces = samplePlaces,
+        recentStops = sampleStops,
+        selectedPlaceId = samplePlaces.last().id,
     )
 
 internal val sampleLocationEmptyState =
     LocationTimelineUiState.Success(
         currentLocation = null,
-        stops = emptyList(),
+        selectedFilter = LocationMemoryTimeFilter.Last30Days,
+        places = emptyList(),
+        visiblePlaces = emptyList(),
+        recentStops = emptyList(),
     )
 
 // ─── Location Timeline States ───────────────────────────────────────────────────
@@ -86,8 +162,11 @@ fun LocationTimeline_Loading() {
     ScreenshotTheme {
         LocationTimelineContent(
             uiState = LocationTimelineUiState.Loading,
-            onSelectStop = {},
+            onSelectPlace = {},
+            onDismissPlaceDetail = {},
             onDeleteStop = {},
+            onSelectFilter = {},
+            onLoadMorePlaces = {},
         )
     }
 }
@@ -99,8 +178,11 @@ fun LocationTimeline_Success() {
     ScreenshotTheme {
         LocationTimelineContent(
             uiState = sampleLocationSuccessState,
-            onSelectStop = {},
+            onSelectPlace = {},
+            onDismissPlaceDetail = {},
             onDeleteStop = {},
+            onSelectFilter = {},
+            onLoadMorePlaces = {},
         )
     }
 }
@@ -112,8 +194,11 @@ fun LocationTimeline_Success_Dark() {
     ScreenshotTheme(darkTheme = true) {
         LocationTimelineContent(
             uiState = sampleLocationSuccessState,
-            onSelectStop = {},
+            onSelectPlace = {},
+            onDismissPlaceDetail = {},
             onDeleteStop = {},
+            onSelectFilter = {},
+            onLoadMorePlaces = {},
         )
     }
 }
@@ -125,8 +210,11 @@ fun LocationTimeline_Empty() {
     ScreenshotTheme {
         LocationTimelineContent(
             uiState = sampleLocationEmptyState,
-            onSelectStop = {},
+            onSelectPlace = {},
+            onDismissPlaceDetail = {},
             onDeleteStop = {},
+            onSelectFilter = {},
+            onLoadMorePlaces = {},
         )
     }
 }
@@ -138,8 +226,11 @@ fun LocationTimeline_Error() {
     ScreenshotTheme {
         LocationTimelineContent(
             uiState = LocationTimelineUiState.Error(LocationTimelineErrorUiState.TemporarilyUnavailable),
-            onSelectStop = {},
+            onSelectPlace = {},
+            onDismissPlaceDetail = {},
             onDeleteStop = {},
+            onSelectFilter = {},
+            onLoadMorePlaces = {},
         )
     }
 }
@@ -151,8 +242,11 @@ fun LocationTimeline_PermissionRequired() {
     ScreenshotTheme {
         LocationTimelineContent(
             uiState = LocationTimelineUiState.Error(LocationTimelineErrorUiState.PermissionRequired),
-            onSelectStop = {},
+            onSelectPlace = {},
+            onDismissPlaceDetail = {},
             onDeleteStop = {},
+            onSelectFilter = {},
+            onLoadMorePlaces = {},
         )
     }
 }
@@ -164,8 +258,11 @@ fun LocationTimeline_ServicesDisabled() {
     ScreenshotTheme {
         LocationTimelineContent(
             uiState = LocationTimelineUiState.Error(LocationTimelineErrorUiState.LocationServicesDisabled),
-            onSelectStop = {},
+            onSelectPlace = {},
+            onDismissPlaceDetail = {},
             onDeleteStop = {},
+            onSelectFilter = {},
+            onLoadMorePlaces = {},
         )
     }
 }
@@ -178,8 +275,11 @@ fun LocationTimeline_NoMapConfigured() {
         CompositionLocalProvider(LocalGoogleMapsAvailabilityOverride provides false) {
             LocationTimelineContent(
                 uiState = sampleLocationSelectedState,
-                onSelectStop = {},
+                onSelectPlace = {},
+                onDismissPlaceDetail = {},
                 onDeleteStop = {},
+                onSelectFilter = {},
+                onLoadMorePlaces = {},
             )
         }
     }

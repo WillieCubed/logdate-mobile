@@ -6,10 +6,14 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import app.logdate.client.domain.location.LocationMemoryTimeFilter
 import app.logdate.feature.location.timeline.ui.LocationTimelineContent
 import app.logdate.feature.location.timeline.ui.LocationTimelineQuickPeekSheet
 import app.logdate.feature.location.timeline.ui.model.CurrentLocationUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationLabelSource
+import app.logdate.feature.location.timeline.ui.model.LocationMemoryKind
+import app.logdate.feature.location.timeline.ui.model.LocationMemoryPreviewUiModel
+import app.logdate.feature.location.timeline.ui.model.LocationPlaceUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationStopUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineErrorUiState
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineUiState
@@ -74,17 +78,84 @@ private val sampleStops =
         ),
     )
 
+private val samplePlaces =
+    listOf(
+        LocationPlaceUiModel(
+            id = "place-1",
+            title = "Golden Gate Park",
+            subtitle = "2 memories · San Francisco, CA",
+            latitude = 37.7749,
+            longitude = -122.4194,
+            lastVisitedLabel = "Visited today",
+            memoryCount = 2,
+            sourceLabel = "Google Places",
+            source = LocationLabelSource.GOOGLE_PLACES,
+            memories =
+                listOf(
+                    LocationMemoryPreviewUiModel(
+                        noteId = Uuid.parse("00000000-0000-0000-0000-000000000081"),
+                        title = "Afternoon walk",
+                        subtitle = "Text memory",
+                        timestamp = Instant.fromEpochMilliseconds(1_740_002_700_000L),
+                        latitude = 37.7749,
+                        longitude = -122.4194,
+                        kind = LocationMemoryKind.TEXT,
+                    ),
+                    LocationMemoryPreviewUiModel(
+                        noteId = Uuid.parse("00000000-0000-0000-0000-000000000082"),
+                        title = "Park snapshot",
+                        subtitle = "Photo memory",
+                        timestamp = Instant.fromEpochMilliseconds(1_740_001_800_000L),
+                        latitude = 37.7749,
+                        longitude = -122.4194,
+                        kind = LocationMemoryKind.PHOTO,
+                    ),
+                ),
+            relatedStops = listOf(sampleStops.first()),
+        ),
+        LocationPlaceUiModel(
+            id = "place-2",
+            title = "Home",
+            subtitle = "1 memory · San Francisco, CA",
+            latitude = 37.7694,
+            longitude = -122.4862,
+            lastVisitedLabel = "Visited yesterday",
+            memoryCount = 1,
+            sourceLabel = "Saved place",
+            source = LocationLabelSource.USER_DEFINED,
+            memories =
+                listOf(
+                    LocationMemoryPreviewUiModel(
+                        noteId = Uuid.parse("00000000-0000-0000-0000-000000000083"),
+                        title = "Quiet evening",
+                        subtitle = "Audio memory",
+                        timestamp = Instant.fromEpochMilliseconds(1_739_995_400_000L),
+                        latitude = 37.7694,
+                        longitude = -122.4862,
+                        kind = LocationMemoryKind.AUDIO,
+                    ),
+                ),
+            relatedStops = listOf(sampleStops.last()),
+        ),
+    )
+
 private val sampleLocationSelectedState =
     LocationTimelineUiState.Success(
         currentLocation = sampleCurrentLocation,
-        stops = sampleStops,
-        selectedStopId = sampleStops.last().id,
+        selectedFilter = LocationMemoryTimeFilter.Last30Days,
+        places = samplePlaces,
+        visiblePlaces = samplePlaces,
+        recentStops = sampleStops,
+        selectedPlaceId = samplePlaces.last().id,
     )
 
 private val sampleLocationEmptyState =
     LocationTimelineUiState.Success(
         currentLocation = null,
-        stops = emptyList(),
+        selectedFilter = LocationMemoryTimeFilter.Last30Days,
+        places = emptyList(),
+        visiblePlaces = emptyList(),
+        recentStops = emptyList(),
     )
 
 private val sampleLocationErrorState =
@@ -134,8 +205,11 @@ fun S01_LocationPopulated() {
         HomeTabRouteFrame(selectedTab = RoutePreviewTab.LOCATION) {
             LocationTimelineContent(
                 uiState = sampleLocationSelectedState,
-                onSelectStop = {},
+                onSelectPlace = {},
+                onDismissPlaceDetail = {},
                 onDeleteStop = {},
+                onSelectFilter = {},
+                onLoadMorePlaces = {},
             )
         }
     }
@@ -149,8 +223,11 @@ fun S02_LocationEmpty() {
         HomeTabRouteFrame(selectedTab = RoutePreviewTab.LOCATION) {
             LocationTimelineContent(
                 uiState = sampleLocationEmptyState,
-                onSelectStop = {},
+                onSelectPlace = {},
+                onDismissPlaceDetail = {},
                 onDeleteStop = {},
+                onSelectFilter = {},
+                onLoadMorePlaces = {},
             )
         }
     }
@@ -164,8 +241,11 @@ fun S03_LocationUnavailable() {
         HomeTabRouteFrame(selectedTab = RoutePreviewTab.LOCATION) {
             LocationTimelineContent(
                 uiState = sampleLocationErrorState,
-                onSelectStop = {},
+                onSelectPlace = {},
+                onDismissPlaceDetail = {},
                 onDeleteStop = {},
+                onSelectFilter = {},
+                onLoadMorePlaces = {},
             )
         }
     }
@@ -193,7 +273,7 @@ fun S04_TimelineLocationQuickPeek() {
                 uiState = sampleLocationSelectedState,
                 onDismissRequest = {},
                 onOpenFullTimeline = {},
-                onSelectStop = {},
+                onSelectPlace = {},
             )
         }
     }
@@ -208,7 +288,7 @@ fun S05_LocationQuickPeekEmpty() {
             uiState = sampleLocationEmptyState,
             onDismissRequest = {},
             onOpenFullTimeline = {},
-            onSelectStop = {},
+            onSelectPlace = {},
         )
     }
 }
@@ -222,7 +302,7 @@ fun S06_LocationQuickPeekLoading() {
             uiState = LocationTimelineUiState.Loading,
             onDismissRequest = {},
             onOpenFullTimeline = {},
-            onSelectStop = {},
+            onSelectPlace = {},
         )
     }
 }
@@ -236,7 +316,7 @@ fun S07_LocationQuickPeekPermissionRequired() {
             uiState = LocationTimelineUiState.Error(LocationTimelineErrorUiState.PermissionRequired),
             onDismissRequest = {},
             onOpenFullTimeline = {},
-            onSelectStop = {},
+            onSelectPlace = {},
         )
     }
 }
@@ -251,7 +331,7 @@ fun S08_LocationQuickPeekNoMapConfigured() {
                 uiState = sampleLocationSelectedState,
                 onDismissRequest = {},
                 onOpenFullTimeline = {},
-                onSelectStop = {},
+                onSelectPlace = {},
             )
         }
     }

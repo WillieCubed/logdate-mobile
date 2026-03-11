@@ -1,6 +1,8 @@
 package app.logdate.feature.location.timeline.ui.model
 
+import app.logdate.client.domain.location.LocationMemoryTimeFilter
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 sealed interface LocationTimelineUiState {
     data object Loading : LocationTimelineUiState
@@ -11,11 +13,15 @@ sealed interface LocationTimelineUiState {
 
     data class Success(
         val currentLocation: CurrentLocationUiModel?,
-        val stops: List<LocationStopUiModel>,
-        val selectedStopId: String? = stops.firstOrNull()?.id,
+        val selectedFilter: LocationMemoryTimeFilter,
+        val places: List<LocationPlaceUiModel>,
+        val visiblePlaces: List<LocationPlaceUiModel>,
+        val recentStops: List<LocationStopUiModel>,
+        val selectedPlaceId: String? = visiblePlaces.firstOrNull()?.id,
+        val canLoadMorePlaces: Boolean = false,
     ) : LocationTimelineUiState {
-        val selectedStop: LocationStopUiModel?
-            get() = stops.firstOrNull { it.id == selectedStopId } ?: stops.firstOrNull()
+        val selectedPlace: LocationPlaceUiModel?
+            get() = visiblePlaces.firstOrNull { it.id == selectedPlaceId } ?: visiblePlaces.firstOrNull()
     }
 }
 
@@ -53,11 +59,42 @@ enum class LocationLabelSource {
     COORDINATES,
 }
 
+enum class LocationMemoryKind {
+    TEXT,
+    PHOTO,
+    AUDIO,
+    VIDEO,
+}
+
 data class CurrentLocationUiModel(
     val title: String,
     val subtitle: String,
     val latitude: Double,
     val longitude: Double,
+)
+
+data class LocationPlaceUiModel(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val latitude: Double,
+    val longitude: Double,
+    val lastVisitedLabel: String,
+    val memoryCount: Int,
+    val sourceLabel: String,
+    val source: LocationLabelSource,
+    val memories: List<LocationMemoryPreviewUiModel>,
+    val relatedStops: List<LocationStopUiModel>,
+)
+
+data class LocationMemoryPreviewUiModel(
+    val noteId: Uuid,
+    val title: String,
+    val subtitle: String,
+    val timestamp: Instant,
+    val latitude: Double,
+    val longitude: Double,
+    val kind: LocationMemoryKind,
 )
 
 data class LocationStopUiModel(

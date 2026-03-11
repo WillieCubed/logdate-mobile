@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -24,21 +25,23 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -54,36 +57,56 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.logdate.client.domain.location.LocationMemoryTimeFilter
 import app.logdate.client.permissions.rememberLocationPermissionState
+import app.logdate.feature.location.timeline.ui.model.CurrentLocationUiModel
+import app.logdate.feature.location.timeline.ui.model.LocationMemoryPreviewUiModel
+import app.logdate.feature.location.timeline.ui.model.LocationPlaceUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationStopUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineErrorUiState
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineUiState
 import logdate.client.feature.location.timeline.generated.resources.Res
+import logdate.client.feature.location.timeline.generated.resources.all_time
 import logdate.client.feature.location.timeline.generated.resources.cancel
+import logdate.client.feature.location.timeline.generated.resources.current_location
 import logdate.client.feature.location.timeline.generated.resources.delete_location
 import logdate.client.feature.location.timeline.generated.resources.delete_location_confirmation
 import logdate.client.feature.location.timeline.generated.resources.enable
+import logdate.client.feature.location.timeline.generated.resources.last_30_days
+import logdate.client.feature.location.timeline.generated.resources.last_90_days
+import logdate.client.feature.location.timeline.generated.resources.last_visited_label
+import logdate.client.feature.location.timeline.generated.resources.load_more_places
 import logdate.client.feature.location.timeline.generated.resources.location_permission_required
 import logdate.client.feature.location.timeline.generated.resources.location_permission_required_description
 import logdate.client.feature.location.timeline.generated.resources.location_services_disabled
 import logdate.client.feature.location.timeline.generated.resources.location_services_disabled_description
 import logdate.client.feature.location.timeline.generated.resources.location_timeline
 import logdate.client.feature.location.timeline.generated.resources.locations_temporarily_unavailable_description
+import logdate.client.feature.location.timeline.generated.resources.memories_count
 import logdate.client.feature.location.timeline.generated.resources.no_location_history_yet
+import logdate.client.feature.location.timeline.generated.resources.no_memories_for_this_range
+import logdate.client.feature.location.timeline.generated.resources.pinned_memory
+import logdate.client.feature.location.timeline.generated.resources.recent_memories
+import logdate.client.feature.location.timeline.generated.resources.recent_stays
 import logdate.client.feature.location.timeline.generated.resources.samples_count
 import logdate.client.feature.location.timeline.generated.resources.stayed_for_duration
 import logdate.client.feature.location.timeline.generated.resources.try_again
 import logdate.client.feature.location.timeline.generated.resources.unable_to_load_location_timeline
+import logdate.client.feature.location.timeline.generated.resources.view_note
+import logdate.client.feature.location.timeline.generated.resources.year_to_date
 import logdate.client.feature.location.timeline.generated.resources.your_location_timeline_will_appear_here_as_you_move_around
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LocationTimelineScreen(
     modifier: Modifier = Modifier,
+    onOpenNote: (Uuid) -> Unit = {},
     viewModel: LocationTimelineViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -100,9 +123,13 @@ fun LocationTimelineScreen(
     ) { paddingValues ->
         LocationTimelineContent(
             uiState = uiState,
-            onSelectStop = viewModel::selectStop,
+            onSelectPlace = viewModel::selectPlace,
+            onDismissPlaceDetail = viewModel::dismissPlaceDetail,
             onDeleteStop = viewModel::deleteStop,
+            onSelectFilter = viewModel::selectFilter,
+            onLoadMorePlaces = viewModel::loadMorePlaces,
             onRetry = viewModel::retry,
+            onOpenNote = onOpenNote,
             modifier =
                 Modifier
                     .fillMaxSize()
@@ -114,15 +141,29 @@ fun LocationTimelineScreen(
 @Composable
 fun LocationTimelineContent(
     uiState: LocationTimelineUiState,
-    onSelectStop: (String) -> Unit,
+    onSelectPlace: (String) -> Unit,
+    onDismissPlaceDetail: () -> Unit,
     onDeleteStop: (String) -> Unit,
+    onSelectFilter: (LocationMemoryTimeFilter) -> Unit,
+    onLoadMorePlaces: () -> Unit,
     onRetry: () -> Unit = {},
+    onOpenNote: (Uuid) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     when (uiState) {
         is LocationTimelineUiState.Loading -> LoadingState(modifier)
         is LocationTimelineUiState.Error -> ErrorState(error = uiState.error, onRetry = onRetry, modifier = modifier)
-        is LocationTimelineUiState.Success -> SuccessState(uiState, onSelectStop, onDeleteStop, modifier)
+        is LocationTimelineUiState.Success ->
+            SuccessState(
+                uiState = uiState,
+                onSelectPlace = onSelectPlace,
+                onDismissPlaceDetail = onDismissPlaceDetail,
+                onDeleteStop = onDeleteStop,
+                onSelectFilter = onSelectFilter,
+                onLoadMorePlaces = onLoadMorePlaces,
+                onOpenNote = onOpenNote,
+                modifier = modifier,
+            )
     }
 }
 
@@ -241,26 +282,31 @@ internal fun LocationTimelineErrorCard(
 @Composable
 private fun SuccessState(
     uiState: LocationTimelineUiState.Success,
-    onSelectStop: (String) -> Unit,
+    onSelectPlace: (String) -> Unit,
+    onDismissPlaceDetail: () -> Unit,
     onDeleteStop: (String) -> Unit,
+    onSelectFilter: (LocationMemoryTimeFilter) -> Unit,
+    onLoadMorePlaces: () -> Unit,
+    onOpenNote: (Uuid) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (uiState.stops.isEmpty() && uiState.currentLocation == null) {
+    if (uiState.visiblePlaces.isEmpty() && uiState.recentStops.isEmpty() && uiState.currentLocation == null) {
         EmptyLocationTimeline(modifier = modifier)
         return
     }
 
+    val listState = rememberLazyListState()
+
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val useTwoPane = maxWidth >= 840.dp
-        val stopsListState = rememberLazyListState()
 
         if (useTwoPane) {
             Row(modifier = Modifier.fillMaxSize()) {
-                locationTimelineMap(
-                    stops = uiState.stops,
+                LocationTimelineMap(
+                    places = uiState.visiblePlaces,
                     currentLocation = uiState.currentLocation,
-                    selectedStopId = uiState.selectedStopId,
-                    onSelectStop = onSelectStop,
+                    selectedPlaceId = uiState.selectedPlaceId,
+                    onSelectPlace = onSelectPlace,
                     modifier =
                         Modifier
                             .weight(1f)
@@ -268,15 +314,16 @@ private fun SuccessState(
                             .padding(16.dp),
                 )
                 VerticalDivider(modifier = Modifier.fillMaxHeight())
-                StopsList(
-                    stops = uiState.stops,
-                    selectedStopId = uiState.selectedStop?.id,
-                    onSelectStop = onSelectStop,
+                PlacesAndHistoryList(
+                    uiState = uiState,
+                    onSelectPlace = onSelectPlace,
                     onDeleteStop = onDeleteStop,
-                    listState = stopsListState,
+                    onSelectFilter = onSelectFilter,
+                    onLoadMorePlaces = onLoadMorePlaces,
+                    listState = listState,
                     modifier =
                         Modifier
-                            .widthIn(min = 320.dp, max = 420.dp)
+                            .widthIn(min = 340.dp, max = 440.dp)
                             .fillMaxSize(),
                 )
             }
@@ -285,13 +332,13 @@ private fun SuccessState(
             val collapsedMapHeight = 148.dp
             val collapseRange = expandedMapHeight - collapsedMapHeight
             val collapseRangePx = with(LocalDensity.current) { collapseRange.toPx() }
-            val mapHeightTarget by remember(stopsListState, collapseRange, collapseRangePx) {
+            val mapHeightTarget by remember(listState, collapseRange, collapseRangePx) {
                 derivedStateOf {
                     val collapseFraction =
                         when {
-                            stopsListState.firstVisibleItemIndex > 0 -> 1f
+                            listState.firstVisibleItemIndex > 0 -> 1f
                             collapseRangePx <= 0f -> 0f
-                            else -> (stopsListState.firstVisibleItemScrollOffset / collapseRangePx).coerceIn(0f, 1f)
+                            else -> (listState.firstVisibleItemScrollOffset / collapseRangePx).coerceIn(0f, 1f)
                         }
 
                     expandedMapHeight - (collapseRange * collapseFraction)
@@ -308,11 +355,11 @@ private fun SuccessState(
             )
 
             Column(modifier = Modifier.fillMaxSize()) {
-                locationTimelineMap(
-                    stops = uiState.stops,
+                LocationTimelineMap(
+                    places = uiState.visiblePlaces,
                     currentLocation = uiState.currentLocation,
-                    selectedStopId = uiState.selectedStopId,
-                    onSelectStop = onSelectStop,
+                    selectedPlaceId = uiState.selectedPlaceId,
+                    onSelectPlace = onSelectPlace,
                     modifier =
                         Modifier
                             .fillMaxWidth()
@@ -320,25 +367,35 @@ private fun SuccessState(
                             .padding(16.dp),
                 )
                 HorizontalDivider()
-                StopsList(
-                    stops = uiState.stops,
-                    selectedStopId = uiState.selectedStop?.id,
-                    onSelectStop = onSelectStop,
+                PlacesAndHistoryList(
+                    uiState = uiState,
+                    onSelectPlace = onSelectPlace,
                     onDeleteStop = onDeleteStop,
-                    listState = stopsListState,
+                    onSelectFilter = onSelectFilter,
+                    onLoadMorePlaces = onLoadMorePlaces,
+                    listState = listState,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
         }
     }
+
+    uiState.selectedPlace?.let { place ->
+        LocationPlaceDetailSheet(
+            place = place,
+            onDismissRequest = onDismissPlaceDetail,
+            onOpenNote = onOpenNote,
+        )
+    }
 }
 
 @Composable
-private fun StopsList(
-    stops: List<LocationStopUiModel>,
-    selectedStopId: String?,
-    onSelectStop: (String) -> Unit,
+private fun PlacesAndHistoryList(
+    uiState: LocationTimelineUiState.Success,
+    onSelectPlace: (String) -> Unit,
     onDeleteStop: (String) -> Unit,
+    onSelectFilter: (LocationMemoryTimeFilter) -> Unit,
+    onLoadMorePlaces: () -> Unit,
     listState: LazyListState,
     modifier: Modifier = Modifier,
 ) {
@@ -348,32 +405,192 @@ private fun StopsList(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        item {
+            PlacesFilterRow(
+                selectedFilter = uiState.selectedFilter,
+                onSelectFilter = onSelectFilter,
+            )
+        }
+
+        uiState.currentLocation?.let { currentLocation ->
+            item {
+                CurrentLocationCard(currentLocation = currentLocation)
+            }
+        }
+
+        item {
+            SectionHeader(
+                title = stringResource(Res.string.recent_memories),
+                subtitle = stringResource(Res.string.memories_count, uiState.places.sumOf(LocationPlaceUiModel::memoryCount)),
+            )
+        }
+
+        if (uiState.visiblePlaces.isEmpty()) {
+            item {
+                Card {
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.no_memories_for_this_range),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            text = stringResource(Res.string.your_location_timeline_will_appear_here_as_you_move_around),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+
         items(
-            items = stops,
+            items = uiState.visiblePlaces,
             key = { it.id },
-        ) { stop ->
-            StopCard(
-                stop = stop,
-                selected = stop.id == selectedStopId,
-                onSelect = { onSelectStop(stop.id) },
-                onDelete = { onDeleteStop(stop.id) },
+        ) { place ->
+            LocationPlaceCard(
+                place = place,
+                selected = place.id == uiState.selectedPlaceId,
+                onSelect = { onSelectPlace(place.id) },
+            )
+        }
+
+        if (uiState.canLoadMorePlaces) {
+            item {
+                TextButton(
+                    onClick = onLoadMorePlaces,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(Res.string.load_more_places))
+                }
+            }
+        }
+
+        if (uiState.recentStops.isNotEmpty()) {
+            item {
+                SectionHeader(
+                    title = stringResource(Res.string.recent_stays),
+                    subtitle = stringResource(Res.string.samples_count, uiState.recentStops.sumOf(LocationStopUiModel::sampleCount)),
+                )
+            }
+
+            items(
+                items = uiState.recentStops,
+                key = { it.id },
+            ) { stop ->
+                StopCard(
+                    stop = stop,
+                    onDelete = { onDeleteStop(stop.id) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlacesFilterRow(
+    selectedFilter: LocationMemoryTimeFilter,
+    onSelectFilter: (LocationMemoryTimeFilter) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        LocationMemoryTimeFilter.entries.forEach { filter ->
+            FilterChip(
+                selected = filter == selectedFilter,
+                onClick = { onSelectFilter(filter) },
+                label = {
+                    Text(FilterLabel(filter))
+                },
             )
         }
     }
 }
 
 @Composable
-private fun StopCard(
-    stop: LocationStopUiModel,
+private fun FilterLabel(filter: LocationMemoryTimeFilter): String =
+    when (filter) {
+        LocationMemoryTimeFilter.Last30Days -> stringResource(Res.string.last_30_days)
+        LocationMemoryTimeFilter.Last90Days -> stringResource(Res.string.last_90_days)
+        LocationMemoryTimeFilter.YearToDate -> stringResource(Res.string.year_to_date)
+        LocationMemoryTimeFilter.AllTime -> stringResource(Res.string.all_time)
+    }
+
+@Composable
+private fun SectionHeader(
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun CurrentLocationCard(
+    currentLocation: CurrentLocationUiModel,
+    modifier: Modifier = Modifier,
+) {
+    Card(modifier = modifier) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = stringResource(Res.string.current_location),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = currentLocation.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = currentLocation.subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LocationPlaceCard(
+    place: LocationPlaceUiModel,
     selected: Boolean,
     onSelect: () -> Unit,
-    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    var showActions by remember(stop.id) { mutableStateOf(false) }
-    var showDeleteConfirmation by remember(stop.id) { mutableStateOf(false) }
-
     Card(
         onClick = onSelect,
+        modifier = modifier,
         border =
             if (selected) {
                 BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
@@ -381,6 +598,56 @@ private fun StopCard(
                 null
             },
     ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = place.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = place.subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = stringResource(Res.string.memories_count, place.memoryCount),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = stringResource(Res.string.last_visited_label, place.lastVisitedLabel),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            place.memories.firstOrNull()?.let { memory ->
+                Text(
+                    text = memory.title,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StopCard(
+    stop: LocationStopUiModel,
+    onDelete: () -> Unit,
+) {
+    var showActions by remember(stop.id) { mutableStateOf(false) }
+    var showDeleteConfirmation by remember(stop.id) { mutableStateOf(false) }
+
+    Card {
         Column(
             modifier =
                 Modifier
@@ -413,11 +680,11 @@ private fun StopCard(
                         Icon(Icons.Default.MoreVert, contentDescription = null)
                     }
 
-                    DropdownMenu(
+                    androidx.compose.material3.DropdownMenu(
                         expanded = showActions,
                         onDismissRequest = { showActions = false },
                     ) {
-                        DropdownMenuItem(
+                        androidx.compose.material3.DropdownMenuItem(
                             text = { Text(stringResource(Res.string.delete_location)) },
                             onClick = {
                                 showActions = false
@@ -438,7 +705,7 @@ private fun StopCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = "${stop.sourceLabel} • ${stringResource(Res.string.samples_count, stop.sampleCount)}",
+                text = stringResource(Res.string.samples_count, stop.sampleCount),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -466,6 +733,147 @@ private fun StopCard(
                 }
             },
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LocationPlaceDetailSheet(
+    place: LocationPlaceUiModel,
+    onDismissRequest: () -> Unit,
+    onOpenNote: (Uuid) -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismissRequest,
+    ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = place.title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = place.subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = stringResource(Res.string.memories_count, place.memoryCount),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        text = stringResource(Res.string.last_visited_label, place.lastVisitedLabel),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            if (place.memories.isNotEmpty()) {
+                item {
+                    SectionHeader(
+                        title = stringResource(Res.string.recent_memories),
+                        subtitle = stringResource(Res.string.memories_count, place.memoryCount),
+                    )
+                }
+
+                items(
+                    items = place.memories,
+                    key = { it.noteId },
+                ) { memory ->
+                    LocationMemoryPreviewCard(
+                        memory = memory,
+                        onOpenNote = { onOpenNote(memory.noteId) },
+                    )
+                }
+            }
+
+            if (place.relatedStops.isNotEmpty()) {
+                item {
+                    SectionHeader(
+                        title = stringResource(Res.string.recent_stays),
+                        subtitle = stringResource(Res.string.samples_count, place.relatedStops.sumOf(LocationStopUiModel::sampleCount)),
+                    )
+                }
+
+                items(
+                    items = place.relatedStops,
+                    key = { it.id },
+                ) { stop ->
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        shape = MaterialTheme.shapes.medium,
+                    ) {
+                        Column(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(
+                                text = stop.timeRange,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            Text(
+                                text = stringResource(Res.string.stayed_for_duration, stop.duration),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocationMemoryPreviewCard(
+    memory: LocationMemoryPreviewUiModel,
+    onOpenNote: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        onClick = onOpenNote,
+        modifier = modifier,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = memory.title.ifBlank { stringResource(Res.string.pinned_memory) },
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = memory.subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(
+                onClick = onOpenNote,
+                modifier = Modifier.align(Alignment.End),
+            ) {
+                Text(stringResource(Res.string.view_note))
+            }
+        }
     }
 }
 

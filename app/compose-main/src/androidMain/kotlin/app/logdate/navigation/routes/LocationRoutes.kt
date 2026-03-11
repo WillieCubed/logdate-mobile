@@ -8,15 +8,16 @@ import app.logdate.navigation.routes.core.LocationRoute
 import app.logdate.navigation.routes.core.switchToTab
 import app.logdate.navigation.scenes.HomeScene
 import app.logdate.navigation.scenes.HomeTab
+import kotlin.uuid.Uuid
 
 fun MainAppNavigator.openLocationTimeline() {
     switchToTab(HomeTab.LOCATION)
 }
 
-fun EntryProviderScope<NavKey>.locationRoutes() {
+fun EntryProviderScope<NavKey>.locationRoutes(onOpenNote: (Uuid) -> Unit) {
     routeEntry<LocationRoute>(
         metadata = HomeScene.homeScene(),
     ) { _ ->
-        LocationTimelineScreen()
+        LocationTimelineScreen(onOpenNote = onOpenNote)
     }
 }

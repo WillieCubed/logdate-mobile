@@ -6,5 +6,5 @@ import org.koin.dsl.module
 
 val locationTimelineModule =
     module {
-        viewModel { LocationTimelineViewModel(get(), get(), get(), get(), get()) }
+        viewModel { LocationTimelineViewModel(get(), get(), get(), get(), get(), get()) }
     }

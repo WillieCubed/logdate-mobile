@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.location.timeline.ui
 
 import androidx.compose.foundation.BorderStroke
@@ -18,6 +20,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,7 +31,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.location.timeline.ui.model.CurrentLocationUiModel
-import app.logdate.feature.location.timeline.ui.model.LocationStopUiModel
+import app.logdate.feature.location.timeline.ui.model.LocationMemoryPreviewUiModel
+import app.logdate.feature.location.timeline.ui.model.LocationPlaceUiModel
 import app.logdate.ui.maps.rememberGoogleMapsEnabled
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
@@ -41,25 +46,27 @@ import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import logdate.client.feature.location.timeline.generated.resources.Res
 import logdate.client.feature.location.timeline.generated.resources.current_location
-import logdate.client.feature.location.timeline.generated.resources.recent_stops
+import logdate.client.feature.location.timeline.generated.resources.memories_count
+import logdate.client.feature.location.timeline.generated.resources.recent_memories
 import org.jetbrains.compose.resources.stringResource
+import kotlin.math.pow
 
 @Composable
-internal actual fun locationTimelineMap(
-    stops: List<LocationStopUiModel>,
+internal actual fun LocationTimelineMap(
+    places: List<LocationPlaceUiModel>,
     currentLocation: CurrentLocationUiModel?,
-    selectedStopId: String?,
-    onSelectStop: (String) -> Unit,
+    selectedPlaceId: String?,
+    onSelectPlace: (String) -> Unit,
     modifier: Modifier,
 ) {
-    val selectedStop = stops.firstOrNull { it.id == selectedStopId } ?: stops.firstOrNull()
-    val initialPoint = selectedStop?.let { LatLng(it.latitude, it.longitude) } ?: currentLocation?.let { LatLng(it.latitude, it.longitude) }
+    val selectedPlace = places.firstOrNull { it.id == selectedPlaceId } ?: places.firstOrNull()
+    val initialPoint = selectedPlace?.toLatLng() ?: currentLocation?.toLatLng() ?: places.firstOrNull()?.toLatLng()
     val googleMapsEnabled = rememberGoogleMapsEnabled()
 
     if (initialPoint == null) {
-        locationTimelineMapFallback(
-            stops = stops,
-            selectedStop = selectedStop,
+        LocationTimelineMapFallback(
+            places = places,
+            selectedPlace = selectedPlace,
             currentLocation = currentLocation,
             modifier = modifier,
         )
@@ -67,9 +74,9 @@ internal actual fun locationTimelineMap(
     }
 
     if (!googleMapsEnabled) {
-        locationTimelineMapFallback(
-            stops = stops,
-            selectedStop = selectedStop,
+        LocationTimelineMapFallback(
+            places = places,
+            selectedPlace = selectedPlace,
             currentLocation = currentLocation,
             modifier = modifier,
         )
@@ -78,19 +85,28 @@ internal actual fun locationTimelineMap(
 
     val cameraPositionState =
         rememberCameraPositionState {
-            position = CameraPosition.fromLatLngZoom(initialPoint, if (stops.size > 1) 11f else 14f)
+            position = CameraPosition.fromLatLngZoom(initialPoint, if (places.size > 1) 11f else 14f)
         }
 
-    LaunchedEffect(selectedStopId, stops, currentLocation) {
-        val target =
-            stops.firstOrNull { it.id == selectedStopId }?.let { LatLng(it.latitude, it.longitude) }
-                ?: currentLocation?.let { LatLng(it.latitude, it.longitude) }
-                ?: stops.firstOrNull()?.let { LatLng(it.latitude, it.longitude) }
-
+    LaunchedEffect(selectedPlaceId, places, currentLocation) {
+        val target = selectedPlace?.toLatLng() ?: currentLocation?.toLatLng() ?: places.firstOrNull()?.toLatLng()
         if (target != null) {
             cameraPositionState.animate(
-                update = CameraUpdateFactory.newLatLngZoom(target, if (selectedStopId != null) 14f else 11f),
+                update = CameraUpdateFactory.newLatLngZoom(target, if (selectedPlace != null) 14f else 11f),
                 durationMs = 600,
+            )
+        }
+    }
+
+    val zoom by remember {
+        derivedStateOf { cameraPositionState.position.zoom }
+    }
+    val mapAnnotations by remember(places, selectedPlaceId, zoom) {
+        derivedStateOf {
+            buildMapAnnotations(
+                places = places,
+                zoom = zoom,
+                selectedPlaceId = selectedPlaceId,
             )
         }
     }
@@ -108,43 +124,166 @@ internal actual fun locationTimelineMap(
                     mapToolbarEnabled = false,
                     myLocationButtonEnabled = false,
                     zoomControlsEnabled = false,
+                    zoomGesturesEnabled = true,
+                    scrollGesturesEnabled = true,
+                    tiltGesturesEnabled = false,
+                    rotationGesturesEnabled = false,
                 )
             },
     ) {
         currentLocation?.let { location ->
             Marker(
-                state = MarkerState(position = LatLng(location.latitude, location.longitude)),
+                state = MarkerState(position = location.toLatLng()),
                 title = location.title,
                 snippet = location.subtitle,
                 icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE),
             )
         }
 
-        stops.forEach { stop ->
-            Marker(
-                state = MarkerState(position = LatLng(stop.latitude, stop.longitude)),
-                title = stop.title,
-                snippet = "${stop.timeRange}\nStayed ${stop.duration}",
-                onClick = {
-                    onSelectStop(stop.id)
-                    false
-                },
-            )
+        mapAnnotations.forEach { annotation ->
+            when (annotation) {
+                is LocationMapAnnotation.Cluster -> {
+                    Marker(
+                        state = MarkerState(position = annotation.position),
+                        title = annotation.title,
+                        snippet = annotation.subtitle,
+                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE),
+                        onClick = {
+                            onSelectPlace(annotation.placeIds.first())
+                            cameraPositionState.move(
+                                CameraUpdateFactory.newLatLngZoom(
+                                    annotation.position,
+                                    (zoom + 2f).coerceAtMost(16f),
+                                ),
+                            )
+                            true
+                        },
+                    )
+                }
+
+                is LocationMapAnnotation.Place -> {
+                    Marker(
+                        state = MarkerState(position = annotation.place.toLatLng()),
+                        title = annotation.place.title,
+                        snippet = stringResource(Res.string.memories_count, annotation.place.memoryCount),
+                        onClick = {
+                            onSelectPlace(annotation.place.id)
+                            false
+                        },
+                    )
+                }
+
+                is LocationMapAnnotation.Memory -> {
+                    Marker(
+                        state = MarkerState(position = annotation.memory.toLatLng()),
+                        title = annotation.memory.title,
+                        snippet = annotation.placeTitle,
+                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_VIOLET),
+                        onClick = {
+                            onSelectPlace(annotation.placeId)
+                            false
+                        },
+                    )
+                }
+            }
         }
     }
 }
 
+private sealed interface LocationMapAnnotation {
+    data class Cluster(
+        val position: LatLng,
+        val title: String,
+        val subtitle: String,
+        val placeIds: List<String>,
+    ) : LocationMapAnnotation
+
+    data class Place(
+        val place: LocationPlaceUiModel,
+    ) : LocationMapAnnotation
+
+    data class Memory(
+        val placeId: String,
+        val placeTitle: String,
+        val memory: LocationMemoryPreviewUiModel,
+    ) : LocationMapAnnotation
+}
+
+private fun buildMapAnnotations(
+    places: List<LocationPlaceUiModel>,
+    zoom: Float,
+    selectedPlaceId: String?,
+): List<LocationMapAnnotation> =
+    when {
+        zoom < 10f -> clusterPlaces(places, zoom)
+        zoom >= 14f && selectedPlaceId != null -> {
+            val selectedPlace = places.firstOrNull { it.id == selectedPlaceId }
+            buildList {
+                selectedPlace?.let { place ->
+                    addAll(
+                        place.memories.map { memory ->
+                            LocationMapAnnotation.Memory(
+                                placeId = place.id,
+                                placeTitle = place.title,
+                                memory = memory,
+                            )
+                        },
+                    )
+                }
+                addAll(
+                    places
+                        .filterNot { it.id == selectedPlaceId }
+                        .map(LocationMapAnnotation::Place),
+                )
+            }
+        }
+        else -> places.map(LocationMapAnnotation::Place)
+    }
+
+private fun clusterPlaces(
+    places: List<LocationPlaceUiModel>,
+    zoom: Float,
+): List<LocationMapAnnotation.Cluster> {
+    val cellSize = clusterCellSize(zoom)
+    return places
+        .groupBy { place ->
+            val latCell = (place.latitude / cellSize).toInt()
+            val lonCell = (place.longitude / cellSize).toInt()
+            latCell to lonCell
+        }.map { (_, groupedPlaces) ->
+            val latitude = groupedPlaces.map(LocationPlaceUiModel::latitude).average()
+            val longitude = groupedPlaces.map(LocationPlaceUiModel::longitude).average()
+            val memoryCount = groupedPlaces.sumOf(LocationPlaceUiModel::memoryCount)
+            val topNames = groupedPlaces.take(2).joinToString(" • ") { it.title }
+            LocationMapAnnotation.Cluster(
+                position = LatLng(latitude, longitude),
+                title = "$memoryCount memories",
+                subtitle = topNames,
+                placeIds = groupedPlaces.map(LocationPlaceUiModel::id),
+            )
+        }
+}
+
+private fun clusterCellSize(zoom: Float): Double =
+    when {
+        zoom < 4f -> 12.0
+        zoom < 6f -> 5.0
+        zoom < 8f -> 1.5
+        zoom < 10f -> 0.4
+        else -> (0.15 / 2.0.pow((zoom - 10f).coerceAtLeast(0f).toDouble())).coerceAtLeast(0.01)
+    }
+
 @Composable
-private fun locationTimelineMapFallback(
-    stops: List<LocationStopUiModel>,
-    selectedStop: LocationStopUiModel?,
+private fun LocationTimelineMapFallback(
+    places: List<LocationPlaceUiModel>,
+    selectedPlace: LocationPlaceUiModel?,
     currentLocation: CurrentLocationUiModel?,
     modifier: Modifier = Modifier,
 ) {
-    val primaryStop = selectedStop ?: stops.firstOrNull()
-    val supportingStops = stops.filterNot { it.id == primaryStop?.id }.take(2)
-    val primaryTitle = primaryStop?.title ?: currentLocation?.title ?: stringResource(Res.string.current_location)
-    val primarySubtitle = primaryStop?.timeRange ?: currentLocation?.subtitle ?: primaryStop?.subtitle.orEmpty()
+    val primaryPlace = selectedPlace ?: places.firstOrNull()
+    val supportingPlaces = places.filterNot { it.id == primaryPlace?.id }.take(2)
+    val primaryTitle = primaryPlace?.title ?: currentLocation?.title ?: stringResource(Res.string.current_location)
+    val primarySubtitle = primaryPlace?.subtitle ?: currentLocation?.subtitle.orEmpty()
 
     Surface(
         modifier = modifier.clip(RoundedCornerShape(24.dp)),
@@ -196,7 +335,7 @@ private fun locationTimelineMapFallback(
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
                     ) {
                         Text(
-                            text = stringResource(Res.string.recent_stops),
+                            text = stringResource(Res.string.recent_memories),
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -221,22 +360,22 @@ private fun locationTimelineMapFallback(
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    primaryStop?.let { stop ->
-                        stopSummaryPill(
-                            title = stop.title,
-                            subtitle = stop.duration,
+                    primaryPlace?.let { place ->
+                        PlaceSummaryPill(
+                            title = place.title,
+                            subtitle = stringResource(Res.string.memories_count, place.memoryCount),
                         )
                     } ?: currentLocation?.let { location ->
-                        stopSummaryPill(
+                        PlaceSummaryPill(
                             title = location.title,
                             subtitle = location.subtitle,
                         )
                     }
 
-                    supportingStops.forEach { stop ->
-                        stopSummaryPill(
-                            title = stop.title,
-                            subtitle = stop.duration,
+                    supportingPlaces.forEach { place ->
+                        PlaceSummaryPill(
+                            title = place.title,
+                            subtitle = stringResource(Res.string.memories_count, place.memoryCount),
                         )
                     }
                 }
@@ -246,7 +385,7 @@ private fun locationTimelineMapFallback(
 }
 
 @Composable
-private fun stopSummaryPill(
+private fun PlaceSummaryPill(
     title: String,
     subtitle: String,
     modifier: Modifier = Modifier,
@@ -297,3 +436,9 @@ private fun stopSummaryPill(
         }
     }
 }
+
+private fun CurrentLocationUiModel.toLatLng(): LatLng = LatLng(latitude, longitude)
+
+private fun LocationPlaceUiModel.toLatLng(): LatLng = LatLng(latitude, longitude)
+
+private fun LocationMemoryPreviewUiModel.toLatLng(): LatLng = LatLng(latitude, longitude)

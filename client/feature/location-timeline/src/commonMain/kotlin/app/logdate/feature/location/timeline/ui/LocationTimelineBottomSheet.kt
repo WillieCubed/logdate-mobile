@@ -6,7 +6,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -31,17 +30,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.feature.location.timeline.ui.model.CurrentLocationUiModel
-import app.logdate.feature.location.timeline.ui.model.LocationStopUiModel
+import app.logdate.feature.location.timeline.ui.model.LocationPlaceUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineErrorUiState
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineUiState
 import logdate.client.feature.location.timeline.generated.resources.Res
 import logdate.client.feature.location.timeline.generated.resources.close
 import logdate.client.feature.location.timeline.generated.resources.current_location
 import logdate.client.feature.location.timeline.generated.resources.location_timeline
+import logdate.client.feature.location.timeline.generated.resources.memories_count
 import logdate.client.feature.location.timeline.generated.resources.no_location_history_yet
 import logdate.client.feature.location.timeline.generated.resources.open_full_location_timeline
-import logdate.client.feature.location.timeline.generated.resources.recent_stops
-import logdate.client.feature.location.timeline.generated.resources.stayed_for_duration
+import logdate.client.feature.location.timeline.generated.resources.recent_memories
 import logdate.client.feature.location.timeline.generated.resources.your_location_timeline_will_appear_here_as_you_move_around
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -60,7 +59,7 @@ fun LocationTimelineBottomSheet(
         uiState = uiState,
         onDismissRequest = onDismissRequest,
         onOpenFullTimeline = onOpenFullTimeline,
-        onSelectStop = viewModel::selectStop,
+        onSelectPlace = viewModel::selectPlace,
         onRetry = viewModel::retry,
         modifier = modifier,
     )
@@ -72,7 +71,7 @@ fun LocationTimelineQuickPeekSheet(
     uiState: LocationTimelineUiState,
     onDismissRequest: () -> Unit,
     onOpenFullTimeline: () -> Unit,
-    onSelectStop: (String) -> Unit,
+    onSelectPlace: (String) -> Unit,
     onRetry: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -86,7 +85,7 @@ fun LocationTimelineQuickPeekSheet(
             uiState = uiState,
             onDismissRequest = onDismissRequest,
             onOpenFullTimeline = onOpenFullTimeline,
-            onSelectStop = onSelectStop,
+            onSelectPlace = onSelectPlace,
             onRetry = onRetry,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -98,7 +97,7 @@ fun LocationTimelineQuickPeekSheetContent(
     uiState: LocationTimelineUiState,
     onDismissRequest: () -> Unit,
     onOpenFullTimeline: () -> Unit,
-    onSelectStop: (String) -> Unit,
+    onSelectPlace: (String) -> Unit,
     onRetry: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -109,7 +108,7 @@ fun LocationTimelineQuickPeekSheetContent(
                 .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Row(
+        androidx.compose.foundation.layout.Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -134,7 +133,7 @@ fun LocationTimelineQuickPeekSheetContent(
             is LocationTimelineUiState.Success ->
                 QuickPeekSuccessState(
                     uiState = uiState,
-                    onSelectStop = onSelectStop,
+                    onSelectPlace = onSelectPlace,
                 )
         }
 
@@ -175,11 +174,11 @@ private fun QuickPeekErrorState(
 @Composable
 private fun QuickPeekSuccessState(
     uiState: LocationTimelineUiState.Success,
-    onSelectStop: (String) -> Unit,
+    onSelectPlace: (String) -> Unit,
 ) {
-    val previewStops = uiState.stops.take(3)
+    val previewPlaces = uiState.visiblePlaces.take(3)
 
-    if (uiState.currentLocation == null && previewStops.isEmpty()) {
+    if (uiState.currentLocation == null && previewPlaces.isEmpty()) {
         Card {
             Column(
                 modifier =
@@ -202,11 +201,11 @@ private fun QuickPeekSuccessState(
         return
     }
 
-    locationTimelineMap(
-        stops = previewStops,
+    LocationTimelineMap(
+        places = previewPlaces,
         currentLocation = uiState.currentLocation,
-        selectedStopId = uiState.selectedStopId,
-        onSelectStop = onSelectStop,
+        selectedPlaceId = uiState.selectedPlace?.id,
+        onSelectPlace = onSelectPlace,
         modifier =
             Modifier
                 .fillMaxWidth()
@@ -214,24 +213,24 @@ private fun QuickPeekSuccessState(
     )
 
     uiState.currentLocation?.let { currentLocation ->
-        CurrentLocationCard(currentLocation)
+        QuickPeekCurrentLocationCard(currentLocation)
     }
 
-    if (previewStops.isNotEmpty()) {
+    if (previewPlaces.isNotEmpty()) {
         Column(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = stringResource(Res.string.recent_stops),
+                text = stringResource(Res.string.recent_memories),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Medium,
             )
 
-            previewStops.forEach { stop ->
-                QuickPeekStopCard(
-                    stop = stop,
-                    selected = stop.id == uiState.selectedStop?.id,
-                    onClick = { onSelectStop(stop.id) },
+            previewPlaces.forEach { place ->
+                QuickPeekPlaceCard(
+                    place = place,
+                    selected = place.id == uiState.selectedPlace?.id,
+                    onClick = { onSelectPlace(place.id) },
                 )
             }
         }
@@ -239,7 +238,7 @@ private fun QuickPeekSuccessState(
 }
 
 @Composable
-private fun CurrentLocationCard(currentLocation: CurrentLocationUiModel) {
+private fun QuickPeekCurrentLocationCard(currentLocation: CurrentLocationUiModel) {
     Card {
         Column(
             modifier =
@@ -268,8 +267,8 @@ private fun CurrentLocationCard(currentLocation: CurrentLocationUiModel) {
 }
 
 @Composable
-private fun QuickPeekStopCard(
-    stop: LocationStopUiModel,
+private fun QuickPeekPlaceCard(
+    place: LocationPlaceUiModel,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
@@ -287,26 +286,22 @@ private fun QuickPeekStopCard(
                 Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
-                text = stop.title,
+                text = place.title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = stop.subtitle,
+                text = place.subtitle,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = stop.timeRange,
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text(
-                text = "${stop.sourceLabel} • ${stringResource(Res.string.stayed_for_duration, stop.duration)}",
+                text = stringResource(Res.string.memories_count, place.memoryCount),
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.primary,
             )
         }
     }
