@@ -44,6 +44,28 @@ public object PlcOperations {
         )
     }
 
+    /**
+     * Builds an unsigned AT Protocol PLC update operation for [handle].
+     *
+     * The returned operation preserves the same `alsoKnownAs`, service, and `atproto`
+     * verification method shape as [atprotoGenesis], but requires a previous PLC CID.
+     */
+    public fun atprotoUpdate(
+        prevCid: String,
+        handle: String,
+        pdsServiceEndpoint: String,
+        signingKeyDidKey: String,
+        rotationKeys: List<String> = listOf(signingKeyDidKey),
+    ): PlcUnsignedOperation {
+        require(prevCid.isNotBlank()) { "prevCid must not be blank" }
+        return atprotoGenesis(
+            handle = handle,
+            pdsServiceEndpoint = pdsServiceEndpoint,
+            signingKeyDidKey = signingKeyDidKey,
+            rotationKeys = rotationKeys,
+        ).copy(prev = prevCid.trim())
+    }
+
     private const val DID_KEY_PREFIX: String = "did:key:"
     private const val ATPROTO_PDS_SERVICE_ID: String = "atproto_pds"
     private const val ATPROTO_PDS_SERVICE_TYPE: String = "AtprotoPersonalDataServer"

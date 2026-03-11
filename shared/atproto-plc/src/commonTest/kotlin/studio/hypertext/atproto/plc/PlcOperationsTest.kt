@@ -62,4 +62,21 @@ class PlcOperationsTest {
             )
         }
     }
+
+    @Test
+    fun `atprotoUpdate builds canonical unsigned plc update`() {
+        val operation =
+            PlcOperations.atprotoUpdate(
+                prevCid = "bafy-prev",
+                handle = "Alice.LogDate.App.",
+                pdsServiceEndpoint = "https://pds.logdate.app/",
+                signingKeyDidKey = "did:key:zSigningKey",
+                rotationKeys = listOf("did:key:zSigningKey", "did:key:zRecoveryKey"),
+            )
+
+        assertEquals("bafy-prev", operation.prev)
+        assertEquals(listOf("at://alice.logdate.app"), operation.alsoKnownAs)
+        assertEquals(listOf("did:key:zSigningKey", "did:key:zRecoveryKey"), operation.rotationKeys)
+        assertEquals("did:key:zSigningKey", operation.verificationMethods["atproto"])
+    }
 }

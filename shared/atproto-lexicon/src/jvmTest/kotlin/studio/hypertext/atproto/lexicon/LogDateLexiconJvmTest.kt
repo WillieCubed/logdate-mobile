@@ -77,7 +77,11 @@ class LogDateLexiconJvmTest {
             listOf(
                 "studio/hypertext/logdate/association.json",
                 "studio/hypertext/logdate/content.json",
+                "studio/hypertext/logdate/device.json",
+                "studio/hypertext/logdate/entry.json",
                 "studio/hypertext/logdate/journal.json",
+                "studio/hypertext/logdate/media.json",
+                "studio/hypertext/logdate/profile.json",
             )
     }
 }
