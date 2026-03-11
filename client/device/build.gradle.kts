@@ -47,6 +47,7 @@ kotlin {
         commonMain.dependencies {
             implementation(projects.shared.model)
             implementation(projects.shared.config)
+            implementation(projects.shared.atprotoCrypto)
             implementation(projects.client.logdateDatastore)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.datetime)
@@ -64,12 +65,14 @@ kotlin {
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.androidx.datastore.preferences)
             implementation(libs.androidx.security.crypto)
+            implementation(libs.bouncycastle.bcprov)
             implementation(project.dependencies.platform(libs.firebase.bom))
             implementation(libs.firebase.firestore)
             implementation(libs.firebase.installations)
             implementation(libs.koin.android)
         }
         desktopMain.dependencies {
+            implementation(libs.bouncycastle.bcprov)
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.napier)
         }

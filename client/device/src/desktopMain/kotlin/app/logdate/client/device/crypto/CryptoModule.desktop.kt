@@ -6,4 +6,5 @@ import org.koin.dsl.module
 actual fun platformCryptoModule(): Module =
     module {
         single<CryptoManager> { DesktopCryptoManager() }
+        single<PlcRecoveryKeyManager> { DeterministicPlcRecoveryKeyManager(get(), JvmPlcRecoveryKeySupport()) }
     }

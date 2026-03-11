@@ -131,6 +131,34 @@ class KeyDerivationTest {
     }
 }
 
+class PlcRecoveryKeyManagerTest {
+    private val cryptoManager = FakeCryptoManager()
+    private val keySupport = FakePlcRecoveryKeySupport()
+    private val manager = DeterministicPlcRecoveryKeyManager(cryptoManager, keySupport)
+
+    @Test
+    fun `deriveDidKey is deterministic for the same recovery phrase`() =
+        runTest {
+            val phrase = List(12) { index -> "word-${index + 1}" }
+
+            val first = manager.deriveDidKey(phrase)
+            val second = manager.deriveDidKey(phrase)
+
+            assertEquals(first, second)
+            assertTrue(first.startsWith("did:key:z"))
+        }
+
+    @Test
+    fun `signPayload uses the deterministic recovery key material`() =
+        runTest {
+            val phrase = List(12) { index -> "word-${index + 1}" }
+
+            val signature = manager.signPayload(phrase, "payload".encodeToByteArray())
+
+            assertEquals("sig-${keySupport.lastDerivedDidKey}-7061796c6f6164", signature)
+        }
+}
+
 // Test implementations
 
 class InMemorySecureStorage : SecureStorage {
@@ -234,5 +262,24 @@ class FakeCryptoManager : CryptoManager {
             index++
         }
         return out
+    }
+}
+
+private class FakePlcRecoveryKeySupport : PlcRecoveryKeySupport {
+    var lastDerivedDidKey: String? = null
+
+    override fun isValidPrivateKey(privateKeyMaterial: ByteArray): Boolean = privateKeyMaterial.any { it != 0.toByte() }
+
+    override fun didKey(privateKeyMaterial: ByteArray): String =
+        "did:key:z${privateKeyMaterial.take(4).joinToString("") { "%02x".format(it.toInt() and 0xff) }}".also {
+            lastDerivedDidKey = it
+        }
+
+    override fun signPayload(
+        privateKeyMaterial: ByteArray,
+        payload: ByteArray,
+    ): String {
+        val didKey = didKey(privateKeyMaterial)
+        return "sig-$didKey-${payload.joinToString("") { "%02x".format(it.toInt() and 0xff) }}"
     }
 }
