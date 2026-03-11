@@ -30,6 +30,7 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
 import app.logdate.client.domain.recommendation.HomeRecommendation
 import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
+import app.logdate.client.domain.timeline.TimelineDay
 import app.logdate.client.domain.timeline.TimelinePlaceVisit
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.feature.journals.ui.JournalClickCallback
@@ -51,6 +52,7 @@ import app.logdate.ui.timeline.TimelinePane
 import app.logdate.ui.timeline.TimelineSuggestionBlock
 import app.logdate.ui.timeline.TimelineUiState
 import app.logdate.ui.timeline.VideoNoteUiState
+import app.logdate.ui.timeline.createTimelineDayUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -95,7 +97,7 @@ fun HomeScreen(
             HomeRouteDestination.Timeline -> {
                 val uiState by viewModel.uiState.collectAsStateWithLifecycle()
                 TimelinePane(
-                    uiState = TimelineUiState(items = uiState.items),
+                    uiState = TimelineUiState(items = uiState.items, loadingState = uiState.loadingState),
                     onNewEntry = onNewEntry,
                     onShareMemory = {},
                     onOpenDay = { date -> viewModel.selectDay(date) },
@@ -204,7 +206,6 @@ internal fun HomeScaffoldWrapper(
  */
 class HomeViewModel(
     private val getStreamingTimelineUseCase: GetStreamingTimelineUseCase,
-    private val fetchNotesForDayUseCase: app.logdate.client.domain.notes.FetchNotesForDayUseCase,
     private val notesRepository: app.logdate.client.repository.journals.JournalNotesRepository,
     private val getHomeRecommendation: GetHomeRecommendationUseCase,
 ) : ViewModel() {
@@ -224,47 +225,12 @@ class HomeViewModel(
         ) { timeline, notes, selection, selectedDayDate, recommendation ->
             val items =
                 timeline.days.map { day ->
-                    TimelineDayUiState(
-                        summary = day.tldr,
-                        date = day.date,
-                        people = day.people.map(Person::toUiState),
-                        events = day.events,
-                        placesVisited = day.placesVisited.map { place -> place.toUiState() },
-                        isLoadingSummary = day.tldr.isEmpty(),
-                        notes =
-                            if (day.date == selectedDayDate) {
-                                // Only include notes for the selected day
-                                notes.map {
-                                    when (it) {
-                                        is JournalNote.Text ->
-                                            TextNoteUiState(
-                                                noteId = it.uid,
-                                                text = it.content,
-                                                timestamp = it.creationTimestamp,
-                                            )
-                                        is JournalNote.Image ->
-                                            ImageNoteUiState(
-                                                noteId = it.uid,
-                                                uri = it.mediaRef,
-                                                timestamp = it.creationTimestamp,
-                                            )
-                                        is JournalNote.Audio ->
-                                            AudioNoteUiState(
-                                                noteId = it.uid,
-                                                uri = it.mediaRef,
-                                                timestamp = it.creationTimestamp,
-                                                duration = it.durationMs,
-                                            )
-                                        is JournalNote.Video ->
-                                            VideoNoteUiState(
-                                                noteId = it.uid,
-                                                uri = it.mediaRef,
-                                                timestamp = it.creationTimestamp,
-                                            )
-                                    }
-                                }
+                    day.toUiState(
+                        overrideNotes =
+                            if (day.date == selectedDayDate && notes.isNotEmpty()) {
+                                notes
                             } else {
-                                emptyList()
+                                day.entries
                             },
                     )
                 }
@@ -393,4 +359,47 @@ class HomeViewModel(
             latitude = latitude,
             longitude = longitude,
         )
+
+    private fun TimelineDay.toUiState(overrideNotes: List<JournalNote> = entries): TimelineDayUiState =
+        createTimelineDayUiState(
+            summary = tldr,
+            date = date,
+            people = people.map(Person::toUiState),
+            events = events,
+            placesVisited = placesVisited.map { place -> place.toUiState() },
+            notes = overrideNotes.toUiState(),
+            isLoadingSummary = tldr.isEmpty(),
+            isLoadingPeople = people.isEmpty() && tldr.isEmpty(),
+        )
+
+    private fun List<JournalNote>.toUiState(): List<app.logdate.ui.timeline.NoteUiState> =
+        sortedByDescending { note -> note.creationTimestamp }.map { note ->
+            when (note) {
+                is JournalNote.Text ->
+                    TextNoteUiState(
+                        noteId = note.uid,
+                        text = note.content,
+                        timestamp = note.creationTimestamp,
+                    )
+                is JournalNote.Image ->
+                    ImageNoteUiState(
+                        noteId = note.uid,
+                        uri = note.mediaRef,
+                        timestamp = note.creationTimestamp,
+                    )
+                is JournalNote.Audio ->
+                    AudioNoteUiState(
+                        noteId = note.uid,
+                        uri = note.mediaRef,
+                        timestamp = note.creationTimestamp,
+                        duration = note.durationMs,
+                    )
+                is JournalNote.Video ->
+                    VideoNoteUiState(
+                        noteId = note.uid,
+                        uri = note.mediaRef,
+                        timestamp = note.creationTimestamp,
+                    )
+            }
+        }
 }

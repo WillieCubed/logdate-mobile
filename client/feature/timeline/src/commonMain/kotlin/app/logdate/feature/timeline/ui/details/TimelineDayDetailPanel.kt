@@ -50,7 +50,9 @@ fun TimelineDayDetailPanel(
     scrollState: LazyListState = rememberLazyListState(),
     modifier: Modifier = Modifier,
 ) {
-    val (summary, timestamp, people) = uiState
+    val summary = uiState.summary
+    val timestamp = uiState.date
+    val people = uiState.people
     val resolvedVisitedLocations =
         visitedLocations.ifEmpty {
             uiState.placesVisited.mapNotNull { place ->

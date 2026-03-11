@@ -14,5 +14,5 @@ val timelineFeatureModule: Module =
         includes(intelligenceModule)
         includes(networkingModule)
 
-        viewModel { TimelineViewModel(get(), get(), get(), get(), get(), get()) }
+        viewModel { TimelineViewModel(get(), get(), get(), get()) }
     }

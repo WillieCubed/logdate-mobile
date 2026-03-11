@@ -251,6 +251,35 @@ class GetTimelineUseCaseTest {
             )
         }
 
+    @Test
+    fun `invoke should include entries and derived day parts for each day`() =
+        runTest {
+            val timestamp = Instant.parse("2025-01-15T10:00:00Z")
+            mockNotesRepository.allNotes =
+                listOf(
+                    JournalNote.Image(
+                        uid = Uuid.random(),
+                        mediaRef = "file://photo.jpg",
+                        creationTimestamp = timestamp,
+                        lastUpdated = timestamp,
+                    ),
+                    JournalNote.Text(
+                        uid = Uuid.random(),
+                        content = "Wrote down a few thoughts after lunch.",
+                        creationTimestamp = timestamp.plus(2.hours),
+                        lastUpdated = timestamp.plus(2.hours),
+                    ),
+                )
+
+            val result = useCase().first()
+
+            assertEquals(1, result.days.size)
+            val day = result.days.first()
+            assertEquals(2, day.entries.size)
+            assertTrue(day.parts.isNotEmpty())
+            assertEquals("file://photo.jpg", day.parts.first().featuredGraphicUri)
+        }
+
     private fun createTestNote(
         content: String,
         timestamp: Instant,

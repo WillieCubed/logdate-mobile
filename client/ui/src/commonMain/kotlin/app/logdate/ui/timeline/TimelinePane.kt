@@ -45,6 +45,7 @@ import kotlin.time.Instant
 
 data class TimelineUiState(
     val items: List<TimelineDayUiState> = emptyList(),
+    val loadingState: TimelineLoadingState = TimelineLoadingState.Loaded,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -99,6 +100,7 @@ fun TimelinePane(
         ) {
             TimelineList(
                 items = uiState.items,
+                loadingState = uiState.loadingState,
                 onOpenDay = onOpenDay,
                 timelineSuggestion = timelineSuggestion,
                 onAddToMemory = onAddToMemory,

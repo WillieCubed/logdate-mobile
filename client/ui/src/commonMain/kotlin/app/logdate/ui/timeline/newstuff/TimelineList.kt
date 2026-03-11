@@ -1,28 +1,37 @@
 @file:OptIn(ExperimentalLayoutApi::class)
-@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+@file:Suppress("ktlint:standard:function-naming")
 
 package app.logdate.ui.timeline.newstuff
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PeopleAlt
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -34,66 +43,52 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.applyPaddingIfLast
 import app.logdate.ui.common.formatting.asRelativeDate
-import app.logdate.ui.location.PlaceUiState
-import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.theme.Spacing
+import app.logdate.ui.timeline.TimelineAudioSectionUiState
+import app.logdate.ui.timeline.TimelineDayCardLayout
+import app.logdate.ui.timeline.TimelineDayRecapUiState
+import app.logdate.ui.timeline.TimelineDaySectionUiState
 import app.logdate.ui.timeline.TimelineDayUiState
+import app.logdate.ui.timeline.TimelineLoadingState
+import app.logdate.ui.timeline.TimelineMediaSectionUiState
+import app.logdate.ui.timeline.TimelinePlaceSectionUiState
 import app.logdate.ui.timeline.TimelineSuggestionBlock
 import app.logdate.ui.timeline.TimelineSuggestionBlockType
 import app.logdate.ui.timeline.TimelineSuggestionBlockUiState
+import app.logdate.ui.timeline.TimelineTextSnippetSectionUiState
 import app.logdate.util.now
 import coil3.compose.AsyncImage
 import kotlinx.datetime.LocalDate
-import logdate.client.ui.generated.resources.*
 import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.a_long_time_passed
+import logdate.client.ui.generated.resources.add_your_birthday_in_settings_to_see_something_special_here
+import logdate.client.ui.generated.resources.congrats_curious_explorer
+import logdate.client.ui.generated.resources.happy_birthday
+import logdate.client.ui.generated.resources.journey_days_count
+import logdate.client.ui.generated.resources.youve_reached_the_end
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.absoluteValue
-import kotlin.uuid.Uuid
 
-/**
- * UI state for the end of timeline section.
- */
 sealed class EndOfTimelineUiState {
-    /**
-     * State when the user has set their birthday.
-     *
-     * @param birthDate The user's birth date
-     * @param daysSinceBirth Number of days since the user was born
-     */
     data class BirthdayCelebration(
         val birthDate: LocalDate,
         val daysSinceBirth: Int,
     ) : EndOfTimelineUiState()
 
-    /**
-     * State when the user has not set their birthday.
-     * Shows an easter egg message encouraging them to add their birthday.
-     */
     data object DiscoveryEasterEgg : EndOfTimelineUiState()
 }
 
-/**
- * Scrollable list of timeline days with an optional suggestion block at the top.
- *
- * @param items Timeline days to display, ordered most-recent first.
- * @param endOfTimelineState Content shown at the bottom of the list (birthday or easter egg).
- * @param onOpenDay Called when the user taps a day row.
- * @param timelineSuggestion When non-null, a prompt card is shown at the top of the list.
- *   [TimelineSuggestionBlock.OngoingEvent] renders as a "Happening Now" prompt;
- *   [TimelineSuggestionBlock.PastMoment] renders as an "Update" prompt for a past day.
- *   Pass null to hide the card entirely.
- * @param onAddToMemory Called when the user accepts the suggestion for a given memory ID.
- * @param onShare Called when the user shares the suggestion for a given memory ID.
- */
 @Composable
 fun TimelineList(
     items: List<TimelineDayUiState>,
     endOfTimelineState: EndOfTimelineUiState,
     onOpenDay: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
+    loadingState: TimelineLoadingState = TimelineLoadingState.Loaded,
     timelineSuggestion: TimelineSuggestionBlock? = null,
     onAddToMemory: (memoryId: String) -> Unit = {},
     onShare: (memoryId: String) -> Unit = {},
@@ -140,34 +135,38 @@ fun TimelineList(
             }
         }
 
-        itemsIndexed(
-            items,
-            key = { _, item -> item.date.toString() },
-        ) { index, item ->
-            TimelineDayListItem(
-                item = item,
-                onOpenDay = onOpenDay,
-                modifier =
-                    Modifier
-                        .applyPaddingIfLast(
-                            currentIndex = index,
-                            totalItems = items.size,
-                        ),
-            )
-            // Check if we should show the time gap message
-            val isNotLastItem = index < items.size - 1
-            if (isNotLastItem) {
-                val currentDate = item.date
-                val nextDate = items[index + 1].date
-                val daysBetween = (currentDate.toEpochDays() - nextDate.toEpochDays()).absoluteValue
-                val shouldShowTimeGapMessage = daysBetween > 10
+        if (items.isEmpty() && loadingState != TimelineLoadingState.Loaded) {
+            items(placeholderLayouts) { layout ->
+                TimelineDaySkeleton(layout = layout)
+            }
+        } else {
+            itemsIndexed(
+                items,
+                key = { _, item -> item.date.toString() },
+            ) { index, item ->
+                TimelineDayListItem(
+                    item = item,
+                    onOpenDay = onOpenDay,
+                    modifier =
+                        Modifier
+                            .applyPaddingIfLast(
+                                currentIndex = index,
+                                totalItems = items.size,
+                            ),
+                )
 
-                if (shouldShowTimeGapMessage) {
-                    TimeGapMessageItem()
+                val isNotLastItem = index < items.size - 1
+                if (isNotLastItem) {
+                    val currentDate = item.date
+                    val nextDate = items[index + 1].date
+                    val daysBetween = (currentDate.toEpochDays() - nextDate.toEpochDays()).absoluteValue
+                    if (daysBetween > 10) {
+                        TimeGapMessageItem()
+                    }
                 }
             }
         }
-        // Always show an end-of-timeline item
+
         item {
             TimeGapMessageItem()
         }
@@ -176,6 +175,14 @@ fun TimelineList(
         }
     }
 }
+
+private val placeholderLayouts =
+    listOf(
+        TimelineDayCardLayout.MEDIA_LED,
+        TimelineDayCardLayout.VOICE_LED,
+        TimelineDayCardLayout.PLACE_LED,
+        TimelineDayCardLayout.STORY_LED,
+    )
 
 @Composable
 internal fun TimeGapMessageItem(modifier: Modifier = Modifier) {
@@ -198,13 +205,6 @@ internal fun TimeGapMessageItem(modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * A composable that displays content at the end of the timeline.
- * Shows either a birthday celebration or an easter egg based on the provided state.
- *
- * @param state The UI state for the end of timeline section
- * @param modifier Modifier to be applied to the container
- */
 @Composable
 internal fun EndOfTimelineItem(
     state: EndOfTimelineUiState,
@@ -229,11 +229,7 @@ internal fun EndOfTimelineItem(
                         style = MaterialTheme.typography.headlineMedium,
                     )
                     Text(
-                        text =
-                            stringResource(
-                                Res.string.journey_days_count,
-                                state.daysSinceBirth,
-                            ),
+                        text = stringResource(Res.string.journey_days_count, state.daysSinceBirth),
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -260,13 +256,6 @@ internal fun EndOfTimelineItem(
     }
 }
 
-/**
- * A timeline item that displays a birthday message.
- * This is kept for backward compatibility.
- *
- * @param birthDate The user's birth date
- * @param modifier A modifier to apply to the item container
- */
 @Composable
 internal fun BirthdayListItem(
     birthDate: LocalDate,
@@ -294,202 +283,654 @@ internal fun TimelineDayListItem(
     onOpenDay: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    val shell = item.layout.shell()
+    Surface(
+        color = shell.containerColor,
+        shape = shell.shape,
         modifier =
             modifier
                 .widthIn(min = 320.dp)
                 .fillMaxWidth()
-                .clip(MaterialTheme.shapes.medium)
-                .clickable {
-                    onOpenDay(item.date)
-                }.padding(Spacing.lg),
+                .padding(horizontal = Spacing.lg)
+                .clip(shell.shape)
+                .clickable { onOpenDay(item.date) },
     ) {
-        TimelineDayHeader(
-            date = item.date,
-            places = item.placesVisited,
-            people = item.people,
-        )
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            shape = MaterialTheme.shapes.small,
-            modifier = Modifier.fillMaxWidth(),
+        Column(
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            modifier =
+                Modifier
+                    .background(shell.backgroundColor)
+                    .padding(Spacing.lg),
         ) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                modifier = Modifier.padding(Spacing.sm),
-            ) {
-                Text(
-                    "In summary",
-                    style = MaterialTheme.typography.labelLarge.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
+            TimelineDayHeader(item = item)
+            TimelineHeroSection(item = item)
+            TimelineRecapStrip(recap = item.recap, accentColor = shell.accentColor)
+            item.supportingSections.forEach { section ->
+                TimelineSupportingSection(
+                    section = section,
+                    layout = item.layout,
                 )
-                if (item.isLoadingSummary) {
-                    SummaryLoadingPlaceholder()
-                } else {
-                    Text(item.summary, style = MaterialTheme.typography.bodyMedium)
-                }
+            }
+            item.supportingSummary?.let { summary ->
+                SupportingSummaryFooter(summary = summary)
             }
         }
-    }
-}
-
-@Composable
-private fun SummaryLoadingPlaceholder(modifier: Modifier = Modifier) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-        modifier = modifier,
-    ) {
-        // Shimmer-like placeholder lines
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-            shape = MaterialTheme.shapes.extraSmall,
-            modifier = Modifier.height(16.dp).widthIn(min = 280.dp),
-        ) {}
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-            shape = MaterialTheme.shapes.extraSmall,
-            modifier = Modifier.height(16.dp).widthIn(min = 200.dp),
-        ) {}
-    }
-}
-
-sealed interface ActivitySectionUiState {
-    val title: String
-}
-
-data class TextSnippetSectionUiState(
-    override val title: String,
-    val content: String,
-) : ActivitySectionUiState
-
-data class QuoteSnippetSectionUiState(
-    override val title: String,
-    val quote: String,
-) : ActivitySectionUiState
-
-data class MediaUiState(
-    val mediaUri: String,
-    val caption: String,
-)
-
-data class MediaSectionUiState(
-    override val title: String,
-    val media: List<MediaUiState>,
-) : ActivitySectionUiState
-
-@Composable
-internal fun ActivitySection(uiState: ActivitySectionUiState) {
-    when (uiState) {
-        is QuoteSnippetSectionUiState -> {
-            ActivitySectionWrapper(title = uiState.title) {
-                Text(uiState.quote, style = MaterialTheme.typography.titleSmall)
-            }
-        }
-
-        is MediaSectionUiState -> {
-            ActivitySectionWrapper(title = uiState.title) {
-                // TODO: Implement logic to display images in a visually aesthetic way
-                FlowRow {
-                    uiState.media.forEach { media ->
-                        AsyncImage(
-                            model = media.mediaUri,
-                            contentDescription = media.caption,
-                            modifier = Modifier.height(200.dp),
-                        )
-                    }
-                }
-            }
-        }
-
-        is TextSnippetSectionUiState -> {
-            ActivitySectionWrapper(title = uiState.title) {
-                Text(uiState.content, style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-    }
-}
-
-@Composable
-internal fun ActivitySectionWrapper(
-    title: String,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(horizontal = Spacing.sm),
-        )
-        content()
     }
 }
 
 @Composable
 private fun TimelineDayHeader(
-    date: LocalDate,
-    places: List<PlaceUiState>,
-    people: List<PersonUiState>,
-    // TODO: Implement click handlers
-    onOpenPlace: (uid: Uuid) -> Unit = {},
-    onOpenPeople: (uid: Uuid) -> Unit = {},
+    item: TimelineDayUiState,
+    modifier: Modifier = Modifier,
 ) {
-    // TODO: Implement hoverable pop-ups for places and people
     Column(
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        modifier = modifier,
     ) {
-        Text(date.asRelativeDate(), style = MaterialTheme.typography.titleLarge)
-        DayMetadata(
-            places = places,
-            people = people,
-            onPlacesClick = {},
-            onPeopleClick = {},
+        Text(
+            text = item.date.asRelativeDate(),
+            style = MaterialTheme.typography.headlineSmall,
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (item.placesVisited.isNotEmpty()) {
+                DayMetaPill(
+                    icon = Icons.Default.LocationOn,
+                    text = "${item.placesVisited.size} places",
+                )
+            }
+            if (item.people.isNotEmpty()) {
+                DayMetaPill(
+                    icon = Icons.Default.PeopleAlt,
+                    text = "${item.people.size} people",
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TimelineHeroSection(
+    item: TimelineDayUiState,
+    modifier: Modifier = Modifier,
+) {
+    item.heroSection?.let { section ->
+        when (section) {
+            is TimelineAudioSectionUiState -> {
+                AudioSection(
+                    section = section,
+                    modifier = modifier,
+                    emphasized = true,
+                )
+            }
+            is TimelineMediaSectionUiState -> {
+                MediaSection(
+                    section = section,
+                    modifier = modifier,
+                    emphasized = true,
+                )
+            }
+            is TimelinePlaceSectionUiState -> {
+                PlaceSection(
+                    section = section,
+                    modifier = modifier,
+                    emphasized = true,
+                )
+            }
+            is TimelineTextSnippetSectionUiState -> {
+                TextSnippetSection(
+                    section = section,
+                    modifier = modifier,
+                    emphasized = true,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TimelineSupportingSection(
+    section: TimelineDaySectionUiState,
+    layout: TimelineDayCardLayout,
+    modifier: Modifier = Modifier,
+) {
+    when (section) {
+        is TimelineAudioSectionUiState -> AudioSection(section = section, modifier = modifier)
+        is TimelineMediaSectionUiState ->
+            MediaSection(
+                section = section,
+                modifier = modifier,
+                compact =
+                    layout != TimelineDayCardLayout.MEDIA_LED,
+            )
+        is TimelinePlaceSectionUiState -> PlaceSection(section = section, modifier = modifier)
+        is TimelineTextSnippetSectionUiState -> TextSnippetSection(section = section, modifier = modifier)
+    }
+}
+
+@Composable
+private fun TimelineRecapStrip(
+    recap: TimelineDayRecapUiState,
+    accentColor: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier,
+) {
+    val recapItems =
+        buildList {
+            if (recap.captureCount > 0) {
+                add("${recap.captureCount} captured")
+            }
+            if (recap.placeCount > 0) {
+                add("${recap.placeCount} visited")
+            }
+            if (recap.peopleCount > 0) {
+                add("${recap.peopleCount} connected")
+            }
+            if (recap.activeSpanMinutes > 0) {
+                add(recap.activeSpanMinutes.toSpanLabel())
+            }
+        }
+
+    if (recapItems.isEmpty()) {
+        return
+    }
+
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        recapItems.forEach { item ->
+            Surface(
+                color = accentColor.copy(alpha = 0.14f),
+                shape = RoundedCornerShape(18.dp),
+            ) {
+                Text(
+                    text = item,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TextSnippetSection(
+    section: TimelineTextSnippetSectionUiState,
+    modifier: Modifier = Modifier,
+    emphasized: Boolean = false,
+) {
+    Surface(
+        color =
+            if (emphasized) {
+                MaterialTheme.colorScheme.surfaceBright
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerLow
+            },
+        shape = RoundedCornerShape(if (emphasized) 24.dp else 18.dp),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            modifier = Modifier.padding(Spacing.lg),
+        ) {
+            SectionLabel(section.label)
+            Text(
+                text = section.text,
+                style =
+                    if (emphasized) {
+                        MaterialTheme.typography.titleLarge
+                    } else {
+                        MaterialTheme.typography.bodyLarge
+                    },
+                maxLines = if (emphasized) 4 else 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MediaSection(
+    section: TimelineMediaSectionUiState,
+    modifier: Modifier = Modifier,
+    emphasized: Boolean = false,
+    compact: Boolean = false,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        SectionLabel(section.label)
+        val mediaShape = RoundedCornerShape(if (emphasized) 28.dp else 20.dp)
+        if (section.items.size == 1) {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = mediaShape,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Box {
+                    AsyncImage(
+                        model = section.items.first().uri,
+                        contentDescription = null,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(if (compact) 1.4f else 1.15f),
+                    )
+                    if (section.items.first().isVideo) {
+                        MediaBadge(
+                            icon = Icons.Default.Videocam,
+                            text = "Video",
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(Spacing.md),
+                        )
+                    }
+                }
+            }
+        } else {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                section.items.forEachIndexed { index, media ->
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        shape = mediaShape,
+                        modifier = Modifier.weight(1f, fill = true),
+                    ) {
+                        Box {
+                            AsyncImage(
+                                model = media.uri,
+                                contentDescription = null,
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .aspectRatio(if (index == 0) 1.2f else 1f),
+                            )
+                            if (media.isVideo) {
+                                MediaBadge(
+                                    icon = Icons.Default.PlayArrow,
+                                    text = "Clip",
+                                    modifier =
+                                        Modifier
+                                            .align(Alignment.BottomStart)
+                                            .padding(Spacing.sm),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AudioSection(
+    section: TimelineAudioSectionUiState,
+    modifier: Modifier = Modifier,
+    emphasized: Boolean = false,
+) {
+    Surface(
+        color =
+            if (emphasized) {
+                MaterialTheme.colorScheme.secondaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerLow
+            },
+        shape = RoundedCornerShape(if (emphasized) 24.dp else 18.dp),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(Spacing.lg),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(if (emphasized) 52.dp else 40.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.GraphicEq,
+                    contentDescription = null,
+                )
+            }
+            Column(
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                modifier = Modifier.weight(1f),
+            ) {
+                SectionLabel(section.label)
+                Text(
+                    text = "Voice note",
+                    style =
+                        if (emphasized) {
+                            MaterialTheme.typography.titleLarge
+                        } else {
+                            MaterialTheme.typography.titleMedium
+                        },
+                )
+                Text(
+                    text = section.note.duration.toDurationLabel(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaceSection(
+    section: TimelinePlaceSectionUiState,
+    modifier: Modifier = Modifier,
+    emphasized: Boolean = false,
+) {
+    Surface(
+        color =
+            if (emphasized) {
+                MaterialTheme.colorScheme.tertiaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerLow
+            },
+        shape = RoundedCornerShape(if (emphasized) 24.dp else 18.dp),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            modifier = Modifier.padding(Spacing.lg),
+        ) {
+            SectionLabel(section.label)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                section.places.forEach { place ->
+                    Surface(
+                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(18.dp),
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Text(
+                                text = place.title,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SupportingSummaryFooter(
+    summary: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = "Summary",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = summary,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
 @Composable
-private fun DayMetadata(
-    places: List<PlaceUiState>,
-    people: List<PersonUiState>,
-    onPlacesClick: () -> Unit,
-    onPeopleClick: () -> Unit,
+private fun SectionLabel(
+    text: String,
+    modifier: Modifier = Modifier,
 ) {
-    Row(
-        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun DayMetaPill(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        shape = RoundedCornerShape(18.dp),
+        modifier = modifier,
     ) {
-        if (places.isNotEmpty()) {
-            Row {
-                Icon(
-                    imageVector = Icons.Default.LocationOn,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(end = Spacing.sm),
-                )
-                Text(
-                    "${places.size} places",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        if (people.isNotEmpty()) {
-            Row {
-                Icon(
-                    imageVector = Icons.Default.PeopleAlt,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(end = Spacing.sm),
-                )
-                Text(
-                    "${people.size} people",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
+}
+
+@Composable
+private fun MediaBadge(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
+        shape = RoundedCornerShape(16.dp),
+        modifier = modifier,
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TimelineDaySkeleton(
+    layout: TimelineDayCardLayout,
+    modifier: Modifier = Modifier,
+) {
+    val shell = layout.shell()
+    Surface(
+        color = shell.containerColor,
+        shape = shell.shape,
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg),
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            modifier =
+                Modifier
+                    .background(shell.backgroundColor)
+                    .padding(Spacing.lg),
+        ) {
+            PlaceholderLine(width = 180.dp, height = 28.dp)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                PlaceholderPill()
+                PlaceholderPill()
+            }
+            when (layout) {
+                TimelineDayCardLayout.MEDIA_LED -> PlaceholderBlock(height = 220.dp)
+                TimelineDayCardLayout.VOICE_LED -> PlaceholderBlock(height = 120.dp)
+                TimelineDayCardLayout.PLACE_LED -> PlaceholderBlock(height = 140.dp)
+                TimelineDayCardLayout.STORY_LED -> PlaceholderBlock(height = 160.dp)
+            }
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                PlaceholderPill(width = 104.dp)
+                PlaceholderPill(width = 92.dp)
+                PlaceholderPill(width = 120.dp)
+            }
+            PlaceholderLine(width = 240.dp)
+            PlaceholderLine(width = 200.dp)
+        }
+    }
+}
+
+@Composable
+private fun PlaceholderBlock(
+    height: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        shape = RoundedCornerShape(24.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .height(height),
+    ) {}
+}
+
+@Composable
+private fun PlaceholderLine(
+    width: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+    height: androidx.compose.ui.unit.Dp = 18.dp,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        shape = RoundedCornerShape(8.dp),
+        modifier =
+            modifier
+                .widthIn(min = width)
+                .height(height),
+    ) {}
+}
+
+@Composable
+private fun PlaceholderPill(
+    modifier: Modifier = Modifier,
+    width: androidx.compose.ui.unit.Dp = 84.dp,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        shape = RoundedCornerShape(18.dp),
+        modifier =
+            modifier
+                .widthIn(min = width)
+                .height(32.dp),
+    ) {}
+}
+
+private data class TimelineCardShell(
+    val containerColor: androidx.compose.ui.graphics.Color,
+    val backgroundColor: androidx.compose.ui.graphics.Color,
+    val accentColor: androidx.compose.ui.graphics.Color,
+    val shape: RoundedCornerShape,
+)
+
+@Composable
+private fun TimelineDayCardLayout.shell(): TimelineCardShell =
+    when (this) {
+        TimelineDayCardLayout.MEDIA_LED ->
+            TimelineCardShell(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                backgroundColor = MaterialTheme.colorScheme.surfaceContainer,
+                accentColor = MaterialTheme.colorScheme.primary,
+                shape = RoundedCornerShape(topStart = 32.dp, topEnd = 12.dp, bottomEnd = 32.dp, bottomStart = 20.dp),
+            )
+        TimelineDayCardLayout.VOICE_LED ->
+            TimelineCardShell(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f),
+                backgroundColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f),
+                accentColor = MaterialTheme.colorScheme.secondary,
+                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 32.dp, bottomEnd = 20.dp, bottomStart = 32.dp),
+            )
+        TimelineDayCardLayout.PLACE_LED ->
+            TimelineCardShell(
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.7f),
+                backgroundColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.7f),
+                accentColor = MaterialTheme.colorScheme.tertiary,
+                shape = RoundedCornerShape(28.dp),
+            )
+        TimelineDayCardLayout.STORY_LED ->
+            TimelineCardShell(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                backgroundColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                accentColor = MaterialTheme.colorScheme.primary,
+                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 28.dp, bottomEnd = 28.dp, bottomStart = 16.dp),
+            )
+    }
+
+private fun Int.toSpanLabel(): String =
+    when {
+        this >= 60 -> {
+            val hours = this / 60
+            val minutes = this % 60
+            if (minutes == 0) {
+                "${hours}h span"
+            } else {
+                "${hours}h ${minutes}m span"
+            }
+        }
+        this > 0 -> "${this}m span"
+        else -> "Quick capture"
+    }
+
+private fun Long.toDurationLabel(): String {
+    val totalSeconds = this / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "$minutes:${seconds.toString().padStart(2, '0')}"
 }

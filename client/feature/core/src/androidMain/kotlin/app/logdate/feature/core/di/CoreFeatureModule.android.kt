@@ -105,7 +105,7 @@ actual val coreFeatureModule: Module =
                 get(),
             )
         }
-        viewModel { HomeViewModel(get(), get(), get(), get()) }
+        viewModel { HomeViewModel(get(), get(), get()) }
         viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get()) }
         viewModel { LocationSettingsViewModel(get()) }
         viewModel { ProfileViewModel(get(), get(), get(), get()) }

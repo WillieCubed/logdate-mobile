@@ -28,6 +28,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
@@ -273,6 +275,35 @@ class GetStreamingTimelineUseCaseTest {
         }
 
     @Test
+    fun `invoke should include entries and day parts for recent content first cards`() =
+        runTest {
+            val timestamp = Instant.parse("2025-01-15T10:00:00Z")
+            mockNotesRepository.recentNotes =
+                listOf(
+                    JournalNote.Image(
+                        uid = Uuid.random(),
+                        mediaRef = "file://photo.jpg",
+                        creationTimestamp = timestamp,
+                        lastUpdated = timestamp,
+                    ),
+                    JournalNote.Text(
+                        uid = Uuid.random(),
+                        content = "Coffee outside before heading downtown.",
+                        creationTimestamp = timestamp.plus(1.hours),
+                        lastUpdated = timestamp.plus(1.hours),
+                    ),
+                )
+
+            val result = useCase(StreamingTimelineRequest.RecentTimeline()).first()
+
+            assertEquals(1, result.days.size)
+            val day = result.days.first()
+            assertEquals(2, day.entries.size)
+            assertTrue(day.parts.isNotEmpty(), "Recent timeline should derive day parts for card assembly")
+            assertEquals("file://photo.jpg", day.parts.first().featuredGraphicUri)
+        }
+
+    @Test
     fun `invoke should handle mixed note types`() =
         runTest {
             // Given - different note types
@@ -434,6 +465,29 @@ class GetStreamingTimelineUseCaseTest {
         }
 
     @Test
+    fun `streaming timeline should enrich recent days after the first content first emission`() =
+        runTest {
+            val recentNotes =
+                listOf(
+                    createTestNote("This is a detailed note about my day", Instant.parse("2025-01-15T10:00:00Z")),
+                )
+            mockNotesRepository.recentNotes = recentNotes
+            mockNotesRepository.allNotes = recentNotes
+
+            val emissions = useCase(StreamingTimelineRequest.RecentTimeline()).take(2).toList()
+
+            assertEquals("", emissions[0].days.first().tldr)
+            assertEquals("Test summary", emissions[1].days.first().tldr)
+            assertEquals(
+                1,
+                emissions[1]
+                    .days
+                    .first()
+                    .entries.size,
+            )
+        }
+
+    @Test
     fun `streaming flow should re-emit when underlying data changes`() =
         runTest {
             // Given - a mutable flow that simulates database updates
@@ -488,18 +542,18 @@ class GetStreamingTimelineUseCaseTest {
                     reactiveUseCase(StreamingTimelineRequest.RecentTimeline()).collect { emissions.add(it) }
                 }
 
-            // Wait for first emission
+            // Wait for initial content-first and enrichment emissions
             delay(50)
-            assertEquals(1, emissions.size, "Should have initial emission")
-            assertEquals(1, emissions[0].days.size)
+            assertTrue(emissions.size >= 1, "Should have at least one initial emission")
+            assertEquals(1, emissions.first().days.size)
 
             // Add a new note
             notesFlow.value = notesFlow.value + createTestNote("New note", Instant.parse("2025-01-16T10:00:00Z"))
             delay(50)
 
             // Then - should have re-emitted with updated data
-            assertEquals(2, emissions.size, "Should re-emit when data changes")
-            assertEquals(2, emissions[1].days.size, "Updated emission should have 2 days")
+            assertTrue(emissions.size >= 2, "Should re-emit when data changes")
+            assertEquals(2, emissions.last().days.size, "Updated emission should have 2 days")
 
             job.cancel()
         }
@@ -548,11 +602,13 @@ class GetStreamingTimelineUseCaseTest {
 
     private class MockJournalNotesRepository : JournalNotesRepository {
         var recentNotes = emptyList<JournalNote>()
+        var allNotes = emptyList<JournalNote>()
         var notesInRange = emptyList<JournalNote>()
         var lastRecentNotesLimit: Int = 0
         val observeNotesInRangeCalls = mutableListOf<Pair<Instant, Instant>>()
 
-        override val allNotesObserved: Flow<List<JournalNote>> = flowOf(emptyList())
+        override val allNotesObserved: Flow<List<JournalNote>>
+            get() = flowOf(allNotes)
 
         override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> {
             lastRecentNotesLimit = limit

@@ -7,12 +7,11 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.notes.RemoveNoteUseCase
 import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
 import app.logdate.client.domain.timeline.GetTimelineBannerUseCase
-import app.logdate.client.domain.timeline.GetTimelineUseCase
 import app.logdate.client.domain.timeline.StreamingTimelineRequest
 import app.logdate.client.domain.timeline.TimelineBannerResult
+import app.logdate.client.domain.timeline.TimelineDay
 import app.logdate.client.domain.timeline.TimelinePlaceVisit
 import app.logdate.client.repository.journals.JournalNote
-import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.shared.model.Person
 import app.logdate.ui.audio.TranscriptionState
@@ -25,6 +24,8 @@ import app.logdate.ui.timeline.TextNoteUiState
 import app.logdate.ui.timeline.TimelineDaySelection
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelineLoadingState
+import app.logdate.ui.timeline.VideoNoteUiState
+import app.logdate.ui.timeline.createTimelineDayUiState
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -35,19 +36,14 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.number
-import kotlinx.datetime.toLocalDateTime
 import kotlin.uuid.Uuid
 
 /**
  * A view model for the timeline overview screen.
  */
 class TimelineViewModel(
-    getTimelineUseCase: GetTimelineUseCase,
     getStreamingTimeline: GetStreamingTimelineUseCase,
     getTimelineBannerUseCase: GetTimelineBannerUseCase,
-    private val notesRepository: JournalNotesRepository, // TODO: Consolidate with GetTimelineUseCase
     private val removeNoteUseCase: RemoveNoteUseCase,
     private val userStateRepository: UserStateRepository,
 ) : ViewModel() {
@@ -121,130 +117,21 @@ class TimelineViewModel(
     val uiState: StateFlow<HomeTimelineUiState> =
         getStreamingTimeline(
             StreamingTimelineRequest.RecentTimeline(),
-        ).combine(notesRepository.allNotesObserved) { timeline, allNotes ->
-            val loadingState =
-                when {
-                    timeline.days.isEmpty() -> TimelineLoadingState.InitialLoading
-                    timeline.days.any { it.tldr.contains("entries") } -> TimelineLoadingState.LoadingContent
-                    else -> TimelineLoadingState.Loaded
-                }
-
-            // NEW APPROACH: Group notes by date components rather than exact date objects
-            // This is more resilient to time zone and equality issues
-            val improvedNotesByDate = mutableMapOf<String, MutableList<JournalNote>>()
-
-            allNotes.forEach { note ->
-                val noteDateTime = note.creationTimestamp.toLocalDateTime(TimeZone.currentSystemDefault())
-                val noteDate = noteDateTime.date
-
-                // Create a string key in format "YYYY-MM-DD"
-                val dateKey = "${noteDate.year}-${noteDate.month.number}-${noteDate.day}"
-
-                if (!improvedNotesByDate.containsKey(dateKey)) {
-                    improvedNotesByDate[dateKey] = mutableListOf()
-                }
-
-                improvedNotesByDate[dateKey]?.add(note)
-            }
-
-            // Function to convert notes to UI state
-            fun List<JournalNote>.toUiState(): List<app.logdate.ui.timeline.NoteUiState> =
-                this.map {
-                    when (it) {
-                        is JournalNote.Text ->
-                            TextNoteUiState(
-                                noteId = it.uid,
-                                text = it.content,
-                                timestamp = it.creationTimestamp,
-                            )
-                        is JournalNote.Image ->
-                            ImageNoteUiState(
-                                noteId = it.uid,
-                                uri = it.mediaRef,
-                                timestamp = it.creationTimestamp,
-                            )
-                        is JournalNote.Audio ->
-                            AudioNoteUiState(
-                                noteId = it.uid,
-                                uri = it.mediaRef,
-                                timestamp = it.creationTimestamp,
-                                duration = it.durationMs,
-                            )
-                        is JournalNote.Video ->
-                            TextNoteUiState(
-                                noteId = it.uid,
-                                text = "[Video Recording]",
-                                timestamp = it.creationTimestamp,
-                            )
-                    }
-                }
-
-            // Helper function to get notes for a specific day by components
-            fun getNotesForDay(date: LocalDate): List<JournalNote> {
-                val dateKey = "${date.year}-${date.month.number}-${date.day}"
-                return improvedNotesByDate[dateKey] ?: emptyList()
-            }
+        ).combine(selectedItemUiState) { timeline, selection ->
+            val items = timeline.days.map { day -> day.toUiState() }
+            val loadingState = if (items.isEmpty()) TimelineLoadingState.InitialLoading else TimelineLoadingState.Loaded
 
             HomeTimelineUiState(
-                items =
-                    timeline.days.map { day ->
-                        // Get notes for this specific day using the component-based approach
-                        val dayNotes = getNotesForDay(day.date)
-
-                        TimelineDayUiState(
-                            summary = day.tldr,
-                            date = day.date,
-                            people = day.people.map(Person::toUiState),
-                            events = day.events,
-                            placesVisited = day.placesVisited.map { place -> place.toUiState() },
-                            notes = dayNotes.toUiState(),
-                            isLoadingSummary = day.tldr.isEmpty(),
-                            isLoadingPeople = day.people.isEmpty() && day.tldr.isEmpty(),
-                        )
-                    },
-                selectedItem = selectedItemUiState.value,
+                items = items,
+                selectedItem = selection,
                 selectedDay =
-                    when (val selection = selectedItemUiState.value) {
-                        is TimelineDaySelection.DateSelected -> {
-                            // Get notes for the selected date using the component-based approach
-                            val notesForSelectedDay = getNotesForDay(selection.date)
-
-                            timeline.days.find { it.date == selection.date }?.let { day ->
-                                TimelineDayUiState(
-                                    summary = day.tldr,
-                                    date = day.date,
-                                    people = day.people.map(Person::toUiState),
-                                    events = day.events,
-                                    placesVisited = day.placesVisited.map { place -> place.toUiState() },
-                                    notes = notesForSelectedDay.toUiState(),
-                                    isLoadingSummary = day.tldr.isEmpty(),
-                                    isLoadingPeople = day.people.isEmpty() && day.tldr.isEmpty(),
-                                )
-                            }
-                        }
-                        is TimelineDaySelection.Selected -> {
-                            // Handle legacy Selected type
-                            // Get notes for the selected date using the component-based approach
-                            val notesForSelectedDay = getNotesForDay(selection.day)
-
-                            timeline.days.find { it.date == selection.day }?.let { day ->
-                                TimelineDayUiState(
-                                    summary = day.tldr,
-                                    date = day.date,
-                                    people = day.people.map(Person::toUiState),
-                                    events = day.events,
-                                    placesVisited = day.placesVisited.map { place -> place.toUiState() },
-                                    notes = notesForSelectedDay.toUiState(),
-                                    isLoadingSummary = day.tldr.isEmpty(),
-                                    isLoadingPeople = day.people.isEmpty() && day.tldr.isEmpty(),
-                                )
-                            }
-                        }
+                    when (selection) {
+                        is TimelineDaySelection.DateSelected -> items.find { item -> item.date == selection.date }
+                        is TimelineDaySelection.Selected -> items.find { item -> item.date == selection.day }
                         TimelineDaySelection.NotSelected -> null
                     },
                 loadingState = loadingState,
-                isLoading = loadingState != TimelineLoadingState.Loaded,
-                // Default to null, will be updated by the banner flow below
+                isLoading = items.isEmpty(),
                 timelineSuggestion = null,
                 snackbarMessage = snackbarMessageState.value,
             )
@@ -318,4 +205,47 @@ class TimelineViewModel(
             latitude = latitude,
             longitude = longitude,
         )
+
+    private fun TimelineDay.toUiState(): TimelineDayUiState =
+        createTimelineDayUiState(
+            summary = tldr,
+            date = date,
+            people = people.map(Person::toUiState),
+            events = events,
+            placesVisited = placesVisited.map { place -> place.toUiState() },
+            notes = entries.toUiState(),
+            isLoadingSummary = tldr.isEmpty(),
+            isLoadingPeople = people.isEmpty() && tldr.isEmpty(),
+        )
+
+    private fun List<JournalNote>.toUiState(): List<app.logdate.ui.timeline.NoteUiState> =
+        sortedByDescending { note -> note.creationTimestamp }.map { note ->
+            when (note) {
+                is JournalNote.Text ->
+                    TextNoteUiState(
+                        noteId = note.uid,
+                        text = note.content,
+                        timestamp = note.creationTimestamp,
+                    )
+                is JournalNote.Image ->
+                    ImageNoteUiState(
+                        noteId = note.uid,
+                        uri = note.mediaRef,
+                        timestamp = note.creationTimestamp,
+                    )
+                is JournalNote.Audio ->
+                    AudioNoteUiState(
+                        noteId = note.uid,
+                        uri = note.mediaRef,
+                        timestamp = note.creationTimestamp,
+                        duration = note.durationMs,
+                    )
+                is JournalNote.Video ->
+                    VideoNoteUiState(
+                        noteId = note.uid,
+                        uri = note.mediaRef,
+                        timestamp = note.creationTimestamp,
+                    )
+            }
+        }
 }

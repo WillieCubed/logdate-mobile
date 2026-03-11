@@ -20,15 +20,66 @@ data class HomeTimelineUiState(
 
 data class TimelineDayUiState(
     val summary: String,
+    val supportingSummary: String? = null,
     val date: LocalDate = LocalDate.now(), // TODO: Don't use default value here
-    val people: List<PersonUiState> = DEMO_PEOPLE,
+    val people: List<PersonUiState> = emptyList(),
     val events: List<String> = emptyList(), // TODO: Actually include events
     val placesVisited: List<PlaceUiState> = emptyList(),
     val mediaUris: List<MediaObjectUiState> = emptyList(), // TODO: Actually include media
     val notes: List<NoteUiState> = emptyList(),
+    val layout: TimelineDayCardLayout = TimelineDayCardLayout.STORY_LED,
+    val recap: TimelineDayRecapUiState = TimelineDayRecapUiState(),
+    val heroSection: TimelineDaySectionUiState? = null,
+    val supportingSections: List<TimelineDaySectionUiState> = emptyList(),
     val isLoadingSummary: Boolean = false,
     val isLoadingPeople: Boolean = false,
 )
+
+enum class TimelineDayCardLayout {
+    MEDIA_LED,
+    VOICE_LED,
+    PLACE_LED,
+    STORY_LED,
+}
+
+data class TimelineDayRecapUiState(
+    val captureCount: Int = 0,
+    val mediaCount: Int = 0,
+    val audioCount: Int = 0,
+    val placeCount: Int = 0,
+    val peopleCount: Int = 0,
+    val activeSpanMinutes: Int = 0,
+)
+
+sealed interface TimelineDaySectionUiState {
+    val label: String
+}
+
+data class TimelineTextSnippetSectionUiState(
+    override val label: String,
+    val text: String,
+    val timestamp: Instant,
+) : TimelineDaySectionUiState
+
+data class TimelineMediaItemUiState(
+    val uri: String,
+    val isVideo: Boolean = false,
+)
+
+data class TimelineMediaSectionUiState(
+    override val label: String,
+    val items: List<TimelineMediaItemUiState>,
+) : TimelineDaySectionUiState
+
+data class TimelineAudioSectionUiState(
+    override val label: String,
+    val note: AudioNoteUiState,
+) : TimelineDaySectionUiState
+
+data class TimelinePlaceSectionUiState(
+    override val label: String,
+    val places: List<PlaceUiState>,
+) : TimelineDaySectionUiState
 
 enum class TimelineLoadingState {
     /** Initial state - show skeleton UI immediately */

@@ -87,6 +87,7 @@ data class TimelineDay(
     val events: List<String> = emptyList(), // TODO: Actually include events
     val placesVisited: List<TimelinePlaceVisit> = emptyList(),
     val parts: List<DayPart> = emptyList(),
+    val entries: List<JournalNote> = emptyList(),
 //    val mediaUris: List<MediaObjectUiState> = emptyList(), // TODO: Actually include media
 )
 
@@ -156,6 +157,9 @@ class GetTimelineDayUseCase(
                 is AIResult.Error -> emptyList()
             }
 
+        // Keep the media lookup warm for downstream screens even though the list cards rely on raw notes.
+        getMediaUrisUseCase(date)
+
         return TimelineDay(
             tldr = summary,
             date = date,
@@ -163,6 +167,8 @@ class GetTimelineDayUseCase(
             end = entries.maxOf { it.creationTimestamp },
             people = people,
             placesVisited = extractPlacesVisited(entries),
+            parts = extractDayParts(entries),
+            entries = entries.sortedByDescending { entry -> entry.creationTimestamp },
         )
     }
 }
@@ -171,6 +177,42 @@ internal fun extractPlacesVisited(entries: List<JournalNote>): List<TimelinePlac
     entries
         .mapNotNull { note -> note.location?.toTimelinePlaceVisit() }
         .distinctBy(TimelinePlaceVisit::id)
+
+internal fun extractDayParts(entries: List<JournalNote>): List<DayPart> {
+    val groupedEntries =
+        entries
+            .sortedBy { entry -> entry.creationTimestamp }
+            .groupBy { entry -> entry.creationTimestamp.toDayPartBucket() }
+
+    return DayPartBucket.entries.mapNotNull { bucket ->
+        val bucketEntries = groupedEntries[bucket].orEmpty()
+        if (bucketEntries.isEmpty()) {
+            null
+        } else {
+            val textPreview =
+                bucketEntries
+                    .filterIsInstance<JournalNote.Text>()
+                    .firstOrNull()
+                    ?.content
+                    ?.trim()
+                    ?.take(120)
+            val locationPreview =
+                bucketEntries
+                    .mapNotNull { entry -> entry.location?.displayName }
+                    .distinct()
+                    .take(2)
+                    .joinToString(" • ")
+                    .ifBlank { null }
+            val fallbackDescription = "${bucketEntries.size} captures"
+
+            DayPart(
+                label = bucket.label,
+                description = textPreview ?: locationPreview ?: fallbackDescription,
+                featuredGraphicUri = bucketEntries.firstVisualUri(),
+            )
+        }
+    }
+}
 
 private fun NoteLocation.toTimelinePlaceVisit(): TimelinePlaceVisit? {
     val latitude = effectiveLatitude ?: return null
@@ -185,3 +227,34 @@ private fun NoteLocation.toTimelinePlaceVisit(): TimelinePlaceVisit? {
 }
 
 private fun roundCoordinate(value: Double): Double = round(value * 10_000) / 10_000
+
+private enum class DayPartBucket(
+    val label: String,
+) {
+    DAWN("Early"),
+    MORNING("Morning"),
+    AFTERNOON("Afternoon"),
+    EVENING("Evening"),
+    LATE("Late"),
+}
+
+private fun Instant.toDayPartBucket(): DayPartBucket {
+    val hour = toLocalDateTime(TimeZone.currentSystemDefault()).hour
+    return when (hour) {
+        in 0..5 -> DayPartBucket.DAWN
+        in 6..11 -> DayPartBucket.MORNING
+        in 12..16 -> DayPartBucket.AFTERNOON
+        in 17..21 -> DayPartBucket.EVENING
+        else -> DayPartBucket.LATE
+    }
+}
+
+private fun List<JournalNote>.firstVisualUri(): String? =
+    firstNotNullOfOrNull { entry ->
+        when (entry) {
+            is JournalNote.Image -> entry.mediaRef
+            is JournalNote.Video -> entry.mediaRef
+            is JournalNote.Audio -> null
+            is JournalNote.Text -> null
+        }
+    }

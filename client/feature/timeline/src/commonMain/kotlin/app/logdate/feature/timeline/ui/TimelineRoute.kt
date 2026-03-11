@@ -89,6 +89,7 @@ internal fun TimelineScreen(
             uiState =
                 app.logdate.ui.timeline.TimelineUiState(
                     items = state.items,
+                    loadingState = state.loadingState,
                 ),
             onNewEntry = onNewEntry,
             onShareMemory = { /* Handle share memory */ },

@@ -36,7 +36,7 @@ fun TimelinePaneScreen(
     var showLocationQuickPeek by rememberSaveable { mutableStateOf(false) }
 
     TimelinePane(
-        uiState = TimelineUiState(items = uiState.items),
+        uiState = TimelineUiState(items = uiState.items, loadingState = uiState.loadingState),
         onNewEntry = onNewEntry,
         onShareMemory = {},
         onOpenDay = { date ->
