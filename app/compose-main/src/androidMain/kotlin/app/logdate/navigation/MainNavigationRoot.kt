@@ -90,6 +90,7 @@ import app.logdate.navigation.routes.core.OnboardingImportRoute
 import app.logdate.navigation.routes.core.OnboardingWelcomeBackRoute
 import app.logdate.navigation.routes.core.PersonalIntroRoute
 import app.logdate.navigation.routes.core.RewindDetailRoute
+import app.logdate.navigation.routes.core.SettingsOverviewRoute
 import app.logdate.navigation.routes.core.TimelineDetail
 import app.logdate.navigation.routes.core.TimelineListRoute
 import app.logdate.navigation.routes.core.goBack
@@ -587,8 +588,7 @@ fun MainNavigationRoot(mainAppNavigator: MainAppNavigator) {
                             },
                             onSetupCompleted = {
                                 // After setup is completed, go back to settings
-                                repeat(mainAppNavigator.backStack.size) { mainAppNavigator.goBack() }
-                                mainAppNavigator.openSettings()
+                                mainAppNavigator.safelyClearBackstack(SettingsOverviewRoute)
                             },
                             onSkip = {
                                 // Simply go back to the previous screen when skipped
