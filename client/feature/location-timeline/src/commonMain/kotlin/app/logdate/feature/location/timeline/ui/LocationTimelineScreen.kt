@@ -68,10 +68,12 @@ import app.logdate.feature.location.timeline.ui.model.LocationPlaceUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationStopUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineErrorUiState
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineUiState
+import io.github.aakira.napier.Napier
 import logdate.client.feature.location.timeline.generated.resources.Res
 import logdate.client.feature.location.timeline.generated.resources.all_time
 import logdate.client.feature.location.timeline.generated.resources.cancel
 import logdate.client.feature.location.timeline.generated.resources.current_location
+import logdate.client.feature.location.timeline.generated.resources.custom_range
 import logdate.client.feature.location.timeline.generated.resources.delete_location
 import logdate.client.feature.location.timeline.generated.resources.delete_location_confirmation
 import logdate.client.feature.location.timeline.generated.resources.enable
@@ -92,7 +94,6 @@ import logdate.client.feature.location.timeline.generated.resources.pinned_memor
 import logdate.client.feature.location.timeline.generated.resources.recent_memories
 import logdate.client.feature.location.timeline.generated.resources.recent_stays
 import logdate.client.feature.location.timeline.generated.resources.samples_count
-import logdate.client.feature.location.timeline.generated.resources.stayed_for_duration
 import logdate.client.feature.location.timeline.generated.resources.try_again
 import logdate.client.feature.location.timeline.generated.resources.unable_to_load_location_timeline
 import logdate.client.feature.location.timeline.generated.resources.view_note
@@ -126,7 +127,7 @@ fun LocationTimelineScreen(
             onSelectPlace = viewModel::selectPlace,
             onDismissPlaceDetail = viewModel::dismissPlaceDetail,
             onDeleteStop = viewModel::deleteStop,
-            onSelectFilter = viewModel::selectFilter,
+            onSelectFilter = { filter -> viewModel.selectFilter(filter) },
             onLoadMorePlaces = viewModel::loadMorePlaces,
             onRetry = viewModel::retry,
             onOpenNote = onOpenNote,
@@ -505,12 +506,13 @@ private fun PlacesFilterRow(
                 .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        LocationMemoryTimeFilter.entries.forEach { filter ->
+        for (filter in LocationMemoryTimeFilter.Presets) {
+            val currentFilter = filter
             FilterChip(
-                selected = filter == selectedFilter,
-                onClick = { onSelectFilter(filter) },
+                selected = currentFilter == selectedFilter,
+                onClick = { onSelectFilter(currentFilter) },
                 label = {
-                    Text(FilterLabel(filter))
+                    Text(FilterLabel(currentFilter))
                 },
             )
         }
@@ -519,11 +521,16 @@ private fun PlacesFilterRow(
 
 @Composable
 private fun FilterLabel(filter: LocationMemoryTimeFilter): String =
-    when (filter) {
+    when (val activeFilter: Any = filter) {
         LocationMemoryTimeFilter.Last30Days -> stringResource(Res.string.last_30_days)
         LocationMemoryTimeFilter.Last90Days -> stringResource(Res.string.last_90_days)
         LocationMemoryTimeFilter.YearToDate -> stringResource(Res.string.year_to_date)
         LocationMemoryTimeFilter.AllTime -> stringResource(Res.string.all_time)
+        is LocationMemoryTimeFilter.Custom -> stringResource(Res.string.custom_range)
+        else -> {
+            Napier.w("Unexpected location filter shown in UI: $activeFilter")
+            stringResource(Res.string.custom_range)
+        }
     }
 
 @Composable
@@ -700,7 +707,7 @@ private fun StopCard(
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
-                text = stringResource(Res.string.stayed_for_duration, stop.duration),
+                text = stop.duration,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -826,7 +833,7 @@ private fun LocationPlaceDetailSheet(
                                 fontWeight = FontWeight.Medium,
                             )
                             Text(
-                                text = stringResource(Res.string.stayed_for_duration, stop.duration),
+                                text = stop.duration,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

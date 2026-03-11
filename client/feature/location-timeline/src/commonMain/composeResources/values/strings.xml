@@ -4,6 +4,7 @@
     <string name="close">Close</string>
     <string name="current_location">Current Location</string>
     <string name="current_location_unavailable">Current location unavailable</string>
+    <string name="custom_range">Custom range</string>
     <string name="delete_location">Delete stop</string>
     <string name="delete_location_confirmation">This removes the recorded location samples for this stop.</string>
     <string name="enable">Enable</string>
@@ -27,7 +28,7 @@
     <string name="pinned_memory">Pinned memory</string>
     <string name="recent_memories">Recent memories</string>
     <string name="recent_stops">Recent places</string>
-    <string name="recent_stays">Recent stays</string>
+    <string name="recent_stays">Recent activity stops</string>
     <string name="samples_count">%1$d samples</string>
     <string name="try_again">Try again</string>
     <string name="unable_to_load_location_timeline">Unable to load locations</string>
@@ -35,5 +36,4 @@
     <string name="year_to_date">This year</string>
     <string name="your_location_timeline_will_appear_here_as_you_move_around">Your recent places will appear here as you move around.</string>
     <string name="coordinates_label">Coordinates: %1$s</string>
-    <string name="stayed_for_duration">Stayed for %1$s</string>
 </resources>

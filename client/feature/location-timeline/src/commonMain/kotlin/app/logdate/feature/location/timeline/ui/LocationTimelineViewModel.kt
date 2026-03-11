@@ -7,6 +7,7 @@ import app.logdate.client.domain.location.DeleteLocationRangeUseCase
 import app.logdate.client.domain.location.LocationMemoryPlace
 import app.logdate.client.domain.location.LocationMemoryTimeFilter
 import app.logdate.client.domain.location.LocationStop
+import app.logdate.client.domain.location.LocationStopEvidenceKind
 import app.logdate.client.domain.location.ObserveLocationMemoryPlacesUseCase
 import app.logdate.client.domain.location.ObserveLocationStopsUseCase
 import app.logdate.client.domain.places.PlaceResolutionResult
@@ -72,7 +73,7 @@ class LocationTimelineViewModel(
 
     private val _uiState = MutableStateFlow<LocationTimelineUiState>(LocationTimelineUiState.Loading)
     val uiState: StateFlow<LocationTimelineUiState> = _uiState.asStateFlow()
-    private val selectedFilter = MutableStateFlow(LocationMemoryTimeFilter.Last30Days)
+    private val selectedFilter = MutableStateFlow<LocationMemoryTimeFilter>(LocationMemoryTimeFilter.Last30Days)
     private val visiblePlaceCount = MutableStateFlow(DEFAULT_PLACE_PAGE_SIZE)
     private var observeTimelineJob: Job? = null
 
@@ -302,12 +303,13 @@ class LocationTimelineViewModel(
             startedAt = startTime.localTime,
             endedAt = endTime.localTime,
             timeRange = formatTimeRange(startTime, endTime),
-            duration = formatDuration(duration),
+            duration = formatEvidence(this@toUiModel),
             sourceLabel = sourceLabel,
             source = source,
             sampleCount = sampleCount,
             startTime = startTime,
             endTime = endTime,
+            hasReliableDuration = hasReliableDuration,
         )
     }
 
@@ -415,12 +417,18 @@ class LocationTimelineViewModel(
         }
     }
 
+    private fun formatEvidence(stop: LocationStop): String =
+        when (stop.evidenceKind) {
+            LocationStopEvidenceKind.STAY -> formatDuration(stop.duration)
+            LocationStopEvidenceKind.OBSERVATION -> "Observed here"
+        }
+
     private fun formatDuration(duration: Duration): String =
         when {
-            duration >= 1.days -> "${duration.inWholeDays}d ${duration.inWholeHours % 24}h"
-            duration >= 1.hours -> "${duration.inWholeHours}h ${duration.inWholeMinutes % 60}m"
-            duration >= 1.minutes -> "${duration.inWholeMinutes}m"
-            else -> "<1m"
+            duration >= 1.days -> "Stayed for ${duration.inWholeDays}d ${duration.inWholeHours % 24}h"
+            duration >= 1.hours -> "Stayed for ${duration.inWholeHours}h ${duration.inWholeMinutes % 60}m"
+            duration >= 1.minutes -> "Stayed for ${duration.inWholeMinutes}m"
+            else -> "Observed here"
         }
 
     private fun calculateDistanceMeters(

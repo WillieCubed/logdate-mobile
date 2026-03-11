@@ -112,4 +112,5 @@ data class LocationStopUiModel(
     val sampleCount: Int,
     val startTime: Instant,
     val endTime: Instant,
+    val hasReliableDuration: Boolean,
 )
