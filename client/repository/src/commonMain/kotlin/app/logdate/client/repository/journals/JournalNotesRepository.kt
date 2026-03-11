@@ -2,6 +2,10 @@ package app.logdate.client.repository.journals
 
 import app.logdate.util.UuidSerializer
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant
@@ -34,6 +38,45 @@ interface JournalNotesRepository {
      * Fast query for recent notes to enable immediate timeline display.
      */
     fun observeRecentNotes(limit: Int = 20): Flow<List<JournalNote>>
+
+    /**
+     * Observes the notes for a single calendar day.
+     */
+    fun observeNotesForDay(day: LocalDate): Flow<List<JournalNote>> =
+        allNotesObserved.map { notes ->
+            val timezone = kotlinx.datetime.TimeZone.currentSystemDefault()
+            notes
+                .filter { note ->
+                    note.creationTimestamp
+                        .toLocalDateTime(timezone)
+                        .date == day
+                }.sortedByDescending(JournalNote::creationTimestamp)
+        }
+
+    /**
+     * Fetches older notes before the provided timestamp, newest first.
+     */
+    suspend fun getNotesBefore(
+        beforeExclusive: Instant,
+        limit: Int,
+    ): List<JournalNote> =
+        allNotesObserved
+            .first()
+            .asSequence()
+            .filter { note -> note.creationTimestamp < beforeExclusive }
+            .sortedByDescending(JournalNote::creationTimestamp)
+            .take(limit)
+            .toList()
+
+    /**
+     * Fast existence check for older notes before a timestamp.
+     */
+    suspend fun hasNotesBefore(beforeExclusive: Instant): Boolean = getNotesBefore(beforeExclusive, limit = 1).isNotEmpty()
+
+    /**
+     * Fetches all notes for a single calendar day.
+     */
+    suspend fun getNotesForDay(day: LocalDate): List<JournalNote> = observeNotesForDay(day).first()
 
     /**
      * Fetches a specific note by its ID. Used for loading entries for editing in new windows.

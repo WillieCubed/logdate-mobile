@@ -40,6 +40,15 @@ interface ImageNoteDao {
     @Query("SELECT * FROM image_notes ORDER BY created DESC LIMIT :limit")
     fun getRecentNotes(limit: Int = 20): Flow<List<ImageNoteEntity>>
 
+    @Query("SELECT * FROM image_notes WHERE created < :beforeTimestamp ORDER BY created DESC LIMIT :limit")
+    suspend fun getRecentNotesBefore(
+        beforeTimestamp: Long,
+        limit: Int,
+    ): List<ImageNoteEntity>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM image_notes WHERE created < :beforeTimestamp)")
+    suspend fun hasNotesBefore(beforeTimestamp: Long): Boolean
+
     /**
      * Returns a paginated flow of [ImageNoteEntity]s ordered by creation date.
      */

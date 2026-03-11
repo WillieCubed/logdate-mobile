@@ -41,6 +41,15 @@ interface AudioNoteDao {
     @Query("SELECT * FROM audio_notes ORDER BY created DESC LIMIT :limit")
     fun getRecentNotes(limit: Int = 20): Flow<List<AudioNoteEntity>>
 
+    @Query("SELECT * FROM audio_notes WHERE created < :beforeTimestamp ORDER BY created DESC LIMIT :limit")
+    suspend fun getRecentNotesBefore(
+        beforeTimestamp: Long,
+        limit: Int,
+    ): List<AudioNoteEntity>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM audio_notes WHERE created < :beforeTimestamp)")
+    suspend fun hasNotesBefore(beforeTimestamp: Long): Boolean
+
     /**
      * Returns notes within a specific date range.
      */

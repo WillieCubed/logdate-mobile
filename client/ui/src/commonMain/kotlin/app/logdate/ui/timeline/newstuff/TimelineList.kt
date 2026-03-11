@@ -103,6 +103,18 @@ private enum class TimelineDayLayoutMode {
     EXPANDED,
 }
 
+private enum class TimelineListContentType {
+    SUGGESTION,
+    DAY_COMPACT,
+    DAY_MEDIUM,
+    DAY_EXPANDED,
+    GAP,
+    SKELETON,
+    APPEND_LOADING,
+    APPEND_ERROR,
+    END_OF_TIMELINE,
+}
+
 private data class TimelineDayStyle(
     val accentColor: Color,
     val railColor: Color,
@@ -128,112 +140,132 @@ fun TimelineList(
     listState: LazyListState = rememberLazyListState(),
 ) {
     val suggestionBlockState: TimelineSuggestionBlockUiState? =
-        when (timelineSuggestion) {
-            is TimelineSuggestionBlock.OngoingEvent ->
-                TimelineSuggestionBlockUiState(
-                    memoryId = timelineSuggestion.memoryId,
-                    type = TimelineSuggestionBlockType.HAPPENING_NOW,
-                    message = timelineSuggestion.message,
-                    location = timelineSuggestion.location,
-                    people = timelineSuggestion.people,
-                    mediaUris = timelineSuggestion.mediaUris,
-                )
-            is TimelineSuggestionBlock.PastMoment ->
-                TimelineSuggestionBlockUiState(
-                    memoryId = timelineSuggestion.memoryId,
-                    type = TimelineSuggestionBlockType.UPDATE,
-                    message = timelineSuggestion.message,
-                    location = timelineSuggestion.location,
-                    people = timelineSuggestion.people,
-                    mediaUris = timelineSuggestion.mediaUris,
-                )
-            null -> null
-        }
-
-    LaunchedEffect(listState, items.size, hasMoreOlderContent, isLoadingMore, appendError) {
-        snapshotFlow {
-            val lastVisibleIndex =
-                listState.layoutInfo.visibleItemsInfo
-                    .lastOrNull()
-                    ?.index ?: return@snapshotFlow false
-            hasMoreOlderContent &&
-                !isLoadingMore &&
-                appendError == null &&
-                items.isNotEmpty() &&
-                lastVisibleIndex >= (listState.layoutInfo.totalItemsCount - 4).coerceAtLeast(0)
-        }.distinctUntilChanged()
-            .filter { shouldLoadMore -> shouldLoadMore }
-            .collect {
-                onLoadMoreOlder()
-            }
-    }
-
-    LazyColumn(
-        modifier = modifier,
-        state = listState,
-        verticalArrangement = Arrangement.spacedBy(Spacing.xl),
-    ) {
-        item {
-            AnimatedVisibility(visible = suggestionBlockState != null) {
-                suggestionBlockState?.let { blockState ->
-                    TimelineSuggestionBlock(
-                        state = blockState,
-                        onAddToMemory = onAddToMemory,
-                        onShare = onShare,
-                        modifier = Modifier.padding(Spacing.lg),
+        remember(timelineSuggestion) {
+            when (timelineSuggestion) {
+                is TimelineSuggestionBlock.OngoingEvent ->
+                    TimelineSuggestionBlockUiState(
+                        memoryId = timelineSuggestion.memoryId,
+                        type = TimelineSuggestionBlockType.HAPPENING_NOW,
+                        message = timelineSuggestion.message,
+                        location = timelineSuggestion.location,
+                        people = timelineSuggestion.people,
+                        mediaUris = timelineSuggestion.mediaUris,
                     )
-                }
+                is TimelineSuggestionBlock.PastMoment ->
+                    TimelineSuggestionBlockUiState(
+                        memoryId = timelineSuggestion.memoryId,
+                        type = TimelineSuggestionBlockType.UPDATE,
+                        message = timelineSuggestion.message,
+                        location = timelineSuggestion.location,
+                        people = timelineSuggestion.people,
+                        mediaUris = timelineSuggestion.mediaUris,
+                    )
+                null -> null
             }
         }
 
-        if (items.isEmpty() && loadingState != TimelineLoadingState.Loaded) {
-            items(placeholderLayouts) { layout ->
-                TimelineDaySkeleton(layout = layout)
-            }
-        } else {
-            itemsIndexed(
-                items,
-                key = { _, item -> item.date.toString() },
-            ) { index, item ->
-                TimelineDayListItem(
-                    item = item,
-                    onOpenDay = onOpenDay,
-                    modifier =
-                        Modifier.applyPaddingIfLast(
-                            currentIndex = index,
-                            totalItems = items.size,
-                        ),
-                )
+    BoxWithConstraints(modifier = modifier) {
+        val layoutMode = maxWidth.toTimelineLayoutMode()
 
-                if (index < items.lastIndex) {
-                    val currentDate = item.date
-                    val nextDate = items[index + 1].date
-                    val daysBetween = (currentDate.toEpochDays() - nextDate.toEpochDays()).absoluteValue
-                    if (daysBetween > 10) {
-                        TimeGapMessageItem()
+        LaunchedEffect(listState, items.size, hasMoreOlderContent, isLoadingMore, appendError) {
+            snapshotFlow {
+                val lastVisibleIndex =
+                    listState.layoutInfo.visibleItemsInfo
+                        .lastOrNull()
+                        ?.index ?: return@snapshotFlow false
+                hasMoreOlderContent &&
+                    !isLoadingMore &&
+                    appendError == null &&
+                    items.isNotEmpty() &&
+                    lastVisibleIndex >= (listState.layoutInfo.totalItemsCount - 4).coerceAtLeast(0)
+            }.distinctUntilChanged()
+                .filter { shouldLoadMore -> shouldLoadMore }
+                .collect {
+                    onLoadMoreOlder()
+                }
+        }
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            state = listState,
+            verticalArrangement = Arrangement.spacedBy(Spacing.xl),
+        ) {
+            item(
+                contentType = TimelineListContentType.SUGGESTION,
+            ) {
+                AnimatedVisibility(visible = suggestionBlockState != null) {
+                    suggestionBlockState?.let { blockState ->
+                        TimelineSuggestionBlock(
+                            state = blockState,
+                            onAddToMemory = onAddToMemory,
+                            onShare = onShare,
+                            modifier = Modifier.padding(Spacing.lg),
+                        )
                     }
                 }
             }
-        }
 
-        if (isLoadingMore) {
-            item {
-                TimelineAppendLoadingItem()
+            if (items.isEmpty() && loadingState != TimelineLoadingState.Loaded) {
+                items(
+                    items = placeholderLayouts,
+                    key = { layout -> layout.name },
+                    contentType = { TimelineListContentType.SKELETON },
+                ) { layout ->
+                    TimelineDaySkeleton(layout = layout)
+                }
+            } else {
+                itemsIndexed(
+                    items = items,
+                    key = { _, item -> item.date.toString() },
+                    contentType = { _, _ -> layoutMode.contentType() },
+                ) { index, item ->
+                    TimelineDayListItem(
+                        item = item,
+                        layoutMode = layoutMode,
+                        onOpenDay = onOpenDay,
+                        modifier =
+                            Modifier.applyPaddingIfLast(
+                                currentIndex = index,
+                                totalItems = items.size,
+                            ),
+                    )
+
+                    if (index < items.lastIndex) {
+                        val currentDate = item.date
+                        val nextDate = items[index + 1].date
+                        val daysBetween = (currentDate.toEpochDays() - nextDate.toEpochDays()).absoluteValue
+                        if (daysBetween > 10) {
+                            TimeGapMessageItem()
+                        }
+                    }
+                }
             }
-        }
 
-        if (appendError != null) {
-            item {
-                TimelineAppendErrorItem(
-                    message = appendError,
-                    onRetry = onLoadMoreOlder,
-                )
+            if (isLoadingMore) {
+                item(
+                    contentType = TimelineListContentType.APPEND_LOADING,
+                ) {
+                    TimelineAppendLoadingItem()
+                }
             }
-        }
 
-        if (!hasMoreOlderContent && items.isNotEmpty()) {
-            item {
-                EndOfTimelineItem(endOfTimelineState)
+            if (appendError != null) {
+                item(
+                    contentType = TimelineListContentType.APPEND_ERROR,
+                ) {
+                    TimelineAppendErrorItem(
+                        message = appendError,
+                        onRetry = onLoadMoreOlder,
+                    )
+                }
+            }
+
+            if (!hasMoreOlderContent && items.isNotEmpty()) {
+                item(
+                    contentType = TimelineListContentType.END_OF_TIMELINE,
+                ) {
+                    EndOfTimelineItem(endOfTimelineState)
+                }
             }
         }
     }
@@ -332,49 +364,43 @@ internal fun BirthdayListItem(
 }
 
 @Composable
-internal fun TimelineDayListItem(
+private fun TimelineDayListItem(
     item: TimelineDayUiState,
+    layoutMode: TimelineDayLayoutMode,
     onOpenDay: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    BoxWithConstraints(
+    val style = item.layout.style()
+
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(if (layoutMode == TimelineDayLayoutMode.COMPACT) Spacing.md else Spacing.xl),
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = Spacing.lg),
+                .padding(horizontal = Spacing.lg)
+                .clip(RoundedCornerShape(32.dp))
+                .clickable { onOpenDay(item.date) }
+                .padding(vertical = if (layoutMode == TimelineDayLayoutMode.COMPACT) Spacing.sm else Spacing.md),
     ) {
-        val layoutMode = maxWidth.toTimelineLayoutMode()
-        val style = item.layout.style()
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(if (layoutMode == TimelineDayLayoutMode.COMPACT) Spacing.md else Spacing.xl),
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(32.dp))
-                    .clickable { onOpenDay(item.date) }
-                    .padding(vertical = if (layoutMode == TimelineDayLayoutMode.COMPACT) Spacing.sm else Spacing.md),
+        TimelineDayRail(
+            item = item,
+            style = style,
+            layoutMode = layoutMode,
+        )
+        Column(
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            modifier = Modifier.weight(1f),
         ) {
-            TimelineDayRail(
+            TimelineDayHeader(
                 item = item,
                 style = style,
                 layoutMode = layoutMode,
             )
-            Column(
-                verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                modifier = Modifier.weight(1f),
-            ) {
-                TimelineDayHeader(
-                    item = item,
-                    style = style,
-                    layoutMode = layoutMode,
-                )
-                TimelineDayContent(
-                    item = item,
-                    style = style,
-                    layoutMode = layoutMode,
-                )
-            }
+            TimelineDayContent(
+                item = item,
+                style = style,
+                layoutMode = layoutMode,
+            )
         }
     }
 }
@@ -1269,6 +1295,13 @@ private fun Dp.toTimelineLayoutMode(): TimelineDayLayoutMode =
         this >= 920.dp -> TimelineDayLayoutMode.EXPANDED
         this >= 620.dp -> TimelineDayLayoutMode.MEDIUM
         else -> TimelineDayLayoutMode.COMPACT
+    }
+
+private fun TimelineDayLayoutMode.contentType(): TimelineListContentType =
+    when (this) {
+        TimelineDayLayoutMode.COMPACT -> TimelineListContentType.DAY_COMPACT
+        TimelineDayLayoutMode.MEDIUM -> TimelineListContentType.DAY_MEDIUM
+        TimelineDayLayoutMode.EXPANDED -> TimelineListContentType.DAY_EXPANDED
     }
 
 private fun Int.toSpanLabel(): String =

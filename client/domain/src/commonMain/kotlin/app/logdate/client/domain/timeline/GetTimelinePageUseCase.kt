@@ -23,33 +23,22 @@ class GetTimelinePageUseCase(
     private val notesRepository: JournalNotesRepository,
 ) {
     suspend operator fun invoke(request: TimelinePageRequest = TimelinePageRequest()): TimelinePage {
-        val allNotes =
-            notesRepository.allNotesObserved.first().sortedByDescending { note ->
-                note.creationTimestamp
-            }
-
         val candidateNotes =
             request.beforeExclusive?.let { beforeExclusive ->
-                allNotes.filter { note -> note.creationTimestamp < beforeExclusive }
-            } ?: allNotes
+                notesRepository.getNotesBefore(
+                    beforeExclusive = beforeExclusive,
+                    limit = request.pageSize,
+                )
+            } ?: notesRepository.observeRecentNotes(request.pageSize).first()
 
         if (candidateNotes.isEmpty()) {
             return TimelinePage()
         }
 
-        val seededPageNotes = candidateNotes.take(request.pageSize)
-        if (seededPageNotes.isEmpty()) {
-            return TimelinePage()
-        }
-
-        val pageDates = seededPageNotes.map(JournalNote::timelineDate).toSet()
+        val pageDates = candidateNotes.map(JournalNote::timelineDate).toSet()
         val timelineDays =
             pageDates.mapNotNull { pageDate ->
-                val dayEntries =
-                    allNotes.filter { note ->
-                        note.timelineDate() == pageDate
-                    }
-                dayEntries.takeIf { it.isNotEmpty() }?.let { entries ->
+                notesRepository.getNotesForDay(pageDate).takeIf { it.isNotEmpty() }?.let { entries ->
                     createBasicTimeline(entries, request.sortOrder).days.firstOrNull()
                 }
             }
@@ -62,7 +51,7 @@ class GetTimelinePageUseCase(
 
         val hasMoreOlderContent =
             oldestLoadedTimestamp?.let { cursor ->
-                allNotes.any { note -> note.creationTimestamp < cursor }
+                notesRepository.hasNotesBefore(cursor)
             } ?: false
 
         return TimelinePage(

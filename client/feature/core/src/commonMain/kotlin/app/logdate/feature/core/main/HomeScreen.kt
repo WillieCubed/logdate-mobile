@@ -59,21 +59,21 @@ import app.logdate.ui.timeline.TimelineUiState
 import app.logdate.ui.timeline.VideoNoteUiState
 import app.logdate.ui.timeline.createTimelineDayUiState
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.atStartOfDayIn
-import kotlinx.datetime.plus
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.create_new_entry
 import org.jetbrains.compose.resources.stringResource
@@ -221,6 +221,7 @@ internal fun HomeScaffoldWrapper(
  * unfinished drafts, etc.) and converts the result into a [TimelineSuggestionBlock] for
  * display at the top of the timeline.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModel(
     private val recentTimelineFlow: Flow<Timeline>,
     private val loadTimelinePage: suspend (TimelinePageRequest) -> TimelinePage,
@@ -249,115 +250,143 @@ class HomeViewModel(
         getHomeRecommendation = getHomeRecommendation,
     )
 
-    private val selectedItemUiState =
-        MutableStateFlow<TimelineDaySelection>(TimelineDaySelection.NotSelected)
-
-    private val selectedNotes = MutableStateFlow(emptyList<JournalNote>())
     private val selectedDayFlow = MutableStateFlow<LocalDate?>(null)
-    private val loadedTimelineDays = MutableStateFlow<List<TimelineDay>>(emptyList())
+    private val appendedTimelineDays = MutableStateFlow<List<TimelineDay>>(emptyList())
     private val isLoadingMore = MutableStateFlow(false)
     private val appendError = MutableStateFlow<String?>(null)
+    private val hasLoadedRecentTimeline = MutableStateFlow(false)
 
-    private val timelineInputs =
-        combine(
-            loadedTimelineDays,
-            notesRepository.allNotesObserved,
-            selectedNotes,
-            selectedItemUiState,
-            selectedDayFlow,
-        ) { timelineDays, allNotes, notes, selection, selectedDayDate ->
-            HomeTimelineInputs(
-                timelineDays = timelineDays,
-                allNotes = allNotes,
-                selectedNotes = notes,
-                selection = selection,
-                selectedDayDate = selectedDayDate,
+    private val recentTimelineState: StateFlow<Timeline> =
+        recentTimelineFlow
+            .onEach { hasLoadedRecentTimeline.value = true }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                Timeline(emptyList()),
             )
-        }
 
-    init {
-        viewModelScope.launch {
-            recentTimelineFlow.collect { timeline ->
-                loadedTimelineDays.value =
-                    if (timeline.days.isEmpty()) {
-                        emptyList()
-                    } else {
-                        mergeRecentTimelineDays(
-                            existing = loadedTimelineDays.value,
-                            recent = timeline.days,
-                        )
-                    }
-            }
-        }
-    }
+    private val timelineFeedDays: StateFlow<List<TimelineDay>> =
+        combine(recentTimelineState, appendedTimelineDays) { recentTimeline, appendedDays ->
+            mergeTimelineDays(existing = appendedDays, incoming = recentTimeline.days)
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            emptyList(),
+        )
 
-    val uiState: StateFlow<HomeTimelineUiState> =
+    private val timelineItems: StateFlow<List<TimelineDayUiState>> =
+        timelineFeedDays
+            .map { timelineDays ->
+                timelineDays.map { timelineDay -> timelineDay.toUiState() }
+            }.stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                emptyList(),
+            )
+
+    private val selectedItemUiState: StateFlow<TimelineDaySelection> =
+        selectedDayFlow
+            .map { selectedDay ->
+                selectedDay?.let(TimelineDaySelection::DateSelected) ?: TimelineDaySelection.NotSelected
+            }.stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                TimelineDaySelection.NotSelected,
+            )
+
+    private val selectedDayNotes: StateFlow<List<JournalNote>> =
+        selectedDayFlow
+            .flatMapLatest { selectedDay ->
+                selectedDay?.let(notesRepository::observeNotesForDay) ?: flowOf(emptyList())
+            }.stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                emptyList(),
+            )
+
+    private val selectedDayUiState: StateFlow<TimelineDayUiState?> =
         combine(
-            timelineInputs,
-            getHomeRecommendation(),
-            isLoadingMore,
-            appendError,
-        ) { inputs, recommendation, isLoadingMoreOlder, appendOlderError ->
-            val items =
-                inputs.timelineDays.map { day ->
-                    day.toUiState(
-                        overrideNotes =
-                            if (day.date == inputs.selectedDayDate && inputs.selectedNotes.isNotEmpty()) {
-                                inputs.selectedNotes
-                            } else {
-                                day.entries
-                            },
-                    )
-                }
+            selectedDayFlow,
+            selectedDayNotes,
+            timelineFeedDays,
+        ) { selectedDayDate, selectedNotes, timelineDays ->
+            val day = selectedDayDate ?: return@combine null
+            val timelineDay = timelineDays.find { timelineEntry -> timelineEntry.date == day } ?: return@combine null
 
-            // Determine the selected day based on the current selection state
-            val selectedDay =
-                when (inputs.selection) {
-                    is TimelineDaySelection.Selected -> {
-                        items.find { it.date == inputs.selection.day }
-                    }
-                    is TimelineDaySelection.DateSelected -> {
-                        items.find { it.date == inputs.selection.date }
-                    }
-                    TimelineDaySelection.NotSelected -> null
-                }
-
-            val oldestLoadedTimestamp = inputs.timelineDays.oldestLoadedTimestamp()
-            val hasMoreOlderContent =
-                oldestLoadedTimestamp?.let { cursor ->
-                    inputs.allNotes.any { note -> note.creationTimestamp < cursor }
-                } ?: false
-
-            HomeTimelineUiState(
-                items = items,
-                selectedItem = inputs.selection,
-                selectedDay = selectedDay,
-                showEmptyState = items.isEmpty(),
-                timelineSuggestion =
-                    when (recommendation) {
-                        is HomeRecommendation.CompleteYourDraft ->
-                            TimelineSuggestionBlock.OngoingEvent(
-                                memoryId = recommendation.draftId.toString(),
-                                message =
-                                    "You have an unfinished entry." +
-                                        recommendation.notePreview?.let { " \"${it.take(60)}\"" }.orEmpty(),
-                            )
-                        is HomeRecommendation.CaptureToday ->
-                            TimelineSuggestionBlock.OngoingEvent(
-                                memoryId = "",
-                                message = recommendation.message,
-                            )
-                        HomeRecommendation.None -> null
-                    },
-                isLoading = items.isEmpty(),
-                isLoadingMore = isLoadingMoreOlder,
-                hasMoreOlderContent = hasMoreOlderContent,
-                appendError = appendOlderError,
-                loadingState = if (items.isEmpty()) TimelineLoadingState.InitialLoading else TimelineLoadingState.Loaded,
+            timelineDay.toUiState(
+                overrideNotes = if (selectedNotes.isEmpty()) timelineDay.entries else selectedNotes,
             )
         }.stateIn(
             viewModelScope,
-            SharingStarted.WhileSubscribed(5000),
+            SharingStarted.WhileSubscribed(5_000),
+            null,
+        )
+
+    private val hasMoreOlderContent: StateFlow<Boolean> =
+        timelineFeedDays
+            .mapLatest { timelineDays ->
+                val oldestLoadedTimestamp = timelineDays.oldestLoadedTimestamp() ?: return@mapLatest false
+                notesRepository.hasNotesBefore(oldestLoadedTimestamp)
+            }.stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                false,
+            )
+
+    private val timelineSuggestionState: StateFlow<TimelineSuggestionBlock?> =
+        getHomeRecommendation()
+            .map { recommendation -> recommendation.toTimelineSuggestionBlock() }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                null,
+            )
+
+    val uiState: StateFlow<HomeTimelineUiState> =
+        combine(
+            combine(
+                timelineItems,
+                selectedItemUiState,
+                selectedDayUiState,
+                timelineSuggestionState,
+            ) { items, selection, selectedDay, suggestion ->
+                HomeTimelineVisualState(
+                    items = items,
+                    selection = selection,
+                    selectedDay = selectedDay,
+                    suggestion = suggestion,
+                )
+            },
+            combine(
+                hasLoadedRecentTimeline,
+                isLoadingMore,
+                hasMoreOlderContent,
+                appendError,
+            ) { hasLoadedRecent, isLoadingMoreOlder, hasMoreOlder, appendOlderError ->
+                HomeTimelineLoadingState(
+                    hasLoadedRecentTimeline = hasLoadedRecent,
+                    isLoadingMore = isLoadingMoreOlder,
+                    hasMoreOlderContent = hasMoreOlder,
+                    appendError = appendOlderError,
+                )
+            },
+        ) { visualState, loadingState ->
+            val showInitialLoading = !loadingState.hasLoadedRecentTimeline && visualState.items.isEmpty()
+            HomeTimelineUiState(
+                items = visualState.items,
+                selectedItem = visualState.selection,
+                selectedDay = visualState.selectedDay,
+                showEmptyState = loadingState.hasLoadedRecentTimeline && visualState.items.isEmpty(),
+                timelineSuggestion = visualState.suggestion,
+                isLoading = showInitialLoading,
+                isLoadingMore = loadingState.isLoadingMore,
+                hasMoreOlderContent = loadingState.hasMoreOlderContent,
+                appendError = loadingState.appendError,
+                loadingState = if (showInitialLoading) TimelineLoadingState.InitialLoading else TimelineLoadingState.Loaded,
+            )
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
             HomeTimelineUiState(
                 isLoading = true,
                 loadingState = TimelineLoadingState.InitialLoading,
@@ -370,22 +399,13 @@ class HomeViewModel(
      * @param date The date of the day to select
      */
     fun selectDay(date: LocalDate) {
-        selectedItemUiState.value =
-            TimelineDaySelection.Selected(
-                id = date.toString(),
-                day = date,
-            )
         selectedDayFlow.value = date
-
-        // Automatically fetch notes when a day is selected
-        fetchNotesForDate(date)
     }
 
     /**
      * Clears the current day selection.
      */
     fun clearSelection() {
-        selectedItemUiState.value = TimelineDaySelection.NotSelected
         selectedDayFlow.value = null
     }
 
@@ -394,8 +414,8 @@ class HomeViewModel(
             return
         }
 
-        val oldestLoadedTimestamp = loadedTimelineDays.value.oldestLoadedTimestamp() ?: return
-        if (!uiState.value.hasMoreOlderContent) {
+        val oldestLoadedTimestamp = timelineFeedDays.value.oldestLoadedTimestamp() ?: return
+        if (!hasMoreOlderContent.value) {
             return
         }
 
@@ -413,7 +433,7 @@ class HomeViewModel(
                     )
 
                 if (olderPage.days.isNotEmpty()) {
-                    loadedTimelineDays.update { existing ->
+                    appendedTimelineDays.update { existing ->
                         mergeTimelineDays(existing = existing, incoming = olderPage.days)
                     }
                 }
@@ -422,59 +442,6 @@ class HomeViewModel(
                 appendError.value = APPEND_ERROR_MESSAGE
             } finally {
                 isLoadingMore.value = false
-            }
-        }
-    }
-
-    /**
-     * Fetches notes for a specific date.
-     *
-     * @param date The date to fetch notes for
-     */
-    fun fetchNotesForDate(date: LocalDate) {
-        Napier.d(
-            tag = "HomeViewModel",
-            message = "EXPLICIT FETCH: Getting notes for date $date",
-        )
-
-        // Create time range for the day
-        val tz = TimeZone.currentSystemDefault()
-        val startInstant = date.atStartOfDayIn(tz)
-        val endInstant = date.plus(1, DateTimeUnit.DAY).atStartOfDayIn(tz)
-
-        // Simply fetch notes for this date range
-        viewModelScope.launch {
-            try {
-                // Direct repository call for simplicity
-                val notes = notesRepository.observeNotesInRange(startInstant, endInstant).first()
-
-                Napier.d(
-                    tag = "HomeViewModel",
-                    message =
-                        "EXPLICIT FETCH RESULT: Found ${notes.size} notes for $date: " +
-                            "${notes.count { it is JournalNote.Text }} text, " +
-                            "${notes.count { it is JournalNote.Image }} image, " +
-                            "${notes.count { it is JournalNote.Audio }} audio, " +
-                            "${notes.count { it is JournalNote.Video }} video notes",
-                )
-
-                // Log audio notes specifically
-                val audioNotes = notes.filterIsInstance<JournalNote.Audio>()
-                if (audioNotes.isNotEmpty()) {
-                    Napier.d(
-                        tag = "HomeViewModel",
-                        message =
-                            "AUDIO NOTES IN FETCH: ${audioNotes.size} audio notes for date $date - " +
-                                "UIDs: ${audioNotes.map { it.uid }}, " +
-                                "URIs: ${audioNotes.map { it.mediaRef }}",
-                    )
-                }
-
-                // Update the selected notes state
-                selectedNotes.value = notes
-            } catch (e: Exception) {
-                Napier.e("Failed to fetch notes for date $date", e)
-                selectedNotes.value = emptyList()
             }
         }
     }
@@ -529,23 +496,21 @@ class HomeViewModel(
                     )
             }
         }
-}
 
-private fun mergeRecentTimelineDays(
-    existing: List<TimelineDay>,
-    recent: List<TimelineDay>,
-): List<TimelineDay> {
-    if (recent.isEmpty()) {
-        return emptyList()
-    }
-
-    val oldestRecentDate = recent.minOf(TimelineDay::date)
-    val retainedExistingDays =
-        existing.filter { day ->
-            day.date < oldestRecentDate || recent.any { recentDay -> recentDay.date == day.date }
+    private fun HomeRecommendation.toTimelineSuggestionBlock(): TimelineSuggestionBlock? =
+        when (this) {
+            is HomeRecommendation.CaptureToday ->
+                TimelineSuggestionBlock.OngoingEvent(
+                    memoryId = "capture-today",
+                    message = message,
+                )
+            is HomeRecommendation.CompleteYourDraft ->
+                TimelineSuggestionBlock.PastMoment(
+                    memoryId = draftId.toString(),
+                    message = notePreview?.takeIf(String::isNotBlank) ?: "Finish your draft while it's still fresh.",
+                )
+            HomeRecommendation.None -> null
         }
-
-    return mergeTimelineDays(existing = retainedExistingDays, incoming = recent)
 }
 
 private fun mergeTimelineDays(
@@ -566,10 +531,16 @@ private fun mergeTimelineDays(
 
 private fun List<TimelineDay>.oldestLoadedTimestamp() = flatMap(TimelineDay::entries).minOfOrNull { note -> note.creationTimestamp }
 
-private data class HomeTimelineInputs(
-    val timelineDays: List<TimelineDay>,
-    val allNotes: List<JournalNote>,
-    val selectedNotes: List<JournalNote>,
+private data class HomeTimelineVisualState(
+    val items: List<TimelineDayUiState>,
     val selection: TimelineDaySelection,
-    val selectedDayDate: LocalDate?,
+    val selectedDay: TimelineDayUiState?,
+    val suggestion: TimelineSuggestionBlock?,
+)
+
+private data class HomeTimelineLoadingState(
+    val hasLoadedRecentTimeline: Boolean,
+    val isLoadingMore: Boolean,
+    val hasMoreOlderContent: Boolean,
+    val appendError: String?,
 )

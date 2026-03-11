@@ -40,6 +40,15 @@ interface VideoNoteDao {
     @Query("SELECT * FROM video_notes ORDER BY created DESC LIMIT :limit")
     fun getRecentNotes(limit: Int = 20): Flow<List<VideoNoteEntity>>
 
+    @Query("SELECT * FROM video_notes WHERE created < :beforeTimestamp ORDER BY created DESC LIMIT :limit")
+    suspend fun getRecentNotesBefore(
+        beforeTimestamp: Long,
+        limit: Int,
+    ): List<VideoNoteEntity>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM video_notes WHERE created < :beforeTimestamp)")
+    suspend fun hasNotesBefore(beforeTimestamp: Long): Boolean
+
     /**
      * Returns notes within a specific date range.
      */

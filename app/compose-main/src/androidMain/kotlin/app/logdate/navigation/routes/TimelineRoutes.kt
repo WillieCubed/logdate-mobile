@@ -52,10 +52,7 @@ fun EntryProviderScope<NavKey>.timelineRoutes(
     ) { _ ->
         TimelinePaneScreen(
             onNewEntry = openEntryEditor,
-            onOpenDay = { day ->
-                homeViewModel.selectDay(day)
-                onOpenTimelineDetail(day)
-            },
+            onOpenDay = onOpenTimelineDetail,
             onOpenSettings = onOpenSettings,
             onOpenLocationTimeline = onOpenLocationTimeline,
             onOpenSearch = onOpenSearch,
@@ -63,10 +60,8 @@ fun EntryProviderScope<NavKey>.timelineRoutes(
         )
     }
     routeEntry<TimelineDetail> { route ->
-        // Explicitly fetch notes for the selected day when entering this screen
         LaunchedEffect(route.day) {
             homeViewModel.selectDay(route.day)
-            homeViewModel.fetchNotesForDate(route.day)
         }
 
         TimelineDetailScreen(

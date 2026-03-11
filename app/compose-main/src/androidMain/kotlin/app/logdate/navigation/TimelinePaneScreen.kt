@@ -46,14 +46,7 @@ fun TimelinePaneScreen(
             ),
         onNewEntry = onNewEntry,
         onShareMemory = {},
-        onOpenDay = { date ->
-            // First select the day in the ViewModel
-            viewModel.selectDay(date)
-            // Then fetch notes for that day
-            viewModel.fetchNotesForDate(date)
-            // Finally navigate to the detail screen
-            onOpenDay(date)
-        },
+        onOpenDay = onOpenDay,
         onSearchClick = onOpenSearch,
         onProfileClick = onOpenSettings,
         onLoadMoreOlder = viewModel::loadMoreOlder,

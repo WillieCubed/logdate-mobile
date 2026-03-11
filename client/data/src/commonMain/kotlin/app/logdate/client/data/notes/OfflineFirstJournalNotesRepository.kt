@@ -30,6 +30,12 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.plus
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -126,6 +132,50 @@ class OfflineFirstJournalNotesRepository(
                 .sortedByDescending { it.creationTimestamp }
                 .take(limit)
         }
+
+    override fun observeNotesForDay(day: LocalDate): Flow<List<JournalNote>> {
+        val timezone = TimeZone.currentSystemDefault()
+        val start = day.atStartOfDayIn(timezone).toEpochMilliseconds()
+        val endExclusive = day.plus(1, DateTimeUnit.DAY).atStartOfDayIn(timezone).toEpochMilliseconds()
+
+        return notePlaceResolver.observeAll().combine(
+            observeNoteBuckets(
+                textFlow = textNoteDao.getNotesInRange(start, endExclusive),
+                imageFlow = imageNoteDao.getNotesInRange(start, endExclusive),
+                audioFlow = audioNoteDao.getNotesInRange(start, endExclusive),
+                videoFlow = videoNoteDao.getNotesInRange(start, endExclusive),
+            ),
+        ) { placeLookup, buckets ->
+            buckets
+                .toNotes(placeLookup)
+                .filter { note ->
+                    note.creationTimestamp
+                        .toLocalDateTime(timezone)
+                        .date == day
+                }.sortedByDescending(JournalNote::creationTimestamp)
+        }
+    }
+
+    override suspend fun getNotesBefore(
+        beforeExclusive: Instant,
+        limit: Int,
+    ): List<JournalNote> =
+        NoteBuckets(
+            textNotes = textNoteDao.getRecentNotesBefore(beforeExclusive.toEpochMilliseconds(), limit),
+            imageNotes = imageNoteDao.getRecentNotesBefore(beforeExclusive.toEpochMilliseconds(), limit),
+            audioNotes = audioNoteDao.getRecentNotesBefore(beforeExclusive.toEpochMilliseconds(), limit),
+            videoNotes = videoNoteDao.getRecentNotesBefore(beforeExclusive.toEpochMilliseconds(), limit),
+        ).toNotes(notePlaceResolver.observeAll().first())
+            .sortedByDescending(JournalNote::creationTimestamp)
+            .take(limit)
+
+    override suspend fun hasNotesBefore(beforeExclusive: Instant): Boolean {
+        val beforeTimestamp = beforeExclusive.toEpochMilliseconds()
+        return textNoteDao.hasNotesBefore(beforeTimestamp) ||
+            imageNoteDao.hasNotesBefore(beforeTimestamp) ||
+            audioNoteDao.hasNotesBefore(beforeTimestamp) ||
+            videoNoteDao.hasNotesBefore(beforeTimestamp)
+    }
 
     override suspend fun getNoteById(noteId: Uuid): JournalNote? {
         // Try each note type DAO until we find the note
