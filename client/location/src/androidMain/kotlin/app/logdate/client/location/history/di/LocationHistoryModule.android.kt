@@ -1,5 +1,6 @@
 package app.logdate.client.location.history.di
 
+import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.location.history.LocationTracker
 import app.logdate.client.location.history.StandardLocationTracker
 import org.koin.core.module.Module
@@ -10,20 +11,11 @@ import org.koin.dsl.module
  */
 actual val locationHistoryModule: Module =
     module {
-
-        // First provide the factory for the LocationTracker interface
-        factory { (locationHistoryRepository: app.logdate.client.repository.location.LocationHistoryRepository) ->
+        single<LocationTracker> {
             StandardLocationTracker(
                 locationProvider = get(),
-                locationHistoryRepository = locationHistoryRepository,
-                deviceId = get(),
-            )
-        }
-
-        // Then create the singleton instance after dataModule is initialized
-        single<LocationTracker> {
-            get<(app.logdate.client.repository.location.LocationHistoryRepository) -> LocationTracker>()(
-                get(),
+                locationHistoryRepository = get(),
+                deviceId = get<DeviceIdProvider>().getDeviceId().value.toString(),
             )
         }
     }

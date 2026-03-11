@@ -1,5 +1,6 @@
 package app.logdate.client.location.history.di
 
+import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.location.history.LocationTracker
 import app.logdate.client.location.history.StandardLocationTracker
 import org.koin.core.module.Module
@@ -14,7 +15,7 @@ actual val locationHistoryModule: Module =
             StandardLocationTracker(
                 locationProvider = get(),
                 locationHistoryRepository = get(),
-                deviceId = get(),
+                deviceId = get<DeviceIdProvider>().getDeviceId().value.toString(),
             )
         }
     }
