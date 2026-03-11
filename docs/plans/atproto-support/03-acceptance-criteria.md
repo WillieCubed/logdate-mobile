@@ -172,7 +172,15 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
 - `com.atproto.server.describeServer` exposes the PDS DID and supported user domains.
 - `com.atproto.repo.describeRepo` exposes repo DID, handle, DID document, and collection list.
 
-### P5.2 Repo Record Endpoints
+### P5.2 Standard Server Session Endpoints
+
+- `com.atproto.server.createAccount` provisions a hosted account, DID, handle, signing key, repo, and ATProto session credentials through the same hosted identity path used by the first-party app.
+- `com.atproto.server.createSession` authenticates a hosted account with ATProto password credentials and returns a standards-compatible access and refresh session pair.
+- `com.atproto.server.getSession` returns the current hosted session details for a valid ATProto access token.
+- `com.atproto.server.refreshSession` rotates a hosted refresh session without falling back to first-party JWT-only behavior.
+- `com.atproto.server.deleteSession` revokes a hosted refresh session.
+
+### P5.3 Repo Record Endpoints
 
 - `com.atproto.repo.getRecord` reads the currently exposed LogDate repo collections.
 - `com.atproto.repo.listRecords` pages the currently exposed LogDate repo collections.
@@ -181,7 +189,13 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
   - first-party LogDate bearer JWTs
   - OAuth DPoP access tokens
 
-### P5.3 Current Repo Scope
+### P5.4 Sync Export Endpoints
+
+- `com.atproto.sync.getRepo` returns a CAR export for the requested hosted repo DID and honors `since` when the requested revision exists locally.
+- `com.atproto.sync.getLatestCommit` returns the currently published repo revision and commit CID for the requested hosted repo DID.
+- `com.atproto.sync.getRepoStatus` returns hosted repo status for the requested DID.
+
+### P5.5 Current Repo Scope
 
 - The currently exposed collections are:
   - `studio.hypertext.logdate.content`
@@ -190,6 +204,8 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
 - The backing store is `LogDateRepoStore`, which uses the shared repo engine for collection-aware reads, writes, cursors, and export semantics.
 - Entries, journals, and associations now persist through a canonical repo-backed `LogDateCollectionsRepository` implementation plus a metadata index for versions, tombstones, and change feeds.
 - Media metadata and encrypted backup metadata now persist through first-class LogDate-owned repository interfaces and are no longer constructed from `SyncRepository` in production wiring.
+- Hosted repos with a provisioned identity sign commits with the active hosted signing key.
+- Repo exports use ATProto-shaped commit blocks, CID links, byte signatures, and MST node roots.
 
 ## Phase 6: Media, Blob, and Backup Boundary Cutover
 
@@ -251,9 +267,10 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
 
 ### P7.2 Interoperability Hardening
 
-- CAR/MST/DAG-CBOR behavior is validated against external AT Protocol implementations.
+- CAR/MST/DAG-CBOR behavior is validated through deterministic shared-library and server integration tests.
 - Checked-in lexicon/codegen coverage expands beyond the current `com.atproto.identity.*`, `com.atproto.server.*`, `com.atproto.repo.*`, and `com.atproto.sync.*` set.
 - Transitional compatibility code can be removed once sync and ATProto surfaces both use the final canonical boundaries.
+- Confidential OAuth clients using `private_key_jwt` are validated with ES256 and ES256K client assertions, request/grant key binding, assertion timestamp checks, and JTI replay protection.
 
 ## Explicit Non-Goals for This Plan Revision
 

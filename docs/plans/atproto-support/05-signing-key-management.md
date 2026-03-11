@@ -16,7 +16,7 @@ In the current implementation, LogDate uses a custodial server-managed signing k
 
 ## Current Algorithm
 
-LogDate currently provisions **P-256** signing keys encoded as multikey values.
+LogDate currently provisions **K-256** signing keys by default, while continuing to support existing **P-256** signing keys encoded as multikey values.
 
 That choice is reflected in:
 
@@ -25,7 +25,7 @@ That choice is reflected in:
 - hosted PLC genesis operations
 - the signing-key export payload
 
-This document intentionally describes the shipped P-256 behavior, not an older Ed25519-only draft.
+This document intentionally describes the shipped K-256-by-default behavior plus existing P-256 compatibility, not an older Ed25519-only draft.
 
 ## Storage Model
 
@@ -67,7 +67,7 @@ The current implementation uses AES-GCM for at-rest encryption of the PKCS#8 pri
 When identity provisioning runs:
 
 1. LogDate checks for an active signing key row.
-2. If none exists, it generates a new P-256 key pair.
+2. If none exists, it generates a new K-256 key pair by default.
 3. The public multikey is stored on the account record.
 4. The encrypted private key is stored in `SigningKeysTable`.
 
@@ -155,13 +155,14 @@ For hosted PLC identities, the same public key is also embedded in the PLC genes
 
 - derive a hosted PLC recovery key directly from the recovery phrase on-device
 - offer a full user-controlled PLC recovery-key signing flow
-- act as a completed AT Protocol repo commit signer for MST/CAR-based repo storage
 
 ## Current Limits
 
 - signing-key export is implemented
 - signing-key rotation is implemented at the service and first-party route layers
 - hosted PLC recovery-key registration is implemented for user-supplied `did:key` values
+- hosted repo commits are signed with the active hosted identity key and persisted in the canonical
+  MST/CAR repo engine
 - the current import route can restore the current active hosted key and can perform migration-safe
   cross-key import for hosted `did:web` and hosted `did:plc` identities when the matching public
   identity update can be published

@@ -29,7 +29,7 @@ Recovery Phrase (BIP-39, 12 words)
                      allowing the user to recover or migrate their AT Protocol
                      identity without the server's involvement.
 
-Signing Key (currently P-256 keypair)
+Signing Key (currently K-256 by default, with existing P-256 keys still supported)
   Stored: server database (private key encrypted at rest with server KEK)
   Exportable: yes, encrypted with recovery-phrase-derived key
   Purpose: sign AT Protocol repo commits and operations
@@ -257,7 +257,7 @@ object AccountsTable : Table("accounts") {
 
 - `did`: The user's canonical DID (`did:plc:abc123` or a hostname-level `did:web`)
 - `handle`: The canonical AT Protocol handle for the account
-- `signingKeyPublic`: The current active signing key's public component (multibase-encoded key, currently P-256)
+- `signingKeyPublic`: The current active signing key's public component (multibase-encoded key, currently K-256 by default with P-256 compatibility)
 - Both nullable for backward compatibility during migration
 
 ### New table: SigningKeysTable
@@ -268,7 +268,7 @@ object SigningKeysTable : Table("signing_keys") {
     val id = uuid("id").autoGenerate()
     val accountId = uuid("account_id").references(AccountsTable.id)
     val purpose = varchar("purpose", 32)              // "atproto"
-    val algorithm = varchar("algorithm", 32).default("P-256")
+    val algorithm = varchar("algorithm", 32).default("K-256")
     val publicKeyMultibase = text("public_key_multibase")
     val privateKeyEncrypted = text("private_key_encrypted")
     val createdAt = timestamp("created_at")

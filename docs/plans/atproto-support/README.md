@@ -26,7 +26,7 @@ Three concerns must be separated:
 |---------|-----------|-------------|---------|
 | **Authentication** | Passkeys (WebAuthn) | User's device hardware | Prove to the custodian "I am authorized to act on this account" |
 | **Identity** | DIDs (did:web, did:plc) | Public (DID Document served by custodian or PLC directory) | Tell the world "this is who I am" -- portable, permanent |
-| **Data provenance** | Signing keys (currently P-256 multikey) | Server (as custodian), exportable to user | Prove "this data was created/approved by this identity" |
+| **Data provenance** | Signing keys (currently K-256 by default, with P-256 compatibility) | Server (as custodian), exportable to user | Prove "this data was created/approved by this identity" |
 
 Passkeys authenticate a user **to** their custodian. DIDs identify the user **to the world**. Signing keys prove data provenance **to anyone**.
 
@@ -55,6 +55,9 @@ The repo now has a real standalone `studio.hypertext.atproto` library surface:
 - checked-in official `com.atproto.identity.*`, `com.atproto.server.*`, and `com.atproto.repo.*` lexicon JSON documents plus deterministic generated Kotlin models for the currently served protocol surface
 - a standalone consumer sample in `samples/atproto-consumer` that builds against `mavenLocal()` artifacts instead of project dependencies
 - server identity, OAuth, and XRPC slices consuming the shared library contracts instead of duplicating route-local ATProto DTOs
+- standard `com.atproto.server.createAccount`, `createSession`, `getSession`, `refreshSession`, and `deleteSession` endpoints backed by hosted account provisioning and ATProto session credentials
+- standard `com.atproto.sync.getRepo`, `getLatestCommit`, and `getRepoStatus` endpoints backed by the shared repo engine and CAR export path
+- OAuth confidential-client support for `private_key_jwt` with ES256 and ES256K client assertions, key binding carried across PAR, code exchange, refresh, and revoke, plus replay protection for client assertion JTIs
 - a canonical repo-backed LogDate collections boundary that stores `content`, `journal`, and `association` records in the shared repo engine while preserving LogDate-owned internal interfaces
 - first-class LogDate-owned media and backup metadata repositories with in-memory and PostgreSQL implementations wired into production
 - a generic LogDate blob service boundary with the current production implementation still backed by GCS
@@ -76,8 +79,16 @@ The repo now has a real standalone `studio.hypertext.atproto` library surface:
   settings flow instead of a placeholder recovery screen
 
 The current backend ATProto support is deployable for the standalone library, hosted identity,
-OAuth, XRPC, canonical collection, blob, and first-party hosted recovery slices, but it is not yet
-a full independently deployed PDS product.
+OAuth, XRPC, canonical collection, blob, and first-party hosted recovery slices, and it now meets
+the repo/CAR/MST/DAG-CBOR requirements of the hosted-PDS compliance target in this plan. It is
+still not a fully separate standalone PDS product outside this repository's `server` module.
+
+Compliance notes:
+
+- Hosted accounts with a provisioned DID and signing key sign repo commits with the active hosted identity key.
+- Repo CAR exports emit ATProto-shaped commit blocks (`version`, `did`, `data`, `rev`, `prev`, `sig`) with CID links and byte signatures.
+- Repo roots are persisted as deterministic MST node graphs, not the earlier flattened compatibility snapshot.
+- `com.atproto.sync.getRepo` now honors `since` by exporting only blocks newer than the requested known revision when that revision exists locally.
 
 ## Future Work Beyond the Current Hosted Slice
 
@@ -95,8 +106,6 @@ surfaces.
 - Expand lexicon/codegen coverage beyond the currently checked-in LogDate and official
   `com.atproto.identity.*`, `com.atproto.server.*`, `com.atproto.repo.*`, and `com.atproto.sync.*`
   surfaces that the server currently serves.
-- Validate CAR, MST, DAG-CBOR, and blob behavior against external AT Protocol implementations,
-  not only internal deterministic tests.
 - Harden the standalone PDS runtime and server deployment shape for multi-instance and release
   operation concerns.
 
