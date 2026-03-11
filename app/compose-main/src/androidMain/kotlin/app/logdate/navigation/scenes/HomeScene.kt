@@ -906,7 +906,7 @@ class HomeSceneStrategy<T : NavKey>(
                     createTwoPaneHomeScene(
                         mainEntry = previousEntry,
                         detailEntry = lastEntry,
-                        previousEntries = entries.dropLast(2),
+                        previousEntries = entries.dropLast(1),
                         tab = classification.parentTab,
                         onTabSelected = onTabSelected,
                         onNewEntry = onNewEntry,

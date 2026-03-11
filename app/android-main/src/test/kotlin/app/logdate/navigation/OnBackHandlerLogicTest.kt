@@ -1,16 +1,20 @@
 package app.logdate.navigation
 
 import app.logdate.navigation.routes.core.EntryEditor
+import app.logdate.navigation.routes.core.JournalDetail
 import app.logdate.navigation.routes.core.JournalList
 import app.logdate.navigation.routes.core.NavigationStart
 import app.logdate.navigation.routes.core.RewindList
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
+import app.logdate.navigation.routes.core.TimelineDetail
 import app.logdate.navigation.routes.core.TimelineListRoute
 import app.logdate.navigation.scenes.HomeTab
 import androidx.compose.runtime.mutableStateListOf
 import androidx.navigation3.runtime.NavKey
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlinx.datetime.LocalDate
+import kotlin.uuid.Uuid
 
 /**
  * Tests for the onBack handler logic in MainNavigationRoot.
@@ -23,12 +27,17 @@ class OnBackHandlerLogicTest {
     /**
      * Replicates the onBack handler logic from MainNavigationRoot for testing.
      * This allows us to unit test the behavior without needing Compose.
+     *
+     * Matches the actual implementation which uses safelyRemoveLastEntry()
+     * (only removes if size > 1) followed by a main tab safety check.
      */
     private fun simulateOnBack(backStack: MutableList<NavKey>) {
         val mainTabRoutes = HomeTab.entries.map { it.route }
 
-        // Normal case: remove a single entry
-        backStack.removeLastOrNull()
+        // Matches safelyRemoveLastEntry(): only remove if size > 1
+        if (backStack.size > 1) {
+            backStack.removeLastOrNull()
+        }
 
         // Safety check: ensure we always have at least one main tab in the backstack
         if (backStack.isEmpty() || backStack.none { it in mainTabRoutes }) {
@@ -213,6 +222,38 @@ class OnBackHandlerLogicTest {
         assertEquals(1, backStack.size)
 
         simulateOnBack(backStack)
+        assertEquals(1, backStack.size)
+        assertEquals(TimelineListRoute, backStack.first())
+    }
+
+    // TwoPaneDetail back navigation (the core bug scenario)
+
+    @Test
+    fun `onBack from timeline detail returns to timeline list`() {
+        val backStack = mutableStateListOf<NavKey>(TimelineListRoute, TimelineDetail(LocalDate(2026, 3, 10)))
+
+        simulateOnBack(backStack)
+
+        assertEquals(1, backStack.size)
+        assertEquals(TimelineListRoute, backStack.first())
+    }
+
+    @Test
+    fun `onBack from journal detail returns to journal list`() {
+        val backStack = mutableStateListOf<NavKey>(JournalList, JournalDetail(Uuid.random()))
+
+        simulateOnBack(backStack)
+
+        assertEquals(1, backStack.size)
+        assertEquals(JournalList, backStack.first())
+    }
+
+    @Test
+    fun `onBack does not remove sole remaining entry`() {
+        val backStack = mutableStateListOf<NavKey>(TimelineListRoute)
+
+        simulateOnBack(backStack)
+
         assertEquals(1, backStack.size)
         assertEquals(TimelineListRoute, backStack.first())
     }
