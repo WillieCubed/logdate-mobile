@@ -54,6 +54,7 @@ class OAuthAuthorizationServiceTest {
                     dpopVerifier = dpopVerifier,
                     accessTokenService = accessTokenService,
                     nonceService = nonceService,
+                    authorizationServerIssuer = "https://logdate.app",
                     clock = clock,
                 )
             val clientKeyPair = generateP256KeyPair()
@@ -151,6 +152,188 @@ class OAuthAuthorizationServiceTest {
         }
 
     @Test
+    fun `authorization service binds confidential client assertions across par token refresh and revoke`() =
+        kotlinx.coroutines.test.runTest {
+            val clock = MutableClock(Instant.parse("2026-03-08T00:00:00Z"))
+            val clientId = "https://viewer.example.com/client.json"
+            val redirectUri = "https://viewer.example.com/callback"
+            val confidentialClientKey = generateP256KeyPair()
+            val otherClientKey = generateP256KeyPair()
+            val resolver =
+                OAuthClientMetadataResolver(
+                    httpClient =
+                        HttpClient(
+                            MockEngine {
+                                respond(
+                                    content =
+                                        clientMetadataJson(
+                                            clientId = clientId,
+                                            redirectUri = redirectUri,
+                                            tokenEndpointAuthMethod = "private_key_jwt",
+                                            tokenEndpointAuthSigningAlg = "ES256",
+                                            jwksJson = clientJwksJson(confidentialClientKey),
+                                        ),
+                                    status = HttpStatusCode.OK,
+                                    headers = headersOf("Content-Type", ContentType.Application.Json.toString()),
+                                )
+                            },
+                        ),
+                    clock = clock,
+                )
+            val nonceService = OAuthNonceService(clock = clock)
+            val keyService = OAuthKeyService()
+            val accessTokenService = OAuthAccessTokenService(OAuthConfig(issuer = "https://logdate.app"), keyService, clock)
+            val service =
+                OAuthAuthorizationService(
+                    clientMetadataResolver = resolver,
+                    dpopVerifier = OAuthDpopVerifier(clock = clock),
+                    accessTokenService = accessTokenService,
+                    nonceService = nonceService,
+                    authorizationServerIssuer = "https://logdate.app",
+                    clock = clock,
+                )
+            val dpopKeyPair = generateP256KeyPair()
+
+            val par =
+                service.createPushedAuthorizationRequest(
+                    clientId = clientId,
+                    redirectUri = redirectUri,
+                    scope = "atproto",
+                    responseType = "code",
+                    codeChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+                    codeChallengeMethod = "S256",
+                    state = "confidential-state",
+                    loginHint = "alice.logdate.app",
+                    clientAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+                    clientAssertion =
+                        createClientAssertion(
+                            keyPair = confidentialClientKey,
+                            clientId = clientId,
+                            audience = "https://logdate.app",
+                            iat = clock.now().epochSeconds,
+                            jti = "par-assertion",
+                        ),
+                    dpopProof =
+                        createDpopProof(
+                            dpopKeyPair,
+                            "POST",
+                            "https://logdate.app/oauth/par",
+                            iat = clock.now().epochSeconds,
+                        ),
+                    htu = "https://logdate.app/oauth/par",
+                )
+            val redirect =
+                service.completeAuthorization(
+                    requestUri = par.requestUri,
+                    subjectDid = "did:plc:alice123",
+                    subjectHandle = "alice.logdate.app",
+                    approved = true,
+                )
+            val code = redirect.substringAfter("code=").substringBefore('&')
+
+            val token =
+                service.exchangeAuthorizationCode(
+                    code = code,
+                    redirectUri = redirectUri,
+                    clientId = clientId,
+                    codeVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+                    clientAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+                    clientAssertion =
+                        createClientAssertion(
+                            keyPair = confidentialClientKey,
+                            clientId = clientId,
+                            audience = "https://logdate.app",
+                            iat = clock.now().epochSeconds,
+                            jti = "token-assertion",
+                        ),
+                    dpopProof =
+                        createDpopProof(
+                            dpopKeyPair,
+                            "POST",
+                            "https://logdate.app/oauth/token",
+                            nonce = service.nonce(),
+                            iat = clock.now().epochSeconds,
+                        ),
+                    htu = "https://logdate.app/oauth/token",
+                )
+            val refreshed =
+                service.exchangeRefreshToken(
+                    refreshToken = token.refresh_token,
+                    clientId = clientId,
+                    clientAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+                    clientAssertion =
+                        createClientAssertion(
+                            keyPair = confidentialClientKey,
+                            clientId = clientId,
+                            audience = "https://logdate.app",
+                            iat = clock.now().epochSeconds,
+                            jti = "refresh-assertion",
+                        ),
+                    dpopProof =
+                        createDpopProof(
+                            dpopKeyPair,
+                            "POST",
+                            "https://logdate.app/oauth/token",
+                            nonce = service.nonce(),
+                            iat = clock.now().epochSeconds,
+                        ),
+                    htu = "https://logdate.app/oauth/token",
+                )
+            val wrongRefreshClient =
+                runCatching {
+                    service.exchangeRefreshToken(
+                        refreshToken = refreshed.refresh_token,
+                        clientId = clientId,
+                        clientAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+                        clientAssertion =
+                            createClientAssertion(
+                                keyPair = otherClientKey,
+                                clientId = clientId,
+                                audience = "https://logdate.app",
+                                iat = clock.now().epochSeconds,
+                                jti = "wrong-refresh-assertion",
+                            ),
+                        dpopProof =
+                            createDpopProof(
+                                dpopKeyPair,
+                                "POST",
+                                "https://logdate.app/oauth/token",
+                                nonce = service.nonce(),
+                                iat = clock.now().epochSeconds,
+                            ),
+                        htu = "https://logdate.app/oauth/token",
+                    )
+                }.exceptionOrNull()
+
+            service.revokeRefreshToken(
+                refreshToken = refreshed.refresh_token,
+                clientId = clientId,
+                clientAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+                clientAssertion =
+                    createClientAssertion(
+                        keyPair = confidentialClientKey,
+                        clientId = clientId,
+                        audience = "https://logdate.app",
+                        iat = clock.now().epochSeconds,
+                        jti = "revoke-assertion",
+                    ),
+                dpopProof =
+                    createDpopProof(
+                        dpopKeyPair,
+                        "POST",
+                        "https://logdate.app/oauth/revoke",
+                        nonce = service.nonce(),
+                        iat = clock.now().epochSeconds,
+                    ),
+                htu = "https://logdate.app/oauth/revoke",
+            )
+
+            assertEquals("did:plc:alice123", token.sub)
+            assertEquals("did:plc:alice123", refreshed.sub)
+            assertIs<OAuthInvalidClientException>(wrongRefreshClient)
+        }
+
+    @Test
     fun `authorization service handles denial expiry and validation failures`() =
         kotlinx.coroutines.test.runTest {
             val clock = MutableClock(Instant.parse("2026-03-08T00:00:00Z"))
@@ -176,6 +359,7 @@ class OAuthAuthorizationServiceTest {
                     dpopVerifier = OAuthDpopVerifier(clock = clock),
                     accessTokenService = OAuthAccessTokenService(OAuthConfig(issuer = "https://logdate.app"), OAuthKeyService(), clock),
                     nonceService = OAuthNonceService(clock = clock),
+                    authorizationServerIssuer = "https://logdate.app",
                     clock = clock,
                 )
             val keyPair = generateP256KeyPair()
@@ -283,6 +467,7 @@ class OAuthAuthorizationServiceTest {
                     dpopVerifier = OAuthDpopVerifier(clock = clock),
                     accessTokenService = OAuthAccessTokenService(OAuthConfig(issuer = "https://logdate.app"), OAuthKeyService(), clock),
                     nonceService = nonceService,
+                    authorizationServerIssuer = "https://logdate.app",
                     clock = clock,
                 )
             val keyPair = generateP256KeyPair()
@@ -564,6 +749,7 @@ class OAuthAuthorizationServiceTest {
                     dpopVerifier = OAuthDpopVerifier(clock = clock),
                     accessTokenService = OAuthAccessTokenService(OAuthConfig(issuer = "https://logdate.app"), OAuthKeyService(), clock),
                     nonceService = nonceService,
+                    authorizationServerIssuer = "https://logdate.app",
                     clock = clock,
                 )
             val keyPair = generateP256KeyPair()
@@ -761,6 +947,8 @@ class OAuthAuthorizationServiceTest {
                 "atproto",
                 "challenge",
                 "thumbprint",
+                null,
+                null,
                 Instant.parse("2026-03-08T00:00:00Z"),
             )
         val refreshToken =
@@ -771,6 +959,8 @@ class OAuthAuthorizationServiceTest {
                 "did:plc:alice123",
                 "atproto",
                 "thumbprint",
+                null,
+                null,
                 Instant.parse("2026-03-08T00:00:00Z"),
                 null,
             )
@@ -807,8 +997,12 @@ class OAuthAuthorizationServiceTest {
         assertEquals("atproto", invokeGetter(authorizationCode, "getScope"))
         assertEquals("challenge", invokeGetter(authorizationCode, "getCodeChallenge"))
         assertEquals("thumbprint", invokeGetter(authorizationCode, "getDpopKeyThumbprint"))
+        assertEquals(null, invokeGetter(authorizationCode, "getClientAuthKeyId"))
+        assertEquals(null, invokeGetter(authorizationCode, "getClientAuthKeyThumbprint"))
         assertEquals("refresh-1", invokeGetter(refreshToken, "getToken"))
         assertEquals("atproto", invokeGetter(refreshToken, "getScope"))
+        assertEquals(null, invokeGetter(refreshToken, "getClientAuthKeyId"))
+        assertEquals(null, invokeGetter(refreshToken, "getClientAuthKeyThumbprint"))
         assertTrue(authorizationCode.toString().contains("code-1"))
         assertTrue(refreshToken.toString().contains("refresh-1"))
         assertTrue(

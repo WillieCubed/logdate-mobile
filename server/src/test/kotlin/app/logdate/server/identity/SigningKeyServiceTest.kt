@@ -1,10 +1,8 @@
 package app.logdate.server.identity
 
 import studio.hypertext.atproto.crypto.Base58Btc
-import java.math.BigInteger
 import java.security.PrivateKey
 import kotlin.test.Test
-import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
@@ -110,22 +108,21 @@ class SigningKeyServiceTest {
             val generated = defaultSeedService.generateKeyPair()
             val decrypted = defaultSeedService.decryptPrivateKey(defaultSeedService.ensureActiveKey(Uuid.random()))
 
-            assertEquals("P-256", generated.algorithm)
+            assertEquals("K-256", generated.algorithm)
             assertTrue(generated.publicKeyMultibase.startsWith("z"))
             assertEquals("EC", decrypted.algorithm)
-
-            val helperClass = Class.forName("app.logdate.server.identity.SigningKeyServiceKt")
-            val toFixedWidth =
-                helperClass
-                    .getDeclaredMethod("toFixedWidth", BigInteger::class.java, Int::class.javaPrimitiveType)
-                    .apply { isAccessible = true }
-
-            val equalWidth = toFixedWidth.invoke(null, BigInteger("0102", 16), 2) as ByteArray
-            val padded = toFixedWidth.invoke(null, BigInteger("01", 16), 4) as ByteArray
-            val truncated = toFixedWidth.invoke(null, BigInteger("0102030405", 16), 4) as ByteArray
-
-            assertContentEquals(byteArrayOf(0x01, 0x02), equalWidth)
-            assertContentEquals(byteArrayOf(0x00, 0x00, 0x00, 0x01), padded)
-            assertContentEquals(byteArrayOf(0x02, 0x03, 0x04, 0x05), truncated)
         }
+
+    @Test
+    fun `service can generate both supported hosted signing key curves`() {
+        val service = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
+
+        val p256 = service.generateKeyPair(studio.hypertext.atproto.crypto.EcCurve.P256)
+        val k256 = service.generateKeyPair(studio.hypertext.atproto.crypto.EcCurve.K256)
+
+        assertEquals("P-256", p256.algorithm)
+        assertEquals("K-256", k256.algorithm)
+        assertTrue(p256.publicKeyMultibase.startsWith("z"))
+        assertTrue(k256.publicKeyMultibase.startsWith("z"))
+    }
 }

@@ -1,17 +1,12 @@
 package app.logdate.server.identity
 
 import kotlinx.serialization.Serializable
-import studio.hypertext.atproto.crypto.Multikey
-import java.math.BigInteger
+import studio.hypertext.atproto.crypto.EcCurve
+import studio.hypertext.atproto.crypto.EcKeySupport
 import java.nio.ByteBuffer
-import java.security.KeyFactory
-import java.security.KeyPairGenerator
 import java.security.MessageDigest
 import java.security.PrivateKey
 import java.security.SecureRandom
-import java.security.interfaces.ECPublicKey
-import java.security.spec.ECGenParameterSpec
-import java.security.spec.PKCS8EncodedKeySpec
 import javax.crypto.Cipher
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
@@ -24,7 +19,7 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
- * Generates and stores encrypted P-256 signing keys for AT Protocol identity documents.
+ * Generates and stores encrypted hosted signing keys for AT Protocol identity documents.
  */
 @OptIn(ExperimentalUuidApi::class, ExperimentalEncodingApi::class)
 class SigningKeyService(
@@ -33,15 +28,11 @@ class SigningKeyService(
 ) {
     private val secureRandom = SecureRandom()
 
-    fun generateKeyPair(): GeneratedSigningKey {
-        val keyPairGenerator = KeyPairGenerator.getInstance("EC")
-        keyPairGenerator.initialize(ECGenParameterSpec(P256_CURVE_NAME), secureRandom)
-        val keyPair = keyPairGenerator.generateKeyPair()
-        val compressedPublicKey = compressPublicKey(keyPair.public as ECPublicKey)
-
+    fun generateKeyPair(curve: EcCurve = DEFAULT_SIGNING_CURVE): GeneratedSigningKey {
+        val keyPair = EcKeySupport.generateKeyPair(curve = curve, secureRandom = secureRandom)
         return GeneratedSigningKey(
-            algorithm = SIGNING_ALGORITHM,
-            publicKeyMultibase = Multikey.encodeP256PublicKey(compressedPublicKey),
+            algorithm = curve.signingKeyAlgorithm,
+            publicKeyMultibase = EcKeySupport.encodePublicKeyMultibase(keyPair.public as java.security.interfaces.ECPublicKey, curve),
             privateKeyPkcs8 = keyPair.private.encoded,
         )
     }
@@ -104,7 +95,7 @@ class SigningKeyService(
         val cipher = Cipher.getInstance(AES_GCM_TRANSFORMATION)
         cipher.init(Cipher.DECRYPT_MODE, aesKey(), GCMParameterSpec(GCM_TAG_BITS, iv))
         val privateKeyBytes = cipher.doFinal(cipherText)
-        return KeyFactory.getInstance("EC").generatePrivate(PKCS8EncodedKeySpec(privateKeyBytes))
+        return EcKeySupport.decodePrivateKey(privateKeyBytes)
     }
 
     fun decryptExportedKey(
@@ -121,7 +112,7 @@ class SigningKeyService(
             GCMParameterSpec(GCM_TAG_BITS, Base64.decode(exportedKey.iv)),
         )
         val privateKeyBytes = cipher.doFinal(Base64.decode(exportedKey.encryptedPrivateKey))
-        return KeyFactory.getInstance("EC").generatePrivate(PKCS8EncodedKeySpec(privateKeyBytes))
+        return EcKeySupport.decodePrivateKey(privateKeyBytes)
     }
 
     suspend fun importActiveKey(
@@ -149,6 +140,9 @@ class SigningKeyService(
             }
         require(exportedKey.publicKeyDidKey == didKeyFor(exportedKey.publicKeyMultibase)) {
             "publicKeyDidKey must match publicKeyMultibase"
+        }
+        require(EcCurve.fromSigningKeyAlgorithm(exportedKey.algorithm) != null) {
+            "Unsupported signing key algorithm: ${exportedKey.algorithm}"
         }
         return buildStoredKey(
             accountId = accountId,
@@ -208,12 +202,6 @@ class SigningKeyService(
         return SecretKeySpec(keyFactory.generateSecret(keySpec).encoded, AES_ALGORITHM)
     }
 
-    private fun compressPublicKey(publicKey: ECPublicKey): ByteArray {
-        val x = publicKey.w.affineX.toFixedWidth(X_COORDINATE_BYTES)
-        val prefix = if (publicKey.w.affineY.testBit(0)) COMPRESSED_ODD_PREFIX else COMPRESSED_EVEN_PREFIX
-        return byteArrayOf(prefix.toByte()) + x
-    }
-
     data class GeneratedSigningKey(
         val algorithm: String,
         val publicKeyMultibase: String,
@@ -233,8 +221,7 @@ class SigningKeyService(
     )
 
     private companion object {
-        private const val SIGNING_ALGORITHM = "P-256"
-        private const val P256_CURVE_NAME = "secp256r1"
+        private val DEFAULT_SIGNING_CURVE: EcCurve = EcCurve.K256
         private const val AES_ALGORITHM = "AES"
         private const val AES_GCM_TRANSFORMATION = "AES/GCM/NoPadding"
         private const val SHA_256_ALGORITHM = "SHA-256"
@@ -244,19 +231,7 @@ class SigningKeyService(
         private const val EXPORT_SALT_SIZE = 16
         private const val EXPORT_KDF_ITERATIONS = 120_000
         private const val EXPORT_AES_KEY_BITS = 256
-        private const val X_COORDINATE_BYTES = 32
-        private const val COMPRESSED_EVEN_PREFIX = 0x02
-        private const val COMPRESSED_ODD_PREFIX = 0x03
     }
 }
 
 internal fun didKeyFor(publicKeyMultibase: String): String = "did:key:$publicKeyMultibase"
-
-private fun BigInteger.toFixedWidth(width: Int): ByteArray {
-    val encoded = toByteArray()
-    return when {
-        encoded.size == width -> encoded
-        encoded.size < width -> ByteArray(width - encoded.size) + encoded
-        else -> encoded.copyOfRange(encoded.size - width, encoded.size)
-    }
-}

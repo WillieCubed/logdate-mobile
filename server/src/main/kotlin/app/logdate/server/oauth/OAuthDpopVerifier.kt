@@ -2,18 +2,11 @@ package app.logdate.server.oauth
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import java.math.BigInteger
+import studio.hypertext.atproto.crypto.EcCurve
+import studio.hypertext.atproto.crypto.EcKeySupport
 import java.net.URI
 import java.nio.charset.StandardCharsets
-import java.security.AlgorithmParameters
-import java.security.KeyFactory
 import java.security.MessageDigest
-import java.security.PublicKey
-import java.security.Signature
-import java.security.spec.ECGenParameterSpec
-import java.security.spec.ECParameterSpec
-import java.security.spec.ECPoint
-import java.security.spec.ECPublicKeySpec
 import java.util.Base64
 import kotlin.math.abs
 import kotlin.time.Clock
@@ -21,7 +14,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 /**
- * Verifies ES256 DPoP proofs and computes JWK thumbprints used for token binding.
+ * Verifies ES256 and ES256K DPoP proofs and computes JWK thumbprints used for token binding.
  */
 class OAuthDpopVerifier(
     private val clock: Clock = Clock.System,
@@ -49,9 +42,12 @@ class OAuthDpopVerifier(
             if (header.typ != "dpop+jwt") {
                 throw OAuthInvalidDpopProofException("DPoP proofs must declare typ=dpop+jwt")
             }
-            if (header.alg != "ES256") {
-                throw OAuthInvalidDpopProofException("DPoP proofs must be signed with ES256")
-            }
+            val curve =
+                when (header.alg) {
+                    EcCurve.P256.jwsAlgorithm -> EcCurve.P256
+                    EcCurve.K256.jwsAlgorithm -> EcCurve.K256
+                    else -> throw OAuthInvalidDpopProofException("DPoP proofs must be signed with ES256 or ES256K")
+                }
             if (claims.htm.uppercase() != method.uppercase()) {
                 throw OAuthInvalidDpopProofException("DPoP htm did not match the request method")
             }
@@ -73,10 +69,18 @@ class OAuthDpopVerifier(
             }
 
             val publicKey = header.jwk.toPublicKey()
-            val verifier = Signature.getInstance(JWS_SIGNATURE_ALGORITHM)
-            verifier.initVerify(publicKey)
-            verifier.update("${segments[0]}.${segments[1]}".toByteArray(StandardCharsets.UTF_8))
-            if (!verifier.verify(base64UrlDecode(segments[2]))) {
+            val verified =
+                runCatching {
+                    EcKeySupport.verifySha256(
+                        publicKey = publicKey,
+                        curve = curve,
+                        payload = "${segments[0]}.${segments[1]}".toByteArray(StandardCharsets.UTF_8),
+                        signature = base64UrlDecode(segments[2]),
+                    )
+                }.getOrElse {
+                    throw OAuthInvalidDpopProofException("DPoP proof signature verification failed")
+                }
+            if (!verified) {
                 throw OAuthInvalidDpopProofException("DPoP proof signature verification failed")
             }
 
@@ -101,16 +105,14 @@ class OAuthDpopVerifier(
         return base64UrlEncode(MessageDigest.getInstance(SHA_256_ALGORITHM).digest(canonical.toByteArray(StandardCharsets.UTF_8)))
     }
 
-    private fun DpopPublicJwk.toPublicKey(): PublicKey {
-        if (kty != "EC" || crv != "P-256") {
-            throw OAuthInvalidDpopProofException("Only P-256 EC DPoP keys are supported")
+    private fun DpopPublicJwk.toPublicKey(): java.security.PublicKey {
+        if (kty != "EC") {
+            throw OAuthInvalidDpopProofException("Only EC DPoP keys are supported")
         }
-
-        val parameters = AlgorithmParameters.getInstance(KEY_ALGORITHM)
-        parameters.init(ECGenParameterSpec(P256_CURVE_NAME))
-        val ecParameters = parameters.getParameterSpec(ECParameterSpec::class.java)
-        val point = ECPoint(BigInteger(1, base64UrlDecode(x)), BigInteger(1, base64UrlDecode(y)))
-        return KeyFactory.getInstance(KEY_ALGORITHM).generatePublic(ECPublicKeySpec(point, ecParameters))
+        val curve =
+            EcCurve.fromJwkCurveName(crv)
+                ?: throw OAuthInvalidDpopProofException("Unsupported DPoP JWK curve")
+        return EcKeySupport.decodePublicKeyFromJwk(curve, base64UrlDecode(x), base64UrlDecode(y))
     }
 
     private fun decodeJsonSegment(segment: String): String = String(base64UrlDecode(segment), StandardCharsets.UTF_8)
@@ -145,9 +147,6 @@ class OAuthDpopVerifier(
 
     private companion object {
         private const val JWT_SEGMENT_COUNT = 3
-        private const val KEY_ALGORITHM = "EC"
-        private const val P256_CURVE_NAME = "secp256r1"
-        private const val JWS_SIGNATURE_ALGORITHM = "SHA256withECDSAinP1363Format"
         private const val SHA_256_ALGORITHM = "SHA-256"
     }
 }

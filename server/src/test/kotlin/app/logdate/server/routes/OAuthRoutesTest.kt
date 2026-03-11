@@ -98,12 +98,16 @@ class OAuthRoutesTest {
             assertEquals("https://logdate.app/oauth/revoke", authorizationPayload["revocation_endpoint"]?.jsonPrimitive?.content)
             assertEquals("https://logdate.app/oauth/jwks", authorizationPayload["jwks_uri"]?.jsonPrimitive?.content)
             assertEquals(
-                "none",
+                listOf("none", "private_key_jwt"),
                 authorizationPayload["token_endpoint_auth_methods_supported"]
                     ?.jsonArray
-                    ?.single()
-                    ?.jsonPrimitive
-                    ?.content,
+                    ?.map { it.jsonPrimitive.content },
+            )
+            assertEquals(
+                listOf("ES256", "ES256K"),
+                authorizationPayload["token_endpoint_auth_signing_alg_values_supported"]
+                    ?.jsonArray
+                    ?.map { it.jsonPrimitive.content },
             )
             assertEquals("https://pds.logdate.app", resourcePayload["resource"]?.jsonPrimitive?.content)
             assertTrue(jwksPayload["keys"]?.jsonArray?.isNotEmpty() == true)
@@ -350,6 +354,8 @@ class OAuthRoutesTest {
                     codeChallengeMethod = any(),
                     state = any(),
                     loginHint = any(),
+                    clientAssertionType = any(),
+                    clientAssertion = any(),
                     dpopProof = any(),
                     htu = any(),
                 )

@@ -127,7 +127,7 @@ class IdentityApiRoutesTest {
             assertTrue(payload.success)
             assertEquals("brie.logdate.app", payload.data.handle)
             assertTrue(payload.data.did.startsWith("did:plc:"))
-            assertEquals("P-256", payload.data.exportedKey.algorithm)
+            assertEquals("K-256", payload.data.exportedKey.algorithm)
             assertTrue(
                 payload.data.exportedKey.publicKeyDidKey
                     .startsWith("did:key:z"),

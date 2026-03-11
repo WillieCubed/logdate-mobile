@@ -2,6 +2,7 @@ package app.logdate.server.oauth
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
+import studio.hypertext.atproto.crypto.EcCurve
 import kotlin.jvm.internal.DefaultConstructorMarker
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -41,6 +42,30 @@ class OAuthDpopVerifierTest {
         assertTrue(verified.jwtId.startsWith("proof-"))
         assertEquals("nonce-1", verified.nonce)
         assertEquals(verified, verified.copy())
+    }
+
+    @Test
+    fun `verifier accepts ES256K proofs`() {
+        val clock = MutableClock(Instant.parse("2026-03-08T00:00:00Z"))
+        val verifier = OAuthDpopVerifier(clock = clock)
+        val keyPair = generateK256KeyPair()
+        val proof =
+            createDpopProof(
+                keyPair = keyPair,
+                method = "POST",
+                htu = "https://logdate.app/oauth/token",
+                iat = clock.now().epochSeconds,
+                alg = "ES256K",
+                jwk = publicJwk(keyPair, EcCurve.K256),
+                curve = EcCurve.K256,
+            )
+
+        val verified = verifier.verify(proof, "POST", "https://logdate.app/oauth/token").getOrThrow()
+
+        assertEquals(
+            verifier.jwkThumbprint(publicJwk(keyPair, EcCurve.K256)),
+            verified.keyThumbprint,
+        )
     }
 
     @Test

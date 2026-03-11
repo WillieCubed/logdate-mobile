@@ -25,6 +25,7 @@ class OAuthAuthorizationService(
     private val dpopVerifier: OAuthDpopVerifier,
     private val accessTokenService: OAuthAccessTokenService,
     private val nonceService: OAuthNonceService,
+    private val authorizationServerIssuer: String,
     private val clock: Clock = Clock.System,
     private val secureRandom: SecureRandom = SecureRandom(),
 ) : PdsOAuthService {
@@ -44,6 +45,8 @@ class OAuthAuthorizationService(
         codeChallengeMethod: String,
         state: String?,
         loginHint: String?,
+        clientAssertionType: String? = null,
+        clientAssertion: String? = null,
         dpopProof: String,
         htu: String,
     ): PushedAuthorizationResponse {
@@ -67,7 +70,15 @@ class OAuthAuthorizationService(
             throw OAuthInvalidRequestException("scope must include atproto")
         }
 
-        val clientMetadata = clientMetadataResolver.resolve(clientId).getOrElse { throw it }
+        val authenticatedClient =
+            clientMetadataResolver
+                .authenticateClient(
+                    clientId = clientId,
+                    clientAssertionType = clientAssertionType,
+                    clientAssertion = clientAssertion,
+                    authorizationServerIssuer = authorizationServerIssuer,
+                ).getOrElse { throw it }
+        val clientMetadata = authenticatedClient.metadata
         if (!clientMetadata.supportsRedirect(redirectUri)) {
             throw OAuthInvalidClientException("redirect_uri is not declared by the client metadata")
         }
@@ -89,6 +100,8 @@ class OAuthAuthorizationService(
                 loginHint = loginHint?.trim()?.takeIf(String::isNotEmpty),
                 codeChallenge = codeChallenge.trim(),
                 dpopKeyThumbprint = proof.keyThumbprint,
+                clientAuthKeyId = authenticatedClient.clientKeyId,
+                clientAuthKeyThumbprint = authenticatedClient.clientKeyThumbprint,
                 expiresAt = clock.now() + REQUEST_URI_TTL,
             )
         return PushedAuthorizationResponse(
@@ -146,6 +159,8 @@ class OAuthAuthorizationService(
                         scope = stored.scope,
                         codeChallenge = stored.codeChallenge,
                         dpopKeyThumbprint = stored.dpopKeyThumbprint,
+                        clientAuthKeyId = stored.clientAuthKeyId,
+                        clientAuthKeyThumbprint = stored.clientAuthKeyThumbprint,
                         expiresAt = clock.now() + AUTHORIZATION_CODE_TTL,
                     )
                 buildMap {
@@ -164,11 +179,13 @@ class OAuthAuthorizationService(
     /**
      * Exchanges an authorization code for a DPoP-bound token pair.
      */
-    fun exchangeAuthorizationCode(
+    suspend fun exchangeAuthorizationCode(
         code: String,
         redirectUri: String,
         clientId: String,
         codeVerifier: String,
+        clientAssertionType: String? = null,
+        clientAssertion: String? = null,
         dpopProof: String,
         htu: String,
     ): OAuthTokenResponse {
@@ -180,6 +197,18 @@ class OAuthAuthorizationService(
         if (stored.clientId != clientId || stored.redirectUri != redirectUri) {
             throw OAuthInvalidGrantException("Authorization code does not match the client or redirect_uri")
         }
+        val authenticatedClient =
+            clientMetadataResolver
+                .authenticateClient(
+                    clientId = clientId,
+                    clientAssertionType = clientAssertionType,
+                    clientAssertion = clientAssertion,
+                    authorizationServerIssuer = authorizationServerIssuer,
+                ).getOrElse { throw it }
+        authenticatedClient.requireBinding(
+            keyId = stored.clientAuthKeyId,
+            keyThumbprint = stored.clientAuthKeyThumbprint,
+        )
         if (pkceChallenge(codeVerifier) != stored.codeChallenge) {
             throw OAuthInvalidGrantException("code_verifier did not match the authorization request")
         }
@@ -212,6 +241,8 @@ class OAuthAuthorizationService(
                 subjectDid = stored.subjectDid,
                 scope = stored.scope,
                 dpopKeyThumbprint = proof.keyThumbprint,
+                clientAuthKeyId = stored.clientAuthKeyId,
+                clientAuthKeyThumbprint = stored.clientAuthKeyThumbprint,
                 expiresAt = clock.now() + REFRESH_TOKEN_TTL,
             )
         return OAuthTokenResponse(
@@ -227,9 +258,11 @@ class OAuthAuthorizationService(
     /**
      * Exchanges a refresh token for a new DPoP-bound token pair.
      */
-    fun exchangeRefreshToken(
+    suspend fun exchangeRefreshToken(
         refreshToken: String,
         clientId: String,
+        clientAssertionType: String? = null,
+        clientAssertion: String? = null,
         dpopProof: String,
         htu: String,
     ): OAuthTokenResponse {
@@ -240,6 +273,18 @@ class OAuthAuthorizationService(
         if (stored.clientId != clientId) {
             throw OAuthInvalidGrantException("Refresh token does not belong to this client")
         }
+        val authenticatedClient =
+            clientMetadataResolver
+                .authenticateClient(
+                    clientId = clientId,
+                    clientAssertionType = clientAssertionType,
+                    clientAssertion = clientAssertion,
+                    authorizationServerIssuer = authorizationServerIssuer,
+                ).getOrElse { throw it }
+        authenticatedClient.requireBinding(
+            keyId = stored.clientAuthKeyId,
+            keyThumbprint = stored.clientAuthKeyThumbprint,
+        )
 
         val expectedNonce = nonceService.currentNonce()
         val proof =
@@ -263,7 +308,11 @@ class OAuthAuthorizationService(
             )
         val rotatedRefreshToken = randomToken()
         refreshTokens.remove(refreshToken)
-        refreshTokens[rotatedRefreshToken] = stored.copy(token = rotatedRefreshToken, expiresAt = clock.now() + REFRESH_TOKEN_TTL)
+        refreshTokens[rotatedRefreshToken] =
+            stored.copy(
+                token = rotatedRefreshToken,
+                expiresAt = clock.now() + REFRESH_TOKEN_TTL,
+            )
         return OAuthTokenResponse(
             access_token = issued.token,
             token_type = "DPoP",
@@ -277,9 +326,11 @@ class OAuthAuthorizationService(
     /**
      * Revokes [refreshToken]. Repeated revocations are treated as success.
      */
-    fun revokeRefreshToken(
+    suspend fun revokeRefreshToken(
         refreshToken: String,
         clientId: String,
+        clientAssertionType: String? = null,
+        clientAssertion: String? = null,
         dpopProof: String,
         htu: String,
     ) {
@@ -287,6 +338,18 @@ class OAuthAuthorizationService(
         if (stored.clientId != clientId) {
             throw OAuthInvalidGrantException("Refresh token does not belong to this client")
         }
+        val authenticatedClient =
+            clientMetadataResolver
+                .authenticateClient(
+                    clientId = clientId,
+                    clientAssertionType = clientAssertionType,
+                    clientAssertion = clientAssertion,
+                    authorizationServerIssuer = authorizationServerIssuer,
+                ).getOrElse { throw it }
+        authenticatedClient.requireBinding(
+            keyId = stored.clientAuthKeyId,
+            keyThumbprint = stored.clientAuthKeyThumbprint,
+        )
 
         val expectedNonce = nonceService.currentNonce()
         val proof =
@@ -320,6 +383,8 @@ class OAuthAuthorizationService(
                 codeChallengeMethod = request.codeChallengeMethod,
                 state = request.state,
                 loginHint = request.loginHint,
+                clientAssertionType = request.clientAssertionType,
+                clientAssertion = request.clientAssertion,
                 dpopProof = request.dpopProof,
                 htu = request.htu,
             )
@@ -338,33 +403,39 @@ class OAuthAuthorizationService(
             )
         }
 
-    override fun exchangeAuthorizationCode(request: AuthorizationCodeTokenRequest): Result<OAuthTokenResponse> =
+    override suspend fun exchangeAuthorizationCode(request: AuthorizationCodeTokenRequest): Result<OAuthTokenResponse> =
         runCatching {
             exchangeAuthorizationCode(
                 code = request.code,
                 redirectUri = request.redirectUri,
                 clientId = request.clientId,
                 codeVerifier = request.codeVerifier,
+                clientAssertionType = request.clientAssertionType,
+                clientAssertion = request.clientAssertion,
                 dpopProof = request.dpopProof,
                 htu = request.htu,
             )
         }
 
-    override fun exchangeRefreshToken(request: RefreshTokenGrantRequest): Result<OAuthTokenResponse> =
+    override suspend fun exchangeRefreshToken(request: RefreshTokenGrantRequest): Result<OAuthTokenResponse> =
         runCatching {
             exchangeRefreshToken(
                 refreshToken = request.refreshToken,
                 clientId = request.clientId,
+                clientAssertionType = request.clientAssertionType,
+                clientAssertion = request.clientAssertion,
                 dpopProof = request.dpopProof,
                 htu = request.htu,
             )
         }
 
-    override fun revokeRefreshToken(request: OAuthRevokeRequest): Result<Unit> =
+    override suspend fun revokeRefreshToken(request: OAuthRevokeRequest): Result<Unit> =
         runCatching {
             revokeRefreshToken(
                 refreshToken = request.refreshToken,
                 clientId = request.clientId,
+                clientAssertionType = request.clientAssertionType,
+                clientAssertion = request.clientAssertion,
                 dpopProof = request.dpopProof,
                 htu = request.htu,
             )
@@ -406,6 +477,8 @@ private data class StoredAuthorizationRequest(
     val loginHint: String?,
     val codeChallenge: String,
     val dpopKeyThumbprint: String,
+    val clientAuthKeyId: String?,
+    val clientAuthKeyThumbprint: String?,
     val expiresAt: kotlin.time.Instant,
 )
 
@@ -418,6 +491,8 @@ private data class StoredAuthorizationCode(
     val scope: String,
     val codeChallenge: String,
     val dpopKeyThumbprint: String,
+    val clientAuthKeyId: String?,
+    val clientAuthKeyThumbprint: String?,
     val expiresAt: kotlin.time.Instant,
 )
 
@@ -427,9 +502,20 @@ private data class StoredRefreshToken(
     val subjectDid: String,
     val scope: String,
     val dpopKeyThumbprint: String,
+    val clientAuthKeyId: String?,
+    val clientAuthKeyThumbprint: String?,
     val expiresAt: kotlin.time.Instant,
     val revokedAt: kotlin.time.Instant? = null,
 )
+
+private fun AuthenticatedOAuthClient.requireBinding(
+    keyId: String?,
+    keyThumbprint: String?,
+) {
+    if (clientKeyId != keyId || clientKeyThumbprint != keyThumbprint) {
+        throw OAuthInvalidGrantException("Client authentication did not match the original grant")
+    }
+}
 
 private fun MutableMap<String, StoredAuthorizationRequest>.requireValidRequest(
     requestUri: String,

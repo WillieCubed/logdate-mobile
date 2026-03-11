@@ -7,10 +7,11 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.serialization.json.Json
-import kotlin.jvm.internal.DefaultConstructorMarker
+import studio.hypertext.atproto.crypto.EcCurve
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
@@ -282,34 +283,11 @@ class OAuthClientMetadataResolverTest {
         }
 
     @Test
-    fun `client metadata synthetic default constructor applies kotlin defaults`() {
-        val constructor =
-            OAuthClientMetadata::class.java.getDeclaredConstructor(
-                String::class.java,
-                List::class.java,
-                List::class.java,
-                List::class.java,
-                String::class.java,
-                String::class.java,
-                java.lang.Boolean.TYPE,
-                String::class.java,
-                Integer.TYPE,
-                DefaultConstructorMarker::class.java,
-            )
-        constructor.isAccessible = true
-
+    fun `client metadata kotlin defaults remain stable for public clients`() {
         val instance =
-            constructor.newInstance(
-                "https://viewer.example.com/client.json",
-                listOf("https://viewer.example.com/callback"),
-                emptyList<String>(),
-                emptyList<String>(),
-                "ignored",
-                "ignored",
-                false,
-                "ignored",
-                0b11111100,
-                null,
+            OAuthClientMetadata(
+                client_id = "https://viewer.example.com/client.json",
+                redirect_uris = listOf("https://viewer.example.com/callback"),
             )
 
         assertEquals(listOf("authorization_code", "refresh_token"), instance.grant_types)
@@ -319,4 +297,200 @@ class OAuthClientMetadataResolverTest {
         assertTrue(instance.dpop_bound_access_tokens)
         assertEquals(null, instance.client_name)
     }
+
+    @Test
+    fun `resolver authenticates confidential clients and rejects replayed assertions`() =
+        kotlinx.coroutines.test.runTest {
+            val clientId = "https://viewer.example.com/client.json"
+            val redirectUri = "https://viewer.example.com/callback"
+            val clock = MutableClock(Instant.parse("2026-03-08T00:00:00Z"))
+            val clientKeyPair = generateP256KeyPair()
+            val resolver =
+                OAuthClientMetadataResolver(
+                    httpClient =
+                        HttpClient(
+                            MockEngine {
+                                respond(
+                                    content =
+                                        clientMetadataJson(
+                                            clientId = clientId,
+                                            redirectUri = redirectUri,
+                                            tokenEndpointAuthMethod = "private_key_jwt",
+                                            tokenEndpointAuthSigningAlg = "ES256",
+                                            jwksJson = clientJwksJson(clientKeyPair),
+                                        ),
+                                    status = HttpStatusCode.OK,
+                                    headers = headersOf("Content-Type", ContentType.Application.Json.toString()),
+                                )
+                            },
+                        ),
+                    clock = clock,
+                )
+            val firstAssertion =
+                createClientAssertion(
+                    keyPair = clientKeyPair,
+                    clientId = clientId,
+                    audience = "https://logdate.app",
+                    iat = clock.now().epochSeconds,
+                    jti = "assertion-1",
+                )
+            val secondAssertion =
+                createClientAssertion(
+                    keyPair = clientKeyPair,
+                    clientId = clientId,
+                    audience = "https://logdate.app",
+                    iat = clock.now().epochSeconds,
+                    jti = "assertion-2",
+                )
+
+            val authenticated =
+                resolver
+                    .authenticateClient(
+                        clientId = clientId,
+                        clientAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+                        clientAssertion = firstAssertion,
+                        authorizationServerIssuer = "https://logdate.app",
+                    ).getOrThrow()
+            val replayed =
+                resolver
+                    .authenticateClient(
+                        clientId = clientId,
+                        clientAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+                        clientAssertion = firstAssertion,
+                        authorizationServerIssuer = "https://logdate.app",
+                    ).exceptionOrNull()
+            val invalidAssertionType =
+                resolver
+                    .authenticateClient(
+                        clientId = clientId,
+                        clientAssertionType = "not-jwt-bearer",
+                        clientAssertion = secondAssertion,
+                        authorizationServerIssuer = "https://logdate.app",
+                    ).exceptionOrNull()
+
+            assertEquals("client-key-1", authenticated.clientKeyId)
+            assertNotNull(authenticated.clientKeyThumbprint)
+            assertIs<OAuthInvalidClientException>(replayed)
+            assertIs<OAuthInvalidClientException>(invalidAssertionType)
+        }
+
+    @Test
+    fun `resolver authenticates confidential ES256K clients`() =
+        kotlinx.coroutines.test.runTest {
+            val clientId = "https://viewer.example.com/client.json"
+            val redirectUri = "https://viewer.example.com/callback"
+            val clock = MutableClock(Instant.parse("2026-03-08T00:00:00Z"))
+            val clientKeyPair = generateK256KeyPair()
+            val resolver =
+                OAuthClientMetadataResolver(
+                    httpClient =
+                        HttpClient(
+                            MockEngine {
+                                respond(
+                                    content =
+                                        clientMetadataJson(
+                                            clientId = clientId,
+                                            redirectUri = redirectUri,
+                                            tokenEndpointAuthMethod = "private_key_jwt",
+                                            tokenEndpointAuthSigningAlg = "ES256K",
+                                            jwksJson = clientJwksJson(clientKeyPair, alg = "ES256K", curve = EcCurve.K256),
+                                        ),
+                                    status = HttpStatusCode.OK,
+                                    headers = headersOf("Content-Type", ContentType.Application.Json.toString()),
+                                )
+                            },
+                        ),
+                    clock = clock,
+                )
+            val assertion =
+                createClientAssertion(
+                    keyPair = clientKeyPair,
+                    clientId = clientId,
+                    audience = "https://logdate.app",
+                    iat = clock.now().epochSeconds,
+                    jti = "assertion-k256",
+                    alg = "ES256K",
+                    curve = EcCurve.K256,
+                )
+
+            val authenticated =
+                resolver
+                    .authenticateClient(
+                        clientId = clientId,
+                        clientAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+                        clientAssertion = assertion,
+                        authorizationServerIssuer = "https://logdate.app",
+                    ).getOrThrow()
+
+            assertEquals("client-key-1", authenticated.clientKeyId)
+            assertNotNull(authenticated.clientKeyThumbprint)
+        }
+
+    @Test
+    fun `resolver rejects confidential client assertions with invalid timestamps`() =
+        kotlinx.coroutines.test.runTest {
+            val clientId = "https://viewer.example.com/client.json"
+            val redirectUri = "https://viewer.example.com/callback"
+            val clock = MutableClock(Instant.parse("2026-03-08T00:00:00Z"))
+            val clientKeyPair = generateP256KeyPair()
+            val resolver =
+                OAuthClientMetadataResolver(
+                    httpClient =
+                        HttpClient(
+                            MockEngine {
+                                respond(
+                                    content =
+                                        clientMetadataJson(
+                                            clientId = clientId,
+                                            redirectUri = redirectUri,
+                                            tokenEndpointAuthMethod = "private_key_jwt",
+                                            tokenEndpointAuthSigningAlg = "ES256",
+                                            jwksJson = clientJwksJson(clientKeyPair),
+                                        ),
+                                    status = HttpStatusCode.OK,
+                                    headers = headersOf("Content-Type", ContentType.Application.Json.toString()),
+                                )
+                            },
+                        ),
+                    clock = clock,
+                )
+            val futureIatAssertion =
+                createClientAssertion(
+                    keyPair = clientKeyPair,
+                    clientId = clientId,
+                    audience = "https://logdate.app",
+                    iat = clock.now().epochSeconds + 120,
+                    exp = clock.now().epochSeconds + 300,
+                    jti = "future-iat",
+                )
+            val invalidWindowAssertion =
+                createClientAssertion(
+                    keyPair = clientKeyPair,
+                    clientId = clientId,
+                    audience = "https://logdate.app",
+                    iat = clock.now().epochSeconds,
+                    exp = clock.now().epochSeconds,
+                    jti = "bad-window",
+                )
+
+            val futureIat =
+                resolver
+                    .authenticateClient(
+                        clientId = clientId,
+                        clientAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+                        clientAssertion = futureIatAssertion,
+                        authorizationServerIssuer = "https://logdate.app",
+                    ).exceptionOrNull()
+            val invalidWindow =
+                resolver
+                    .authenticateClient(
+                        clientId = clientId,
+                        clientAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+                        clientAssertion = invalidWindowAssertion,
+                        authorizationServerIssuer = "https://logdate.app",
+                    ).exceptionOrNull()
+
+            assertIs<OAuthInvalidClientException>(futureIat)
+            assertIs<OAuthInvalidClientException>(invalidWindow)
+        }
 }
