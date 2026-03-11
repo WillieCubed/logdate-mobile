@@ -87,6 +87,7 @@ actual fun VideoPlayerContent(
 ) {
     if (LocalInspectionMode.current) {
         PreviewVideoPlayerContent(
+            previewThumbnailModel = uri,
             modifier = modifier,
         )
         return
@@ -373,20 +374,31 @@ private fun VideoPickerCard(
 }
 
 @Composable
-private fun PreviewVideoPlayerContent(modifier: Modifier = Modifier) {
+private fun PreviewVideoPlayerContent(
+    previewThumbnailModel: Any?,
+    modifier: Modifier = Modifier,
+) {
     Box(
         modifier =
             modifier
                 .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
                 .aspectRatio(16f / 9f),
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-        )
+        if (previewThumbnailModel != null) {
+            AsyncImage(
+                model = previewThumbnailModel,
+                contentDescription = stringResource(Res.string.video_thumbnail),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            )
+        }
 
         Surface(
             shape = CircleShape,
