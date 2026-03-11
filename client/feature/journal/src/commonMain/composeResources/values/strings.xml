@@ -36,8 +36,11 @@
     <string name="journal_settings">Journal Settings</string>
     <string name="journal_settings_2">Journal settings</string>
     <string name="loading">Loading...</string>
+    <string name="location">Location</string>
     <string name="new_journal">New Journal</string>
     <string name="no_entries_in_this_journal_yet">No entries in this journal yet</string>
+    <string name="open_in_locations">Open in Locations</string>
+    <string name="pinned_location">Pinned location</string>
     <string name="privacy">Privacy</string>
     <string name="save_changes">Save changes</string>
     <string name="see_all_journals">See All Journals</string>

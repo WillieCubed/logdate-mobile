@@ -1,4 +1,6 @@
-@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+@file:Suppress(
+    "ktlint:standard:function-naming",
+)
 @file:OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 
 package app.logdate.feature.journals.ui.detail
@@ -16,10 +18,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -31,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.feature.editor.ui.audio.expansion.ImmersiveAudioScreen
 import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
 import app.logdate.feature.editor.ui.video.VideoPlayerContent
@@ -40,8 +45,15 @@ import app.logdate.ui.common.transitions.TransitionKeys.EDITOR_TRANSITION
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
-import logdate.client.feature.journal.generated.resources.*
 import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.feature.journal.generated.resources.back
+import logdate.client.feature.journal.generated.resources.error
+import logdate.client.feature.journal.generated.resources.image
+import logdate.client.feature.journal.generated.resources.image_note
+import logdate.client.feature.journal.generated.resources.location
+import logdate.client.feature.journal.generated.resources.open_in_locations
+import logdate.client.feature.journal.generated.resources.pinned_location
+import logdate.client.feature.journal.generated.resources.video
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -54,6 +66,7 @@ import kotlin.uuid.Uuid
 fun NoteViewerScreen(
     noteId: Uuid,
     onGoBack: () -> Unit,
+    onOpenLocationTimeline: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: NoteViewerViewModel =
         koinViewModel(
@@ -83,6 +96,7 @@ fun NoteViewerScreen(
             NoteViewerScaffoldContent(
                 shared = state.shared,
                 onGoBack = onGoBack,
+                onOpenLocationTimeline = onOpenLocationTimeline,
                 modifier = modifier,
             ) {
                 Text(
@@ -95,6 +109,7 @@ fun NoteViewerScreen(
             NoteViewerScaffoldContent(
                 shared = state.shared,
                 onGoBack = onGoBack,
+                onOpenLocationTimeline = onOpenLocationTimeline,
                 modifier = modifier,
             ) {
                 NoteViewerImageContent(mediaRef = state.mediaRef)
@@ -104,6 +119,7 @@ fun NoteViewerScreen(
             NoteViewerScaffoldContent(
                 shared = state.shared,
                 onGoBack = onGoBack,
+                onOpenLocationTimeline = onOpenLocationTimeline,
                 modifier = modifier,
             ) {
                 NoteViewerVideoContent(mediaRef = state.mediaRef)
@@ -186,6 +202,7 @@ private fun AudioNoteViewerEntry(
 fun NoteViewerScaffoldContent(
     shared: NoteViewerShared,
     onGoBack: () -> Unit,
+    onOpenLocationTimeline: () -> Unit = {},
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
@@ -208,7 +225,11 @@ fun NoteViewerScaffoldContent(
             NoteViewerToolbar(onGoBack = onGoBack)
         },
         editorContent = {
-            NoteViewerContent(shared = shared, content = content)
+            NoteViewerContent(
+                shared = shared,
+                onOpenLocationTimeline = onOpenLocationTimeline,
+                content = content,
+            )
         },
         bottomContent = {
             Spacer(modifier = Modifier.fillMaxWidth())
@@ -243,6 +264,7 @@ private fun NoteViewerToolbar(onGoBack: () -> Unit) {
 @Composable
 fun NoteViewerContent(
     shared: NoteViewerShared,
+    onOpenLocationTimeline: () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     Column(
@@ -257,6 +279,13 @@ fun NoteViewerContent(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        shared.location?.let { location ->
+            NoteLocationCard(
+                location = location,
+                onOpenLocationTimeline = onOpenLocationTimeline,
+            )
+        }
 
         Card(
             modifier =
@@ -277,6 +306,74 @@ fun NoteViewerContent(
                 color = MaterialTheme.colorScheme.surface,
             ) {
                 content()
+            }
+        }
+    }
+}
+
+@Composable
+private fun NoteLocationCard(
+    location: NoteLocation,
+    onOpenLocationTimeline: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val coordinates = location.coordinates
+    val place = location.place
+    val title = location.displayName ?: stringResource(Res.string.pinned_location)
+    val subtitle =
+        when {
+            coordinates != null ->
+                "${coordinates.latitude.formatCoordinate()}, ${coordinates.longitude.formatCoordinate()}"
+            place != null ->
+                "${place.latitude.formatCoordinate()}, ${place.longitude.formatCoordinate()}"
+            else -> ""
+        }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            ),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FilledTonalIconButton(
+                onClick = onOpenLocationTimeline,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = null,
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+            ) {
+                Text(
+                    text = stringResource(Res.string.location),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                if (subtitle.isNotBlank()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            FilledTonalButton(onClick = onOpenLocationTimeline) {
+                Text(text = stringResource(Res.string.open_in_locations))
             }
         }
     }
@@ -324,6 +421,8 @@ fun NoteViewerErrorContent(
         }
     }
 }
+
+private fun Double.formatCoordinate(): String = "%,.4f".format(this)
 
 /**
  * Audio note presentation for note viewer previews and route rendering.
