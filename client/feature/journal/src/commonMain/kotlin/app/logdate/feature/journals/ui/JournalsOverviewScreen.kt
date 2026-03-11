@@ -23,12 +23,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.shared.model.Journal
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
@@ -48,7 +48,7 @@ fun JournalsOverviewScreen(
     modifier: Modifier = Modifier,
     viewModel: JournalsOverviewViewModel = koinViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     JournalsOverviewScreenContent(
         journals = state.journals,
@@ -126,12 +126,13 @@ fun JournalListPanel(
             } else {
 //                JournalList(state.journals, onOpenJournal, modifier)
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                    val reservedForButton = 56.dp + Spacing.lg
+                    val reservedForButton = (maxHeight * 0.12f).coerceIn(44.dp, 72.dp)
+                    val contentSpacing = (maxHeight * 0.03f).coerceIn(Spacing.sm, Spacing.lg)
                     val carouselMaxHeight = (maxHeight - reservedForButton).coerceAtLeast(220.dp)
 
                     Column(
                         modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.lg, Alignment.CenterVertically),
+                        verticalArrangement = Arrangement.spacedBy(contentSpacing, Alignment.CenterVertically),
                     ) {
                         JournalCoverFlowCarousel(
                             journals = journals,

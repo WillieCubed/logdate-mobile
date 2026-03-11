@@ -6,9 +6,9 @@ package app.logdate.feature.rewind.ui
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.feature.rewind.ui.overview.RewindOverviewViewModel
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.ExperimentalUuidApi
@@ -50,7 +50,7 @@ fun RewindOverviewScreen(
     viewModel: RewindOverviewViewModel = koinViewModel(),
     modifier: Modifier = Modifier,
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     RewindScreenContent(
         uiState,
         onOpenRewind = onOpenRewind,
