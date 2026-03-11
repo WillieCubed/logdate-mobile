@@ -1,10 +1,6 @@
 package app.logdate.screenshots.components.editor
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.feature.editor.audio.model.DaylightPeriod
@@ -19,7 +15,6 @@ import app.logdate.feature.editor.ui.audio.expansion.SpatialExpandedAudioBlock
 import app.logdate.feature.editor.ui.content.EmptyEditorStateContent
 import app.logdate.feature.editor.ui.dialog.alert.ExitConfirmationDialog
 import app.logdate.feature.editor.ui.editor.RecordingState
-import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
 import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTheme
@@ -65,22 +60,6 @@ fun Editor_Empty_Dark() {
             onStartPhotoBlock = {},
             onStartAudioBlock = {},
             onStartCameraBlock = {},
-        )
-    }
-}
-
-// ─── Immersive Editor Layout ────────────────────────────────────────────────────
-
-@PreviewTest
-@Preview(showBackground = true, device = PHONE)
-@Composable
-fun ImmersiveEditorLayout_Empty() {
-    ScreenshotTheme {
-        ImmersiveEditorLayout(
-            isEditorFocused = false,
-            topBarContent = { Text("← Back") },
-            editorContent = { Box(modifier = Modifier.fillMaxSize()) },
-            bottomContent = { Text("Toolbar placeholder") },
         )
     }
 }
@@ -302,4 +281,3 @@ fun ExitConfirmation_Dialog() {
         )
     }
 }
-

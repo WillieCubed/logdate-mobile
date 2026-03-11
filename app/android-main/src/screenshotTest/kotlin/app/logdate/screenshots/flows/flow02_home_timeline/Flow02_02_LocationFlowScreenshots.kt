@@ -2,6 +2,7 @@ package app.logdate.screenshots.flows.flow02_home_timeline
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
@@ -17,6 +18,7 @@ import app.logdate.screenshots.common.RoutePreviewTab
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTheme
+import app.logdate.ui.maps.LocalGoogleMapsAvailabilityOverride
 import app.logdate.ui.location.PlaceUiState
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelinePane
@@ -217,5 +219,21 @@ fun S07_LocationQuickPeekPermissionRequired() {
             onOpenFullTimeline = {},
             onSelectStop = {},
         )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun S08_LocationQuickPeekNoMapConfigured() {
+    ScreenshotTheme {
+        CompositionLocalProvider(LocalGoogleMapsAvailabilityOverride provides false) {
+            LocationTimelineQuickPeekSheet(
+                uiState = sampleLocationSelectedState,
+                onDismissRequest = {},
+                onOpenFullTimeline = {},
+                onSelectStop = {},
+            )
+        }
     }
 }

@@ -149,7 +149,7 @@ fun S01_SettingsOverviewDefault() {
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun S02_SettingsOverviewListDetailPlaceholder() {
+fun S02_SettingsOverviewEmptyDetail() {
     ScreenshotTheme {
         Row(modifier = Modifier.fillMaxSize()) {
             SettingsOverviewContent(

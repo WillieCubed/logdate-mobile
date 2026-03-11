@@ -184,7 +184,7 @@ fun S03_TimelineScrollToTopVisible() {
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun S04_TimelineDetailPlaceholder() {
+fun S04_TimelineDetailEmptyState() {
     ScreenshotTheme {
         HomeDetailRouteFrame(
             selectedTab = RoutePreviewTab.TIMELINE,

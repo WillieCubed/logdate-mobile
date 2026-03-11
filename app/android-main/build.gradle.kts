@@ -18,6 +18,13 @@ val googleMapsApiKey =
         .orElse(configProperties.getProperty("GOOGLE_MAPS_API_KEY") ?: "")
         .get()
 
+val googleMapsManifestValue =
+    if (googleMapsApiKey.isBlank()) {
+        "@string/google_api_key"
+    } else {
+        googleMapsApiKey
+    }
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
@@ -45,7 +52,7 @@ extensions.configure<ApplicationExtension> {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        manifestPlaceholders["googleMapsApiKey"] = googleMapsApiKey
+        manifestPlaceholders["googleMapsApiKey"] = googleMapsManifestValue
     }
 
     buildTypes {

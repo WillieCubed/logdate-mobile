@@ -1,16 +1,8 @@
 package app.logdate.screenshots.flows.flow05_journals
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NotePlace
@@ -23,15 +15,18 @@ import app.logdate.feature.journals.ui.detail.AudioNoteViewerContent
 import app.logdate.feature.journals.ui.detail.AudioNoteViewerUiState
 import app.logdate.feature.journals.ui.detail.AudioPlaybackUiState
 import app.logdate.feature.journals.ui.detail.NoteViewerErrorContent
+import app.logdate.feature.journals.ui.detail.NoteViewerImageContent
 import app.logdate.feature.journals.ui.detail.NoteViewerLoadingContent
 import app.logdate.feature.journals.ui.detail.NoteViewerScaffoldContent
 import app.logdate.feature.journals.ui.detail.NoteViewerShared
+import app.logdate.feature.journals.ui.detail.NoteViewerVideoContent
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTheme
-import app.logdate.ui.theme.Spacing
 import com.android.tools.screenshot.PreviewTest
 import kotlin.uuid.Uuid
+
+private const val sampleVideoPreviewUri = "android.resource://co.reasonabletech.logdate/mipmap/ic_launcher"
 
 private val sharedNote =
     NoteViewerShared(
@@ -114,10 +109,7 @@ fun S04_NoteViewerImage() {
             shared = sharedNote,
             onGoBack = {},
         ) {
-            MediaPlaceholder(
-                label = "Image",
-                description = "Golden-hour desk setup",
-            )
+            NoteViewerImageContent(mediaRef = sampleVideoPreviewUri)
         }
     }
 }
@@ -131,10 +123,7 @@ fun S05_NoteViewerVideo() {
             shared = sharedNote,
             onGoBack = {},
         ) {
-            MediaPlaceholder(
-                label = "Video",
-                description = "Evening commute clip",
-            )
+            NoteViewerVideoContent(mediaRef = sampleVideoPreviewUri)
         }
     }
 }
@@ -155,32 +144,5 @@ fun S06_NoteViewerAudio() {
                 ),
             onGoBack = {},
         )
-    }
-}
-
-@Composable
-private fun MediaPlaceholder(
-    label: String,
-    description: String,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = Spacing.xxl * 4)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }

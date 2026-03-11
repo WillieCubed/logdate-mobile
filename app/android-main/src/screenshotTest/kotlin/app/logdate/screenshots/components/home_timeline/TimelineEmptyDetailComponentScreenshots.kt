@@ -12,7 +12,7 @@ import com.android.tools.screenshot.PreviewTest
 @PreviewTest
 @Preview(showBackground = true, device = PHONE)
 @Composable
-fun TimelineDetails_Empty() {
+fun TimelineDetails_EmptyDetail() {
     ScreenshotTheme {
         TimelineDetailsEmptyPlaceholder()
     }
@@ -21,7 +21,7 @@ fun TimelineDetails_Empty() {
 @PreviewTest
 @Preview(showBackground = true, device = PHONE, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
-fun TimelineDetails_Empty_Dark() {
+fun TimelineDetails_EmptyDetail_Dark() {
     ScreenshotTheme(darkTheme = true) {
         TimelineDetailsEmptyPlaceholder()
     }

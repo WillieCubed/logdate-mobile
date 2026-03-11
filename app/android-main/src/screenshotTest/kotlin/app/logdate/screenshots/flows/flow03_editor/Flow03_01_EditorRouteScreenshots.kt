@@ -27,7 +27,7 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 private const val sampleImageUri = "android.resource://co.reasonabletech.logdate/mipmap/ic_launcher"
-private const val sampleVideoUri = "preview://editor/video"
+private const val sampleVideoUri = sampleImageUri
 
 private val editorAudioPalette =
     AudioPalette(
@@ -106,7 +106,6 @@ fun S02_EntryEditorListMixedContent() {
 @Composable
 fun S03_EntryEditorImmersiveAudio() {
     EditorRouteFrame(
-        isEditorFocused = true,
         isImmersiveBlockActive = true,
     ) {
         SpatialExpandedAudioBlock(
@@ -162,13 +161,11 @@ fun S05_EntryEditorDraftsDialog() {
 
 @Composable
 private fun EditorRouteFrame(
-    isEditorFocused: Boolean = false,
     isImmersiveBlockActive: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     ScreenshotTheme {
         ImmersiveEditorLayout(
-            isEditorFocused = isEditorFocused,
             isImmersiveBlockActive = isImmersiveBlockActive,
             topBarContent = {
                 NoteEditorToolbar(

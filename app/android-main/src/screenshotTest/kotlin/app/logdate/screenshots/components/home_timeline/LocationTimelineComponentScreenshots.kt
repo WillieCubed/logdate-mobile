@@ -1,5 +1,6 @@
 package app.logdate.screenshots.components.home_timeline
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.feature.location.timeline.ui.LocationTimelineContent
@@ -10,6 +11,7 @@ import app.logdate.feature.location.timeline.ui.model.LocationTimelineErrorUiSta
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineUiState
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTheme
+import app.logdate.ui.maps.LocalGoogleMapsAvailabilityOverride
 import com.android.tools.screenshot.PreviewTest
 import kotlin.time.Instant
 
@@ -165,5 +167,20 @@ fun LocationTimeline_ServicesDisabled() {
             onSelectStop = {},
             onDeleteStop = {},
         )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun LocationTimeline_NoMapConfigured() {
+    ScreenshotTheme {
+        CompositionLocalProvider(LocalGoogleMapsAvailabilityOverride provides false) {
+            LocationTimelineContent(
+                uiState = sampleLocationSelectedState,
+                onSelectStop = {},
+                onDeleteStop = {},
+            )
+        }
     }
 }

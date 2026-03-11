@@ -37,7 +37,7 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 private const val SAMPLE_IMAGE_URI = "android.resource://co.reasonabletech.logdate/mipmap/ic_launcher"
-private const val SAMPLE_VIDEO_URI = "preview://editor/video"
+private const val SAMPLE_VIDEO_URI = SAMPLE_IMAGE_URI
 
 private val mockPalette = AudioPalette(
     waveformGradientStart = 0xFFE8A044,
@@ -279,7 +279,6 @@ private fun EditorModeFrame(
 ) {
     ScreenshotTheme {
         ImmersiveEditorLayout(
-            isEditorFocused = true,
             isImmersiveBlockActive = isImmersiveBlockActive,
             topBarContent = {
                 NoteEditorToolbar(

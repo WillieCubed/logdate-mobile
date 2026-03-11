@@ -1,15 +1,7 @@
 package app.logdate.screenshots.flows.flow01_onboarding
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import app.logdate.client.billing.model.LogDateBackupPlanOption
 import app.logdate.feature.onboarding.ui.CloudAccountSetupContent
-import app.logdate.feature.onboarding.ui.CloudSetupOption
 import app.logdate.feature.onboarding.ui.MemoriesImportInfoScreen
 import app.logdate.feature.onboarding.ui.OnboardingCompletionContent
 import app.logdate.feature.onboarding.ui.OnboardingStartScreenContent
@@ -17,7 +9,6 @@ import app.logdate.feature.onboarding.ui.PersonalIntroContent
 import app.logdate.feature.onboarding.ui.PersonalIntroStep
 import app.logdate.feature.onboarding.ui.PersonalIntroUiState
 import app.logdate.feature.onboarding.ui.WelcomeBackScreenContent
-import app.logdate.screenshots.common.PlaceholderRouteFrame
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTheme
 import com.android.tools.screenshot.PreviewTest
@@ -68,60 +59,7 @@ fun S03_OnboardingSignInSetupSync() {
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun S04_OnboardingSignInCreateAccountPlaceholder() {
-    ScreenshotTheme {
-        CloudAccountSetupContent(
-            useCompactLayout = true,
-            selectedOption = CloudSetupOption.CREATE_ACCOUNT,
-            onBack = {},
-            onOptionSelected = {},
-            onContinue = {},
-            onSkip = {},
-            onPlanSelected = { _: LogDateBackupPlanOption -> },
-        )
-    }
-}
-
-@PreviewTest
-@ScreenshotPreviewMatrix
-@Composable
-fun S05_OnboardingSignInSignInPlaceholder() {
-    ScreenshotTheme {
-        CloudAccountSetupContent(
-            useCompactLayout = true,
-            selectedOption = CloudSetupOption.SIGN_IN,
-            onBack = {},
-            onOptionSelected = {},
-            onContinue = {},
-            onSkip = {},
-            onPlanSelected = { _: LogDateBackupPlanOption -> },
-        )
-    }
-}
-
-@PreviewTest
-@ScreenshotPreviewMatrix
-@Composable
-fun S06_OnboardingEntryBlank() {
-    ScreenshotTheme {
-        PlaceholderRouteFrame {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "Current route is intentionally blank.",
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            }
-        }
-    }
-}
-
-@PreviewTest
-@ScreenshotPreviewMatrix
-@Composable
-fun S07_OnboardingImportInfo() {
+fun S04_OnboardingImportInfo() {
     ScreenshotTheme {
         MemoriesImportInfoScreen(onBack = {}, onContinue = {})
     }
@@ -130,7 +68,7 @@ fun S07_OnboardingImportInfo() {
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun S08_PersonalIntroNameStep() {
+fun S05_PersonalIntroNameStep() {
     ScreenshotTheme {
         PersonalIntroContent(
             uiState =
@@ -151,7 +89,7 @@ fun S08_PersonalIntroNameStep() {
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun S09_PersonalIntroBioStep() {
+fun S06_PersonalIntroBioStep() {
     ScreenshotTheme {
         PersonalIntroContent(
             uiState =
@@ -173,7 +111,7 @@ fun S09_PersonalIntroBioStep() {
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun S10_OnboardingCompleteStreak() {
+fun S07_OnboardingCompleteStreak() {
     ScreenshotTheme {
         OnboardingCompletionContent(
             shouldShowFinish = false,
@@ -186,7 +124,7 @@ fun S10_OnboardingCompleteStreak() {
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun S11_OnboardingCompleteFinal() {
+fun S08_OnboardingCompleteFinal() {
     ScreenshotTheme {
         OnboardingCompletionContent(
             shouldShowFinish = true,
@@ -199,7 +137,7 @@ fun S11_OnboardingCompleteFinal() {
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun S12_OnboardingWelcomeBack() {
+fun S09_OnboardingWelcomeBack() {
     ScreenshotTheme {
         WelcomeBackScreenContent(name = "Alex")
     }
