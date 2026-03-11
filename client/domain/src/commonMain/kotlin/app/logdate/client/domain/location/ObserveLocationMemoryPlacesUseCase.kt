@@ -142,37 +142,31 @@ internal fun LocationMemoryTimeFilter.contains(
     val noteDate = timestamp.toLocalDateTime(timeZone).date
     val currentDate = now.toLocalDateTime(timeZone).date
 
-    return when (val filter: Any = this) {
-        LocationMemoryTimeFilter.Last30Days ->
-            noteDate.isWithin(
-                startInclusive = currentDate.minus(DatePeriod(days = 29)),
-                endInclusive = currentDate,
-            )
-
-        LocationMemoryTimeFilter.Last90Days ->
-            noteDate.isWithin(
-                startInclusive = currentDate.minus(DatePeriod(days = 89)),
-                endInclusive = currentDate,
-            )
-
-        LocationMemoryTimeFilter.YearToDate ->
-            noteDate.isWithin(
-                startInclusive = LocalDate(currentDate.year, 1, 1),
-                endInclusive = currentDate,
-            )
-
-        LocationMemoryTimeFilter.AllTime -> true
-
-        is LocationMemoryTimeFilter.Custom ->
-            noteDate.isWithin(
-                startInclusive = filter.startInclusive,
-                endInclusive = filter.endInclusive,
-            )
-
-        else -> {
-            Napier.w("Unexpected location memory filter encountered while matching notes: $filter")
-            true
-        }
+    return if (this == LocationMemoryTimeFilter.Last30Days) {
+        noteDate.isWithin(
+            startInclusive = currentDate.minus(DatePeriod(days = 29)),
+            endInclusive = currentDate,
+        )
+    } else if (this == LocationMemoryTimeFilter.Last90Days) {
+        noteDate.isWithin(
+            startInclusive = currentDate.minus(DatePeriod(days = 89)),
+            endInclusive = currentDate,
+        )
+    } else if (this == LocationMemoryTimeFilter.YearToDate) {
+        noteDate.isWithin(
+            startInclusive = LocalDate(currentDate.year, 1, 1),
+            endInclusive = currentDate,
+        )
+    } else if (this == LocationMemoryTimeFilter.AllTime) {
+        true
+    } else if (this is LocationMemoryTimeFilter.Custom) {
+        noteDate.isWithin(
+            startInclusive = startInclusive,
+            endInclusive = endInclusive,
+        )
+    } else {
+        Napier.w("Unexpected location memory filter encountered while matching notes: $this")
+        true
     }
 }
 
