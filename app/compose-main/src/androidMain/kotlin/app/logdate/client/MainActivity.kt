@@ -26,6 +26,7 @@ import app.logdate.client.launch.LaunchStage
 import app.logdate.client.launch.LaunchStageSnapshot
 import app.logdate.client.launch.markCompleted
 import app.logdate.client.launch.reduceLaunchBootstrapState
+import app.logdate.client.location.tracking.NAV_SOURCE_LOCATION_HISTORY
 import app.logdate.client.media.audio.EXTRA_NAV_SOURCE
 import app.logdate.client.media.audio.EXTRA_NOTE_ID
 import app.logdate.client.media.audio.NAV_SOURCE_AUDIO_PLAYBACK
@@ -43,6 +44,7 @@ import app.logdate.feature.core.isAppUnlocked
 import app.logdate.feature.core.restore.AndroidRestoreLauncher
 import app.logdate.feature.core.settings.updates.AppUpdateCheckTrigger
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
+import app.logdate.navigation.routes.core.LocationRoute
 import app.logdate.navigation.routes.core.NoteViewerRoute
 import io.github.aakira.napier.Napier
 import io.github.vinceglb.filekit.core.FileKit
@@ -52,6 +54,7 @@ import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import kotlin.uuid.Uuid
+import app.logdate.client.location.tracking.EXTRA_NAV_SOURCE as EXTRA_LOCATION_NAV_SOURCE
 
 /**
  * The main app activity.
@@ -353,9 +356,18 @@ class MainActivity : FragmentActivity() {
 /** Resolves the optional deep-link destination used when audio playback re-enters the app. */
 private fun resolveNavKey(intent: Intent?): NavKey? {
     if (intent == null) return null
-    if (intent.getStringExtra(EXTRA_NAV_SOURCE) != NAV_SOURCE_AUDIO_PLAYBACK) return null
-    val noteId = intent.getStringExtra(EXTRA_NOTE_ID) ?: return null
-    return runCatching { NoteViewerRoute(Uuid.parse(noteId)) }.getOrNull()
+    return when {
+        intent.getStringExtra(EXTRA_NAV_SOURCE) == NAV_SOURCE_AUDIO_PLAYBACK -> {
+            val noteId = intent.getStringExtra(EXTRA_NOTE_ID) ?: return null
+            runCatching { NoteViewerRoute(Uuid.parse(noteId)) }.getOrNull()
+        }
+
+        intent.getStringExtra(EXTRA_LOCATION_NAV_SOURCE) == NAV_SOURCE_LOCATION_HISTORY -> {
+            LocationRoute
+        }
+
+        else -> null
+    }
 }
 
 /** Compose preview for the Android activity root. */

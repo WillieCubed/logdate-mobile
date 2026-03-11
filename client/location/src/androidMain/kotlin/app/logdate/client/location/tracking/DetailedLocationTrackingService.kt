@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import androidx.core.app.NotificationCompat
 import app.logdate.client.location.ClientLocationProvider
 import app.logdate.client.location.history.LocationTracker
 import app.logdate.client.repository.location.LocationCapturePipeline
@@ -141,12 +142,14 @@ class DetailedLocationTrackingService :
         val channel =
             NotificationChannel(
                 CHANNEL_ID,
-                "Location detail tracking",
-                NotificationManager.IMPORTANCE_LOW,
+                "Location history",
+                NotificationManager.IMPORTANCE_MIN,
             ).apply {
-                description = "Keeps detailed activity tracking running in the background."
+                description = "Keeps your location history up to date in the background."
                 setSound(null, null)
                 enableVibration(false)
+                setShowBadge(false)
+                lockscreenVisibility = Notification.VISIBILITY_SECRET
             }
         manager.createNotificationChannel(channel)
     }
@@ -155,7 +158,10 @@ class DetailedLocationTrackingService :
         val launchIntent =
             packageManager.getLaunchIntentForPackage(packageName)
                 ?: Intent()
-        launchIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        launchIntent.apply {
+            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            putExtra(EXTRA_NAV_SOURCE, NAV_SOURCE_LOCATION_HISTORY)
+        }
         val pendingIntent =
             PendingIntent.getActivity(
                 this,
@@ -164,13 +170,18 @@ class DetailedLocationTrackingService :
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
 
-        return Notification
+        return NotificationCompat
             .Builder(this, CHANNEL_ID)
-            .setContentTitle("Detailed location tracking")
-            .setContentText("Capturing a denser activity trace for comparison.")
+            .setContentTitle("Location history is on")
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setContentIntent(pendingIntent)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .setSilent(true)
             .build()
     }
 }
