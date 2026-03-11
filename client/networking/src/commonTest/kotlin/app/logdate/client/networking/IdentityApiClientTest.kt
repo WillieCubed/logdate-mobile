@@ -141,4 +141,96 @@ class IdentityApiClientTest {
             assertTrue(result.isSuccess)
             assertEquals("cid-1", result.getOrThrow().single().cid)
         }
+
+    @Test
+    fun `prepareRecoverySigningKeyImport uses recovery prepare path`() =
+        runTest {
+            val client =
+                createClient(
+                    MockEngine { request ->
+                        assertEquals("/api/v1/identity/signing-key/import/recovery/prepare", request.url.encodedPath)
+                        respond(
+                            content =
+                                """
+                                {
+                                  "success": true,
+                                  "data": {
+                                    "did": "did:plc:alice123",
+                                    "handle": "alice.logdate.app",
+                                    "recoveryDidKey": "did:key:zRecovery",
+                                    "nextPublicKeyDidKey": "did:key:zNext",
+                                    "unsignedOperationJson": "{}",
+                                    "signingPayloadBase64Url": "cGF5bG9hZA"
+                                  }
+                                }
+                                """.trimIndent(),
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                        )
+                    },
+                )
+
+            val result =
+                client.prepareRecoverySigningKeyImport(
+                    accessToken = "tok-1",
+                    passphrase = "secret",
+                    exportedKey =
+                        ExportedSigningKeyDto(
+                            algorithm = "P-256",
+                            publicKeyMultibase = "zPublic",
+                            publicKeyDidKey = "did:key:zPublic",
+                            encryptedPrivateKey = "ciphertext",
+                            salt = "salt",
+                            iv = "iv",
+                        ),
+                )
+
+            assertTrue(result.isSuccess)
+            assertEquals("did:key:zRecovery", result.getOrThrow().recoveryDidKey)
+        }
+
+    @Test
+    fun `completeRecoverySigningKeyImport uses recovery complete path`() =
+        runTest {
+            val client =
+                createClient(
+                    MockEngine { request ->
+                        assertEquals("/api/v1/identity/signing-key/import/recovery/complete", request.url.encodedPath)
+                        respond(
+                            content =
+                                """
+                                {
+                                  "success": true,
+                                  "data": {
+                                    "did": "did:plc:alice123",
+                                    "handle": "alice.logdate.app",
+                                    "publicKeyDidKey": "did:key:zImported"
+                                  }
+                                }
+                                """.trimIndent(),
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                        )
+                    },
+                )
+
+            val result =
+                client.completeRecoverySigningKeyImport(
+                    accessToken = "tok-1",
+                    passphrase = "secret",
+                    exportedKey =
+                        ExportedSigningKeyDto(
+                            algorithm = "P-256",
+                            publicKeyMultibase = "zPublic",
+                            publicKeyDidKey = "did:key:zPublic",
+                            encryptedPrivateKey = "ciphertext",
+                            salt = "salt",
+                            iv = "iv",
+                        ),
+                    signature = "sig-1",
+                )
+
+            assertTrue(result.isSuccess)
+            assertEquals("did:key:zImported", result.getOrThrow().publicKeyDidKey)
+        }
 }

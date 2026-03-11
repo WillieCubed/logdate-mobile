@@ -152,7 +152,7 @@ actual val dataModule: Module =
         // Account
         single<AccountRepository> { DefaultAccountRepository(get()) { null } } // TODO: Implement proper token provider
         single<PasskeyAccountRepository> { DefaultPasskeyAccountRepository(get(), get(), get(), get(), get()) }
-        single<AccountIdentityRepository> { DefaultAccountIdentityRepository(get(), get(), get()) }
+        single<AccountIdentityRepository> { DefaultAccountIdentityRepository(get(), get(), get(), get()) }
 
         // Quota
         factory<RemoteQuotaDataSource> { StubRemoteQuotaDataSource() }

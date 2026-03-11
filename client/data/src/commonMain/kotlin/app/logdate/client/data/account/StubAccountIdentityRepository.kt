@@ -1,5 +1,6 @@
 package app.logdate.client.data.account
 
+import app.logdate.client.repository.account.AccountDerivedPlcRecoveryKey
 import app.logdate.client.repository.account.AccountExportedSigningKey
 import app.logdate.client.repository.account.AccountHostedPlcOperation
 import app.logdate.client.repository.account.AccountIdentityRepository
@@ -71,6 +72,15 @@ class StubAccountIdentityRepository : AccountIdentityRepository {
                 publicKeyDidKey = "did:key:zStubImportedKey",
             ),
         )
+
+    override suspend fun importSigningKeyWithRecovery(
+        passphrase: String,
+        exportedKeyJson: String,
+        recoveryPhrase: String,
+    ): Result<AccountImportedSigningKey> = importSigningKey(passphrase, exportedKeyJson)
+
+    override suspend fun derivePlcRecoveryDidKey(recoveryPhrase: String): Result<AccountDerivedPlcRecoveryKey> =
+        Result.success(AccountDerivedPlcRecoveryKey(recoveryDidKey = "did:key:zStubRecoveryKey"))
 
     override suspend fun registerPlcRecoveryKey(recoveryDidKey: String): Result<AccountRegisteredPlcRecoveryKey> =
         Result.success(

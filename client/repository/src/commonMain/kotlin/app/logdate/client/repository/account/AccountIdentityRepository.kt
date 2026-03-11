@@ -19,6 +19,14 @@ interface AccountIdentityRepository {
         exportedKeyJson: String,
     ): Result<AccountImportedSigningKey>
 
+    suspend fun importSigningKeyWithRecovery(
+        passphrase: String,
+        exportedKeyJson: String,
+        recoveryPhrase: String,
+    ): Result<AccountImportedSigningKey>
+
+    suspend fun derivePlcRecoveryDidKey(recoveryPhrase: String): Result<AccountDerivedPlcRecoveryKey>
+
     suspend fun registerPlcRecoveryKey(recoveryDidKey: String): Result<AccountRegisteredPlcRecoveryKey>
 }
 
@@ -74,6 +82,11 @@ data class AccountImportedSigningKey(
     val did: String,
     val handle: String,
     val publicKeyDidKey: String,
+)
+
+@Serializable
+data class AccountDerivedPlcRecoveryKey(
+    val recoveryDidKey: String,
 )
 
 @Serializable

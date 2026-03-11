@@ -39,6 +39,19 @@ interface IdentityApiClientContract {
         exportedKey: ExportedSigningKeyDto,
     ): Result<ImportSigningKeyDataDto>
 
+    suspend fun prepareRecoverySigningKeyImport(
+        accessToken: String,
+        passphrase: String,
+        exportedKey: ExportedSigningKeyDto,
+    ): Result<PrepareRecoverySigningKeyImportDataDto>
+
+    suspend fun completeRecoverySigningKeyImport(
+        accessToken: String,
+        passphrase: String,
+        exportedKey: ExportedSigningKeyDto,
+        signature: String,
+    ): Result<ImportSigningKeyDataDto>
+
     suspend fun registerPlcRecoveryKey(
         accessToken: String,
         recoveryDidKey: String,
@@ -137,6 +150,54 @@ class IdentityApiClient(
             accessToken = accessToken,
         )
 
+    override suspend fun prepareRecoverySigningKeyImport(
+        accessToken: String,
+        passphrase: String,
+        exportedKey: ExportedSigningKeyDto,
+    ): Result<PrepareRecoverySigningKeyImportDataDto> =
+        request(
+            request = { token ->
+                post("${getBaseUrl()}/identity/signing-key/import/recovery/prepare") {
+                    header("Authorization", "Bearer $token")
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        PrepareRecoverySigningKeyImportRequestDto(
+                            passphrase = passphrase,
+                            exportedKey = exportedKey,
+                        ),
+                    )
+                }
+            },
+            success = { payload -> json.decodeFromString<PrepareRecoverySigningKeyImportResponseDto>(payload).data },
+            failureMessage = "Failed to prepare signing key recovery import",
+            accessToken = accessToken,
+        )
+
+    override suspend fun completeRecoverySigningKeyImport(
+        accessToken: String,
+        passphrase: String,
+        exportedKey: ExportedSigningKeyDto,
+        signature: String,
+    ): Result<ImportSigningKeyDataDto> =
+        request(
+            request = { token ->
+                post("${getBaseUrl()}/identity/signing-key/import/recovery/complete") {
+                    header("Authorization", "Bearer $token")
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        CompleteRecoverySigningKeyImportRequestDto(
+                            passphrase = passphrase,
+                            exportedKey = exportedKey,
+                            signature = signature,
+                        ),
+                    )
+                }
+            },
+            success = { payload -> json.decodeFromString<ImportSigningKeyResponseDto>(payload).data },
+            failureMessage = "Failed to complete signing key recovery import",
+            accessToken = accessToken,
+        )
+
     override suspend fun registerPlcRecoveryKey(
         accessToken: String,
         recoveryDidKey: String,
@@ -230,6 +291,19 @@ data class ImportSigningKeyRequestDto(
 )
 
 @Serializable
+data class PrepareRecoverySigningKeyImportRequestDto(
+    val passphrase: String,
+    val exportedKey: ExportedSigningKeyDto,
+)
+
+@Serializable
+data class CompleteRecoverySigningKeyImportRequestDto(
+    val passphrase: String,
+    val exportedKey: ExportedSigningKeyDto,
+    val signature: String,
+)
+
+@Serializable
 data class RegisterPlcRecoveryKeyRequestDto(
     val recoveryDidKey: String,
 )
@@ -268,10 +342,26 @@ data class ImportSigningKeyResponseDto(
 )
 
 @Serializable
+data class PrepareRecoverySigningKeyImportResponseDto(
+    val success: Boolean,
+    val data: PrepareRecoverySigningKeyImportDataDto,
+)
+
+@Serializable
 data class ImportSigningKeyDataDto(
     val did: String,
     val handle: String,
     val publicKeyDidKey: String,
+)
+
+@Serializable
+data class PrepareRecoverySigningKeyImportDataDto(
+    val did: String,
+    val handle: String,
+    val recoveryDidKey: String,
+    val nextPublicKeyDidKey: String,
+    val unsignedOperationJson: String,
+    val signingPayloadBase64Url: String,
 )
 
 @Serializable

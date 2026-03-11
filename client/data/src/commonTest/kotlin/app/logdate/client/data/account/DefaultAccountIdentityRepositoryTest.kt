@@ -2,12 +2,14 @@ package app.logdate.client.data.account
 
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
+import app.logdate.client.device.crypto.PlcRecoveryKeyManager
 import app.logdate.client.networking.ExportSigningKeyDataDto
 import app.logdate.client.networking.ExportedSigningKeyDto
 import app.logdate.client.networking.HostedPlcOperationDataDto
 import app.logdate.client.networking.IdentityApiClientContract
 import app.logdate.client.networking.IdentityStatusDataDto
 import app.logdate.client.networking.ImportSigningKeyDataDto
+import app.logdate.client.networking.PrepareRecoverySigningKeyImportDataDto
 import app.logdate.client.networking.RegisterPlcRecoveryKeyDataDto
 import app.logdate.client.networking.RotateSigningKeyDataDto
 import app.logdate.client.repository.account.ExportedIdentitySigningKeyPayload
@@ -30,6 +32,7 @@ class DefaultAccountIdentityRepositoryTest {
                 DefaultAccountIdentityRepository(
                     apiClient = FakeIdentityApiClient(),
                     sessionStorage = FakeSessionStorage(),
+                    plcRecoveryKeyManager = FakePlcRecoveryKeyManager(),
                     json = json,
                 )
 
@@ -47,6 +50,7 @@ class DefaultAccountIdentityRepositoryTest {
                 DefaultAccountIdentityRepository(
                     apiClient = apiClient,
                     sessionStorage = FakeSessionStorage(session = TEST_SESSION),
+                    plcRecoveryKeyManager = FakePlcRecoveryKeyManager(),
                     json = json,
                 )
 
@@ -65,6 +69,7 @@ class DefaultAccountIdentityRepositoryTest {
                 DefaultAccountIdentityRepository(
                     apiClient = apiClient,
                     sessionStorage = FakeSessionStorage(session = TEST_SESSION),
+                    plcRecoveryKeyManager = FakePlcRecoveryKeyManager(),
                     json = json,
                 )
             val exportedKeyJson =
@@ -89,6 +94,61 @@ class DefaultAccountIdentityRepositoryTest {
             assertEquals("test-passphrase", apiClient.lastPassphrase)
             assertEquals("did:key:zPublic", apiClient.lastImportedExportedKey?.publicKeyDidKey)
             assertEquals("did:key:zImported", result.getOrThrow().publicKeyDidKey)
+        }
+
+    @Test
+    fun `importSigningKeyWithRecovery derives the recovery key and signs the prepared payload`() =
+        runTest {
+            val apiClient = FakeIdentityApiClient()
+            val repository =
+                DefaultAccountIdentityRepository(
+                    apiClient = apiClient,
+                    sessionStorage = FakeSessionStorage(session = TEST_SESSION),
+                    plcRecoveryKeyManager = FakePlcRecoveryKeyManager(),
+                    json = json,
+                )
+            val exportedKeyJson =
+                json.encodeToString(
+                    ExportedIdentitySigningKeyPayload(
+                        algorithm = "P-256",
+                        publicKeyMultibase = "zPublic",
+                        publicKeyDidKey = "did:key:zPublic",
+                        encryptedPrivateKey = "test-ciphertext",
+                        salt = "test-salt",
+                        iv = "test-iv",
+                    ),
+                )
+
+            val result =
+                repository.importSigningKeyWithRecovery(
+                    passphrase = "test-passphrase",
+                    exportedKeyJson = exportedKeyJson,
+                    recoveryPhrase = "one two three four five six seven eight nine ten eleven twelve",
+                )
+
+            assertTrue(result.isSuccess)
+            assertEquals("signed:payload", apiClient.lastRecoverySignature)
+            assertEquals("did:key:zImported", result.getOrThrow().publicKeyDidKey)
+        }
+
+    @Test
+    fun `derivePlcRecoveryDidKey returns the deterministic client-side did key`() =
+        runTest {
+            val repository =
+                DefaultAccountIdentityRepository(
+                    apiClient = FakeIdentityApiClient(),
+                    sessionStorage = FakeSessionStorage(session = TEST_SESSION),
+                    plcRecoveryKeyManager = FakePlcRecoveryKeyManager(),
+                    json = json,
+                )
+
+            val result =
+                repository.derivePlcRecoveryDidKey(
+                    "one two three four five six seven eight nine ten eleven twelve",
+                )
+
+            assertTrue(result.isSuccess)
+            assertEquals("did:key:zRecovery", result.getOrThrow().recoveryDidKey)
         }
 }
 
@@ -123,6 +183,7 @@ private class FakeIdentityApiClient : IdentityApiClientContract {
     var lastAccessToken: String? = null
     var lastPassphrase: String? = null
     var lastImportedExportedKey: ExportedSigningKeyDto? = null
+    var lastRecoverySignature: String? = null
 
     override suspend fun getIdentityStatus(accessToken: String): Result<IdentityStatusDataDto> {
         lastAccessToken = accessToken
@@ -218,6 +279,45 @@ private class FakeIdentityApiClient : IdentityApiClientContract {
         )
     }
 
+    override suspend fun prepareRecoverySigningKeyImport(
+        accessToken: String,
+        passphrase: String,
+        exportedKey: ExportedSigningKeyDto,
+    ): Result<PrepareRecoverySigningKeyImportDataDto> {
+        lastAccessToken = accessToken
+        lastPassphrase = passphrase
+        lastImportedExportedKey = exportedKey
+        return Result.success(
+            PrepareRecoverySigningKeyImportDataDto(
+                did = "did:plc:alice123",
+                handle = "alice.logdate.app",
+                recoveryDidKey = "did:key:zRecovery",
+                nextPublicKeyDidKey = "did:key:zImported",
+                unsignedOperationJson = """{"type":"plc_operation"}""",
+                signingPayloadBase64Url = "cGF5bG9hZA",
+            ),
+        )
+    }
+
+    override suspend fun completeRecoverySigningKeyImport(
+        accessToken: String,
+        passphrase: String,
+        exportedKey: ExportedSigningKeyDto,
+        signature: String,
+    ): Result<ImportSigningKeyDataDto> {
+        lastAccessToken = accessToken
+        lastPassphrase = passphrase
+        lastImportedExportedKey = exportedKey
+        lastRecoverySignature = signature
+        return Result.success(
+            ImportSigningKeyDataDto(
+                did = "did:plc:alice123",
+                handle = "alice.logdate.app",
+                publicKeyDidKey = "did:key:zImported",
+            ),
+        )
+    }
+
     override suspend fun registerPlcRecoveryKey(
         accessToken: String,
         recoveryDidKey: String,
@@ -231,4 +331,13 @@ private class FakeIdentityApiClient : IdentityApiClientContract {
             ),
         )
     }
+}
+
+private class FakePlcRecoveryKeyManager : PlcRecoveryKeyManager {
+    override suspend fun deriveDidKey(recoveryPhrase: List<String>): String = "did:key:zRecovery"
+
+    override suspend fun signPayload(
+        recoveryPhrase: List<String>,
+        payload: ByteArray,
+    ): String = "signed:${payload.decodeToString()}"
 }

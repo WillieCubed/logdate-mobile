@@ -1,8 +1,10 @@
 package app.logdate.client.data.account
 
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.device.crypto.PlcRecoveryKeyManager
 import app.logdate.client.networking.ExportedSigningKeyDto
 import app.logdate.client.networking.IdentityApiClientContract
+import app.logdate.client.repository.account.AccountDerivedPlcRecoveryKey
 import app.logdate.client.repository.account.AccountExportedSigningKey
 import app.logdate.client.repository.account.AccountHostedPlcOperation
 import app.logdate.client.repository.account.AccountIdentityRepository
@@ -13,13 +15,17 @@ import app.logdate.client.repository.account.AccountRotatedSigningKey
 import app.logdate.client.repository.account.ExportedIdentitySigningKeyPayload
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.json.Json
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * Default authenticated repository for first-party AT Protocol identity management.
  */
+@OptIn(ExperimentalEncodingApi::class)
 class DefaultAccountIdentityRepository(
     private val apiClient: IdentityApiClientContract,
     private val sessionStorage: SessionStorage,
+    private val plcRecoveryKeyManager: PlcRecoveryKeyManager,
     private val json: Json =
         Json {
             ignoreUnknownKeys = true
@@ -105,6 +111,56 @@ class DefaultAccountIdentityRepository(
                 }
         }
 
+    override suspend fun importSigningKeyWithRecovery(
+        passphrase: String,
+        exportedKeyJson: String,
+        recoveryPhrase: String,
+    ): Result<AccountImportedSigningKey> =
+        runWithAccessToken("import signing key with recovery") { token ->
+            val exportedKey =
+                runCatching {
+                    json.decodeFromString<ExportedIdentitySigningKeyPayload>(exportedKeyJson.trim())
+                }.getOrElse { error ->
+                    return@runWithAccessToken Result.failure(IllegalArgumentException("Invalid signing key JSON", error))
+                }
+            val recoveryWords = recoveryPhrase.trim().split(WHITESPACE_REGEX).filter(String::isNotBlank)
+            apiClient
+                .prepareRecoverySigningKeyImport(
+                    accessToken = token,
+                    passphrase = passphrase,
+                    exportedKey = exportedKey.toDto(),
+                ).mapCatching { prepared ->
+                    val derivedDidKey = plcRecoveryKeyManager.deriveDidKey(recoveryWords)
+                    require(derivedDidKey == prepared.recoveryDidKey) {
+                        "Recovery phrase does not match the registered PLC recovery key"
+                    }
+                    val signature =
+                        plcRecoveryKeyManager.signPayload(
+                            recoveryPhrase = recoveryWords,
+                            payload = decodeBase64Url(prepared.signingPayloadBase64Url),
+                        )
+                    apiClient
+                        .completeRecoverySigningKeyImport(
+                            accessToken = token,
+                            passphrase = passphrase,
+                            exportedKey = exportedKey.toDto(),
+                            signature = signature,
+                        ).getOrThrow()
+                }.map { payload ->
+                    AccountImportedSigningKey(
+                        did = payload.did,
+                        handle = payload.handle,
+                        publicKeyDidKey = payload.publicKeyDidKey,
+                    )
+                }
+        }
+
+    override suspend fun derivePlcRecoveryDidKey(recoveryPhrase: String): Result<AccountDerivedPlcRecoveryKey> =
+        runCatching {
+            val recoveryWords = recoveryPhrase.trim().split(WHITESPACE_REGEX).filter(String::isNotBlank)
+            AccountDerivedPlcRecoveryKey(recoveryDidKey = plcRecoveryKeyManager.deriveDidKey(recoveryWords))
+        }
+
     override suspend fun registerPlcRecoveryKey(recoveryDidKey: String): Result<AccountRegisteredPlcRecoveryKey> =
         runWithAccessToken("register PLC recovery key") { token ->
             apiClient.registerPlcRecoveryKey(token, recoveryDidKey).map { payload ->
@@ -130,7 +186,20 @@ class DefaultAccountIdentityRepository(
             Result.failure(error)
         }
     }
+
+    private fun decodeBase64Url(value: String): ByteArray {
+        val normalized =
+            when (value.length % 4) {
+                0 -> value
+                2 -> "$value=="
+                3 -> "$value="
+                else -> throw IllegalArgumentException("Invalid base64url payload")
+            }
+        return Base64.UrlSafe.decode(normalized)
+    }
 }
+
+private val WHITESPACE_REGEX = Regex("\\s+")
 
 private fun app.logdate.client.networking.ExportedSigningKeyDto.toRepositoryModel(): ExportedIdentitySigningKeyPayload =
     ExportedIdentitySigningKeyPayload(
