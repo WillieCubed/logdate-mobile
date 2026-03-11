@@ -26,13 +26,10 @@ class OAuthAuthorizationService(
     private val accessTokenService: OAuthAccessTokenService,
     private val nonceService: OAuthNonceService,
     private val authorizationServerIssuer: String,
+    private val runtimeStateRepository: OAuthRuntimeStateRepository = InMemoryOAuthRuntimeStateRepository(),
     private val clock: Clock = Clock.System,
     private val secureRandom: SecureRandom = SecureRandom(),
 ) : PdsOAuthService {
-    private val requestUris = mutableMapOf<String, StoredAuthorizationRequest>()
-    private val authorizationCodes = mutableMapOf<String, StoredAuthorizationCode>()
-    private val refreshTokens = mutableMapOf<String, StoredRefreshToken>()
-
     /**
      * Validates and stores a pushed authorization request.
      */
@@ -89,7 +86,7 @@ class OAuthAuthorizationService(
 
         val proof = dpopVerifier.verify(dpopProof, method = "POST", htu = htu).getOrElse { throw it }
         val requestUri = "urn:ietf:params:oauth:request_uri:${randomToken()}"
-        requestUris[requestUri] =
+        runtimeStateRepository.saveAuthorizationRequest(
             StoredAuthorizationRequest(
                 requestUri = requestUri,
                 clientId = clientId,
@@ -103,7 +100,8 @@ class OAuthAuthorizationService(
                 clientAuthKeyId = authenticatedClient.clientKeyId,
                 clientAuthKeyThumbprint = authenticatedClient.clientKeyThumbprint,
                 expiresAt = clock.now() + REQUEST_URI_TTL,
-            )
+            ),
+        )
         return PushedAuthorizationResponse(
             requestUri = requestUri,
             expiresInSeconds = REQUEST_URI_TTL.inWholeSeconds,
@@ -114,8 +112,8 @@ class OAuthAuthorizationService(
     /**
      * Returns prompt details for a stored authorization request.
      */
-    fun describeAuthorizationRequest(requestUri: String): AuthorizationPrompt {
-        val stored = requestUris.requireValidRequest(requestUri, clock)
+    suspend fun describeAuthorizationRequest(requestUri: String): AuthorizationPrompt {
+        val stored = runtimeStateRepository.requireValidRequest(requestUri, clock)
         return AuthorizationPrompt(
             requestUri = stored.requestUri,
             clientId = stored.clientId,
@@ -130,14 +128,14 @@ class OAuthAuthorizationService(
     /**
      * Approves or denies the stored authorization request.
      */
-    fun completeAuthorization(
+    suspend fun completeAuthorization(
         requestUri: String,
         subjectDid: String,
         subjectHandle: String,
         approved: Boolean,
     ): String {
-        val stored = requestUris.requireValidRequest(requestUri, clock)
-        requestUris.remove(requestUri)
+        val stored = runtimeStateRepository.requireValidRequest(requestUri, clock)
+        runtimeStateRepository.deleteAuthorizationRequest(requestUri)
 
         if (stored.loginHint != null &&
             stored.loginHint.lowercase() != subjectHandle.lowercase() &&
@@ -149,7 +147,7 @@ class OAuthAuthorizationService(
         val queryParameters =
             if (approved) {
                 val code = randomToken()
-                authorizationCodes[code] =
+                runtimeStateRepository.saveAuthorizationCode(
                     StoredAuthorizationCode(
                         code = code,
                         clientId = stored.clientId,
@@ -162,7 +160,8 @@ class OAuthAuthorizationService(
                         clientAuthKeyId = stored.clientAuthKeyId,
                         clientAuthKeyThumbprint = stored.clientAuthKeyThumbprint,
                         expiresAt = clock.now() + AUTHORIZATION_CODE_TTL,
-                    )
+                    ),
+                )
                 buildMap {
                     put("code", code)
                     stored.state?.let { put("state", it) }
@@ -190,8 +189,8 @@ class OAuthAuthorizationService(
         htu: String,
     ): OAuthTokenResponse {
         val stored =
-            authorizationCodes
-                .remove(code)
+            runtimeStateRepository
+                .takeAuthorizationCode(code)
                 ?.takeIf { clock.now() < it.expiresAt }
                 ?: throw OAuthInvalidGrantException("Authorization code is invalid or expired")
         if (stored.clientId != clientId || stored.redirectUri != redirectUri) {
@@ -234,7 +233,7 @@ class OAuthAuthorizationService(
                 keyThumbprint = proof.keyThumbprint,
             )
         val refreshToken = randomToken()
-        refreshTokens[refreshToken] =
+        runtimeStateRepository.saveRefreshToken(
             StoredRefreshToken(
                 token = refreshToken,
                 clientId = stored.clientId,
@@ -244,7 +243,8 @@ class OAuthAuthorizationService(
                 clientAuthKeyId = stored.clientAuthKeyId,
                 clientAuthKeyThumbprint = stored.clientAuthKeyThumbprint,
                 expiresAt = clock.now() + REFRESH_TOKEN_TTL,
-            )
+            ),
+        )
         return OAuthTokenResponse(
             access_token = issued.token,
             token_type = "DPoP",
@@ -267,7 +267,8 @@ class OAuthAuthorizationService(
         htu: String,
     ): OAuthTokenResponse {
         val stored =
-            refreshTokens[refreshToken]
+            runtimeStateRepository
+                .findRefreshToken(refreshToken)
                 ?.takeIf { it.revokedAt == null && clock.now() < it.expiresAt }
                 ?: throw OAuthInvalidGrantException("Refresh token is invalid or expired")
         if (stored.clientId != clientId) {
@@ -307,12 +308,13 @@ class OAuthAuthorizationService(
                 keyThumbprint = stored.dpopKeyThumbprint,
             )
         val rotatedRefreshToken = randomToken()
-        refreshTokens.remove(refreshToken)
-        refreshTokens[rotatedRefreshToken] =
+        runtimeStateRepository.deleteRefreshToken(refreshToken)
+        runtimeStateRepository.saveRefreshToken(
             stored.copy(
                 token = rotatedRefreshToken,
                 expiresAt = clock.now() + REFRESH_TOKEN_TTL,
-            )
+            ),
+        )
         return OAuthTokenResponse(
             access_token = issued.token,
             token_type = "DPoP",
@@ -334,7 +336,7 @@ class OAuthAuthorizationService(
         dpopProof: String,
         htu: String,
     ) {
-        val stored = refreshTokens[refreshToken] ?: return
+        val stored = runtimeStateRepository.findRefreshToken(refreshToken) ?: return
         if (stored.clientId != clientId) {
             throw OAuthInvalidGrantException("Refresh token does not belong to this client")
         }
@@ -364,7 +366,7 @@ class OAuthAuthorizationService(
             throw OAuthInvalidGrantException("Refresh token DPoP key did not match the original grant")
         }
 
-        refreshTokens[refreshToken] = stored.copy(revokedAt = clock.now())
+        runtimeStateRepository.revokeRefreshToken(refreshToken, clock.now())
     }
 
     /**
@@ -391,16 +393,18 @@ class OAuthAuthorizationService(
         }
 
     override fun loadAuthorizationPrompt(requestUri: String): Result<AuthorizationPrompt> =
-        runCatching { describeAuthorizationRequest(requestUri) }
+        runCatching { kotlinx.coroutines.runBlocking { describeAuthorizationRequest(requestUri) } }
 
     override fun completeAuthorization(request: AuthorizationDecisionRequest): Result<String> =
         runCatching {
-            completeAuthorization(
-                requestUri = request.requestUri,
-                subjectDid = request.subjectDid,
-                subjectHandle = request.subjectHandle,
-                approved = request.approved,
-            )
+            kotlinx.coroutines.runBlocking {
+                completeAuthorization(
+                    requestUri = request.requestUri,
+                    subjectDid = request.subjectDid,
+                    subjectHandle = request.subjectHandle,
+                    approved = request.approved,
+                )
+            }
         }
 
     override suspend fun exchangeAuthorizationCode(request: AuthorizationCodeTokenRequest): Result<OAuthTokenResponse> =
@@ -464,50 +468,6 @@ class OAuthAuthorizationService(
     }
 }
 
-/**
- * Stored request metadata surfaced to the consent UI.
- */
-private data class StoredAuthorizationRequest(
-    val requestUri: String,
-    val clientId: String,
-    val clientName: String,
-    val redirectUri: String,
-    val scope: String,
-    val state: String?,
-    val loginHint: String?,
-    val codeChallenge: String,
-    val dpopKeyThumbprint: String,
-    val clientAuthKeyId: String?,
-    val clientAuthKeyThumbprint: String?,
-    val expiresAt: kotlin.time.Instant,
-)
-
-private data class StoredAuthorizationCode(
-    val code: String,
-    val clientId: String,
-    val redirectUri: String,
-    val subjectDid: String,
-    val subjectHandle: String,
-    val scope: String,
-    val codeChallenge: String,
-    val dpopKeyThumbprint: String,
-    val clientAuthKeyId: String?,
-    val clientAuthKeyThumbprint: String?,
-    val expiresAt: kotlin.time.Instant,
-)
-
-private data class StoredRefreshToken(
-    val token: String,
-    val clientId: String,
-    val subjectDid: String,
-    val scope: String,
-    val dpopKeyThumbprint: String,
-    val clientAuthKeyId: String?,
-    val clientAuthKeyThumbprint: String?,
-    val expiresAt: kotlin.time.Instant,
-    val revokedAt: kotlin.time.Instant? = null,
-)
-
 private fun AuthenticatedOAuthClient.requireBinding(
     keyId: String?,
     keyThumbprint: String?,
@@ -517,13 +477,13 @@ private fun AuthenticatedOAuthClient.requireBinding(
     }
 }
 
-private fun MutableMap<String, StoredAuthorizationRequest>.requireValidRequest(
+private suspend fun OAuthRuntimeStateRepository.requireValidRequest(
     requestUri: String,
     clock: Clock,
 ): StoredAuthorizationRequest {
-    val stored = this[requestUri] ?: throw OAuthInvalidRequestException("request_uri is invalid or expired")
+    val stored = findAuthorizationRequest(requestUri) ?: throw OAuthInvalidRequestException("request_uri is invalid or expired")
     if (clock.now() >= stored.expiresAt) {
-        remove(requestUri)
+        deleteAuthorizationRequest(requestUri)
         throw OAuthInvalidRequestException("request_uri is invalid or expired")
     }
     return stored

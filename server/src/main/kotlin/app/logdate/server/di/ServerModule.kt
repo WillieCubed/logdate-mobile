@@ -34,6 +34,9 @@ import app.logdate.server.database.LogDateBackupsTable
 import app.logdate.server.database.LogDateCollectionRecordsTable
 import app.logdate.server.database.LogDateCollectionStatesTable
 import app.logdate.server.database.LogDateMediaRecordsTable
+import app.logdate.server.database.OAuthAuthorizationCodesTable
+import app.logdate.server.database.OAuthAuthorizationRequestsTable
+import app.logdate.server.database.OAuthRefreshTokensTable
 import app.logdate.server.database.PostgreSQLAccountIdentityRepository
 import app.logdate.server.database.PostgreSQLAccountRepository
 import app.logdate.server.database.PostgreSQLAtprotoPasswordCredentialRepository
@@ -43,6 +46,7 @@ import app.logdate.server.database.PostgreSQLLogDateAtprotoBlobRepository
 import app.logdate.server.database.PostgreSQLLogDateBackupRepository
 import app.logdate.server.database.PostgreSQLLogDateCollectionsMetadataStore
 import app.logdate.server.database.PostgreSQLLogDateMediaRepository
+import app.logdate.server.database.PostgreSQLOAuthRuntimeStateRepository
 import app.logdate.server.database.PostgreSQLPasskeyRepository
 import app.logdate.server.database.PostgreSQLRepoBlockStore
 import app.logdate.server.database.PostgreSQLSessionManager
@@ -64,6 +68,7 @@ import app.logdate.server.logdate.LogDateAtprotoBlobRepository
 import app.logdate.server.logdate.LogDateBackupRepository
 import app.logdate.server.logdate.LogDateCollectionsMetadataStore
 import app.logdate.server.logdate.LogDateMediaRepository
+import app.logdate.server.oauth.InMemoryOAuthRuntimeStateRepository
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthAuthorizationService
 import app.logdate.server.oauth.OAuthClientMetadataResolver
@@ -71,6 +76,7 @@ import app.logdate.server.oauth.OAuthConfig
 import app.logdate.server.oauth.OAuthDpopVerifier
 import app.logdate.server.oauth.OAuthKeyService
 import app.logdate.server.oauth.OAuthNonceService
+import app.logdate.server.oauth.OAuthRuntimeStateRepository
 import app.logdate.server.passkeys.InMemoryPasskeyRepository
 import app.logdate.server.passkeys.PasskeyRepository
 import app.logdate.server.passkeys.WebAuthnConfig
@@ -127,6 +133,9 @@ fun initializeDatabase(): Boolean =
                     LogDateMediaRecordsTable,
                     LogDateBackupsTable,
                     LogDateAtprotoBlobsTable,
+                    OAuthAuthorizationRequestsTable,
+                    OAuthAuthorizationCodesTable,
+                    OAuthRefreshTokensTable,
                 )
             }
         } else {
@@ -206,6 +215,13 @@ fun serverModule(isDatabaseAvailable: Boolean) =
         single { OAuthKeyService() }
         single { OAuthNonceService() }
         single { OAuthDpopVerifier() }
+        single<OAuthRuntimeStateRepository> {
+            if (isDatabaseAvailable) {
+                PostgreSQLOAuthRuntimeStateRepository()
+            } else {
+                InMemoryOAuthRuntimeStateRepository()
+            }
+        }
         single { OAuthClientMetadataResolver(httpClient = get()) }
         single { OAuthAccessTokenService(config = get(), keyService = get()) }
         single {
@@ -216,6 +232,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                 accessTokenService = get(),
                 nonceService = get(),
                 authorizationServerIssuer = config.normalizedIssuer,
+                runtimeStateRepository = get(),
             )
         }
         single {

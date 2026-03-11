@@ -22,9 +22,11 @@ import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.InMemorySigningKeyRepository
 import app.logdate.server.identity.SigningKeyService
+import app.logdate.server.logdate.CompositeLogDateMediaBlobRepository
 import app.logdate.server.logdate.InMemoryLogDateAtprotoBlobRepository
 import app.logdate.server.logdate.InMemoryLogDateBlobStorage
 import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
+import app.logdate.server.logdate.InMemoryLogDateMediaRepository
 import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthAuthorizationService
@@ -105,6 +107,12 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
     val repoBlockStore = InMemoryRepoBlockStore()
     val blobStorage = InMemoryLogDateBlobStorage()
     val atprotoBlobRepository = InMemoryLogDateAtprotoBlobRepository()
+    val mediaRepository = InMemoryLogDateMediaRepository()
+    val mediaBlobRepository =
+        CompositeLogDateMediaBlobRepository(
+            mediaRepository = mediaRepository,
+            atprotoBlobRepository = atprotoBlobRepository,
+        )
     val logDateCollectionsRepository =
         RepoBackedLogDateCollectionsRepository(
             accountRepository = accountRepository,
@@ -132,7 +140,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
         DefaultPdsBlobService(
             LogDatePdsBlobStore(
                 identityService = atprotoIdentityService,
-                blobRepository = atprotoBlobRepository,
+                mediaBlobRepository = mediaBlobRepository,
                 blobStorage = blobStorage,
             ),
         )

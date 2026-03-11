@@ -56,6 +56,57 @@ object AtprotoSessionsTable : Table("atproto_sessions") {
     }
 }
 
+object OAuthAuthorizationRequestsTable : Table("oauth_authorization_requests") {
+    val requestUri = varchar("request_uri", 255)
+    val clientId = text("client_id")
+    val clientName = varchar("client_name", 255)
+    val redirectUri = text("redirect_uri")
+    val scope = text("scope")
+    val state = text("state").nullable()
+    val loginHint = text("login_hint").nullable()
+    val codeChallenge = text("code_challenge")
+    val dpopKeyThumbprint = varchar("dpop_key_thumbprint", 255)
+    val clientAuthKeyId = text("client_auth_key_id").nullable()
+    val clientAuthKeyThumbprint = varchar("client_auth_key_thumbprint", 255).nullable()
+    val expiresAt = timestamp("expires_at")
+
+    override val primaryKey = PrimaryKey(requestUri)
+}
+
+object OAuthAuthorizationCodesTable : Table("oauth_authorization_codes") {
+    val code = varchar("code", 255)
+    val clientId = text("client_id")
+    val redirectUri = text("redirect_uri")
+    val subjectDid = varchar("subject_did", 255)
+    val subjectHandle = varchar("subject_handle", 255)
+    val scope = text("scope")
+    val codeChallenge = text("code_challenge")
+    val dpopKeyThumbprint = varchar("dpop_key_thumbprint", 255)
+    val clientAuthKeyId = text("client_auth_key_id").nullable()
+    val clientAuthKeyThumbprint = varchar("client_auth_key_thumbprint", 255).nullable()
+    val expiresAt = timestamp("expires_at")
+
+    override val primaryKey = PrimaryKey(code)
+}
+
+object OAuthRefreshTokensTable : Table("oauth_refresh_tokens") {
+    val token = varchar("token", 255)
+    val clientId = text("client_id")
+    val subjectDid = varchar("subject_did", 255)
+    val scope = text("scope")
+    val dpopKeyThumbprint = varchar("dpop_key_thumbprint", 255)
+    val clientAuthKeyId = text("client_auth_key_id").nullable()
+    val clientAuthKeyThumbprint = varchar("client_auth_key_thumbprint", 255).nullable()
+    val expiresAt = timestamp("expires_at")
+    val revokedAt = timestamp("revoked_at").nullable()
+
+    override val primaryKey = PrimaryKey(token)
+
+    init {
+        index("idx_oauth_refresh_tokens_subject", false, subjectDid)
+    }
+}
+
 @OptIn(ExperimentalUuidApi::class)
 object SigningKeysTable : Table("signing_keys") {
     val id = uuid("id").autoGenerate()

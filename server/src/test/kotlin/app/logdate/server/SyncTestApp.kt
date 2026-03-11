@@ -10,6 +10,7 @@ import app.logdate.server.logdate.InMemoryLogDateBackupRepository
 import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
 import app.logdate.server.logdate.InMemoryLogDateMediaRepository
 import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
+import app.logdate.server.logdate.asLogDateMediaBlobRepository
 import app.logdate.server.routes.syncRoutes
 import app.logdate.server.sync.GcsMediaStorage
 import app.logdate.server.sync.InMemorySyncRepository
@@ -85,7 +86,7 @@ fun TestApplicationBuilder.configureSyncTestApp(
                     metrics = metrics,
                     mediaAccessPolicy = mediaAccessPolicy,
                     collectionsRepository = collectionsRepository,
-                    mediaRepository = mediaRepository,
+                    mediaBlobRepository = mediaRepository.asLogDateMediaBlobRepository(),
                     backupRepository = backupRepository,
                 )
             }

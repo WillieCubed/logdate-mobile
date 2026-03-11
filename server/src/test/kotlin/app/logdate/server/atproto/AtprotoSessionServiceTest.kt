@@ -27,7 +27,7 @@ class AtprotoSessionServiceTest {
                         CreateAccountRequest(
                             email = "alice@example.com",
                             handle = "alice.logdate.app",
-                            password = "pass1",
+                            password = "pass-1",
                         ),
                     ).getOrThrow()
             val account = context.accountRepository.findByHandle("alice.logdate.app")
@@ -54,7 +54,7 @@ class AtprotoSessionServiceTest {
                     CreateAccountRequest(
                         email = "brie@example.com",
                         handle = "brie.logdate.app",
-                        password = "pass1",
+                        password = "pass-1",
                     ),
                 ).getOrThrow()
 
@@ -63,7 +63,7 @@ class AtprotoSessionServiceTest {
                     .createSession(
                         CreateSessionRequest(
                             identifier = "brie@example.com",
-                            password = "pass1",
+                            password = "pass-1",
                         ),
                     ).getOrThrow()
             val refreshed = context.service.refreshSession(session.refreshJwt).getOrThrow()
