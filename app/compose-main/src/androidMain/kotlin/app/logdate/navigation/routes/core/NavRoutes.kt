@@ -170,12 +170,6 @@ data object DevicesSettingsRoute : NavKey
 data object DangerZoneSettingsRoute : NavKey
 
 /**
- * Route key for the full-screen birthday settings screen.
- */
-@Serializable
-data object BirthdaySettingsRoute : NavKey
-
-/**
  * Navigation route for advanced settings (server configuration, developer options).
  */
 @Serializable
