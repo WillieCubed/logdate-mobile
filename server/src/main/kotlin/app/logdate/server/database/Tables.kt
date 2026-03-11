@@ -30,11 +30,38 @@ object AccountsTable : Table("accounts") {
 }
 
 @OptIn(ExperimentalUuidApi::class)
+object AtprotoPasswordCredentialsTable : Table("atproto_password_credentials") {
+    val accountId = uuid("account_id").references(AccountsTable.id)
+    val salt = text("salt")
+    val hash = text("hash")
+    val iterations = integer("iterations")
+    val createdAt = timestamp("created_at")
+    val updatedAt = timestamp("updated_at")
+
+    override val primaryKey = PrimaryKey(accountId)
+}
+
+@OptIn(ExperimentalUuidApi::class)
+object AtprotoSessionsTable : Table("atproto_sessions") {
+    val id = varchar("id", 64)
+    val accountId = uuid("account_id").references(AccountsTable.id)
+    val createdAt = timestamp("created_at")
+    val refreshExpiresAt = timestamp("refresh_expires_at")
+    val revokedAt = timestamp("revoked_at").nullable()
+
+    override val primaryKey = PrimaryKey(id)
+
+    init {
+        index("idx_atproto_sessions_account", false, accountId)
+    }
+}
+
+@OptIn(ExperimentalUuidApi::class)
 object SigningKeysTable : Table("signing_keys") {
     val id = uuid("id").autoGenerate()
     val accountId = uuid("account_id").references(AccountsTable.id)
     val purpose = varchar("purpose", 32).default("atproto")
-    val algorithm = varchar("algorithm", 32).default("P-256")
+    val algorithm = varchar("algorithm", 32).default("K-256")
     val publicKeyMultibase = text("public_key_multibase")
     val privateKeyEncrypted = text("private_key_encrypted")
     val createdAt = timestamp("created_at")

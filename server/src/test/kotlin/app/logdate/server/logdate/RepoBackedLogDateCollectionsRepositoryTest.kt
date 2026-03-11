@@ -28,6 +28,7 @@ class RepoBackedLogDateCollectionsRepositoryTest {
     fun `entries become canonical repo records while preserving sync change feeds`() =
         runTest {
             val accountRepository = InMemoryAccountRepository()
+            val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
             val identityService = identityService(accountRepository)
             val account =
                 identityService.ensureIdentity(
@@ -45,6 +46,7 @@ class RepoBackedLogDateCollectionsRepositoryTest {
                 RepoBackedLogDateCollectionsRepository(
                     accountRepository = accountRepository,
                     identityService = identityService,
+                    signingKeyService = signingKeyService,
                     blockStore = blockStore,
                     metadataStore = InMemoryLogDateCollectionsMetadataStore(),
                 )
@@ -100,6 +102,7 @@ class RepoBackedLogDateCollectionsRepositoryTest {
     fun `journals and associations share the same canonical repo did and status counts`() =
         runTest {
             val accountRepository = InMemoryAccountRepository()
+            val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
             val identityService = identityService(accountRepository)
             val account =
                 identityService.ensureIdentity(
@@ -117,6 +120,7 @@ class RepoBackedLogDateCollectionsRepositoryTest {
                 RepoBackedLogDateCollectionsRepository(
                     accountRepository = accountRepository,
                     identityService = identityService,
+                    signingKeyService = signingKeyService,
                     blockStore = blockStore,
                     metadataStore = InMemoryLogDateCollectionsMetadataStore(),
                 )
@@ -178,10 +182,12 @@ class RepoBackedLogDateCollectionsRepositoryTest {
     fun `missing accounts fall back to a stable synthetic repo did`() =
         runTest {
             val accountRepository = InMemoryAccountRepository()
+            val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
             val repository =
                 RepoBackedLogDateCollectionsRepository(
                     accountRepository = accountRepository,
                     identityService = identityService(accountRepository),
+                    signingKeyService = signingKeyService,
                     blockStore = InMemoryRepoBlockStore(),
                     metadataStore = InMemoryLogDateCollectionsMetadataStore(),
                 )

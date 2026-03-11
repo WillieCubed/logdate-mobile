@@ -51,12 +51,16 @@ class AtprotoInternalsTest {
 
     @Test
     fun `fixed width big integer helper pads and truncates as needed`() {
-        val helper = Class.forName("app.logdate.server.identity.SigningKeyServiceKt")
-        val method = helper.getDeclaredMethod("access\$toFixedWidth", BigInteger::class.java, Int::class.javaPrimitiveType)
+        val helper = Class.forName("studio.hypertext.atproto.crypto.EcKeySupport")
+        val instance = helper.getDeclaredField("INSTANCE").get(null)
+        val method =
+            helper
+                .getDeclaredMethod("toFixedWidth", BigInteger::class.java, Int::class.javaPrimitiveType)
+                .apply { isAccessible = true }
 
-        assertContentEquals(byteArrayOf(0, 0, 1), method.invoke(null, BigInteger.ONE, 3) as ByteArray)
-        assertContentEquals(byteArrayOf(1, 2, 3), method.invoke(null, BigInteger("010203", 16), 3) as ByteArray)
-        assertContentEquals(byteArrayOf(2, 3), method.invoke(null, BigInteger("010203", 16), 2) as ByteArray)
+        assertContentEquals(byteArrayOf(0, 0, 1), method.invoke(instance, BigInteger.ONE, 3) as ByteArray)
+        assertContentEquals(byteArrayOf(1, 2, 3), method.invoke(instance, BigInteger("010203", 16), 3) as ByteArray)
+        assertContentEquals(byteArrayOf(2, 3), method.invoke(instance, BigInteger("010203", 16), 2) as ByteArray)
     }
 
     private fun syntheticCidMethod(

@@ -1,5 +1,6 @@
 package app.logdate.server.routes
 
+import app.logdate.server.atproto.AtprotoSessionTokenService
 import app.logdate.server.atproto.InvalidSwapException
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountRepository
@@ -29,16 +30,23 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import studio.hypertext.atproto.identity.AtprotoDid
+import studio.hypertext.atproto.pds.CreateAccountRequest
 import studio.hypertext.atproto.pds.CreateRecordRequest
+import studio.hypertext.atproto.pds.CreateSessionRequest
 import studio.hypertext.atproto.pds.DeleteRecordRequest
 import studio.hypertext.atproto.pds.EmptyPdsResponse
 import studio.hypertext.atproto.pds.GetBlobRequest
+import studio.hypertext.atproto.pds.GetLatestCommitRequest
 import studio.hypertext.atproto.pds.GetRecordRequest
+import studio.hypertext.atproto.pds.GetRepoRequest
+import studio.hypertext.atproto.pds.GetRepoStatusRequest
 import studio.hypertext.atproto.pds.ListRecordsRequest
 import studio.hypertext.atproto.pds.PdsBlobService
 import studio.hypertext.atproto.pds.PdsDiscoveryService
 import studio.hypertext.atproto.pds.PdsErrorResponse
 import studio.hypertext.atproto.pds.PdsRepoService
+import studio.hypertext.atproto.pds.PdsSessionService
+import studio.hypertext.atproto.pds.PdsSyncService
 import studio.hypertext.atproto.pds.PutRecordRequest
 import studio.hypertext.atproto.pds.UploadBlobRequest
 import studio.hypertext.atproto.repo.Cid
@@ -46,6 +54,7 @@ import studio.hypertext.atproto.repo.RepoRecordId
 import studio.hypertext.atproto.repo.UnsupportedCollectionException
 import studio.hypertext.atproto.syntax.Nsid
 import studio.hypertext.atproto.syntax.RecordKey
+import studio.hypertext.atproto.syntax.Tid
 import java.util.UUID
 
 fun Route.xrpcRoutes(
@@ -54,7 +63,10 @@ fun Route.xrpcRoutes(
     accountRepository: AccountRepository? = null,
     tokenService: TokenService? = null,
     repoService: PdsRepoService? = null,
+    sessionService: PdsSessionService? = null,
+    syncService: PdsSyncService? = null,
     blobService: PdsBlobService? = null,
+    atprotoSessionTokenService: AtprotoSessionTokenService? = null,
     oauthAccessTokenService: OAuthAccessTokenService? = null,
     oauthDpopVerifier: OAuthDpopVerifier? = null,
     oauthNonceService: OAuthNonceService? = null,
@@ -84,6 +96,85 @@ fun Route.xrpcRoutes(
             }
 
             call.respond(HttpStatusCode.OK, resolved)
+        }
+
+        post("/com.atproto.server.createAccount") {
+            val sessions =
+                sessionService ?: return@post call.respond(
+                    HttpStatusCode.NotImplemented,
+                    PdsErrorResponse("Unsupported", "Session service is not configured"),
+                )
+            val request = call.receive<CreateAccountRequest>()
+            val result = sessions.createAccount(request)
+            val session = result.getOrNull()
+            if (session == null) {
+                call.respondForSessionError(result.exceptionOrNull())
+                return@post
+            }
+            call.respond(HttpStatusCode.OK, session)
+        }
+
+        post("/com.atproto.server.createSession") {
+            val sessions =
+                sessionService ?: return@post call.respond(
+                    HttpStatusCode.NotImplemented,
+                    PdsErrorResponse("Unsupported", "Session service is not configured"),
+                )
+            val request = call.receive<CreateSessionRequest>()
+            val result = sessions.createSession(request)
+            val session = result.getOrNull()
+            if (session == null) {
+                call.respondForSessionError(result.exceptionOrNull())
+                return@post
+            }
+            call.respond(HttpStatusCode.OK, session)
+        }
+
+        get("/com.atproto.server.getSession") {
+            val sessions =
+                sessionService ?: return@get call.respond(
+                    HttpStatusCode.NotImplemented,
+                    PdsErrorResponse("Unsupported", "Session service is not configured"),
+                )
+            val bearerToken = call.requireBearerToken() ?: return@get
+            val result = sessions.getSession(bearerToken)
+            val session = result.getOrNull()
+            if (session == null) {
+                call.respondForSessionError(result.exceptionOrNull())
+                return@get
+            }
+            call.respond(HttpStatusCode.OK, session)
+        }
+
+        post("/com.atproto.server.refreshSession") {
+            val sessions =
+                sessionService ?: return@post call.respond(
+                    HttpStatusCode.NotImplemented,
+                    PdsErrorResponse("Unsupported", "Session service is not configured"),
+                )
+            val bearerToken = call.requireBearerToken() ?: return@post
+            val result = sessions.refreshSession(bearerToken)
+            val session = result.getOrNull()
+            if (session == null) {
+                call.respondForSessionError(result.exceptionOrNull())
+                return@post
+            }
+            call.respond(HttpStatusCode.OK, session)
+        }
+
+        post("/com.atproto.server.deleteSession") {
+            val sessions =
+                sessionService ?: return@post call.respond(
+                    HttpStatusCode.NotImplemented,
+                    PdsErrorResponse("Unsupported", "Session service is not configured"),
+                )
+            val bearerToken = call.requireBearerToken() ?: return@post
+            val result = sessions.deleteSession(bearerToken)
+            if (result.isFailure) {
+                call.respondForSessionError(result.exceptionOrNull())
+                return@post
+            }
+            call.respond(HttpStatusCode.OK, EmptyPdsResponse())
         }
 
         get("/com.atproto.server.describeServer") {
@@ -122,6 +213,92 @@ fun Route.xrpcRoutes(
             }
 
             call.respond(HttpStatusCode.OK, repoDescription)
+        }
+
+        get("/com.atproto.sync.getRepo") {
+            val syncApi =
+                syncService ?: return@get call.respond(
+                    HttpStatusCode.NotImplemented,
+                    PdsErrorResponse("Unsupported", "Sync service is not configured"),
+                )
+            val didValue =
+                call.request.queryParameters["did"]
+                    ?.trim()
+                    .orEmpty()
+            if (didValue.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidRequest", "did is required"))
+                return@get
+            }
+            val did = AtprotoDid.parse(didValue).getOrNull()
+            val since =
+                call.request.queryParameters["since"]
+                    ?.trim()
+                    ?.takeIf(String::isNotEmpty)
+                    ?.let(Tid::parse)
+                    ?.getOrNull()
+            if (did == null || (call.request.queryParameters["since"] != null && since == null)) {
+                call.respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidRequest", "Invalid did or since"))
+                return@get
+            }
+            val result = syncApi.getRepo(GetRepoRequest(did = did, since = since))
+            val export = result.getOrNull()
+            if (export == null) {
+                call.respondForSyncError(result.exceptionOrNull())
+                return@get
+            }
+            call.respondBytes(
+                bytes = export.bytes,
+                contentType = ContentType.parse(export.contentType),
+                status = HttpStatusCode.OK,
+            )
+        }
+
+        get("/com.atproto.sync.getLatestCommit") {
+            val syncApi =
+                syncService ?: return@get call.respond(
+                    HttpStatusCode.NotImplemented,
+                    PdsErrorResponse("Unsupported", "Sync service is not configured"),
+                )
+            val didValue =
+                call.request.queryParameters["did"]
+                    ?.trim()
+                    .orEmpty()
+            val did = AtprotoDid.parse(didValue).getOrNull()
+            if (did == null) {
+                call.respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidRequest", "did is required"))
+                return@get
+            }
+            val result = syncApi.getLatestCommit(GetLatestCommitRequest(did))
+            val latestCommit = result.getOrNull()
+            if (latestCommit == null) {
+                call.respondForSyncError(result.exceptionOrNull())
+                return@get
+            }
+            call.respond(HttpStatusCode.OK, latestCommit)
+        }
+
+        get("/com.atproto.sync.getRepoStatus") {
+            val syncApi =
+                syncService ?: return@get call.respond(
+                    HttpStatusCode.NotImplemented,
+                    PdsErrorResponse("Unsupported", "Sync service is not configured"),
+                )
+            val didValue =
+                call.request.queryParameters["did"]
+                    ?.trim()
+                    .orEmpty()
+            val did = AtprotoDid.parse(didValue).getOrNull()
+            if (did == null) {
+                call.respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidRequest", "did is required"))
+                return@get
+            }
+            val result = syncApi.getRepoStatus(GetRepoStatusRequest(did))
+            val repoStatus = result.getOrNull()
+            if (repoStatus == null) {
+                call.respondForSyncError(result.exceptionOrNull())
+                return@get
+            }
+            call.respond(HttpStatusCode.OK, repoStatus)
         }
 
         get("/com.atproto.repo.getRecord") {
@@ -254,6 +431,7 @@ fun Route.xrpcRoutes(
                     identityService = identityService,
                     accountRepository = accountRepository,
                     tokenService = tokenService,
+                    atprotoSessionTokenService = atprotoSessionTokenService,
                     oauthAccessTokenService = oauthAccessTokenService,
                     oauthDpopVerifier = oauthDpopVerifier,
                     oauthNonceService = oauthNonceService,
@@ -301,6 +479,7 @@ fun Route.xrpcRoutes(
                     identityService = identityService,
                     accountRepository = accountRepository,
                     tokenService = tokenService,
+                    atprotoSessionTokenService = atprotoSessionTokenService,
                     oauthAccessTokenService = oauthAccessTokenService,
                     oauthDpopVerifier = oauthDpopVerifier,
                     oauthNonceService = oauthNonceService,
@@ -348,6 +527,7 @@ fun Route.xrpcRoutes(
                     identityService = identityService,
                     accountRepository = accountRepository,
                     tokenService = tokenService,
+                    atprotoSessionTokenService = atprotoSessionTokenService,
                     oauthAccessTokenService = oauthAccessTokenService,
                     oauthDpopVerifier = oauthDpopVerifier,
                     oauthNonceService = oauthNonceService,
@@ -392,6 +572,7 @@ fun Route.xrpcRoutes(
                     identityService = identityService,
                     accountRepository = accountRepository,
                     tokenService = tokenService,
+                    atprotoSessionTokenService = atprotoSessionTokenService,
                     oauthAccessTokenService = oauthAccessTokenService,
                     oauthDpopVerifier = oauthDpopVerifier,
                     oauthNonceService = oauthNonceService,
@@ -528,11 +709,12 @@ private suspend fun io.ktor.server.application.ApplicationCall.requireAuthentica
     identityService: AtprotoIdentityService,
     accountRepository: AccountRepository?,
     tokenService: TokenService?,
+    atprotoSessionTokenService: AtprotoSessionTokenService?,
     oauthAccessTokenService: OAuthAccessTokenService?,
     oauthDpopVerifier: OAuthDpopVerifier?,
     oauthNonceService: OAuthNonceService?,
 ): Account? {
-    if (accountRepository == null || tokenService == null) {
+    if (accountRepository == null) {
         respond(
             HttpStatusCode.NotImplemented,
             PdsErrorResponse("Unsupported", "Repo auth is not configured"),
@@ -599,8 +781,23 @@ private suspend fun io.ktor.server.application.ApplicationCall.requireAuthentica
         respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", "Missing bearer token"))
         return null
     }
+    if (atprotoSessionTokenService == null && tokenService == null) {
+        respond(
+            HttpStatusCode.NotImplemented,
+            PdsErrorResponse("Unsupported", "Repo auth is not configured"),
+        )
+        return null
+    }
 
-    val subject = tokenService.validateAccessToken(authHeader.removePrefix("Bearer ").trim())
+    val bearerToken = authHeader.removePrefix("Bearer ").trim()
+    val atprotoAccount =
+        atprotoSessionTokenService
+            ?.getAccessAccount(bearerToken, accountRepository, identityService)
+    if (atprotoAccount != null) {
+        return atprotoAccount
+    }
+
+    val subject = tokenService?.validateAccessToken(bearerToken)
     val accountId = subject?.let { runCatching { UUID.fromString(it) }.getOrNull() }
     if (accountId == null) {
         respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", "Invalid bearer token"))
@@ -627,6 +824,15 @@ private fun io.ktor.server.application.ApplicationCall.absoluteRequestUrl(): Str
             "${origin.serverHost}:${origin.serverPort}"
         }
     return "${origin.scheme}://$host${request.path()}"
+}
+
+private suspend fun io.ktor.server.application.ApplicationCall.requireBearerToken(): String? {
+    val authHeader = request.header(HttpHeaders.Authorization)
+    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", "Missing bearer token"))
+        return null
+    }
+    return authHeader.removePrefix("Bearer ").trim()
 }
 
 private const val DPOP_HEADER = "DPoP"
@@ -702,4 +908,35 @@ private suspend fun io.ktor.server.application.ApplicationCall.respondForBlobErr
         HttpStatusCode.BadRequest,
         PdsErrorResponse("InvalidRequest", error?.message ?: "Invalid blob request"),
     )
+}
+
+private suspend fun io.ktor.server.application.ApplicationCall.respondForSessionError(error: Throwable?) {
+    val message = error?.message.orEmpty()
+    when {
+        message == "UnsupportedDomain" ->
+            respond(HttpStatusCode.BadRequest, PdsErrorResponse("UnsupportedDomain", "Handle domain is not supported"))
+
+        message == "InvalidPassword" || message.contains("Password must", ignoreCase = true) ->
+            respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidPassword", "Password does not satisfy server requirements"))
+
+        message == "AccountTakedown" ->
+            respond(HttpStatusCode.Forbidden, PdsErrorResponse("AccountTakedown", "Account is not active"))
+
+        message == "InvalidToken" || message == "Invalid login" ->
+            respond(HttpStatusCode.Unauthorized, PdsErrorResponse("InvalidToken", "Authentication failed"))
+
+        else ->
+            respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidRequest", message.ifBlank { "Invalid session request" }))
+    }
+}
+
+private suspend fun io.ktor.server.application.ApplicationCall.respondForSyncError(error: Throwable?) {
+    val message = error?.message.orEmpty()
+    when {
+        message.startsWith("Unknown repo:") ->
+            respond(HttpStatusCode.NotFound, PdsErrorResponse("RepoNotFound", message))
+
+        else ->
+            respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidRequest", message.ifBlank { "Invalid sync request" }))
+    }
 }

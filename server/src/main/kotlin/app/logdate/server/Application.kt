@@ -1,6 +1,9 @@
 package app.logdate.server
 
 import app.logdate.SERVER_PORT
+import app.logdate.server.atproto.AtprotoPasswordService
+import app.logdate.server.atproto.AtprotoPdsSessionService
+import app.logdate.server.atproto.AtprotoSessionTokenService
 import app.logdate.server.atproto.LogDatePdsBlobStore
 import app.logdate.server.atproto.LogDateRepoStore
 import app.logdate.server.auth.AccountIdentityRepository
@@ -67,6 +70,7 @@ import org.koin.logger.slf4jLogger
 import studio.hypertext.atproto.pds.DescribeServerResponse
 import studio.hypertext.atproto.pds.runtime.DefaultPdsBlobService
 import studio.hypertext.atproto.pds.runtime.DefaultPdsRepoService
+import studio.hypertext.atproto.pds.runtime.DefaultPdsSyncService
 import studio.hypertext.atproto.pds.runtime.StaticPdsDiscoveryService
 import studio.hypertext.atproto.repo.RepoBlockStore
 import kotlin.uuid.ExperimentalUuidApi
@@ -131,6 +135,9 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     val oauthDpopVerifier: OAuthDpopVerifier by inject()
     val oauthAccessTokenService: OAuthAccessTokenService by inject()
     val oauthAuthorizationService: OAuthAuthorizationService by inject()
+    val atprotoPasswordService: AtprotoPasswordService by inject()
+    val atprotoSessionTokenService: AtprotoSessionTokenService by inject()
+    val atprotoPdsSessionService: AtprotoPdsSessionService by inject()
     val webAuthnConfig: WebAuthnConfig by inject()
     val repoBlockStore: RepoBlockStore by inject()
     val logDateCollectionsMetadataStore: LogDateCollectionsMetadataStore by inject()
@@ -142,6 +149,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
         RepoBackedLogDateCollectionsRepository(
             accountRepository = accountRepository,
             identityService = atprotoIdentityService,
+            signingKeyService = signingKeyService,
             blockStore = repoBlockStore,
             metadataStore = logDateCollectionsMetadataStore,
         )
@@ -149,10 +157,13 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
         LogDateRepoStore(
             collectionsRepository = logDateCollectionsRepository,
             identityService = atprotoIdentityService,
+            signingKeyService = signingKeyService,
+            accountRepository = accountRepository,
             blockStore = repoBlockStore,
         )
     atprotoIdentityService.setRepoCollectionsResolver(logDateRepoStore::collectionsForDid)
     val pdsRepoService = DefaultPdsRepoService(logDateRepoStore)
+    val pdsSyncService = DefaultPdsSyncService(logDateRepoStore)
     val pdsBlobService =
         blobStorage?.let { configuredStorage ->
             DefaultPdsBlobService(
@@ -250,7 +261,10 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
             accountRepository = accountRepository,
             tokenService = tokenService,
             repoService = pdsRepoService,
+            sessionService = atprotoPdsSessionService,
+            syncService = pdsSyncService,
             blobService = pdsBlobService,
+            atprotoSessionTokenService = atprotoSessionTokenService,
             oauthAccessTokenService = oauthAccessTokenService,
             oauthDpopVerifier = oauthDpopVerifier,
             oauthNonceService = oauthNonceService,

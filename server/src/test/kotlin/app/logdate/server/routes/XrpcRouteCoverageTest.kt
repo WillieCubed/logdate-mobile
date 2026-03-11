@@ -1,5 +1,7 @@
 package app.logdate.server.routes
 
+import app.logdate.server.atproto.AtprotoSessionTokenService
+import app.logdate.server.atproto.InMemoryAtprotoSessionRepository
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.InMemoryAccountRepository
@@ -41,15 +43,27 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.identity.DidDocument
+import studio.hypertext.atproto.pds.CreateAccountRequest
 import studio.hypertext.atproto.pds.CreateRecordRequest
+import studio.hypertext.atproto.pds.CreateSessionRequest
 import studio.hypertext.atproto.pds.DeleteRecordRequest
 import studio.hypertext.atproto.pds.DescribeRepoResponse
 import studio.hypertext.atproto.pds.DescribeServerResponse
 import studio.hypertext.atproto.pds.EmptyPdsResponse
+import studio.hypertext.atproto.pds.GetLatestCommitRequest
+import studio.hypertext.atproto.pds.GetLatestCommitResponse
+import studio.hypertext.atproto.pds.GetRepoRequest
+import studio.hypertext.atproto.pds.GetRepoStatusRequest
+import studio.hypertext.atproto.pds.GetRepoStatusResponse
 import studio.hypertext.atproto.pds.ListRecordsResponse
 import studio.hypertext.atproto.pds.PdsErrorResponse
+import studio.hypertext.atproto.pds.PdsSessionService
+import studio.hypertext.atproto.pds.PdsSyncService
 import studio.hypertext.atproto.pds.PutRecordRequest
+import studio.hypertext.atproto.pds.RepoExportResponse
 import studio.hypertext.atproto.pds.ResolveHandleResponse
+import studio.hypertext.atproto.pds.SessionInfoResponse
+import studio.hypertext.atproto.pds.SessionResponse
 import studio.hypertext.atproto.pds.runtime.DefaultPdsRepoService
 import studio.hypertext.atproto.repo.Cid
 import studio.hypertext.atproto.repo.RepoEngine
@@ -65,6 +79,7 @@ import studio.hypertext.atproto.repo.UnsupportedCollectionException
 import studio.hypertext.atproto.syntax.AtUri
 import studio.hypertext.atproto.syntax.Nsid
 import studio.hypertext.atproto.syntax.RecordKey
+import studio.hypertext.atproto.syntax.Tid
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 import kotlin.coroutines.intrinsics.suspendCoroutineUninterceptedOrReturn
@@ -962,6 +977,155 @@ class XrpcRouteCoverageTest {
             assertEquals(null, missingRecordId)
         }
 
+    @Test
+    fun `xrpc routes proxy standard session endpoints`() =
+        testApplication {
+            val sessionService = StubSessionService()
+            configureXrpcApp(
+                repoRecordStore = StubRepoRecordStore(),
+                sessionService = sessionService,
+            )
+
+            val createdAccount =
+                client.post("/xrpc/com.atproto.server.createAccount") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """
+                        {
+                          "email": "alice@example.com",
+                          "handle": "alice.logdate.app",
+                          "password": "pass1"
+                        }
+                        """.trimIndent(),
+                    )
+                }
+            val createdSession =
+                client.post("/xrpc/com.atproto.server.createSession") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """
+                        {
+                          "identifier": "alice@example.com",
+                          "password": "pass1"
+                        }
+                        """.trimIndent(),
+                    )
+                }
+            val fetchedSession =
+                client.get("/xrpc/com.atproto.server.getSession") {
+                    header(HttpHeaders.Authorization, "Bearer hosted-access")
+                }
+            val refreshedSession =
+                client.post("/xrpc/com.atproto.server.refreshSession") {
+                    header(HttpHeaders.Authorization, "Bearer hosted-refresh")
+                }
+            val deletedSession =
+                client.post("/xrpc/com.atproto.server.deleteSession") {
+                    header(HttpHeaders.Authorization, "Bearer hosted-refresh")
+                }
+
+            assertEquals(HttpStatusCode.OK, createdAccount.status)
+            assertEquals(HttpStatusCode.OK, createdSession.status)
+            assertEquals(HttpStatusCode.OK, fetchedSession.status)
+            assertEquals(HttpStatusCode.OK, refreshedSession.status)
+            assertEquals(HttpStatusCode.OK, deletedSession.status)
+            assertEquals("alice.logdate.app", sessionService.lastCreateAccountRequest?.handle)
+            assertEquals("alice@example.com", sessionService.lastCreateSessionRequest?.identifier)
+            assertEquals("hosted-access", sessionService.lastAccessToken)
+            assertEquals("hosted-refresh", sessionService.lastRefreshToken)
+            assertEquals("hosted-refresh", sessionService.deletedRefreshToken)
+        }
+
+    @Test
+    fun `xrpc routes proxy standard sync export endpoints`() =
+        testApplication {
+            val syncService = StubSyncService()
+            configureXrpcApp(
+                repoRecordStore = StubRepoRecordStore(),
+                syncService = syncService,
+            )
+
+            val repoResponse =
+                client.get("/xrpc/com.atproto.sync.getRepo?did=did:web:alice.logdate.app&since=${Tid.fromLong(5L)}")
+            val latestCommit = client.get("/xrpc/com.atproto.sync.getLatestCommit?did=did:web:alice.logdate.app")
+            val repoStatus = client.get("/xrpc/com.atproto.sync.getRepoStatus?did=did:web:alice.logdate.app")
+
+            assertEquals(HttpStatusCode.OK, repoResponse.status)
+            assertEquals("application/vnd.ipld.car", repoResponse.contentType().toString())
+            assertEquals("car-bytes", repoResponse.bodyAsText())
+            assertEquals("did:web:alice.logdate.app", syncService.lastGetRepoRequest?.did.toString())
+            assertEquals(5L, syncService.lastGetRepoRequest?.since?.toLong())
+            assertEquals("did:web:alice.logdate.app", syncService.lastGetLatestCommitRequest?.did.toString())
+            assertEquals("did:web:alice.logdate.app", syncService.lastGetRepoStatusRequest?.did.toString())
+            assertEquals(
+                "bafyreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku",
+                json
+                    .parseToJsonElement(latestCommit.bodyAsText())
+                    .jsonObject["cid"]
+                    ?.jsonPrimitive
+                    ?.content,
+            )
+            assertEquals(
+                Tid.fromLong(9L).toString(),
+                json
+                    .parseToJsonElement(repoStatus.bodyAsText())
+                    .jsonObject["rev"]
+                    ?.jsonPrimitive
+                    ?.content,
+            )
+        }
+
+    @Test
+    fun `xrpc repo routes accept hosted atproto session bearer tokens`() =
+        testApplication {
+            val store = StubRepoRecordStore()
+            val atprotoSessionTokenService = AtprotoSessionTokenService(InMemoryAtprotoSessionRepository(), secret = "test")
+            val env =
+                configureXrpcApp(
+                    repoRecordStore = store,
+                    tokenService = null,
+                    atprotoSessionTokenService = atprotoSessionTokenService,
+                )
+            val account =
+                runBlocking {
+                    env.accountRepository.save(
+                        Account(
+                            id = Uuid.random(),
+                            username = "session-user",
+                            displayName = "Session User",
+                            createdAt = Clock.System.now(),
+                        ),
+                    )
+                }
+            val ensuredAccount = runBlocking { env.identityService.ensureIdentity(account) }
+            val session = runBlocking { atprotoSessionTokenService.createSession(ensuredAccount) }
+
+            val created =
+                client.post("/xrpc/com.atproto.repo.createRecord") {
+                    contentType(ContentType.Application.Json)
+                    header(HttpHeaders.Authorization, "Bearer ${session.accessJwt}")
+                    setBody(
+                        """
+                        {
+                          "repo": "${ensuredAccount.did}",
+                          "collection": "studio.hypertext.logdate.content",
+                          "record": { "type": "TEXT" }
+                        }
+                        """.trimIndent(),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.OK, created.status)
+            assertEquals(
+                "bafy-create",
+                json
+                    .parseToJsonElement(created.bodyAsText())
+                    .jsonObject["cid"]
+                    ?.jsonPrimitive
+                    ?.content,
+            )
+        }
+
     private suspend fun invokeSuspendingMethod(
         target: Any?,
         method: java.lang.reflect.Method,
@@ -980,6 +1144,9 @@ class XrpcRouteCoverageTest {
         repoRecordStore: RepoEngine,
         accountRepository: AccountRepository? = InMemoryAccountRepository(),
         tokenService: JwtTokenService? = JwtTokenService("xrpc-route-coverage-secret"),
+        sessionService: PdsSessionService? = null,
+        syncService: PdsSyncService? = null,
+        atprotoSessionTokenService: AtprotoSessionTokenService? = null,
     ): XrpcCoverageEnvironment {
         val concreteAccountRepository = accountRepository ?: InMemoryAccountRepository()
         val identityService = identityService(concreteAccountRepository)
@@ -998,6 +1165,9 @@ class XrpcRouteCoverageTest {
                     accountRepository = accountRepository,
                     tokenService = tokenService,
                     repoService = DefaultPdsRepoService(repoRecordStore),
+                    sessionService = sessionService,
+                    syncService = syncService,
+                    atprotoSessionTokenService = atprotoSessionTokenService,
                     oauthAccessTokenService = oauthAccessTokenService,
                     oauthDpopVerifier = oauthDpopVerifier,
                     oauthNonceService = oauthNonceService,
@@ -1013,6 +1183,91 @@ class XrpcRouteCoverageTest {
             oauthDpopVerifier = oauthDpopVerifier,
             oauthAccessTokenService = oauthAccessTokenService,
         )
+    }
+
+    private class StubSessionService : PdsSessionService {
+        var lastCreateAccountRequest: CreateAccountRequest? = null
+        var lastCreateSessionRequest: CreateSessionRequest? = null
+        var lastAccessToken: String? = null
+        var lastRefreshToken: String? = null
+        var deletedRefreshToken: String? = null
+
+        private val sessionInfo =
+            SessionInfoResponse(
+                handle = "alice.logdate.app",
+                did = AtprotoDid.require("did:web:alice.logdate.app"),
+                active = true,
+            )
+        private val sessionResponse =
+            SessionResponse(
+                accessJwt = "hosted-access",
+                refreshJwt = "hosted-refresh",
+                handle = "alice.logdate.app",
+                did = sessionInfo.did,
+                active = true,
+            )
+
+        override suspend fun createAccount(request: CreateAccountRequest): Result<SessionResponse> {
+            lastCreateAccountRequest = request
+            return Result.success(sessionResponse)
+        }
+
+        override suspend fun createSession(request: CreateSessionRequest): Result<SessionResponse> {
+            lastCreateSessionRequest = request
+            return Result.success(sessionResponse)
+        }
+
+        override suspend fun getSession(accessJwt: String): Result<SessionInfoResponse> {
+            lastAccessToken = accessJwt
+            return Result.success(sessionInfo)
+        }
+
+        override suspend fun refreshSession(refreshJwt: String): Result<SessionResponse> {
+            lastRefreshToken = refreshJwt
+            return Result.success(sessionResponse)
+        }
+
+        override suspend fun deleteSession(refreshJwt: String): Result<Unit> {
+            deletedRefreshToken = refreshJwt
+            return Result.success(Unit)
+        }
+    }
+
+    private class StubSyncService : PdsSyncService {
+        var lastGetRepoRequest: GetRepoRequest? = null
+        var lastGetLatestCommitRequest: GetLatestCommitRequest? = null
+        var lastGetRepoStatusRequest: GetRepoStatusRequest? = null
+
+        override suspend fun getRepo(request: GetRepoRequest): Result<RepoExportResponse?> {
+            lastGetRepoRequest = request
+            return Result.success(
+                RepoExportResponse(
+                    contentType = "application/vnd.ipld.car",
+                    bytes = "car-bytes".encodeToByteArray(),
+                ),
+            )
+        }
+
+        override suspend fun getLatestCommit(request: GetLatestCommitRequest): Result<GetLatestCommitResponse?> {
+            lastGetLatestCommitRequest = request
+            return Result.success(
+                GetLatestCommitResponse(
+                    cid = Cid.require("bafyreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"),
+                    rev = Tid.fromLong(9L),
+                ),
+            )
+        }
+
+        override suspend fun getRepoStatus(request: GetRepoStatusRequest): Result<GetRepoStatusResponse?> {
+            lastGetRepoStatusRequest = request
+            return Result.success(
+                GetRepoStatusResponse(
+                    did = request.did,
+                    active = true,
+                    rev = Tid.fromLong(9L),
+                ),
+            )
+        }
     }
 
     private fun identityService(accountRepository: AccountRepository): AtprotoIdentityService =
@@ -1120,7 +1375,10 @@ class XrpcRouteCoverageTest {
             limit: Int,
         ): Result<List<SignedRepoCommit>> = listCommitsResult
 
-        override suspend fun export(repo: AtprotoDid): Result<RepoExport> = exportResult
+        override suspend fun export(
+            repo: AtprotoDid,
+            since: Tid?,
+        ): Result<RepoExport> = exportResult
 
         override suspend fun import(export: RepoExport): Result<RepoHead> = Result.success(export.head)
 

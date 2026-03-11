@@ -1,6 +1,13 @@
 package app.logdate.server.di
 
 import app.logdate.server.ServerDescriptorConfig
+import app.logdate.server.atproto.AtprotoPasswordCredentialRepository
+import app.logdate.server.atproto.AtprotoPasswordService
+import app.logdate.server.atproto.AtprotoPdsSessionService
+import app.logdate.server.atproto.AtprotoSessionRepository
+import app.logdate.server.atproto.AtprotoSessionTokenService
+import app.logdate.server.atproto.InMemoryAtprotoPasswordCredentialRepository
+import app.logdate.server.atproto.InMemoryAtprotoSessionRepository
 import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.AuthMetricsRegistry
@@ -14,10 +21,12 @@ import app.logdate.server.auth.SessionManager
 import app.logdate.server.database.AccountIdentitiesTable
 import app.logdate.server.database.AccountLinkEventsTable
 import app.logdate.server.database.AccountsTable
+import app.logdate.server.database.AtprotoPasswordCredentialsTable
 import app.logdate.server.database.AtprotoRepoBlockLinksTable
 import app.logdate.server.database.AtprotoRepoBlocksTable
 import app.logdate.server.database.AtprotoRepoCommitsTable
 import app.logdate.server.database.AtprotoRepoHeadsTable
+import app.logdate.server.database.AtprotoSessionsTable
 import app.logdate.server.database.DatabaseConfig
 import app.logdate.server.database.HostedPlcOperationsTable
 import app.logdate.server.database.LogDateAtprotoBlobsTable
@@ -27,6 +36,8 @@ import app.logdate.server.database.LogDateCollectionStatesTable
 import app.logdate.server.database.LogDateMediaRecordsTable
 import app.logdate.server.database.PostgreSQLAccountIdentityRepository
 import app.logdate.server.database.PostgreSQLAccountRepository
+import app.logdate.server.database.PostgreSQLAtprotoPasswordCredentialRepository
+import app.logdate.server.database.PostgreSQLAtprotoSessionRepository
 import app.logdate.server.database.PostgreSQLHostedPlcOperationRepository
 import app.logdate.server.database.PostgreSQLLogDateAtprotoBlobRepository
 import app.logdate.server.database.PostgreSQLLogDateBackupRepository
@@ -96,6 +107,8 @@ fun initializeDatabase(): Boolean =
             transaction {
                 SchemaUtils.createMissingTablesAndColumns(
                     AccountsTable,
+                    AtprotoPasswordCredentialsTable,
+                    AtprotoSessionsTable,
                     ContentSyncTable,
                     JournalSyncTable,
                     AssociationSyncTable,
@@ -134,6 +147,22 @@ fun serverModule(isDatabaseAvailable: Boolean) =
     module {
         single<AccountRepository> {
             if (isDatabaseAvailable) PostgreSQLAccountRepository() else InMemoryAccountRepository()
+        }
+
+        single<AtprotoPasswordCredentialRepository> {
+            if (isDatabaseAvailable) {
+                PostgreSQLAtprotoPasswordCredentialRepository()
+            } else {
+                InMemoryAtprotoPasswordCredentialRepository()
+            }
+        }
+
+        single<AtprotoSessionRepository> {
+            if (isDatabaseAvailable) {
+                PostgreSQLAtprotoSessionRepository()
+            } else {
+                InMemoryAtprotoSessionRepository()
+            }
         }
 
         single<AccountIdentityRepository> {
@@ -180,11 +209,13 @@ fun serverModule(isDatabaseAvailable: Boolean) =
         single { OAuthClientMetadataResolver(httpClient = get()) }
         single { OAuthAccessTokenService(config = get(), keyService = get()) }
         single {
+            val config: OAuthConfig = get()
             OAuthAuthorizationService(
                 clientMetadataResolver = get(),
                 dpopVerifier = get(),
                 accessTokenService = get(),
                 nonceService = get(),
+                authorizationServerIssuer = config.normalizedIssuer,
             )
         }
         single {
@@ -218,6 +249,16 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                 signingKeyService = get(),
                 config = get(),
                 plcIdentityService = get(),
+            )
+        }
+        single { AtprotoPasswordService(repository = get()) }
+        single { AtprotoSessionTokenService(sessionRepository = get()) }
+        single {
+            AtprotoPdsSessionService(
+                accountRepository = get(),
+                identityService = get(),
+                passwordService = get(),
+                sessionTokenService = get(),
             )
         }
 

@@ -1,5 +1,10 @@
 package app.logdate.server
 
+import app.logdate.server.atproto.AtprotoPasswordService
+import app.logdate.server.atproto.AtprotoPdsSessionService
+import app.logdate.server.atproto.AtprotoSessionTokenService
+import app.logdate.server.atproto.InMemoryAtprotoPasswordCredentialRepository
+import app.logdate.server.atproto.InMemoryAtprotoSessionRepository
 import app.logdate.server.atproto.LogDatePdsBlobStore
 import app.logdate.server.atproto.LogDateRepoStore
 import app.logdate.server.auth.AccountIdentityRepository
@@ -50,6 +55,7 @@ import kotlinx.serialization.modules.SerializersModule
 import studio.hypertext.atproto.pds.DescribeServerResponse
 import studio.hypertext.atproto.pds.runtime.DefaultPdsBlobService
 import studio.hypertext.atproto.pds.runtime.DefaultPdsRepoService
+import studio.hypertext.atproto.pds.runtime.DefaultPdsSyncService
 import studio.hypertext.atproto.pds.runtime.StaticPdsDiscoveryService
 import studio.hypertext.atproto.repo.InMemoryRepoBlockStore
 import kotlin.uuid.ExperimentalUuidApi
@@ -88,6 +94,8 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
 ): AuthV1TestEnvironment {
     val verifier: GoogleIdTokenVerifier = googleIdTokenVerifier ?: FakeGoogleIdTokenVerifier(googleClaimsByToken)
     val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-signing-key-kek")
+    val atprotoPasswordService = AtprotoPasswordService(InMemoryAtprotoPasswordCredentialRepository())
+    val atprotoSessionTokenService = AtprotoSessionTokenService(InMemoryAtprotoSessionRepository(), secret = "test")
     val atprotoIdentityService =
         AtprotoIdentityService(
             accountRepository = accountRepository,
@@ -101,6 +109,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
         RepoBackedLogDateCollectionsRepository(
             accountRepository = accountRepository,
             identityService = atprotoIdentityService,
+            signingKeyService = signingKeyService,
             blockStore = repoBlockStore,
             metadataStore = InMemoryLogDateCollectionsMetadataStore(),
         )
@@ -108,6 +117,8 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
         LogDateRepoStore(
             collectionsRepository = logDateCollectionsRepository,
             identityService = atprotoIdentityService,
+            signingKeyService = signingKeyService,
+            accountRepository = accountRepository,
             blockStore = repoBlockStore,
         )
     atprotoIdentityService.setRepoCollectionsResolver(logDateRepoStore::collectionsForDid)
@@ -116,6 +127,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
     val oauthDpopVerifier = OAuthDpopVerifier()
     val oauthAccessTokenService = OAuthAccessTokenService(config = oauthConfig, keyService = oauthKeyService)
     val pdsRepoService = DefaultPdsRepoService(logDateRepoStore)
+    val pdsSyncService = DefaultPdsSyncService(logDateRepoStore)
     val pdsBlobService =
         DefaultPdsBlobService(
             LogDatePdsBlobStore(
@@ -123,6 +135,13 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
                 blobRepository = atprotoBlobRepository,
                 blobStorage = blobStorage,
             ),
+        )
+    val pdsSessionService =
+        AtprotoPdsSessionService(
+            accountRepository = accountRepository,
+            identityService = atprotoIdentityService,
+            passwordService = atprotoPasswordService,
+            sessionTokenService = atprotoSessionTokenService,
         )
     val pdsDiscoveryService =
         StaticPdsDiscoveryService(
@@ -143,6 +162,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
             dpopVerifier = oauthDpopVerifier,
             accessTokenService = oauthAccessTokenService,
             nonceService = oauthNonceService,
+            authorizationServerIssuer = oauthConfig.normalizedIssuer,
         )
 
     val json =
@@ -177,7 +197,10 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
                 accountRepository = accountRepository,
                 tokenService = tokenService,
                 repoService = pdsRepoService,
+                sessionService = pdsSessionService,
+                syncService = pdsSyncService,
                 blobService = pdsBlobService,
+                atprotoSessionTokenService = atprotoSessionTokenService,
                 oauthAccessTokenService = oauthAccessTokenService,
                 oauthDpopVerifier = oauthDpopVerifier,
                 oauthNonceService = oauthNonceService,

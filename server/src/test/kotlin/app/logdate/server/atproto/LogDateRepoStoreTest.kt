@@ -34,6 +34,7 @@ class LogDateRepoStoreTest {
     fun `repo store stays stable across instances and clears when records are deleted`() =
         runTest {
             val accountRepository = InMemoryAccountRepository()
+            val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
             val identityService = identityService(accountRepository)
             val account =
                 identityService.ensureIdentity(
@@ -52,6 +53,7 @@ class LogDateRepoStoreTest {
                 RepoBackedLogDateCollectionsRepository(
                     accountRepository = accountRepository,
                     identityService = identityService,
+                    signingKeyService = signingKeyService,
                     blockStore = blockStore,
                     metadataStore = InMemoryLogDateCollectionsMetadataStore(),
                 )
@@ -59,6 +61,8 @@ class LogDateRepoStoreTest {
                 LogDateRepoStore(
                     collectionsRepository = collectionsRepository,
                     identityService = identityService,
+                    signingKeyService = signingKeyService,
+                    accountRepository = accountRepository,
                     blockStore = blockStore,
                 )
 
@@ -88,6 +92,8 @@ class LogDateRepoStoreTest {
                 LogDateRepoStore(
                     collectionsRepository = collectionsRepository,
                     identityService = identityService,
+                    signingKeyService = signingKeyService,
+                    accountRepository = accountRepository,
                     blockStore = blockStore,
                 )
 
@@ -123,6 +129,7 @@ class LogDateRepoStoreTest {
     fun `repo reads reflect writes performed through the canonical collections repository`() =
         runTest {
             val accountRepository = InMemoryAccountRepository()
+            val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
             val identityService = identityService(accountRepository)
             val account =
                 identityService.ensureIdentity(
@@ -141,6 +148,7 @@ class LogDateRepoStoreTest {
                 RepoBackedLogDateCollectionsRepository(
                     accountRepository = accountRepository,
                     identityService = identityService,
+                    signingKeyService = signingKeyService,
                     blockStore = blockStore,
                     metadataStore = InMemoryLogDateCollectionsMetadataStore(),
                 )
@@ -148,6 +156,8 @@ class LogDateRepoStoreTest {
                 LogDateRepoStore(
                     collectionsRepository = collectionsRepository,
                     identityService = identityService,
+                    signingKeyService = signingKeyService,
+                    accountRepository = accountRepository,
                     blockStore = blockStore,
                 )
 

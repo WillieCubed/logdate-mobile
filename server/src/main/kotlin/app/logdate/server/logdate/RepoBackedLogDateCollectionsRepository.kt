@@ -2,9 +2,11 @@
 
 package app.logdate.server.logdate
 
+import app.logdate.server.atproto.HostedRepoCommitSigner
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.database.toKotlinUuid
 import app.logdate.server.identity.AtprotoIdentityService
+import app.logdate.server.identity.SigningKeyService
 import io.github.aakira.napier.Napier
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.repo.DefaultRepoEngine
@@ -24,10 +26,11 @@ import kotlin.uuid.ExperimentalUuidApi
 internal class RepoBackedLogDateCollectionsRepository(
     private val accountRepository: AccountRepository,
     private val identityService: AtprotoIdentityService,
+    signingKeyService: SigningKeyService,
     blockStore: RepoBlockStore,
     private val metadataStore: LogDateCollectionsMetadataStore,
 ) : LogDateCollectionsRepository {
-    private val repoEngine = DefaultRepoEngine(blockStore)
+    private val repoEngine = DefaultRepoEngine(blockStore, signer = HostedRepoCommitSigner(accountRepository, signingKeyService))
 
     override suspend fun status(userId: UUID): LogDateCollectionsStatus = metadataStore.status(userId)
 

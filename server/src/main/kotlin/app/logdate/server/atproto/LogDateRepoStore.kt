@@ -2,8 +2,10 @@
 
 package app.logdate.server.atproto
 
+import app.logdate.server.auth.AccountRepository
 import app.logdate.server.database.toJavaUUID
 import app.logdate.server.identity.AtprotoIdentityService
+import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.logdate.DEFAULT_CONTENT_TYPE
 import app.logdate.server.logdate.DEFAULT_DURATION_MS
 import app.logdate.server.logdate.LogDateAssociation
@@ -38,6 +40,7 @@ import studio.hypertext.atproto.repo.SignedRepoCommit
 import studio.hypertext.atproto.repo.UnsupportedCollectionException
 import studio.hypertext.atproto.syntax.Nsid
 import studio.hypertext.atproto.syntax.RecordKey
+import studio.hypertext.atproto.syntax.Tid
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -50,9 +53,11 @@ import kotlin.uuid.Uuid
 class LogDateRepoStore(
     private val collectionsRepository: LogDateCollectionsRepository,
     private val identityService: AtprotoIdentityService,
+    signingKeyService: SigningKeyService,
+    accountRepository: AccountRepository,
     blockStore: RepoBlockStore,
 ) : RepoEngine {
-    private val canonicalEngine = DefaultRepoEngine(blockStore)
+    private val canonicalEngine = DefaultRepoEngine(blockStore, signer = HostedRepoCommitSigner(accountRepository, signingKeyService))
 
     suspend fun collectionsForDid(did: String): List<Nsid> {
         val userId = resolveUserId(AtprotoDid.require(did))
@@ -156,10 +161,13 @@ class LogDateRepoStore(
             canonicalEngine.listCommits(repo, limit).getOrThrow()
         }
 
-    override suspend fun export(repo: AtprotoDid): Result<RepoExport> =
+    override suspend fun export(
+        repo: AtprotoDid,
+        since: Tid?,
+    ): Result<RepoExport> =
         runCatching {
             requireKnownRepo(repo)
-            canonicalEngine.export(repo).getOrThrow()
+            canonicalEngine.export(repo, since).getOrThrow()
         }
 
     override suspend fun import(export: RepoExport): Result<RepoHead> =

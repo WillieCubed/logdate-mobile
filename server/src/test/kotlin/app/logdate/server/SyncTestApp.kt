@@ -45,16 +45,18 @@ fun TestApplicationBuilder.configureSyncTestApp(
     mediaAccessPolicy: MediaAccessPolicy = MediaAccessPolicy(useSignedUrls = false, signedUrlTtlHours = 1),
 ): SyncTestEnvironment {
     val accountRepository = InMemoryAccountRepository()
+    val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "sync-test-kek")
     val atprotoIdentityService =
         AtprotoIdentityService(
             accountRepository = accountRepository,
-            signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "sync-test-kek"),
+            signingKeyService = signingKeyService,
             config = AtprotoIdentityConfig(handleDomain = "logdate.app", pdsServiceEndpoint = "https://logdate.app"),
         )
     val collectionsRepository =
         RepoBackedLogDateCollectionsRepository(
             accountRepository = accountRepository,
             identityService = atprotoIdentityService,
+            signingKeyService = signingKeyService,
             blockStore = InMemoryRepoBlockStore(),
             metadataStore = InMemoryLogDateCollectionsMetadataStore(),
         )

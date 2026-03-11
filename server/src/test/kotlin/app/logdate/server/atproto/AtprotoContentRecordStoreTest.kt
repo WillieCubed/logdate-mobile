@@ -612,10 +612,12 @@ class AtprotoContentRecordStoreTest {
         identityService: AtprotoIdentityService,
     ): CanonicalStoreContext {
         val blockStore = InMemoryRepoBlockStore()
+        val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
         val collectionsRepository =
             RepoBackedLogDateCollectionsRepository(
                 accountRepository = accountRepository,
                 identityService = identityService,
+                signingKeyService = signingKeyService,
                 blockStore = blockStore,
                 metadataStore = InMemoryLogDateCollectionsMetadataStore(),
             )
@@ -625,6 +627,8 @@ class AtprotoContentRecordStoreTest {
                 AtprotoContentRecordStore(
                     collectionsRepository = collectionsRepository,
                     identityService = identityService,
+                    signingKeyService = signingKeyService,
+                    accountRepository = accountRepository,
                     blockStore = blockStore,
                 ),
         )
