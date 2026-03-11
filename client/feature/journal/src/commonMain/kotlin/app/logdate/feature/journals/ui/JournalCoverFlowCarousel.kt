@@ -57,7 +57,7 @@ fun JournalCoverFlowCarousel(
 
         val widthFromViewport = (maxWidth * 0.52f).coerceIn(cardMinWidth, cardMaxWidth)
         val widthFromHeight =
-            if (maxCardHeight.isSpecified) {
+            if (maxCardHeight != Dp.Unspecified) {
                 val verticalPadding = Spacing.sm * 2
                 val baseCardHeight =
                     ((maxCardHeight - verticalPadding).coerceAtLeast(1.dp) / maxCardScale)
