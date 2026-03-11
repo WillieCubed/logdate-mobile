@@ -138,8 +138,12 @@ fun AccountSettings_Default() {
             onExportSigningKey = {},
             onRotateSigningKey = {},
             onImportSigningKey = { _, _ -> },
+            onImportSigningKeyWithRecovery = { _, _, _ -> },
+            onDerivePlcRecoveryKey = {},
             onRegisterPlcRecoveryKey = {},
+            onRegisterDerivedPlcRecoveryKey = {},
             onClearIdentityActionState = {},
+            onClearDerivedRecoveryDidKey = {},
             onClearExportedKeyJson = {},
         )
     }
@@ -169,8 +173,12 @@ fun AccountSettings_NoAccount() {
             onExportSigningKey = {},
             onRotateSigningKey = {},
             onImportSigningKey = { _, _ -> },
+            onImportSigningKeyWithRecovery = { _, _, _ -> },
+            onDerivePlcRecoveryKey = {},
             onRegisterPlcRecoveryKey = {},
+            onRegisterDerivedPlcRecoveryKey = {},
             onClearIdentityActionState = {},
+            onClearDerivedRecoveryDidKey = {},
             onClearExportedKeyJson = {},
         )
     }
@@ -401,8 +409,12 @@ fun SettingsListDetail_Landscape_Account() {
                     onExportSigningKey = {},
                     onRotateSigningKey = {},
                     onImportSigningKey = { _, _ -> },
+                    onImportSigningKeyWithRecovery = { _, _, _ -> },
+                    onDerivePlcRecoveryKey = {},
                     onRegisterPlcRecoveryKey = {},
+                    onRegisterDerivedPlcRecoveryKey = {},
                     onClearIdentityActionState = {},
+                    onClearDerivedRecoveryDidKey = {},
                     onClearExportedKeyJson = {},
                 )
             }
@@ -450,8 +462,12 @@ fun SettingsListDetail_Tablet_Account() {
                     onExportSigningKey = {},
                     onRotateSigningKey = {},
                     onImportSigningKey = { _, _ -> },
+                    onImportSigningKeyWithRecovery = { _, _, _ -> },
+                    onDerivePlcRecoveryKey = {},
                     onRegisterPlcRecoveryKey = {},
+                    onRegisterDerivedPlcRecoveryKey = {},
                     onClearIdentityActionState = {},
+                    onClearDerivedRecoveryDidKey = {},
                     onClearExportedKeyJson = {},
                 )
             }

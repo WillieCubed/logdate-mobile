@@ -212,8 +212,12 @@ fun S03_AccountSettingsAuthenticated() {
             onExportSigningKey = {},
             onRotateSigningKey = {},
             onImportSigningKey = { _, _ -> },
+            onImportSigningKeyWithRecovery = { _, _, _ -> },
+            onDerivePlcRecoveryKey = {},
             onRegisterPlcRecoveryKey = {},
+            onRegisterDerivedPlcRecoveryKey = {},
             onClearIdentityActionState = {},
+            onClearDerivedRecoveryDidKey = {},
             onClearExportedKeyJson = {},
         )
     }
@@ -243,8 +247,12 @@ fun S04_AccountSettingsSignedOut() {
             onExportSigningKey = {},
             onRotateSigningKey = {},
             onImportSigningKey = { _, _ -> },
+            onImportSigningKeyWithRecovery = { _, _, _ -> },
+            onDerivePlcRecoveryKey = {},
             onRegisterPlcRecoveryKey = {},
+            onRegisterDerivedPlcRecoveryKey = {},
             onClearIdentityActionState = {},
+            onClearDerivedRecoveryDidKey = {},
             onClearExportedKeyJson = {},
         )
     }
@@ -494,7 +502,7 @@ fun S13_LocationSettingsTrackingOn() {
             settings =
                 LocationTrackingSettings(
                     backgroundTrackingEnabled = true,
-                    trackingIntervalMinutes = 45,
+                    minimumPersistIntervalMinutes = 45,
                     autoTrackForJournalEntries = true,
                     autoTrackForTimelineReview = true,
                 ),
