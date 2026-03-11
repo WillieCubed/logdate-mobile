@@ -41,7 +41,6 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.feature.journals.ui.JournalClickCallback
 import app.logdate.feature.journals.ui.JournalsOverviewScreen
-import app.logdate.feature.location.timeline.ui.LocationTimelineScreen
 import app.logdate.feature.rewind.ui.RewindOverviewScreen
 import app.logdate.shared.model.Person
 import app.logdate.ui.common.applyScreenStyles
@@ -89,6 +88,7 @@ fun HomeScreen(
     onBrowseJournals: () -> Unit,
     onOpenRewind: (Uuid) -> Unit,
     onOpenSettings: () -> Unit = {},
+    locationContent: @Composable (Modifier) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = koinViewModel(),
 ) {
@@ -146,11 +146,10 @@ fun HomeScreen(
             }
 
             HomeRouteDestination.LocationHistory -> {
-                LocationTimelineScreen(
-                    modifier =
-                        Modifier
-                            .applyScreenStyles()
-                            .safeDrawingPadding(),
+                locationContent(
+                    Modifier
+                        .applyScreenStyles()
+                        .safeDrawingPadding(),
                 )
             }
         }

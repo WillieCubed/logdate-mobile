@@ -72,7 +72,6 @@ kotlin {
             implementation(projects.client.feature.timeline)
             implementation(projects.client.feature.rewind)
             implementation(projects.client.feature.journal)
-            implementation(projects.client.feature.locationTimeline)
             // Compose plugin dependencies
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)

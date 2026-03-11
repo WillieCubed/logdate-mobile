@@ -30,16 +30,12 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import app.logdate.client.location.settings.LocationCaptureMode
 import app.logdate.client.location.settings.LocationTrackingSettings
-import app.logdate.feature.location.timeline.ui.LocationTimelineBottomSheet
 import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
@@ -85,11 +81,11 @@ import org.koin.compose.viewmodel.koinViewModel
 fun LocationSettingsScreen(
     onBack: () -> Unit,
     onOpenLocationTimeline: () -> Unit,
+    onShowLocationTimeline: () -> Unit = onOpenLocationTimeline,
     viewModel: LocationSettingsViewModel = koinViewModel(),
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var showLocationQuickPeek by rememberSaveable { mutableStateOf(false) }
 
     LocationSettingsContent(
         settings = uiState.settings,
@@ -100,23 +96,9 @@ fun LocationSettingsScreen(
         onUpdateTrackingInterval = viewModel::updateTrackingInterval,
         onToggleMirroredExperiment = viewModel::toggleMirroredExperiment,
         onToggleServerAssist = viewModel::toggleServerAssist,
-        onShowLocationTimeline = {
-            showLocationQuickPeek = true
-        },
+        onShowLocationTimeline = onShowLocationTimeline,
         modifier = modifier.applyScreenStyles(),
     )
-
-    if (showLocationQuickPeek) {
-        LocationTimelineBottomSheet(
-            onDismissRequest = {
-                showLocationQuickPeek = false
-            },
-            onOpenFullTimeline = {
-                showLocationQuickPeek = false
-                onOpenLocationTimeline()
-            },
-        )
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

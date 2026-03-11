@@ -6,6 +6,10 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
@@ -18,6 +22,7 @@ import app.logdate.feature.core.settings.ui.LocationSettingsScreen
 import app.logdate.feature.core.settings.ui.PrivacySettingsScreen
 import app.logdate.feature.core.settings.ui.SettingsOverviewScreen
 import app.logdate.feature.core.settings.ui.devices.DevicesScreen
+import app.logdate.feature.location.timeline.ui.LocationTimelineBottomSheet
 import app.logdate.navigation.MainAppNavigator
 import app.logdate.navigation.routes.core.AccountSettingsRoute
 import app.logdate.navigation.routes.core.AdvancedSettingsRoute
@@ -226,10 +231,27 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     routeEntry<LocationSettingsRoute>(
         metadata = ListDetailSceneStrategy.detailPane(),
     ) { _ ->
+        var showLocationQuickPeek by rememberSaveable { mutableStateOf(false) }
+
         LocationSettingsScreen(
             onBack = onBack,
             onOpenLocationTimeline = onOpenLocationTimeline,
+            onShowLocationTimeline = {
+                showLocationQuickPeek = true
+            },
         )
+
+        if (showLocationQuickPeek) {
+            LocationTimelineBottomSheet(
+                onDismissRequest = {
+                    showLocationQuickPeek = false
+                },
+                onOpenFullTimeline = {
+                    showLocationQuickPeek = false
+                    onOpenLocationTimeline()
+                },
+            )
+        }
     }
 
     // Advanced settings screen (detail pane)
