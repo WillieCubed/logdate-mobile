@@ -197,13 +197,17 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
 
 ### P5.5 Current Repo Scope
 
-- The currently exposed collections are:
-  - `studio.hypertext.logdate.content`
+- The hosted LogDate schema family is:
+  - `studio.hypertext.logdate.profile`
+  - `studio.hypertext.logdate.entry`
+  - `studio.hypertext.logdate.media`
   - `studio.hypertext.logdate.journal`
   - `studio.hypertext.logdate.association`
+  - `studio.hypertext.logdate.device`
+- The legacy `studio.hypertext.logdate.content` collection remains available as a compatibility alias while clients migrate to `entry`.
 - The backing store is `LogDateRepoStore`, which uses the shared repo engine for collection-aware reads, writes, cursors, and export semantics.
 - Entries, journals, and associations now persist through a canonical repo-backed `LogDateCollectionsRepository` implementation plus a metadata index for versions, tombstones, and change feeds.
-- Media metadata and encrypted backup metadata now persist through first-class LogDate-owned repository interfaces and are no longer constructed from `SyncRepository` in production wiring.
+- Media metadata, ATProto blob metadata, and encrypted backup metadata now persist through LogDate-owned repository interfaces and are no longer constructed from `SyncRepository` in production wiring.
 - Hosted repos with a provisioned identity sign commits with the active hosted signing key.
 - Repo exports use ATProto-shaped commit blocks, CID links, byte signatures, and MST node roots.
 
@@ -228,7 +232,7 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
 
 - `com.atproto.repo.uploadBlob` accepts authenticated raw binary uploads and returns a valid AT Protocol blob reference payload.
 - `com.atproto.sync.getBlob` returns the originally uploaded raw bytes for a valid DID + CID pair without requiring auth.
-- ATProto blob metadata persists through a first-class LogDate-owned repository interface rather than route-local or sync-table-only lookups.
+- First-party media metadata and ATProto blob metadata share a unified LogDate-owned media/blob boundary rather than separate route-local or sync-table-only lookups.
 - The checked-in official lexicon/codegen set includes:
   - `com.atproto.repo.uploadBlob`
   - `com.atproto.sync.getBlob`

@@ -178,13 +178,16 @@ The server now exposes a repo-style XRPC surface backed by a sync-backed multi-c
 - `com.atproto.repo.putRecord`
 - `com.atproto.repo.deleteRecord`
 
-This slice currently exposes:
+This slice currently exposes the hosted LogDate schema family:
 
-- `studio.hypertext.logdate.content`
+- `studio.hypertext.logdate.profile`
+- `studio.hypertext.logdate.entry`
+- `studio.hypertext.logdate.media`
 - `studio.hypertext.logdate.journal`
 - `studio.hypertext.logdate.association`
+- `studio.hypertext.logdate.device`
 
-The backing implementation is `LogDateRepoStore`, which hydrates `DefaultRepoEngine` from the existing sync repository and persists writes back into those sync tables. That gives route behavior canonical collection-aware repo semantics today while remaining compatible with the current storage model. Durable block-store persistence is still future work.
+The legacy `studio.hypertext.logdate.content` collection remains as a compatibility alias while entry-shaped clients migrate. The backing implementation is `LogDateRepoStore`, which uses the shared repo engine for canonical repo persistence and layers compatibility views over the LogDate-owned collection repositories and media/blob boundary.
 
 ### New server package: `server/.../identity/`
 

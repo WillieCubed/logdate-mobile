@@ -169,12 +169,16 @@ These journeys describe the current target architecture and the shipped AT Proto
    - `com.atproto.repo.deleteRecord`
 3. The server routes the write through `LogDateRepoStore` via the shared `PdsRepoService` runtime.
 4. `LogDateRepoStore` hydrates the shared repo engine from the account's sync-backed records, applies the repo write with collection-aware semantics, and persists the resulting state back into LogDate storage.
-5. The currently exposed collections are:
-   - `studio.hypertext.logdate.content`
+5. The hosted LogDate schema family is:
+   - `studio.hypertext.logdate.profile`
+   - `studio.hypertext.logdate.entry`
+   - `studio.hypertext.logdate.media`
    - `studio.hypertext.logdate.journal`
    - `studio.hypertext.logdate.association`
-6. Reads from `getRecord` and `listRecords` surface the same collection set with shared repo cursors and record IDs.
+   - `studio.hypertext.logdate.device`
+6. The legacy `studio.hypertext.logdate.content` collection remains available as a compatibility alias while clients migrate to `entry`.
+7. Reads from `getRecord` and `listRecords` surface the same collection set with shared repo cursors and record IDs.
 
 **Outcome**
 
-- LogDate exposes a small standalone PDS-like surface now while durable block-store persistence and broader protocol interoperability remain future work.
+- LogDate exposes a hosted standalone PDS slice now with canonical repo persistence, first-party recovery tooling, and a unified media/blob boundary. Broader protocol surface area remains future work.
