@@ -106,7 +106,10 @@ fun MainActivityUiRoot(
         if (pendingNavKey != null) {
             if (!mainAppNavigator.backStack.contains(pendingNavKey)) {
                 mainAppNavigator.navigateHomeFromLaunch()
-                mainAppNavigator.backStack.add(pendingNavKey)
+                // Guard: navigateHomeFromLaunch may have already added the key (e.g. TimelineListRoute)
+                if (!mainAppNavigator.backStack.contains(pendingNavKey)) {
+                    mainAppNavigator.backStack.add(pendingNavKey)
+                }
             }
             onDeepLinkHandled()
             hasHandledInitialNavigation = true
