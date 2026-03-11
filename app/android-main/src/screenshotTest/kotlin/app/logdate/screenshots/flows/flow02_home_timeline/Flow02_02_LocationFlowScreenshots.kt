@@ -20,12 +20,15 @@ import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTheme
 import app.logdate.ui.maps.LocalGoogleMapsAvailabilityOverride
 import app.logdate.ui.location.PlaceUiState
+import app.logdate.ui.timeline.TextNoteUiState
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelinePane
 import app.logdate.ui.timeline.TimelineUiState
+import app.logdate.ui.timeline.createTimelineDayUiState
 import com.android.tools.screenshot.PreviewTest
 import kotlinx.datetime.LocalDate
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 private val sampleCurrentLocation =
     CurrentLocationUiModel(
@@ -91,18 +94,34 @@ private val sampleLocationErrorState =
 
 private val timelineQuickPeekDays =
     listOf(
-        TimelineDayUiState(
+        createTimelineDayUiState(
             summary = "Stopped by Blue Bottle before heading to Dolores Park and logging a few notes.",
             date = LocalDate(2025, 2, 20),
+            notes =
+                listOf(
+                    TextNoteUiState(
+                        noteId = Uuid.parse("00000000-0000-0000-0000-000000000071"),
+                        text = "Quick location-rich day: coffee, park, then home with just enough time to log the route.",
+                        timestamp = Instant.parse("2025-02-20T15:00:00Z"),
+                    ),
+                ),
             placesVisited =
                 listOf(
                     PlaceUiState(id = "place-1", title = "Blue Bottle Coffee"),
                     PlaceUiState(id = "place-2", title = "Dolores Park"),
                 ),
         ),
-        TimelineDayUiState(
+        createTimelineDayUiState(
             summary = "Wrapped up errands and ended the evening back at home.",
             date = LocalDate(2025, 2, 19),
+            notes =
+                listOf(
+                    TextNoteUiState(
+                        noteId = Uuid.parse("00000000-0000-0000-0000-000000000072"),
+                        text = "Errands stayed compact, and the last stop of the day was home.",
+                        timestamp = Instant.parse("2025-02-19T20:00:00Z"),
+                    ),
+                ),
             placesVisited = listOf(PlaceUiState(id = "place-3", title = "Home")),
         ),
     )

@@ -1,16 +1,27 @@
 package app.logdate.screenshots.components.settings_account
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import app.logdate.client.location.settings.LocationTrackingSettings
+import app.logdate.client.repository.account.AccountIdentityStatus
+import app.logdate.feature.core.export.ExportState
+import app.logdate.feature.core.settings.ui.AccountIdentityState
 import app.logdate.feature.core.settings.ui.AccountSettingsContent
 import app.logdate.feature.core.settings.ui.AdvancedSettingsContent
 import app.logdate.feature.core.settings.ui.BirthdayUpdateState
 import app.logdate.feature.core.settings.ui.ConflictsState
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsContent
 import app.logdate.feature.core.settings.ui.DataSettingsContent
-import app.logdate.feature.core.export.ExportState
 import app.logdate.feature.core.settings.ui.IntegrityState
 import app.logdate.feature.core.settings.ui.LocationSettingsContent
 import app.logdate.feature.core.settings.ui.PrivacySettingsContent
@@ -26,16 +37,7 @@ import app.logdate.feature.core.settings.ui.dialogs.ResetAppConfirmationDialog
 import app.logdate.feature.core.settings.updates.AppUpdateFlowType
 import app.logdate.feature.core.settings.updates.AppUpdateStatus
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
-import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.shared.model.user.UserData
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.VerticalDivider
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE_LANDSCAPE
 import app.logdate.screenshots.common.ScreenshotTestData.TABLET
@@ -55,6 +57,17 @@ private val sampleQuota = StorageQuotaUi(
     usagePercentage = 0.4f,
     formattedTotal = "5.0 GB",
     formattedUsed = "2.0 GB",
+)
+
+private val sampleIdentityState = AccountIdentityState(
+    status = AccountIdentityStatus(
+        did = "did:plc:preview123",
+        handle = "alex_j.logdate.app",
+        signingKeyPublicMultibase = "zPreview",
+        signingKeyDidKey = "did:key:zPreview",
+        plcRecoveryDidKey = "did:key:zRecovery",
+        plcOperationCount = 2,
+    ),
 )
 
 // ─── Settings Overview ──────────────────────────────────────────────────────────
@@ -120,6 +133,14 @@ fun AccountSettings_Default() {
             onSignOut = {},
             birthdayUpdateState = BirthdayUpdateState.Idle,
             profileUpdateState = ProfileUpdateState.Idle,
+            identityState = sampleIdentityState,
+            onRefreshIdentity = {},
+            onExportSigningKey = {},
+            onRotateSigningKey = {},
+            onImportSigningKey = { _, _ -> },
+            onRegisterPlcRecoveryKey = {},
+            onClearIdentityActionState = {},
+            onClearExportedKeyJson = {},
         )
     }
 }
@@ -143,6 +164,14 @@ fun AccountSettings_NoAccount() {
             onSignOut = {},
             birthdayUpdateState = BirthdayUpdateState.Idle,
             profileUpdateState = ProfileUpdateState.Idle,
+            identityState = AccountIdentityState(),
+            onRefreshIdentity = {},
+            onExportSigningKey = {},
+            onRotateSigningKey = {},
+            onImportSigningKey = { _, _ -> },
+            onRegisterPlcRecoveryKey = {},
+            onClearIdentityActionState = {},
+            onClearExportedKeyJson = {},
         )
     }
 }
@@ -367,6 +396,14 @@ fun SettingsListDetail_Landscape_Account() {
                     onSignOut = {},
                     birthdayUpdateState = BirthdayUpdateState.Idle,
                     profileUpdateState = ProfileUpdateState.Idle,
+                    identityState = sampleIdentityState,
+                    onRefreshIdentity = {},
+                    onExportSigningKey = {},
+                    onRotateSigningKey = {},
+                    onImportSigningKey = { _, _ -> },
+                    onRegisterPlcRecoveryKey = {},
+                    onClearIdentityActionState = {},
+                    onClearExportedKeyJson = {},
                 )
             }
         }
@@ -408,6 +445,14 @@ fun SettingsListDetail_Tablet_Account() {
                     onSignOut = {},
                     birthdayUpdateState = BirthdayUpdateState.Idle,
                     profileUpdateState = ProfileUpdateState.Idle,
+                    identityState = sampleIdentityState,
+                    onRefreshIdentity = {},
+                    onExportSigningKey = {},
+                    onRotateSigningKey = {},
+                    onImportSigningKey = { _, _ -> },
+                    onRegisterPlcRecoveryKey = {},
+                    onClearIdentityActionState = {},
+                    onClearExportedKeyJson = {},
                 )
             }
         }

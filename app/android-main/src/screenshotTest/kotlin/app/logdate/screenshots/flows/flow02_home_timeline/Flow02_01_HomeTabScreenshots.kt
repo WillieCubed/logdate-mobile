@@ -21,28 +21,57 @@ import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.ImageNoteUiState
 import app.logdate.ui.timeline.TextNoteUiState
 import app.logdate.ui.timeline.TimelineDayUiState
+import app.logdate.ui.timeline.TimelineLoadingState
 import app.logdate.ui.timeline.TimelinePane
 import app.logdate.ui.timeline.TimelineSuggestionBlock
 import app.logdate.ui.timeline.TimelineUiState
 import app.logdate.ui.timeline.VideoNoteUiState
+import app.logdate.ui.timeline.createTimelineDayUiState
 import com.android.tools.screenshot.PreviewTest
 import kotlinx.datetime.LocalDate
 import kotlin.uuid.Uuid
 
 private val timelineDays =
     listOf(
-        TimelineDayUiState(
+        createTimelineDayUiState(
             summary = "Wrapped up the route inventory and started wiring screenshot helpers.",
             date = LocalDate(2025, 2, 20),
+            notes =
+                listOf(
+                    ImageNoteUiState(
+                        noteId = Uuid.parse("00000000-0000-0000-0000-000000000031"),
+                        uri = "android.resource://co.reasonabletech.logdate/mipmap/ic_launcher",
+                        timestamp = ScreenshotTestData.baseInstant,
+                    ),
+                    TextNoteUiState(
+                        noteId = Uuid.parse("00000000-0000-0000-0000-000000000032"),
+                        text = "Captured the route shell, then tightened spacing around the new timeline cards.",
+                        timestamp = ScreenshotTestData.baseInstant,
+                    ),
+                ),
             placesVisited =
                 listOf(
                     PlaceUiState(id = "place-1", title = "Blue Bottle Coffee"),
                     PlaceUiState(id = "place-2", title = "Dolores Park"),
                 ),
         ),
-        TimelineDayUiState(
+        createTimelineDayUiState(
             summary = "Captured the golden-hour ferry ride home after a long day.",
             date = LocalDate(2025, 2, 19),
+            notes =
+                listOf(
+                    AudioNoteUiState(
+                        noteId = Uuid.parse("00000000-0000-0000-0000-000000000033"),
+                        uri = "preview://audio",
+                        timestamp = ScreenshotTestData.baseInstant,
+                        duration = 67_000L,
+                    ),
+                    TextNoteUiState(
+                        noteId = Uuid.parse("00000000-0000-0000-0000-000000000034"),
+                        text = "Kept the end-of-day note short and let the audio carry the texture instead.",
+                        timestamp = ScreenshotTestData.baseInstant,
+                    ),
+                ),
             placesVisited = listOf(PlaceUiState(id = "place-3", title = "Home")),
         ),
     )
@@ -149,7 +178,7 @@ fun S02_TimelineEmpty() {
     ScreenshotTheme {
         HomeTabRouteFrame(selectedTab = RoutePreviewTab.TIMELINE) {
             TimelinePane(
-                uiState = TimelineUiState(items = emptyList()),
+                uiState = TimelineUiState(items = emptyList(), loadingState = TimelineLoadingState.InitialLoading),
                 onNewEntry = {},
                 onShareMemory = {},
                 onOpenDay = {},

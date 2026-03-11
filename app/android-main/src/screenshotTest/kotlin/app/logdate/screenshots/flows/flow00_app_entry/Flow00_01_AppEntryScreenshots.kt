@@ -21,12 +21,17 @@ import app.logdate.screenshots.common.RoutePreviewTab
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTheme
 import app.logdate.ui.location.PlaceUiState
+import app.logdate.ui.timeline.ImageNoteUiState
+import app.logdate.ui.timeline.TextNoteUiState
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelinePane
 import app.logdate.ui.timeline.TimelineSuggestionBlock
 import app.logdate.ui.timeline.TimelineUiState
+import app.logdate.ui.timeline.createTimelineDayUiState
 import com.android.tools.screenshot.PreviewTest
 import kotlinx.datetime.LocalDate
+import kotlin.time.Instant
+import kotlin.uuid.Uuid
 import logdate.app.composemain.generated.resources.Res
 import logdate.app.composemain.generated.resources.encrypted_data_recovery_required
 import logdate.app.composemain.generated.resources.open_recovery_tools
@@ -37,18 +42,39 @@ import org.jetbrains.compose.resources.stringResource
 
 private val rootTimelineDays =
     listOf(
-        TimelineDayUiState(
+        createTimelineDayUiState(
             summary = "Wrapped up the screenshot audit and tightened the adaptive shells for larger windows.",
             date = LocalDate(2025, 2, 20),
+            notes =
+                listOf(
+                    ImageNoteUiState(
+                        noteId = Uuid.parse("00000000-0000-0000-0000-000000000061"),
+                        uri = "android.resource://co.reasonabletech.logdate/mipmap/ic_launcher",
+                        timestamp = Instant.parse("2025-02-20T18:10:00Z"),
+                    ),
+                    TextNoteUiState(
+                        noteId = Uuid.parse("00000000-0000-0000-0000-000000000062"),
+                        text = "Tightened the adaptive timeline shells for larger windows and made the cards feel intentional.",
+                        timestamp = Instant.parse("2025-02-20T18:25:00Z"),
+                    ),
+                ),
             placesVisited =
                 listOf(
                     PlaceUiState(id = "place-1", title = "Blue Bottle Coffee"),
                     PlaceUiState(id = "place-2", title = "Mission Dolores Park"),
                 ),
         ),
-        TimelineDayUiState(
+        createTimelineDayUiState(
             summary = "Reviewed the journals flow on tablet and trimmed the empty padding back to a readable column.",
             date = LocalDate(2025, 2, 19),
+            notes =
+                listOf(
+                    TextNoteUiState(
+                        noteId = Uuid.parse("00000000-0000-0000-0000-000000000063"),
+                        text = "The tablet journals flow finally reads like a deliberate column instead of a stretched phone screen.",
+                        timestamp = Instant.parse("2025-02-19T20:00:00Z"),
+                    ),
+                ),
             placesVisited = listOf(PlaceUiState(id = "place-3", title = "Home")),
         ),
     )

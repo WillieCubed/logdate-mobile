@@ -10,9 +10,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import app.logdate.client.location.settings.LocationTrackingSettings
+import app.logdate.client.repository.account.AccountIdentityStatus
 import app.logdate.client.sync.SyncStatus
 import app.logdate.client.sync.conflict.SyncConflictRecord
 import app.logdate.feature.core.restore.RestoreSummary
+import app.logdate.feature.core.settings.ui.AccountIdentityState
 import app.logdate.feature.core.settings.ui.AccountSettingsContent
 import app.logdate.feature.core.settings.ui.AdvancedSettingsContent
 import app.logdate.feature.core.settings.ui.BirthdayUpdateState
@@ -89,6 +91,19 @@ private val samplePasskeys =
             createdAt = "Jan 2025",
             lastUsed = ScreenshotTestData.baseInstant,
         ),
+    )
+
+private val sampleIdentityState =
+    AccountIdentityState(
+        status =
+            AccountIdentityStatus(
+                did = "did:plc:preview123",
+                handle = "alex_j.logdate.app",
+                signingKeyPublicMultibase = "zPreview",
+                signingKeyDidKey = "did:key:zPreview",
+                plcRecoveryDidKey = "did:key:zRecovery",
+                plcOperationCount = 2,
+            ),
     )
 
 private val sampleServerDescriptor =
@@ -192,6 +207,14 @@ fun S03_AccountSettingsAuthenticated() {
             onSignOut = { _ -> },
             birthdayUpdateState = BirthdayUpdateState.Idle,
             profileUpdateState = ProfileUpdateState.Idle,
+            identityState = sampleIdentityState,
+            onRefreshIdentity = {},
+            onExportSigningKey = {},
+            onRotateSigningKey = {},
+            onImportSigningKey = { _, _ -> },
+            onRegisterPlcRecoveryKey = {},
+            onClearIdentityActionState = {},
+            onClearExportedKeyJson = {},
         )
     }
 }
@@ -215,6 +238,14 @@ fun S04_AccountSettingsSignedOut() {
             onSignOut = { _ -> },
             birthdayUpdateState = BirthdayUpdateState.Idle,
             profileUpdateState = ProfileUpdateState.Idle,
+            identityState = AccountIdentityState(),
+            onRefreshIdentity = {},
+            onExportSigningKey = {},
+            onRotateSigningKey = {},
+            onImportSigningKey = { _, _ -> },
+            onRegisterPlcRecoveryKey = {},
+            onClearIdentityActionState = {},
+            onClearExportedKeyJson = {},
         )
     }
 }
