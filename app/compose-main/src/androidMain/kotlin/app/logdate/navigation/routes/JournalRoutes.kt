@@ -64,6 +64,7 @@ fun EntryProviderScope<NavKey>.journalRoutes(
     onBack: () -> Unit,
     onOpenJournalDetail: JournalClickCallback,
     onCreateJournal: () -> Unit,
+    onBrowseJournals: () -> Unit,
     onJournalDeleted: () -> Unit,
     onNavigateToNoteDetail: (Uuid) -> Unit,
     onNavigateToJournalSettings: (Uuid) -> Unit = {},
@@ -75,7 +76,7 @@ fun EntryProviderScope<NavKey>.journalRoutes(
     ) {
         JournalsOverviewScreen(
             onOpenJournal = onOpenJournalDetail,
-            onBrowseJournals = { /* TODO: Handle browse navigation */ },
+            onBrowseJournals = onBrowseJournals,
             onCreateJournal = onCreateJournal,
             onNavigationClick = { /* TODO: Handle navigation menu click */ },
         )

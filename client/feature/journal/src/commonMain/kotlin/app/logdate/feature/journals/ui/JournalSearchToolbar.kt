@@ -3,6 +3,7 @@
 package app.logdate.feature.journals.ui
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,6 +25,9 @@ fun JournalSearchToolbar(
         expanded = expanded,
         onExpand = { setExpanded(true) },
         onNavigationClick = onNavigationClick,
-        modifier = modifier.fillMaxWidth(),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .statusBarsPadding(),
     )
 }

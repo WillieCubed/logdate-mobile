@@ -526,6 +526,7 @@ fun MainNavigationRoot(mainAppNavigator: MainAppNavigator) {
                             onBack = mainAppNavigator::goBack,
                             onOpenJournalDetail = mainAppNavigator::openJournalDetail,
                             onCreateJournal = { mainAppNavigator.backStack.add(NewJournalRoute) },
+                            onBrowseJournals = mainAppNavigator::openSearch,
                             onJournalDeleted = { mainAppNavigator.backStack.removeLastOrNull() },
                             onNavigateToNoteDetail = { noteId ->
                                 mainAppNavigator.backStack.add(NoteViewerRoute(noteId))

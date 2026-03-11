@@ -57,6 +57,8 @@ import logdate.client.feature.journal.generated.resources.video
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
+import kotlin.math.absoluteValue
+import kotlin.math.roundToLong
 import kotlin.uuid.Uuid
 
 /**
@@ -422,7 +424,15 @@ fun NoteViewerErrorContent(
     }
 }
 
-private fun Double.formatCoordinate(): String = "%,.4f".format(this)
+private fun Double.formatCoordinate(): String {
+    val roundedScaled = (this * 10_000).roundToLong()
+    val absoluteScaled = roundedScaled.absoluteValue
+    val wholePart = absoluteScaled / 10_000
+    val fractionPart = (absoluteScaled % 10_000).toString().padStart(4, '0')
+    val sign = if (roundedScaled < 0) "-" else ""
+
+    return "$sign$wholePart.$fractionPart"
+}
 
 /**
  * Audio note presentation for note viewer previews and route rendering.

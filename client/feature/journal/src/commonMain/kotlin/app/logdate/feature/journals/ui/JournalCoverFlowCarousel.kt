@@ -7,9 +7,10 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -25,6 +26,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.shared.model.Journal
 import app.logdate.ui.theme.Spacing
+import kotlin.math.abs
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -45,74 +47,78 @@ fun JournalCoverFlowCarousel(
 
     val listState = rememberLazyListState()
 
-    // Calculate which item is the center/focused item
-    val centralItemIndex by remember {
-        derivedStateOf {
-            val firstItemIndex = listState.firstVisibleItemIndex
-            val firstItemOffset = listState.firstVisibleItemScrollOffset
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val carouselCardWidth = (maxWidth * 0.52f).coerceIn(168.dp, 208.dp)
+        val horizontalContentPadding = (maxWidth * 0.08f).coerceIn(Spacing.md, Spacing.xl)
 
-            // If we're scrolled more than halfway through the first visible item,
-            // the next item is more central
-            if (firstItemOffset > 120) {
-                (firstItemIndex + 1).coerceAtMost(journals.lastIndex)
-            } else {
-                firstItemIndex
+        // Continuously scale cards based on proximity to the viewport center.
+        val scaleByIndex by remember {
+            derivedStateOf {
+                val layoutInfo = listState.layoutInfo
+                val viewportCenter = (layoutInfo.viewportStartOffset + layoutInfo.viewportEndOffset) / 2f
+                val viewportHalfWidth =
+                    ((layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset) / 2f).coerceAtLeast(1f)
+
+                layoutInfo.visibleItemsInfo.associate { itemInfo ->
+                    val itemCenter = itemInfo.offset + (itemInfo.size / 2f)
+                    val normalizedDistance = (abs(itemCenter - viewportCenter) / viewportHalfWidth).coerceIn(0f, 1f)
+                    val proximity = 1f - normalizedDistance
+                    val easedProximity = proximity * proximity
+                    val scale = 0.88f + (1.15f - 0.88f) * easedProximity
+
+                    itemInfo.index to scale
+                }
             }
         }
-    }
 
-    LazyRow(
-        state = listState,
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
-        contentPadding =
-            PaddingValues(
-                horizontal = Spacing.xxxl,
-                vertical = Spacing.lg,
-            ),
-    ) {
-        itemsIndexed(journals) { index, item ->
-            val isCentralItem = index == centralItemIndex
+        LazyRow(
+            state = listState,
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            contentPadding =
+                PaddingValues(
+                    horizontal = horizontalContentPadding,
+                    vertical = Spacing.sm,
+                ),
+        ) {
+            itemsIndexed(journals) { index, item ->
+                val targetScale = scaleByIndex[index] ?: 0.88f
 
-            // Scale animation for the focused item
-            val targetScale = if (isCentralItem) 1.15f else 0.9f
+                val scale by animateFloatAsState(
+                    targetValue = targetScale,
+                    animationSpec =
+                        tween(
+                            durationMillis = 300,
+                            easing = FastOutSlowInEasing,
+                        ),
+                    label = "Cover Scale Animation",
+                )
 
-            val scale by animateFloatAsState(
-                targetValue = targetScale,
-                animationSpec =
-                    tween(
-                        durationMillis = 300,
-                        easing = FastOutSlowInEasing,
-                    ),
-                label = "Cover Scale Animation",
-            )
+                when (item) {
+                    is JournalListItemUiState.ExistingJournal -> {
+                        AnimatedContent(true) {
+                            JournalCover(
+                                journal = item.data,
+                                onClick = { onOpenJournal(item.data.id) },
+                                backgroundColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                modifier =
+                                    Modifier
+                                        .width(carouselCardWidth)
+                                        .scale(scale),
+                            )
+                        }
+                    }
 
-            when (item) {
-                is JournalListItemUiState.ExistingJournal -> {
-                    AnimatedContent(true) {
-                        JournalCover(
-                            journal = item.data,
-                            onClick = { onOpenJournal(item.data.id) },
-                            backgroundColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    is JournalListItemUiState.CreateJournalPlaceholder -> {
+                        CreateJournalPlaceholder(
+                            onClick = onCreateJournal,
                             modifier =
                                 Modifier
-                                    .scale(scale)
-                                    .widthIn(min = 240.dp)
-                                    .heightIn(max = 400.dp),
+                                    .width(carouselCardWidth)
+                                    .scale(scale),
                         )
                     }
-                }
-
-                is JournalListItemUiState.CreateJournalPlaceholder -> {
-                    CreateJournalPlaceholder(
-                        onClick = onCreateJournal,
-                        modifier =
-                            Modifier
-                                .scale(scale)
-                                .widthIn(min = 240.dp)
-                                .heightIn(max = 400.dp),
-                    )
                 }
             }
         }

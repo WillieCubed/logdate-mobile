@@ -9,10 +9,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -69,6 +69,8 @@ fun JournalsOverviewScreenContent(
 ) {
     Scaffold(
         modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             JournalSearchToolbar(
                 onNavigationClick = onNavigationClick,
@@ -79,9 +81,9 @@ fun JournalsOverviewScreenContent(
         Box(
             modifier =
                 Modifier
-                    .fillMaxWidth()
+                    .fillMaxSize()
                     .padding(paddingValues),
-            contentAlignment = Alignment.TopCenter,
+            contentAlignment = Alignment.Center,
         ) {
             JournalListPanel(
                 journals = journals,
@@ -89,11 +91,7 @@ fun JournalsOverviewScreenContent(
                 onBrowseJournals = onBrowseJournals,
                 onCreateJournal = onCreateJournal,
                 showLoading = false,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                        .widthIn(max = 960.dp),
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }
@@ -113,7 +111,7 @@ fun JournalListPanel(
         modifier = modifier,
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = MaterialTheme.shapes.medium,
+        shape = JournalsPanelShape,
     ) {
         JournalListPlaceholder(isVisible = showLoading)
         AnimatedVisibility(
@@ -126,15 +124,19 @@ fun JournalListPanel(
             } else {
 //                JournalList(state.journals, onOpenJournal, modifier)
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.lg, Alignment.CenterVertically),
                 ) {
                     JournalCoverFlowCarousel(
                         journals = journals,
                         onOpenJournal = onOpenJournal,
                         onCreateJournal = onCreateJournal,
-                        modifier = modifier.fillMaxHeight(),
+                        modifier = Modifier.fillMaxWidth(),
                     )
-                    TextButton(onClick = onBrowseJournals) {
+                    TextButton(
+                        onClick = onBrowseJournals,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    ) {
                         Text(text = stringResource(Res.string.action_browse_journals))
                     }
                 }
@@ -178,6 +180,12 @@ internal val JournalShape =
     RoundedCornerShape(
         topEnd = 16.dp,
         bottomEnd = 16.dp,
+    )
+
+private val JournalsPanelShape =
+    RoundedCornerShape(
+        topStart = 16.dp,
+        topEnd = 16.dp,
     )
 
 typealias JournalClickCallback = (journalId: Uuid) -> Unit
