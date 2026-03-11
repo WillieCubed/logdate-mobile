@@ -192,13 +192,13 @@ class NavigationExtensionsTest {
     }
 
     @Test
-    fun `switchToTab from non-main-tab entry adds new tab`() {
+    fun `switchToTab from non-main-tab entry clears stack and sets new tab`() {
         val navigator = MainAppNavigator(SettingsOverviewRoute)
 
         navigator.switchToTab(HomeTab.TIMELINE)
 
-        assertEquals(2, navigator.backStack.size)
-        assertEquals(TimelineListRoute, navigator.backStack.last())
+        assertEquals(1, navigator.backStack.size)
+        assertEquals(TimelineListRoute, navigator.backStack.first())
     }
 
     @Test

@@ -112,15 +112,10 @@ fun MainAppNavigator.switchToTab(tab: HomeTab) {
                 }
             }
         } else {
-            // Remove any existing main tabs from the backstack
-            // Starting from the end to avoid index shifting
-            otherMainTabsIndices.sortedDescending().forEach { index ->
-                if (index < backStack.size) { // Safety check
-                    backStack.removeAt(index)
-                }
-            }
-
-            // Then add the new tab
+            // Current top is not a main tab (e.g. a detail view).
+            // Clear the entire stack and set the new tab as the sole entry
+            // to avoid orphaning detail views under the new tab.
+            backStack.clear()
             backStack.add(tab.route)
         }
     }
