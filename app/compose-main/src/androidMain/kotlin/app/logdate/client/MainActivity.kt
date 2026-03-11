@@ -212,7 +212,10 @@ class MainActivity : FragmentActivity() {
                     onShowUnlockPrompt = viewModel::showNativeUnlockPrompt,
                     pendingNavKey = pendingNavKey,
                     onDeepLinkHandled = { pendingNavKey = null },
-                    onInitialNavigationReady = { markLaunchStage(LaunchStage.InitialNavigationReady) },
+                    onInitialNavigationReady = {
+                        markLaunchStage(LaunchStage.InitialNavigationReady)
+                        reportFullyDrawn()
+                    },
                     databaseStartupState = databaseStartupState,
                     onResetEncryptedStorage = ::resetEncryptedStorageAndRestart,
                     appUpdateUiState = appUpdateUiState,

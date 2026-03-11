@@ -5,35 +5,16 @@ package app.logdate.client
 import android.content.Intent
 import android.view.Menu
 import android.view.MenuItem
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import app.logdate.navigation.EditorManager
-import io.github.aakira.napier.Napier
-import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
 /**
- * Sets up support for multi-window editor functionality.
- * This should be called from the MainActivity's onCreate method.
+ * Initializes the multi-window feature gate without starting any background observers.
  */
 fun MainActivity.setupMultiWindowSupport() {
     val editorManager: EditorManager by inject()
-
-    // Monitor window layout changes if needed
-    if (editorManager.supportsMultiWindow()) {
-        // Use lifecycleScope to collect flow values when the lifecycle is active
-        lifecycleScope.launch {
-            // Collect flow values in a coroutine
-            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                editorManager
-                    .getWindowLayoutInfo(this@setupMultiWindowSupport)
-                    .collect { windowLayoutInfo ->
-                        // Update UI based on window layout if needed
-                        Napier.d("Window layout changed: $windowLayoutInfo")
-                    }
-            }
-        }
+    if (!editorManager.supportsMultiWindow()) {
+        return
     }
 }
 
