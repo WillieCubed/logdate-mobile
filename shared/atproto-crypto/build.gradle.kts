@@ -37,8 +37,16 @@ kotlin {
     jvm()
 
     sourceSets {
+        jvmMain.dependencies {
+            implementation(libs.bouncycastle.bcprov)
+        }
+
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+        }
+
+        jvmTest.dependencies {
+            implementation(libs.kotlin.test.junit)
         }
     }
 }

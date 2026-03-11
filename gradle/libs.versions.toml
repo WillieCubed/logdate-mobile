@@ -58,6 +58,7 @@ napier = "2.7.1"
 multiplatformMarkdownRenderer = "0.39.2"
 webauthn4j = "0.31.0.RELEASE"
 jwtKt = "1.2.1"
+bouncycastle = "1.83"
 
 # Database Dependencies
 exposed = "0.57.0"
@@ -229,6 +230,7 @@ webauthn4j = { group = "com.webauthn4j", name = "webauthn4j-core", version.ref =
 
 # JWT (Kotlin Multiplatform)
 jwtKt = { group = "com.appstractive", name = "jwt-kt", version.ref = "jwtKt" }
+bouncycastle-bcprov = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncycastle" }
 
 # Database Libraries
 exposed-core = { group = "org.jetbrains.exposed", name = "exposed-core", version.ref = "exposed" }

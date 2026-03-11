@@ -49,7 +49,17 @@ public value class Cid(
          * Creates a CID for raw blob bytes using the AT Protocol `raw` codec.
          */
         public fun rawSha256(bytes: ByteArray): Cid = sha256(codec = RAW_CODEC, bytes = bytes)
+
+        /**
+         * Encodes raw CID bytes as a base32 CID string.
+         */
+        public fun fromBytes(bytes: ByteArray): Cid = Cid("$MULTIBASE_BASE32_PREFIX${encodeBase32(bytes)}")
     }
+
+    /**
+     * Returns the raw CID bytes without the multibase prefix.
+     */
+    public fun toBytes(): ByteArray = decodeBase32(value.removePrefix(MULTIBASE_BASE32_PREFIX.toString()))
 }
 
 internal fun encodeVarint(value: Int): ByteArray {
@@ -87,6 +97,25 @@ internal fun encodeBase32(bytes: ByteArray): String {
     return output.toString()
 }
 
+internal fun decodeBase32(value: String): ByteArray {
+    if (value.isEmpty()) {
+        return byteArrayOf()
+    }
+    val output = ArrayList<Byte>((value.length * 5) / 8)
+    var buffer = 0
+    var bitsLeft = 0
+    value.forEach { character ->
+        val digit = BASE32_DECODE_TABLE[character] ?: error("Unsupported base32 character: $character")
+        buffer = (buffer shl 5) or digit
+        bitsLeft += 5
+        if (bitsLeft >= 8) {
+            bitsLeft -= 8
+            output += ((buffer shr bitsLeft) and 0xff).toByte()
+        }
+    }
+    return output.toByteArray()
+}
+
 private const val CID_VERSION: Int = 1
 public const val RAW_CODEC: Int = 0x55
 public const val DAG_CBOR_CODEC: Int = 0x71
@@ -94,3 +123,4 @@ private const val SHA256_MULTIHASH_CODE: Int = 0x12
 private const val SHA256_DIGEST_SIZE: Int = 32
 private const val MULTIBASE_BASE32_PREFIX: Char = 'b'
 private const val BASE32_ALPHABET: String = "abcdefghijklmnopqrstuvwxyz234567"
+private val BASE32_DECODE_TABLE: Map<Char, Int> = BASE32_ALPHABET.withIndex().associate { (index, character) -> character to index }

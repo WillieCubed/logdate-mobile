@@ -4,11 +4,14 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.syntax.Nsid
 import studio.hypertext.atproto.syntax.RecordKey
+import studio.hypertext.atproto.syntax.Tid
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.startCoroutine
@@ -61,6 +64,8 @@ class RepoEngineCoverageTest {
                         add(JsonNull)
                     },
                 )
+                put("link", DagCborCodec.link(Cid.sha256(codec = DAG_CBOR_CODEC, bytes = "cid".encodeToByteArray())))
+                put("bytes", DagCborCodec.bytes(byteArrayOf(0x01, 0x23, 0x45)))
             }
 
         val decoded = DagCborCodec.decode(DagCborCodec.encode(element))
@@ -73,7 +78,6 @@ class RepoEngineCoverageTest {
         assertEquals(JsonPrimitive(-1), DagCborCodec.decode(DagCborCodec.encode(JsonPrimitive(-1))))
         assertFails { DagCborCodec.encode(JsonPrimitive(1.5)) }
         assertFails { DagCborCodec.decode(byteArrayOf(0x1c)) }
-        assertFails { DagCborCodec.decode(byteArrayOf(0x40)) }
         assertFails { DagCborCodec.decode(byteArrayOf(0x61)) }
         assertFails { DagCborCodec.decode(byteArrayOf(0xff.toByte())) }
     }
@@ -97,7 +101,7 @@ class RepoEngineCoverageTest {
             RepoExport(
                 repo = repo,
                 head = head,
-                commits = listOf(SignedRepoCommit(cid = commitCid, commit = commit, signature = "sig-1")),
+                commits = listOf(SignedRepoCommit(cid = commitCid, commit = commit, signature = "c2lnLTE")),
                 blocks =
                     listOf(
                         RepoBlock(cid = root, bytes = "root".encodeToByteArray()),
@@ -109,9 +113,60 @@ class RepoEngineCoverageTest {
 
         assertEquals(export.repo, restored.repo)
         assertEquals(export.head, restored.head)
-        assertEquals(export.commits, restored.commits)
+        assertEquals(export.commits.map { it.cid }, restored.commits.map { it.cid })
+        assertEquals(export.commits.map { it.commit.repo }, restored.commits.map { it.commit.repo })
+        assertEquals(export.commits.map { it.commit.root }, restored.commits.map { it.commit.root })
+        assertEquals(export.commits.map { it.commit.prev }, restored.commits.map { it.commit.prev })
+        assertEquals(export.commits.map { it.commit.revision }, restored.commits.map { it.commit.revision })
+        assertEquals(export.commits.map { it.signature }, restored.commits.map { it.signature })
         assertEquals(export.blocks.map { it.cid }, restored.blocks.map { it.cid })
         assertContentEquals(export.blocks.first().bytes, restored.blocks.first().bytes)
+        val encodedCommit =
+            DagCborCodec.decode(
+                restored.blocks
+                    .first { it.cid == commitCid }
+                    .bytes,
+            )
+        val encodedCommitObject = encodedCommit.jsonObject
+
+        assertEquals(
+            repo.toString(),
+            encodedCommitObject.getValue("did").jsonPrimitive.content,
+        )
+        assertEquals(
+            root.toString(),
+            encodedCommitObject
+                .getValue("data")
+                .jsonObject
+                .getValue("\$link")
+                .jsonPrimitive
+                .content,
+        )
+        assertEquals(
+            prev.toString(),
+            encodedCommitObject
+                .getValue("prev")
+                .jsonObject
+                .getValue("\$link")
+                .jsonPrimitive
+                .content,
+        )
+        assertEquals(
+            Tid.fromLong(commit.revision).toString(),
+            encodedCommitObject.getValue("rev").jsonPrimitive.content,
+        )
+        assertEquals(
+            "sig-1".encodeToByteArray().decodeToString(),
+            requireNotNull(DagCborCodec.bytesOrNull(encodedCommitObject.getValue("sig"))).decodeToString(),
+        )
+        assertEquals(
+            3,
+            encodedCommitObject
+                .getValue("version")
+                .jsonPrimitive
+                .content
+                .toInt(),
+        )
     }
 
     @Test
@@ -119,6 +174,8 @@ class RepoEngineCoverageTest {
         val recordCid = Cid.sha256(codec = DAG_CBOR_CODEC, bytes = "entry".encodeToByteArray())
         val tree = MerkleSearchTree.empty().put(collection = collection, recordKey = RecordKey.require("entry-1"), cid = recordCid)
         val rootCid = tree.rootCid()
+        val blockGraph = tree.toBlockGraph()
+        val rootNode = DagCborCodec.decode(blockGraph.blocks.first { it.cid == rootCid }.bytes).jsonObject
         val commit =
             RepoCommit(
                 repo = repo,
@@ -128,7 +185,9 @@ class RepoEngineCoverageTest {
                 recordCount = 1,
             )
 
-        assertEquals(Cid.sha256(DAG_CBOR_CODEC, DagCborCodec.encode(tree.toJsonElement())), rootCid)
+        assertEquals(blockGraph.root, rootCid)
+        assertEquals(JsonNull, rootNode.getValue("l"))
+        assertEquals(1, rootNode.getValue("e").jsonArray.size)
         assertNull(commit.prev)
         assertEquals(1, commit.recordCount)
     }
@@ -316,6 +375,54 @@ class RepoEngineCoverageTest {
         assertEquals(1, commits.size)
         assertEquals(repo, exported.repo)
         assertTrue(unknownExport is IllegalArgumentException)
+    }
+
+    @Test
+    fun `repo export can return a diff since a previous revision`() {
+        val engine = DefaultRepoEngine(InMemoryRepoBlockStore(), fixedClock)
+        val firstWrite =
+            runSuspend {
+                engine
+                    .putRecord(
+                        recordId =
+                            RepoRecordId(
+                                repo = repo,
+                                collection = collection,
+                                recordKey = RecordKey.require("entry-1"),
+                            ),
+                        value =
+                            buildJsonObject {
+                                put("\$type", collection.toString())
+                                put("text", "alpha")
+                            },
+                    ).getOrThrow()
+            }
+        val firstHead = runSuspend { requireNotNull(engine.loadHead(repo).getOrThrow()) }
+
+        runSuspend {
+            engine
+                .putRecord(
+                    recordId =
+                        RepoRecordId(
+                            repo = repo,
+                            collection = collection,
+                            recordKey = RecordKey.require("entry-2"),
+                        ),
+                    value =
+                        buildJsonObject {
+                            put("\$type", collection.toString())
+                            put("text", "beta")
+                        },
+                ).getOrThrow()
+        }
+
+        val fullExport = runSuspend { engine.export(repo).getOrThrow() }
+        val diffExport = runSuspend { engine.export(repo, since = Tid.fromLong(firstHead.revision)).getOrThrow() }
+
+        assertEquals(listOf(2L), diffExport.commits.map { it.commit.revision })
+        assertTrue(fullExport.blocks.any { it.cid.toString() == firstWrite.cid })
+        assertTrue(diffExport.blocks.none { it.cid.toString() == firstWrite.cid })
+        assertEquals(fullExport.head, diffExport.head)
     }
 
     private fun assertFalseOrMissing(value: Boolean) {

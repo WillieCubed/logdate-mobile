@@ -1,5 +1,6 @@
 package studio.hypertext.atproto.repo
 
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -10,11 +11,12 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
 import kotlinx.serialization.json.put
-import okio.ByteString.Companion.decodeBase64
-import okio.ByteString.Companion.toByteString
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.syntax.Nsid
 import studio.hypertext.atproto.syntax.RecordKey
+import studio.hypertext.atproto.syntax.Tid
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Clock
 
 /**
@@ -35,9 +37,12 @@ public interface RepoEngine : RepoRecordStore {
     ): Result<List<SignedRepoCommit>>
 
     /**
-     * Exports [repo] into a CAR-like archive payload.
+     * Exports [repo] into a CAR archive payload.
      */
-    public suspend fun export(repo: AtprotoDid): Result<RepoExport>
+    public suspend fun export(
+        repo: AtprotoDid,
+        since: Tid? = null,
+    ): Result<RepoExport>
 
     /**
      * Imports [export] and installs it as the current repo state.
@@ -57,14 +62,18 @@ public interface RepoEngine : RepoRecordStore {
  */
 public interface RepoCommitSigner {
     /**
-     * Signs [payload] and returns the detached signature string.
+     * Signs [payload] for [commit] and returns the detached signature string.
      */
-    public fun sign(payload: ByteArray): String
+    public suspend fun sign(
+        commit: RepoCommit,
+        payload: ByteArray,
+    ): String
 
     /**
-     * Verifies [signature] for [payload].
+     * Verifies [signature] for [commit] and [payload].
      */
-    public fun verify(
+    public suspend fun verify(
+        commit: RepoCommit,
         payload: ByteArray,
         signature: String,
     ): Boolean
@@ -74,12 +83,16 @@ public interface RepoCommitSigner {
  * Deterministic digest-based commit signer used by default.
  */
 public object DigestRepoCommitSigner : RepoCommitSigner {
-    override fun sign(payload: ByteArray): String = Cid.sha256(DAG_CBOR_CODEC, payload).toString()
+    override suspend fun sign(
+        commit: RepoCommit,
+        payload: ByteArray,
+    ): String = Cid.sha256(DAG_CBOR_CODEC, payload).toString()
 
-    override fun verify(
+    override suspend fun verify(
+        commit: RepoCommit,
         payload: ByteArray,
         signature: String,
-    ): Boolean = sign(payload) == signature
+    ): Boolean = sign(commit, payload) == signature
 }
 
 /**
@@ -188,7 +201,7 @@ public class DefaultRepoEngine(
             blockStore.writeBlock(recordId.repo, RepoBlock(recordCid, recordBytes)).getOrThrow()
 
             val updatedTree = snapshot.tree.put(recordId.collection, recordId.recordKey, recordCid)
-            val head = persistSnapshot(recordId.repo, updatedTree, snapshot.head)
+            persistSnapshot(recordId.repo, updatedTree, snapshot.head)
             RepoWriteResult(
                 uri = recordId.uri,
                 cid = recordCid.toString(),
@@ -221,14 +234,34 @@ public class DefaultRepoEngine(
             .listCommits(repo)
             .mapCatching { commits -> commits.takeLast(limit.coerceAtLeast(1)).reversed() }
 
-    override suspend fun export(repo: AtprotoDid): Result<RepoExport> =
+    override suspend fun export(
+        repo: AtprotoDid,
+        since: Tid?,
+    ): Result<RepoExport> =
         runCatching {
-            val head = requireNotNull(blockStore.readHead(repo).getOrThrow()) { "Unknown repo: $repo" }
+            val snapshot = loadSnapshot(repo)
+            val head = requireNotNull(snapshot.head) { "Unknown repo: $repo" }
+            val commits = blockStore.listCommits(repo).getOrThrow()
+            val exportCommits =
+                commits.filter { commit ->
+                    since == null || commit.commit.revision > since.toLong()
+                }
+            val currentBlocks = reachableBlocks(repo, snapshot.tree, commits.lastOrNull())
+            val previousBlockIds =
+                if (since == null) {
+                    emptySet()
+                } else {
+                    val previousCommit = commits.lastOrNull { commit -> commit.commit.revision == since.toLong() }
+                    previousCommit?.let { commit ->
+                        val previousTree = MerkleSearchTree.fromBlocks(commit.commit.root) { cid -> blockStore.readBlock(cid).getOrThrow() }
+                        reachableBlocks(repo, previousTree, commit).mapTo(linkedSetOf(), RepoBlock::cid)
+                    } ?: emptySet()
+                }
             RepoExport(
                 repo = repo,
                 head = head,
-                commits = blockStore.listCommits(repo).getOrThrow(),
-                blocks = blockStore.listBlocks(repo).getOrThrow(),
+                commits = exportCommits,
+                blocks = currentBlocks.filterNot { block -> block.cid in previousBlockIds },
             )
         }
 
@@ -238,8 +271,8 @@ public class DefaultRepoEngine(
                 blockStore.writeBlock(export.repo, block).getOrThrow()
             }
             export.commits.forEach { commit ->
-                val commitBytes = encodeCommit(commit.commit)
-                require(signer.verify(commitBytes, commit.signature)) { "Invalid commit signature for ${commit.cid}" }
+                val commitBytes = encodeCommitPayload(commit.commit)
+                require(signer.verify(commit.commit, commitBytes, commit.signature)) { "Invalid commit signature for ${commit.cid}" }
                 blockStore.appendCommit(export.repo, commit).getOrThrow()
             }
             blockStore.writeHead(export.head).getOrThrow()
@@ -248,8 +281,7 @@ public class DefaultRepoEngine(
 
     private suspend fun loadSnapshot(repo: AtprotoDid): RepoSnapshot {
         val head = blockStore.readHead(repo).getOrThrow() ?: return RepoSnapshot(head = null, tree = MerkleSearchTree.empty())
-        val snapshotBlock = requireNotNull(blockStore.readBlock(head.root).getOrThrow()) { "Missing snapshot block ${head.root}" }
-        val tree = MerkleSearchTree.fromJsonElement(DagCborCodec.decode(snapshotBlock.bytes).jsonArray)
+        val tree = MerkleSearchTree.fromBlocks(head.root) { cid -> blockStore.readBlock(cid).getOrThrow() }
         return RepoSnapshot(head = head, tree = tree)
     }
 
@@ -258,9 +290,11 @@ public class DefaultRepoEngine(
         tree: MerkleSearchTree,
         previousHead: RepoHead?,
     ): RepoHead {
-        val snapshotBytes = DagCborCodec.encode(tree.toJsonElement())
-        val rootCid = Cid.sha256(DAG_CBOR_CODEC, snapshotBytes)
-        blockStore.writeBlock(repo, RepoBlock(rootCid, snapshotBytes)).getOrThrow()
+        val graph = tree.toBlockGraph()
+        graph.blocks.forEach { block ->
+            blockStore.writeBlock(repo, block).getOrThrow()
+        }
+        val rootCid = graph.root
 
         val commit =
             RepoCommit(
@@ -271,14 +305,17 @@ public class DefaultRepoEngine(
                 createdAtEpochMillis = clock.now().toEpochMilliseconds(),
                 recordCount = tree.entries().size,
             )
-        val commitBytes = encodeCommit(commit)
-        val commitCid = Cid.sha256(DAG_CBOR_CODEC, commitBytes)
-        blockStore.writeBlock(repo, RepoBlock(commitCid, commitBytes)).getOrThrow()
+        val unsignedCommitBytes = encodeCommitPayload(commit)
+        val signature = signer.sign(commit, unsignedCommitBytes)
+        val signedCommitBytes = encodeSignedCommitPayload(commit, signature)
+        val commitCid = Cid.sha256(DAG_CBOR_CODEC, signedCommitBytes)
+        blockStore.writeBlock(repo, RepoBlock(commitCid, signedCommitBytes)).getOrThrow()
+
         val signedCommit =
             SignedRepoCommit(
                 cid = commitCid,
                 commit = commit,
-                signature = signer.sign(commitBytes),
+                signature = signature,
             )
         blockStore.appendCommit(repo, signedCommit).getOrThrow()
 
@@ -293,22 +330,31 @@ public class DefaultRepoEngine(
         return head
     }
 
-    private fun encodeCommit(commit: RepoCommit): ByteArray =
-        DagCborCodec.encode(
-            buildJsonObject {
-                put("repo", commit.repo.toString())
-                put("root", commit.root.toString())
-                commit.prev?.let { put("prev", it.toString()) }
-                put("revision", commit.revision)
-                put("createdAtEpochMillis", commit.createdAtEpochMillis)
-                put("recordCount", commit.recordCount)
-            },
-        )
-
     private data class RepoSnapshot(
         val head: RepoHead?,
         val tree: MerkleSearchTree,
     )
+
+    private suspend fun reachableBlocks(
+        repo: AtprotoDid,
+        tree: MerkleSearchTree,
+        headCommit: SignedRepoCommit?,
+    ): List<RepoBlock> {
+        val blocks = linkedMapOf<Cid, RepoBlock>()
+        headCommit?.let { commit ->
+            val commitBlock = requireNotNull(blockStore.readBlock(commit.cid).getOrThrow()) { "Missing commit block ${commit.cid}" }
+            blocks[commitBlock.cid] = commitBlock
+        }
+        val graph = tree.toBlockGraph()
+        graph.blocks.forEach { block ->
+            blocks[block.cid] = block
+        }
+        tree.entries().forEach { entry ->
+            val leafBlock = requireNotNull(blockStore.readBlock(entry.cid).getOrThrow()) { "Missing record block ${entry.cid}" }
+            blocks[leafBlock.cid] = leafBlock
+        }
+        return blocks.values.toList()
+    }
 
     private companion object {
         private const val MAX_PAGE_SIZE: Int = 100
@@ -316,113 +362,276 @@ public class DefaultRepoEngine(
 }
 
 /**
- * Serializes and deserializes repo exports into a deterministic archive payload.
+ * Serializes and deserializes repo exports into CAR v1 archives.
  */
+@OptIn(ExperimentalEncodingApi::class)
 public object CarCodec {
-    private val json = kotlinx.serialization.json.Json { explicitNulls = false }
-
     /**
-     * Writes [export] into bytes.
+     * Writes [export] into CAR bytes.
      */
     public fun write(export: RepoExport): ByteArray {
-        val payload =
-            buildJsonObject {
-                put("repo", export.repo.toString())
-                put("root", export.head.root.toString())
-                put("commit", export.head.commitCid.toString())
-                put("revision", export.head.revision)
-                put(
-                    "commits",
-                    buildJsonArray {
-                        export.commits.forEach { commit ->
-                            add(
-                                buildJsonObject {
-                                    put("cid", commit.cid.toString())
-                                    put("repo", commit.commit.repo.toString())
-                                    put("root", commit.commit.root.toString())
-                                    commit.commit.prev?.let { put("prev", it.toString()) }
-                                    put("revision", commit.commit.revision)
-                                    put("createdAtEpochMillis", commit.commit.createdAtEpochMillis)
-                                    put("recordCount", commit.commit.recordCount)
-                                    put("signature", commit.signature)
-                                },
-                            )
-                        }
-                    },
+        val blockMap = LinkedHashMap<Cid, RepoBlock>()
+        export.blocks.forEach { block ->
+            blockMap[block.cid] = block
+        }
+        export.commits.forEach { commit ->
+            blockMap[commit.cid] =
+                RepoBlock(
+                    cid = commit.cid,
+                    bytes = encodeSignedCommitPayload(commit.commit, commit.signature),
                 )
-                put(
-                    "blocks",
-                    buildJsonArray {
-                        export.blocks.forEach { block ->
-                            add(
-                                buildJsonObject {
-                                    put("cid", block.cid.toString())
-                                    put("data", block.bytes.toByteString().base64())
-                                },
-                            )
-                        }
-                    },
-                )
-            }
-        return json
-            .encodeToString(
-                kotlinx.serialization.json.JsonObject
-                    .serializer(),
-                payload,
-            ).encodeToByteArray()
+        }
+        return writeCar(roots = listOf(export.head.commitCid), blocks = blockMap.values.toList())
     }
 
     /**
      * Reads [bytes] into a repo export.
      */
     public fun read(bytes: ByteArray): RepoExport {
-        val payload = json.parseToJsonElement(bytes.decodeToString()).jsonObject
-        val repo = AtprotoDid.require(payload.getValue("repo").jsonPrimitive.content)
+        val archive = readCar(bytes)
+        val commits = archive.blocks.mapNotNull(::decodeSignedCommitBlock).sortedBy { it.commit.revision }
+        val headCommit = requireNotNull(commits.lastOrNull()) { "CAR archive did not contain a repo commit block" }
         val head =
             RepoHead(
-                repo = repo,
-                root = Cid.require(payload.getValue("root").jsonPrimitive.content),
-                commitCid = Cid.require(payload.getValue("commit").jsonPrimitive.content),
-                revision = payload.getValue("revision").jsonPrimitive.long,
+                repo = headCommit.commit.repo,
+                root = headCommit.commit.root,
+                commitCid = archive.roots.singleOrNull() ?: headCommit.cid,
+                revision = headCommit.commit.revision,
             )
-        val commits =
-            payload.getValue("commits").jsonArray.map { encodedCommit ->
-                val commit = encodedCommit.jsonObject
-                SignedRepoCommit(
-                    cid = Cid.require(commit.getValue("cid").jsonPrimitive.content),
-                    commit =
-                        RepoCommit(
-                            repo = AtprotoDid.require(commit.getValue("repo").jsonPrimitive.content),
-                            root = Cid.require(commit.getValue("root").jsonPrimitive.content),
-                            prev = commit["prev"]?.jsonPrimitive?.contentOrNull?.let(Cid::require),
-                            revision = commit.getValue("revision").jsonPrimitive.long,
-                            createdAtEpochMillis = commit.getValue("createdAtEpochMillis").jsonPrimitive.long,
-                            recordCount = commit.getValue("recordCount").jsonPrimitive.int,
-                        ),
-                    signature = commit.getValue("signature").jsonPrimitive.content,
-                )
-            }
-        val blocks =
-            payload.getValue("blocks").jsonArray.map { encodedBlock ->
-                val block = encodedBlock.jsonObject
-                RepoBlock(
-                    cid = Cid.require(block.getValue("cid").jsonPrimitive.content),
-                    bytes =
-                        requireNotNull(
-                            block
-                                .getValue("data")
-                                .jsonPrimitive.content
-                                .decodeBase64(),
-                        ).toByteArray(),
-                )
-            }
         return RepoExport(
-            repo = repo,
+            repo = headCommit.commit.repo,
             head = head,
             commits = commits,
-            blocks = blocks,
+            blocks = archive.blocks,
         )
     }
+
+    /**
+     * Writes a raw CAR v1 archive for [roots] and [blocks].
+     */
+    public fun writeCar(
+        roots: List<Cid>,
+        blocks: List<RepoBlock>,
+    ): ByteArray {
+        val headerBytes =
+            DagCborCodec.encode(
+                buildJsonObject {
+                    put("version", 1)
+                    put(
+                        "roots",
+                        buildJsonArray {
+                            roots.forEach { add(DagCborCodec.link(it)) }
+                        },
+                    )
+                },
+            )
+        return joinByteArrays(
+            buildList {
+                add(writeSection(headerBytes))
+                blocks.forEach { block ->
+                    add(writeSection(block.cid.toBytes() + block.bytes))
+                }
+            },
+        )
+    }
+
+    /**
+     * Reads a CAR v1 archive.
+     */
+    public fun readCar(bytes: ByteArray): CarArchive {
+        var cursor = 0
+        val headerSection = readSection(bytes, cursor)
+        cursor = headerSection.nextOffset
+        val header = DagCborCodec.decode(headerSection.sectionBytes).jsonObject
+        require(header.getValue("version").jsonPrimitive.int == 1) { "Unsupported CAR version" }
+        val roots =
+            header.getValue("roots").jsonArray.map { encodedRoot ->
+                requireNotNull(DagCborCodec.linkOrNull(encodedRoot)) { "CAR roots must be CID links" }
+            }
+
+        val blocks = mutableListOf<RepoBlock>()
+        while (cursor < bytes.size) {
+            val section = readSection(bytes, cursor)
+            cursor = section.nextOffset
+            val decoded = decodeCid(section.sectionBytes)
+            blocks += RepoBlock(cid = decoded.cid, bytes = decoded.blockBytes)
+        }
+        return CarArchive(roots = roots, blocks = blocks)
+    }
+
+    private fun decodeSignedCommitBlock(block: RepoBlock): SignedRepoCommit? =
+        runCatching {
+            val encoded = DagCborCodec.decode(block.bytes).jsonObject
+            val signature =
+                encoded["sig"]?.let(::decodeCommitSignature)
+                    ?: encoded["sig"]?.jsonPrimitive?.contentOrNull
+                    ?: return null
+            val did = encoded["did"]?.jsonPrimitive?.content ?: encoded["repo"]?.jsonPrimitive?.content
+            val data =
+                DagCborCodec.linkOrNull(encoded["data"])?.toString()
+                    ?: encoded["data"]?.jsonPrimitive?.contentOrNull
+                    ?: DagCborCodec.linkOrNull(encoded["root"])?.toString()
+                    ?: encoded["root"]?.jsonPrimitive?.contentOrNull
+            val rev =
+                encoded["rev"]
+                    ?.jsonPrimitive
+                    ?.content
+                    ?.let(Tid::require)
+                    ?.toLong()
+                    ?: encoded["revision"]?.jsonPrimitive?.long
+            val commit =
+                RepoCommit(
+                    repo = AtprotoDid.require(requireNotNull(did) { "Signed repo commit is missing did/repo" }),
+                    root = Cid.require(requireNotNull(data) { "Signed repo commit is missing data/root" }),
+                    prev =
+                        DagCborCodec.linkOrNull(encoded["prev"])
+                            ?: encoded["prev"]?.jsonPrimitive?.contentOrNull?.let(Cid::require),
+                    revision = requireNotNull(rev) { "Signed repo commit is missing rev/revision" },
+                    createdAtEpochMillis = encoded["createdAtEpochMillis"]?.jsonPrimitive?.long ?: 0L,
+                    recordCount = encoded["recordCount"]?.jsonPrimitive?.int ?: 0,
+                )
+            SignedRepoCommit(cid = block.cid, commit = commit, signature = signature)
+        }.getOrNull()
+
+    private fun writeSection(sectionBytes: ByteArray): ByteArray = encodeVarintLong(sectionBytes.size.toLong()) + sectionBytes
+
+    private fun readSection(
+        bytes: ByteArray,
+        offset: Int,
+    ): CarSection {
+        val (sectionLength, lengthBytes) = decodeVarintLong(bytes, offset)
+        val start = offset + lengthBytes
+        val end = start + sectionLength.toInt()
+        require(end <= bytes.size) { "Unexpected end of CAR input" }
+        return CarSection(
+            sectionBytes = bytes.copyOfRange(start, end),
+            nextOffset = end,
+        )
+    }
+
+    private fun decodeCid(sectionBytes: ByteArray): DecodedCid {
+        val (_, versionLength) = decodeVarintLong(sectionBytes, 0)
+        val (_, codecLength) = decodeVarintLong(sectionBytes, versionLength)
+        val digestCodeOffset = versionLength + codecLength
+        val (_, digestCodeLength) = decodeVarintLong(sectionBytes, digestCodeOffset)
+        val (digestSize, digestSizeLength) = decodeVarintLong(sectionBytes, digestCodeOffset + digestCodeLength)
+        val cidLength = digestCodeOffset + digestCodeLength + digestSizeLength + digestSize.toInt()
+        require(cidLength <= sectionBytes.size) { "Invalid CID length inside CAR block" }
+        return DecodedCid(
+            cid = Cid.fromBytes(sectionBytes.copyOfRange(0, cidLength)),
+            blockBytes = sectionBytes.copyOfRange(cidLength, sectionBytes.size),
+        )
+    }
+}
+
+private fun encodeCommitPayload(commit: RepoCommit): ByteArray =
+    DagCborCodec.encode(
+        buildJsonObject {
+            put("version", REPO_COMMIT_VERSION)
+            put("did", commit.repo.toString())
+            put("data", DagCborCodec.link(commit.root))
+            commit.prev?.let { put("prev", DagCborCodec.link(it)) }
+            put("rev", Tid.fromLong(commit.revision).toString())
+        },
+    )
+
+private fun encodeSignedCommitPayload(
+    commit: RepoCommit,
+    signature: String,
+): ByteArray =
+    DagCborCodec.encode(
+        buildJsonObject {
+            put("version", REPO_COMMIT_VERSION)
+            put("did", commit.repo.toString())
+            put("data", DagCborCodec.link(commit.root))
+            commit.prev?.let { put("prev", DagCborCodec.link(it)) }
+            put("rev", Tid.fromLong(commit.revision).toString())
+            put("sig", DagCborCodec.bytes(encodeCommitSignature(signature)))
+        },
+    )
+
+private const val REPO_COMMIT_VERSION: Int = 3
+
+/**
+ * Parsed CAR archive payload.
+ */
+public data class CarArchive(
+    val roots: List<Cid>,
+    val blocks: List<RepoBlock>,
+)
+
+private data class CarSection(
+    val sectionBytes: ByteArray,
+    val nextOffset: Int,
+)
+
+private data class DecodedCid(
+    val cid: Cid,
+    val blockBytes: ByteArray,
+)
+
+private fun encodeCommitSignature(signature: String): ByteArray =
+    if (Cid.parse(signature).isSuccess) {
+        signature.encodeToByteArray()
+    } else {
+        runCatching { Base64.UrlSafe.decode(signature.padBase64Url()) }.getOrElse { signature.encodeToByteArray() }
+    }
+
+private fun decodeCommitSignature(element: JsonElement): String {
+    val signatureBytes = DagCborCodec.bytesOrNull(element) ?: error("Commit signature must be bytes")
+    val asciiSignature = signatureBytes.decodeToString()
+    return if (Cid.parse(asciiSignature).isSuccess) {
+        asciiSignature
+    } else {
+        Base64.UrlSafe.encode(signatureBytes).trimEnd('=')
+    }
+}
+
+private fun joinByteArrays(chunks: List<ByteArray>): ByteArray {
+    val totalSize = chunks.sumOf(ByteArray::size)
+    val output = ByteArray(totalSize)
+    var cursor = 0
+    chunks.forEach { chunk ->
+        chunk.copyInto(output, destinationOffset = cursor)
+        cursor += chunk.size
+    }
+    return output
+}
+
+private fun String.padBase64Url(): String = this + "=".repeat((4 - length % 4) % 4)
+
+private fun encodeVarintLong(value: Long): ByteArray {
+    require(value >= 0L) { "Varints must be non-negative" }
+    var remaining = value
+    val bytes = mutableListOf<Byte>()
+    do {
+        var next = (remaining and 0x7f).toInt()
+        remaining = remaining ushr 7
+        if (remaining != 0L) {
+            next = next or 0x80
+        }
+        bytes += next.toByte()
+    } while (remaining != 0L)
+    return bytes.toByteArray()
+}
+
+private fun decodeVarintLong(
+    bytes: ByteArray,
+    offset: Int,
+): Pair<Long, Int> {
+    var value = 0L
+    var shift = 0
+    var index = offset
+    while (index < bytes.size) {
+        val next = bytes[index].toInt() and 0xff
+        value = value or ((next and 0x7f).toLong() shl shift)
+        index += 1
+        if ((next and 0x80) == 0) {
+            return value to (index - offset)
+        }
+        shift += 7
+    }
+    error("Unexpected end of varint input")
 }
 
 /**

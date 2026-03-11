@@ -39,4 +39,12 @@ class TidTest {
     fun reportsValidityForValidTid() {
         assertTrue(Tid.isValid("3jzfcijpj2z2a"))
     }
+
+    @Test
+    fun encodesAndDecodesLongValues() {
+        val tid = Tid.fromLong(42L)
+
+        assertEquals("222222222223e", tid.value)
+        assertEquals(42L, tid.toLong())
+    }
 }
