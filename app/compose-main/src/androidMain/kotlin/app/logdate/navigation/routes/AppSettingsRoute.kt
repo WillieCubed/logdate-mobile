@@ -19,7 +19,9 @@ import app.logdate.feature.core.settings.ui.AdvancedSettingsScreen
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsScreen
 import app.logdate.feature.core.settings.ui.DataSettingsScreen
 import app.logdate.feature.core.settings.ui.LocationSettingsScreen
+import app.logdate.feature.core.settings.ui.MemoriesSettingsScreen
 import app.logdate.feature.core.settings.ui.PrivacySettingsScreen
+import app.logdate.feature.core.settings.ui.RecommendationSettingsScreen
 import app.logdate.feature.core.settings.ui.SettingsOverviewScreen
 import app.logdate.feature.core.settings.ui.devices.DevicesScreen
 import app.logdate.feature.location.timeline.ui.LocationTimelineBottomSheet
@@ -30,8 +32,10 @@ import app.logdate.navigation.routes.core.DangerZoneSettingsRoute
 import app.logdate.navigation.routes.core.DataSettingsRoute
 import app.logdate.navigation.routes.core.DevicesSettingsRoute
 import app.logdate.navigation.routes.core.LocationSettingsRoute
+import app.logdate.navigation.routes.core.MemoriesSettingsRoute
 import app.logdate.navigation.routes.core.OnboardingStart
 import app.logdate.navigation.routes.core.PrivacySettingsRoute
+import app.logdate.navigation.routes.core.RecommendationSettingsRoute
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
 import app.logdate.navigation.scenes.SettingsEmptyDetailPane
 import io.github.aakira.napier.Napier
@@ -107,6 +111,20 @@ fun MainAppNavigator.openDangerZoneSettings() {
 }
 
 /**
+ * Opens the memories personalization settings screen.
+ */
+fun MainAppNavigator.openMemoriesSettings() {
+    backStack.add(MemoriesSettingsRoute)
+}
+
+/**
+ * Opens the recommendations detail settings screen.
+ */
+fun MainAppNavigator.openRecommendationSettings() {
+    backStack.add(RecommendationSettingsRoute)
+}
+
+/**
  * Opens the advanced settings screen for server configuration and developer options.
  */
 fun MainAppNavigator.openAdvancedSettings() {
@@ -133,6 +151,8 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onNavigateToDangerZone: () -> Unit,
     onNavigateToLocation: () -> Unit,
     onOpenLocationTimeline: () -> Unit,
+    onNavigateToMemories: () -> Unit,
+    onNavigateToRecommendations: () -> Unit,
     onNavigateToAdvanced: () -> Unit,
 ) {
     // Main settings overview screen (list pane)
@@ -151,6 +171,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
             onNavigateToDangerZone = onNavigateToDangerZone,
             onNavigateToDevices = onNavigateToDevices,
             onNavigateToLocation = onNavigateToLocation,
+            onNavigateToMemories = onNavigateToMemories,
             onNavigateToAdvanced = onNavigateToAdvanced,
         )
     }
@@ -252,6 +273,25 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
                 },
             )
         }
+    }
+
+    // Memories settings overview (detail pane)
+    routeEntry<MemoriesSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        MemoriesSettingsScreen(
+            onBack = onBack,
+            onNavigateToRecommendations = onNavigateToRecommendations,
+        )
+    }
+
+    // Recommendations detail (detail pane)
+    routeEntry<RecommendationSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        RecommendationSettingsScreen(
+            onBack = onBack,
+        )
     }
 
     // Advanced settings screen (detail pane)

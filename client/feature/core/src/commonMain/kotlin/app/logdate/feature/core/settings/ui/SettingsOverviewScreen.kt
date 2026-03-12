@@ -16,17 +16,19 @@ import androidx.compose.material.icons.filled.DataObject
 import androidx.compose.material.icons.filled.DeveloperMode
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.ScreenshotMonitor
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -39,6 +41,8 @@ import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.back
+import logdate.client.feature.core.generated.resources.memories
+import logdate.client.feature.core.generated.resources.memories_description
 import logdate.client.feature.core.generated.resources.navigate_to_title
 import logdate.client.feature.core.generated.resources.screen_title_settings
 import logdate.client.feature.core.generated.resources.settings
@@ -59,6 +63,7 @@ fun SettingsOverviewScreen(
     onNavigateToDevices: () -> Unit,
     onNavigateToDangerZone: () -> Unit,
     onNavigateToLocation: () -> Unit,
+    onNavigateToMemories: () -> Unit,
     onNavigateToAdvanced: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: AccountSettingsViewModel = koinViewModel(),
@@ -74,6 +79,7 @@ fun SettingsOverviewScreen(
         onNavigateToDevices = onNavigateToDevices,
         onNavigateToDangerZone = onNavigateToDangerZone,
         onNavigateToLocation = onNavigateToLocation,
+        onNavigateToMemories = onNavigateToMemories,
         onNavigateToAdvanced = onNavigateToAdvanced,
         userProfile = accountState.currentAccount.toUserProfile(),
         modifier = modifier,
@@ -91,11 +97,12 @@ fun SettingsOverviewContent(
     onNavigateToDevices: () -> Unit,
     onNavigateToDangerZone: () -> Unit,
     onNavigateToLocation: () -> Unit,
+    onNavigateToMemories: () -> Unit,
     onNavigateToAdvanced: () -> Unit,
     userProfile: UserProfile,
     modifier: Modifier = Modifier,
 ) {
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
     Scaffold(
         modifier =
@@ -104,7 +111,7 @@ fun SettingsOverviewContent(
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 title = { Text(stringResource(Res.string.screen_title_settings)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -181,6 +188,15 @@ fun SettingsOverviewContent(
                                 description = "Manage location tracking and history settings",
                                 icon = { Icon(Icons.Default.ScreenshotMonitor, contentDescription = null) },
                                 onClick = onNavigateToLocation,
+                            )
+                        }
+
+                        SurfaceItem {
+                            SettingsNavigationItem(
+                                title = stringResource(Res.string.memories),
+                                description = stringResource(Res.string.memories_description),
+                                icon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
+                                onClick = onNavigateToMemories,
                             )
                         }
 
@@ -266,6 +282,7 @@ private fun SettingsOverviewScreenPreview() {
         onNavigateToDevices = {},
         onNavigateToDangerZone = {},
         onNavigateToLocation = {},
+        onNavigateToMemories = {},
         onNavigateToAdvanced = {},
         userProfile =
             UserProfile(
@@ -288,6 +305,7 @@ private fun SettingsOverviewScreenPreviewNotSignedIn() {
         onNavigateToDevices = {},
         onNavigateToDangerZone = {},
         onNavigateToLocation = {},
+        onNavigateToMemories = {},
         onNavigateToAdvanced = {},
         userProfile =
             UserProfile(

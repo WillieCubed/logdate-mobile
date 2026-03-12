@@ -3,9 +3,13 @@
 package app.logdate.client
 
 import android.app.Application
+import android.content.Context
 import android.util.Log
 import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.di.initializeKoin
+import coil3.ImageLoader
+import coil3.SingletonImageLoader
+import coil3.video.VideoFrameDecoder
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
 import org.koin.core.component.KoinComponent
@@ -18,7 +22,15 @@ import org.koin.core.component.get
  */
 class LogdateApplication :
     Application(),
-    KoinComponent {
+    KoinComponent,
+    SingletonImageLoader.Factory {
+    override fun newImageLoader(context: Context): ImageLoader =
+        ImageLoader
+            .Builder(context)
+            .components {
+                add(VideoFrameDecoder.Factory())
+            }.build()
+
     override fun onCreate() {
         super.onCreate()
         Log.i(APP_STARTUP_TAG, "Application onCreate: initializing logging and DI")

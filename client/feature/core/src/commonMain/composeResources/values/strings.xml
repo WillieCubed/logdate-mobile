@@ -380,4 +380,17 @@
     <string name="passkey_operation_removing_message">Please wait while we remove your passkey</string>
     <string name="passkey_operation_creating">Creating</string>
     <string name="passkey_operation_creating_message">Please wait while we create your passkey</string>
+    <string name="memories">Memories</string>
+    <string name="memories_description">Personalize recommendations and memory recall</string>
+    <string name="recommendations">Recommendations</string>
+    <string name="recommendations_summary_on">Suggestions based on drafts, memories, and location</string>
+    <string name="recommendations_summary_off">No timeline suggestions</string>
+    <string name="recommendations_detail_description">Get personalized suggestions on your timeline based on your drafts, past memories, and current location. Your theme will adapt as you use the app.</string>
+    <string name="use_recommendations">Use recommendations</string>
+    <string name="on">On</string>
+    <string name="off">Off</string>
+    <string name="recall_options">Recall options</string>
+    <string name="smart_recall">Smart recall</string>
+    <string name="smart_recall_description">Surface more relevant past memories beyond simple date matching</string>
+    <string name="recommendations_privacy_note">Recommendations are generated entirely on your device. No data leaves your phone.</string>
 </resources>

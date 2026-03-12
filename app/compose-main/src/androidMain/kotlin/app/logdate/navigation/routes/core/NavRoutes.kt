@@ -164,6 +164,18 @@ data object DataSettingsRoute : NavKey
 data object DevicesSettingsRoute : NavKey
 
 /**
+ * Navigation route for memories personalization settings.
+ */
+@Serializable
+data object MemoriesSettingsRoute : NavKey
+
+/**
+ * Navigation route for the recommendations detail settings screen.
+ */
+@Serializable
+data object RecommendationSettingsRoute : NavKey
+
+/**
  * Navigation route for destructive actions like resetting the app or deleting data.
  */
 @Serializable

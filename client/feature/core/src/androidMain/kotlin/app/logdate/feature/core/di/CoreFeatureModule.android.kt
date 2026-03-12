@@ -22,6 +22,7 @@ import app.logdate.feature.core.settings.ui.AdvancedSettingsViewModel
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsViewModel
 import app.logdate.feature.core.settings.ui.DataSettingsViewModel
 import app.logdate.feature.core.settings.ui.LocationSettingsViewModel
+import app.logdate.feature.core.settings.ui.MemoriesSettingsViewModel
 import app.logdate.feature.core.settings.ui.PrivacySettingsViewModel
 import app.logdate.feature.core.settings.ui.ServerConfigurationCoordinator
 import app.logdate.feature.core.settings.updates.AppUpdateController
@@ -115,6 +116,7 @@ actual val coreFeatureModule: Module =
         }
         viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get()) }
         viewModel { LocationSettingsViewModel(get()) }
+        viewModel { MemoriesSettingsViewModel(get()) }
         viewModel { ProfileViewModel(get(), get(), get(), get()) }
     }
 

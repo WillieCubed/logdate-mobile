@@ -112,8 +112,10 @@ import app.logdate.navigation.routes.openJournalDetail
 import app.logdate.navigation.routes.openJournalSettings
 import app.logdate.navigation.routes.openLocationSettings
 import app.logdate.navigation.routes.openLocationTimeline
+import app.logdate.navigation.routes.openMemoriesSettings
 import app.logdate.navigation.routes.openPrivacySettings
 import app.logdate.navigation.routes.openProfile
+import app.logdate.navigation.routes.openRecommendationSettings
 import app.logdate.navigation.routes.openSearch
 import app.logdate.navigation.routes.openSettings
 import app.logdate.navigation.routes.openShareJournal
@@ -521,9 +523,21 @@ fun MainNavigationRoot(
                         onboarding(
                             onBack = mainAppNavigator::goBack,
                             onStartOnboarding = { mainAppNavigator.backStack.add(PersonalIntroRoute) },
-                            onContinueToEntry = { mainAppNavigator.backStack.add(OnboardingImportRoute) },
-                            onImportCompleted = { mainAppNavigator.backStack.add(OnboardingCompleteRoute) },
-                            onWelcomeBack = { mainAppNavigator.backStack.add(OnboardingWelcomeBackRoute) },
+                            onContinueToEntry = {
+                                mainAppNavigator.backStack.add(
+                                    OnboardingImportRoute,
+                                )
+                            },
+                            onImportCompleted = {
+                                mainAppNavigator.backStack.add(
+                                    OnboardingCompleteRoute,
+                                )
+                            },
+                            onWelcomeBack = {
+                                mainAppNavigator.backStack.add(
+                                    OnboardingWelcomeBackRoute,
+                                )
+                            },
                             onComplete = mainAppNavigator::navigateHomeFromOnboarding,
                         )
                         journalRoutes(
@@ -589,6 +603,8 @@ fun MainNavigationRoot(
                             onNavigateToDangerZone = mainAppNavigator::openDangerZoneSettings,
                             onNavigateToLocation = mainAppNavigator::openLocationSettings,
                             onOpenLocationTimeline = mainAppNavigator::openLocationTimeline,
+                            onNavigateToMemories = mainAppNavigator::openMemoriesSettings,
+                            onNavigateToRecommendations = mainAppNavigator::openRecommendationSettings,
                             onNavigateToAdvanced = mainAppNavigator::openAdvancedSettings,
                         )
                         cloudAccountSetup(

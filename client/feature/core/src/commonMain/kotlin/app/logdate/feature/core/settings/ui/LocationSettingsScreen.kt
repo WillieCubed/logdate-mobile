@@ -2,7 +2,6 @@
 
 package app.logdate.feature.core.settings.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,16 +16,15 @@ import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -38,6 +36,7 @@ import app.logdate.client.location.settings.LocationCaptureMode
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.common.MaterialContainer
+import app.logdate.ui.common.ToggleSettingsItem
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
@@ -115,7 +114,7 @@ fun LocationSettingsContent(
     onShowLocationTimeline: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
     val mirroredExperimentEnabled = settings.captureMode == LocationCaptureMode.EXPERIMENT_MIRRORED
     val intervalOptions = listOf(2L, 5L, 10L, 15L, 30L, 60L, 120L)
     val selectedIntervalIndex =
@@ -128,7 +127,7 @@ fun LocationSettingsContent(
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 title = { Text(stringResource(Res.string.location_settings)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -358,80 +357,4 @@ private fun LocationSettingsNotes() {
             )
         }
     }
-}
-
-/**
- * A block of related settings items used to group options together.
- */
-@Composable
-fun SettingsSection(
-    title: String,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(vertical = Spacing.sm),
-        )
-
-        MaterialContainer {
-            content()
-        }
-    }
-}
-
-/**
- * A simple settings item with a slot for title and description and optional actions.
- *
- * @param title The title of the settings item
- * @param description The description text for the settings item. This should provide a great amount of context to the user.
- * @param overline Optional overline text for additional context or grouping. Meant to be a brief label.
- * @param onClick Callback when the item is clicked
- */
-@Composable
-fun SimpleSettingsItem(
-    title: String,
-    description: String,
-    overline: String? = null,
-    onClick: () -> Unit = {},
-    action: @Composable () -> Unit,
-) {
-    ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = { Text(description) },
-        overlineContent = overline?.let { { Text(it) } },
-        trailingContent = action,
-        modifier = Modifier.fillMaxWidth().clickable { onClick() },
-    )
-}
-
-/**
- * A [SimpleSettingsItem] that has a toggleable switch.
- */
-@Composable
-fun ToggleSettingsItem(
-    title: String,
-    description: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    overline: String? = null,
-    onClick: () -> Unit = {},
-) {
-    SimpleSettingsItem(
-        title = title,
-        description = description,
-        overline = overline,
-        onClick = onClick,
-        action = {
-            Switch(
-                checked = checked,
-                onCheckedChange = onCheckedChange,
-            )
-        },
-    )
 }
