@@ -6,6 +6,7 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import app.logdate.client.sharing.NoOpSharingLauncher
 import app.logdate.navigation.LocalSharedTransitionScope
 import app.logdate.navigation.MainNavigationRoot
 import app.logdate.navigation.rememberMainAppNavigator
@@ -22,6 +23,7 @@ internal fun MainActivityLoadingRoot() {
             ) {
                 MainNavigationRoot(
                     mainAppNavigator = rememberMainAppNavigator(initialRoute = NavigationStart),
+                    sharingLauncher = NoOpSharingLauncher,
                 )
             }
         }

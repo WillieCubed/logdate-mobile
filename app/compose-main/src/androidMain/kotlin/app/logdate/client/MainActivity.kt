@@ -31,6 +31,8 @@ import app.logdate.client.location.tracking.NAV_SOURCE_LOCATION_HISTORY
 import app.logdate.client.media.audio.EXTRA_NAV_SOURCE
 import app.logdate.client.media.audio.EXTRA_NOTE_ID
 import app.logdate.client.media.audio.NAV_SOURCE_AUDIO_PLAYBACK
+import app.logdate.client.sharing.NoOpSharingLauncher
+import app.logdate.client.sharing.SharingLauncher
 import app.logdate.client.updates.ActivityResultAppUpdateFlowLauncher
 import app.logdate.client.updates.PlayInAppUpdateController
 import app.logdate.feature.core.AndroidBiometricGatekeeper
@@ -78,6 +80,7 @@ class MainActivity : FragmentActivity() {
     private val databaseRecoveryController: DatabaseRecoveryController by inject()
     private val playInAppUpdateController: PlayInAppUpdateController by inject()
     private val locationTrackingManager: LocationTrackingManager by inject()
+    private val sharingLauncher: SharingLauncher by inject()
 
     private val viewModel by viewModel<AppViewModel>()
 
@@ -226,6 +229,7 @@ class MainActivity : FragmentActivity() {
                             playInAppUpdateController.completeUpdate()
                         }
                     },
+                    sharingLauncher = sharingLauncher,
                 )
             } else {
                 MainActivityLoadingRoot()
@@ -385,6 +389,7 @@ fun AppAndroidPreview() {
     MainActivityUiRoot(
         appUiState = GlobalAppUiLoadedState(),
         onShowUnlockPrompt = { /* No-op for preview */ },
+        sharingLauncher = NoOpSharingLauncher,
     )
 }
 

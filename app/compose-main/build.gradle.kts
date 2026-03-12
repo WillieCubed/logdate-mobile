@@ -74,6 +74,7 @@ kotlin {
             implementation(projects.client.repository)
             implementation(projects.client.location)
             implementation(projects.client.media)
+            implementation(projects.client.sharing)
             implementation(projects.client.sync)
             implementation(projects.client.healthConnect)
             implementation(projects.client.util)

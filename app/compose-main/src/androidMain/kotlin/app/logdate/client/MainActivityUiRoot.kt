@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavKey
 import app.logdate.client.database.DatabaseStartupState
+import app.logdate.client.sharing.SharingLauncher
 import app.logdate.feature.core.GlobalAppUiLoadedState
 import app.logdate.feature.core.requiresUnlock
 import app.logdate.feature.core.settings.updates.AppUpdateStatus
@@ -71,6 +72,7 @@ fun MainActivityUiRoot(
     appUpdateUiState: AppUpdateUiState = AppUpdateUiState(),
     onCompleteAppUpdate: () -> Unit = {},
     mainAppNavigator: MainAppNavigator = rememberMainAppNavigator(initialRoute = NavigationStart),
+    sharingLauncher: SharingLauncher,
 ) {
     var hasRequestedUnlock by remember { mutableStateOf(false) }
     var hasHandledInitialNavigation by remember { mutableStateOf(false) }
@@ -132,7 +134,7 @@ fun MainActivityUiRoot(
                 LocalSharedTransitionScope provides this,
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    MainNavigationRoot(mainAppNavigator)
+                    MainNavigationRoot(mainAppNavigator, sharingLauncher)
 
                     SnackbarHost(
                         hostState = appUpdateSnackbarHostState,
