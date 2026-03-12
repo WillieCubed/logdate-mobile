@@ -189,6 +189,10 @@ class FakeCameraCaptureManager : CameraCaptureManager {
         _state.value = _state.value.copy(captureMode = mode)
     }
 
+    override fun setAspectRatio(ratio: CameraAspectRatio) {
+        _state.value = _state.value.copy(aspectRatio = ratio)
+    }
+
     override fun clearCapturedUri() {
         _state.value = _state.value.copy(lastCapturedUri = null)
     }

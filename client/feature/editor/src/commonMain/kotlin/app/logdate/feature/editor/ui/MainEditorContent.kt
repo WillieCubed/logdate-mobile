@@ -10,6 +10,8 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.SeekableTransitionState
 import androidx.compose.animation.core.rememberTransition
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -163,9 +165,16 @@ fun MainEditorContent(
             transition.AnimatedContent(
                 contentKey = { it::class },
                 // The shared container morph is the semantic transition here.
-                // Disabling shell-level fades keeps predictive back purely spatial.
+                // When expanding, non-selected tiles are faded out instantly so IME-driven
+                // layout shifts don't push them above the expanding surface.
+                // For Expanded → Empty/List (predictive back), keep ExitTransition.None so
+                // the gesture scrub remains purely spatial with no competing fade.
                 transitionSpec = {
-                    EnterTransition.None togetherWith ExitTransition.None
+                    if (targetState is EditorDisplay.Expanded) {
+                        EnterTransition.None togetherWith fadeOut(snap())
+                    } else {
+                        EnterTransition.None togetherWith ExitTransition.None
+                    }
                 },
             ) { target ->
                 val avs = this

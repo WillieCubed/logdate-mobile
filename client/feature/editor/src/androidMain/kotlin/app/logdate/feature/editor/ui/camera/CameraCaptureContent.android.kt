@@ -8,6 +8,10 @@ import androidx.camera.core.SurfaceOrientedMeteringPointFactory
 import androidx.camera.viewfinder.core.ImplementationMode
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -27,6 +31,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -69,9 +74,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -485,6 +494,16 @@ private fun InlineCameraCapture(
     // Viewfinder size for metering point calculations
     var viewfinderSize by remember { mutableStateOf(IntSize.Zero) }
 
+    val animatedAspectRatio by animateFloatAsState(
+        targetValue = uiState.aspectRatio.ratio,
+        animationSpec =
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow,
+            ),
+        label = "viewfinderAspectRatio",
+    )
+
     Surface(
         modifier = modifier.fillMaxSize(),
         color = Color.Black,
@@ -504,7 +523,7 @@ private fun InlineCameraCapture(
                     Box(
                         modifier =
                             Modifier
-                                .aspectRatio(3f / 4f)
+                                .aspectRatio(animatedAspectRatio)
                                 .clip(RoundedCornerShape(20.dp))
                                 .onSizeChanged { viewfinderSize = it }
                                 .pointerInput(Unit) {
@@ -564,63 +583,38 @@ private fun InlineCameraCapture(
                 )
             }
 
-            // Top controls row — recording indicator + switch camera only (back handled by editor toolbar)
-            Row(
+            // Top controls — recording indicator only (back handled by editor toolbar)
+            AnimatedVisibility(
+                visible = uiState.isRecording,
+                enter = fadeIn(),
+                exit = fadeOut(),
                 modifier =
                     Modifier
-                        .fillMaxWidth()
                         .align(Alignment.TopEnd)
                         .statusBarsPadding()
                         .padding(16.dp),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (uiState.isRecording) {
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.errorContainer,
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.FiberManualRecord,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onErrorContainer,
-                                modifier = Modifier.size(12.dp),
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = uiState.formattedDuration,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                style = MaterialTheme.typography.labelMedium,
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-
-                IconButton(
-                    onClick = {
-                        currentZoom = 1f
-                        viewModel.switchCamera()
-                    },
-                    enabled = !uiState.isRecording,
-                    modifier =
-                        Modifier
-                            .background(MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.7f), CircleShape),
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.errorContainer,
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Cameraswitch,
-                        contentDescription = stringResource(Res.string.switch_camera),
-                        tint =
-                            if (uiState.isRecording) {
-                                MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.38f)
-                            } else {
-                                MaterialTheme.colorScheme.inverseOnSurface
-                            },
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FiberManualRecord,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(12.dp),
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = uiState.formattedDuration,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    }
                 }
             }
 
@@ -638,26 +632,71 @@ private fun InlineCameraCapture(
                     enter = fadeIn(),
                     exit = fadeOut(),
                 ) {
-                    PhotoVideoToggle(
-                        currentMode = uiState.captureMode,
-                        onModeChanged = { viewModel.setCaptureMode(it) },
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        AspectRatioSelector(
+                            selected = uiState.aspectRatio,
+                            onSelected = { viewModel.setAspectRatio(it) },
+                        )
+
+                        PhotoVideoToggle(
+                            currentMode = uiState.captureMode,
+                            onModeChanged = { viewModel.setCaptureMode(it) },
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                ShutterButton(
-                    isRecording = uiState.isRecording,
-                    captureMode = uiState.captureMode,
-                    isCapturing = uiState.isCapturing,
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        if (uiState.captureMode == CaptureMode.PHOTO) {
-                            showFlash = true
-                        }
-                        viewModel.capture()
-                    },
-                )
+                // Shutter row: empty spacer | shutter | switch camera
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // Balance spacer so shutter stays centered
+                    Spacer(modifier = Modifier.size(48.dp))
+
+                    ShutterButton(
+                        isRecording = uiState.isRecording,
+                        captureMode = uiState.captureMode,
+                        isCapturing = uiState.isCapturing,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            if (uiState.captureMode == CaptureMode.PHOTO) {
+                                showFlash = true
+                            }
+                            viewModel.capture()
+                        },
+                    )
+
+                    IconButton(
+                        onClick = {
+                            currentZoom = 1f
+                            viewModel.switchCamera()
+                        },
+                        enabled = !uiState.isRecording,
+                        modifier =
+                            Modifier
+                                .background(
+                                    MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.7f),
+                                    CircleShape,
+                                ),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Cameraswitch,
+                            contentDescription = stringResource(Res.string.switch_camera),
+                            tint =
+                                if (uiState.isRecording) {
+                                    MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.38f)
+                                } else {
+                                    MaterialTheme.colorScheme.inverseOnSurface
+                                },
+                        )
+                    }
+                }
             }
 
             // Error display
@@ -763,6 +802,103 @@ private fun ShutterButton(
             ) {}
         }
     }
+}
+
+/**
+ * MD3 Expressive sliding-pill aspect ratio selector.
+ *
+ * A compact rounded container with three ratio labels. A filled indicator pill
+ * slides behind the selected label with a bouncy spring animation.
+ */
+@Suppress("ktlint:standard:function-naming")
+@Composable
+private fun AspectRatioSelector(
+    selected: CameraAspectRatio,
+    onSelected: (CameraAspectRatio) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val options = CameraAspectRatio.entries
+    val selectedIndex = options.indexOf(selected)
+
+    // Track each slot's x-offset and width so the indicator can slide to the right position.
+    val slotOffsets = remember { mutableMapOf<Int, Float>() }
+    val slotWidths = remember { mutableMapOf<Int, Float>() }
+
+    val indicatorOffset by animateDpAsState(
+        targetValue = (slotOffsets[selectedIndex] ?: 0f).pxToDp(),
+        animationSpec =
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow,
+            ),
+        label = "indicatorOffset",
+    )
+    val indicatorWidth by animateDpAsState(
+        targetValue = (slotWidths[selectedIndex] ?: 0f).pxToDp(),
+        animationSpec =
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow,
+            ),
+        label = "indicatorWidth",
+    )
+
+    Surface(
+        modifier = modifier,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.3f),
+    ) {
+        Box {
+            // Sliding indicator pill
+            if (indicatorWidth > 0.dp) {
+                Surface(
+                    modifier =
+                        Modifier
+                            .offset(x = indicatorOffset)
+                            .size(width = indicatorWidth, height = 36.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.85f),
+                ) {}
+            }
+
+            // Label slots
+            Row {
+                options.forEachIndexed { index, ratio ->
+                    Box(
+                        modifier =
+                            Modifier
+                                .clickable { onSelected(ratio) }
+                                .onSizeChanged { size ->
+                                    slotWidths[index] = size.width.toFloat()
+                                }.onGloballyPositioned { coordinates ->
+                                    slotOffsets[index] = coordinates.positionInParent().x
+                                }.padding(horizontal = 16.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = ratio.displayName,
+                            style = MaterialTheme.typography.labelMedium,
+                            color =
+                                if (ratio == selected) {
+                                    MaterialTheme.colorScheme.inverseOnSurface
+                                } else {
+                                    MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.6f)
+                                },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Converts a pixel value to [Dp] in a composable context.
+ */
+@Composable
+private fun Float.pxToDp(): Dp {
+    val density = LocalDensity.current
+    return with(density) { this@pxToDp.toDp() }
 }
 
 /**
