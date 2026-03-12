@@ -5,10 +5,10 @@ package app.logdate.feature.timeline.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.notes.RemoveNoteUseCase
+import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
+import app.logdate.client.domain.recommendation.HomeRecommendation
 import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
-import app.logdate.client.domain.timeline.GetTimelineBannerUseCase
 import app.logdate.client.domain.timeline.StreamingTimelineRequest
-import app.logdate.client.domain.timeline.TimelineBannerResult
 import app.logdate.client.domain.timeline.TimelineDay
 import app.logdate.client.domain.timeline.TimelinePlaceVisit
 import app.logdate.client.repository.journals.JournalNote
@@ -24,6 +24,7 @@ import app.logdate.ui.timeline.TextNoteUiState
 import app.logdate.ui.timeline.TimelineDaySelection
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelineLoadingState
+import app.logdate.ui.timeline.TimelineSuggestionBlock
 import app.logdate.ui.timeline.VideoNoteUiState
 import app.logdate.ui.timeline.createTimelineDayUiState
 import io.github.aakira.napier.Napier
@@ -43,7 +44,7 @@ import kotlin.uuid.Uuid
  */
 class TimelineViewModel(
     getStreamingTimeline: GetStreamingTimelineUseCase,
-    getTimelineBannerUseCase: GetTimelineBannerUseCase,
+    private val getHomeRecommendation: GetHomeRecommendationUseCase,
     private val removeNoteUseCase: RemoveNoteUseCase,
     private val userStateRepository: UserStateRepository,
 ) : ViewModel() {
@@ -135,25 +136,8 @@ class TimelineViewModel(
                 timelineSuggestion = null,
                 snackbarMessage = snackbarMessageState.value,
             )
-        }.combine(getTimelineBannerUseCase()) { state, bannerResult ->
-            when (bannerResult) {
-                is TimelineBannerResult.ShowBanner ->
-                    state.copy(
-                        // Create a TimelineSuggestionBlock from the banner data
-                        timelineSuggestion =
-                            app.logdate.ui.timeline.TimelineSuggestionBlock.OngoingEvent(
-                                memoryId = bannerResult.memoryId,
-                                message = bannerResult.message,
-                                location = bannerResult.location,
-                                people = bannerResult.people,
-                                mediaUris = emptyList(),
-                            ),
-                    )
-                TimelineBannerResult.NoBanner ->
-                    state.copy(
-                        timelineSuggestion = null,
-                    )
-            }
+        }.combine(getHomeRecommendation().map { it.toTimelineSuggestionBlock() }) { state, suggestion ->
+            state.copy(timelineSuggestion = suggestion)
         }.combine(snackbarMessageState) { state, snackbarMessage ->
             state.copy(snackbarMessage = snackbarMessage)
         }.stateIn(
@@ -217,6 +201,33 @@ class TimelineViewModel(
             isLoadingSummary = tldr.isEmpty(),
             isLoadingPeople = people.isEmpty() && tldr.isEmpty(),
         )
+
+    private fun HomeRecommendation.toTimelineSuggestionBlock(): TimelineSuggestionBlock? =
+        when (this) {
+            is HomeRecommendation.EmptyDay ->
+                TimelineSuggestionBlock.EmptyDay(
+                    message = message,
+                    locationName = locationName,
+                )
+            is HomeRecommendation.CompleteYourDraft ->
+                TimelineSuggestionBlock.CompleteDraft(
+                    draftId = draftId.toString(),
+                    notePreview = notePreview?.takeIf(String::isNotBlank),
+                )
+            is HomeRecommendation.MemoryRecall ->
+                TimelineSuggestionBlock.MemoryRecall(
+                    memoryDate = date,
+                    title = summary,
+                    people = people,
+                    mediaUris =
+                        mediaUris.map { uri ->
+                            app.logdate.ui.timeline
+                                .MediaObjectUiState(uid = uri, uri = uri)
+                        },
+                    isAiGenerated = isAiGenerated,
+                )
+            HomeRecommendation.None -> null
+        }
 
     private fun List<JournalNote>.toUiState(): List<app.logdate.ui.timeline.NoteUiState> =
         sortedByDescending { note -> note.creationTimestamp }.map { note ->

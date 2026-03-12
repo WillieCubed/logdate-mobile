@@ -1,8 +1,20 @@
 package app.logdate.client.sharing
 
+import kotlinx.datetime.LocalDate
 import kotlin.uuid.Uuid
 
 interface SharingLauncher {
+    /**
+     * Shares a memory from a specific day using the system share sheet.
+     *
+     * @param date The date of the memory to share
+     * @param summary A text summary of the memory, used as share content
+     */
+    fun shareMemoryDay(
+        date: LocalDate,
+        summary: String = "",
+    )
+
     /**
      * Shares a journal to Instagram as a story.
      *

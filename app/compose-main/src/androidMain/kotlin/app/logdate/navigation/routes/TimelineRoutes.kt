@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
+import app.logdate.client.sharing.SharingLauncher
 import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.feature.timeline.ui.details.TimelineDayDetailPanel
 import app.logdate.navigation.MainAppNavigator
@@ -39,6 +40,8 @@ fun MainAppNavigator.openTimelineDetail(day: LocalDate) {
 
 fun EntryProviderScope<NavKey>.timelineRoutes(
     openEntryEditor: () -> Unit,
+    onOpenDraft: (draftId: String) -> Unit,
+    sharingLauncher: SharingLauncher,
     onOpenTimelineDetail: (day: LocalDate) -> Unit,
     onCloseTimelineDetail: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -56,6 +59,8 @@ fun EntryProviderScope<NavKey>.timelineRoutes(
             onOpenSettings = onOpenSettings,
             onOpenLocationTimeline = onOpenLocationTimeline,
             onOpenSearch = onOpenSearch,
+            onOpenDraft = onOpenDraft,
+            onShareMemory = { date -> sharingLauncher.shareMemoryDay(date) },
             viewModel = homeViewModel,
         )
     }

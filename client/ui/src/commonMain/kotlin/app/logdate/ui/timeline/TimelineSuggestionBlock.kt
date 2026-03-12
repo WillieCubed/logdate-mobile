@@ -2,7 +2,6 @@
 
 package app.logdate.ui.timeline
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,8 +11,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AddLink
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -28,70 +29,75 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.common.MetadataChip
 import app.logdate.ui.common.PeopleMetadataChip
 import app.logdate.ui.theme.Spacing
 import coil3.compose.AsyncImage
+import kotlinx.datetime.LocalDate
 import logdate.client.ui.generated.resources.*
 import logdate.client.ui.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * Represents different types of timeline suggestion blocks that can be shown to users
+ * Represents different types of timeline suggestion blocks that can be shown to users.
  */
 sealed interface TimelineSuggestionBlock {
     /**
-     * A suggestion to update a past moment with additional content
+     * The user has an unfinished draft to complete.
      */
-    data class PastMoment(
-        val memoryId: String,
-        val message: String,
-        val location: String? = null,
-        val people: List<String> = emptyList(),
-        val mediaUris: List<MediaObjectUiState> = emptyList(),
+    data class CompleteDraft(
+        val draftId: String,
+        val notePreview: String?,
     ) : TimelineSuggestionBlock
 
     /**
-     * A suggestion for an ongoing event that could be documented
+     * Encourage writing when the user has no entries today.
      */
-    data class OngoingEvent(
-        val memoryId: String,
+    data class EmptyDay(
         val message: String,
-        val location: String? = null,
+        val locationName: String? = null,
+    ) : TimelineSuggestionBlock
+
+    /**
+     * "On this day" memory recall — past entries worth revisiting.
+     */
+    data class MemoryRecall(
+        val memoryDate: LocalDate,
+        val title: String,
         val people: List<String> = emptyList(),
         val mediaUris: List<MediaObjectUiState> = emptyList(),
+        val isAiGenerated: Boolean = false,
     ) : TimelineSuggestionBlock
 }
 
 data class TimelineSuggestionBlockUiState(
-    val memoryId: String,
-    val type: TimelineSuggestionBlockType = TimelineSuggestionBlockType.UPDATE,
+    val type: TimelineSuggestionBlockType,
     val message: String,
+    val draftId: String? = null,
+    val memoryDate: LocalDate? = null,
     val location: String? = null,
-    /**
-     * First names of people in the suggested entry.
-     */
     val people: List<String> = emptyList(),
     val mediaUris: List<MediaObjectUiState> = emptyList(),
+    val isAiGenerated: Boolean = false,
 )
 
 enum class TimelineSuggestionBlockType {
     /**
-     * An event has already been documented by someone else, but the user has not yet added memories.
+     * The user has an unfinished draft.
      */
-    UPDATE,
+    COMPLETE_DRAFT,
 
     /**
-     * An event that the user is associated with is currently happening.
+     * The user has no entries for today.
      */
-    HAPPENING_NOW,
+    EMPTY_DAY,
 
     /**
-     * There is a (calendar) event that the user has not yet documented.
+     * A past memory worth revisiting — "on this day" style.
      */
-    EVENT,
+    MEMORY_RECALL,
 }
 
 /**
@@ -101,20 +107,36 @@ enum class TimelineSuggestionBlockType {
 @Composable
 fun TimelineSuggestionBlock(
     state: TimelineSuggestionBlockUiState,
-    onAddToMemory: (memoryId: String) -> Unit,
-    onShare: (memoryId: String) -> Unit,
+    onStartWriting: () -> Unit,
+    onOpenDraft: (draftId: String) -> Unit,
+    onViewMemoryDay: (LocalDate) -> Unit,
+    onShareMemory: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val suggestedTypeTitle =
         when (state.type) {
-            TimelineSuggestionBlockType.UPDATE -> "Update"
-            TimelineSuggestionBlockType.HAPPENING_NOW -> "Happening Now"
-            TimelineSuggestionBlockType.EVENT -> "Event"
+            TimelineSuggestionBlockType.COMPLETE_DRAFT -> stringResource(Res.string.suggestion_label_draft)
+            TimelineSuggestionBlockType.EMPTY_DAY -> stringResource(Res.string.suggestion_label_today)
+            TimelineSuggestionBlockType.MEMORY_RECALL -> stringResource(Res.string.suggestion_label_memory)
         }
 
-    fun onMediaClick(uid: String) {
-        // TODO: Handle media click, maybe full-screen/modal?
-    }
+    val containerColor =
+        when (state.type) {
+            TimelineSuggestionBlockType.EMPTY_DAY -> MaterialTheme.colorScheme.tertiaryContainer
+            else -> MaterialTheme.colorScheme.primaryContainer
+        }
+
+    val contentColor =
+        when (state.type) {
+            TimelineSuggestionBlockType.EMPTY_DAY -> MaterialTheme.colorScheme.onTertiaryContainer
+            else -> MaterialTheme.colorScheme.onPrimaryContainer
+        }
+
+    val labelColor =
+        when (state.type) {
+            TimelineSuggestionBlockType.EMPTY_DAY -> MaterialTheme.colorScheme.tertiary
+            else -> MaterialTheme.colorScheme.primary
+        }
 
     Column(
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -122,8 +144,8 @@ fun TimelineSuggestionBlock(
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            color = containerColor,
+            contentColor = contentColor,
             shape = MaterialTheme.shapes.large,
         ) {
             Column {
@@ -138,38 +160,63 @@ fun TimelineSuggestionBlock(
                         suggestedTypeTitle,
                         style =
                             MaterialTheme.typography.labelMedium.copy(
-                                color = MaterialTheme.colorScheme.primary,
+                                color = labelColor,
                             ),
                     )
                     Text(state.message, style = MaterialTheme.typography.titleMedium)
                 }
                 if (state.mediaUris.isNotEmpty()) {
-                    RecentMediaCarousel(state.mediaUris, ::onMediaClick)
+                    RecentMediaCarousel(state.mediaUris)
                 }
-                if (state.people.isNotEmpty()) {
-                    Row(
-                        modifier =
-                            Modifier.padding(
-                                start = Spacing.lg,
-                                end = Spacing.lg,
-                                top = Spacing.sm,
-                                bottom = Spacing.lg,
-                            ),
-                    ) {
-                        PeopleMetadataChip(state.people)
-                    }
-                }
+                SuggestionMetadata(state)
             }
         }
 
-        // Use different action buttons based on suggestion type
         SuggestionActions(
-            type = state.type,
-            memoryId = state.memoryId,
-            onAddToMemory = onAddToMemory,
-            onShare = onShare,
+            state = state,
+            onStartWriting = onStartWriting,
+            onOpenDraft = onOpenDraft,
+            onViewMemoryDay = onViewMemoryDay,
+            onShareMemory = onShareMemory,
             modifier = Modifier.fillMaxWidth(),
         )
+    }
+}
+
+@Composable
+private fun SuggestionMetadata(
+    state: TimelineSuggestionBlockUiState,
+    modifier: Modifier = Modifier,
+) {
+    val hasMetadata = state.people.isNotEmpty() || state.location != null
+
+    if (!hasMetadata) return
+
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        modifier =
+            modifier.padding(
+                start = Spacing.lg,
+                end = Spacing.lg,
+                top = Spacing.sm,
+                bottom = Spacing.lg,
+            ),
+    ) {
+        if (state.people.isNotEmpty()) {
+            PeopleMetadataChip(state.people)
+        }
+        if (state.location != null) {
+            MetadataChip(
+                label = stringResource(Res.string.suggestion_near_location, state.location),
+                icon = {
+                    Icon(
+                        Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                },
+            )
+        }
     }
 }
 
@@ -177,7 +224,6 @@ fun TimelineSuggestionBlock(
 @Composable
 private fun RecentMediaCarousel(
     mediaUris: List<MediaObjectUiState>,
-    onClick: (uid: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val carouselState = rememberCarouselState(itemCount = mediaUris::size)
@@ -198,189 +244,148 @@ private fun RecentMediaCarousel(
     ) {
         mediaUris.forEach { media ->
             key(media.uid) {
-                CarouselItem(
-                    uri = media.uri,
-                    onClick = { onClick(media.uid) },
-                    modifier = Modifier.fillMaxWidth(),
+                AsyncImage(
+                    model = media.uri,
+                    contentDescription = stringResource(Res.string.suggestion_media_item),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.extraLarge),
+                    contentScale = ContentScale.Crop,
                 )
             }
         }
     }
 }
 
-@Composable
-private fun CarouselItem(
-    uri: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    AsyncImage(
-        model = uri,
-        contentDescription = null,
-        modifier =
-            modifier
-                .clip(MaterialTheme.shapes.extraLarge)
-                .clickable(role = Role.Image, onClick = onClick),
-        contentScale = ContentScale.Crop,
-//        modifier = Modifier.widthIn(200.dp),
-    )
-}
-
 /**
- * Actions section for timeline suggestions that changes based on suggestion type.
+ * Actions section for timeline suggestions that adapts based on suggestion type.
  */
 @Composable
 private fun SuggestionActions(
-    type: TimelineSuggestionBlockType,
-    memoryId: String,
-    onAddToMemory: (String) -> Unit,
-    onShare: (String) -> Unit,
+    state: TimelineSuggestionBlockUiState,
+    onStartWriting: () -> Unit,
+    onOpenDraft: (String) -> Unit,
+    onViewMemoryDay: (LocalDate) -> Unit,
+    onShareMemory: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    when (type) {
-        TimelineSuggestionBlockType.HAPPENING_NOW -> {
-            // For "happening now" suggestions (today's memories), only show Add button
-            Row(
-                horizontalArrangement = Arrangement.Center,
-                modifier = modifier,
-            ) {
-                AssistChip(
-                    onClick = { onAddToMemory(memoryId) },
-                    label = { Text(stringResource(Res.string.add_to_memories)) },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    },
-                )
-            }
-        }
-        else -> {
-            // For other suggestion types, show both Add and Share buttons
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(Spacing.md, Alignment.End),
-                modifier = modifier,
-            ) {
-                AssistChip(
-                    onClick = { onAddToMemory(memoryId) },
-                    label = { Text(stringResource(Res.string.add_to_memories)) },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    },
-                )
-                AssistChip(
-                    onClick = { onShare(memoryId) },
-                    label = { Text(stringResource(Res.string.share_link)) },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Default.AddLink,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    },
-                )
-            }
-        }
-    }
-}
-
-/**
- * @deprecated Use SuggestionActions instead
- */
-@Composable
-private fun AssistChipsBlock(
-    onAddToMemory: () -> Unit,
-    onShare: () -> Unit,
-    modifier: Modifier,
-) {
-    // TODO: Figure out why there's internal padding here
     Row(
         horizontalArrangement = Arrangement.spacedBy(Spacing.md, Alignment.End),
         modifier = modifier,
     ) {
-        AssistChip(
-            onClick = onAddToMemory,
-            label = {
-                Text(stringResource(Res.string.add_to_memories))
-            },
-            leadingIcon = {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+        when (state.type) {
+            TimelineSuggestionBlockType.COMPLETE_DRAFT -> {
+                AssistChip(
+                    onClick = { state.draftId?.let(onOpenDraft) },
+                    label = { Text(stringResource(Res.string.finish_draft)) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.EditNote,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    },
                 )
-            },
-        )
-        AssistChip(
-            onClick = onShare,
-            label = {
-                Text(stringResource(Res.string.share_link))
-            },
-            leadingIcon = {
-                Icon(
-                    Icons.Default.AddLink,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+            }
+            TimelineSuggestionBlockType.EMPTY_DAY -> {
+                AssistChip(
+                    onClick = onStartWriting,
+                    label = { Text(stringResource(Res.string.start_writing)) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.EditNote,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.tertiary,
+                        )
+                    },
                 )
-            },
-        )
+            }
+            TimelineSuggestionBlockType.MEMORY_RECALL -> {
+                AssistChip(
+                    onClick = { state.memoryDate?.let(onViewMemoryDay) },
+                    label = { Text(stringResource(Res.string.view_memory)) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.History,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    },
+                )
+                AssistChip(
+                    onClick = { state.memoryDate?.let(onShareMemory) },
+                    label = { Text(stringResource(Res.string.share_link)) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Share,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    },
+                )
+            }
+        }
     }
 }
 
 @Preview
 @Composable
-private fun TimelineSuggestionBlockPreview() {
+private fun TimelineSuggestionBlockPreview_MemoryRecall() {
     val state =
         TimelineSuggestionBlockUiState(
-            memoryId = "1",
+            type = TimelineSuggestionBlockType.MEMORY_RECALL,
             message = "Trip to Six Flags Over Texas",
             mediaUris =
                 listOf(
-                    MediaObjectUiState(
-                        uri = "https://picsum.photos/200/300",
-                        uid = "1",
-                    ),
-                    MediaObjectUiState(
-                        uri = "https://picsum.photos/200/300",
-                        uid = "2",
-                    ),
-                    MediaObjectUiState(
-                        uri = "https://picsum.photos/200/300",
-                        uid = "3",
-                    ),
-                    MediaObjectUiState(
-                        uri = "https://picsum.photos/200/300",
-                        uid = "4",
-                    ),
+                    MediaObjectUiState(uri = "https://picsum.photos/200/300", uid = "1"),
+                    MediaObjectUiState(uri = "https://picsum.photos/200/300", uid = "2"),
+                    MediaObjectUiState(uri = "https://picsum.photos/200/300", uid = "3"),
+                    MediaObjectUiState(uri = "https://picsum.photos/200/300", uid = "4"),
                 ),
             people = listOf("Lane", "Anna", "Willie", "Jake"),
         )
     TimelineSuggestionBlock(
         state,
-        onAddToMemory = {},
-        onShare = {},
+        onStartWriting = {},
+        onOpenDraft = {},
+        onViewMemoryDay = {},
+        onShareMemory = {},
     )
 }
 
 @Preview
 @Composable
-private fun TimelineSuggestionBlockPreview_HappeningNow() {
+private fun TimelineSuggestionBlockPreview_CompleteDraft() {
     val state =
         TimelineSuggestionBlockUiState(
-            memoryId = "1",
-            type = TimelineSuggestionBlockType.HAPPENING_NOW,
-            message = "Trip to Six Flags Over Texas",
-            mediaUris = emptyList(),
+            type = TimelineSuggestionBlockType.COMPLETE_DRAFT,
+            message = "Had a great time at the park today with...",
+            draftId = "draft-1",
         )
     TimelineSuggestionBlock(
         state,
-        onAddToMemory = {},
-        onShare = {},
+        onStartWriting = {},
+        onOpenDraft = {},
+        onViewMemoryDay = {},
+        onShareMemory = {},
+    )
+}
+
+@Preview
+@Composable
+private fun TimelineSuggestionBlockPreview_EmptyDay() {
+    val state =
+        TimelineSuggestionBlockUiState(
+            type = TimelineSuggestionBlockType.EMPTY_DAY,
+            message = "What's going on?",
+            location = "Dallas",
+        )
+    TimelineSuggestionBlock(
+        state,
+        onStartWriting = {},
+        onOpenDraft = {},
+        onViewMemoryDay = {},
+        onShareMemory = {},
     )
 }

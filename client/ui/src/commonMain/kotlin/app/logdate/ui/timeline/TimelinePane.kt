@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.ui.theme.Spacing
@@ -57,14 +58,15 @@ data class TimelineUiState(
 fun TimelinePane(
     uiState: TimelineUiState,
     onNewEntry: () -> Unit,
-    onShareMemory: (memoryId: String) -> Unit,
     onOpenDay: (LocalDate) -> Unit,
     onLoadMoreOlder: () -> Unit = {},
     timelineSuggestion: TimelineSuggestionBlock? = null,
     listState: LazyListState = rememberLazyListState(),
     onSearchClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
-    onAddToMemory: (memoryId: String) -> Unit = {},
+    onStartWriting: () -> Unit = onNewEntry,
+    onOpenDraft: (draftId: String) -> Unit = {},
+    onShareMemory: (LocalDate) -> Unit = {},
     onHistoryClick: () -> Unit = {},
     birthday: Instant? = null,
     modifier: Modifier = Modifier,
@@ -72,7 +74,6 @@ fun TimelinePane(
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val endOfTimelineState by remember(birthday) {
         derivedStateOf {
-            // TODO: Likely fix this redundancy
             if (birthday != null && birthday != Instant.DISTANT_PAST) {
                 val birthDate = birthday.toLocalDateTime(TimeZone.currentSystemDefault()).date
                 val daysSinceBirth = (LocalDate.now().toEpochDays() - birthDate.toEpochDays()).toInt()
@@ -85,6 +86,7 @@ fun TimelinePane(
 
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TimelineTopAppBar(
@@ -110,8 +112,10 @@ fun TimelinePane(
                 onOpenDay = onOpenDay,
                 onLoadMoreOlder = onLoadMoreOlder,
                 timelineSuggestion = timelineSuggestion,
-                onAddToMemory = onAddToMemory,
-                onShare = onShareMemory,
+                onStartWriting = onStartWriting,
+                onOpenDraft = onOpenDraft,
+                onViewMemoryDay = onOpenDay,
+                onShareMemory = onShareMemory,
                 modifier = Modifier.consumeWindowInsets(paddingValues),
                 endOfTimelineState = endOfTimelineState,
                 listState = listState,
@@ -165,12 +169,6 @@ internal fun ScrollToTopButton(
     }
 }
 
-// @Composable
-// private fun LazyListScope.constructTimeline(
-// ) {
-
-// }
-
 @Preview
 @Composable
 private fun TimelinePanePreview() {
@@ -178,13 +176,11 @@ private fun TimelinePanePreview() {
         uiState = TimelineUiState(),
         onOpenDay = {},
         onNewEntry = {},
-        onShareMemory = {},
         timelineSuggestion =
-            TimelineSuggestionBlock.OngoingEvent(
-                memoryId = "",
-                message = "You haven't added any memories today.",
+            TimelineSuggestionBlock.EmptyDay(
+                message = "What's going on?",
+                locationName = "Dallas",
             ),
-        // Use a sample birthday for preview
-        birthday = Instant.fromEpochMilliseconds(1655342400000), // June 16, 2022
+        birthday = Instant.fromEpochMilliseconds(1655342400000),
     )
 }

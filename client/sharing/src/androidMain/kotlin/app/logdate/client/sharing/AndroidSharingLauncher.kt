@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+import kotlinx.datetime.LocalDate
 import kotlin.uuid.Uuid
 
 /**
@@ -23,6 +24,28 @@ class AndroidSharingLauncher(
     private val shareAssetGenerator: ShareAssetInterface,
     private val coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
 ) : SharingLauncher {
+    override fun shareMemoryDay(
+        date: LocalDate,
+        summary: String,
+    ) {
+        val shareText =
+            if (summary.isNotBlank()) {
+                "My memory from $date: $summary"
+            } else {
+                "Check out my memory from $date on LogDate!"
+            }
+        val shareIntent =
+            Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, shareText)
+            }
+        val chooserIntent =
+            Intent.createChooser(shareIntent, null).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        context.startActivity(chooserIntent)
+    }
+
     /**
      * Shares a journal to Instagram as a story.
      *

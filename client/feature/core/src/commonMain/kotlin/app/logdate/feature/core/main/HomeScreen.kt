@@ -49,6 +49,7 @@ import app.logdate.ui.profiles.toUiState
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.HomeTimelineUiState
 import app.logdate.ui.timeline.ImageNoteUiState
+import app.logdate.ui.timeline.MediaObjectUiState
 import app.logdate.ui.timeline.TextNoteUiState
 import app.logdate.ui.timeline.TimelineDaySelection
 import app.logdate.ui.timeline.TimelineDayUiState
@@ -116,12 +117,10 @@ fun HomeScreen(
                             appendError = uiState.appendError,
                         ),
                     onNewEntry = onNewEntry,
-                    onShareMemory = {},
                     onOpenDay = { date -> viewModel.selectDay(date) },
                     onLoadMoreOlder = viewModel::loadMoreOlder,
                     onProfileClick = onOpenSettings,
                     timelineSuggestion = uiState.timelineSuggestion,
-                    // onHistoryClick handled in TimelinePaneScreen
                     modifier =
                         Modifier
                             .applyScreenStyles()
@@ -499,15 +498,23 @@ class HomeViewModel(
 
     private fun HomeRecommendation.toTimelineSuggestionBlock(): TimelineSuggestionBlock? =
         when (this) {
-            is HomeRecommendation.CaptureToday ->
-                TimelineSuggestionBlock.OngoingEvent(
-                    memoryId = "capture-today",
+            is HomeRecommendation.EmptyDay ->
+                TimelineSuggestionBlock.EmptyDay(
                     message = message,
+                    locationName = locationName,
                 )
             is HomeRecommendation.CompleteYourDraft ->
-                TimelineSuggestionBlock.PastMoment(
-                    memoryId = draftId.toString(),
-                    message = notePreview?.takeIf(String::isNotBlank) ?: "Finish your draft while it's still fresh.",
+                TimelineSuggestionBlock.CompleteDraft(
+                    draftId = draftId.toString(),
+                    notePreview = notePreview?.takeIf(String::isNotBlank),
+                )
+            is HomeRecommendation.MemoryRecall ->
+                TimelineSuggestionBlock.MemoryRecall(
+                    memoryDate = date,
+                    title = summary,
+                    people = people,
+                    mediaUris = mediaUris.map { uri -> MediaObjectUiState(uid = uri, uri = uri) },
+                    isAiGenerated = isAiGenerated,
                 )
             HomeRecommendation.None -> null
         }

@@ -2,14 +2,20 @@ package app.logdate.client.domain.recommendation
 
 import app.logdate.client.domain.notes.HasNotesForTodayUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
+import app.logdate.client.domain.places.ResolveLocationToPlaceUseCase
+import app.logdate.client.location.places.StubExternalPlacesProvider
+import app.logdate.client.location.places.StubLocationProvider
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.places.UserPlacesRepository
+import app.logdate.shared.model.Place
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -30,18 +36,22 @@ class HomeRecommendationIntegrationTest {
     // Reactive state flows that allow tests to push data changes mid-test
     private val notesFlow = MutableStateFlow(emptyList<JournalNote>())
     private val draftsFlow = MutableStateFlow(emptyList<EntryDraft>())
+    private val notesRepository = ReactiveNotesRepository(notesFlow)
 
     private val useCase =
         GetHomeRecommendationUseCase(
-            hasNotesForToday = HasNotesForTodayUseCase(ReactiveNotesRepository(notesFlow)),
+            hasNotesForToday = HasNotesForTodayUseCase(notesRepository),
             fetchMostRecentDraft = FetchMostRecentDraftUseCase(ReactiveDraftRepository(draftsFlow)),
+            getMemoryRecall = GetMemoryRecallUseCase(notesRepository),
+            clientLocationProvider = StubLocationProvider,
+            resolveLocationToPlace = ResolveLocationToPlaceUseCase(EmptyUserPlacesRepository(), StubExternalPlacesProvider()),
         )
 
     @Test
-    fun `fresh user sees CaptureToday recommendation`() =
+    fun `fresh user sees EmptyDay recommendation`() =
         runTest {
             val result = useCase().first()
-            assertIs<HomeRecommendation.CaptureToday>(result)
+            assertIs<HomeRecommendation.EmptyDay>(result)
         }
 
     @Test
@@ -78,19 +88,19 @@ class HomeRecommendationIntegrationTest {
             val emissions = mutableListOf<HomeRecommendation>()
             val job = launch { useCase().collect { emissions.add(it) } }
 
-            // State 1: no notes, no draft → CaptureToday
+            // State 1: no notes, no draft → EmptyDay
             delay(50)
-            assertIs<HomeRecommendation.CaptureToday>(emissions.last())
+            assertIs<HomeRecommendation.EmptyDay>(emissions.last())
 
             // State 2: draft created → CompleteYourDraft
             draftsFlow.value = listOf(draftWithText("Started"))
             delay(50)
             assertIs<HomeRecommendation.CompleteYourDraft>(emissions.last())
 
-            // State 3: draft removed, still no notes → CaptureToday
+            // State 3: draft removed, still no notes → EmptyDay
             draftsFlow.value = emptyList()
             delay(50)
-            assertIs<HomeRecommendation.CaptureToday>(emissions.last())
+            assertIs<HomeRecommendation.EmptyDay>(emissions.last())
 
             // State 4: note added → None
             notesFlow.value = listOf(textNote())
@@ -192,5 +202,27 @@ class HomeRecommendationIntegrationTest {
         ): Uuid = uid
 
         override suspend fun deleteDraft(uid: Uuid) = Unit
+    }
+
+    private class EmptyUserPlacesRepository : UserPlacesRepository {
+        override suspend fun getAllPlaces(): List<Place> = emptyList()
+
+        override fun observeAllPlaces(): Flow<List<Place>> = flowOf(emptyList())
+
+        override suspend fun getPlacesNear(
+            latitude: Double,
+            longitude: Double,
+            radiusMeters: Double,
+        ): List<Place> = emptyList()
+
+        override suspend fun getPlaceById(placeId: String): Place? = null
+
+        override suspend fun createPlace(place: Place): Result<Place> = Result.success(place)
+
+        override suspend fun updatePlace(place: Place): Result<Place> = Result.success(place)
+
+        override suspend fun deletePlace(placeId: String): Result<Unit> = Result.success(Unit)
+
+        override suspend fun searchPlaces(query: String): List<Place> = emptyList()
     }
 }

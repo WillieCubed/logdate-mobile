@@ -30,6 +30,7 @@ import app.logdate.client.domain.onboarding.ProcessPersonalIntroductionUseCase
 import app.logdate.client.domain.places.ResolveLocationToPlaceUseCase
 import app.logdate.client.domain.profile.UpdateProfileUseCase
 import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
+import app.logdate.client.domain.recommendation.GetMemoryRecallUseCase
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
 import app.logdate.client.domain.rewind.GenerateBasicRewindUseCase
 import app.logdate.client.domain.rewind.GenerateRewindTitleUseCase
@@ -39,7 +40,6 @@ import app.logdate.client.domain.rewind.GetWeekRewindUseCase
 import app.logdate.client.domain.search.SearchEntriesUseCase
 import app.logdate.client.domain.timeline.GetMediaUrisUseCase
 import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
-import app.logdate.client.domain.timeline.GetTimelineBannerUseCase
 import app.logdate.client.domain.timeline.GetTimelineDayUseCase
 import app.logdate.client.domain.timeline.GetTimelinePageUseCase
 import app.logdate.client.domain.timeline.GetTimelineUseCase
@@ -117,7 +117,6 @@ val domainModule: Module =
         factory { GetStreamingTimelineUseCase(get(), get()) }
         factory { GetTimelinePageUseCase(get()) }
         factory { GetTimelineDayUseCase(get(), get(), get()) }
-        factory { GetTimelineBannerUseCase(get(), get()) }
         factory { SummarizeJournalEntriesUseCase(get()) }
 
         // Include health domain module
@@ -146,5 +145,6 @@ val domainModule: Module =
         factory { SearchEntriesUseCase(get()) }
 
         // Recommendations
-        factory { GetHomeRecommendationUseCase(get(), get()) }
+        factory { GetMemoryRecallUseCase(get(), getOrNull()) }
+        factory { GetHomeRecommendationUseCase(get(), get(), get(), get(), get()) }
     }

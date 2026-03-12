@@ -150,7 +150,7 @@ private val mostRecentRewind =
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun S01_TimelinePopulated() {
+fun S01_TimelineSuggestionCompleteYourDraft() {
     ScreenshotTheme {
         HomeTabRouteFrame(selectedTab = RoutePreviewTab.TIMELINE) {
             TimelinePane(
@@ -162,9 +162,9 @@ fun S01_TimelinePopulated() {
                 onProfileClick = {},
                 onHistoryClick = {},
                 timelineSuggestion =
-                    TimelineSuggestionBlock.OngoingEvent(
-                        memoryId = "memory-1",
-                        message = "You have an unfinished memory from this afternoon.",
+                    TimelineSuggestionBlock.CompleteDraft(
+                        draftId = "draft-1",
+                        notePreview = "You have an unfinished memory from this afternoon.",
                     ),
             )
         }
@@ -205,6 +205,54 @@ fun S03_TimelineScrollToTopVisible() {
                 onProfileClick = {},
                 onHistoryClick = {},
                 listState = LazyListState(firstVisibleItemIndex = 2, firstVisibleItemScrollOffset = 0),
+            )
+        }
+    }
+}
+
+@PreviewTest
+@ScreenshotPreviewMatrix
+@Composable
+fun S03a_TimelineSuggestionEmptyDayWithLocation() {
+    ScreenshotTheme {
+        HomeTabRouteFrame(selectedTab = RoutePreviewTab.TIMELINE) {
+            TimelinePane(
+                uiState = TimelineUiState(items = timelineDays),
+                onNewEntry = {},
+                onShareMemory = {},
+                onOpenDay = {},
+                onSearchClick = {},
+                onProfileClick = {},
+                onHistoryClick = {},
+                timelineSuggestion =
+                    TimelineSuggestionBlock.EmptyDay(
+                        message = "What's going on?",
+                        locationName = "Blue Bottle Coffee",
+                    ),
+            )
+        }
+    }
+}
+
+@PreviewTest
+@ScreenshotPreviewMatrix
+@Composable
+fun S03b_TimelineSuggestionOnThisDayMemoryRecall() {
+    ScreenshotTheme {
+        HomeTabRouteFrame(selectedTab = RoutePreviewTab.TIMELINE) {
+            TimelinePane(
+                uiState = TimelineUiState(items = timelineDays),
+                onNewEntry = {},
+                onShareMemory = {},
+                onOpenDay = {},
+                onSearchClick = {},
+                onProfileClick = {},
+                onHistoryClick = {},
+                timelineSuggestion =
+                    TimelineSuggestionBlock.MemoryRecall(
+                        memoryDate = LocalDate(2024, 2, 20),
+                        title = "Wrapped up the route inventory and started wiring screenshot helpers.",
+                    ),
             )
         }
     }

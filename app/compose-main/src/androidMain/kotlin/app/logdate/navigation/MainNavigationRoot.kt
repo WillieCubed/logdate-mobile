@@ -73,6 +73,7 @@ import androidx.navigation3.scene.Scene
 import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.scene.SceneStrategyScope
 import androidx.navigation3.ui.NavDisplay
+import app.logdate.client.sharing.SharingLauncher
 import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.feature.journals.ui.detail.NoteViewerScreen
 import app.logdate.feature.timeline.ui.TimelineLoadingPlaceholder
@@ -446,7 +447,10 @@ private fun createSceneStrategy(
  */
 @Suppress("ktlint:standard:function-naming")
 @Composable
-fun MainNavigationRoot(mainAppNavigator: MainAppNavigator) {
+fun MainNavigationRoot(
+    mainAppNavigator: MainAppNavigator,
+    sharingLauncher: SharingLauncher,
+) {
     val hasTimelineRoute =
         mainAppNavigator.backStack.any { route ->
             route is TimelineListRoute || route is TimelineDetail
@@ -538,6 +542,12 @@ fun MainNavigationRoot(mainAppNavigator: MainAppNavigator) {
                         homeViewModel?.let { safeHomeViewModel ->
                             timelineRoutes(
                                 openEntryEditor = mainAppNavigator::openEntryEditor,
+                                onOpenDraft = { draftId ->
+                                    mainAppNavigator.openEntryEditor(
+                                        entryId = kotlin.uuid.Uuid.parse(draftId),
+                                    )
+                                },
+                                sharingLauncher = sharingLauncher,
                                 onOpenTimelineDetail = mainAppNavigator::openTimelineDetail,
                                 onCloseTimelineDetail = mainAppNavigator::goBack,
                                 onOpenSettings = mainAppNavigator::openSettings,

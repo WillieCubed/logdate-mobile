@@ -84,6 +84,7 @@ import logdate.client.ui.generated.resources.add_your_birthday_in_settings_to_se
 import logdate.client.ui.generated.resources.congrats_curious_explorer
 import logdate.client.ui.generated.resources.happy_birthday
 import logdate.client.ui.generated.resources.journey_days_count
+import logdate.client.ui.generated.resources.suggestion_draft_fallback
 import logdate.client.ui.generated.resources.youve_reached_the_end
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.absoluteValue
@@ -135,30 +136,36 @@ fun TimelineList(
     appendError: String? = null,
     onLoadMoreOlder: () -> Unit = {},
     timelineSuggestion: TimelineSuggestionBlock? = null,
-    onAddToMemory: (memoryId: String) -> Unit = {},
-    onShare: (memoryId: String) -> Unit = {},
+    onStartWriting: () -> Unit = {},
+    onOpenDraft: (draftId: String) -> Unit = {},
+    onViewMemoryDay: (LocalDate) -> Unit = {},
+    onShareMemory: (LocalDate) -> Unit = {},
     listState: LazyListState = rememberLazyListState(),
 ) {
+    val draftFallbackMessage = stringResource(Res.string.suggestion_draft_fallback)
     val suggestionBlockState: TimelineSuggestionBlockUiState? =
-        remember(timelineSuggestion) {
+        remember(timelineSuggestion, draftFallbackMessage) {
             when (timelineSuggestion) {
-                is TimelineSuggestionBlock.OngoingEvent ->
+                is TimelineSuggestionBlock.CompleteDraft ->
                     TimelineSuggestionBlockUiState(
-                        memoryId = timelineSuggestion.memoryId,
-                        type = TimelineSuggestionBlockType.HAPPENING_NOW,
-                        message = timelineSuggestion.message,
-                        location = timelineSuggestion.location,
-                        people = timelineSuggestion.people,
-                        mediaUris = timelineSuggestion.mediaUris,
+                        type = TimelineSuggestionBlockType.COMPLETE_DRAFT,
+                        message = timelineSuggestion.notePreview ?: draftFallbackMessage,
+                        draftId = timelineSuggestion.draftId,
                     )
-                is TimelineSuggestionBlock.PastMoment ->
+                is TimelineSuggestionBlock.EmptyDay ->
                     TimelineSuggestionBlockUiState(
-                        memoryId = timelineSuggestion.memoryId,
-                        type = TimelineSuggestionBlockType.UPDATE,
+                        type = TimelineSuggestionBlockType.EMPTY_DAY,
                         message = timelineSuggestion.message,
-                        location = timelineSuggestion.location,
+                        location = timelineSuggestion.locationName,
+                    )
+                is TimelineSuggestionBlock.MemoryRecall ->
+                    TimelineSuggestionBlockUiState(
+                        type = TimelineSuggestionBlockType.MEMORY_RECALL,
+                        message = timelineSuggestion.title,
+                        memoryDate = timelineSuggestion.memoryDate,
                         people = timelineSuggestion.people,
                         mediaUris = timelineSuggestion.mediaUris,
+                        isAiGenerated = timelineSuggestion.isAiGenerated,
                     )
                 null -> null
             }
@@ -197,8 +204,10 @@ fun TimelineList(
                     suggestionBlockState?.let { blockState ->
                         TimelineSuggestionBlock(
                             state = blockState,
-                            onAddToMemory = onAddToMemory,
-                            onShare = onShare,
+                            onStartWriting = onStartWriting,
+                            onOpenDraft = onOpenDraft,
+                            onViewMemoryDay = onViewMemoryDay,
+                            onShareMemory = onShareMemory,
                             modifier = Modifier.padding(Spacing.lg),
                         )
                     }

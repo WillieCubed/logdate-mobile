@@ -20,6 +20,8 @@ import org.koin.compose.viewmodel.koinViewModel
  * @param onOpenDay Callback for when user selects a specific day to view details
  * @param onOpenSettings Callback for when the user clicks the settings icon
  * @param onOpenSearch Callback for when the user clicks the search icon
+ * @param onOpenDraft Callback for when the user taps "Finish Draft" on a suggestion
+ * @param onShareMemory Callback for when the user taps "Share" on a memory recall
  * @param viewModel HomeViewModel that contains timeline data
  */
 @Suppress("ktlint:standard:function-naming")
@@ -30,6 +32,8 @@ fun TimelinePaneScreen(
     onOpenSettings: () -> Unit,
     onOpenLocationTimeline: () -> Unit,
     onOpenSearch: () -> Unit = {},
+    onOpenDraft: (draftId: String) -> Unit = {},
+    onShareMemory: (LocalDate) -> Unit = {},
     viewModel: HomeViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -45,12 +49,13 @@ fun TimelinePaneScreen(
                 appendError = uiState.appendError,
             ),
         onNewEntry = onNewEntry,
-        onShareMemory = {},
         onOpenDay = onOpenDay,
         onSearchClick = onOpenSearch,
         onProfileClick = onOpenSettings,
         onLoadMoreOlder = viewModel::loadMoreOlder,
         timelineSuggestion = uiState.timelineSuggestion,
+        onOpenDraft = onOpenDraft,
+        onShareMemory = onShareMemory,
         onHistoryClick = {
             showLocationQuickPeek = true
         },

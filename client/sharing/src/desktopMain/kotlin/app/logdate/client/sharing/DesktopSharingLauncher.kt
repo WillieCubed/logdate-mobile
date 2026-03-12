@@ -1,10 +1,12 @@
 package app.logdate.client.sharing
 
 import app.logdate.client.repository.journals.JournalRepository
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+import kotlinx.datetime.LocalDate
 import java.awt.Desktop
 import java.net.URI
 import kotlin.uuid.Uuid
@@ -21,6 +23,13 @@ class DesktopSharingLauncher(
     private val journalRepository: JournalRepository,
     private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Main),
 ) : SharingLauncher {
+    override fun shareMemoryDay(
+        date: LocalDate,
+        summary: String,
+    ) {
+        Napier.w { "Memory sharing is not yet supported on desktop" }
+    }
+
     /**
      * Shares a journal to Instagram as a story.
      *

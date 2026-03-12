@@ -5,6 +5,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+import kotlinx.datetime.LocalDate
 import kotlin.uuid.Uuid
 
 /**
@@ -19,6 +20,13 @@ class IosSharingLauncher(
     private val journalRepository: JournalRepository,
     private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Main),
 ) : SharingLauncher {
+    override fun shareMemoryDay(
+        date: LocalDate,
+        summary: String,
+    ) {
+        // iOS share sheet implementation needed
+    }
+
     /**
      * Shares a journal to Instagram as a story.
      *

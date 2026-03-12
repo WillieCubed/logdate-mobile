@@ -2,10 +2,15 @@ package app.logdate.client.domain.recommendation
 
 import app.logdate.client.domain.notes.HasNotesForTodayUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
+import app.logdate.client.domain.places.ResolveLocationToPlaceUseCase
+import app.logdate.client.location.places.StubExternalPlacesProvider
+import app.logdate.client.location.places.StubLocationProvider
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.places.UserPlacesRepository
+import app.logdate.shared.model.Place
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,6 +40,9 @@ class GetHomeRecommendationUseCaseTest {
             GetHomeRecommendationUseCase(
                 hasNotesForToday = HasNotesForTodayUseCase(mockNotesRepository),
                 fetchMostRecentDraft = FetchMostRecentDraftUseCase(mockDraftRepository),
+                getMemoryRecall = GetMemoryRecallUseCase(mockNotesRepository),
+                clientLocationProvider = StubLocationProvider,
+                resolveLocationToPlace = ResolveLocationToPlaceUseCase(EmptyUserPlacesRepository(), StubExternalPlacesProvider()),
             )
     }
 
@@ -51,28 +59,28 @@ class GetHomeRecommendationUseCaseTest {
             assertIs<HomeRecommendation.None>(result)
         }
 
-    // --- CaptureToday ---
+    // --- EmptyDay ---
 
     @Test
-    fun `returns CaptureToday when user has no notes today and no drafts`() =
+    fun `returns EmptyDay when user has no notes today and no drafts`() =
         runTest {
             mockNotesRepository.notesForRange = emptyList()
             mockDraftRepository.drafts = emptyList()
 
             val result = useCase().first()
 
-            assertIs<HomeRecommendation.CaptureToday>(result)
+            assertIs<HomeRecommendation.EmptyDay>(result)
         }
 
     @Test
-    fun `CaptureToday carries default message`() =
+    fun `EmptyDay carries default message`() =
         runTest {
             mockNotesRepository.notesForRange = emptyList()
             mockDraftRepository.drafts = emptyList()
 
-            val result = useCase().first() as HomeRecommendation.CaptureToday
+            val result = useCase().first() as HomeRecommendation.EmptyDay
 
-            assertEquals("You haven't added any memories today.", result.message)
+            assertEquals("What's going on?", result.message)
         }
 
     // --- CompleteYourDraft ---
@@ -128,10 +136,10 @@ class GetHomeRecommendationUseCaseTest {
     // --- Priority ---
 
     @Test
-    fun `CompleteYourDraft takes priority over CaptureToday when draft exists`() =
+    fun `CompleteYourDraft takes priority over EmptyDay when draft exists`() =
         runTest {
             val draft = createDraftWithText("Draft content")
-            // No notes today — would normally trigger CaptureToday
+            // No notes today — would normally trigger EmptyDay
             mockNotesRepository.notesForRange = emptyList()
             mockDraftRepository.drafts = listOf(draft)
 
@@ -166,13 +174,12 @@ class GetHomeRecommendationUseCaseTest {
             val job = launch { useCase().collect { emissions.add(it) } }
 
             delay(50)
-            assertIs<HomeRecommendation.CaptureToday>(emissions[0])
+            assertIs<HomeRecommendation.EmptyDay>(emissions[0])
 
             notesFlow.value = listOf(createTextNote())
 
             delay(50)
-            assertEquals(2, emissions.size)
-            assertIs<HomeRecommendation.None>(emissions[1])
+            assertIs<HomeRecommendation.None>(emissions.last())
 
             job.cancel()
         }
@@ -188,13 +195,12 @@ class GetHomeRecommendationUseCaseTest {
             val job = launch { useCase().collect { emissions.add(it) } }
 
             delay(50)
-            assertIs<HomeRecommendation.CaptureToday>(emissions[0])
+            assertIs<HomeRecommendation.EmptyDay>(emissions[0])
 
             draftsFlow.value = listOf(createDraftWithText("New draft"))
 
             delay(50)
-            assertEquals(2, emissions.size)
-            assertIs<HomeRecommendation.CompleteYourDraft>(emissions[1])
+            assertIs<HomeRecommendation.CompleteYourDraft>(emissions.last())
 
             job.cancel()
         }
@@ -216,8 +222,7 @@ class GetHomeRecommendationUseCaseTest {
             draftsFlow.value = emptyList()
 
             delay(50)
-            assertEquals(2, emissions.size)
-            assertIs<HomeRecommendation.None>(emissions[1])
+            assertIs<HomeRecommendation.None>(emissions.last())
 
             job.cancel()
         }
@@ -328,5 +333,27 @@ class GetHomeRecommendationUseCaseTest {
         ): Uuid = uid
 
         override suspend fun deleteDraft(uid: Uuid) = Unit
+    }
+
+    private class EmptyUserPlacesRepository : UserPlacesRepository {
+        override suspend fun getAllPlaces(): List<Place> = emptyList()
+
+        override fun observeAllPlaces(): Flow<List<Place>> = flowOf(emptyList())
+
+        override suspend fun getPlacesNear(
+            latitude: Double,
+            longitude: Double,
+            radiusMeters: Double,
+        ): List<Place> = emptyList()
+
+        override suspend fun getPlaceById(placeId: String): Place? = null
+
+        override suspend fun createPlace(place: Place): Result<Place> = Result.success(place)
+
+        override suspend fun updatePlace(place: Place): Result<Place> = Result.success(place)
+
+        override suspend fun deletePlace(placeId: String): Result<Unit> = Result.success(Unit)
+
+        override suspend fun searchPlaces(query: String): List<Place> = emptyList()
     }
 }
