@@ -29,8 +29,10 @@ import app.logdate.client.domain.notes.drafts.UpdateEntryDraftUseCase
 import app.logdate.client.domain.onboarding.ProcessPersonalIntroductionUseCase
 import app.logdate.client.domain.places.ResolveLocationToPlaceUseCase
 import app.logdate.client.domain.profile.UpdateProfileUseCase
+import app.logdate.client.domain.recommendation.DefaultMemoriesSettingsRepository
 import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
 import app.logdate.client.domain.recommendation.GetMemoryRecallUseCase
+import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
 import app.logdate.client.domain.rewind.GenerateBasicRewindUseCase
 import app.logdate.client.domain.rewind.GenerateRewindTitleUseCase
@@ -146,5 +148,6 @@ val domainModule: Module =
 
         // Recommendations
         factory { GetMemoryRecallUseCase(get(), getOrNull()) }
-        factory { GetHomeRecommendationUseCase(get(), get(), get(), get(), get()) }
+        factory { GetHomeRecommendationUseCase(get(), get(), get(), get(), get(), get()) }
+        single<MemoriesSettingsRepository> { DefaultMemoriesSettingsRepository(get()) }
     }

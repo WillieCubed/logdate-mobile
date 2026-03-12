@@ -7,8 +7,11 @@ import app.logdate.client.domain.places.ResolveLocationToPlaceUseCase
 import app.logdate.client.location.ClientLocationProvider
 import app.logdate.client.repository.journals.JournalNote
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 
@@ -21,12 +24,14 @@ import kotlinx.coroutines.flow.onStart
  * 3. [HomeRecommendation.EmptyDay] — the user has not logged anything today
  * 4. [HomeRecommendation.None] — no action needed
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class GetHomeRecommendationUseCase(
     private val hasNotesForToday: HasNotesForTodayUseCase,
     private val fetchMostRecentDraft: FetchMostRecentDraftUseCase,
     private val getMemoryRecall: GetMemoryRecallUseCase,
     private val clientLocationProvider: ClientLocationProvider,
     private val resolveLocationToPlace: ResolveLocationToPlaceUseCase,
+    private val memoriesSettingsRepository: MemoriesSettingsRepository,
 ) {
     private val locationNameFlow: Flow<String?> =
         clientLocationProvider.currentLocation
@@ -44,34 +49,39 @@ class GetHomeRecommendationUseCase(
             }.onStart { emit(null) }
 
     operator fun invoke(): Flow<HomeRecommendation> =
-        combine(
-            hasNotesForToday(),
-            fetchMostRecentDraft(),
-            getMemoryRecall(),
-            locationNameFlow,
-        ) { hasNotes, recentDraft, recall, locationName ->
-            when {
-                recentDraft != null ->
-                    HomeRecommendation.CompleteYourDraft(
-                        draftId = recentDraft.id,
-                        notePreview =
-                            recentDraft.notes
-                                .filterIsInstance<JournalNote.Text>()
-                                .firstOrNull()
-                                ?.content,
-                    )
-                recall != null ->
-                    HomeRecommendation.MemoryRecall(
-                        date = recall.date,
-                        summary = recall.summary,
-                        people = recall.people,
-                        mediaUris = recall.mediaUris,
-                    )
-                !hasNotes ->
-                    HomeRecommendation.EmptyDay(
-                        locationName = locationName,
-                    )
-                else -> HomeRecommendation.None
+        memoriesSettingsRepository.observeSettings().flatMapLatest { settings ->
+            if (!settings.contextualRecommendationsEnabled) {
+                return@flatMapLatest flowOf(HomeRecommendation.None)
+            }
+            combine(
+                hasNotesForToday(),
+                fetchMostRecentDraft(),
+                getMemoryRecall(aiEnabled = settings.aiRecallEnabled),
+                locationNameFlow,
+            ) { hasNotes, recentDraft, recall, locationName ->
+                when {
+                    recentDraft != null ->
+                        HomeRecommendation.CompleteYourDraft(
+                            draftId = recentDraft.id,
+                            notePreview =
+                                recentDraft.notes
+                                    .filterIsInstance<JournalNote.Text>()
+                                    .firstOrNull()
+                                    ?.content,
+                        )
+                    recall != null ->
+                        HomeRecommendation.MemoryRecall(
+                            date = recall.date,
+                            summary = recall.summary,
+                            people = recall.people,
+                            mediaUris = recall.mediaUris,
+                        )
+                    !hasNotes ->
+                        HomeRecommendation.EmptyDay(
+                            locationName = locationName,
+                        )
+                    else -> HomeRecommendation.None
+                }
             }
         }
 }
