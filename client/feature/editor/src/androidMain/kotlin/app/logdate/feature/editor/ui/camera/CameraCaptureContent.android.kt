@@ -501,6 +501,11 @@ private fun InlineCameraCapture(
         }
     }
 
+    // Camera switch overlay — fades to black during the switch so the user
+    // sees a smooth transition instead of the viewfinder blinking.
+    val switchOverlayAlpha = remember { Animatable(0f) }
+    var isSwitchingCamera by remember { mutableStateOf(false) }
+
     // Capture flash state
     var showFlash by remember { mutableStateOf(false) }
     LaunchedEffect(uiState.isCapturing) {
@@ -525,6 +530,18 @@ private fun InlineCameraCapture(
             focusRingScale.animateTo(1f, tween(200))
             delay(800)
             focusRingAlpha.animateTo(0f, tween(300))
+        }
+    }
+
+    // Orchestrate camera switch: fade to black → switch → fade back
+    LaunchedEffect(isSwitchingCamera) {
+        if (isSwitchingCamera) {
+            switchOverlayAlpha.animateTo(1f, tween(150, easing = FastOutSlowInEasing))
+            viewModel.switchCamera()
+            // Brief hold so CameraX has time to emit the new surface request
+            delay(200)
+            switchOverlayAlpha.animateTo(0f, tween(300, easing = FastOutSlowInEasing))
+            isSwitchingCamera = false
         }
     }
 
@@ -619,6 +636,16 @@ private fun InlineCameraCapture(
                 )
             }
 
+            // Camera switch crossfade overlay
+            if (switchOverlayAlpha.value > 0f) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = switchOverlayAlpha.value)),
+                )
+            }
+
             // Top controls — recording indicator only (back handled by editor toolbar)
             AnimatedVisibility(
                 visible = uiState.isRecording,
@@ -710,10 +737,12 @@ private fun InlineCameraCapture(
 
                     IconButton(
                         onClick = {
-                            currentZoom = 1f
-                            viewModel.switchCamera()
+                            if (!isSwitchingCamera) {
+                                isSwitchingCamera = true
+                                currentZoom = 1f
+                            }
                         },
-                        enabled = !uiState.isRecording,
+                        enabled = !uiState.isRecording && !isSwitchingCamera,
                         modifier =
                             Modifier
                                 .background(
