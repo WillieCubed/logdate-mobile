@@ -31,7 +31,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import app.logdate.ui.theme.Spacing
-import androidx.compose.ui.util.lerp as lerpFloat
 
 /**
  * Signals to editor components nested anywhere beneath [ImmersiveEditorLayout] that the
@@ -84,14 +83,12 @@ fun ImmersiveEditorLayout(
         val topOffset = lerp(0.dp, statusBarTop + 40.dp, immersiveExitProgress)
         val horizontalPadding = lerp(0.dp, Spacing.sm, immersiveExitProgress)
         val innerTopPadding = lerp(0.dp, Spacing.sm, immersiveExitProgress)
-        val scrimAlpha = lerpFloat(0.72f, 0.50f, immersiveExitProgress)
-
         CompositionLocalProvider(LocalEditorIsCompact provides isCompact) {
             Box(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = scrimAlpha)),
+                        .background(MaterialTheme.colorScheme.surfaceDim),
             ) {
                 Box(
                     modifier =
