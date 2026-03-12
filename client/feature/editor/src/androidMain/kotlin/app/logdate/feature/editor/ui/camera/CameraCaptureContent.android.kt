@@ -501,8 +501,8 @@ private fun InlineCameraCapture(
         }
     }
 
-    // Camera switch overlay — fades to black during the switch so the user
-    // sees a smooth transition instead of the viewfinder blinking.
+    // Camera switch overlay — brief dim pulse signals the switch while
+    // the old frame stays visible until the new camera feed arrives.
     val switchOverlayAlpha = remember { Animatable(0f) }
     var isSwitchingCamera by remember { mutableStateOf(false) }
 
@@ -533,14 +533,12 @@ private fun InlineCameraCapture(
         }
     }
 
-    // Orchestrate camera switch: fade to black → switch → fade back
+    // Orchestrate camera switch: quick dim → switch (old frame stays) → fade back
     LaunchedEffect(isSwitchingCamera) {
         if (isSwitchingCamera) {
-            switchOverlayAlpha.animateTo(1f, tween(150, easing = FastOutSlowInEasing))
+            switchOverlayAlpha.animateTo(0.6f, tween(80, easing = FastOutSlowInEasing))
             viewModel.switchCamera()
-            // Brief hold so CameraX has time to emit the new surface request
-            delay(200)
-            switchOverlayAlpha.animateTo(0f, tween(300, easing = FastOutSlowInEasing))
+            switchOverlayAlpha.animateTo(0f, tween(200, easing = FastOutSlowInEasing))
             isSwitchingCamera = false
         }
     }

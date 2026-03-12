@@ -378,19 +378,78 @@ class AndroidCameraCaptureManager(
     }
 
     override suspend fun switchCamera() {
-        val newFacing =
-            when (_state.value.cameraFacing) {
-                CameraFacing.FRONT -> CameraFacing.BACK
-                CameraFacing.BACK -> CameraFacing.FRONT
-            }
-
         if (_state.value.isRecording) {
             Napier.w("Cannot switch camera while recording")
             return
         }
 
-        stopPreview()
-        startPreview(newFacing)
+        val provider = cameraProvider ?: return
+        val owner = lifecycleOwner ?: return
+        val newFacing =
+            when (_state.value.cameraFacing) {
+                CameraFacing.FRONT -> CameraFacing.BACK
+                CameraFacing.BACK -> CameraFacing.FRONT
+            }
+        val cameraSelector =
+            when (newFacing) {
+                CameraFacing.FRONT -> CameraSelector.DEFAULT_FRONT_CAMERA
+                CameraFacing.BACK -> CameraSelector.DEFAULT_BACK_CAMERA
+            }
+
+        val aspectRatioStrategy =
+            when (_state.value.aspectRatio) {
+                CameraAspectRatio.STANDARD -> AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY
+                CameraAspectRatio.FULL,
+                CameraAspectRatio.SQUARE,
+                -> AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY
+            }
+        val resolutionSelector =
+            ResolutionSelector
+                .Builder()
+                .setAspectRatioStrategy(aspectRatioStrategy)
+                .build()
+
+        // Build new use cases before unbinding so the surface provider callback
+        // fires as soon as the new camera is bound — the old frame stays visible
+        // in the viewfinder until the new SurfaceRequest arrives.
+        preview =
+            Preview
+                .Builder()
+                .setResolutionSelector(resolutionSelector)
+                .build()
+                .apply {
+                    setSurfaceProvider { request ->
+                        _surfaceRequest.value = request
+                    }
+                }
+        imageCapture =
+            ImageCapture
+                .Builder()
+                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                .setResolutionSelector(resolutionSelector)
+                .build()
+        val recorder =
+            Recorder
+                .Builder()
+                .setQualitySelector(QualitySelector.from(Quality.HIGHEST))
+                .build()
+        videoCapture = VideoCapture.withOutput(recorder)
+
+        try {
+            provider.unbindAll()
+            camera =
+                provider.bindToLifecycle(
+                    owner,
+                    cameraSelector,
+                    preview,
+                    imageCapture,
+                    videoCapture,
+                )
+            _state.update { it.copy(cameraFacing = newFacing) }
+        } catch (e: Exception) {
+            Napier.e("Failed to switch camera", e)
+            _state.update { it.copy(error = CameraCaptureError.Unknown(e.message ?: "Switch failed")) }
+        }
     }
 
     override fun setCaptureMode(mode: CaptureMode) {
