@@ -26,6 +26,7 @@ import app.logdate.client.launch.LaunchStage
 import app.logdate.client.launch.LaunchStageSnapshot
 import app.logdate.client.launch.markCompleted
 import app.logdate.client.launch.reduceLaunchBootstrapState
+import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.client.location.tracking.NAV_SOURCE_LOCATION_HISTORY
 import app.logdate.client.media.audio.EXTRA_NAV_SOURCE
 import app.logdate.client.media.audio.EXTRA_NOTE_ID
@@ -76,6 +77,7 @@ class MainActivity : FragmentActivity() {
     private val databaseStartupMonitor: DatabaseStartupMonitor by inject()
     private val databaseRecoveryController: DatabaseRecoveryController by inject()
     private val playInAppUpdateController: PlayInAppUpdateController by inject()
+    private val locationTrackingManager: LocationTrackingManager by inject()
 
     private val viewModel by viewModel<AppViewModel>()
 
@@ -259,6 +261,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        locationTrackingManager.onActivityResumed()
         activityProvider.currentActivity = this
         lifecycleScope.launch {
             playInAppUpdateController.resumeIfUpdateInProgress()
@@ -267,6 +270,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onPause() {
         super.onPause()
+        locationTrackingManager.onActivityPaused()
         viewModel.onAppBackgrounded()
         if (activityProvider.currentActivity === this) {
             // Only clear the reference if it's still pointing to this activity

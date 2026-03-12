@@ -1,5 +1,6 @@
 package app.logdate.client.location.tracking
 
+import android.app.ForegroundServiceStartNotAllowedException
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -10,6 +11,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import app.logdate.client.location.ClientLocationProvider
 import app.logdate.client.location.history.LocationTracker
@@ -28,12 +30,22 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import kotlin.time.Duration.Companion.seconds
 
-fun Context.startDetailedLocationTrackingService() {
+fun Context.startDetailedLocationTrackingService(): Boolean {
     val intent =
         Intent(this, DetailedLocationTrackingService::class.java).apply {
             action = DetailedLocationTrackingService.ACTION_START
         }
-    startForegroundService(intent)
+    return runCatching {
+        startForegroundService(intent)
+        true
+    }.getOrElse { error ->
+        if (isForegroundServiceStartNotAllowed(error)) {
+            Napier.w("Detailed location tracking start denied by foreground service policy", error)
+            false
+        } else {
+            throw error
+        }
+    }
 }
 
 fun Context.stopDetailedLocationTrackingService() {
@@ -43,6 +55,17 @@ fun Context.stopDetailedLocationTrackingService() {
         }
     stopService(intent)
 }
+
+private fun isForegroundServiceStartNotAllowed(error: Throwable): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+        return false
+    }
+
+    return isForegroundServiceStartNotAllowedApi31(error)
+}
+
+@RequiresApi(Build.VERSION_CODES.S)
+private fun isForegroundServiceStartNotAllowedApi31(error: Throwable): Boolean = error is ForegroundServiceStartNotAllowedException
 
 class DetailedLocationTrackingService :
     Service(),

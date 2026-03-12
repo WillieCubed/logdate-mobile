@@ -11,12 +11,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.window.layout.WindowMetricsCalculator
+import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.feature.editor.ui.NoteEditorScreen
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.ui.theme.LogDateTheme
 import io.github.aakira.napier.Napier
 import io.github.vinceglb.filekit.core.FileKit
 import kotlinx.coroutines.launch
+import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import kotlin.uuid.Uuid
 
@@ -36,6 +38,7 @@ import kotlin.uuid.Uuid
  */
 class EditorActivity : FragmentActivity() {
     private val viewModel by viewModel<EntryEditorViewModel>()
+    private val locationTrackingManager: LocationTrackingManager by inject()
 
     // We'll implement EditorInstanceId handling later
     private var instanceId: String? = null
@@ -104,12 +107,18 @@ class EditorActivity : FragmentActivity() {
 
     override fun onPause() {
         super.onPause()
+        locationTrackingManager.onActivityPaused()
         // Auto-save content when going to background
         val editorState = viewModel.editorState.value
         if (editorState.isDirty) {
             Napier.d("Auto-saving editor content on pause")
             viewModel.autoSaveEntry(editorState)
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        locationTrackingManager.onActivityResumed()
     }
 
     /**
