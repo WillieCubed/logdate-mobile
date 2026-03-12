@@ -45,6 +45,7 @@ activitypub  # ActivityPub protocol implementation
 atproto  # AT Protocol standalone library implementation
 
 # Cross-cutting scopes
+standards  # Commit message, code style, and contribution guidelines
 infra  # CI/CD, Gradle config, Terraform, build scripts
 build  # Build system changes (plugins, dependencies, versions)
 ios  # iOS-specific platform code
