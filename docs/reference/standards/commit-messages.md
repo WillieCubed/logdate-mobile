@@ -64,7 +64,7 @@ Special annotations tools parse, placed after body text on separate lines:
 
 | Type | Purpose | Body Should Include |
 |------|---------|-------------------|
-| **feat** | New functionality added (capability that didn't exist before) | What feature does, why needed, important implementation decisions |
+| **feat** | New functionality added (capability that didn't exist before) | What users can now do, why it matters, how it feels — written like a changelog entry, not a code review |
 | **fix** | Behavior corrected (something wasn't working, now it is) | What was broken, why it was broken, how fix addresses root cause |
 | **refactor** | Code restructured without behavior change | Why restructuring was needed (bugs? clarity? enabling future work?) |
 | **docs** | Documentation-only changes (README, comments, API docs) | Usually self-explanatory; explain if non-obvious |
@@ -223,19 +223,99 @@ Subheadings like "Added:", "Improved:", "Removed:" are fine for organizing large
 
 ### For Features
 
-Answer: What does it do? Why was it needed? What does it enable?
+**`feat` commits must prioritize end-user behavior.** Write them like a changelog entry that a user of the app would read and understand. Lead with what the user can now do, not what classes were added or what internal plumbing changed.
+
+Answer: What can users do now that they couldn't before? How does the experience feel? Why does it matter?
 
 ```
+❌ BAD — Sounds like a code review:
 feat(workspace): add automatic workspace backups
 
-Users requested reliable backup functionality for workspace data.
-This commit adds automatic daily backups to cold storage with
-configurable retention policies.
+Add WorkspaceBackupService with daily cron trigger and S3 cold
+storage integration. Uses incremental snapshots via BackupEngine.
+Wired through DI in WorkspaceModule.
 
-Backups use incremental snapshots to reduce storage costs while
-maintaining full point-in-time recovery capability. Addresses the
-data loss concerns raised in support tickets #456 and #789.
+✅ GOOD — Sounds like a changelog:
+feat(workspace): add automatic workspace backups
+
+Workspaces are now backed up daily to cold storage. If something
+goes wrong, you can restore to any point in the last 30 days.
+Backups are incremental so they won't eat through storage quotas.
+
+Addresses the data loss concerns raised in support tickets #456
+and #789.
 ```
+
+The diff already shows the implementation details. The commit message should explain the **experience**, not the **mechanism**.
+
+#### Sneaky Tech Dumps
+
+These look like reasonable commit messages at first glance, but they describe plumbing instead of behavior. A user reading the changelog learns nothing about what changed for them.
+
+```
+❌ SNEAKY — Mentions "users" but immediately dives into internals:
+feat(timeline): show contextual suggestion cards on timeline
+
+Replace legacy OngoingEvent and SharedMemory suggestion types with
+three functional card variants: CompleteDraft navigates to the editor,
+MemoryRecall surfaces past entries with a share action via
+SharingLauncher, and EmptyDay prompts writing with nearby location.
+
+Remove GetTimelineBannerUseCase, deprecated SuggestedEntryBlock, and
+dead SharedMemory domain type. Fix people extraction bug that returned
+location names. Wire SharingLauncher through navigation with Koin DI.
+```
+
+The title is fine but the body is a laundry list of classes renamed, deleted, and rewired. Nobody outside the codebase knows what a `SharingLauncher` or `GetTimelineBannerUseCase` is. Compare:
+
+```
+✅ GOOD — Describes the same change as an experience:
+feat(timeline): show contextual suggestion cards on timeline
+
+The timeline now shows contextual suggestions that respond to what
+you've been doing. Unfinished drafts surface a card that takes you
+straight back to the editor. Past memories from the same date appear
+as shareable "on this day" cards. When there's nothing captured yet,
+a gentle prompt encourages you to start writing, showing your nearby
+location when available.
+```
+
+More examples of passable-looking tech dumps:
+
+```
+❌ SNEAKY — Uses "support" but describes architecture:
+feat(editor): support multi-format note capture
+
+Add AudioCaptureManager and VideoCaptureManager implementing the
+CaptureStrategy interface. Each format registers through the
+EditorModule DI container and is resolved at runtime based on the
+selected capture mode.
+
+✅ GOOD:
+feat(editor): capture audio and video notes
+
+You can now record audio memos and video clips directly in the
+editor alongside text and photos. Each format appears as a
+playable card in your timeline.
+```
+
+```
+❌ SNEAKY — Starts user-facing, then derails:
+feat(sharing): share memories to social platforms
+
+Implement ShareIntentBuilder with platform-specific strategies for
+Instagram Stories and the system share sheet. Uses ContentProvider
+for URI resolution and FileProvider for secure media access.
+
+✅ GOOD:
+feat(sharing): share memories to social platforms
+
+You can now share a memory to Instagram Stories or any app on your
+phone via the system share sheet. Photos and videos are included
+automatically.
+```
+
+**The test**: If you removed every class name, interface name, and module name from the body, would a sentence still say something meaningful? If not, rewrite it.
 
 ### For Bug Fixes
 
