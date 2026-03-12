@@ -26,8 +26,10 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -265,6 +267,7 @@ private fun PreviewInlineCameraCapture(modifier: Modifier = Modifier) {
                 modifier =
                     Modifier
                         .fillMaxWidth()
+                        .statusBarsPadding()
                         .padding(horizontal = 20.dp, vertical = 18.dp)
                         .align(Alignment.TopCenter),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -304,6 +307,7 @@ private fun PreviewInlineCameraCapture(modifier: Modifier = Modifier) {
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
                         .padding(bottom = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -377,6 +381,7 @@ private fun MediaReviewContent(
                     Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
                         .background(
                             MaterialTheme.colorScheme.surfaceContainer,
                             RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
@@ -487,66 +492,61 @@ private fun InlineCameraCapture(
         Box(modifier = Modifier.fillMaxSize()) {
             // Camera viewfinder from the manager's surface request
             val currentSurfaceRequest = surfaceRequest
-            if (currentSurfaceRequest != null) {
-                Box(
-                    modifier =
-                        Modifier
-                            .align(Alignment.Center)
-                            .aspectRatio(3f / 4f)
-                            .clip(RoundedCornerShape(20.dp))
-                            .onSizeChanged { viewfinderSize = it }
-                            .pointerInput(Unit) {
-                                detectTransformGestures { _, _, zoom, _ ->
-                                    currentZoom = (currentZoom * zoom).coerceIn(1f, 10f)
-                                    manager?.setZoomRatio(currentZoom)
-                                }
-                            }.pointerInput(Unit) {
-                                detectTapGestures(
-                                    onTap = { offset ->
-                                        focusPoint = offset
-                                        if (viewfinderSize.width > 0 && viewfinderSize.height > 0) {
-                                            val factory =
-                                                SurfaceOrientedMeteringPointFactory(
-                                                    viewfinderSize.width.toFloat(),
-                                                    viewfinderSize.height.toFloat(),
-                                                )
-                                            manager?.tapToFocus(factory, offset.x, offset.y)
-                                        }
-                                    },
-                                )
-                            },
-                ) {
-                    CameraXViewfinder(
-                        surfaceRequest = currentSurfaceRequest,
-                        implementationMode = ImplementationMode.EXTERNAL,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+            AnimatedVisibility(
+                visible = currentSurfaceRequest != null,
+                enter = fadeIn(tween(150)),
+                exit = fadeOut(tween(200)),
+                modifier = Modifier.align(Alignment.Center),
+            ) {
+                // currentSurfaceRequest is captured at composition time;
+                // AnimatedVisibility keeps rendering the exit animation after it becomes null.
+                currentSurfaceRequest?.let { request ->
+                    Box(
+                        modifier =
+                            Modifier
+                                .aspectRatio(3f / 4f)
+                                .clip(RoundedCornerShape(20.dp))
+                                .onSizeChanged { viewfinderSize = it }
+                                .pointerInput(Unit) {
+                                    detectTransformGestures { _, _, zoom, _ ->
+                                        currentZoom = (currentZoom * zoom).coerceIn(1f, 10f)
+                                        manager?.setZoomRatio(currentZoom)
+                                    }
+                                }.pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onTap = { offset ->
+                                            focusPoint = offset
+                                            if (viewfinderSize.width > 0 && viewfinderSize.height > 0) {
+                                                val factory =
+                                                    SurfaceOrientedMeteringPointFactory(
+                                                        viewfinderSize.width.toFloat(),
+                                                        viewfinderSize.height.toFloat(),
+                                                    )
+                                                manager?.tapToFocus(factory, offset.x, offset.y)
+                                            }
+                                        },
+                                    )
+                                },
+                    ) {
+                        CameraXViewfinder(
+                            surfaceRequest = request,
+                            implementationMode = ImplementationMode.EXTERNAL,
+                            modifier = Modifier.fillMaxSize(),
+                        )
 
-                    // Focus ring overlay
-                    currentFocusPoint?.let { point ->
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            val ringSize = 80f * focusRingScale.value
-                            drawCircle(
-                                color = primaryColor.copy(alpha = focusRingAlpha.value),
-                                radius = ringSize / 2,
-                                center = point,
-                                style = Stroke(width = 2f),
-                            )
+                        // Focus ring overlay
+                        currentFocusPoint?.let { point ->
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val ringSize = 80f * focusRingScale.value
+                                drawCircle(
+                                    color = primaryColor.copy(alpha = focusRingAlpha.value),
+                                    radius = ringSize / 2,
+                                    center = point,
+                                    style = Stroke(width = 2f),
+                                )
+                            }
                         }
                     }
-                }
-            } else {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = stringResource(Res.string.loading_camera),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
 
@@ -570,6 +570,7 @@ private fun InlineCameraCapture(
                     Modifier
                         .fillMaxWidth()
                         .align(Alignment.TopEnd)
+                        .statusBarsPadding()
                         .padding(16.dp),
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
@@ -628,6 +629,7 @@ private fun InlineCameraCapture(
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
                         .padding(bottom = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -664,6 +666,7 @@ private fun InlineCameraCapture(
                     modifier =
                         Modifier
                             .align(Alignment.TopCenter)
+                            .statusBarsPadding()
                             .padding(top = 16.dp),
                     shape = RoundedCornerShape(8.dp),
                     color = MaterialTheme.colorScheme.errorContainer,
