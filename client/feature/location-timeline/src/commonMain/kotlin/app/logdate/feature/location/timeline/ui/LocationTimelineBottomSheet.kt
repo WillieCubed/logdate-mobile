@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -33,6 +34,7 @@ import app.logdate.feature.location.timeline.ui.model.CurrentLocationUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationPlaceUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineErrorUiState
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineUiState
+import kotlinx.coroutines.launch
 import logdate.client.feature.location.timeline.generated.resources.Res
 import logdate.client.feature.location.timeline.generated.resources.close
 import logdate.client.feature.location.timeline.generated.resources.current_location
@@ -75,15 +77,24 @@ fun LocationTimelineQuickPeekSheet(
     onRetry: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+
+    val hideAndDismiss: () -> Unit = {
+        scope.launch { sheetState.hide() }.invokeOnCompletion {
+            if (!sheetState.isVisible) onDismissRequest()
+        }
+    }
+
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = sheetState,
         dragHandle = { BottomSheetDefaults.DragHandle() },
         modifier = modifier,
     ) {
         LocationTimelineQuickPeekSheetContent(
             uiState = uiState,
-            onDismissRequest = onDismissRequest,
+            onDismissRequest = hideAndDismiss,
             onOpenFullTimeline = onOpenFullTimeline,
             onSelectPlace = onSelectPlace,
             onRetry = onRetry,
