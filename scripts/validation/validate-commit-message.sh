@@ -18,6 +18,7 @@ source "$REPO_ROOT/scripts/validation/hook-common.sh"
 context="commit-msg"
 message=""
 message_file=""
+MAX_BODY_LINE_LENGTH=72
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -80,6 +81,30 @@ title_len=${#title}
 if [[ $title_len -gt 72 ]]; then
     errors+=("LENGTH: Title is $title_len chars (max 72).")
 fi
+
+is_footer_line() {
+    local line="$1"
+    [[ "$line" =~ ^(BREAKING[[:space:]]CHANGE:|[A-Za-z][A-Za-z-]*:|Fixes[[:space:]]#|Closes[[:space:]]#|Related[[:space:]]to[[:space:]]#|Co-Authored-By:|Co-authored-by:) ]]
+}
+
+line_number=1
+while IFS= read -r line; do
+    line_number=$((line_number + 1))
+    line="${line%$'\r'}"
+
+    if [[ -z "$line" ]] || [[ "$line" == \#* ]]; then
+        continue
+    fi
+
+    if is_footer_line "$line"; then
+        continue
+    fi
+
+    line_len=${#line}
+    if [[ $line_len -gt $MAX_BODY_LINE_LENGTH ]]; then
+        errors+=("LENGTH: Body line $line_number is $line_len chars (max $MAX_BODY_LINE_LENGTH).")
+    fi
+done < <(echo "$message" | tail -n +2)
 
 if echo "$title" | grep -qE "^($VALID_TYPES)\([^)]+\)!?: .+"; then
     scope="$(echo "$title" | sed -E "s/^($VALID_TYPES)\(([^)]+)\)!?: .*/\2/")"

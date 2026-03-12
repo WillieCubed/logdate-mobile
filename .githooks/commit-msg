@@ -5,6 +5,12 @@ set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 COMMIT_MSG_FILE="$1"
+
+formatter_output="$("$REPO_ROOT/scripts/validation/format-commit-message.sh" "$COMMIT_MSG_FILE" 2>&1)"
+if [[ -n "$formatter_output" ]]; then
+    echo "$formatter_output"
+fi
+
 set +e
 output="$("$REPO_ROOT/scripts/validation/validate-commit-message.sh" --file "$COMMIT_MSG_FILE" --context commit-msg 2>&1)"
 status=$?
