@@ -9,8 +9,10 @@ import app.logdate.feature.editor.ui.MainEditorContent
 import app.logdate.feature.editor.ui.audio.ActiveRecordingDisplay
 import app.logdate.feature.editor.ui.audio.AudioRecordingControls
 import app.logdate.feature.editor.ui.audio.expansion.SpatialExpandedAudioBlock
+import app.logdate.feature.editor.ui.camera.CameraAspectRatio
 import app.logdate.feature.editor.ui.camera.CameraCapturePreviewContent
 import app.logdate.feature.editor.ui.camera.CameraCapturePreviewState
+import app.logdate.feature.editor.ui.camera.CaptureMode
 import app.logdate.feature.editor.ui.camera.CapturedMediaType
 import app.logdate.feature.editor.ui.common.NoteEditorToolbar
 import app.logdate.feature.editor.ui.content.EditorBottomContent
@@ -28,6 +30,8 @@ import app.logdate.feature.editor.ui.text.TextBlockContent
 import app.logdate.feature.editor.ui.video.VideoBlockEditor
 import app.logdate.feature.editor.ui.video.VideoPickerPreviewContent
 import app.logdate.screenshots.common.ScreenshotTestData
+import app.logdate.screenshots.common.LargeScreenAuditPreviewMatrix
+import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTheme
 import com.android.tools.screenshot.PreviewTest
@@ -173,19 +177,84 @@ fun EditorMode_AudioPlayback() {
 }
 
 @PreviewTest
-@Preview(showBackground = true, device = PHONE)
+@ScreenshotPreviewMatrix
+@LargeScreenAuditPreviewMatrix
 @Composable
 fun EditorMode_CameraCapture() {
     EditorModeFrame(isImmersiveBlockActive = true) {
         CameraCapturePreviewContent(
-            state = CameraCapturePreviewState.LiveCapture,
+            state = CameraCapturePreviewState.LiveCapture(),
             modifier = Modifier.fillMaxSize(),
         )
     }
 }
 
 @PreviewTest
-@Preview(showBackground = true, device = PHONE)
+@ScreenshotPreviewMatrix
+@LargeScreenAuditPreviewMatrix
+@Composable
+fun EditorMode_CameraCapture_Full() {
+    EditorModeFrame(isImmersiveBlockActive = true) {
+        CameraCapturePreviewContent(
+            state =
+                CameraCapturePreviewState.LiveCapture(
+                    aspectRatio = CameraAspectRatio.FULL,
+                ),
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@ScreenshotPreviewMatrix
+@LargeScreenAuditPreviewMatrix
+@Composable
+fun EditorMode_CameraCapture_Square() {
+    EditorModeFrame(isImmersiveBlockActive = true) {
+        CameraCapturePreviewContent(
+            state =
+                CameraCapturePreviewState.LiveCapture(
+                    aspectRatio = CameraAspectRatio.SQUARE,
+                ),
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@ScreenshotPreviewMatrix
+@Composable
+fun EditorMode_CameraCapture_VideoMode() {
+    EditorModeFrame(isImmersiveBlockActive = true) {
+        CameraCapturePreviewContent(
+            state =
+                CameraCapturePreviewState.LiveCapture(
+                    captureMode = CaptureMode.VIDEO,
+                ),
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@ScreenshotPreviewMatrix
+@LargeScreenAuditPreviewMatrix
+@Composable
+fun EditorMode_CameraCapture_Recording() {
+    EditorModeFrame(isImmersiveBlockActive = true) {
+        CameraCapturePreviewContent(
+            state =
+                CameraCapturePreviewState.LiveCapture(
+                    captureMode = CaptureMode.VIDEO,
+                    isRecording = true,
+                ),
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@ScreenshotPreviewMatrix
 @Composable
 fun EditorMode_CameraPermission() {
     EditorModeFrame {
@@ -197,7 +266,8 @@ fun EditorMode_CameraPermission() {
 }
 
 @PreviewTest
-@Preview(showBackground = true, device = PHONE)
+@ScreenshotPreviewMatrix
+@LargeScreenAuditPreviewMatrix
 @Composable
 fun EditorMode_CameraReviewPhoto() {
     EditorModeFrame(isImmersiveBlockActive = true) {
@@ -213,7 +283,7 @@ fun EditorMode_CameraReviewPhoto() {
 }
 
 @PreviewTest
-@Preview(showBackground = true, device = PHONE)
+@ScreenshotPreviewMatrix
 @Composable
 fun EditorMode_CameraReviewVideo() {
     EditorModeFrame(isImmersiveBlockActive = true) {

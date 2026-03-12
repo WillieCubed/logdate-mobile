@@ -94,7 +94,6 @@ import kotlinx.coroutines.delay
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.captured_photo
 import logdate.client.feature.editor.generated.resources.captured_video
-import logdate.client.feature.editor.generated.resources.loading_camera
 import logdate.client.feature.editor.generated.resources.photo
 import logdate.client.feature.editor.generated.resources.retake
 import logdate.client.feature.editor.generated.resources.switch_camera
@@ -112,7 +111,11 @@ import org.koin.compose.viewmodel.koinViewModel
 sealed interface CameraCapturePreviewState {
     data object PermissionRequired : CameraCapturePreviewState
 
-    data object LiveCapture : CameraCapturePreviewState
+    data class LiveCapture(
+        val aspectRatio: CameraAspectRatio = CameraAspectRatio.STANDARD,
+        val captureMode: CaptureMode = CaptureMode.PHOTO,
+        val isRecording: Boolean = false,
+    ) : CameraCapturePreviewState
 
     data class Review(
         val uri: String,
@@ -130,7 +133,7 @@ actual fun CameraCaptureContent(
 ) {
     if (LocalInspectionMode.current) {
         CameraCapturePreviewContent(
-            state = CameraCapturePreviewState.LiveCapture,
+            state = CameraCapturePreviewState.LiveCapture(),
             modifier = modifier,
         )
         return
@@ -200,8 +203,11 @@ fun CameraCapturePreviewContent(
                 modifier = modifier,
             )
 
-        CameraCapturePreviewState.LiveCapture ->
+        is CameraCapturePreviewState.LiveCapture ->
             PreviewInlineCameraCapture(
+                aspectRatio = state.aspectRatio,
+                captureMode = state.captureMode,
+                isRecording = state.isRecording,
                 modifier = modifier,
             )
 
@@ -259,88 +265,123 @@ private fun CameraPermissionRequest(
 }
 
 @Composable
-private fun PreviewInlineCameraCapture(modifier: Modifier = Modifier) {
+private fun PreviewInlineCameraCapture(
+    aspectRatio: CameraAspectRatio = CameraAspectRatio.STANDARD,
+    captureMode: CaptureMode = CaptureMode.PHOTO,
+    isRecording: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
     Surface(
         modifier = modifier.fillMaxSize(),
         color = Color.Black,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
+            // Viewfinder placeholder
             Box(
                 modifier =
                     Modifier
-                        .fillMaxSize()
+                        .align(Alignment.Center)
+                        .aspectRatio(aspectRatio.ratio)
+                        .clip(RoundedCornerShape(20.dp))
                         .background(Color(0xFF101318)),
             )
 
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = 20.dp, vertical = 18.dp)
-                        .align(Alignment.TopCenter),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            // Top controls — recording indicator
+            if (isRecording) {
                 Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f),
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .statusBarsPadding()
+                            .padding(16.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.errorContainer,
                 ) {
-                    IconButton(onClick = {}) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Icon(
-                            imageVector = Icons.Default.Cameraswitch,
-                            contentDescription = stringResource(Res.string.switch_camera),
+                            imageVector = Icons.Default.FiberManualRecord,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(12.dp),
                         )
-                    }
-                }
-
-                SingleChoiceSegmentedButtonRow {
-                    SegmentedButton(
-                        selected = true,
-                        onClick = {},
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                    ) {
-                        Text(stringResource(Res.string.photo))
-                    }
-                    SegmentedButton(
-                        selected = false,
-                        onClick = {},
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                    ) {
-                        Text(stringResource(Res.string.video))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "01:45",
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
                     }
                 }
             }
 
+            // Bottom controls
             Column(
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
-                        .padding(bottom = 32.dp),
+                        .padding(bottom = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f),
-                    modifier = Modifier.size(84.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.CameraAlt,
-                            contentDescription = stringResource(Res.string.photo),
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(36.dp),
+                if (!isRecording) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        AspectRatioSelector(
+                            selected = aspectRatio,
+                            onSelected = {},
+                        )
+
+                        PhotoVideoToggle(
+                            currentMode = captureMode,
+                            onModeChanged = {},
                         )
                     }
                 }
 
-                Text(
-                    text = stringResource(Res.string.loading_camera),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.8f),
-                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Shutter row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Spacer(modifier = Modifier.size(48.dp))
+
+                    ShutterButton(
+                        isRecording = isRecording,
+                        captureMode = captureMode,
+                        isCapturing = false,
+                        onClick = {},
+                    )
+
+                    IconButton(
+                        onClick = {},
+                        enabled = !isRecording,
+                        modifier =
+                            Modifier
+                                .background(
+                                    MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.7f),
+                                    CircleShape,
+                                ),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Cameraswitch,
+                            contentDescription = stringResource(Res.string.switch_camera),
+                            tint =
+                                if (isRecording) {
+                                    MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.38f)
+                                } else {
+                                    MaterialTheme.colorScheme.inverseOnSurface
+                                },
+                        )
+                    }
+                }
             }
         }
     }

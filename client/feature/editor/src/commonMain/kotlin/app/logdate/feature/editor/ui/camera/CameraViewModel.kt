@@ -34,6 +34,7 @@ class CameraViewModel(
                         isPreviewActive = captureState.isPreviewActive,
                         cameraFacing = captureState.cameraFacing,
                         captureMode = captureState.captureMode,
+                        aspectRatio = captureState.aspectRatio,
                         isRecording = captureState.isRecording,
                         recordingDurationMs = captureState.recordingDurationMs,
                         capturedMediaUri = captureState.lastCapturedUri,
@@ -92,6 +93,13 @@ class CameraViewModel(
      */
     fun setCaptureMode(mode: CaptureMode) {
         cameraCaptureManager.setCaptureMode(mode)
+    }
+
+    /**
+     * Sets the aspect ratio for the camera viewfinder and capture.
+     */
+    fun setAspectRatio(ratio: CameraAspectRatio) {
+        cameraCaptureManager.setAspectRatio(ratio)
     }
 
     /**
@@ -180,6 +188,7 @@ data class CameraUiState(
     val isPreviewActive: Boolean = false,
     val cameraFacing: CameraFacing = CameraFacing.BACK,
     val captureMode: CaptureMode = CaptureMode.PHOTO,
+    val aspectRatio: CameraAspectRatio = CameraAspectRatio.STANDARD,
     val isCapturing: Boolean = false,
     val isRecording: Boolean = false,
     val recordingDurationMs: Long = 0L,

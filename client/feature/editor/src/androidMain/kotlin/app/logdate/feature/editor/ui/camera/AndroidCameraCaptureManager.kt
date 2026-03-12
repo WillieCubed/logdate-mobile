@@ -121,10 +121,18 @@ class AndroidCameraCaptureManager(
                     CameraFacing.BACK -> CameraSelector.DEFAULT_BACK_CAMERA
                 }
 
+            val aspectRatioStrategy =
+                when (_state.value.aspectRatio) {
+                    CameraAspectRatio.STANDARD -> AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY
+                    CameraAspectRatio.FULL,
+                    CameraAspectRatio.SQUARE,
+                    -> AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY
+                }
+
             val resolutionSelector =
                 ResolutionSelector
                     .Builder()
-                    .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+                    .setAspectRatioStrategy(aspectRatioStrategy)
                     .build()
 
             preview =
@@ -387,6 +395,10 @@ class AndroidCameraCaptureManager(
 
     override fun setCaptureMode(mode: CaptureMode) {
         _state.update { it.copy(captureMode = mode) }
+    }
+
+    override fun setAspectRatio(ratio: CameraAspectRatio) {
+        _state.update { it.copy(aspectRatio = ratio) }
     }
 
     override fun clearCapturedUri() {

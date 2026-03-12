@@ -51,6 +51,11 @@ interface CameraCaptureManager {
     fun setCaptureMode(mode: CaptureMode)
 
     /**
+     * Sets the aspect ratio for the camera viewfinder and capture.
+     */
+    fun setAspectRatio(ratio: CameraAspectRatio)
+
+    /**
      * Clears the last captured URI from the manager's state.
      * Called after the UI has consumed the captured media to prevent stale state.
      */
@@ -70,6 +75,7 @@ data class CameraCaptureState(
     val isPreviewActive: Boolean = false,
     val cameraFacing: CameraFacing = CameraFacing.BACK,
     val captureMode: CaptureMode = CaptureMode.PHOTO,
+    val aspectRatio: CameraAspectRatio = CameraAspectRatio.STANDARD,
     val isRecording: Boolean = false,
     val recordingDurationMs: Long = 0L,
     val lastCapturedUri: String? = null,
@@ -90,6 +96,20 @@ enum class CameraFacing {
 enum class CaptureMode {
     PHOTO,
     VIDEO,
+}
+
+/**
+ * Aspect ratio options for camera capture.
+ *
+ * The [ratio] is expressed as width/height for use with Compose's `aspectRatio` modifier.
+ */
+enum class CameraAspectRatio(
+    val displayName: String,
+    val ratio: Float,
+) {
+    FULL(displayName = "9:16", ratio = 9f / 16f),
+    STANDARD(displayName = "4:3", ratio = 3f / 4f),
+    SQUARE(displayName = "1:1", ratio = 1f),
 }
 
 /**
