@@ -1,10 +1,12 @@
 package app.logdate.client.domain.recommendation
 
+import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.domain.notes.HasNotesForTodayUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
 import app.logdate.client.domain.places.ResolveLocationToPlaceUseCase
 import app.logdate.client.location.places.StubExternalPlacesProvider
 import app.logdate.client.location.places.StubLocationProvider
+import app.logdate.client.location.places.StubReverseGeocodingProvider
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNote
@@ -42,7 +44,13 @@ class GetHomeRecommendationUseCaseTest {
                 fetchMostRecentDraft = FetchMostRecentDraftUseCase(mockDraftRepository),
                 getMemoryRecall = GetMemoryRecallUseCase(mockNotesRepository),
                 clientLocationProvider = StubLocationProvider,
-                resolveLocationToPlace = ResolveLocationToPlaceUseCase(EmptyUserPlacesRepository(), StubExternalPlacesProvider()),
+                resolveLocationToPlace =
+                    ResolveLocationToPlaceUseCase(
+                        userPlacesRepository = EmptyUserPlacesRepository(),
+                        externalPlacesProvider = StubExternalPlacesProvider(),
+                        reverseGeocodingProvider = StubReverseGeocodingProvider(),
+                    ),
+                memoriesSettingsRepository = DefaultMemoriesSettingsRepository(MockKeyValueStorage()),
             )
     }
 
@@ -355,5 +363,132 @@ class GetHomeRecommendationUseCaseTest {
         override suspend fun deletePlace(placeId: String): Result<Unit> = Result.success(Unit)
 
         override suspend fun searchPlaces(query: String): List<Place> = emptyList()
+    }
+
+    private class MockKeyValueStorage : KeyValueStorage {
+        private val store = mutableMapOf<String, Any?>()
+        private val stringFlows = mutableMapOf<String, MutableStateFlow<String?>>()
+        private val booleanFlows = mutableMapOf<String, MutableStateFlow<Boolean>>()
+        private val intFlows = mutableMapOf<String, MutableStateFlow<Int>>()
+        private val longFlows = mutableMapOf<String, MutableStateFlow<Long>>()
+        private val floatFlows = mutableMapOf<String, MutableStateFlow<Float>>()
+
+        override suspend fun getString(key: String): String? = store[key] as? String
+
+        override fun getStringSync(key: String): String? = store[key] as? String
+
+        override suspend fun getBoolean(
+            key: String,
+            defaultValue: Boolean,
+        ): Boolean = store[key] as? Boolean ?: defaultValue
+
+        override suspend fun putString(
+            key: String,
+            value: String,
+        ) {
+            store[key] = value
+            stringFlows.getOrPut(key) { MutableStateFlow(value) }.value = value
+        }
+
+        override suspend fun putBoolean(
+            key: String,
+            value: Boolean,
+        ) {
+            store[key] = value
+            booleanFlows.getOrPut(key) { MutableStateFlow(value) }.value = value
+        }
+
+        override suspend fun getInt(
+            key: String,
+            defaultValue: Int,
+        ): Int = store[key] as? Int ?: defaultValue
+
+        override suspend fun putInt(
+            key: String,
+            value: Int,
+        ) {
+            store[key] = value
+            intFlows.getOrPut(key) { MutableStateFlow(value) }.value = value
+        }
+
+        override suspend fun getLong(
+            key: String,
+            defaultValue: Long,
+        ): Long = store[key] as? Long ?: defaultValue
+
+        override suspend fun putLong(
+            key: String,
+            value: Long,
+        ) {
+            store[key] = value
+            longFlows.getOrPut(key) { MutableStateFlow(value) }.value = value
+        }
+
+        override suspend fun getFloat(
+            key: String,
+            defaultValue: Float,
+        ): Float = store[key] as? Float ?: defaultValue
+
+        override suspend fun putFloat(
+            key: String,
+            value: Float,
+        ) {
+            store[key] = value
+            floatFlows.getOrPut(key) { MutableStateFlow(value) }.value = value
+        }
+
+        override suspend fun remove(key: String) {
+            store.remove(key)
+            stringFlows.remove(key)
+            booleanFlows.remove(key)
+            intFlows.remove(key)
+            longFlows.remove(key)
+            floatFlows.remove(key)
+        }
+
+        override suspend fun contains(key: String): Boolean = store.containsKey(key)
+
+        override suspend fun clear() {
+            store.clear()
+            stringFlows.clear()
+            booleanFlows.clear()
+            intFlows.clear()
+            longFlows.clear()
+            floatFlows.clear()
+        }
+
+        override fun observeString(key: String): Flow<String?> = stringFlows.getOrPut(key) { MutableStateFlow(store[key] as? String) }
+
+        override fun observeBoolean(
+            key: String,
+            defaultValue: Boolean,
+        ): Flow<Boolean> =
+            booleanFlows.getOrPut(key) {
+                MutableStateFlow(store[key] as? Boolean ?: defaultValue)
+            }
+
+        override fun observeInt(
+            key: String,
+            defaultValue: Int,
+        ): Flow<Int> =
+            intFlows.getOrPut(key) {
+                MutableStateFlow(store[key] as? Int ?: defaultValue)
+            }
+
+        override fun observeLong(
+            key: String,
+            defaultValue: Long,
+        ): Flow<Long> =
+            longFlows.getOrPut(key) {
+                MutableStateFlow(store[key] as? Long ?: defaultValue)
+            }
+
+        override fun observeFloat(
+            key: String,
+            defaultValue: Float,
+        ): Flow<Float> =
+            floatFlows.getOrPut(key) {
+                MutableStateFlow(store[key] as? Float ?: defaultValue)
+            }
     }
 }

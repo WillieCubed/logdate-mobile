@@ -68,7 +68,7 @@ enum class LocationMemoryKind {
 
 data class CurrentLocationUiModel(
     val title: String,
-    val subtitle: String,
+    val subtitle: String?,
     val latitude: Double,
     val longitude: Double,
 )

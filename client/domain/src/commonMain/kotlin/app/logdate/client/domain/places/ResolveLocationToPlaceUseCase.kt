@@ -1,6 +1,8 @@
 package app.logdate.client.domain.places
 
 import app.logdate.client.location.places.ExternalPlacesProvider
+import app.logdate.client.location.places.GeocodedAddress
+import app.logdate.client.location.places.ReverseGeocodingProvider
 import app.logdate.client.repository.places.UserPlacesRepository
 import app.logdate.shared.model.Location
 import app.logdate.shared.model.Place
@@ -19,6 +21,7 @@ import kotlin.math.sqrt
 class ResolveLocationToPlaceUseCase(
     private val userPlacesRepository: UserPlacesRepository,
     private val externalPlacesProvider: ExternalPlacesProvider,
+    private val reverseGeocodingProvider: ReverseGeocodingProvider,
     // Matching radius in meters
     private val placeMatchingRadius: Double = 100.0,
 ) {
@@ -44,8 +47,18 @@ class ResolveLocationToPlaceUseCase(
             }
 
         val bestSuggestion = externalSuggestions.firstOrNull()
-        return if (bestSuggestion != null) {
-            PlaceResolutionResult.ExternalSuggestion(bestSuggestion)
+        if (bestSuggestion != null) {
+            return PlaceResolutionResult.ExternalSuggestion(bestSuggestion)
+        }
+
+        // Fallback to reverse geocoding for coarse location
+        val geocoded =
+            runCatching { reverseGeocodingProvider.reverseGeocode(location) }
+                .onFailure { error ->
+                    Napier.w("Failed to reverse geocode location", error)
+                }.getOrNull()
+        return if (geocoded != null) {
+            PlaceResolutionResult.CoarseLocation(location, geocoded)
         } else {
             PlaceResolutionResult.UnknownLocation(location)
         }
@@ -97,6 +110,11 @@ sealed class PlaceResolutionResult {
 
     data class ExternalSuggestion(
         val suggestion: app.logdate.client.location.places.PlaceSuggestion,
+    ) : PlaceResolutionResult()
+
+    data class CoarseLocation(
+        val location: Location,
+        val address: GeocodedAddress,
     ) : PlaceResolutionResult()
 
     data class UnknownLocation(

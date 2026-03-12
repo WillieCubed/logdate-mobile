@@ -138,7 +138,7 @@ val domainModule: Module =
         factory { DeleteJournalUseCase(get()) }
 
         // Places
-        factory { ResolveLocationToPlaceUseCase(get(), get()) }
+        factory { ResolveLocationToPlaceUseCase(get(), get(), get()) }
 
         // Profile
         factory { UpdateProfileUseCase(get()) }

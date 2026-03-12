@@ -13,6 +13,7 @@ import app.logdate.client.domain.location.ObserveLocationStopsUseCase
 import app.logdate.client.domain.places.PlaceResolutionResult
 import app.logdate.client.domain.places.ResolveLocationToPlaceUseCase
 import app.logdate.client.domain.world.ObserveLocationUseCase
+import app.logdate.client.location.places.GeocodedAddress
 import app.logdate.client.repository.journals.NoteType
 import app.logdate.feature.location.timeline.ui.model.CurrentLocationUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationLabelSource
@@ -241,18 +242,31 @@ class LocationTimelineViewModel(
         )
     }
 
+    private fun formatCoarseLocation(address: GeocodedAddress): String =
+        when {
+            address.thoroughfare != null && address.locality != null ->
+                "Near ${address.thoroughfare}, ${address.locality}"
+            address.subLocality != null && address.locality != null ->
+                "${address.subLocality}, ${address.locality}"
+            address.locality != null -> "Somewhere in ${address.locality}"
+            address.adminArea != null -> "Somewhere in ${address.adminArea}"
+            else -> ""
+        }
+
     private suspend fun Location.toCurrentLocationUiModel(): CurrentLocationUiModel {
         val resolvedPlace = resolveLocationToPlaceUseCase(this)
         val title =
             when (resolvedPlace) {
                 is PlaceResolutionResult.UserDefinedPlace -> resolvedPlace.place.name
                 is PlaceResolutionResult.ExternalSuggestion -> resolvedPlace.suggestion.name
+                is PlaceResolutionResult.CoarseLocation -> formatCoarseLocation(resolvedPlace.address)
                 is PlaceResolutionResult.UnknownLocation -> "Current location"
             }
         val subtitle =
             when (resolvedPlace) {
                 is PlaceResolutionResult.ExternalSuggestion -> resolvedPlace.suggestion.address
                 is PlaceResolutionResult.UserDefinedPlace -> formatCoordinates(latitude, longitude)
+                is PlaceResolutionResult.CoarseLocation -> null
                 is PlaceResolutionResult.UnknownLocation -> formatCoordinates(latitude, longitude)
             }
 
@@ -284,6 +298,13 @@ class LocationTimelineViewModel(
                 subtitle = resolvedPlace.suggestion.address
                 sourceLabel = "Google Places"
                 source = LocationLabelSource.GOOGLE_PLACES
+            }
+
+            is PlaceResolutionResult.CoarseLocation -> {
+                title = formatCoarseLocation(resolvedPlace.address)
+                subtitle = resolvedPlace.address.locality ?: resolvedPlace.address.adminArea ?: ""
+                sourceLabel = "Location"
+                source = LocationLabelSource.COORDINATES
             }
 
             is PlaceResolutionResult.UnknownLocation -> {
@@ -352,6 +373,13 @@ class LocationTimelineViewModel(
                 subtitle = resolvedPlace.suggestion.address
                 sourceLabel = "Nearby place"
                 source = LocationLabelSource.GOOGLE_PLACES
+            }
+
+            resolvedPlace is PlaceResolutionResult.CoarseLocation -> {
+                title = formatCoarseLocation(resolvedPlace.address)
+                subtitle = formatCoordinates(latitude, longitude)
+                sourceLabel = "Location"
+                source = LocationLabelSource.COORDINATES
             }
 
             else -> {

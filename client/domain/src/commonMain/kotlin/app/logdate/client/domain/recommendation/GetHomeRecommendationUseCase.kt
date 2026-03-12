@@ -5,6 +5,7 @@ import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
 import app.logdate.client.domain.places.PlaceResolutionResult
 import app.logdate.client.domain.places.ResolveLocationToPlaceUseCase
 import app.logdate.client.location.ClientLocationProvider
+import app.logdate.client.location.places.GeocodedAddress
 import app.logdate.client.repository.journals.JournalNote
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -40,6 +41,8 @@ class GetHomeRecommendationUseCase(
                     when (val result = resolveLocationToPlace(location)) {
                         is PlaceResolutionResult.UserDefinedPlace -> result.place.name
                         is PlaceResolutionResult.ExternalSuggestion -> result.suggestion.name
+                        is PlaceResolutionResult.CoarseLocation ->
+                            formatCoarseLocation(result.address)
                         is PlaceResolutionResult.UnknownLocation -> null
                     }
                 } catch (e: Exception) {
@@ -47,6 +50,17 @@ class GetHomeRecommendationUseCase(
                     null
                 }
             }.onStart { emit(null) }
+
+    private fun formatCoarseLocation(address: GeocodedAddress): String? =
+        when {
+            address.thoroughfare != null && address.locality != null ->
+                "Near ${address.thoroughfare}, ${address.locality}"
+            address.subLocality != null && address.locality != null ->
+                "${address.subLocality}, ${address.locality}"
+            address.locality != null -> "Somewhere in ${address.locality}"
+            address.adminArea != null -> "Somewhere in ${address.adminArea}"
+            else -> null
+        }
 
     operator fun invoke(): Flow<HomeRecommendation> =
         memoriesSettingsRepository.observeSettings().flatMapLatest { settings ->

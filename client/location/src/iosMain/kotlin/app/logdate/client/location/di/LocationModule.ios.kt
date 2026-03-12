@@ -4,7 +4,9 @@ import app.logdate.client.location.ClientLocationProvider
 import app.logdate.client.location.IosLocationProvider
 import app.logdate.client.location.history.di.locationHistoryModule
 import app.logdate.client.location.places.ExternalPlacesProvider
+import app.logdate.client.location.places.ReverseGeocodingProvider
 import app.logdate.client.location.places.StubExternalPlacesProvider
+import app.logdate.client.location.places.StubReverseGeocodingProvider
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -15,4 +17,5 @@ actual val locationModule: Module =
 
         single<ClientLocationProvider> { IosLocationProvider() }
         single<ExternalPlacesProvider> { StubExternalPlacesProvider() }
+        single<ReverseGeocodingProvider> { StubReverseGeocodingProvider() }
     }

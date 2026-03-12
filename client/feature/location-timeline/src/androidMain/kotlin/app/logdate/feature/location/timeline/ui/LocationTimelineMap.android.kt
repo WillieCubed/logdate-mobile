@@ -368,7 +368,7 @@ private fun LocationTimelineMapFallback(
                     } ?: currentLocation?.let { location ->
                         PlaceSummaryPill(
                             title = location.title,
-                            subtitle = location.subtitle,
+                            subtitle = location.subtitle ?: "",
                         )
                     }
 
