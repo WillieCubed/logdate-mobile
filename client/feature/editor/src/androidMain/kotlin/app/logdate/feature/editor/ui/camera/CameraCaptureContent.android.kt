@@ -8,10 +8,9 @@ import androidx.camera.core.SurfaceOrientedMeteringPointFactory
 import androidx.camera.viewfinder.core.ImplementationMode
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -537,11 +536,7 @@ private fun InlineCameraCapture(
 
     val animatedAspectRatio by animateFloatAsState(
         targetValue = uiState.aspectRatio.ratio,
-        animationSpec =
-            spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessLow,
-            ),
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
         label = "viewfinderAspectRatio",
     )
 
@@ -849,7 +844,7 @@ private fun ShutterButton(
  * MD3 Expressive sliding-pill aspect ratio selector.
  *
  * A compact rounded container with three ratio labels. A filled indicator pill
- * slides behind the selected label with a bouncy spring animation.
+ * slides behind the selected label with a smooth ease-out transition.
  */
 @Suppress("ktlint:standard:function-naming")
 @Composable
@@ -867,20 +862,12 @@ private fun AspectRatioSelector(
 
     val indicatorOffset by animateDpAsState(
         targetValue = (slotOffsets[selectedIndex] ?: 0f).pxToDp(),
-        animationSpec =
-            spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessLow,
-            ),
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
         label = "indicatorOffset",
     )
     val indicatorWidth by animateDpAsState(
         targetValue = (slotWidths[selectedIndex] ?: 0f).pxToDp(),
-        animationSpec =
-            spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessLow,
-            ),
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
         label = "indicatorWidth",
     )
 
