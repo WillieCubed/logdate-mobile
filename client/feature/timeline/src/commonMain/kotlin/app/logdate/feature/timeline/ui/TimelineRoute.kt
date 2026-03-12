@@ -13,6 +13,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.ui.audio.LocalTranscriptionState
 import app.logdate.ui.timeline.HomeTimelineUiState
@@ -54,7 +55,6 @@ fun TimelineRoute(
         TimelineScreen(
             state = state,
             onNewEntry = onNewEntry,
-            onAddToMemory = { memoryId -> viewModel.showAddToMemoriesSnackbar(memoryId) },
             onDismissSnackbar = { viewModel.dismissSnackbar() },
             onSetSelectedDay = { date -> viewModel.setSelectedDay(date) },
             birthday = viewModel.birthday.collectAsState().value,
@@ -67,7 +67,6 @@ fun TimelineRoute(
 internal fun TimelineScreen(
     state: HomeTimelineUiState,
     onNewEntry: () -> Unit,
-    onAddToMemory: (memoryId: String) -> Unit,
     onDismissSnackbar: () -> Unit,
     onSetSelectedDay: (LocalDate) -> Unit,
     birthday: Instant?,
@@ -84,6 +83,7 @@ internal fun TimelineScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        containerColor = Color.Transparent,
     ) { paddingValues ->
         TimelinePane(
             uiState =
@@ -94,7 +94,6 @@ internal fun TimelineScreen(
             onNewEntry = onNewEntry,
             onShareMemory = { /* Handle share memory */ },
             onOpenDay = { date -> onSetSelectedDay(date) },
-            onAddToMemory = onAddToMemory,
             birthday = birthday,
             modifier = modifier.padding(paddingValues),
         )
@@ -107,7 +106,6 @@ private fun TimelineScreenPreview() {
     TimelineScreen(
         state = HomeTimelineUiState(),
         onNewEntry = {},
-        onAddToMemory = {},
         onDismissSnackbar = {},
         onSetSelectedDay = {},
         birthday = null,

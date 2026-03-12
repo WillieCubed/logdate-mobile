@@ -138,9 +138,9 @@ private fun RootPreviewFrame(
                 onProfileClick = {},
                 onHistoryClick = {},
                 timelineSuggestion =
-                    TimelineSuggestionBlock.OngoingEvent(
-                        memoryId = "memory-1",
-                        message = "You have an unfinished memory from this afternoon.",
+                    TimelineSuggestionBlock.CompleteDraft(
+                        draftId = "draft-1",
+                        notePreview = "You have an unfinished memory from this afternoon.",
                     ),
             )
         }
