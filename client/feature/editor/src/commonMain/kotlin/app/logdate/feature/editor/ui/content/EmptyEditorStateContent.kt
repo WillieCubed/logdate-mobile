@@ -113,8 +113,7 @@ fun EmptyEditorStateContent(
         Row(
             modifier =
                 modifier
-                    .fillMaxSize()
-                    .padding(spacing),
+                    .fillMaxSize(),
             horizontalArrangement = Arrangement.spacedBy(spacing),
         ) {
             TextEntrySurface(
@@ -139,8 +138,7 @@ fun EmptyEditorStateContent(
         Column(
             modifier =
                 modifier
-                    .fillMaxSize()
-                    .padding(spacing),
+                    .fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(spacing),
         ) {
             Row(
