@@ -317,6 +317,34 @@ automatically.
 
 **The test**: If you removed every class name, interface name, and module name from the body, would a sentence still say something meaningful? If not, rewrite it.
 
+#### Reframed Technical Detail
+
+A subtler variant: the message avoids class names but still describes implementation mechanics dressed up in user-facing language. The sentence is *about* the code, not about the experience.
+
+```
+❌ REFRAMED — Technical detail wearing a user costume:
+feat(settings): add Memories settings screen
+
+All settings screens now use the expandable large title header that
+collapses as you scroll. Shared toggle and section composables have
+been extracted to the ui module so future settings screens don't
+need to redeclare them.
+```
+
+No class names appear, but "expandable large title header that collapses as you scroll" describes a UI component choice, and "shared toggle and section composables extracted to the ui module" is pure refactoring detail. A user would never say either sentence.
+
+```
+✅ GOOD — Same change, user perspective only:
+feat(settings): add Memories settings to control recommendations and recall
+
+You can now toggle recommendations on or off right from the settings
+overview, or tap through to fine-tune which types of recall the app
+uses — like turning off smart recall while keeping other suggestions
+active.
+```
+
+**The rule for `feat` and `fix` commits is absolute**: the body must contain *zero* implementation detail — no component names, no architectural decisions, no refactoring rationale. If the change also includes refactoring or structural cleanup, those details belong in a separate `refactor` or `chore` commit, not buried in a `feat` body. Only `refactor`, `chore`, `perf`, and `docs` commits may reference internal structure.
+
 ### For Bug Fixes
 
 Answer: What was broken? What caused it? How does the fix address it?
