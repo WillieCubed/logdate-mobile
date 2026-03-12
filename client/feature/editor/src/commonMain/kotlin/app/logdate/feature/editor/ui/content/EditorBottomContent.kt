@@ -14,6 +14,8 @@ fun EditorBottomContent(
     availableJournals: List<Journal>,
     selectedJournalIds: List<Uuid>,
     onJournalSelectionChanged: (List<Uuid>) -> Unit,
+    journalSelectorExpanded: Boolean,
+    onJournalSelectorExpandedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -24,6 +26,8 @@ fun EditorBottomContent(
             availableJournals = availableJournals,
             selectedJournalIds = selectedJournalIds,
             onSelectionChanged = onJournalSelectionChanged,
+            expanded = journalSelectorExpanded,
+            onExpandedChange = onJournalSelectorExpandedChange,
         )
     }
 }

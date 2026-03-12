@@ -56,13 +56,20 @@ fun EntryEditorContent(
     val editorState by viewModel.editorState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val shouldReturnToPickerOnBack = editorState.shouldReturnToPickerOnBack()
+    var journalSelectorExpanded by remember { mutableStateOf(false) }
 
     val uiState =
         rememberBlocksUiState(
             editorState = editorState,
             onUpdateBlock = viewModel::updateBlock,
-            onFocusBlock = viewModel::setExpandedBlockId,
-            onCreateBlock = { type, id -> viewModel.createNewBlock(type, id) },
+            onFocusBlock = { id ->
+                journalSelectorExpanded = false
+                viewModel.setExpandedBlockId(id)
+            },
+            onCreateBlock = { type, id ->
+                journalSelectorExpanded = false
+                viewModel.createNewBlock(type, id)
+            },
             onDeleteBlock = viewModel::removeBlock,
             onUpdateJournalSelection = viewModel::setSelectedJournals,
         )
@@ -190,6 +197,8 @@ fun EntryEditorContent(
                 availableJournals = uiState.availableJournals,
                 selectedJournalIds = uiState.selectedJournalIds,
                 onJournalSelectionChanged = uiState.onJournalSelectionChanged,
+                journalSelectorExpanded = journalSelectorExpanded,
+                onJournalSelectorExpandedChange = { journalSelectorExpanded = it },
             )
         },
     )

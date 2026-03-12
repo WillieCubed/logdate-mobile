@@ -37,6 +37,8 @@ fun JournalSelector_Collapsed_NoSelection() {
             availableJournals = ScreenshotTestData.sampleJournals,
             selectedJournalIds = emptyList(),
             onSelectionChanged = {},
+            expanded = false,
+            onExpandedChange = {},
         )
     }
 }
@@ -51,6 +53,8 @@ fun JournalSelector_Collapsed_OneSelected() {
             availableJournals = ScreenshotTestData.sampleJournals,
             selectedJournalIds = listOf(ScreenshotTestData.sampleJournal.id),
             onSelectionChanged = {},
+            expanded = false,
+            onExpandedChange = {},
         )
     }
 }
@@ -68,6 +72,8 @@ fun JournalSelector_Collapsed_MultipleSelected() {
                 ScreenshotTestData.sampleJournal2.id,
             ),
             onSelectionChanged = {},
+            expanded = false,
+            onExpandedChange = {},
         )
     }
 }
@@ -85,6 +91,8 @@ fun JournalSelector_Compact_Collapsed() {
             availableJournals = ScreenshotTestData.sampleJournals,
             selectedJournalIds = listOf(ScreenshotTestData.sampleJournal.id),
             onSelectionChanged = {},
+            expanded = false,
+            onExpandedChange = {},
         )
     }
 }
@@ -108,7 +116,8 @@ fun JournalSelector_Expanded_WithSelection() {
             availableJournals = ScreenshotTestData.sampleJournals,
             selectedJournalIds = listOf(ScreenshotTestData.sampleJournal.id),
             onSelectionChanged = {},
-            initialExpanded = true,
+            expanded = true,
+            onExpandedChange = {},
         )
     }
 }
@@ -127,7 +136,8 @@ fun JournalSelector_Expanded_EmptyState() {
             availableJournals = emptyList(),
             selectedJournalIds = emptyList(),
             onSelectionChanged = {},
-            initialExpanded = true,
+            expanded = true,
+            onExpandedChange = {},
         )
     }
 }
@@ -148,7 +158,8 @@ fun JournalSelector_Expanded_Overflow() {
             availableJournals = manyJournals,
             selectedJournalIds = listOf(manyJournals.first().id),
             onSelectionChanged = {},
-            initialExpanded = true,
+            expanded = true,
+            onExpandedChange = {},
         )
     }
 }
@@ -168,7 +179,8 @@ fun JournalSelector_Compact_Expanded_Overflow() {
             availableJournals = manyJournals,
             selectedJournalIds = listOf(manyJournals.first().id),
             onSelectionChanged = {},
-            initialExpanded = true,
+            expanded = true,
+            onExpandedChange = {},
         )
     }
 }

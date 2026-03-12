@@ -1,11 +1,19 @@
 @file:Suppress("ktlint:standard:function-naming")
+@file:OptIn(ExperimentalSharedTransitionApi::class)
 
 package app.logdate.feature.editor.ui.common
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,34 +28,33 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.layout.LocalEditorIsCompact
 import app.logdate.shared.model.Journal
+import app.logdate.ui.content.JournalContentCover
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import logdate.client.feature.editor.generated.resources.Res
@@ -58,29 +65,35 @@ import kotlin.uuid.Uuid
 /**
  * A Material You styled selector for associating an entry with one or more journals.
  *
- * When tapped, the card expands upward into a scrollable list as a floating surface — it does
- * not reflow surrounding content. The expansion is anchored at the bottom of the card so the
- * surface appears to rise in place. Predictive back gestures drive a real-time scale/fade on
- * the expanded surface, snapping back elastically on cancellation.
+ * The collapsed state is a tappable [Card] rendered by [SelectorContent]. Tapping opens a
+ * floating [JournalPickerList] card that rises upward from the same bottom edge via
+ * [AnchoredExpandingLayout] — surrounding content is never reflowed because the expanded card
+ * is placed at a higher z-layer. Animations use the MD3 Expressive motion curves defined in
+ * [journalSelectorEnterTransition] and [journalSelectorExitTransition].
  *
- * Renders a compact variant when [LocalEditorIsCompact] is true (e.g. landscape phones).
+ * [PlatformPredictiveBackHandler] tracks the system back gesture in real time, clipping
+ * the journal list down via [journalListBackClip] while the "Journals" header stays fixed.
+ * Cancelling the gesture snaps the list back with an elastic spring.
+ *
+ * Renders a compact variant when [LocalEditorIsCompact] is `true` (e.g. landscape phones).
  *
  * @param availableJournals All journals the user can assign the entry to.
  * @param selectedJournalIds IDs of journals currently associated with this entry.
  * @param onSelectionChanged Called with the full updated selection whenever the user toggles a journal.
+ * @param expanded Whether the picker is currently open. Callers own this state so they can
+ *   collapse the picker in response to external events (e.g. a block being selected).
+ * @param onExpandedChange Called when the picker should open or close due to user interaction.
  * @param modifier Modifier applied to the outer [AnchoredExpandingLayout].
- * @param initialExpanded Whether the picker starts in the expanded state. Intended for previews
- *   and screenshot tests; production callers should leave this at the default `false`.
  */
 @Composable
 fun JournalSelectorDropdown(
     availableJournals: List<Journal>,
     selectedJournalIds: List<Uuid>,
     onSelectionChanged: (List<Uuid>) -> Unit,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    initialExpanded: Boolean = false,
 ) {
-    var expanded by remember { mutableStateOf(initialExpanded) }
     val backProgress = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
 
@@ -89,117 +102,179 @@ fun JournalSelectorDropdown(
         onProgress = { progress -> scope.launch { backProgress.snapTo(progress) } },
         onBack = {
             scope.launch { backProgress.snapTo(0f) }
-            expanded = false
+            onExpandedChange(false)
         },
         onCancel = { scope.launch { backProgress.animateTo(0f, spring()) } },
     )
 
-    AnchoredExpandingLayout(
-        modifier = modifier,
-        collapsedContent = {
-            Card(
-                onClick = { expanded = true },
-                modifier = Modifier.fillMaxWidth(),
-                colors =
-                    CardDefaults.cardColors(
-                        containerColor =
-                            if (selectedJournalIds.isNotEmpty()) {
-                                MaterialTheme.colorScheme.primaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.surfaceVariant
-                            },
-                    ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                shape = JournalSelectorShape,
-            ) {
-                SelectorContent(
-                    selectedCount = selectedJournalIds.size,
-                    availableJournals = availableJournals,
-                    selectedJournalIds = selectedJournalIds,
-                )
-            }
-        },
-        expandedContent = {
-            AnimatedVisibility(
-                visible = expanded,
-                enter = journalSelectorEnterTransition(),
-                exit = journalSelectorExitTransition(),
-            ) {
-                Card(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .journalSelectorExpandedHeight()
-                            .graphicsLayer {
-                                val scale = 1f - backProgress.value * 0.08f
-                                scaleX = scale
-                                scaleY = scale
-                                alpha = 1f - backProgress.value * 0.3f
-                                transformOrigin = TransformOrigin(0.5f, 1f)
-                            },
-                    colors =
-                        CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                    shape = JournalSelectorShape,
-                ) {
-                    JournalPickerList(
+    val collapsedColor =
+        if (selectedJournalIds.isNotEmpty()) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant
+        }
+
+    NoReflowLayout(modifier = modifier) {
+        SharedTransitionLayout {
+            AnimatedContent(
+                targetState = expanded,
+                transitionSpec = { journalSelectorContentTransition() },
+                label = "JournalSelectorContent",
+            ) { isExpanded ->
+                if (isExpanded) {
+                    ExpandedSelectorCard(
+                        sharedTransitionScope = this@SharedTransitionLayout,
+                        animatedVisibilityScope = this@AnimatedContent,
                         availableJournals = availableJournals,
                         selectedJournalIds = selectedJournalIds,
                         onSelectionChanged = onSelectionChanged,
+                        backProgress = { backProgress.value },
+                    )
+                } else {
+                    CollapsedSelectorCard(
+                        sharedTransitionScope = this@SharedTransitionLayout,
+                        animatedVisibilityScope = this@AnimatedContent,
+                        availableJournals = availableJournals,
+                        selectedJournalIds = selectedJournalIds,
+                        collapsedColor = collapsedColor,
+                        onClick = { onExpandedChange(true) },
                     )
                 }
             }
-        },
-    )
+        }
+    }
 }
 
 /**
- * A layout that reports only the [collapsedContent] height to its parent, then places
- * [expandedContent] above it anchored to the same bottom edge on a higher z-layer.
- *
- * This lets the expanded picker float over surrounding content without reflowing it —
- * the parent sees a stable footprint equal to the collapsed card.
+ * The collapsed state of [JournalSelectorDropdown]: a tappable card showing the current
+ * journal selection. The card surface participates in a shared element transition with
+ * [ExpandedSelectorCard] via [sharedBounds], and when exactly one journal is selected its
+ * title text morphs to the matching row in the expanded list via [sharedElement].
  */
 @Composable
-private fun AnchoredExpandingLayout(
+private fun CollapsedSelectorCard(
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    availableJournals: List<Journal>,
+    selectedJournalIds: List<Uuid>,
+    collapsedColor: Color,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    collapsedContent: @Composable () -> Unit,
-    expandedContent: @Composable () -> Unit,
 ) {
-    Layout(
-        modifier = modifier,
-        content = {
-            collapsedContent()
-            expandedContent()
-        },
-    ) { measurables, constraints ->
-        val collapsedPlaceable = measurables[0].measure(constraints)
-        val expandedPlaceable = measurables[1].measure(constraints.copy(minHeight = 0))
-
-        layout(collapsedPlaceable.width, collapsedPlaceable.height) {
-            collapsedPlaceable.placeRelative(x = 0, y = 0)
-            // Align expanded content's bottom to collapsed card's bottom so the surface
-            // appears to rise upward from the same anchor point.
-            expandedPlaceable.placeRelative(
-                x = 0,
-                y = collapsedPlaceable.height - expandedPlaceable.height,
-                zIndex = 1f,
+    with(sharedTransitionScope) {
+        Card(
+            onClick = onClick,
+            modifier =
+                modifier
+                    .fillMaxWidth()
+                    .sharedBounds(
+                        rememberSharedContentState(SELECTOR_SURFACE_KEY),
+                        animatedVisibilityScope = animatedVisibilityScope,
+                    ),
+            colors = CardDefaults.cardColors(containerColor = collapsedColor),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            shape = JournalSelectorShape,
+        ) {
+            SelectorContent(
+                selectedCount = selectedJournalIds.size,
+                availableJournals = availableJournals,
+                selectedJournalIds = selectedJournalIds,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope,
             )
         }
     }
 }
 
 /**
- * The collapsed trigger row: icon, journal name/count, and expand chevron.
- * Uses reduced sizes on height-constrained screens via [LocalEditorIsCompact].
+ * The expanded state of [JournalSelectorDropdown]: a floating card with the full journal
+ * picker list. Shares a surface key with [CollapsedSelectorCard] so the card morphs
+ * seamlessly between states. The selected journal title in each [JournalItem] row
+ * participates in a shared element transition with the collapsed trigger text.
+ */
+@Composable
+private fun ExpandedSelectorCard(
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    availableJournals: List<Journal>,
+    selectedJournalIds: List<Uuid>,
+    onSelectionChanged: (List<Uuid>) -> Unit,
+    backProgress: () -> Float,
+    modifier: Modifier = Modifier,
+) {
+    with(sharedTransitionScope) {
+        Card(
+            modifier =
+                modifier
+                    .fillMaxWidth()
+                    .journalSelectorExpandedHeight()
+                    .sharedBounds(
+                        rememberSharedContentState(SELECTOR_SURFACE_KEY),
+                        animatedVisibilityScope = animatedVisibilityScope,
+                    ),
+            colors =
+                CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+            shape = JournalSelectorShape,
+        ) {
+            JournalPickerList(
+                availableJournals = availableJournals,
+                selectedJournalIds = selectedJournalIds,
+                onSelectionChanged = onSelectionChanged,
+                backProgress = backProgress,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope,
+            )
+        }
+    }
+}
+
+private const val SELECTOR_SURFACE_KEY = "journal_selector_surface"
+
+/**
+ * A layout that always reports the collapsed (smallest) height to its parent, preventing
+ * reflow when the [JournalSelectorDropdown] expands. Expanded content overflows upward
+ * from the bottom edge on a higher z-layer.
+ */
+@Composable
+private fun NoReflowLayout(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    var collapsedHeight by remember { mutableIntStateOf(0) }
+
+    Layout(modifier = modifier, content = content) { measurables, constraints ->
+        val placeable = measurables[0].measure(constraints.copy(minHeight = 0))
+
+        // Capture the collapsed height on first measure (or if the content shrinks).
+        if (collapsedHeight == 0 || placeable.height < collapsedHeight) {
+            collapsedHeight = placeable.height
+        }
+
+        val reportedHeight = minOf(placeable.height, collapsedHeight)
+        layout(placeable.width, reportedHeight) {
+            // Bottom-aligned: expanded content grows upward past the top edge.
+            placeable.placeRelative(0, reportedHeight - placeable.height, zIndex = 1f)
+        }
+    }
+}
+
+/**
+ * The collapsed trigger row shown inside the [JournalSelectorDropdown] card.
+ *
+ * Composed of three sections: a circular icon badge, a [JournalSelectionText] label in the
+ * middle, and [SelectorIndicators] trailing. Sizes scale down on height-constrained screens
+ * via [LocalEditorIsCompact] (e.g. landscape phones).
  */
 @Composable
 private fun SelectorContent(
     selectedCount: Int,
     availableJournals: List<Journal>,
     selectedJournalIds: List<Uuid>,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     modifier: Modifier = Modifier,
 ) {
     val isCompact = LocalEditorIsCompact.current
@@ -248,6 +323,8 @@ private fun SelectorContent(
             selectedCount = selectedCount,
             availableJournals = availableJournals,
             selectedJournalIds = selectedJournalIds,
+            sharedTransitionScope = sharedTransitionScope,
+            animatedVisibilityScope = animatedVisibilityScope,
             modifier = Modifier.weight(1f),
         )
 
@@ -256,30 +333,53 @@ private fun SelectorContent(
 }
 
 /**
- * Displays the current selection label inside the collapsed trigger row.
+ * Displays the current selection label inside the [SelectorContent] trigger row.
  *
  * Shows the journal title when exactly one is selected, a generic "Multiple journals" label
- * when more than one is selected, and a placeholder when nothing is selected yet.
- * A secondary line showing the count is shown for multi-selection on non-compact screens.
+ * when more than one is selected, and a placeholder when nothing is selected yet. A secondary
+ * line showing the count appears for multi-selection on non-compact screens. Typography and
+ * layout scale down on height-constrained screens via [LocalEditorIsCompact].
  */
 @Composable
 private fun JournalSelectionText(
     selectedCount: Int,
     availableJournals: List<Journal>,
     selectedJournalIds: List<Uuid>,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     modifier: Modifier = Modifier,
 ) {
     val isCompact = LocalEditorIsCompact.current
+    val selectedJournal =
+        if (selectedCount == 1) {
+            availableJournals.find { it.id == selectedJournalIds.first() }
+        } else {
+            null
+        }
+    val titleText =
+        when (selectedCount) {
+            0 -> "Select journals"
+            1 -> selectedJournal?.title ?: "Unknown journal"
+            else -> "Multiple journals"
+        }
+    // When exactly one journal is selected, the title participates in a shared element
+    // transition with the matching JournalItem row in the expanded list.
+    val titleModifier =
+        if (selectedJournal != null) {
+            with(sharedTransitionScope) {
+                Modifier.sharedElement(
+                    rememberSharedContentState("journal_title_${selectedJournal.id}"),
+                    animatedVisibilityScope = animatedVisibilityScope,
+                )
+            }
+        } else {
+            Modifier
+        }
+
     Column(modifier = modifier) {
         Text(
-            text =
-                when (selectedCount) {
-                    0 -> "Select journals"
-                    1 ->
-                        availableJournals.find { it.id == selectedJournalIds.first() }?.title
-                            ?: "Unknown journal"
-                    else -> "Multiple journals"
-                },
+            text = titleText,
+            modifier = titleModifier,
             style =
                 if (isCompact) {
                     MaterialTheme.typography.bodyMedium
@@ -308,8 +408,11 @@ private fun JournalSelectionText(
 }
 
 /**
- * Trailing section of the collapsed trigger: a count badge (when > 0 journals selected) and
- * a chevron icon. The badge and chevron tint track the selection state colour.
+ * Trailing section of the [SelectorContent] trigger row.
+ *
+ * Shows a numeric [Badge] when one or more journals are selected, followed by an expand
+ * chevron. Both the badge and chevron tint flip between `primary`/`onPrimaryContainer`
+ * (selected) and `onSurfaceVariant` (empty) to mirror the card's container color.
  */
 @Composable
 private fun SelectorIndicators(selectedCount: Int) {
@@ -341,17 +444,25 @@ private fun SelectorIndicators(selectedCount: Int) {
 }
 
 /**
- * The expanded list of journals, shown as a floating surface rising above the selector card.
- * Capped at [journalSelectorExpandedHeight] (~4 items, screen-height-aware).
+ * The scrollable journal list shown inside the expanded card of [JournalSelectorDropdown].
+ *
+ * Height is capped by [journalSelectorExpandedHeight] so at most four items are visible before
+ * the list scrolls — the cut-off indicates more items exist. When [availableJournals] is empty,
+ * an [EmptyJournalItem] placeholder is shown instead of the list. Each populated row is a
+ * [JournalItem] keyed by journal ID for stable recomposition.
  */
 @Composable
 private fun JournalPickerList(
     availableJournals: List<Journal>,
     selectedJournalIds: List<Uuid>,
     onSelectionChanged: (List<Uuid>) -> Unit,
+    backProgress: () -> Float = { 0f },
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
+        // Header stays fixed during predictive back — only the list below clips.
         Text(
             text = "Journals",
             style = MaterialTheme.typography.labelMedium,
@@ -361,7 +472,7 @@ private fun JournalPickerList(
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
         )
-        LazyColumn {
+        LazyColumn(modifier = Modifier.journalListBackClip(backProgress)) {
             if (availableJournals.isEmpty()) {
                 item { EmptyJournalItem() }
             } else {
@@ -379,6 +490,8 @@ private fun JournalPickerList(
                             }
                             onSelectionChanged(newSelection)
                         },
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedVisibilityScope = animatedVisibilityScope,
                     )
                 }
             }
@@ -386,109 +499,107 @@ private fun JournalPickerList(
     }
 }
 
-/** Placeholder shown inside [JournalPickerList] when the user has no journals yet. */
+/**
+ * Placeholder row shown inside [JournalPickerList] when [availableJournals] is empty.
+ *
+ * Uses the same [ListItem] structure as [JournalItem] so the picker card maintains a
+ * consistent minimum height rather than collapsing to just its header.
+ */
 @Composable
 private fun EmptyJournalItem() {
-    DropdownMenuItem(
-        text = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(4.dp),
-            ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(end = 12.dp),
-                )
-                Text(
-                    "No journals available",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+    ListItem(
+        headlineContent = {
+            Text(
+                text = "No journals available",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         },
-        onClick = {},
-        colors = MenuDefaults.itemColors(textColor = MaterialTheme.colorScheme.onSurfaceVariant),
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
     )
 }
 
 /**
- * A single row in [JournalPickerList] representing one journal.
+ * A single selectable row in [JournalPickerList] representing one journal.
  *
- * A filled circular check indicator appears on the left when the journal is selected.
- * Tapping toggles the selection via [onClick]; the caller is responsible for updating state.
+ * Leading content is a [JournalContentCover] — the small spine-shaped cover used consistently
+ * throughout the app to represent journals. When [isSelected] is `true`, the row background
+ * transitions to `primaryContainer` and the text color to `onPrimaryContainer` via
+ * `animateColorAsState`, keeping both in sync. A trailing checkmark animates in and out using
+ * [journalItemCheckmarkEnterTransition] and [journalItemCheckmarkExitTransition].
+ *
+ * The caller ([JournalPickerList]) owns selection state and passes the updated list to
+ * [JournalSelectorDropdown]'s `onSelectionChanged` callback.
  */
 @Composable
 private fun JournalItem(
     journal: Journal,
     isSelected: Boolean,
     onClick: () -> Unit,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
 ) {
-    DropdownMenuItem(
-        text = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(4.dp),
+    val containerColor by animateColorAsState(
+        targetValue =
+            if (isSelected) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                Color.Transparent
+            },
+        label = "JournalItemBackground",
+    )
+    val textColor by animateColorAsState(
+        targetValue =
+            if (isSelected) {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+        label = "JournalItemText",
+    )
+    // When this journal is selected, its title participates in a shared element transition
+    // with the collapsed trigger's JournalSelectionText.
+    val titleModifier =
+        if (isSelected) {
+            with(sharedTransitionScope) {
+                Modifier.sharedElement(
+                    rememberSharedContentState("journal_title_${journal.id}"),
+                    animatedVisibilityScope = animatedVisibilityScope,
+                )
+            }
+        } else {
+            Modifier
+        }
+    ListItem(
+        headlineContent = {
+            Text(
+                text = journal.title,
+                modifier = titleModifier,
+                fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+                color = textColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        leadingContent = { JournalContentCover() },
+        trailingContent = {
+            AnimatedVisibility(
+                visible = isSelected,
+                enter = journalItemCheckmarkEnterTransition(),
+                exit = journalItemCheckmarkExitTransition(),
             ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (isSelected) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                                },
-                            ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (isSelected) {
-                        Icon(
-                            Icons.Default.Check,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                }
-
-                Spacer(Modifier.width(Spacing.md))
-
-                Text(
-                    text = journal.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
-                    color =
-                        if (isSelected) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
         },
-        onClick = onClick,
-        colors =
-            MenuDefaults.itemColors(
-                textColor =
-                    if (isSelected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-            ),
-        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+        colors = ListItemDefaults.colors(containerColor = containerColor),
+        modifier =
+            Modifier
+                .padding(horizontal = Spacing.xs, vertical = 2.dp)
+                .clip(MaterialTheme.shapes.medium)
+                .clickable(onClick = onClick),
     )
 }
