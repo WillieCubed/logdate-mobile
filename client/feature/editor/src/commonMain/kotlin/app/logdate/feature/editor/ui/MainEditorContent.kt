@@ -4,7 +4,6 @@ package app.logdate.feature.editor.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
@@ -165,16 +164,13 @@ fun MainEditorContent(
             transition.AnimatedContent(
                 contentKey = { it::class },
                 // The shared container morph is the semantic transition here.
-                // When expanding, non-selected tiles are faded out instantly so IME-driven
-                // layout shifts don't push them above the expanding surface.
-                // For Expanded → Empty/List (predictive back), keep ExitTransition.None so
-                // the gesture scrub remains purely spatial with no competing fade.
+                // All exit transitions use fadeOut(snap()) to instantly remove exiting
+                // content. This prevents a LazyColumn double-measurement crash that
+                // occurs when SharedTransitionLayout's lookahead pass and AnimatedContent
+                // both try to measure LazyColumn items during a transition.
+                // The sharedBounds overlay handles the visual morph independently.
                 transitionSpec = {
-                    if (targetState is EditorDisplay.Expanded) {
-                        EnterTransition.None togetherWith fadeOut(snap())
-                    } else {
-                        EnterTransition.None togetherWith ExitTransition.None
-                    }
+                    EnterTransition.None togetherWith fadeOut(snap())
                 },
             ) { target ->
                 val avs = this

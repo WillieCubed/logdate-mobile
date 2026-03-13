@@ -118,6 +118,8 @@ kotlin {
             implementation(libs.koin.androidx.workmanager)
             implementation(libs.material)
             implementation(libs.play.app.update.ktx)
+            implementation(libs.coil.compose)
+            implementation(libs.coil.video)
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
