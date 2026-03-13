@@ -3,12 +3,11 @@
 package app.logdate.feature.editor.ui.camera
 
 import android.Manifest
-import androidx.camera.compose.CameraXViewfinder
-import androidx.camera.core.SurfaceOrientedMeteringPointFactory
-import androidx.camera.viewfinder.core.ImplementationMode
+import androidx.camera.view.PreviewView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -62,6 +61,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -76,12 +76,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
@@ -89,7 +90,10 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import io.github.aakira.napier.Napier
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.captured_photo
 import logdate.client.feature.editor.generated.resources.captured_video
@@ -121,6 +125,8 @@ sealed interface CameraCapturePreviewState {
         val mediaType: CapturedMediaType,
     ) : CameraCapturePreviewState
 }
+
+private const val CAMERA_SWITCH_PREVIEW_TIMEOUT_MS = 2_000L
 
 @Suppress("ktlint:standard:function-naming")
 @OptIn(ExperimentalPermissionsApi::class)
@@ -467,8 +473,7 @@ private fun MediaReviewContent(
 
 /**
  * First-class inline camera capture interface with live preview and controls.
- * Uses the [AndroidCameraCaptureManager]'s surface request directly to avoid
- * conflicting camera bindings.
+ * Uses an attached [PreviewView] so the UI can wait for CameraX's streaming signal.
  */
 @Suppress("ktlint:standard:function-naming")
 @Composable
@@ -477,32 +482,38 @@ private fun InlineCameraCapture(
     uiState: CameraUiState,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val haptic = LocalHapticFeedback.current
 
     val manager = viewModel.getCaptureManager() as? AndroidCameraCaptureManager
+    val previewStreaming by manager?.previewStreaming?.collectAsState()
+        ?: remember { mutableStateOf(false) }
+    val currentPreviewStreaming by rememberUpdatedState(previewStreaming)
+    val previewView =
+        remember(context) {
+            PreviewView(context).apply {
+                implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                scaleType = PreviewView.ScaleType.FILL_CENTER
+            }
+        }
 
-    // Collect the surface request from the manager
-    val surfaceRequest by manager?.surfaceRequest?.collectAsState()
-        ?: remember { mutableStateOf(null) }
-
-    // Start preview every time this composable enters composition.
-    // LaunchedEffect(Unit) re-fires on each fresh composition entry (after retake, reopen, etc.)
-    // and its coroutine is cancelled when the composable leaves.
-    LaunchedEffect(Unit) {
+    // Start preview every time this composable enters composition with the attached PreviewView.
+    LaunchedEffect(manager, lifecycleOwner, previewView) {
+        manager?.attachPreviewView(previewView)
         manager?.setLifecycleOwner(lifecycleOwner)
         viewModel.startPreview()
     }
 
     // Stop preview when this composable leaves composition (review screen, block delete, etc.)
-    DisposableEffect(Unit) {
+    DisposableEffect(manager, previewView) {
         onDispose {
             viewModel.stopPreview()
+            manager?.attachPreviewView(null)
         }
     }
 
-    // Camera switch overlay — brief dim pulse signals the switch while
-    // the old frame stays visible until the new camera feed arrives.
+    // Camera switch overlay — smooth fade to black, switch, then fade out.
     val switchOverlayAlpha = remember { Animatable(0f) }
     var isSwitchingCamera by remember { mutableStateOf(false) }
 
@@ -533,21 +544,44 @@ private fun InlineCameraCapture(
         }
     }
 
-    // Orchestrate camera switch: quick dim → switch (old frame stays) → fade back
+    // Orchestrate camera switch: fade to black → switch → wait for new feed → fade out
     LaunchedEffect(isSwitchingCamera) {
         if (isSwitchingCamera) {
-            switchOverlayAlpha.animateTo(0.6f, tween(80, easing = FastOutSlowInEasing))
+            val previewManager = manager
+            if (previewManager == null) {
+                switchOverlayAlpha.snapTo(0f)
+                isSwitchingCamera = false
+                return@LaunchedEffect
+            }
+
+            switchOverlayAlpha.animateTo(1f, tween(120, easing = FastOutSlowInEasing))
+            val waitForStreaming =
+                async {
+                    withTimeoutOrNull(CAMERA_SWITCH_PREVIEW_TIMEOUT_MS) {
+                        awaitFreshPreviewStreaming(previewManager.previewStreaming)
+                    }
+                }
+
             viewModel.switchCamera()
-            switchOverlayAlpha.animateTo(0f, tween(200, easing = FastOutSlowInEasing))
+
+            val previewReady =
+                if (previewManager.state.value.error == null) {
+                    waitForStreaming.await() != null
+                } else {
+                    waitForStreaming.cancel()
+                    false
+                }
+
+            if (!previewReady) {
+                Napier.w("Camera switch preview did not report streaming before overlay timeout")
+            }
+            switchOverlayAlpha.animateTo(0f, tween(250, easing = LinearEasing))
             isSwitchingCamera = false
         }
     }
 
     // Zoom state
     var currentZoom by remember { mutableFloatStateOf(1f) }
-
-    // Viewfinder size for metering point calculations
-    var viewfinderSize by remember { mutableStateOf(IntSize.Zero) }
 
     val animatedAspectRatio by animateFloatAsState(
         targetValue = uiState.aspectRatio.ratio,
@@ -560,62 +594,50 @@ private fun InlineCameraCapture(
         color = Color.Black,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Camera viewfinder from the manager's surface request
-            val currentSurfaceRequest = surfaceRequest
-            AnimatedVisibility(
-                visible = currentSurfaceRequest != null,
-                enter = fadeIn(tween(150)),
-                exit = fadeOut(tween(200)),
-                modifier = Modifier.align(Alignment.Center),
-            ) {
-                // currentSurfaceRequest is captured at composition time;
-                // AnimatedVisibility keeps rendering the exit animation after it becomes null.
-                currentSurfaceRequest?.let { request ->
-                    Box(
-                        modifier =
-                            Modifier
-                                .aspectRatio(animatedAspectRatio)
-                                .clip(RoundedCornerShape(20.dp))
-                                .onSizeChanged { viewfinderSize = it }
-                                .pointerInput(Unit) {
-                                    detectTransformGestures { _, _, zoom, _ ->
-                                        currentZoom = (currentZoom * zoom).coerceIn(1f, 10f)
-                                        manager?.setZoomRatio(currentZoom)
-                                    }
-                                }.pointerInput(Unit) {
-                                    detectTapGestures(
-                                        onTap = { offset ->
-                                            focusPoint = offset
-                                            if (viewfinderSize.width > 0 && viewfinderSize.height > 0) {
-                                                val factory =
-                                                    SurfaceOrientedMeteringPointFactory(
-                                                        viewfinderSize.width.toFloat(),
-                                                        viewfinderSize.height.toFloat(),
-                                                    )
-                                                manager?.tapToFocus(factory, offset.x, offset.y)
-                                            }
-                                        },
-                                    )
-                                },
-                    ) {
-                        CameraXViewfinder(
-                            surfaceRequest = request,
-                            implementationMode = ImplementationMode.EXTERNAL,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-
-                        // Focus ring overlay
-                        currentFocusPoint?.let { point ->
-                            Canvas(modifier = Modifier.fillMaxSize()) {
-                                val ringSize = 80f * focusRingScale.value
-                                drawCircle(
-                                    color = primaryColor.copy(alpha = focusRingAlpha.value),
-                                    radius = ringSize / 2,
-                                    center = point,
-                                    style = Stroke(width = 2f),
-                                )
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.Center)
+                        .aspectRatio(animatedAspectRatio)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color.Black)
+                        .pointerInput(Unit) {
+                            detectTransformGestures { _, _, zoom, _ ->
+                                currentZoom = (currentZoom * zoom).coerceIn(1f, 10f)
+                                manager?.setZoomRatio(currentZoom)
                             }
-                        }
+                        }.pointerInput(Unit) {
+                            detectTapGestures(
+                                onTap = { offset ->
+                                    if (!currentPreviewStreaming) {
+                                        return@detectTapGestures
+                                    }
+
+                                    focusPoint = offset
+                                    manager?.tapToFocus(offset.x, offset.y)
+                                },
+                            )
+                        },
+            ) {
+                AndroidView(
+                    factory = { previewView },
+                    modifier = Modifier.fillMaxSize(),
+                    update = { view ->
+                        view.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                        view.scaleType = PreviewView.ScaleType.FILL_CENTER
+                    },
+                )
+
+                // Focus ring overlay
+                currentFocusPoint?.let { point ->
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val ringSize = 80f * focusRingScale.value
+                        drawCircle(
+                            color = primaryColor.copy(alpha = focusRingAlpha.value),
+                            radius = ringSize / 2,
+                            center = point,
+                            style = Stroke(width = 2f),
+                        )
                     }
                 }
             }

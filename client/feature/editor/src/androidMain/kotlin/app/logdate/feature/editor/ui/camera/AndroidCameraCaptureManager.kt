@@ -1,17 +1,17 @@
 package app.logdate.feature.editor.ui.camera
 
+import android.Manifest
 import android.content.ContentValues
 import android.content.Context
 import android.os.Build
 import android.provider.MediaStore
+import androidx.annotation.RequiresPermission
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
-import androidx.camera.core.MeteringPointFactory
 import androidx.camera.core.Preview
-import androidx.camera.core.SurfaceRequest
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -23,8 +23,10 @@ import androidx.camera.video.Recorder
 import androidx.camera.video.Recording
 import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
+import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.Observer
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -50,13 +52,12 @@ class AndroidCameraCaptureManager(
     private val _state = MutableStateFlow(CameraCaptureState())
     override val state: StateFlow<CameraCaptureState> = _state.asStateFlow()
 
-    private val _surfaceRequest = MutableStateFlow<SurfaceRequest?>(null)
+    private val _previewStreaming = MutableStateFlow(false)
 
     /**
-     * Observable surface request for binding to a [CameraXViewfinder].
-     * Emits a new [SurfaceRequest] each time the preview is started or the camera is switched.
+     * Emits `true` when the attached [PreviewView] reports that frames are streaming.
      */
-    val surfaceRequest: StateFlow<SurfaceRequest?> = _surfaceRequest.asStateFlow()
+    val previewStreaming: StateFlow<Boolean> = _previewStreaming.asStateFlow()
 
     private var cameraProvider: ProcessCameraProvider? = null
     private var preview: Preview? = null
@@ -66,6 +67,8 @@ class AndroidCameraCaptureManager(
     private var lifecycleOwner: LifecycleOwner? = null
     private var camera: Camera? = null
     private var recordingDeferred: CompletableDeferred<String?>? = null
+    private var previewView: PreviewView? = null
+    private var previewStreamObserver: Observer<PreviewView.StreamState>? = null
 
     private val mainExecutor: Executor = ContextCompat.getMainExecutor(context)
     private val timestampFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
@@ -76,6 +79,37 @@ class AndroidCameraCaptureManager(
      */
     fun setLifecycleOwner(owner: LifecycleOwner) {
         lifecycleOwner = owner
+    }
+
+    /**
+     * Attaches the [PreviewView] used to render the live camera stream.
+     */
+    fun attachPreviewView(view: PreviewView?) {
+        if (previewView === view) {
+            return
+        }
+
+        previewStreamObserver?.let { observer ->
+            previewView?.previewStreamState?.removeObserver(observer)
+        }
+
+        previewView = view
+
+        if (view == null) {
+            previewStreamObserver = null
+            _previewStreaming.value = false
+            return
+        }
+
+        val observer =
+            Observer<PreviewView.StreamState> { state ->
+                _previewStreaming.value = state == PreviewView.StreamState.STREAMING
+            }
+        previewStreamObserver = observer
+        view.previewStreamState.observeForever(observer)
+        _previewStreaming.value = view.previewStreamState.value == PreviewView.StreamState.STREAMING
+
+        preview?.surfaceProvider = view.surfaceProvider
     }
 
     /**
@@ -91,17 +125,20 @@ class AndroidCameraCaptureManager(
 
     /**
      * Triggers tap-to-focus at the given point.
-     * @param meteringPointFactory Factory from the viewfinder for coordinate mapping.
-     * @param x Normalized x coordinate (0..1) or pixel coordinate depending on factory.
-     * @param y Normalized y coordinate (0..1) or pixel coordinate depending on factory.
+     * @param x Pixel x coordinate in the attached [PreviewView].
+     * @param y Pixel y coordinate in the attached [PreviewView].
      */
     fun tapToFocus(
-        meteringPointFactory: MeteringPointFactory,
         x: Float,
         y: Float,
     ) {
         val cam = camera ?: return
-        val point = meteringPointFactory.createPoint(x, y)
+        val currentPreviewView = previewView ?: return
+        if (!_previewStreaming.value) {
+            return
+        }
+
+        val point = currentPreviewView.meteringPointFactory.createPoint(x, y)
         val action =
             FocusMeteringAction
                 .Builder(point)
@@ -110,105 +147,63 @@ class AndroidCameraCaptureManager(
         cam.cameraControl.startFocusAndMetering(action)
     }
 
-    override suspend fun startPreview(facing: CameraFacing) {
-        try {
-            val provider = ProcessCameraProvider.awaitInstance(context)
-            cameraProvider = provider
+    override suspend fun startPreview(facing: CameraFacing) =
+        withContext(Dispatchers.Main) {
+            try {
+                val provider = ProcessCameraProvider.awaitInstance(context)
+                cameraProvider = provider
+                val owner = lifecycleOwner ?: error("LifecycleOwner is not set")
 
-            val cameraSelector =
-                when (facing) {
-                    CameraFacing.FRONT -> CameraSelector.DEFAULT_FRONT_CAMERA
-                    CameraFacing.BACK -> CameraSelector.DEFAULT_BACK_CAMERA
-                }
-
-            val aspectRatioStrategy =
-                when (_state.value.aspectRatio) {
-                    CameraAspectRatio.STANDARD -> AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY
-                    CameraAspectRatio.FULL,
-                    CameraAspectRatio.SQUARE,
-                    -> AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY
-                }
-
-            val resolutionSelector =
-                ResolutionSelector
-                    .Builder()
-                    .setAspectRatioStrategy(aspectRatioStrategy)
-                    .build()
-
-            preview =
-                Preview
-                    .Builder()
-                    .setResolutionSelector(resolutionSelector)
-                    .build()
-                    .apply {
-                        setSurfaceProvider { request ->
-                            _surfaceRequest.value = request
-                        }
-                    }
-
-            imageCapture =
-                ImageCapture
-                    .Builder()
-                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                    .setResolutionSelector(resolutionSelector)
-                    .build()
-
-            val recorder =
-                Recorder
-                    .Builder()
-                    .setQualitySelector(QualitySelector.from(Quality.HIGHEST))
-                    .build()
-            videoCapture = VideoCapture.withOutput(recorder)
-
-            val owner = lifecycleOwner
-            if (owner != null) {
+                _previewStreaming.value = false
+                createUseCases()
                 provider.unbindAll()
                 camera =
                     provider.bindToLifecycle(
                         owner,
-                        cameraSelector,
+                        cameraSelectorFor(facing),
                         preview,
                         imageCapture,
                         videoCapture,
                     )
-            }
 
-            _state.update {
-                it.copy(
-                    isPreviewActive = true,
-                    cameraFacing = facing,
-                    error = null,
-                )
-            }
-        } catch (e: Exception) {
-            Napier.e("Failed to start camera preview", e)
-            _state.update {
-                it.copy(
-                    isPreviewActive = false,
-                    error = CameraCaptureError.Unknown(e.message ?: "Unknown error"),
-                )
+                _state.update {
+                    it.copy(
+                        isPreviewActive = true,
+                        cameraFacing = facing,
+                        error = null,
+                    )
+                }
+            } catch (e: Exception) {
+                Napier.e("Failed to start camera preview", e)
+                _previewStreaming.value = false
+                _state.update {
+                    it.copy(
+                        isPreviewActive = false,
+                        error = CameraCaptureError.Unknown(e.message ?: "Unknown error"),
+                    )
+                }
             }
         }
-    }
 
-    override suspend fun stopPreview() {
-        try {
-            currentRecording?.stop()
-            currentRecording = null
-            camera = null
-            _surfaceRequest.value = null
-            cameraProvider?.unbindAll()
-            _state.update {
-                it.copy(
-                    isPreviewActive = false,
-                    isRecording = false,
-                    recordingDurationMs = 0L,
-                )
+    override suspend fun stopPreview() =
+        withContext(Dispatchers.Main) {
+            try {
+                currentRecording?.stop()
+                currentRecording = null
+                camera = null
+                _previewStreaming.value = false
+                cameraProvider?.unbindAll()
+                _state.update {
+                    it.copy(
+                        isPreviewActive = false,
+                        isRecording = false,
+                        recordingDurationMs = 0L,
+                    )
+                }
+            } catch (e: Exception) {
+                Napier.e("Error stopping camera preview", e)
             }
-        } catch (e: Exception) {
-            Napier.e("Error stopping camera preview", e)
         }
-    }
 
     override suspend fun capturePhoto(): String? =
         withContext(Dispatchers.Main) {
@@ -266,6 +261,7 @@ class AndroidCameraCaptureManager(
             }
         }
 
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     override suspend fun startVideoRecording() {
         val capture =
             videoCapture ?: run {
@@ -286,9 +282,7 @@ class AndroidCameraCaptureManager(
             ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                 put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Movies/LogDate")
-                }
+                put(MediaStore.MediaColumns.RELATIVE_PATH, "Movies/LogDate")
             }
 
         val outputOptions =
@@ -377,80 +371,55 @@ class AndroidCameraCaptureManager(
         return deferred.await()
     }
 
-    override suspend fun switchCamera() {
-        if (_state.value.isRecording) {
-            Napier.w("Cannot switch camera while recording")
-            return
-        }
-
-        val provider = cameraProvider ?: return
-        val owner = lifecycleOwner ?: return
-        val newFacing =
-            when (_state.value.cameraFacing) {
-                CameraFacing.FRONT -> CameraFacing.BACK
-                CameraFacing.BACK -> CameraFacing.FRONT
-            }
-        val cameraSelector =
-            when (newFacing) {
-                CameraFacing.FRONT -> CameraSelector.DEFAULT_FRONT_CAMERA
-                CameraFacing.BACK -> CameraSelector.DEFAULT_BACK_CAMERA
+    override suspend fun switchCamera() =
+        withContext(Dispatchers.Main) {
+            if (_state.value.isRecording) {
+                Napier.w("Cannot switch camera while recording")
+                return@withContext
             }
 
-        val aspectRatioStrategy =
-            when (_state.value.aspectRatio) {
-                CameraAspectRatio.STANDARD -> AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY
-                CameraAspectRatio.FULL,
-                CameraAspectRatio.SQUARE,
-                -> AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY
-            }
-        val resolutionSelector =
-            ResolutionSelector
-                .Builder()
-                .setAspectRatioStrategy(aspectRatioStrategy)
-                .build()
-
-        // Build new use cases before unbinding so the surface provider callback
-        // fires as soon as the new camera is bound — the old frame stays visible
-        // in the viewfinder until the new SurfaceRequest arrives.
-        preview =
-            Preview
-                .Builder()
-                .setResolutionSelector(resolutionSelector)
-                .build()
-                .apply {
-                    setSurfaceProvider { request ->
-                        _surfaceRequest.value = request
+            val provider =
+                cameraProvider ?: run {
+                    _state.update {
+                        it.copy(error = CameraCaptureError.Unknown("Camera provider is not ready"))
                     }
+                    return@withContext
                 }
-        imageCapture =
-            ImageCapture
-                .Builder()
-                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                .setResolutionSelector(resolutionSelector)
-                .build()
-        val recorder =
-            Recorder
-                .Builder()
-                .setQualitySelector(QualitySelector.from(Quality.HIGHEST))
-                .build()
-        videoCapture = VideoCapture.withOutput(recorder)
+            val owner =
+                lifecycleOwner ?: run {
+                    _state.update {
+                        it.copy(error = CameraCaptureError.Unknown("Lifecycle owner is not ready"))
+                    }
+                    return@withContext
+                }
+            val newFacing =
+                when (_state.value.cameraFacing) {
+                    CameraFacing.FRONT -> CameraFacing.BACK
+                    CameraFacing.BACK -> CameraFacing.FRONT
+                }
 
-        try {
-            provider.unbindAll()
-            camera =
-                provider.bindToLifecycle(
-                    owner,
-                    cameraSelector,
-                    preview,
-                    imageCapture,
-                    videoCapture,
-                )
-            _state.update { it.copy(cameraFacing = newFacing) }
-        } catch (e: Exception) {
-            Napier.e("Failed to switch camera", e)
-            _state.update { it.copy(error = CameraCaptureError.Unknown(e.message ?: "Switch failed")) }
+            try {
+                _state.update { it.copy(error = null) }
+                _previewStreaming.value = false
+                createUseCases()
+                provider.unbindAll()
+                camera =
+                    provider.bindToLifecycle(
+                        owner,
+                        cameraSelectorFor(newFacing),
+                        preview,
+                        imageCapture,
+                        videoCapture,
+                    )
+                _state.update { it.copy(cameraFacing = newFacing, error = null) }
+            } catch (e: Exception) {
+                Napier.e("Failed to switch camera", e)
+                _previewStreaming.value = false
+                _state.update {
+                    it.copy(error = CameraCaptureError.Unknown(e.message ?: "Switch failed"))
+                }
+            }
         }
-    }
 
     override fun setCaptureMode(mode: CaptureMode) {
         _state.update { it.copy(captureMode = mode) }
@@ -469,8 +438,13 @@ class AndroidCameraCaptureManager(
         currentRecording = null
         recordingDeferred?.complete(null)
         recordingDeferred = null
+        previewStreamObserver?.let { observer ->
+            previewView?.previewStreamState?.removeObserver(observer)
+        }
+        previewStreamObserver = null
+        previewView = null
+        _previewStreaming.value = false
         camera = null
-        _surfaceRequest.value = null
         cameraProvider?.unbindAll()
         cameraProvider = null
         preview = null
@@ -478,5 +452,54 @@ class AndroidCameraCaptureManager(
         videoCapture = null
         lifecycleOwner = null
         _state.update { CameraCaptureState() }
+    }
+
+    private fun cameraSelectorFor(facing: CameraFacing): CameraSelector =
+        when (facing) {
+            CameraFacing.FRONT -> CameraSelector.DEFAULT_FRONT_CAMERA
+            CameraFacing.BACK -> CameraSelector.DEFAULT_BACK_CAMERA
+        }
+
+    private fun createUseCases() {
+        val currentPreviewView = previewView ?: error("PreviewView is not attached")
+        val resolutionSelector = resolutionSelector()
+
+        preview =
+            Preview
+                .Builder()
+                .setResolutionSelector(resolutionSelector)
+                .build()
+                .apply {
+                    setSurfaceProvider(currentPreviewView.surfaceProvider)
+                }
+
+        imageCapture =
+            ImageCapture
+                .Builder()
+                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                .setResolutionSelector(resolutionSelector)
+                .build()
+
+        val recorder =
+            Recorder
+                .Builder()
+                .setQualitySelector(QualitySelector.from(Quality.HIGHEST))
+                .build()
+        videoCapture = VideoCapture.withOutput(recorder)
+    }
+
+    private fun resolutionSelector(): ResolutionSelector {
+        val aspectRatioStrategy =
+            when (_state.value.aspectRatio) {
+                CameraAspectRatio.STANDARD -> AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY
+                CameraAspectRatio.FULL,
+                CameraAspectRatio.SQUARE,
+                -> AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY
+            }
+
+        return ResolutionSelector
+            .Builder()
+            .setAspectRatioStrategy(aspectRatioStrategy)
+            .build()
     }
 }

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.feature.editor.ui.formatMediaDuration
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -80,12 +81,13 @@ class CameraViewModel(
     /**
      * Switches between front and back cameras.
      */
-    fun switchCamera() {
-        previewJob?.cancel()
+    suspend fun switchCamera() {
+        previewJob?.cancelAndJoin()
         previewJob =
             viewModelScope.launch {
                 cameraCaptureManager.switchCamera()
             }
+        previewJob?.join()
     }
 
     /**
