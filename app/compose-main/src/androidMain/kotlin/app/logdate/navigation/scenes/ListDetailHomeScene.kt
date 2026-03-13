@@ -1,10 +1,6 @@
-@file:OptIn(ExperimentalSharedTransitionApi::class)
-
 package app.logdate.navigation.scenes
 
-import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,7 +13,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
@@ -27,37 +22,33 @@ import androidx.window.core.layout.WindowSizeClass.Companion.HEIGHT_DP_MEDIUM_LO
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
 import app.logdate.ui.theme.Spacing
-import logdate.app.composemain.generated.resources.Res
-import logdate.app.composemain.generated.resources.new_entry
-import org.jetbrains.compose.resources.stringResource
 
 /**
- * A [Scene] for single-pane content with navigation chrome (bottom nav bar or side rail).
+ * A [Scene] for two-pane list-detail layouts, used when a detail entry is selected
+ * alongside a parent list (e.g., timeline list + day detail).
  *
- * Used for main tab views (Timeline, Journals, Rewind, Location) and detail-only fallback views.
- * Two-pane list-detail layouts with a selected detail are handled by [ListDetailHomeScene].
- *
- * Special case: on the timeline tab in landscape/expanded mode, this scene shows a two-pane
- * layout with a placeholder in the detail pane, so the user sees the list-detail structure
- * before selecting an entry.
+ * Adaptive behavior:
+ * - Expanded/landscape screens: Side-by-side Surface panels with nav rail
+ * - Compact/medium screens: Detail-only fullscreen, navigation hidden
  */
-class HomeScene<T : NavKey>(
+class ListDetailHomeScene<T : NavKey>(
     override val key: Any,
     override val previousEntries: List<NavEntry<T>>,
     val mainEntry: NavEntry<T>,
+    val detailEntry: NavEntry<T>,
     val onTabSelected: (HomeTab) -> Unit,
     val onNewEntry: () -> Unit,
     val selectedTab: HomeTab,
 ) : Scene<T> {
-    override val entries: List<NavEntry<T>> = listOf(mainEntry)
+    override val entries: List<NavEntry<T>> = listOf(mainEntry, detailEntry)
 
     override val content: @Composable (() -> Unit) = {
-        HomeSceneContent()
+        ListDetailContent()
     }
 
     @Suppress("ktlint:standard:function-naming")
     @Composable
-    private fun HomeSceneContent() {
+    private fun ListDetailContent() {
         val adaptiveInfo = currentWindowAdaptiveInfo()
         val windowSizeClass = adaptiveInfo.windowSizeClass
 
@@ -65,19 +56,20 @@ class HomeScene<T : NavKey>(
             !windowSizeClass.isHeightAtLeastBreakpoint(HEIGHT_DP_MEDIUM_LOWER_BOUND) &&
                 windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_MEDIUM_LOWER_BOUND)
 
-        val showTwoPaneWithPlaceholder =
-            selectedTab == HomeTab.TIMELINE &&
-                (windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND) || isLandscapeCompact)
+        val showTwoPane =
+            windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND) || isLandscapeCompact
+
+        val isDetailOnlyView = !showTwoPane
 
         val snackbarHostState = remember { SnackbarHostState() }
 
         NavigationShell(
             selectedTab = selectedTab,
             onTabSelected = onTabSelected,
-            isDetailOnlyView = false,
+            isDetailOnlyView = isDetailOnlyView,
             snackbarHostState = snackbarHostState,
         ) {
-            if (showTwoPaneWithPlaceholder) {
+            if (showTwoPane) {
                 val panelShape = MaterialTheme.shapes.extraLarge
                 Row(
                     modifier =
@@ -110,70 +102,33 @@ class HomeScene<T : NavKey>(
                         shape = panelShape,
                         color = MaterialTheme.colorScheme.surface,
                     ) {
-                        DetailPlaceholder()
+                        detailEntry.Content()
                     }
                 }
             } else {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    mainEntry.Content()
-
-                    SharedElementFAB(
-                        onClick = onNewEntry,
-                        contentDescription = stringResource(Res.string.new_entry),
-                        modifier =
-                            Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(16.dp),
-                    )
-                }
+                // Compact/medium: detail takes over fullscreen
+                detailEntry.Content()
             }
         }
-    }
-
-    companion object {
-        private const val HOME_SCENE_KEY = "HomeScene"
-
-        /**
-         * Helper function to add metadata to a [NavEntry] indicating it can be displayed
-         * in the home scene.
-         */
-        fun homeScene() = mapOf(HOME_SCENE_KEY to true)
     }
 }
 
 /**
- * Creates a HomeScene for a main tab.
+ * Creates a ListDetailHomeScene for a two-pane detail view.
  */
-internal fun <T : NavKey> createMainTabHomeScene(
-    entry: NavEntry<T>,
+internal fun <T : NavKey> createTwoPaneHomeScene(
+    mainEntry: NavEntry<T>,
+    detailEntry: NavEntry<T>,
     previousEntries: List<NavEntry<T>>,
     tab: HomeTab,
     onTabSelected: (HomeTab) -> Unit,
     onNewEntry: () -> Unit,
-): HomeScene<T> =
-    HomeScene(
-        key = Pair("HomeScene", entry.contentKey),
+): ListDetailHomeScene<T> =
+    ListDetailHomeScene(
+        key = Triple("ListDetailHomeScene", mainEntry.contentKey, detailEntry.contentKey),
         previousEntries = previousEntries,
-        mainEntry = entry,
-        onTabSelected = onTabSelected,
-        onNewEntry = onNewEntry,
-        selectedTab = tab,
-    )
-
-/**
- * Creates a HomeScene for a full-screen detail view.
- */
-internal fun <T : NavKey> createFullscreenHomeScene(
-    entry: NavEntry<T>,
-    previousEntries: List<NavEntry<T>>,
-    tab: HomeTab,
-    onTabSelected: (HomeTab) -> Unit,
-    onNewEntry: () -> Unit,
-): HomeScene<T> =
-    HomeScene(
-        key = Pair("HomeScene", entry.contentKey),
-        previousEntries = previousEntries,
-        mainEntry = entry,
+        mainEntry = mainEntry,
+        detailEntry = detailEntry,
         onTabSelected = onTabSelected,
         onNewEntry = onNewEntry,
         selectedTab = tab,
