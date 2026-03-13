@@ -16,6 +16,7 @@ import app.logdate.client.database.dao.ImageNoteDao
 import app.logdate.client.database.dao.JournalDao
 import app.logdate.client.database.dao.JournalNotesDao
 import app.logdate.client.database.dao.LocationHistoryDao
+import app.logdate.client.database.dao.MediaCaptionDao
 import app.logdate.client.database.dao.PlaceDao
 import app.logdate.client.database.dao.SearchDao
 import app.logdate.client.database.dao.StorageMetadataDao
@@ -36,6 +37,7 @@ import app.logdate.client.database.entities.ImageNoteEntity
 import app.logdate.client.database.entities.JournalEntity
 import app.logdate.client.database.entities.JournalNoteCrossRef
 import app.logdate.client.database.entities.LocationLogEntity
+import app.logdate.client.database.entities.MediaCaptionEntity
 import app.logdate.client.database.entities.PlaceEntity
 import app.logdate.client.database.entities.StorageMetadataEntity
 import app.logdate.client.database.entities.TextNoteEntity
@@ -72,6 +74,7 @@ import app.logdate.client.database.migrations.MIGRATION_23_24
 import app.logdate.client.database.migrations.MIGRATION_24_25
 import app.logdate.client.database.migrations.MIGRATION_25_26
 import app.logdate.client.database.migrations.MIGRATION_26_27
+import app.logdate.client.database.migrations.MIGRATION_27_28
 import app.logdate.client.database.migrations.MIGRATION_2_3
 import app.logdate.client.database.migrations.MIGRATION_3_4
 import app.logdate.client.database.migrations.MIGRATION_4_5
@@ -122,8 +125,9 @@ import kotlinx.coroutines.IO
         TranscriptionEntity::class,
         PlaceEntity::class,
         UserPlaceEntity::class,
+        MediaCaptionEntity::class,
     ],
-    version = 27, // Repair location sample metadata migration
+    version = 28,
     exportSchema = true,
 )
 @TypeConverters(
@@ -174,6 +178,8 @@ abstract class LogDateDatabase : RoomDatabase() {
     abstract fun placeDao(): PlaceDao
 
     abstract fun userPlaceDao(): UserPlaceDao
+
+    abstract fun mediaCaptionDao(): MediaCaptionDao
 }
 
 /**
@@ -236,6 +242,7 @@ fun getRoomDatabase(
                 MIGRATION_24_25,
                 MIGRATION_25_26,
                 MIGRATION_26_27,
+                MIGRATION_27_28,
             ).fallbackToDestructiveMigration(destroyTablesOnUpgrade)
             .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)
             .setQueryCoroutineContext(dispatcher)

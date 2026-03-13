@@ -206,6 +206,7 @@ sealed class JournalNote(
         override val creationTimestamp: Instant,
         override val lastUpdated: Instant,
         val mediaRef: String,
+        val caption: String = "",
         override val syncVersion: Long = 0,
         override val location: NoteLocation? = null,
     ) : JournalNote(NoteType.IMAGE)
@@ -217,6 +218,7 @@ sealed class JournalNote(
         override val creationTimestamp: Instant,
         override val lastUpdated: Instant,
         val mediaRef: String,
+        val caption: String = "",
         override val syncVersion: Long = 0,
         override val location: NoteLocation? = null,
     ) : JournalNote(NoteType.VIDEO)

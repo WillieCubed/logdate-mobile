@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -19,7 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.common.DeleteMediaButton
-import app.logdate.feature.editor.ui.common.MediaCaptionField
+import app.logdate.feature.editor.ui.common.MediaOverlayCaptionArea
 import app.logdate.feature.editor.ui.editor.CameraBlockUiState
 import app.logdate.feature.editor.ui.formatMediaDuration
 import coil3.compose.AsyncImage
@@ -92,65 +91,61 @@ private fun CapturedMediaContent(
     onDiscardMedia: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    Box(
         modifier =
             modifier
                 .fillMaxSize()
-                .padding(8.dp),
+                .padding(8.dp)
+                .clip(RoundedCornerShape(16.dp)),
     ) {
-        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-            when (block.mediaType) {
-                CapturedMediaType.PHOTO -> {
-                    AsyncImage(
-                        model =
-                            ImageRequest
-                                .Builder(LocalPlatformContext.current)
-                                .data(block.uri)
-                                .build(),
-                        contentDescription = block.caption.ifBlank { "Captured photo" },
-                        contentScale = ContentScale.Crop,
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(16.dp)),
-                    )
-                }
+        when (block.mediaType) {
+            CapturedMediaType.PHOTO -> {
+                AsyncImage(
+                    model =
+                        ImageRequest
+                            .Builder(LocalPlatformContext.current)
+                            .data(block.uri)
+                            .build(),
+                    contentDescription = block.caption.ifBlank { "Captured photo" },
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
 
-                CapturedMediaType.VIDEO -> {
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
-                                contentDescription = stringResource(Res.string.play_video),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                text = formatDuration(block.durationMs),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+            CapturedMediaType.VIDEO -> {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = stringResource(Res.string.play_video),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = formatDuration(block.durationMs),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
-
-            DeleteMediaButton(
-                onClick = onDiscardMedia,
-                contentDescription = stringResource(Res.string.delete_media),
-                modifier = Modifier.align(Alignment.TopEnd),
-            )
         }
 
-        MediaCaptionField(
+        DeleteMediaButton(
+            onClick = onDiscardMedia,
+            contentDescription = stringResource(Res.string.delete_media),
+            modifier = Modifier.align(Alignment.TopEnd),
+        )
+
+        MediaOverlayCaptionArea(
             caption = block.caption,
             onCaptionChanged = { onBlockUpdated(block.copy(caption = it)) },
+            modifier = Modifier.align(Alignment.BottomStart),
         )
     }
 }

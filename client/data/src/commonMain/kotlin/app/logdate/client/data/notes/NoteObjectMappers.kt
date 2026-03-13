@@ -68,15 +68,18 @@ fun JournalNote.Text.toEntity() =
         placeId = location?.place?.id,
     )
 
-fun ImageNoteEntity.toModel(place: NotePlace? = null) =
-    JournalNote.Image(
-        uid = uid,
-        mediaRef = contentUri,
-        creationTimestamp = created,
-        lastUpdated = lastUpdated,
-        syncVersion = syncVersion,
-        location = mapLocation(latitude, longitude, altitude, locationAccuracy, place),
-    )
+fun ImageNoteEntity.toModel(
+    place: NotePlace? = null,
+    caption: String = "",
+) = JournalNote.Image(
+    uid = uid,
+    mediaRef = contentUri,
+    caption = caption,
+    creationTimestamp = created,
+    lastUpdated = lastUpdated,
+    syncVersion = syncVersion,
+    location = mapLocation(latitude, longitude, altitude, locationAccuracy, place),
+)
 
 fun JournalNote.Image.toEntity() =
     ImageNoteEntity(
@@ -92,15 +95,18 @@ fun JournalNote.Image.toEntity() =
         placeId = location?.place?.id,
     )
 
-fun VideoNoteEntity.toModel(place: NotePlace? = null) =
-    JournalNote.Video(
-        uid = uid,
-        mediaRef = contentUri,
-        creationTimestamp = created,
-        lastUpdated = lastUpdated,
-        syncVersion = syncVersion,
-        location = mapLocation(latitude, longitude, altitude, locationAccuracy, place),
-    )
+fun VideoNoteEntity.toModel(
+    place: NotePlace? = null,
+    caption: String = "",
+) = JournalNote.Video(
+    uid = uid,
+    mediaRef = contentUri,
+    caption = caption,
+    creationTimestamp = created,
+    lastUpdated = lastUpdated,
+    syncVersion = syncVersion,
+    location = mapLocation(latitude, longitude, altitude, locationAccuracy, place),
+)
 
 fun JournalNote.Video.toEntity() =
     VideoNoteEntity(

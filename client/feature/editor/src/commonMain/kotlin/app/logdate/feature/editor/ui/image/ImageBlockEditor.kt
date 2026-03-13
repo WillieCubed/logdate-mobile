@@ -1,9 +1,7 @@
 package app.logdate.feature.editor.ui.image
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -13,7 +11,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.common.DeleteMediaButton
-import app.logdate.feature.editor.ui.common.MediaCaptionField
+import app.logdate.feature.editor.ui.common.MediaOverlayCaptionArea
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
@@ -44,42 +42,34 @@ fun ImageBlockEditor(
     val hasExistingImage = block.uri != null
 
     if (hasExistingImage) {
-        Column(
+        Box(
             modifier =
                 modifier
                     .fillMaxSize()
-                    .padding(8.dp),
+                    .padding(8.dp)
+                    .clip(RoundedCornerShape(16.dp)),
         ) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-            ) {
-                AsyncImage(
-                    model =
-                        ImageRequest
-                            .Builder(LocalPlatformContext.current)
-                            .data(block.uri)
-                            .build(),
-                    contentDescription = block.caption.ifBlank { "Image" },
-                    contentScale = ContentScale.Crop,
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(16.dp)),
-                )
+            AsyncImage(
+                model =
+                    ImageRequest
+                        .Builder(LocalPlatformContext.current)
+                        .data(block.uri)
+                        .build(),
+                contentDescription = block.caption.ifBlank { "Image" },
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
 
-                DeleteMediaButton(
-                    onClick = onDeleteRequested,
-                    contentDescription = stringResource(Res.string.delete_image),
-                    modifier = Modifier.align(Alignment.TopEnd),
-                )
-            }
+            DeleteMediaButton(
+                onClick = onDeleteRequested,
+                contentDescription = stringResource(Res.string.delete_image),
+                modifier = Modifier.align(Alignment.TopEnd),
+            )
 
-            MediaCaptionField(
+            MediaOverlayCaptionArea(
                 caption = block.caption,
                 onCaptionChanged = { onBlockUpdated(block.copy(caption = it)) },
+                modifier = Modifier.align(Alignment.BottomStart),
             )
         }
     } else {

@@ -31,6 +31,7 @@ fun JournalNote.toDomainBlock(): EntryBlockUiState =
                 timestamp = creationTimestamp,
                 location = null,
                 uri = mediaRef,
+                caption = caption,
             )
 
         is JournalNote.Video ->
@@ -39,6 +40,7 @@ fun JournalNote.toDomainBlock(): EntryBlockUiState =
                 timestamp = creationTimestamp,
                 location = null,
                 uri = mediaRef,
+                caption = caption,
             )
 
         is JournalNote.Audio ->
@@ -76,6 +78,7 @@ fun EntryBlockUiState.toJournalNote(): JournalNote? {
                 creationTimestamp = timestamp,
                 lastUpdated = now,
                 mediaRef = uri ?: return null,
+                caption = caption,
             )
         }
 
@@ -89,6 +92,7 @@ fun EntryBlockUiState.toJournalNote(): JournalNote? {
                         creationTimestamp = timestamp,
                         lastUpdated = now,
                         mediaRef = mediaRef,
+                        caption = caption,
                     )
                 CapturedMediaType.VIDEO ->
                     JournalNote.Video(
@@ -96,6 +100,7 @@ fun EntryBlockUiState.toJournalNote(): JournalNote? {
                         creationTimestamp = timestamp,
                         lastUpdated = now,
                         mediaRef = mediaRef,
+                        caption = caption,
                     )
             }
         }
@@ -107,6 +112,7 @@ fun EntryBlockUiState.toJournalNote(): JournalNote? {
                 creationTimestamp = timestamp,
                 lastUpdated = now,
                 mediaRef = uri ?: return null,
+                caption = caption,
             )
         }
 

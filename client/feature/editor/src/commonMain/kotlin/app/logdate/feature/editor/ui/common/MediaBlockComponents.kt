@@ -1,6 +1,7 @@
 package app.logdate.feature.editor.ui.common
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
@@ -14,6 +15,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
@@ -71,6 +73,31 @@ fun OverlayCaptionField(
         maxLines = 3,
         modifier = modifier.fillMaxWidth(),
     )
+}
+
+/**
+ * Overlay area that combines a dark gradient scrim with the caption text field.
+ * Place this at the bottom of a [Box] containing the media content.
+ */
+@Suppress("ktlint:standard:function-naming")
+@Composable
+fun MediaOverlayCaptionArea(
+    caption: String,
+    onCaptionChanged: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f)),
+                    ),
+                ).padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        OverlayCaptionField(caption = caption, onCaptionChanged = onCaptionChanged)
+    }
 }
 
 @Suppress("ktlint:standard:function-naming")

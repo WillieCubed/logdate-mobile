@@ -243,6 +243,7 @@ class TimelineViewModel(
                         noteId = note.uid,
                         uri = note.mediaRef,
                         timestamp = note.creationTimestamp,
+                        caption = note.caption,
                     )
                 is JournalNote.Audio ->
                     AudioNoteUiState(
@@ -256,6 +257,7 @@ class TimelineViewModel(
                         noteId = note.uid,
                         uri = note.mediaRef,
                         timestamp = note.creationTimestamp,
+                        caption = note.caption,
                     )
             }
         }

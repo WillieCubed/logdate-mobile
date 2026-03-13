@@ -116,6 +116,7 @@ data class ImageNoteUiState(
     val noteId: Uuid,
     val uri: String,
     val timestamp: Instant,
+    val caption: String = "",
 ) : NoteUiState
 
 data class AudioNoteUiState(
@@ -131,4 +132,5 @@ data class VideoNoteUiState(
     val timestamp: Instant,
     val thumbnailUri: String? = null,
     val duration: Long = 0, // Duration in milliseconds
+    val caption: String = "",
 ) : NoteUiState
