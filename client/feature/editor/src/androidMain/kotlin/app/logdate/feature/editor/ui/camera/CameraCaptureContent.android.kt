@@ -88,6 +88,7 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import coil3.video.videoFramePercent
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import io.github.aakira.napier.Napier
@@ -418,17 +419,44 @@ private fun MediaReviewContent(
         color = Color.Black,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            AsyncImage(
-                model =
-                    ImageRequest
-                        .Builder(LocalPlatformContext.current)
-                        .data(uri)
-                        .crossfade(true)
-                        .build(),
-                contentDescription = contentDesc,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize(),
-            )
+            Box(modifier = Modifier.fillMaxSize()) {
+                AsyncImage(
+                    model =
+                        ImageRequest
+                            .Builder(LocalPlatformContext.current)
+                            .data(uri)
+                            .crossfade(true)
+                            .apply {
+                                if (mediaType == CapturedMediaType.VIDEO) {
+                                    videoFramePercent(0.1)
+                                }
+                            }.build(),
+                    contentDescription = contentDesc,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize(),
+                )
+
+                // Play icon overlay for video captures
+                if (mediaType == CapturedMediaType.VIDEO) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color.White.copy(alpha = 0.9f),
+                        modifier =
+                            Modifier
+                                .size(64.dp)
+                                .align(Alignment.Center),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Videocam,
+                                contentDescription = null,
+                                modifier = Modifier.size(36.dp),
+                                tint = Color.Black,
+                            )
+                        }
+                    }
+                }
+            }
 
             // Bottom action bar
             Row(
