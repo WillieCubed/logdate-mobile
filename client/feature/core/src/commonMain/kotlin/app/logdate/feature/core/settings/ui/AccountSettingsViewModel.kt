@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.domain.account.GetCurrentAccountUseCase
+import app.logdate.client.domain.identity.ObserveUserIdentityUseCase
+import app.logdate.client.domain.identity.ResolvedUserIdentity
 import app.logdate.client.domain.profile.UpdateProfileUseCase
 import app.logdate.client.repository.account.AccountHostedPlcOperation
 import app.logdate.client.repository.account.AccountIdentityRepository
@@ -89,6 +91,7 @@ class AccountSettingsViewModel(
     private val passkeyAccountRepository: PasskeyAccountRepository,
     private val sessionStorage: SessionStorage,
     private val preferencesDataSource: LogdatePreferencesDataSource,
+    private val observeUserIdentityUseCase: ObserveUserIdentityUseCase,
 ) : ViewModel() {
     private val _profileUpdateState = MutableStateFlow<ProfileUpdateState>(ProfileUpdateState.Idle)
     val profileUpdateState: StateFlow<ProfileUpdateState> = _profileUpdateState
@@ -136,6 +139,23 @@ class AccountSettingsViewModel(
                 isAuthenticated = false,
             ),
         )
+
+    val resolvedIdentity: StateFlow<ResolvedUserIdentity> =
+        observeUserIdentityUseCase()
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                ResolvedUserIdentity(
+                    displayName = "",
+                    username = null,
+                    profilePhotoUri = null,
+                    bio = null,
+                    birthday = null,
+                    onboardedDate = null,
+                    isAuthenticated = false,
+                    cloudAccountId = null,
+                ),
+            )
 
     init {
         viewModelScope.launch {

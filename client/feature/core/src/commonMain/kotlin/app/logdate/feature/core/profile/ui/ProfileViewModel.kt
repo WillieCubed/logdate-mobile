@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import kotlin.time.Instant
 
 /**
  * ViewModel for the profile screen with local-first approach.
@@ -156,6 +157,36 @@ class ProfileViewModel(
                     )
             } catch (e: Exception) {
                 Napier.e("Unexpected error saving display name", e)
+                _uiState.value =
+                    _uiState.value.copy(
+                        updateState = ProfileUpdateState.Error("Unexpected error: ${e.message}"),
+                    )
+            }
+        }
+    }
+
+    /**
+     * Save birthday to the local profile.
+     */
+    fun saveBirthday(birthday: Instant) {
+        viewModelScope.launch {
+            try {
+                _uiState.value = _uiState.value.copy(updateState = ProfileUpdateState.Updating)
+                val result = profileRepository.updateBirthday(birthday)
+                if (result.isFailure) {
+                    Napier.e("Failed to update birthday", result.exceptionOrNull())
+                    _uiState.value =
+                        _uiState.value.copy(
+                            updateState = ProfileUpdateState.Error("Failed to save birthday"),
+                        )
+                } else {
+                    _uiState.value =
+                        _uiState.value.copy(
+                            updateState = ProfileUpdateState.Success,
+                        )
+                }
+            } catch (e: Exception) {
+                Napier.e("Unexpected error saving birthday", e)
                 _uiState.value =
                     _uiState.value.copy(
                         updateState = ProfileUpdateState.Error("Unexpected error: ${e.message}"),

@@ -101,11 +101,7 @@ fun SettingsOverviewScreen(
     modifier: Modifier = Modifier,
     viewModel: AccountSettingsViewModel = koinViewModel(),
 ) {
-    val accountState by viewModel.state.collectAsState()
-
-    val localDisplayName = accountState.userData.displayName
-    val cloudDisplayName = accountState.currentAccount.displayName
-    val resolvedName = localDisplayName.ifEmpty { cloudDisplayName }
+    val identity by viewModel.resolvedIdentity.collectAsState()
 
     SettingsOverviewContent(
         onBack = onBack,
@@ -119,11 +115,11 @@ fun SettingsOverviewScreen(
         onNavigateToExport = onNavigateToExport,
         userProfile =
             UserProfile(
-                name = resolvedName,
-                username = accountState.currentAccount.username,
-                isAuthenticated = accountState.isAuthenticated,
+                name = identity.displayName,
+                username = identity.username ?: "",
+                isAuthenticated = identity.isAuthenticated,
             ),
-        onboardedDate = accountState.userData.onboardedDate,
+        onboardedDate = identity.onboardedDate ?: Instant.DISTANT_PAST,
         modifier = modifier,
     )
 }

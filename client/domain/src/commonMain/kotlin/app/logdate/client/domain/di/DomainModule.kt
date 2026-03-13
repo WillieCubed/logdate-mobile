@@ -7,6 +7,7 @@ import app.logdate.client.domain.di.locationDomainModule
 import app.logdate.client.domain.entities.ExtractPeopleUseCase
 import app.logdate.client.domain.export.ExportUserDataUseCase
 import app.logdate.client.domain.export.GetExportCountsUseCase
+import app.logdate.client.domain.identity.ObserveUserIdentityUseCase
 import app.logdate.client.domain.journals.DeleteJournalUseCase
 import app.logdate.client.domain.journals.GetCurrentUserJournalsUseCase
 import app.logdate.client.domain.journals.GetDefaultSelectedJournalsUseCase
@@ -144,6 +145,9 @@ val domainModule: Module =
 
         // Profile
         factory { UpdateProfileUseCase(get()) }
+
+        // Identity
+        factory { ObserveUserIdentityUseCase(get(), get(), get(), get()) }
 
         // Search
         factory { SearchEntriesUseCase(get()) }

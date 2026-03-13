@@ -3,9 +3,6 @@
 package app.logdate.feature.core.profile.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -13,36 +10,36 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -59,10 +56,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.core.settings.ui.components.BirthdaySelector
 import app.logdate.shared.model.profile.LogDateProfile
-import app.logdate.ui.common.MaterialContainer
+import app.logdate.ui.common.DefaultSettingsContentContainer
+import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.applyScreenStyles
-import app.logdate.ui.common.applyStandardContentWidth
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.formatDateLocalized
 import kotlinx.datetime.TimeZone
@@ -79,27 +77,12 @@ import logdate.client.feature.core.generated.resources.personal_information
 import logdate.client.feature.core.generated.resources.profile
 import logdate.client.feature.core.generated.resources.profile_photo
 import logdate.client.feature.core.generated.resources.profile_updated_successfully
-import logdate.client.feature.core.generated.resources.refresh_profile
 import logdate.client.feature.core.generated.resources.save
 import logdate.client.feature.core.generated.resources.username_handle
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import kotlin.time.Instant
 
-/**
- * Material 3 Expressive profile screen featuring a cookie-shaped profile photo,
- * headline-sized display name with inline editing, and organized information sections.
- *
- * This screen follows Material Design 3 Expressive principles:
- * - Bold, expressive typography with headline sizing
- * - Dynamic colors and shapes for visual hierarchy
- * - Smooth motion and state transitions
- * - Container-based information architecture
- * - Accessible design patterns
- *
- * @param onBack Callback for when the user presses the back button
- * @param modifier Modifier to be applied to the screen
- * @param viewModel ViewModel for managing profile state
- */
 @Composable
 fun ProfileScreen(
     onBack: () -> Unit,
@@ -110,7 +93,6 @@ fun ProfileScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val profileUpdatedMessage = stringResource(Res.string.profile_updated_successfully)
 
-    // Handle error messages
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { message ->
             snackbarHostState.showSnackbar(message)
@@ -118,7 +100,6 @@ fun ProfileScreen(
         }
     }
 
-    // Handle update success — snackbar auto-dismisses, then reset state
     LaunchedEffect(uiState.updateState) {
         if (uiState.updateState is ProfileUpdateState.Success) {
             snackbarHostState.showSnackbar(profileUpdatedMessage)
@@ -132,7 +113,7 @@ fun ProfileScreen(
         onStartEditingDisplayName = viewModel::startEditingDisplayName,
         onCancelEditing = viewModel::cancelEditing,
         onSaveDisplayName = viewModel::saveDisplayName,
-        onRefresh = viewModel::refreshProfile,
+        onSaveBirthday = viewModel::saveBirthday,
         snackbarHostState = snackbarHostState,
         modifier = modifier,
     )
@@ -146,12 +127,11 @@ fun ProfileScreenContent(
     onStartEditingDisplayName: () -> Unit,
     onCancelEditing: () -> Unit,
     onSaveDisplayName: (String) -> Unit,
-    onRefresh: () -> Unit,
+    onSaveBirthday: (Instant) -> Unit,
     snackbarHostState: SnackbarHostState,
     modifier: Modifier = Modifier,
 ) {
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
-    val scrollState = rememberScrollState()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
     val profile =
         createProfileDisplayModel(
             localProfile = uiState.localProfile,
@@ -164,17 +144,16 @@ fun ProfileScreenContent(
             modifier
                 .applyScreenStyles()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 title = { Text(stringResource(Res.string.profile)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onRefresh) {
-                        Icon(Icons.Default.Refresh, contentDescription = stringResource(Res.string.refresh_profile))
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = stringResource(Res.string.back),
+                        )
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -182,8 +161,6 @@ fun ProfileScreenContent(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { paddingValues ->
-
-        // Show loading indicator
         if (uiState.isLoading) {
             Box(
                 modifier =
@@ -197,7 +174,6 @@ fun ProfileScreenContent(
             return@Scaffold
         }
 
-        // Show update progress
         Column {
             AnimatedVisibility(
                 visible = uiState.updateState is ProfileUpdateState.Updating,
@@ -210,40 +186,104 @@ fun ProfileScreenContent(
                 )
             }
 
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .applyStandardContentWidth()
-                        .verticalScroll(scrollState)
-                        .padding(paddingValues)
-                        .padding(horizontal = Spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(Spacing.xl),
-            ) {
-                // Profile header with cookie-shaped photo and headline display name
-                ProfileHeader(
-                    profile = profile,
-                    editState = uiState.editState,
-                    onStartEditingDisplayName = onStartEditingDisplayName,
-                    onCancelEditing = onCancelEditing,
-                    onSaveDisplayName = onSaveDisplayName,
-                    modifier = Modifier.padding(vertical = Spacing.lg),
-                )
+            DefaultSettingsContentContainer {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = paddingValues,
+                    verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+                ) {
+                    // Profile header
+                    item {
+                        ProfileHeader(
+                            profile = profile,
+                            editState = uiState.editState,
+                            onStartEditingDisplayName = onStartEditingDisplayName,
+                            onCancelEditing = onCancelEditing,
+                            onSaveDisplayName = onSaveDisplayName,
+                            modifier =
+                                Modifier
+                                    .padding(horizontal = Spacing.lg)
+                                    .padding(vertical = Spacing.lg),
+                        )
+                    }
 
-                // Account Information Section (only show if user has cloud account)
-                if (profile.hasCloudAccount) {
-                    AccountInformationSection(
-                        profile = profile,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
+                    // Personal Information Section
+                    item {
+                        SettingsSection(
+                            title = stringResource(Res.string.personal_information),
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        ) {
+                            BirthdaySelector(
+                                birthday = profile.birthday ?: Instant.DISTANT_PAST,
+                                onBirthdaySelected = onSaveBirthday,
+                            )
+                        }
+                    }
 
-                // Personal Information Section
-                if (profile.birthday != null) {
-                    PersonalInformationSection(
-                        profile = profile,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    // Account Information Section (only show if user has cloud account)
+                    if (profile.hasCloudAccount) {
+                        item {
+                            SettingsSection(
+                                title = stringResource(Res.string.account_information),
+                                modifier = Modifier.padding(horizontal = Spacing.lg),
+                            ) {
+                                profile.username?.let { username ->
+                                    ProfileInfoItem(
+                                        icon = Icons.Default.Person,
+                                        label = "Username",
+                                        value = "@$username",
+                                    )
+                                }
+
+                                profile.joinDate?.let { joinDate ->
+                                    ProfileInfoItem(
+                                        icon = Icons.Default.CalendarMonth,
+                                        label = "Member since",
+                                        value =
+                                            formatDateLocalized(
+                                                joinDate
+                                                    .toLocalDateTime(TimeZone.currentSystemDefault())
+                                                    .date,
+                                            ),
+                                    )
+                                }
+
+                                ListItem(
+                                    leadingContent = {
+                                        Icon(
+                                            imageVector = Icons.Default.AccountCircle,
+                                            contentDescription = null,
+                                            tint =
+                                                if (profile.isAuthenticated) {
+                                                    MaterialTheme.colorScheme.primary
+                                                } else {
+                                                    MaterialTheme.colorScheme.error
+                                                },
+                                        )
+                                    },
+                                    headlineContent = {
+                                        Text(stringResource(Res.string.authentication))
+                                    },
+                                    supportingContent = {
+                                        Text(
+                                            text =
+                                                if (profile.isAuthenticated) {
+                                                    "Authenticated"
+                                                } else {
+                                                    "Not authenticated"
+                                                },
+                                            color =
+                                                if (profile.isAuthenticated) {
+                                                    MaterialTheme.colorScheme.primary
+                                                } else {
+                                                    MaterialTheme.colorScheme.error
+                                                },
+                                        )
+                                    },
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -264,7 +304,7 @@ private fun ProfileHeader(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
-        // Cookie-shaped profile photo (circular for now, could be enhanced to cookie shape)
+        // Profile photo placeholder
         Box(
             modifier =
                 Modifier
@@ -287,7 +327,6 @@ private fun ProfileHeader(
         // Display name with inline editing
         when (editState) {
             is ProfileEditState.DisplayName -> {
-                // Edit mode
                 var editedName by remember { mutableStateOf(editState.currentValue) }
 
                 Column(
@@ -315,7 +354,6 @@ private fun ProfileHeader(
                 }
             }
             else -> {
-                // Display mode with expressive headline typography
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -339,14 +377,6 @@ private fun ProfileHeader(
                             },
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        modifier =
-                            Modifier.animateContentSize(
-                                animationSpec =
-                                    spring(
-                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                        stiffness = Spring.StiffnessLow,
-                                    ),
-                            ),
                     )
 
                     IconButton(
@@ -376,139 +406,24 @@ private fun ProfileHeader(
 }
 
 @Composable
-private fun AccountInformationSection(
-    profile: ProfileDisplayModel,
-    modifier: Modifier = Modifier,
-) {
-    MaterialContainer(modifier = modifier) {
-        SurfaceItem {
-            Column(
-                modifier = Modifier.padding(Spacing.md),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                Text(
-                    text = stringResource(Res.string.account_information),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-
-                profile.username?.let { username ->
-                    ProfileInfoItem(
-                        icon = Icons.Default.Person,
-                        label = "Username",
-                        value = "@$username",
-                    )
-                }
-
-                profile.joinDate?.let { joinDate ->
-                    ProfileInfoItem(
-                        icon = Icons.Default.CalendarMonth,
-                        label = "Member since",
-                        value = formatDateLocalized(joinDate.toLocalDateTime(TimeZone.currentSystemDefault()).date),
-                    )
-                }
-
-                // Authentication status
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AccountCircle,
-                        contentDescription = null,
-                        tint =
-                            if (profile.isAuthenticated) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.error
-                            },
-                        modifier = Modifier.size(20.dp),
-                    )
-
-                    Column {
-                        Text(
-                            text = stringResource(Res.string.authentication),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            text = if (profile.isAuthenticated) "Authenticated" else "Not authenticated",
-                            style = MaterialTheme.typography.bodySmall,
-                            color =
-                                if (profile.isAuthenticated) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.error
-                                },
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PersonalInformationSection(
-    profile: ProfileDisplayModel,
-    modifier: Modifier = Modifier,
-) {
-    MaterialContainer(modifier = modifier) {
-        SurfaceItem {
-            Column(
-                modifier = Modifier.padding(Spacing.md),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                Text(
-                    text = stringResource(Res.string.personal_information),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-
-                profile.birthday?.let { birthday ->
-                    ProfileInfoItem(
-                        icon = Icons.Default.Cake,
-                        label = "Birthday",
-                        value = formatDateLocalized(birthday.toLocalDateTime(TimeZone.currentSystemDefault()).date),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun ProfileInfoItem(
     icon: ImageVector,
     label: String,
     value: String,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp),
-        )
-
-        Column {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+    ListItem(
+        leadingContent = {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
-    }
+        },
+        headlineContent = { Text(label) },
+        supportingContent = { Text(value) },
+        modifier = modifier,
+    )
 }
 
 @Preview
@@ -522,7 +437,7 @@ fun ProfileScreenContentPreview() {
                         displayName = "John Doe",
                         birthday = null,
                     ),
-                account = null, // Would contain LogDateAccount in real usage
+                account = null,
                 userData = null,
                 isLoading = false,
                 editState = ProfileEditState.None,
@@ -532,7 +447,7 @@ fun ProfileScreenContentPreview() {
         onStartEditingDisplayName = {},
         onCancelEditing = {},
         onSaveDisplayName = {},
-        onRefresh = {},
+        onSaveBirthday = {},
         snackbarHostState = SnackbarHostState(),
     )
 }

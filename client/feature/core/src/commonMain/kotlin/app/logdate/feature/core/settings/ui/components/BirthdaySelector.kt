@@ -52,13 +52,13 @@ fun BirthdaySelector(
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
 
-    // Format the birthday for display
+    // Format the birthday for display.
+    // M3 DatePicker returns UTC midnight millis, so interpret as UTC to avoid off-by-one.
     val formattedBirthday =
         if (birthday == Instant.DISTANT_PAST) {
             "Not set"
         } else {
-            // Use kotlinx.datetime.format for properly localized date
-            val localDate = birthday.toLocalDateTime(TimeZone.currentSystemDefault()).date
+            val localDate = birthday.toLocalDateTime(TimeZone.UTC).date
             formatDateLocalized(localDate)
         }
 
