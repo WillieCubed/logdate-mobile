@@ -31,11 +31,11 @@ import app.logdate.feature.core.settings.updates.AppUpdateUiState
 import app.logdate.navigation.MainAppNavigator
 import app.logdate.navigation.MainNavigationRoot
 import app.logdate.navigation.rememberMainAppNavigator
-import app.logdate.navigation.routes.core.DataSettingsRoute
+import app.logdate.navigation.routes.core.ExportSettingsRoute
 import app.logdate.navigation.routes.core.NavigationStart
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
 import app.logdate.navigation.routes.core.navigateHomeFromLaunch
-import app.logdate.navigation.routes.openDataSettings
+import app.logdate.navigation.routes.openExportSettings
 import app.logdate.navigation.routes.openSettings
 import app.logdate.navigation.routes.startOnboarding
 import app.logdate.ui.LocalSharedTransitionScope
@@ -160,8 +160,8 @@ fun MainActivityUiRoot(
                                 onClick = {
                                     hideRecoveryDialog = true
                                     mainAppNavigator.safelyClearBackstack(SettingsOverviewRoute)
-                                    if (!mainAppNavigator.backStack.contains(DataSettingsRoute)) {
-                                        mainAppNavigator.openDataSettings()
+                                    if (!mainAppNavigator.backStack.contains(ExportSettingsRoute)) {
+                                        mainAppNavigator.openExportSettings()
                                     } else if (!mainAppNavigator.backStack.contains(SettingsOverviewRoute)) {
                                         mainAppNavigator.openSettings()
                                     }

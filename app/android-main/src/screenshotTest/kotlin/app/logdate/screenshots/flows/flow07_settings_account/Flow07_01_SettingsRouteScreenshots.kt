@@ -17,7 +17,6 @@ import app.logdate.feature.core.restore.RestoreSummary
 import app.logdate.feature.core.settings.ui.AccountIdentityState
 import app.logdate.feature.core.settings.ui.AccountSettingsContent
 import app.logdate.feature.core.settings.ui.AdvancedSettingsContent
-import app.logdate.feature.core.settings.ui.BirthdayUpdateState
 import app.logdate.feature.core.settings.ui.ConflictsState
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsContent
 import app.logdate.feature.core.settings.ui.DataSettingsContent
@@ -27,11 +26,7 @@ import app.logdate.feature.core.settings.ui.PasskeyCreationState
 import app.logdate.feature.core.settings.ui.PasskeyInfo
 import app.logdate.feature.core.settings.ui.PasskeyRevocationState
 import app.logdate.feature.core.settings.ui.PrivacySettingsContent
-import app.logdate.feature.core.settings.ui.ProfileUpdateState
 import app.logdate.feature.core.settings.ui.RestoreState
-import app.logdate.feature.core.settings.ui.ServerPreset
-import app.logdate.feature.core.settings.ui.ServerSelectionState
-import app.logdate.feature.core.settings.ui.ServerValidationState
 import app.logdate.feature.core.settings.ui.SettingsOverviewContent
 import app.logdate.feature.core.settings.ui.StorageQuotaUi
 import app.logdate.feature.core.settings.ui.UserProfile
@@ -39,11 +34,6 @@ import app.logdate.feature.core.settings.updates.AppUpdateFlowType
 import app.logdate.feature.core.settings.updates.AppUpdateStatus
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
 import app.logdate.navigation.scenes.SettingsEmptyDetailPane
-import app.logdate.shared.model.DeploymentKind
-import app.logdate.shared.model.ServerCapability
-import app.logdate.shared.model.ServerDescriptor
-import app.logdate.shared.model.ServerPasskeyConfig
-import app.logdate.shared.model.user.UserData
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTheme
@@ -106,17 +96,6 @@ private val sampleIdentityState =
             ),
     )
 
-private val sampleServerDescriptor =
-    ServerDescriptor(
-        serverOrigin = "https://logdate.app",
-        apiBaseUrl = "https://logdate.app/api",
-        deploymentKind = DeploymentKind.FIRST_PARTY,
-        displayName = "LogDate Cloud",
-        handleDomain = "logdate.app",
-        passkey = ServerPasskeyConfig(rpId = "logdate.app", rpName = "LogDate"),
-        capabilities = listOf(ServerCapability.AUTH_PASSKEY, ServerCapability.MANAGED_QUOTA),
-    )
-
 private val sampleSyncStatus =
     SyncStatus(
         isEnabled = true,
@@ -150,12 +129,12 @@ fun S01_SettingsOverviewDefault() {
             onBack = {},
             onNavigateToProfile = {},
             onNavigateToAccount = {},
-            onNavigateToPrivacy = {},
-            onNavigateToData = {},
             onNavigateToDevices = {},
             onNavigateToDangerZone = {},
             onNavigateToLocation = {},
-            onNavigateToAdvanced = {},
+            onNavigateToMemories = {},
+            onNavigateToSync = {},
+            onNavigateToExport = {},
             userProfile = sampleUserProfile,
         )
     }
@@ -171,12 +150,12 @@ fun S02_SettingsOverviewEmptyDetail() {
                 onBack = {},
                 onNavigateToProfile = {},
                 onNavigateToAccount = {},
-                onNavigateToPrivacy = {},
-                onNavigateToData = {},
                 onNavigateToDevices = {},
                 onNavigateToDangerZone = {},
                 onNavigateToLocation = {},
-                onNavigateToAdvanced = {},
+                onNavigateToMemories = {},
+                onNavigateToSync = {},
+                onNavigateToExport = {},
                 userProfile = sampleUserProfile,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             )
@@ -196,17 +175,11 @@ fun S03_AccountSettingsAuthenticated() {
         AccountSettingsContent(
             onBack = {},
             onCreatePasskey = {},
-            onUpdateBirthday = {},
-            onResetBirthdayUpdateState = {},
             userProfile = sampleUserProfile,
             passkeys = samplePasskeys,
-            userData = UserData(),
             isAuthenticated = true,
-            onUpdateProfile = { _, _ -> },
             onRevokePasskey = {},
             onSignOut = { _ -> },
-            birthdayUpdateState = BirthdayUpdateState.Idle,
-            profileUpdateState = ProfileUpdateState.Idle,
             identityState = sampleIdentityState,
             onRefreshIdentity = {},
             onExportSigningKey = {},
@@ -231,17 +204,11 @@ fun S04_AccountSettingsSignedOut() {
         AccountSettingsContent(
             onBack = {},
             onCreatePasskey = {},
-            onUpdateBirthday = {},
-            onResetBirthdayUpdateState = {},
             userProfile = signedOutUserProfile,
             passkeys = emptyList(),
-            userData = UserData(),
             isAuthenticated = false,
-            onUpdateProfile = { _, _ -> },
             onRevokePasskey = {},
             onSignOut = { _ -> },
-            birthdayUpdateState = BirthdayUpdateState.Idle,
-            profileUpdateState = ProfileUpdateState.Idle,
             identityState = AccountIdentityState(),
             onRefreshIdentity = {},
             onExportSigningKey = {},
@@ -485,10 +452,10 @@ fun S12_LocationSettingsTrackingOff() {
             settings = LocationTrackingSettings(backgroundTrackingEnabled = false),
             onBack = {},
             onToggleBackgroundTracking = {},
-            onToggleJournalTracking = {},
-            onToggleTimelineTracking = {},
-            onUpdateTrackingInterval = {},
             onShowLocationTimeline = {},
+            onNavigateToTrackingOptions = {},
+            onNavigateToInterval = {},
+            onNavigateToAdvanced = {},
         )
     }
 }
@@ -508,10 +475,10 @@ fun S13_LocationSettingsTrackingOn() {
                 ),
             onBack = {},
             onToggleBackgroundTracking = {},
-            onToggleJournalTracking = {},
-            onToggleTimelineTracking = {},
-            onUpdateTrackingInterval = {},
             onShowLocationTimeline = {},
+            onNavigateToTrackingOptions = {},
+            onNavigateToInterval = {},
+            onNavigateToAdvanced = {},
         )
     }
 }
@@ -523,18 +490,9 @@ fun S14_AdvancedSettingsDefault() {
     ScreenshotTheme {
         AdvancedSettingsContent(
             onBack = {},
-            serverSelectionState =
-                ServerSelectionState(
-                    selectedPreset = ServerPreset.PRODUCTION,
-                    activeServerDescriptor = sampleServerDescriptor,
-                ),
             appUpdateUiState = AppUpdateUiState(currentVersionName = "0.1.0"),
-            onSelectPreset = {},
-            onUpdateCustomUrl = {},
-            onValidateAndSave = {},
             onCheckForAppUpdates = {},
             onCompleteAppUpdate = {},
-            onShowCustomServerInfo = {},
         )
     }
 }
@@ -546,22 +504,13 @@ fun S15_AdvancedSettingsUpdateReady() {
     ScreenshotTheme {
         AdvancedSettingsContent(
             onBack = {},
-            serverSelectionState =
-                ServerSelectionState(
-                    selectedPreset = ServerPreset.PRODUCTION,
-                    activeServerDescriptor = sampleServerDescriptor,
-                ),
             appUpdateUiState =
                 AppUpdateUiState(
                     currentVersionName = "0.1.0",
                     status = AppUpdateStatus.Downloaded,
                 ),
-            onSelectPreset = {},
-            onUpdateCustomUrl = {},
-            onValidateAndSave = {},
             onCheckForAppUpdates = {},
             onCompleteAppUpdate = {},
-            onShowCustomServerInfo = {},
         )
     }
 }
@@ -569,29 +518,18 @@ fun S15_AdvancedSettingsUpdateReady() {
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun S16_AdvancedSettingsCustomServerError() {
+fun S16_AdvancedSettingsUpdateAvailableImmediate() {
     ScreenshotTheme {
         AdvancedSettingsContent(
             onBack = {},
-            serverSelectionState =
-                ServerSelectionState(
-                    selectedPreset = ServerPreset.CUSTOM,
-                    customServerUrl = "https://preview.logdate.dev",
-                    validationState = ServerValidationState.Error("Unable to reach server"),
-                    activeServerDescriptor = sampleServerDescriptor,
-                ),
             appUpdateUiState =
                 AppUpdateUiState(
                     currentVersionName = "0.1.0",
                     status = AppUpdateStatus.Available,
                     flowType = AppUpdateFlowType.Immediate,
                 ),
-            onSelectPreset = {},
-            onUpdateCustomUrl = {},
-            onValidateAndSave = {},
             onCheckForAppUpdates = {},
             onCompleteAppUpdate = {},
-            onShowCustomServerInfo = {},
         )
     }
 }

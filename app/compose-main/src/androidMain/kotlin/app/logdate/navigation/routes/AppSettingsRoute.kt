@@ -17,26 +17,34 @@ import app.logdate.feature.core.profile.ui.ProfileScreen
 import app.logdate.feature.core.settings.ui.AccountSettingsScreen
 import app.logdate.feature.core.settings.ui.AdvancedSettingsScreen
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsScreen
-import app.logdate.feature.core.settings.ui.DataSettingsScreen
+import app.logdate.feature.core.settings.ui.ExportSettingsScreen
+import app.logdate.feature.core.settings.ui.LocationAdvancedScreen
+import app.logdate.feature.core.settings.ui.LocationIntervalScreen
 import app.logdate.feature.core.settings.ui.LocationSettingsScreen
+import app.logdate.feature.core.settings.ui.LocationTrackingOptionsScreen
 import app.logdate.feature.core.settings.ui.MemoriesSettingsScreen
 import app.logdate.feature.core.settings.ui.PrivacySettingsScreen
 import app.logdate.feature.core.settings.ui.RecommendationSettingsScreen
 import app.logdate.feature.core.settings.ui.SettingsOverviewScreen
+import app.logdate.feature.core.settings.ui.SyncSettingsScreen
 import app.logdate.feature.core.settings.ui.devices.DevicesScreen
 import app.logdate.feature.location.timeline.ui.LocationTimelineBottomSheet
 import app.logdate.navigation.MainAppNavigator
 import app.logdate.navigation.routes.core.AccountSettingsRoute
 import app.logdate.navigation.routes.core.AdvancedSettingsRoute
 import app.logdate.navigation.routes.core.DangerZoneSettingsRoute
-import app.logdate.navigation.routes.core.DataSettingsRoute
 import app.logdate.navigation.routes.core.DevicesSettingsRoute
+import app.logdate.navigation.routes.core.ExportSettingsRoute
+import app.logdate.navigation.routes.core.LocationAdvancedRoute
+import app.logdate.navigation.routes.core.LocationIntervalRoute
 import app.logdate.navigation.routes.core.LocationSettingsRoute
+import app.logdate.navigation.routes.core.LocationTrackingOptionsRoute
 import app.logdate.navigation.routes.core.MemoriesSettingsRoute
 import app.logdate.navigation.routes.core.OnboardingStart
 import app.logdate.navigation.routes.core.PrivacySettingsRoute
 import app.logdate.navigation.routes.core.RecommendationSettingsRoute
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
+import app.logdate.navigation.routes.core.SyncSettingsRoute
 import app.logdate.navigation.scenes.SettingsEmptyDetailPane
 import io.github.aakira.napier.Napier
 
@@ -97,13 +105,6 @@ fun MainAppNavigator.openDevicesSettings() {
 }
 
 /**
- * Opens the data and storage settings screen.
- */
-fun MainAppNavigator.openDataSettings() {
-    backStack.add(DataSettingsRoute)
-}
-
-/**
  * Opens the danger zone settings screen with destructive actions.
  */
 fun MainAppNavigator.openDangerZoneSettings() {
@@ -125,10 +126,45 @@ fun MainAppNavigator.openRecommendationSettings() {
 }
 
 /**
- * Opens the advanced settings screen for server configuration and developer options.
+ * Opens the advanced settings screen for app updates.
  */
 fun MainAppNavigator.openAdvancedSettings() {
     backStack.add(AdvancedSettingsRoute)
+}
+
+/**
+ * Opens the sync and backup settings screen.
+ */
+fun MainAppNavigator.openSyncSettings() {
+    backStack.add(SyncSettingsRoute)
+}
+
+/**
+ * Opens the export and import settings screen.
+ */
+fun MainAppNavigator.openExportSettings() {
+    backStack.add(ExportSettingsRoute)
+}
+
+/**
+ * Opens the location tracking options detail screen.
+ */
+fun MainAppNavigator.openLocationTrackingOptions() {
+    backStack.add(LocationTrackingOptionsRoute)
+}
+
+/**
+ * Opens the location update interval detail screen.
+ */
+fun MainAppNavigator.openLocationInterval() {
+    backStack.add(LocationIntervalRoute)
+}
+
+/**
+ * Opens the location advanced settings detail screen.
+ */
+fun MainAppNavigator.openLocationAdvanced() {
+    backStack.add(LocationAdvancedRoute)
 }
 
 /**
@@ -145,8 +181,6 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onNavigateToCloudAccountCreation: () -> Unit,
     onNavigateToProfile: () -> Unit,
     onNavigateToAccount: () -> Unit,
-    onNavigateToPrivacy: () -> Unit,
-    onNavigateToData: () -> Unit,
     onNavigateToDevices: () -> Unit,
     onNavigateToDangerZone: () -> Unit,
     onNavigateToLocation: () -> Unit,
@@ -154,6 +188,11 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onNavigateToMemories: () -> Unit,
     onNavigateToRecommendations: () -> Unit,
     onNavigateToAdvanced: () -> Unit,
+    onNavigateToSync: () -> Unit,
+    onNavigateToExport: () -> Unit,
+    onNavigateToLocationTrackingOptions: () -> Unit,
+    onNavigateToLocationInterval: () -> Unit,
+    onNavigateToLocationAdvanced: () -> Unit,
 ) {
     // Main settings overview screen (list pane)
     routeEntry<SettingsOverviewRoute>(
@@ -166,17 +205,16 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
             onBack = onBack,
             onNavigateToProfile = onNavigateToProfile,
             onNavigateToAccount = onNavigateToAccount,
-            onNavigateToPrivacy = onNavigateToPrivacy,
-            onNavigateToData = onNavigateToData,
-            onNavigateToDangerZone = onNavigateToDangerZone,
             onNavigateToDevices = onNavigateToDevices,
+            onNavigateToDangerZone = onNavigateToDangerZone,
             onNavigateToLocation = onNavigateToLocation,
             onNavigateToMemories = onNavigateToMemories,
-            onNavigateToAdvanced = onNavigateToAdvanced,
+            onNavigateToSync = onNavigateToSync,
+            onNavigateToExport = onNavigateToExport,
         )
     }
 
-    // Profile screen (navigates away from settings context, no pane metadata)
+    // Profile screen
     routeEntry<ProfileRoute>(
         metadata = ListDetailSceneStrategy.detailPane(),
     ) { _ ->
@@ -185,7 +223,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
         )
     }
 
-    // Account management settings screen (detail pane)
+    // Account & Sign-In settings screen (detail pane)
     routeEntry<AccountSettingsRoute>(
         metadata = ListDetailSceneStrategy.detailPane(),
     ) { _ ->
@@ -214,12 +252,21 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
         )
     }
 
-    // Data and storage settings screen (detail pane)
-    routeEntry<DataSettingsRoute>(
+    // Sync & Backup settings screen (detail pane)
+    routeEntry<SyncSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        SyncSettingsScreen(
+            onBack = onBack,
+        )
+    }
+
+    // Export & Import settings screen (detail pane)
+    routeEntry<ExportSettingsRoute>(
         metadata = ListDetailSceneStrategy.detailPane(),
     ) { _ ->
         val context = LocalContext.current
-        DataSettingsScreen(
+        ExportSettingsScreen(
             onBack = onBack,
             onShareFile = { path ->
                 try {
@@ -248,7 +295,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
         )
     }
 
-    // Location settings screen (detail pane)
+    // Location settings overview screen (detail pane)
     routeEntry<LocationSettingsRoute>(
         metadata = ListDetailSceneStrategy.detailPane(),
     ) { _ ->
@@ -260,6 +307,9 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
             onShowLocationTimeline = {
                 showLocationQuickPeek = true
             },
+            onNavigateToTrackingOptions = onNavigateToLocationTrackingOptions,
+            onNavigateToInterval = onNavigateToLocationInterval,
+            onNavigateToAdvanced = onNavigateToLocationAdvanced,
         )
 
         if (showLocationQuickPeek) {
@@ -273,6 +323,33 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
                 },
             )
         }
+    }
+
+    // Location tracking options detail screen
+    routeEntry<LocationTrackingOptionsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        LocationTrackingOptionsScreen(
+            onBack = onBack,
+        )
+    }
+
+    // Location interval detail screen
+    routeEntry<LocationIntervalRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        LocationIntervalScreen(
+            onBack = onBack,
+        )
+    }
+
+    // Location advanced detail screen
+    routeEntry<LocationAdvancedRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        LocationAdvancedScreen(
+            onBack = onBack,
+        )
     }
 
     // Memories settings overview (detail pane)
@@ -294,7 +371,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
         )
     }
 
-    // Advanced settings screen (detail pane)
+    // Advanced settings screen (hidden from main settings overview)
     routeEntry<AdvancedSettingsRoute>(
         metadata = ListDetailSceneStrategy.detailPane(),
     ) { _ ->

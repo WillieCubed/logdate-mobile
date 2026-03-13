@@ -12,12 +12,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.DataObject
-import androidx.compose.material.icons.filled.DeveloperMode
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Devices
-import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.filled.ScreenshotMonitor
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -40,33 +40,48 @@ import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.account_and_sign_in
+import logdate.client.feature.core.generated.resources.account_settings_description
 import logdate.client.feature.core.generated.resources.back
+import logdate.client.feature.core.generated.resources.danger_zone
+import logdate.client.feature.core.generated.resources.danger_zone_description
+import logdate.client.feature.core.generated.resources.devices
+import logdate.client.feature.core.generated.resources.devices_settings_description
+import logdate.client.feature.core.generated.resources.export_and_import
+import logdate.client.feature.core.generated.resources.export_and_import_description
+import logdate.client.feature.core.generated.resources.location_settings
+import logdate.client.feature.core.generated.resources.location_settings_description
 import logdate.client.feature.core.generated.resources.memories
 import logdate.client.feature.core.generated.resources.memories_description
 import logdate.client.feature.core.generated.resources.navigate_to_title
+import logdate.client.feature.core.generated.resources.profile
+import logdate.client.feature.core.generated.resources.profile_settings_description
 import logdate.client.feature.core.generated.resources.screen_title_settings
-import logdate.client.feature.core.generated.resources.settings_group_account
-import logdate.client.feature.core.generated.resources.settings_group_app
-import logdate.client.feature.core.generated.resources.settings_group_developer
+import logdate.client.feature.core.generated.resources.settings_group_data_storage
+import logdate.client.feature.core.generated.resources.settings_group_personal
+import logdate.client.feature.core.generated.resources.settings_group_privacy_security
+import logdate.client.feature.core.generated.resources.sync_and_backup
+import logdate.client.feature.core.generated.resources.sync_and_backup_description
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * Main settings overview screen that displays navigation options to different settings sections.
  * This is the entry point for the settings flow and serves as the list pane in list-detail layouts.
+ *
+ * Groups: Personal / Privacy & Security / Data & Storage
  */
 @Composable
 fun SettingsOverviewScreen(
     onBack: () -> Unit,
     onNavigateToProfile: () -> Unit,
     onNavigateToAccount: () -> Unit,
-    onNavigateToPrivacy: () -> Unit,
-    onNavigateToData: () -> Unit,
     onNavigateToDevices: () -> Unit,
     onNavigateToDangerZone: () -> Unit,
     onNavigateToLocation: () -> Unit,
     onNavigateToMemories: () -> Unit,
-    onNavigateToAdvanced: () -> Unit,
+    onNavigateToSync: () -> Unit,
+    onNavigateToExport: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: AccountSettingsViewModel = koinViewModel(),
 ) {
@@ -76,13 +91,12 @@ fun SettingsOverviewScreen(
         onBack = onBack,
         onNavigateToProfile = onNavigateToProfile,
         onNavigateToAccount = onNavigateToAccount,
-        onNavigateToPrivacy = onNavigateToPrivacy,
-        onNavigateToData = onNavigateToData,
         onNavigateToDevices = onNavigateToDevices,
         onNavigateToDangerZone = onNavigateToDangerZone,
         onNavigateToLocation = onNavigateToLocation,
         onNavigateToMemories = onNavigateToMemories,
-        onNavigateToAdvanced = onNavigateToAdvanced,
+        onNavigateToSync = onNavigateToSync,
+        onNavigateToExport = onNavigateToExport,
         userProfile = accountState.currentAccount.toUserProfile(),
         modifier = modifier,
     )
@@ -94,13 +108,12 @@ fun SettingsOverviewContent(
     onBack: () -> Unit,
     onNavigateToProfile: () -> Unit,
     onNavigateToAccount: () -> Unit,
-    onNavigateToPrivacy: () -> Unit,
-    onNavigateToData: () -> Unit,
     onNavigateToDevices: () -> Unit,
     onNavigateToDangerZone: () -> Unit,
     onNavigateToLocation: () -> Unit,
     onNavigateToMemories: () -> Unit,
-    onNavigateToAdvanced: () -> Unit,
+    onNavigateToSync: () -> Unit,
+    onNavigateToExport: () -> Unit,
     userProfile: UserProfile,
     modifier: Modifier = Modifier,
 ) {
@@ -140,50 +153,17 @@ fun SettingsOverviewContent(
                     )
                 }
 
-                // Account group
+                // Personal group
                 item {
                     SettingsSection(
-                        title = stringResource(Res.string.settings_group_account),
+                        title = stringResource(Res.string.settings_group_personal),
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     ) {
                         SettingsNavigationItem(
-                            title = "Profile",
-                            description = "View and edit your profile information",
+                            title = stringResource(Res.string.profile),
+                            description = stringResource(Res.string.profile_settings_description),
                             icon = { Icon(Icons.Default.AccountCircle, contentDescription = null) },
                             onClick = onNavigateToProfile,
-                        )
-                        SettingsNavigationItem(
-                            title = "Account",
-                            description = "Manage your account settings and authentication",
-                            icon = { Icon(Icons.Default.AccountCircle, contentDescription = null) },
-                            onClick = onNavigateToAccount,
-                        )
-                        SettingsNavigationItem(
-                            title = "Devices",
-                            description = "Manage your connected devices",
-                            icon = { Icon(Icons.Default.Devices, contentDescription = null) },
-                            onClick = onNavigateToDevices,
-                        )
-                    }
-                }
-
-                // App group
-                item {
-                    SettingsSection(
-                        title = stringResource(Res.string.settings_group_app),
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    ) {
-                        SettingsNavigationItem(
-                            title = "Privacy & Security",
-                            description = "Control your privacy settings and app security",
-                            icon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                            onClick = onNavigateToPrivacy,
-                        )
-                        SettingsNavigationItem(
-                            title = "Location",
-                            description = "Manage location tracking and history settings",
-                            icon = { Icon(Icons.Default.ScreenshotMonitor, contentDescription = null) },
-                            onClick = onNavigateToLocation,
                         )
                         SettingsNavigationItem(
                             title = stringResource(Res.string.memories),
@@ -191,30 +171,57 @@ fun SettingsOverviewContent(
                             icon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
                             onClick = onNavigateToMemories,
                         )
+                    }
+                }
+
+                // Privacy & Security group
+                item {
+                    SettingsSection(
+                        title = stringResource(Res.string.settings_group_privacy_security),
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    ) {
                         SettingsNavigationItem(
-                            title = "Data & Storage",
-                            description = "Manage your data usage and storage preferences",
-                            icon = { Icon(Icons.Default.DataObject, contentDescription = null) },
-                            onClick = onNavigateToData,
+                            title = stringResource(Res.string.account_and_sign_in),
+                            description = stringResource(Res.string.account_settings_description),
+                            icon = { Icon(Icons.Default.Cloud, contentDescription = null) },
+                            onClick = onNavigateToAccount,
+                        )
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.devices),
+                            description = stringResource(Res.string.devices_settings_description),
+                            icon = { Icon(Icons.Default.Devices, contentDescription = null) },
+                            onClick = onNavigateToDevices,
+                        )
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.location_settings),
+                            description = stringResource(Res.string.location_settings_description),
+                            icon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
+                            onClick = onNavigateToLocation,
                         )
                     }
                 }
 
-                // Developer group
+                // Data & Storage group
                 item {
                     SettingsSection(
-                        title = stringResource(Res.string.settings_group_developer),
+                        title = stringResource(Res.string.settings_group_data_storage),
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     ) {
                         SettingsNavigationItem(
-                            title = "Advanced",
-                            description = "Server configuration and developer options",
-                            icon = { Icon(Icons.Default.DeveloperMode, contentDescription = null) },
-                            onClick = onNavigateToAdvanced,
+                            title = stringResource(Res.string.sync_and_backup),
+                            description = stringResource(Res.string.sync_and_backup_description),
+                            icon = { Icon(Icons.Default.Sync, contentDescription = null) },
+                            onClick = onNavigateToSync,
                         )
                         SettingsNavigationItem(
-                            title = "Danger Zone",
-                            description = "Reset app, delete data, and other destructive actions",
+                            title = stringResource(Res.string.export_and_import),
+                            description = stringResource(Res.string.export_and_import_description),
+                            icon = { Icon(Icons.Default.FileDownload, contentDescription = null) },
+                            onClick = onNavigateToExport,
+                        )
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.danger_zone),
+                            description = stringResource(Res.string.danger_zone_description),
                             icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                             onClick = onNavigateToDangerZone,
                             isDangerous = true,
@@ -269,13 +276,12 @@ private fun SettingsOverviewScreenPreview() {
         onBack = {},
         onNavigateToProfile = {},
         onNavigateToAccount = {},
-        onNavigateToPrivacy = {},
-        onNavigateToData = {},
         onNavigateToDevices = {},
         onNavigateToDangerZone = {},
         onNavigateToLocation = {},
         onNavigateToMemories = {},
-        onNavigateToAdvanced = {},
+        onNavigateToSync = {},
+        onNavigateToExport = {},
         userProfile =
             UserProfile(
                 name = "John Doe",
@@ -292,13 +298,12 @@ private fun SettingsOverviewScreenPreviewNotSignedIn() {
         onBack = {},
         onNavigateToProfile = {},
         onNavigateToAccount = {},
-        onNavigateToPrivacy = {},
-        onNavigateToData = {},
         onNavigateToDevices = {},
         onNavigateToDangerZone = {},
         onNavigateToLocation = {},
         onNavigateToMemories = {},
-        onNavigateToAdvanced = {},
+        onNavigateToSync = {},
+        onNavigateToExport = {},
         userProfile =
             UserProfile(
                 name = "",

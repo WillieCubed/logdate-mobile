@@ -186,3 +186,33 @@ data object DangerZoneSettingsRoute : NavKey
  */
 @Serializable
 data object AdvancedSettingsRoute : NavKey
+
+/**
+ * Navigation route for the sync and backup settings screen.
+ */
+@Serializable
+data object SyncSettingsRoute : NavKey
+
+/**
+ * Navigation route for the export and import settings screen.
+ */
+@Serializable
+data object ExportSettingsRoute : NavKey
+
+/**
+ * Navigation route for location tracking options detail screen.
+ */
+@Serializable
+data object LocationTrackingOptionsRoute : NavKey
+
+/**
+ * Navigation route for location update interval detail screen.
+ */
+@Serializable
+data object LocationIntervalRoute : NavKey
+
+/**
+ * Navigation route for location advanced settings detail screen.
+ */
+@Serializable
+data object LocationAdvancedRoute : NavKey

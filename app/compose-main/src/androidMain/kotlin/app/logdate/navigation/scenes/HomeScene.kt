@@ -81,8 +81,6 @@ package app.logdate.navigation.scenes
  * 5. Performance Optimized: Scenes are created on-demand and reused when possible
  */
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -119,9 +117,7 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -132,6 +128,7 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.scene.SceneStrategyScope
+import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import androidx.window.core.layout.WindowSizeClass.Companion.HEIGHT_DP_MEDIUM_LOWER_BOUND
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
@@ -147,10 +144,14 @@ import app.logdate.navigation.routes.core.DangerZoneSettingsRoute
 import app.logdate.navigation.routes.core.DataSettingsRoute
 import app.logdate.navigation.routes.core.DevicesSettingsRoute
 import app.logdate.navigation.routes.core.EntryEditor
+import app.logdate.navigation.routes.core.ExportSettingsRoute
 import app.logdate.navigation.routes.core.JournalDetail
 import app.logdate.navigation.routes.core.JournalList
+import app.logdate.navigation.routes.core.LocationAdvancedRoute
+import app.logdate.navigation.routes.core.LocationIntervalRoute
 import app.logdate.navigation.routes.core.LocationRoute
 import app.logdate.navigation.routes.core.LocationSettingsRoute
+import app.logdate.navigation.routes.core.LocationTrackingOptionsRoute
 import app.logdate.navigation.routes.core.NavigationStart
 import app.logdate.navigation.routes.core.OnboardingCompleteRoute
 import app.logdate.navigation.routes.core.OnboardingEntryRoute
@@ -162,6 +163,7 @@ import app.logdate.navigation.routes.core.PrivacySettingsRoute
 import app.logdate.navigation.routes.core.RewindDetailRoute
 import app.logdate.navigation.routes.core.RewindList
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
+import app.logdate.navigation.routes.core.SyncSettingsRoute
 import app.logdate.navigation.routes.core.TimelineDetail
 import app.logdate.navigation.routes.core.TimelineListRoute
 import app.logdate.navigation.routes.routeClass
@@ -171,11 +173,6 @@ import logdate.app.composemain.generated.resources.new_entry
 import logdate.app.composemain.generated.resources.select_an_entry_to_view_details
 import org.jetbrains.compose.resources.stringResource
 import kotlin.reflect.KClass
-
-/**
- * CompositionLocal for providing AnimatedVisibilityScope throughout the home scene.
- */
-val LocalAnimatedVisibilityScope = staticCompositionLocalOf<AnimatedVisibilityScope?> { null }
 
 /**
  * Shared element key for the FAB to editor transition.
@@ -360,7 +357,12 @@ object RouteConfig {
             DevicesSettingsRoute::class,
             DangerZoneSettingsRoute::class,
             LocationSettingsRoute::class,
+            LocationTrackingOptionsRoute::class,
+            LocationIntervalRoute::class,
+            LocationAdvancedRoute::class,
             AdvancedSettingsRoute::class,
+            SyncSettingsRoute::class,
+            ExportSettingsRoute::class,
             -> return RouteClassification.Excluded
 
             // Cloud account setup flows - all should be excluded
@@ -580,12 +582,7 @@ class HomeScene<T : NavKey>(
      *    - This creates a fullscreen detail experience on smaller devices
      */
     override val content: @Composable (() -> Unit) = {
-        // Wrap the entire content with AnimatedVisibility to provide AnimatedVisibilityScope
-        AnimatedVisibility(visible = true) {
-            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@AnimatedVisibility) {
-                HomeSceneContent()
-            }
-        }
+        HomeSceneContent()
     }
 
     @Suppress("ktlint:standard:function-naming")
@@ -1003,25 +1000,22 @@ private fun SharedElementFAB(
     modifier: Modifier = Modifier,
 ) {
     val sharedTransitionScope = LocalSharedTransitionScope.current
-    val animatedVisibilityScope = LocalAnimatedVisibilityScope.current
+    val animatedContentScope = LocalNavAnimatedContentScope.current
 
     FloatingActionButton(
         onClick = onClick,
         containerColor = MaterialTheme.colorScheme.primaryContainer,
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         modifier =
-            when {
-                sharedTransitionScope != null && animatedVisibilityScope != null -> {
-                    // TODO: Fix shared element API compatibility
-                    // with(sharedTransitionScope) {
-                    //     modifier.sharedElement(
-                    //         rememberSharedContentState(key = FAB_TO_EDITOR_SHARED_ELEMENT_KEY),
-                    //         animatedVisibilityScope = animatedVisibilityScope
-                    //     )
-                    // }
-                    modifier
+            if (sharedTransitionScope != null) {
+                with(sharedTransitionScope) {
+                    modifier.sharedBounds(
+                        rememberSharedContentState(key = FAB_TO_EDITOR_SHARED_ELEMENT_KEY),
+                        animatedVisibilityScope = animatedContentScope,
+                    )
                 }
-                else -> modifier
+            } else {
+                modifier
             },
     ) {
         Icon(

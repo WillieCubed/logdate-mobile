@@ -2,7 +2,6 @@
 
 package app.logdate.feature.core.settings.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,14 +11,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -27,11 +24,9 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,56 +36,36 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.tooling.preview.Preview
-import app.logdate.feature.core.settings.ui.components.formatDateLocalized
-import app.logdate.shared.model.user.UserData
 import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.launch
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_actions
-import logdate.client.feature.core.generated.resources.account_and_profile
+import logdate.client.feature.core.generated.resources.account_and_sign_in
+import logdate.client.feature.core.generated.resources.account_information
 import logdate.client.feature.core.generated.resources.back
-import logdate.client.feature.core.generated.resources.birthday
-import logdate.client.feature.core.generated.resources.birthday_update_failed
-import logdate.client.feature.core.generated.resources.birthday_updated
 import logdate.client.feature.core.generated.resources.cancel
 import logdate.client.feature.core.generated.resources.create_account
-import logdate.client.feature.core.generated.resources.display_name
 import logdate.client.feature.core.generated.resources.not_signed_in_to_logdate_cloud
-import logdate.client.feature.core.generated.resources.personal_information
-import logdate.client.feature.core.generated.resources.profile_information
-import logdate.client.feature.core.generated.resources.profile_update_failed
-import logdate.client.feature.core.generated.resources.profile_updated_successfully
-import logdate.client.feature.core.generated.resources.set_your_birthday
 import logdate.client.feature.core.generated.resources.sign_in
-import logdate.client.feature.core.generated.resources.sign_in_to_set_display_name
+import logdate.client.feature.core.generated.resources.sign_in_to_logdate_cloud_settings_summary
 import logdate.client.feature.core.generated.resources.sign_out
 import logdate.client.feature.core.generated.resources.sign_out_2
 import logdate.client.feature.core.generated.resources.sign_out_failed
 import logdate.client.feature.core.generated.resources.sign_out_of_your_logdate_cloud_account_on_this_device
-import logdate.client.feature.core.generated.resources.update_profile
-import logdate.client.feature.core.generated.resources.updating
-import logdate.client.feature.core.generated.resources.username
+import logdate.client.feature.core.generated.resources.username_handle
 import logdate.client.feature.core.generated.resources.youll_need_to_sign_in_again_to_sync_data_on_this_device
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
-import kotlin.time.Clock
-import kotlin.time.Instant
 
 /**
- * Account management settings screen.
+ * Account and sign-in settings screen.
  *
- * This screen automatically adapts to different screen sizes:
- * - Large screens: Acts as a detail pane with minimal header (when in two-pane layout)
- * - Small screens: Standard screen with back navigation
- *
- * @param onBack Callback for when the user presses the back button
- * @param onNavigateToCloudAccountCreation Callback for creating a cloud account
- * @param onNavigateToSignIn Callback for signing in to LogDate Cloud
+ * Focused on cloud account management: sign-in, server configuration,
+ * passkeys, AT Protocol identity, and sign-out.
+ * Profile editing (name, birthday) has moved to ProfileScreen.
  */
 @Composable
 fun AccountSettingsScreen(
@@ -99,12 +74,12 @@ fun AccountSettingsScreen(
     onNavigateToSignIn: () -> Unit = {},
     accountViewModel: AccountSettingsViewModel = koinViewModel(),
     privacyViewModel: PrivacySettingsViewModel = koinViewModel(),
+    advancedViewModel: AdvancedSettingsViewModel = koinViewModel(),
 ) {
     val accountState by accountViewModel.state.collectAsState()
-    val birthdayUpdateState by accountViewModel.birthdayUpdateState.collectAsState()
-    val profileUpdateState by accountViewModel.profileUpdateState.collectAsState()
     val identityState by accountViewModel.identityState.collectAsState()
     val privacyState by privacyViewModel.state.collectAsState()
+    val serverSelectionState by advancedViewModel.serverSelectionState.collectAsState()
     val isAuthenticated = accountState.isAuthenticated
     val onCreatePasskey =
         if (isAuthenticated) {
@@ -116,17 +91,11 @@ fun AccountSettingsScreen(
     AccountSettingsContent(
         onBack = onBack,
         onCreatePasskey = onCreatePasskey,
-        onUpdateBirthday = accountViewModel::updateBirthday,
-        onResetBirthdayUpdateState = accountViewModel::resetBirthdayUpdateState,
         userProfile = accountState.currentAccount.toUserProfile(),
         passkeys = privacyState.passkeys,
-        userData = accountState.userData,
         isAuthenticated = isAuthenticated,
-        onUpdateProfile = accountViewModel::updateProfile,
         onRevokePasskey = { passkey -> privacyViewModel.revokePasskey(passkey.id) },
         onSignOut = { onError -> accountViewModel.signOut(onError) },
-        birthdayUpdateState = birthdayUpdateState,
-        profileUpdateState = profileUpdateState,
         identityState = identityState,
         onRefreshIdentity = accountViewModel::refreshIdentityState,
         onExportSigningKey = accountViewModel::exportSigningKey,
@@ -141,6 +110,10 @@ fun AccountSettingsScreen(
         onClearDerivedRecoveryDidKey = accountViewModel::clearDerivedRecoveryDidKey,
         onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
         onNavigateToSignIn = onNavigateToSignIn,
+        serverSelectionState = serverSelectionState,
+        onSelectServerPreset = advancedViewModel::selectServerPreset,
+        onUpdateCustomServerUrl = advancedViewModel::updateCustomServerUrl,
+        onValidateAndSaveServer = advancedViewModel::validateAndSaveServer,
     )
 }
 
@@ -149,17 +122,11 @@ fun AccountSettingsScreen(
 fun AccountSettingsContent(
     onBack: () -> Unit,
     onCreatePasskey: () -> Unit,
-    onUpdateBirthday: (kotlin.time.Instant) -> Unit,
-    onResetBirthdayUpdateState: () -> Unit,
     userProfile: UserProfile,
     passkeys: List<PasskeyInfo>,
-    userData: UserData,
     isAuthenticated: Boolean,
-    onUpdateProfile: (displayName: String, username: String) -> Unit,
     onRevokePasskey: (PasskeyInfo) -> Unit,
     onSignOut: (onError: (String) -> Unit) -> Unit,
-    birthdayUpdateState: BirthdayUpdateState,
-    profileUpdateState: ProfileUpdateState,
     identityState: AccountIdentityState,
     onRefreshIdentity: () -> Unit,
     onExportSigningKey: (String) -> Unit,
@@ -174,43 +141,24 @@ fun AccountSettingsContent(
     onClearDerivedRecoveryDidKey: () -> Unit,
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit = {},
+    serverSelectionState: ServerSelectionState = ServerSelectionState(),
+    onSelectServerPreset: (ServerPreset) -> Unit = {},
+    onUpdateCustomServerUrl: (String) -> Unit = {},
+    onValidateAndSaveServer: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
     val snackbarHostState = remember { SnackbarHostState() }
     var showSignOutDialog by remember { mutableStateOf(false) }
-    var showBirthdayDialog by remember { mutableStateOf(false) }
+    val showCustomServerInfo = remember { mutableStateOf(false) }
 
-    // State for profile edit fields
-    var displayName by remember { mutableStateOf(userProfile.name) }
-    var username by remember { mutableStateOf(userProfile.username) }
-    val birthdayUpdatedMessage = stringResource(Res.string.birthday_updated)
-    val birthdayUpdateFailedMessage = stringResource(Res.string.birthday_update_failed)
-    val profileUpdatedMessage = stringResource(Res.string.profile_updated_successfully)
-    val profileUpdateFailedMessage = stringResource(Res.string.profile_update_failed)
-
-    // Handle birthday update state changes
-    LaunchedEffect(birthdayUpdateState) {
-        when (birthdayUpdateState) {
-            is BirthdayUpdateState.Success -> {
-                snackbarHostState.showSnackbar(birthdayUpdatedMessage)
-            }
-            is BirthdayUpdateState.Error -> {
-                snackbarHostState.showSnackbar(birthdayUpdateFailedMessage)
-            }
-            else -> { /* No action needed */ }
-        }
-    }
-
-    LaunchedEffect(profileUpdateState) {
-        when (profileUpdateState) {
-            is ProfileUpdateState.Success -> {
-                snackbarHostState.showSnackbar(profileUpdatedMessage)
-            }
-            is ProfileUpdateState.Error -> {
-                snackbarHostState.showSnackbar(profileUpdateFailedMessage)
-            }
-            else -> { /* No action needed */ }
-        }
+    if (showCustomServerInfo.value) {
+        CustomServerInfoBottomSheet(
+            onDismiss = { showCustomServerInfo.value = false },
+            onUseCustomServer = {
+                onSelectServerPreset(ServerPreset.CUSTOM)
+                showCustomServerInfo.value = false
+            },
+        )
     }
 
     Scaffold(
@@ -221,7 +169,7 @@ fun AccountSettingsContent(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             LargeTopAppBar(
-                title = { Text(stringResource(Res.string.account_and_profile)) },
+                title = { Text(stringResource(Res.string.account_and_sign_in)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
@@ -238,55 +186,15 @@ fun AccountSettingsContent(
                 contentPadding = paddingValues,
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                // Profile edit section
-                if (isAuthenticated) {
-                    item {
-                        Column(
-                            modifier = Modifier.padding(horizontal = Spacing.lg),
-                            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                        ) {
-                            Text(
-                                text = stringResource(Res.string.profile_information),
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-
-                            TextField(
-                                value = displayName,
-                                onValueChange = { displayName = it },
-                                label = { Text(stringResource(Res.string.display_name)) },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-
-                            TextField(
-                                value = username,
-                                onValueChange = { username = it },
-                                label = { Text(stringResource(Res.string.username)) },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-
-                            Button(
-                                onClick = { onUpdateProfile(displayName, username) },
-                                enabled = profileUpdateState != ProfileUpdateState.Updating,
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text(
-                                    if (profileUpdateState == ProfileUpdateState.Updating) {
-                                        stringResource(Res.string.updating)
-                                    } else {
-                                        stringResource(Res.string.update_profile)
-                                    },
-                                )
-                            }
-                        }
-                    }
-                } else {
+                if (!isAuthenticated) {
+                    // Sign-in CTA
                     item {
                         Column(
                             modifier = Modifier.padding(horizontal = Spacing.lg),
                             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                         ) {
                             Text(
-                                text = stringResource(Res.string.profile_information),
+                                text = stringResource(Res.string.account_information),
                                 style = MaterialTheme.typography.titleMedium,
                             )
 
@@ -304,7 +212,7 @@ fun AccountSettingsContent(
                                             color = MaterialTheme.colorScheme.primary,
                                         )
                                         Text(
-                                            text = stringResource(Res.string.sign_in_to_set_display_name),
+                                            text = stringResource(Res.string.sign_in_to_logdate_cloud_settings_summary),
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
@@ -331,6 +239,49 @@ fun AccountSettingsContent(
                             }
                         }
                     }
+                } else {
+                    // Account info summary
+                    item {
+                        Column(
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        ) {
+                            Text(
+                                text = stringResource(Res.string.account_information),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            MaterialContainer {
+                                Column(
+                                    modifier = Modifier.padding(Spacing.md),
+                                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                                ) {
+                                    Text(
+                                        text = userProfile.name.ifEmpty { userProfile.username },
+                                        style = MaterialTheme.typography.titleMedium,
+                                    )
+                                    if (userProfile.username.isNotEmpty()) {
+                                        Text(
+                                            text = stringResource(Res.string.username_handle, userProfile.username),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Server configuration section
+                item {
+                    ServerSelectionSection(
+                        serverSelectionState = serverSelectionState,
+                        onSelectPreset = onSelectServerPreset,
+                        onUpdateCustomUrl = onUpdateCustomServerUrl,
+                        onValidateAndSave = onValidateAndSaveServer,
+                        onShowCustomServerInfo = { showCustomServerInfo.value = true },
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
                 }
 
                 // Passkeys section
@@ -344,6 +295,7 @@ fun AccountSettingsContent(
                     )
                 }
 
+                // AT Protocol identity (authenticated only)
                 if (isAuthenticated) {
                     item {
                         AtprotoIdentitySection(
@@ -364,49 +316,7 @@ fun AccountSettingsContent(
                     }
                 }
 
-                // Personal information
-                item {
-                    Column(
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    ) {
-                        Text(
-                            text = stringResource(Res.string.personal_information),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-
-                        // Birthday selector in MaterialContainer - now navigates to full screen
-                        MaterialContainer {
-                            SurfaceItem {
-                                ListItem(
-                                    headlineContent = { Text(stringResource(Res.string.birthday)) },
-                                    supportingContent = {
-                                        val formattedBirthday =
-                                            if (userData.birthday == Instant.DISTANT_PAST) {
-                                                stringResource(Res.string.set_your_birthday)
-                                            } else {
-                                                val localDate =
-                                                    userData.birthday
-                                                        .toLocalDateTime(TimeZone.currentSystemDefault())
-                                                        .date
-                                                formatDateLocalized(localDate)
-                                            }
-                                        Text(formattedBirthday)
-                                    },
-                                    leadingContent = {
-                                        Icon(
-                                            imageVector = Icons.Default.DateRange,
-                                            contentDescription = null,
-                                        )
-                                    },
-                                    modifier = Modifier.clickable { showBirthdayDialog = true },
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Account actions
+                // Account actions (sign out)
                 if (isAuthenticated) {
                     item {
                         Column(
@@ -420,7 +330,7 @@ fun AccountSettingsContent(
 
                             MaterialContainer {
                                 SurfaceItem {
-                                    ListItem(
+                                    androidx.compose.material3.ListItem(
                                         headlineContent = { Text(stringResource(Res.string.sign_out)) },
                                         supportingContent = {
                                             Text(stringResource(Res.string.sign_out_of_your_logdate_cloud_account_on_this_device))
@@ -440,19 +350,6 @@ fun AccountSettingsContent(
                 }
             }
         }
-    }
-
-    if (showBirthdayDialog) {
-        BirthdayPickerDialog(
-            initialBirthday = userData.birthday,
-            onDismiss = { showBirthdayDialog = false },
-            onSave = { birthday ->
-                onUpdateBirthday(birthday)
-                showBirthdayDialog = false
-            },
-            birthdayUpdateState = birthdayUpdateState,
-            onResetBirthdayUpdateState = onResetBirthdayUpdateState,
-        )
     }
 
     if (showSignOutDialog) {
@@ -491,48 +388,17 @@ private fun AccountSettingsScreenPreview() {
     AccountSettingsContent(
         onBack = {},
         onCreatePasskey = {},
-        onUpdateBirthday = {},
-        onResetBirthdayUpdateState = {},
         userProfile =
             UserProfile(
                 name = "John Doe",
                 username = "johndoe",
                 isAuthenticated = true,
             ),
-        passkeys =
-            listOf(
-                PasskeyInfo(
-                    id = "passkey1",
-                    name = "Preview Passkey",
-                    device = "Demo Device",
-                    createdAt = "Jan 1, 2023",
-                    lastUsed = Clock.System.now(),
-                ),
-            ),
-        userData =
-            UserData(
-                birthday = Clock.System.now(),
-                isOnboarded = true,
-                onboardedDate = Clock.System.now(),
-            ),
+        passkeys = emptyList(),
         isAuthenticated = true,
-        onUpdateProfile = { _, _ -> },
         onRevokePasskey = {},
         onSignOut = { _ -> },
-        birthdayUpdateState = BirthdayUpdateState.Idle,
-        profileUpdateState = ProfileUpdateState.Idle,
-        identityState =
-            AccountIdentityState(
-                status =
-                    app.logdate.client.repository.account.AccountIdentityStatus(
-                        did = "did:plc:preview123",
-                        handle = "johndoe.logdate.app",
-                        signingKeyPublicMultibase = "zPreview",
-                        signingKeyDidKey = "did:key:zPreview",
-                        plcRecoveryDidKey = "did:key:zRecovery",
-                        plcOperationCount = 2,
-                    ),
-            ),
+        identityState = AccountIdentityState(),
         onRefreshIdentity = {},
         onExportSigningKey = {},
         onRotateSigningKey = {},

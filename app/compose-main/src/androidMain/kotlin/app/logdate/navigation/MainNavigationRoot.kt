@@ -106,19 +106,22 @@ import app.logdate.navigation.routes.onboarding
 import app.logdate.navigation.routes.openAccountSettings
 import app.logdate.navigation.routes.openAdvancedSettings
 import app.logdate.navigation.routes.openDangerZoneSettings
-import app.logdate.navigation.routes.openDataSettings
 import app.logdate.navigation.routes.openDevicesSettings
+import app.logdate.navigation.routes.openExportSettings
 import app.logdate.navigation.routes.openJournalDetail
 import app.logdate.navigation.routes.openJournalSettings
+import app.logdate.navigation.routes.openLocationAdvanced
+import app.logdate.navigation.routes.openLocationInterval
 import app.logdate.navigation.routes.openLocationSettings
 import app.logdate.navigation.routes.openLocationTimeline
+import app.logdate.navigation.routes.openLocationTrackingOptions
 import app.logdate.navigation.routes.openMemoriesSettings
-import app.logdate.navigation.routes.openPrivacySettings
 import app.logdate.navigation.routes.openProfile
 import app.logdate.navigation.routes.openRecommendationSettings
 import app.logdate.navigation.routes.openSearch
 import app.logdate.navigation.routes.openSettings
 import app.logdate.navigation.routes.openShareJournal
+import app.logdate.navigation.routes.openSyncSettings
 import app.logdate.navigation.routes.openTimelineDetail
 import app.logdate.navigation.routes.resetApp
 import app.logdate.navigation.routes.rewindRoutes
@@ -597,8 +600,6 @@ fun MainNavigationRoot(
                             },
                             onNavigateToProfile = mainAppNavigator::openProfile,
                             onNavigateToAccount = mainAppNavigator::openAccountSettings,
-                            onNavigateToPrivacy = mainAppNavigator::openPrivacySettings,
-                            onNavigateToData = mainAppNavigator::openDataSettings,
                             onNavigateToDevices = mainAppNavigator::openDevicesSettings,
                             onNavigateToDangerZone = mainAppNavigator::openDangerZoneSettings,
                             onNavigateToLocation = mainAppNavigator::openLocationSettings,
@@ -606,6 +607,11 @@ fun MainNavigationRoot(
                             onNavigateToMemories = mainAppNavigator::openMemoriesSettings,
                             onNavigateToRecommendations = mainAppNavigator::openRecommendationSettings,
                             onNavigateToAdvanced = mainAppNavigator::openAdvancedSettings,
+                            onNavigateToSync = mainAppNavigator::openSyncSettings,
+                            onNavigateToExport = mainAppNavigator::openExportSettings,
+                            onNavigateToLocationTrackingOptions = mainAppNavigator::openLocationTrackingOptions,
+                            onNavigateToLocationInterval = mainAppNavigator::openLocationInterval,
+                            onNavigateToLocationAdvanced = mainAppNavigator::openLocationAdvanced,
                         )
                         cloudAccountSetup(
                             onBack = mainAppNavigator::goBack,

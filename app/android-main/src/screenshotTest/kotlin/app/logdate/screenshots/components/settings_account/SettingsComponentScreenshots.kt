@@ -18,17 +18,13 @@ import app.logdate.feature.core.export.ExportState
 import app.logdate.feature.core.settings.ui.AccountIdentityState
 import app.logdate.feature.core.settings.ui.AccountSettingsContent
 import app.logdate.feature.core.settings.ui.AdvancedSettingsContent
-import app.logdate.feature.core.settings.ui.BirthdayUpdateState
 import app.logdate.feature.core.settings.ui.ConflictsState
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsContent
 import app.logdate.feature.core.settings.ui.DataSettingsContent
 import app.logdate.feature.core.settings.ui.IntegrityState
 import app.logdate.feature.core.settings.ui.LocationSettingsContent
 import app.logdate.feature.core.settings.ui.PrivacySettingsContent
-import app.logdate.feature.core.settings.ui.ProfileUpdateState
 import app.logdate.feature.core.settings.ui.RestoreState
-import app.logdate.feature.core.settings.ui.ServerPreset
-import app.logdate.feature.core.settings.ui.ServerSelectionState
 import app.logdate.feature.core.settings.ui.SettingsOverviewContent
 import app.logdate.feature.core.settings.ui.StorageQuotaUi
 import app.logdate.feature.core.settings.ui.UserProfile
@@ -37,7 +33,6 @@ import app.logdate.feature.core.settings.ui.dialogs.ResetAppConfirmationDialog
 import app.logdate.feature.core.settings.updates.AppUpdateFlowType
 import app.logdate.feature.core.settings.updates.AppUpdateStatus
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
-import app.logdate.shared.model.user.UserData
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE_LANDSCAPE
 import app.logdate.screenshots.common.ScreenshotTestData.TABLET
@@ -81,12 +76,12 @@ fun SettingsOverview() {
             onBack = {},
             onNavigateToProfile = {},
             onNavigateToAccount = {},
-            onNavigateToPrivacy = {},
-            onNavigateToData = {},
             onNavigateToDevices = {},
             onNavigateToDangerZone = {},
             onNavigateToLocation = {},
-            onNavigateToAdvanced = {},
+            onNavigateToMemories = {},
+            onNavigateToSync = {},
+            onNavigateToExport = {},
             userProfile = sampleUserProfile,
         )
     }
@@ -101,12 +96,12 @@ fun SettingsOverview_Dark() {
             onBack = {},
             onNavigateToProfile = {},
             onNavigateToAccount = {},
-            onNavigateToPrivacy = {},
-            onNavigateToData = {},
             onNavigateToDevices = {},
             onNavigateToDangerZone = {},
             onNavigateToLocation = {},
-            onNavigateToAdvanced = {},
+            onNavigateToMemories = {},
+            onNavigateToSync = {},
+            onNavigateToExport = {},
             userProfile = sampleUserProfile,
         )
     }
@@ -122,17 +117,11 @@ fun AccountSettings_Default() {
         AccountSettingsContent(
             onBack = {},
             onCreatePasskey = {},
-            onUpdateBirthday = {},
-            onResetBirthdayUpdateState = {},
             userProfile = sampleUserProfile,
             passkeys = emptyList(),
-            userData = UserData(),
             isAuthenticated = true,
-            onUpdateProfile = { _, _ -> },
             onRevokePasskey = {},
-            onSignOut = {},
-            birthdayUpdateState = BirthdayUpdateState.Idle,
-            profileUpdateState = ProfileUpdateState.Idle,
+            onSignOut = { _ -> },
             identityState = sampleIdentityState,
             onRefreshIdentity = {},
             onExportSigningKey = {},
@@ -157,17 +146,11 @@ fun AccountSettings_NoAccount() {
         AccountSettingsContent(
             onBack = {},
             onCreatePasskey = {},
-            onUpdateBirthday = {},
-            onResetBirthdayUpdateState = {},
             userProfile = UserProfile(name = "Local User", username = "", isAuthenticated = false),
             passkeys = emptyList(),
-            userData = UserData(),
             isAuthenticated = false,
-            onUpdateProfile = { _, _ -> },
             onRevokePasskey = {},
-            onSignOut = {},
-            birthdayUpdateState = BirthdayUpdateState.Idle,
-            profileUpdateState = ProfileUpdateState.Idle,
+            onSignOut = { _ -> },
             identityState = AccountIdentityState(),
             onRefreshIdentity = {},
             onExportSigningKey = {},
@@ -245,10 +228,10 @@ fun LocationSettings() {
             settings = LocationTrackingSettings(),
             onBack = {},
             onToggleBackgroundTracking = {},
-            onToggleJournalTracking = {},
-            onToggleTimelineTracking = {},
-            onUpdateTrackingInterval = {},
             onShowLocationTimeline = {},
+            onNavigateToTrackingOptions = {},
+            onNavigateToInterval = {},
+            onNavigateToAdvanced = {},
         )
     }
 }
@@ -262,14 +245,9 @@ fun AdvancedSettings() {
     ScreenshotTheme {
         AdvancedSettingsContent(
             onBack = {},
-            serverSelectionState = ServerSelectionState(),
             appUpdateUiState = AppUpdateUiState(currentVersionName = "0.1.0"),
-            onSelectPreset = {},
-            onUpdateCustomUrl = {},
-            onValidateAndSave = {},
             onCheckForAppUpdates = {},
             onCompleteAppUpdate = {},
-            onShowCustomServerInfo = {},
         )
     }
 }
@@ -282,18 +260,13 @@ fun AdvancedSettings_UpdateReady() {
     ScreenshotTheme {
         AdvancedSettingsContent(
             onBack = {},
-            serverSelectionState = ServerSelectionState(),
             appUpdateUiState =
                 AppUpdateUiState(
                     currentVersionName = "0.1.0",
                     status = AppUpdateStatus.Downloaded,
                 ),
-            onSelectPreset = {},
-            onUpdateCustomUrl = {},
-            onValidateAndSave = {},
             onCheckForAppUpdates = {},
             onCompleteAppUpdate = {},
-            onShowCustomServerInfo = {},
         )
     }
 }
@@ -306,19 +279,14 @@ fun AdvancedSettings_UpdateAvailableImmediate() {
     ScreenshotTheme {
         AdvancedSettingsContent(
             onBack = {},
-            serverSelectionState = ServerSelectionState(),
             appUpdateUiState =
                 AppUpdateUiState(
                     currentVersionName = "0.1.0",
                     status = AppUpdateStatus.Available,
                     flowType = AppUpdateFlowType.Immediate,
                 ),
-            onSelectPreset = {},
-            onUpdateCustomUrl = {},
-            onValidateAndSave = {},
             onCheckForAppUpdates = {},
             onCompleteAppUpdate = {},
-            onShowCustomServerInfo = {},
         )
     }
 }
@@ -379,12 +347,12 @@ fun SettingsListDetail_Landscape_Account() {
                 onBack = {},
                 onNavigateToProfile = {},
                 onNavigateToAccount = {},
-                onNavigateToPrivacy = {},
-                onNavigateToData = {},
                 onNavigateToDevices = {},
                 onNavigateToDangerZone = {},
                 onNavigateToLocation = {},
-                onNavigateToAdvanced = {},
+                onNavigateToMemories = {},
+                onNavigateToSync = {},
+                onNavigateToExport = {},
                 userProfile = sampleUserProfile,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             )
@@ -393,17 +361,11 @@ fun SettingsListDetail_Landscape_Account() {
                 AccountSettingsContent(
                     onBack = {},
                     onCreatePasskey = {},
-                    onUpdateBirthday = {},
-                    onResetBirthdayUpdateState = {},
                     userProfile = sampleUserProfile,
                     passkeys = emptyList(),
-                    userData = UserData(),
                     isAuthenticated = true,
-                    onUpdateProfile = { _, _ -> },
                     onRevokePasskey = {},
-                    onSignOut = {},
-                    birthdayUpdateState = BirthdayUpdateState.Idle,
-                    profileUpdateState = ProfileUpdateState.Idle,
+                    onSignOut = { _ -> },
                     identityState = sampleIdentityState,
                     onRefreshIdentity = {},
                     onExportSigningKey = {},
@@ -432,12 +394,12 @@ fun SettingsListDetail_Tablet_Account() {
                 onBack = {},
                 onNavigateToProfile = {},
                 onNavigateToAccount = {},
-                onNavigateToPrivacy = {},
-                onNavigateToData = {},
                 onNavigateToDevices = {},
                 onNavigateToDangerZone = {},
                 onNavigateToLocation = {},
-                onNavigateToAdvanced = {},
+                onNavigateToMemories = {},
+                onNavigateToSync = {},
+                onNavigateToExport = {},
                 userProfile = sampleUserProfile,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             )
@@ -446,17 +408,11 @@ fun SettingsListDetail_Tablet_Account() {
                 AccountSettingsContent(
                     onBack = {},
                     onCreatePasskey = {},
-                    onUpdateBirthday = {},
-                    onResetBirthdayUpdateState = {},
                     userProfile = sampleUserProfile,
                     passkeys = emptyList(),
-                    userData = UserData(),
                     isAuthenticated = true,
-                    onUpdateProfile = { _, _ -> },
                     onRevokePasskey = {},
-                    onSignOut = {},
-                    birthdayUpdateState = BirthdayUpdateState.Idle,
-                    profileUpdateState = ProfileUpdateState.Idle,
+                    onSignOut = { _ -> },
                     identityState = sampleIdentityState,
                     onRefreshIdentity = {},
                     onExportSigningKey = {},
