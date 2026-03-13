@@ -408,6 +408,7 @@ class EntryEditorViewModel(
                                     creationTimestamp = block.timestamp,
                                     lastUpdated = Clock.System.now(),
                                     mediaRef = block.uri ?: return@mapNotNull null,
+                                    caption = block.caption,
                                 )
                             is CameraBlockUiState -> {
                                 val mediaRef = block.uri ?: return@mapNotNull null
@@ -418,6 +419,7 @@ class EntryEditorViewModel(
                                             creationTimestamp = block.timestamp,
                                             lastUpdated = Clock.System.now(),
                                             mediaRef = mediaRef,
+                                            caption = block.caption,
                                         )
                                     CapturedMediaType.VIDEO ->
                                         JournalNote.Video(
@@ -425,6 +427,7 @@ class EntryEditorViewModel(
                                             creationTimestamp = block.timestamp,
                                             lastUpdated = Clock.System.now(),
                                             mediaRef = mediaRef,
+                                            caption = block.caption,
                                         )
                                 }
                             }
@@ -434,6 +437,7 @@ class EntryEditorViewModel(
                                     creationTimestamp = block.timestamp,
                                     lastUpdated = Clock.System.now(),
                                     mediaRef = block.uri ?: return@mapNotNull null,
+                                    caption = block.caption,
                                 )
                             is AudioBlockUiState ->
                                 JournalNote.Audio(
