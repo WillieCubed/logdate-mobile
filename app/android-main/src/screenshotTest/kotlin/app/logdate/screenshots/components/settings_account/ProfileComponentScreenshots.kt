@@ -35,7 +35,7 @@ fun Profile_Default() {
             onStartEditingDisplayName = {},
             onCancelEditing = {},
             onSaveDisplayName = {},
-            onSaveBirthday = {},
+            onNavigateToBirthday = {},
             snackbarHostState = snackbarHostState,
         )
     }
@@ -57,7 +57,7 @@ fun Profile_Default_Dark() {
             onStartEditingDisplayName = {},
             onCancelEditing = {},
             onSaveDisplayName = {},
-            onSaveBirthday = {},
+            onNavigateToBirthday = {},
             snackbarHostState = snackbarHostState,
         )
     }
@@ -80,7 +80,7 @@ fun Profile_EditDisplayName() {
             onStartEditingDisplayName = {},
             onCancelEditing = {},
             onSaveDisplayName = {},
-            onSaveBirthday = {},
+            onNavigateToBirthday = {},
             snackbarHostState = snackbarHostState,
         )
     }
@@ -103,7 +103,7 @@ fun Profile_Updating() {
             onStartEditingDisplayName = {},
             onCancelEditing = {},
             onSaveDisplayName = {},
-            onSaveBirthday = {},
+            onNavigateToBirthday = {},
             snackbarHostState = snackbarHostState,
         )
     }
@@ -125,7 +125,7 @@ fun Profile_NoAccount() {
             onStartEditingDisplayName = {},
             onCancelEditing = {},
             onSaveDisplayName = {},
-            onSaveBirthday = {},
+            onNavigateToBirthday = {},
             snackbarHostState = snackbarHostState,
         )
     }
