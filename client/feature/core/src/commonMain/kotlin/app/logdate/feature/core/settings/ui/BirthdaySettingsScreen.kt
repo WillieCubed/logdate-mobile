@@ -72,7 +72,6 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.floor
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 
 /**
@@ -283,17 +282,9 @@ fun BirthdaySettingsContent(
 
     // Date picker dialog
     if (showDatePicker) {
-        val initialMillis =
-            resolvedBirthday
-                ?.toEpochMilliseconds()
-                ?: Clock.System
-                    .now()
-                    .minus(7305.days)
-                    .toEpochMilliseconds()
-
         val datePickerState =
             rememberDatePickerState(
-                initialSelectedDateMillis = initialMillis,
+                initialSelectedDateMillis = resolvedBirthday?.toEpochMilliseconds(),
             )
 
         DatePickerDialog(
