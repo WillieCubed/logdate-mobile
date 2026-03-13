@@ -216,3 +216,9 @@ data object LocationIntervalRoute : NavKey
  */
 @Serializable
 data object LocationAdvancedRoute : NavKey
+
+/**
+ * Navigation route for the birthday personalization detail screen.
+ */
+@Serializable
+data object BirthdaySettingsRoute : NavKey

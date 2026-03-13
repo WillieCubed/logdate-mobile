@@ -13,8 +13,14 @@ fun NavController.navigateToProfile() {
     navigate(ProfileRoute)
 }
 
-fun NavGraphBuilder.profileRoute(onGoBack: () -> Unit) {
+fun NavGraphBuilder.profileRoute(
+    onGoBack: () -> Unit,
+    onNavigateToBirthday: () -> Unit,
+) {
     composable<ProfileRoute> {
-        ProfileScreen(onBack = onGoBack)
+        ProfileScreen(
+            onBack = onGoBack,
+            onNavigateToBirthday = onNavigateToBirthday,
+        )
     }
 }

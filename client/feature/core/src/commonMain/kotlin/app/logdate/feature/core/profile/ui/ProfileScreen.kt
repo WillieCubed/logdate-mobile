@@ -6,6 +6,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.CircularProgressIndicator
@@ -56,7 +58,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import app.logdate.feature.core.settings.ui.components.BirthdaySelector
 import app.logdate.shared.model.profile.LogDateProfile
 import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.common.SettingsSection
@@ -69,6 +70,7 @@ import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_information
 import logdate.client.feature.core.generated.resources.authentication
 import logdate.client.feature.core.generated.resources.back
+import logdate.client.feature.core.generated.resources.birthday
 import logdate.client.feature.core.generated.resources.cancel
 import logdate.client.feature.core.generated.resources.display_name
 import logdate.client.feature.core.generated.resources.edit_display_name
@@ -86,6 +88,7 @@ import kotlin.time.Instant
 @Composable
 fun ProfileScreen(
     onBack: () -> Unit,
+    onNavigateToBirthday: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ProfileViewModel = koinViewModel(),
 ) {
@@ -110,10 +113,10 @@ fun ProfileScreen(
     ProfileScreenContent(
         uiState = uiState,
         onBack = onBack,
+        onNavigateToBirthday = onNavigateToBirthday,
         onStartEditingDisplayName = viewModel::startEditingDisplayName,
         onCancelEditing = viewModel::cancelEditing,
         onSaveDisplayName = viewModel::saveDisplayName,
-        onSaveBirthday = viewModel::saveBirthday,
         snackbarHostState = snackbarHostState,
         modifier = modifier,
     )
@@ -124,10 +127,10 @@ fun ProfileScreen(
 fun ProfileScreenContent(
     uiState: ProfileUiState,
     onBack: () -> Unit,
+    onNavigateToBirthday: () -> Unit,
     onStartEditingDisplayName: () -> Unit,
     onCancelEditing: () -> Unit,
     onSaveDisplayName: (String) -> Unit,
-    onSaveBirthday: (Instant) -> Unit,
     snackbarHostState: SnackbarHostState,
     modifier: Modifier = Modifier,
 ) {
@@ -213,9 +216,26 @@ fun ProfileScreenContent(
                             title = stringResource(Res.string.personal_information),
                             modifier = Modifier.padding(horizontal = Spacing.lg),
                         ) {
-                            BirthdaySelector(
-                                birthday = profile.birthday ?: Instant.DISTANT_PAST,
-                                onBirthdaySelected = onSaveBirthday,
+                            val formattedBirthday =
+                                if (profile.birthday == null || profile.birthday == Instant.DISTANT_PAST) {
+                                    "Not set"
+                                } else {
+                                    formatDateLocalized(
+                                        profile.birthday
+                                            .toLocalDateTime(TimeZone.UTC)
+                                            .date,
+                                    )
+                                }
+                            ListItem(
+                                headlineContent = { Text(stringResource(Res.string.birthday)) },
+                                supportingContent = { Text(formattedBirthday) },
+                                leadingContent = {
+                                    Icon(
+                                        imageVector = Icons.Default.DateRange,
+                                        contentDescription = null,
+                                    )
+                                },
+                                modifier = Modifier.clickable { onNavigateToBirthday() },
                             )
                         }
                     }
@@ -444,10 +464,10 @@ fun ProfileScreenContentPreview() {
                 updateState = ProfileUpdateState.Idle,
             ),
         onBack = {},
+        onNavigateToBirthday = {},
         onStartEditingDisplayName = {},
         onCancelEditing = {},
         onSaveDisplayName = {},
-        onSaveBirthday = {},
         snackbarHostState = SnackbarHostState(),
     )
 }

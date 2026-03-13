@@ -26,7 +26,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlin.time.Instant
 
 data class AccountSettingsState(
     val userData: UserData,
@@ -53,18 +52,6 @@ sealed class ProfileUpdateState {
     data class Error(
         val message: String,
     ) : ProfileUpdateState()
-}
-
-sealed class BirthdayUpdateState {
-    data object Idle : BirthdayUpdateState()
-
-    data object Updating : BirthdayUpdateState()
-
-    data object Success : BirthdayUpdateState()
-
-    data class Error(
-        val message: String,
-    ) : BirthdayUpdateState()
 }
 
 sealed class IdentityActionState {
@@ -95,9 +82,6 @@ class AccountSettingsViewModel(
 ) : ViewModel() {
     private val _profileUpdateState = MutableStateFlow<ProfileUpdateState>(ProfileUpdateState.Idle)
     val profileUpdateState: StateFlow<ProfileUpdateState> = _profileUpdateState
-
-    private val _birthdayUpdateState = MutableStateFlow<BirthdayUpdateState>(BirthdayUpdateState.Idle)
-    val birthdayUpdateState: StateFlow<BirthdayUpdateState> = _birthdayUpdateState
 
     private val identityJson =
         Json {
@@ -207,27 +191,6 @@ class AccountSettingsViewModel(
                 }
             }
         }
-    }
-
-    fun updateBirthday(birthday: Instant) {
-        Napier.d("AccountSettingsViewModel: updateBirthday called with $birthday")
-        viewModelScope.launch {
-            try {
-                _birthdayUpdateState.value = BirthdayUpdateState.Updating
-                userStateRepository.setBirthday(birthday)
-                _birthdayUpdateState.value = BirthdayUpdateState.Success
-            } catch (e: Exception) {
-                Napier.e("AccountSettingsViewModel: failed to update birthday", e)
-                _birthdayUpdateState.value =
-                    BirthdayUpdateState.Error(
-                        e.message ?: "Failed to update birthday",
-                    )
-            }
-        }
-    }
-
-    fun resetBirthdayUpdateState() {
-        _birthdayUpdateState.value = BirthdayUpdateState.Idle
     }
 
     /**

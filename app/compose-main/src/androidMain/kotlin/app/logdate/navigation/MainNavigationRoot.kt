@@ -44,6 +44,7 @@ package app.logdate.navigation
 
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
@@ -105,6 +106,7 @@ import app.logdate.navigation.routes.locationRoutes
 import app.logdate.navigation.routes.onboarding
 import app.logdate.navigation.routes.openAccountSettings
 import app.logdate.navigation.routes.openAdvancedSettings
+import app.logdate.navigation.routes.openBirthdaySettings
 import app.logdate.navigation.routes.openDangerZoneSettings
 import app.logdate.navigation.routes.openDevicesSettings
 import app.logdate.navigation.routes.openExportSettings
@@ -270,9 +272,10 @@ private fun createBackTransitionSpec(): AnimatedContentTransitionScope<Scene<Nav
         val isToMainTab = isMainTabRoute(toRoute)
 
         when {
-            // Returning to main tab: spatial reset with fade
+            // Returning to main tab: destination is immediately visible underneath;
+            // only the outgoing screen fades away to avoid semi-transparent overlap.
             isToMainTab -> {
-                fadeIn() togetherWith fadeOut()
+                EnterTransition.None togetherWith fadeOut()
             }
             // Hierarchical back navigation: slide in from left (reverse of forward)
             else -> {
@@ -311,9 +314,10 @@ private fun createPredictiveBackTransitionSpec(): AnimatedContentTransitionScope
         val isToMainTab = isMainTabRoute(toRoute)
 
         when {
-            // Returning to main tab: fade transition (matches popTransitionSpec)
+            // Returning to main tab: destination is immediately visible underneath;
+            // only the outgoing screen fades away to avoid semi-transparent overlap.
             isToMainTab -> {
-                fadeIn() togetherWith fadeOut()
+                EnterTransition.None togetherWith fadeOut()
             }
             // Hierarchical back navigation: slide in from left (matches popTransitionSpec)
             else -> {
@@ -612,6 +616,7 @@ fun MainNavigationRoot(
                             onNavigateToLocationTrackingOptions = mainAppNavigator::openLocationTrackingOptions,
                             onNavigateToLocationInterval = mainAppNavigator::openLocationInterval,
                             onNavigateToLocationAdvanced = mainAppNavigator::openLocationAdvanced,
+                            onNavigateToBirthday = mainAppNavigator::openBirthdaySettings,
                         )
                         cloudAccountSetup(
                             onBack = mainAppNavigator::goBack,

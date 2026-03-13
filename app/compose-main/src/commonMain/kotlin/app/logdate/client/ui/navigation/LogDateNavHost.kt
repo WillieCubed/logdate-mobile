@@ -114,6 +114,7 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
 
         profileRoute(
             onGoBack = { navController.popBackStack() },
+            onNavigateToBirthday = { /* TODO: Navigate to birthday detail page */ },
         )
 
         cloudAccountSetupRoute(

@@ -16,6 +16,7 @@ import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.core.profile.ui.ProfileScreen
 import app.logdate.feature.core.settings.ui.AccountSettingsScreen
 import app.logdate.feature.core.settings.ui.AdvancedSettingsScreen
+import app.logdate.feature.core.settings.ui.BirthdaySettingsScreen
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsScreen
 import app.logdate.feature.core.settings.ui.ExportSettingsScreen
 import app.logdate.feature.core.settings.ui.LocationAdvancedScreen
@@ -32,6 +33,7 @@ import app.logdate.feature.location.timeline.ui.LocationTimelineBottomSheet
 import app.logdate.navigation.MainAppNavigator
 import app.logdate.navigation.routes.core.AccountSettingsRoute
 import app.logdate.navigation.routes.core.AdvancedSettingsRoute
+import app.logdate.navigation.routes.core.BirthdaySettingsRoute
 import app.logdate.navigation.routes.core.DangerZoneSettingsRoute
 import app.logdate.navigation.routes.core.DevicesSettingsRoute
 import app.logdate.navigation.routes.core.ExportSettingsRoute
@@ -168,6 +170,13 @@ fun MainAppNavigator.openLocationAdvanced() {
 }
 
 /**
+ * Opens the birthday personalization detail screen.
+ */
+fun MainAppNavigator.openBirthdaySettings() {
+    backStack.add(BirthdaySettingsRoute)
+}
+
+/**
  * Provides the navigation routes for app settings-related screens.
  *
  * Uses Navigation3's [ListDetailSceneStrategy] for adaptive list-detail layouts.
@@ -193,6 +202,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onNavigateToLocationTrackingOptions: () -> Unit,
     onNavigateToLocationInterval: () -> Unit,
     onNavigateToLocationAdvanced: () -> Unit,
+    onNavigateToBirthday: () -> Unit,
 ) {
     // Main settings overview screen (list pane)
     routeEntry<SettingsOverviewRoute>(
@@ -219,6 +229,16 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
         metadata = ListDetailSceneStrategy.detailPane(),
     ) { _ ->
         ProfileScreen(
+            onBack = onBack,
+            onNavigateToBirthday = onNavigateToBirthday,
+        )
+    }
+
+    // Birthday personalization detail screen
+    routeEntry<BirthdaySettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        BirthdaySettingsScreen(
             onBack = onBack,
         )
     }

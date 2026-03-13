@@ -29,7 +29,4 @@ data object LocationSettingsRoute
 data object DangerZoneSettingsRoute
 
 @Serializable
-data object BirthdaySettingsRoute
-
-@Serializable
 data object AdvancedSettingsRoute

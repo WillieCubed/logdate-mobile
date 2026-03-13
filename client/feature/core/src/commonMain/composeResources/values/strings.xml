@@ -66,6 +66,9 @@
     <string name="birthday_update_failed">Failed to update birthday</string>
     <string name="bio_optional">Bio (Optional)</string>
     <string name="birthday">Birthday</string>
+    <string name="birthday_detail_description">Your birthday marks where your story begins. LogDate uses it to anchor your timeline, celebrate with you each year, and shape memories around the moments of your life.</string>
+    <string name="your_birthday">Your birthday</string>
+    <string name="birthday_not_set">Not set</string>
     <string name="cancel">Cancel</string>
     <string name="check_availability">Check Availability</string>
     <string name="choose_a_username">Choose a Username</string>
