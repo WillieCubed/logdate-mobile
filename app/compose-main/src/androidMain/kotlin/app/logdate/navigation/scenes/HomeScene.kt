@@ -81,7 +81,10 @@ package app.logdate.navigation.scenes
  * 5. Performance Optimized: Scenes are created on-demand and reused when possible
  */
 
+import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -120,6 +123,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
@@ -180,6 +184,13 @@ import kotlin.reflect.KClass
  * to the entry editor screen.
  */
 private const val FAB_TO_EDITOR_SHARED_ELEMENT_KEY = "fab_to_editor"
+
+// Front-loads the bounds movement so the shape rounding is visible early in the transition
+// rather than only at the very end when the bounds approach FAB size.
+private val FabEditorBoundsTransform =
+    BoundsTransform { _, _ ->
+        tween(durationMillis = 350, easing = FastOutSlowInEasing)
+    }
 
 /**
  * Defines how different route types should be handled by the HomeSceneStrategy.
@@ -1009,10 +1020,16 @@ private fun SharedElementFAB(
         modifier =
             if (sharedTransitionScope != null) {
                 with(sharedTransitionScope) {
-                    modifier.sharedBounds(
-                        rememberSharedContentState(key = FAB_TO_EDITOR_SHARED_ELEMENT_KEY),
-                        animatedVisibilityScope = animatedContentScope,
-                    )
+                    modifier
+                        // shadow() draws in the parent canvas before sharedBounds creates its
+                        // clipping compositing layer, so the elevation shadow is never clipped.
+                        .shadow(elevation = 6.dp, shape = MaterialTheme.shapes.large, clip = false)
+                        .sharedBounds(
+                            rememberSharedContentState(key = FAB_TO_EDITOR_SHARED_ELEMENT_KEY),
+                            animatedVisibilityScope = animatedContentScope,
+                            boundsTransform = FabEditorBoundsTransform,
+                            clipInOverlayDuringTransition = OverlayClip(MaterialTheme.shapes.large),
+                        )
                 }
             } else {
                 modifier

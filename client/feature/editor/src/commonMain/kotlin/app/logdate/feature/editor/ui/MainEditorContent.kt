@@ -224,9 +224,12 @@ fun MainEditorContent(
                         EditorDisplay.List -> {
                             Box(
                                 modifier =
-                                    Modifier
-                                        .fillMaxSize()
-                                        .windowInsetsPadding(WindowInsets.ime),
+                                    with(sts) {
+                                        Modifier
+                                            .fillMaxSize()
+                                            .skipToLookaheadSize()
+                                            .windowInsetsPadding(WindowInsets.ime)
+                                    },
                             ) {
                                 LazyColumn(state = listState) {
                                     items(

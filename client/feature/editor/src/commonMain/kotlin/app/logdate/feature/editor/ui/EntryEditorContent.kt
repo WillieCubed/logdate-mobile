@@ -114,8 +114,13 @@ fun EntryEditorContent(
     }
 
     // Expanded-block back is handled by MainEditorContent via PlatformPredictiveBackHandler.
-    // This handler only covers the remaining cases: unsaved changes and plain exit.
-    PlatformBackHandler(enabled = editorState.expandedBlockId == null) {
+    // This handler only covers cases that must interrupt navigation: unsaved changes and
+    // shouldReturnToPicker. Plain exit is left to Nav3 so predictive back can animate.
+    PlatformBackHandler(
+        enabled =
+            editorState.expandedBlockId == null &&
+                (shouldReturnToPickerOnBack || !editorState.canExitWithoutSaving),
+    ) {
         handleEditorBack()
     }
 
