@@ -3,6 +3,7 @@
 package app.logdate.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -18,15 +19,6 @@ val LightColorScheme =
         primary = Purple40,
         secondary = PurpleGrey40,
         tertiary = Pink40,
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-     */
     )
 
 /**
@@ -40,6 +32,19 @@ val DarkColorScheme =
         secondary = PurpleGrey80,
         tertiary = Pink80,
     )
+
+/**
+ * Resolves the active [ColorScheme] for the current platform and user preferences.
+ *
+ * On Android 12+, returns a dynamic color scheme derived from the user's wallpaper when
+ * [dynamicColor] is true. On all other platforms, or when dynamic color is unavailable, returns
+ * [LightColorScheme] or [DarkColorScheme] based on [darkTheme].
+ */
+@Composable
+expect fun rememberColorScheme(
+    dynamicColor: Boolean,
+    darkTheme: Boolean,
+): ColorScheme
 
 /**
  * A theme for the LogDate app.
@@ -58,20 +63,8 @@ fun LogDateTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    val colorScheme =
-        when {
-            // TODO: Re-enable dynamic color when able
-//        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-//            val context = LocalContext.current
-//            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-//        }
-
-            darkTheme -> DarkColorScheme
-            else -> LightColorScheme
-        }
-
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = rememberColorScheme(dynamicColor, darkTheme),
         typography = Typography,
         content = content,
     )
