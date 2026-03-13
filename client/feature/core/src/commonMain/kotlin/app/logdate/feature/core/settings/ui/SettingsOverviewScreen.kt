@@ -2,12 +2,17 @@
 
 package app.logdate.feature.core.settings.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
@@ -16,9 +21,12 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,13 +40,18 @@ import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_and_sign_in
 import logdate.client.feature.core.generated.resources.account_settings_description
@@ -47,10 +60,12 @@ import logdate.client.feature.core.generated.resources.danger_zone
 import logdate.client.feature.core.generated.resources.danger_zone_description
 import logdate.client.feature.core.generated.resources.devices
 import logdate.client.feature.core.generated.resources.devices_settings_description
+import logdate.client.feature.core.generated.resources.edit_profile
 import logdate.client.feature.core.generated.resources.export_and_import
 import logdate.client.feature.core.generated.resources.export_and_import_description
 import logdate.client.feature.core.generated.resources.location_settings
 import logdate.client.feature.core.generated.resources.location_settings_description
+import logdate.client.feature.core.generated.resources.logging_since
 import logdate.client.feature.core.generated.resources.memories
 import logdate.client.feature.core.generated.resources.memories_description
 import logdate.client.feature.core.generated.resources.navigate_to_title
@@ -64,6 +79,7 @@ import logdate.client.feature.core.generated.resources.sync_and_backup
 import logdate.client.feature.core.generated.resources.sync_and_backup_description
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import kotlin.time.Instant
 
 /**
  * Main settings overview screen that displays navigation options to different settings sections.
@@ -87,6 +103,10 @@ fun SettingsOverviewScreen(
 ) {
     val accountState by viewModel.state.collectAsState()
 
+    val localDisplayName = accountState.userData.displayName
+    val cloudDisplayName = accountState.currentAccount.displayName
+    val resolvedName = localDisplayName.ifEmpty { cloudDisplayName }
+
     SettingsOverviewContent(
         onBack = onBack,
         onNavigateToProfile = onNavigateToProfile,
@@ -97,7 +117,13 @@ fun SettingsOverviewScreen(
         onNavigateToMemories = onNavigateToMemories,
         onNavigateToSync = onNavigateToSync,
         onNavigateToExport = onNavigateToExport,
-        userProfile = accountState.currentAccount.toUserProfile(),
+        userProfile =
+            UserProfile(
+                name = resolvedName,
+                username = accountState.currentAccount.username,
+                isAuthenticated = accountState.isAuthenticated,
+            ),
+        onboardedDate = accountState.userData.onboardedDate,
         modifier = modifier,
     )
 }
@@ -115,6 +141,7 @@ fun SettingsOverviewContent(
     onNavigateToSync: () -> Unit,
     onNavigateToExport: () -> Unit,
     userProfile: UserProfile,
+    onboardedDate: Instant = Instant.DISTANT_PAST,
     modifier: Modifier = Modifier,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
@@ -144,12 +171,11 @@ fun SettingsOverviewContent(
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
                 item {
-                    ProfileSection(
-                        profile = userProfile,
-                        onUpdateProfile = { _, _ -> },
+                    SettingsIdentityCard(
+                        userProfile = userProfile,
+                        onboardedDate = onboardedDate,
+                        onEditProfile = onNavigateToProfile,
                         modifier = Modifier.padding(horizontal = Spacing.lg),
-                        isPreview = true,
-                        onNavigateToProfile = onNavigateToProfile,
                     )
                 }
 
@@ -267,6 +293,85 @@ private fun SettingsNavigationItem(
         },
         modifier = Modifier.clickable(onClick = onClick),
     )
+}
+
+@Composable
+private fun SettingsIdentityCard(
+    userProfile: UserProfile,
+    onboardedDate: Instant,
+    onEditProfile: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val displayName = userProfile.name.ifEmpty { userProfile.username.ifEmpty { "You" } }
+    val yearString =
+        if (onboardedDate != Instant.DISTANT_PAST) {
+            onboardedDate
+                .toLocalDateTime(TimeZone.currentSystemDefault())
+                .year
+                .toString()
+        } else {
+            null
+        }
+
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.large)
+                .background(MaterialTheme.colorScheme.primaryContainer)
+                .clickable(onClick = onEditProfile)
+                .padding(Spacing.lg),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        // Avatar
+        Box(
+            modifier =
+                Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Default.Person,
+                contentDescription = null,
+                modifier = Modifier.size(36.dp),
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
+
+        // Name and subtitle
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        ) {
+            Text(
+                text = displayName,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            if (yearString != null) {
+                Text(
+                    text = stringResource(Res.string.logging_since, yearString),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                )
+            }
+        }
+
+        // Edit profile button
+        ElevatedButton(
+            onClick = onEditProfile,
+            colors =
+                ButtonDefaults.elevatedButtonColors(
+                    containerColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f),
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ),
+        ) {
+            Text(stringResource(Res.string.edit_profile))
+        }
+    }
 }
 
 @Preview

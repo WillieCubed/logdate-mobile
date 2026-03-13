@@ -130,6 +130,7 @@
     <string name="custom_server_info_url_body">Enter the server root origin only, such as https://journal.example.com. Do not include /api paths.</string>
     <string name="edit_display_name">Edit display name</string>
     <string name="edit_profile">Edit profile</string>
+    <string name="logging_since">logging since %1$s</string>
     <string name="edit_profile_2">Edit Profile</string>
     <string name="enter_a_new_name_for_this_device">Enter a new name for this device:</string>
     <string name="enter_your_name">Enter your name</string>
