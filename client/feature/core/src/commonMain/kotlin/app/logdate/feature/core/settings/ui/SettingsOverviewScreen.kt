@@ -36,7 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.ui.common.DefaultSettingsContentContainer
-import app.logdate.ui.common.MaterialContainer
+import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
@@ -45,7 +45,9 @@ import logdate.client.feature.core.generated.resources.memories
 import logdate.client.feature.core.generated.resources.memories_description
 import logdate.client.feature.core.generated.resources.navigate_to_title
 import logdate.client.feature.core.generated.resources.screen_title_settings
-import logdate.client.feature.core.generated.resources.settings
+import logdate.client.feature.core.generated.resources.settings_group_account
+import logdate.client.feature.core.generated.resources.settings_group_app
+import logdate.client.feature.core.generated.resources.settings_group_developer
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -138,95 +140,85 @@ fun SettingsOverviewContent(
                     )
                 }
 
+                // Account group
                 item {
-                    Text(
-                        text = stringResource(Res.string.settings),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-                    )
+                    SettingsSection(
+                        title = stringResource(Res.string.settings_group_account),
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    ) {
+                        SettingsNavigationItem(
+                            title = "Profile",
+                            description = "View and edit your profile information",
+                            icon = { Icon(Icons.Default.AccountCircle, contentDescription = null) },
+                            onClick = onNavigateToProfile,
+                        )
+                        SettingsNavigationItem(
+                            title = "Account",
+                            description = "Manage your account settings and authentication",
+                            icon = { Icon(Icons.Default.AccountCircle, contentDescription = null) },
+                            onClick = onNavigateToAccount,
+                        )
+                        SettingsNavigationItem(
+                            title = "Devices",
+                            description = "Manage your connected devices",
+                            icon = { Icon(Icons.Default.Devices, contentDescription = null) },
+                            onClick = onNavigateToDevices,
+                        )
+                    }
+                }
 
-                    MaterialContainer(modifier = Modifier.padding(horizontal = Spacing.lg)) {
-                        SurfaceItem {
-                            SettingsNavigationItem(
-                                title = "Profile",
-                                description = "View and edit your profile information",
-                                icon = { Icon(Icons.Default.AccountCircle, contentDescription = null) },
-                                onClick = onNavigateToProfile,
-                            )
-                        }
+                // App group
+                item {
+                    SettingsSection(
+                        title = stringResource(Res.string.settings_group_app),
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    ) {
+                        SettingsNavigationItem(
+                            title = "Privacy & Security",
+                            description = "Control your privacy settings and app security",
+                            icon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                            onClick = onNavigateToPrivacy,
+                        )
+                        SettingsNavigationItem(
+                            title = "Location",
+                            description = "Manage location tracking and history settings",
+                            icon = { Icon(Icons.Default.ScreenshotMonitor, contentDescription = null) },
+                            onClick = onNavigateToLocation,
+                        )
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.memories),
+                            description = stringResource(Res.string.memories_description),
+                            icon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
+                            onClick = onNavigateToMemories,
+                        )
+                        SettingsNavigationItem(
+                            title = "Data & Storage",
+                            description = "Manage your data usage and storage preferences",
+                            icon = { Icon(Icons.Default.DataObject, contentDescription = null) },
+                            onClick = onNavigateToData,
+                        )
+                    }
+                }
 
-                        SurfaceItem {
-                            SettingsNavigationItem(
-                                title = "Account",
-                                description = "Manage your account settings and authentication",
-                                icon = { Icon(Icons.Default.AccountCircle, contentDescription = null) },
-                                onClick = onNavigateToAccount,
-                            )
-                        }
-
-                        SurfaceItem {
-                            SettingsNavigationItem(
-                                title = "Devices",
-                                description = "Manage your connected devices",
-                                icon = { Icon(Icons.Default.Devices, contentDescription = null) },
-                                onClick = onNavigateToDevices,
-                            )
-                        }
-
-                        SurfaceItem {
-                            SettingsNavigationItem(
-                                title = "Privacy & Security",
-                                description = "Control your privacy settings and app security",
-                                icon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                                onClick = onNavigateToPrivacy,
-                            )
-                        }
-
-                        SurfaceItem {
-                            SettingsNavigationItem(
-                                title = "Location",
-                                description = "Manage location tracking and history settings",
-                                icon = { Icon(Icons.Default.ScreenshotMonitor, contentDescription = null) },
-                                onClick = onNavigateToLocation,
-                            )
-                        }
-
-                        SurfaceItem {
-                            SettingsNavigationItem(
-                                title = stringResource(Res.string.memories),
-                                description = stringResource(Res.string.memories_description),
-                                icon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
-                                onClick = onNavigateToMemories,
-                            )
-                        }
-
-                        SurfaceItem {
-                            SettingsNavigationItem(
-                                title = "Data & Storage",
-                                description = "Manage your data usage and storage preferences",
-                                icon = { Icon(Icons.Default.DataObject, contentDescription = null) },
-                                onClick = onNavigateToData,
-                            )
-                        }
-
-                        SurfaceItem {
-                            SettingsNavigationItem(
-                                title = "Advanced",
-                                description = "Server configuration and developer options",
-                                icon = { Icon(Icons.Default.DeveloperMode, contentDescription = null) },
-                                onClick = onNavigateToAdvanced,
-                            )
-                        }
-
-                        SurfaceItem {
-                            SettingsNavigationItem(
-                                title = "Danger Zone",
-                                description = "Reset app, delete data, and other destructive actions",
-                                icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-                                onClick = onNavigateToDangerZone,
-                                isDangerous = true,
-                            )
-                        }
+                // Developer group
+                item {
+                    SettingsSection(
+                        title = stringResource(Res.string.settings_group_developer),
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    ) {
+                        SettingsNavigationItem(
+                            title = "Advanced",
+                            description = "Server configuration and developer options",
+                            icon = { Icon(Icons.Default.DeveloperMode, contentDescription = null) },
+                            onClick = onNavigateToAdvanced,
+                        )
+                        SettingsNavigationItem(
+                            title = "Danger Zone",
+                            description = "Reset app, delete data, and other destructive actions",
+                            icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                            onClick = onNavigateToDangerZone,
+                            isDangerous = true,
+                        )
                     }
                 }
             }

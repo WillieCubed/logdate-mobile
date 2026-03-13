@@ -28,7 +28,7 @@
     <string name="app_updates">App Updates</string>
     <string name="almost_ready">Almost ready!</string>
     <string name="app_security">App Security</string>
-    <string name="are_you_sure_you_want_to_reset_this_devices_id_this_is_primarily_used_for_privacy_purposes_and_will_generate_a_new_unique_identifier_for_this_device_this_wont_affect_your_data_but_may_require_re_syncing_with_logdate_cloud">Are you sure you want to reset this device&apos;s ID? This is primarily used for privacy purposes and will generate a new unique identifier for this device. This won&apos;t affect your data but may require re-syncing with LogDate Cloud.</string>
+    <string name="reset_device_id_confirmation">Are you sure you want to reset this device&apos;s ID? This is primarily used for privacy purposes and will generate a new unique identifier for this device. This won&apos;t affect your data but may require re-syncing with LogDate Cloud.</string>
     <string name="at">@</string>
     <string name="atproto_did">DID</string>
     <string name="atproto_derive_plc_recovery_key">Derive PLC Recovery Key</string>
@@ -178,6 +178,7 @@
     <string name="personal_information">Personal Information</string>
     <string name="privacy_and_security">Privacy &amp; Security</string>
     <string name="privacy_policy">Privacy Policy</string>
+    <string name="privacy_security_description">Control how LogDate protects your data, who can access it, and how your location is used.</string>
     <string name="profile">Profile</string>
     <string name="profile_information">Profile Information</string>
     <string name="profile_update_failed">Failed to update profile</string>
@@ -216,6 +217,9 @@
     <string name="server_domain_sign_in_hint">Use your passkey for accounts on %1$s.</string>
     <string name="set_your_birthday">Set your birthday!</string>
     <string name="settings">Settings</string>
+    <string name="settings_group_account">Account</string>
+    <string name="settings_group_app">App</string>
+    <string name="settings_group_developer">Developer</string>
     <string name="share_something_about_yourself_with_the_logdate_community">Share something about yourself with the LogDate community</string>
     <string name="sign_in">Sign In</string>
     <string name="sign_in_required">Sign in required</string>

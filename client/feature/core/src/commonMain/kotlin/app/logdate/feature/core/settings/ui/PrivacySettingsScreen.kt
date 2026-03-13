@@ -24,7 +24,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
@@ -41,7 +40,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.ui.common.DefaultSettingsContentContainer
-import app.logdate.ui.common.MaterialContainer
+import app.logdate.ui.common.SettingsSection
+import app.logdate.ui.common.ToggleSettingsItem
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
@@ -63,6 +63,7 @@ import logdate.client.feature.core.generated.resources.passkey_operation_removin
 import logdate.client.feature.core.generated.resources.passkey_operation_removing_message
 import logdate.client.feature.core.generated.resources.passkey_removed_successfully
 import logdate.client.feature.core.generated.resources.privacy_and_security
+import logdate.client.feature.core.generated.resources.privacy_security_description
 import logdate.client.feature.core.generated.resources.remove
 import logdate.client.feature.core.generated.resources.remove_passkey
 import logdate.client.feature.core.generated.resources.remove_passkey_from_device
@@ -282,77 +283,65 @@ fun PrivacySettingsContent(
                 contentPadding = paddingValues,
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
+                // Description
+                item {
+                    Text(
+                        text = stringResource(Res.string.privacy_security_description),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
+
                 // App Security section
                 item {
-                    Column(
+                    SettingsSection(
+                        title = stringResource(Res.string.app_security),
                         modifier = Modifier.padding(horizontal = Spacing.lg),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
-                        Text(
-                            text = stringResource(Res.string.app_security),
-                            style = MaterialTheme.typography.titleMedium,
+                        ToggleSettingsItem(
+                            title = stringResource(Res.string.settings_biometric_label),
+                            description = stringResource(Res.string.settings_biometric_description),
+                            checked = isBiometricsEnabled,
+                            onCheckedChange = { enabled ->
+                                if (enabled) {
+                                    onSetBiometricsEnabled(true)
+                                } else {
+                                    showDisableBiometricsDialog = true
+                                }
+                            },
                         )
-
-                        MaterialContainer {
-                            SurfaceItem {
-                                ListItem(
-                                    headlineContent = { Text(stringResource(Res.string.settings_biometric_label)) },
-                                    supportingContent = { Text(stringResource(Res.string.settings_biometric_description)) },
-                                    trailingContent = {
-                                        Switch(
-                                            checked = isBiometricsEnabled,
-                                            onCheckedChange = { enabled ->
-                                                if (enabled) {
-                                                    onSetBiometricsEnabled(true)
-                                                } else {
-                                                    showDisableBiometricsDialog = true
-                                                }
-                                            },
-                                        )
-                                    },
-                                )
-                            }
-                        }
                     }
                 }
 
                 // Location Settings Section
                 item {
-                    Column(
+                    SettingsSection(
+                        title = stringResource(Res.string.location_privacy),
                         modifier = Modifier.padding(horizontal = Spacing.lg),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
-                        Text(
-                            text = stringResource(Res.string.location_privacy),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-
-                        MaterialContainer {
-                            SurfaceItem {
-                                ListItem(
-                                    headlineContent = { Text(stringResource(Res.string.location_settings)) },
-                                    supportingContent = {
-                                        Text(
-                                            stringResource(Res.string.manage_location_tracking_and_privacy_preferences),
-                                        )
-                                    },
-                                    leadingContent = {
-                                        Icon(
-                                            imageVector = Icons.Default.LocationOn,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                        )
-                                    },
-                                    trailingContent = {
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                                            contentDescription = stringResource(Res.string.navigate_to_location_settings),
-                                        )
-                                    },
-                                    modifier = Modifier.clickable(onClick = onNavigateToLocationSettings),
+                        ListItem(
+                            headlineContent = { Text(stringResource(Res.string.location_settings)) },
+                            supportingContent = {
+                                Text(
+                                    stringResource(Res.string.manage_location_tracking_and_privacy_preferences),
                                 )
-                            }
-                        }
+                            },
+                            leadingContent = {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            },
+                            trailingContent = {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                                    contentDescription = stringResource(Res.string.navigate_to_location_settings),
+                                )
+                            },
+                            modifier = Modifier.clickable(onClick = onNavigateToLocationSettings),
+                        )
                     }
                 }
 
