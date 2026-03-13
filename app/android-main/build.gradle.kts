@@ -114,6 +114,21 @@ tasks.withType<Test>().configureEach {
         }
 }
 
+configurations.all {
+    resolutionStrategy.eachDependency {
+        // Navigation3 beta01 pulls compose.ui to 1.11.0-beta01 while JetBrains
+        // Compose 1.11.0-alpha04 maps foundation to 1.11.0-alpha06. The ABI
+        // changed between alpha and beta for PointerEventType.Pan, causing a
+        // runtime NoSuchMethodError. Force all androidx.compose artifacts to the
+        // same beta01 version so foundation and ui stay compatible.
+        if (requested.group.startsWith("androidx.compose") &&
+            requested.version?.contains("1.11.0-alpha") == true
+        ) {
+            useVersion("1.11.0-beta01")
+        }
+    }
+}
+
 dependencies {
     implementation(projects.app.composeMain)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
