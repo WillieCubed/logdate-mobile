@@ -14,7 +14,9 @@ import kotlinx.coroutines.flow.asSharedFlow
  * Stub implementation that returns a fixed location for desktop platforms
  * where GPS is typically not available.
  */
-class DesktopLocationProvider : ClientLocationProvider {
+class DesktopLocationProvider(
+    private val permissionManager: app.logdate.client.permissions.PermissionManager,
+) : ClientLocationProvider {
     private val locationFlowState = MutableSharedFlow<Location>(replay = 1)
     override val currentLocation: SharedFlow<Location> = locationFlowState.asSharedFlow()
 
@@ -34,6 +36,9 @@ class DesktopLocationProvider : ClientLocationProvider {
             println("Failed to emit default location: ${e.message}")
         }
     }
+
+    override fun hasLocationPermission(): Boolean =
+        permissionManager.isPermissionGranted(app.logdate.client.permissions.PermissionType.LOCATION)
 
     override suspend fun getCurrentLocation(): Location = defaultLocation
 

@@ -21,6 +21,8 @@ object StubLocationProvider : ClientLocationProvider {
     override val currentLocation: SharedFlow<Location>
         get() = _currentLocation.asSharedFlow()
 
+    override fun hasLocationPermission(): Boolean = true
+
     override suspend fun getCurrentLocation(): Location = mockLocation
 
     override suspend fun refreshLocation() {

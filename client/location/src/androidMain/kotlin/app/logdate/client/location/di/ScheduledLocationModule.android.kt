@@ -15,6 +15,6 @@ val scheduledLocationModule =
     module {
         workerOf(::ScheduledLocationTrackerWorker)
         single { ScheduledLocationTrackingService(androidContext()) }
-        single { OptimizedBackgroundLocationRegistrar(androidContext()) }
-        single { LocationTrackingManager(androidContext(), get(), get(), get()) }
+        single { OptimizedBackgroundLocationRegistrar(androidContext(), get()) }
+        single { LocationTrackingManager(androidContext(), get(), get(), get(), get()) }
     }

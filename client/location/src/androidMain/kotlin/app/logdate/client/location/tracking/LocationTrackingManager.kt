@@ -4,6 +4,7 @@ import android.content.Context
 import app.logdate.client.location.settings.LocationCaptureMode
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
+import app.logdate.client.permissions.PermissionManager
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,6 +21,7 @@ class LocationTrackingManager(
     private val scheduledLocationTrackingService: ScheduledLocationTrackingService,
     private val optimizedBackgroundLocationRegistrar: OptimizedBackgroundLocationRegistrar,
     private val locationTrackingSettingsRepository: LocationTrackingSettingsRepository,
+    private val permissionManager: PermissionManager,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val foregroundActivityCounter = ForegroundActivityCounter()
@@ -74,7 +76,7 @@ class LocationTrackingManager(
         }
 
         if (decision.shouldStartDetailedForegroundTracking) {
-            context.startDetailedLocationTrackingService()
+            context.startDetailedLocationTrackingService(permissionManager)
         } else if (
             settings.backgroundTrackingEnabled &&
             settings.captureMode == LocationCaptureMode.EXPERIMENT_MIRRORED &&

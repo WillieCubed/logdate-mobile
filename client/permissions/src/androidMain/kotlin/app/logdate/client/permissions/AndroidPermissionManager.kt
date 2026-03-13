@@ -85,8 +85,13 @@ class AndroidPermissionManager(
             return true
         }
 
-        return permissions.all {
-            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        val isGranted = { p: String ->
+            ContextCompat.checkSelfPermission(context, p) == PackageManager.PERMISSION_GRANTED
+        }
+        // Location is disjunctive: either fine or coarse is sufficient.
+        return when (type) {
+            PermissionType.LOCATION -> permissions.any(isGranted)
+            else -> permissions.all(isGranted)
         }
     }
 
@@ -111,12 +116,16 @@ class AndroidPermissionManager(
             return PermissionStatus.GRANTED
         }
 
-        val allGranted =
-            permissions.all {
-                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        val isGranted = { p: String ->
+            ContextCompat.checkSelfPermission(context, p) == PackageManager.PERMISSION_GRANTED
+        }
+        val granted =
+            when (type) {
+                PermissionType.LOCATION -> permissions.any(isGranted)
+                else -> permissions.all(isGranted)
             }
 
-        return if (allGranted) {
+        return if (granted) {
             PermissionStatus.GRANTED
         } else {
             // We can't determine if permanently denied without an activity

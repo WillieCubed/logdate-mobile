@@ -18,7 +18,7 @@ actual val locationModule: Module =
         includes(scheduledLocationModule)
         includes(locationSettingsModule)
 
-        single<ClientLocationProvider> { AndroidLocationProvider(get()) }
+        single<ClientLocationProvider> { AndroidLocationProvider(get(), get()) }
         single<ExternalPlacesProvider> { GooglePlacesExternalPlacesProvider(get()) }
         single { Geocoder(get()) }
         single<ReverseGeocodingProvider> { AndroidReverseGeocodingProvider(get()) }

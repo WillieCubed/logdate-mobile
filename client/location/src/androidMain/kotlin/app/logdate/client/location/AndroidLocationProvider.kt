@@ -1,10 +1,7 @@
 package app.logdate.client.location
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
 import android.os.Looper
-import androidx.core.content.ContextCompat
 import app.logdate.shared.model.AltitudeUnit
 import app.logdate.shared.model.Location
 import app.logdate.shared.model.LocationAltitude
@@ -35,6 +32,7 @@ import android.location.Location as AndroidLocation
  */
 class AndroidLocationProvider(
     private val context: Context,
+    private val permissionManager: app.logdate.client.permissions.PermissionManager,
 ) : ClientLocationProvider {
     private val fusedLocationClient: FusedLocationProviderClient by lazy {
         LocationServices.getFusedLocationProviderClient(context)
@@ -179,18 +177,8 @@ class AndroidLocationProvider(
             }
         }
 
-    /**
-     * Checks if location permissions are granted.
-     */
-    fun hasLocationPermission(): Boolean =
-        ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_FINE_LOCATION,
-        ) == PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_COARSE_LOCATION,
-            ) == PackageManager.PERMISSION_GRANTED
+    override fun hasLocationPermission(): Boolean =
+        permissionManager.isPermissionGranted(app.logdate.client.permissions.PermissionType.LOCATION)
 
     private fun AndroidLocation.toLogDateLocation(): Location =
         Location(

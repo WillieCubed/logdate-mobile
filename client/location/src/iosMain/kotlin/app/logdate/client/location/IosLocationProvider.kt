@@ -13,7 +13,9 @@ import kotlinx.coroutines.flow.asSharedFlow
  * This is a temporary implementation to allow compilation.
  * It should be replaced with a real implementation using CoreLocation.
  */
-class IosLocationProvider : ClientLocationProvider {
+class IosLocationProvider(
+    private val permissionManager: app.logdate.client.permissions.PermissionManager,
+) : ClientLocationProvider {
     private val _currentLocation = MutableSharedFlow<Location>(replay = 1)
 
     override val currentLocation: SharedFlow<Location> = _currentLocation.asSharedFlow()
@@ -35,8 +37,6 @@ class IosLocationProvider : ClientLocationProvider {
      * Check if the app has location permission
      * @return true if the app has location permission, false otherwise
      */
-    fun hasLocationPermission(): Boolean {
-        // Stub implementation - always return true for now
-        return true
-    }
+    override fun hasLocationPermission(): Boolean =
+        permissionManager.isPermissionGranted(app.logdate.client.permissions.PermissionType.LOCATION)
 }

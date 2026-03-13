@@ -1,12 +1,10 @@
 package app.logdate.client.location.tracking
 
-import android.Manifest
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
-import androidx.core.content.ContextCompat
+import app.logdate.client.location.ClientLocationProvider
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
@@ -18,13 +16,14 @@ internal const val OPTIMIZED_BACKGROUND_LOCATION_UPDATE_ACTION =
 
 class OptimizedBackgroundLocationRegistrar(
     private val context: Context,
+    private val locationProvider: ClientLocationProvider,
 ) {
     private val fusedLocationClient by lazy {
         LocationServices.getFusedLocationProviderClient(context)
     }
 
     fun start(minimumPersistIntervalMinutes: Long) {
-        if (!hasLocationPermission()) {
+        if (!locationProvider.hasLocationPermission()) {
             Napier.w("Skipping optimized background location registration because location permission is missing")
             return
         }
@@ -64,16 +63,6 @@ class OptimizedBackgroundLocationRegistrar(
             Napier.w("Failed to remove passive background location updates", error)
         }
     }
-
-    private fun hasLocationPermission(): Boolean =
-        ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_FINE_LOCATION,
-        ) == PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_COARSE_LOCATION,
-            ) == PackageManager.PERMISSION_GRANTED
 }
 
 internal fun optimizedBackgroundPendingIntent(context: Context): PendingIntent {

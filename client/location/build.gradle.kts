@@ -45,6 +45,7 @@ kotlin {
             implementation(projects.shared.model)
             implementation(projects.client.database)
             implementation(projects.client.logdateDatastore)
+            implementation(projects.client.permissions)
             implementation(projects.client.repository)
             implementation(projects.client.device)
             // External dependencies

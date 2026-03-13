@@ -15,7 +15,7 @@ actual val locationModule: Module =
         includes(locationTrackerModule)
         includes(locationHistoryModule)
 
-        single<ClientLocationProvider> { IosLocationProvider() }
+        single<ClientLocationProvider> { IosLocationProvider(get()) }
         single<ExternalPlacesProvider> { StubExternalPlacesProvider() }
         single<ReverseGeocodingProvider> { StubReverseGeocodingProvider() }
     }

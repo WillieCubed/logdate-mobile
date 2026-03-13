@@ -1,10 +1,7 @@
 package app.logdate.client.location
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
 import android.os.Looper
-import androidx.core.content.ContextCompat
 import app.logdate.shared.model.Location
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
@@ -51,7 +48,7 @@ class AndroidDeviceLocationTracker(
     override fun isTrackingEnabled(): Boolean = isTrackingActive
 
     override suspend fun startTracking(): Boolean {
-        if (!hasLocationPermission()) {
+        if (!locationProvider.hasLocationPermission()) {
             Napier.w("Location tracking not started: Missing location permission")
             return false
         }
@@ -130,14 +127,4 @@ class AndroidDeviceLocationTracker(
             throw SecurityException("Location permission not granted", e)
         }
     }
-
-    private fun hasLocationPermission(): Boolean =
-        ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_FINE_LOCATION,
-        ) == PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_COARSE_LOCATION,
-            ) == PackageManager.PERMISSION_GRANTED
 }

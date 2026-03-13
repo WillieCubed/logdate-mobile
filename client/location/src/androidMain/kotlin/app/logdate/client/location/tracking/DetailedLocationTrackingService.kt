@@ -15,6 +15,8 @@ import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import app.logdate.client.location.ClientLocationProvider
 import app.logdate.client.location.history.LocationTracker
+import app.logdate.client.permissions.PermissionManager
+import app.logdate.client.permissions.PermissionType
 import app.logdate.client.repository.location.LocationCapturePipeline
 import app.logdate.client.repository.location.LocationCaptureSource
 import io.github.aakira.napier.Napier
@@ -30,7 +32,18 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import kotlin.time.Duration.Companion.seconds
 
-fun Context.startDetailedLocationTrackingService(): Boolean {
+/**
+ * Starts the detailed foreground location tracking service if location permission is granted.
+ *
+ * @param permissionManager Used to verify permission before starting the foreground service.
+ *   This prevents a fatal [ForegroundServiceDidNotStartInTimeException] when the service
+ *   cannot call [Service.startForeground] with type [ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION].
+ */
+fun Context.startDetailedLocationTrackingService(permissionManager: PermissionManager): Boolean {
+    if (!permissionManager.isPermissionGranted(PermissionType.LOCATION)) {
+        Napier.w("Detailed location tracking not started: missing location permission")
+        return false
+    }
     val intent =
         Intent(this, DetailedLocationTrackingService::class.java).apply {
             action = DetailedLocationTrackingService.ACTION_START

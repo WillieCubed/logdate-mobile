@@ -15,6 +15,11 @@ interface ClientLocationProvider {
     val currentLocation: SharedFlow<Location>
 
     /**
+     * Returns true if the app has been granted location permission by the user.
+     */
+    fun hasLocationPermission(): Boolean
+
+    /**
      * Gets the current location of the client.
      */
     suspend fun getCurrentLocation(): Location

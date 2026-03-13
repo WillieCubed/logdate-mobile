@@ -13,7 +13,7 @@ import java.net.InetAddress
 actual val locationModule: Module =
     module {
 
-        single<ClientLocationProvider> { DesktopLocationProvider() }
+        single<ClientLocationProvider> { DesktopLocationProvider(get()) }
         single<ExternalPlacesProvider> { StubExternalPlacesProvider() }
         single<ReverseGeocodingProvider> { StubReverseGeocodingProvider() }
 
