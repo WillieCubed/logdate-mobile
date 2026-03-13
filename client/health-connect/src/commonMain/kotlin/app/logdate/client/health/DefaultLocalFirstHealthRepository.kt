@@ -7,6 +7,7 @@ import app.logdate.client.health.model.SleepSession
 import app.logdate.client.health.model.TimeOfDay
 import app.logdate.client.health.util.LogdatePreferencesDataSource
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
@@ -16,7 +17,6 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
-import kotlin.coroutines.CoroutineContext
 import kotlin.time.Instant
 
 /**
@@ -29,7 +29,7 @@ class DefaultLocalFirstHealthRepository(
     private val localDataSource: LocalHealthDataSource,
     private val remoteDataSource: RemoteHealthDataSource,
     private val preferencesDataSource: LogdatePreferencesDataSource,
-    private val ioDispatcher: CoroutineContext,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : LocalFirstHealthRepository {
     // Implementation of HealthDataRepository methods
     override suspend fun getAvailableDataTypes(): List<String> =

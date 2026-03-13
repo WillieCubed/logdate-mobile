@@ -2,10 +2,10 @@ package app.logdate.client.health.di
 
 import app.logdate.client.health.datasource.AndroidHealthConnectDataSource
 import app.logdate.client.health.datasource.RemoteHealthDataSource
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
-import kotlin.coroutines.CoroutineContext
 
 /**
  * Android-specific health module that provides platform implementations
@@ -18,7 +18,7 @@ val androidHealthModule =
         }
 
         // Android-specific IO dispatcher
-        single<CoroutineContext>(
+        single<CoroutineDispatcher>(
             qualifier =
                 org.koin.core.qualifier
                     .named("io-dispatcher"),
