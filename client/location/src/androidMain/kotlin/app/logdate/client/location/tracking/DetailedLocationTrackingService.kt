@@ -33,11 +33,13 @@ import org.koin.core.component.inject
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Starts the detailed foreground location tracking service if location permission is granted.
+ * Starts the [DetailedLocationTrackingService] if location permission is granted.
  *
  * @param permissionManager Used to verify permission before starting the foreground service.
- *   This prevents a fatal [ForegroundServiceDidNotStartInTimeException] when the service
- *   cannot call [Service.startForeground] with type [ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION].
+ *   This prevents a [ForegroundServiceStartNotAllowedException] when the service cannot call
+ *   [Service.startForeground] with type [ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION].
+ * @return `true` if the service was started, `false` if permission was missing or the system
+ *   denied the foreground service launch.
  */
 fun Context.startDetailedLocationTrackingService(permissionManager: PermissionManager): Boolean {
     if (!permissionManager.isPermissionGranted(PermissionType.LOCATION)) {
@@ -61,6 +63,7 @@ fun Context.startDetailedLocationTrackingService(permissionManager: PermissionMa
     }
 }
 
+/** Stops the [DetailedLocationTrackingService] if it is running. */
 fun Context.stopDetailedLocationTrackingService() {
     val intent =
         Intent(this, DetailedLocationTrackingService::class.java).apply {
@@ -80,6 +83,14 @@ private fun isForegroundServiceStartNotAllowed(error: Throwable): Boolean {
 @RequiresApi(Build.VERSION_CODES.S)
 private fun isForegroundServiceStartNotAllowedApi31(error: Throwable): Boolean = error is ForegroundServiceStartNotAllowedException
 
+/**
+ * Foreground service that actively samples the device location every [SAMPLE_INTERVAL_SECONDS]
+ * seconds (currently 15) and saves each sample to [LocationTracker].
+ *
+ * This is only used in the [LocationCaptureMode.EXPERIMENT_MIRRORED] capture mode. A persistent
+ * notification is shown while the service is running, as required by Android for foreground
+ * location services.
+ */
 class DetailedLocationTrackingService :
     Service(),
     KoinComponent {
@@ -89,6 +100,9 @@ class DetailedLocationTrackingService :
         private const val CHANNEL_ID = "logdate_location_detail_tracking"
         private const val NOTIFICATION_ID = 1904
         private const val SAMPLE_INTERVAL_SECONDS = 15L
+
+        /** Maximum time to wait for a single location fix before skipping the sample. */
+        private const val LOCATION_FIX_TIMEOUT_SECONDS = 20L
     }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -150,7 +164,7 @@ class DetailedLocationTrackingService :
                     runCatching {
                         locationProvider.refreshLocation()
                         val location =
-                            withTimeoutOrNull(20.seconds) {
+                            withTimeoutOrNull(LOCATION_FIX_TIMEOUT_SECONDS.seconds) {
                                 locationProvider.getCurrentLocation()
                             }
 

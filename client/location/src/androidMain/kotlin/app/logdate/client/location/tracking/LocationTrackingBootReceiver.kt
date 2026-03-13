@@ -7,6 +7,14 @@ import io.github.aakira.napier.Napier
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
+/**
+ * Restores location tracking after a device reboot or app update.
+ *
+ * Responds to [Intent.ACTION_BOOT_COMPLETED] and [Intent.ACTION_MY_PACKAGE_REPLACED] by
+ * re-registering location updates through [LocationTrackingManager].
+ *
+ * @see OptimizedBackgroundLocationRegistrar
+ */
 class LocationTrackingBootReceiver :
     BroadcastReceiver(),
     KoinComponent {

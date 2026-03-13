@@ -39,8 +39,24 @@ data class LocationTrackingSettings(
         get() = minimumPersistIntervalMinutes
 }
 
+/**
+ * Determines how background location samples are captured and persisted.
+ */
 @Serializable
 enum class LocationCaptureMode {
+    /**
+     * Default capture mode.
+     *
+     * The app only records a location when another app has already requested one from the
+     * system, adding zero extra battery drain.
+     */
     STABLE,
+
+    /**
+     * Experimental capture mode that uses more battery.
+     *
+     * Runs an active foreground service that samples location every few seconds, in addition
+     * to the default passive captures from [STABLE].
+     */
     EXPERIMENT_MIRRORED,
 }

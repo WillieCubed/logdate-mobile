@@ -23,6 +23,19 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 import android.location.Location as AndroidLocation
 
+/**
+ * Receives background location updates from the system and saves them to [LocationTracker].
+ *
+ * These are "passive" updates: the device only delivers a location fix when some other app has
+ * already requested one, so this receiver adds zero extra battery drain. Updates arrive as
+ * broadcast intents sent by [OptimizedBackgroundLocationRegistrar].
+ *
+ * Because a [BroadcastReceiver] is normally killed as soon as [onReceive] returns, this class
+ * calls [goAsync] to keep the process alive while the location is persisted on a background
+ * coroutine.
+ *
+ * @see OptimizedBackgroundLocationRegistrar
+ */
 class OptimizedBackgroundLocationReceiver :
     BroadcastReceiver(),
     KoinComponent {

@@ -14,27 +14,56 @@ import kotlin.time.Duration.Companion.minutes
 internal const val OPTIMIZED_BACKGROUND_LOCATION_UPDATE_ACTION =
     "app.logdate.location.action.OPTIMIZED_BACKGROUND_LOCATION_UPDATE"
 
+/**
+ * Manages registration of passive background location updates with Google Play Services.
+ *
+ * "Passive" means the device only delivers a location fix when some other app has already
+ * requested one, avoiding extra battery drain. When a fix arrives, it is broadcast to
+ * [OptimizedBackgroundLocationReceiver] for persistence.
+ *
+ * @see OptimizedBackgroundLocationReceiver
+ * @see LocationTrackingBootReceiver
+ */
 class OptimizedBackgroundLocationRegistrar(
     private val context: Context,
     private val locationProvider: ClientLocationProvider,
 ) {
+    companion object {
+        /** Minimum allowed interval between passive updates, in minutes. */
+        private const val MIN_INTERVAL_MINUTES = 2L
+
+        /** Minimum distance the device must move before an update is delivered, in meters. */
+        private const val MIN_UPDATE_DISTANCE_METERS = 50f
+
+        /** Updates may be batched for up to this multiple of the requested interval. */
+        private const val MAX_DELAY_MULTIPLIER = 3
+    }
+
     private val fusedLocationClient by lazy {
         LocationServices.getFusedLocationProviderClient(context)
     }
 
+    /**
+     * Registers passive location updates with the given [minimumPersistIntervalMinutes] interval.
+     *
+     * The interval is clamped to a minimum of [MIN_INTERVAL_MINUTES] minutes. Updates are also
+     * suppressed when the device has moved less than [MIN_UPDATE_DISTANCE_METERS] meters, and
+     * may be batched for up to [MAX_DELAY_MULTIPLIER]x the interval to save battery. No-ops if
+     * location permission has not been granted.
+     */
     fun start(minimumPersistIntervalMinutes: Long) {
         if (!locationProvider.hasLocationPermission()) {
             Napier.w("Skipping optimized background location registration because location permission is missing")
             return
         }
 
-        val intervalMillis = minimumPersistIntervalMinutes.coerceAtLeast(2).minutes.inWholeMilliseconds
+        val intervalMillis = minimumPersistIntervalMinutes.coerceAtLeast(MIN_INTERVAL_MINUTES).minutes.inWholeMilliseconds
         val request =
             LocationRequest
                 .Builder(Priority.PRIORITY_PASSIVE, intervalMillis)
                 .setMinUpdateIntervalMillis(intervalMillis)
-                .setMinUpdateDistanceMeters(50f)
-                .setMaxUpdateDelayMillis(intervalMillis * 3)
+                .setMinUpdateDistanceMeters(MIN_UPDATE_DISTANCE_METERS)
+                .setMaxUpdateDelayMillis(intervalMillis * MAX_DELAY_MULTIPLIER)
                 .build()
 
         try {
@@ -50,6 +79,7 @@ class OptimizedBackgroundLocationRegistrar(
         }
     }
 
+    /** Unregisters passive location updates. */
     fun stop() {
         try {
             fusedLocationClient

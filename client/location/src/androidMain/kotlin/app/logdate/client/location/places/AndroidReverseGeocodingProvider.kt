@@ -10,9 +10,20 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 
+/**
+ * Converts latitude/longitude coordinates into street addresses using the Android [Geocoder].
+ *
+ * Implements [ReverseGeocodingProvider]. On API 33+ (Android 13) the non-blocking callback API
+ * is used; on older versions the call runs on [Dispatchers.IO] because the legacy API blocks.
+ */
 class AndroidReverseGeocodingProvider(
     private val geocoder: Geocoder,
 ) : ReverseGeocodingProvider {
+    companion object {
+        /** Number of addresses to request from the geocoder (only the best match is needed). */
+        private const val MAX_GEOCODER_RESULTS = 1
+    }
+
     override suspend fun reverseGeocode(location: Location): GeocodedAddress? =
         try {
             val address =
@@ -22,7 +33,7 @@ class AndroidReverseGeocodingProvider(
                         geocoder.getFromLocation(
                             location.latitude,
                             location.longitude,
-                            1,
+                            MAX_GEOCODER_RESULTS,
                         ) { addresses ->
                             continuation.resume(addresses.firstOrNull())
                         }
@@ -35,7 +46,7 @@ class AndroidReverseGeocodingProvider(
                             .getFromLocation(
                                 location.latitude,
                                 location.longitude,
-                                1,
+                                MAX_GEOCODER_RESULTS,
                             )?.firstOrNull()
                     }
                 }
