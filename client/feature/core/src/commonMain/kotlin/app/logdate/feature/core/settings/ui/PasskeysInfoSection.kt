@@ -82,25 +82,24 @@ fun PasskeysInfoSection(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-            modifier = Modifier.padding(Spacing.lg),
         ) {
             Text(
                 text = stringResource(Res.string.passkeys),
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
             )
             Text(
                 text = stringResource(Res.string.passkeys_are_a_quick_and_secure_way_to_sign_into_your_logdate_account),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
-        MaterialContainer(modifier = modifier) {
+        MaterialContainer {
             // Dynamic content based on passkeys state
             if (passkeys.isEmpty()) {
                 // Empty state

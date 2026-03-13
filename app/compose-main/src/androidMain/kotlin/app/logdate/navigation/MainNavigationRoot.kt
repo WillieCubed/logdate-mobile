@@ -78,7 +78,6 @@ import app.logdate.client.sharing.SharingLauncher
 import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.feature.journals.ui.detail.NoteViewerScreen
 import app.logdate.feature.timeline.ui.TimelineLoadingPlaceholder
-import app.logdate.navigation.routes.CloudAccountIntroRoute
 import app.logdate.navigation.routes.DisplayNameSelectionRoute
 import app.logdate.navigation.routes.PasskeyCreationRoute
 import app.logdate.navigation.routes.UsernameSelectionRoute
@@ -599,9 +598,6 @@ fun MainNavigationRoot(
                         appSettingsRoutes(
                             onBack = mainAppNavigator::goBack,
                             onAppReset = mainAppNavigator::resetApp,
-                            onNavigateToCloudAccountCreation = {
-                                mainAppNavigator.backStack.add(CloudAccountIntroRoute())
-                            },
                             onNavigateToProfile = mainAppNavigator::openProfile,
                             onNavigateToAccount = mainAppNavigator::openAccountSettings,
                             onNavigateToDevices = mainAppNavigator::openDevicesSettings,

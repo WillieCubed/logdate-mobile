@@ -7,26 +7,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -36,16 +27,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.tooling.preview.Preview
-import app.logdate.ui.common.DefaultSettingsContentContainer
+import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.ToggleSettingsItem
-import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.app_security
-import logdate.client.feature.core.generated.resources.back
 import logdate.client.feature.core.generated.resources.cancel
 import logdate.client.feature.core.generated.resources.confirm
 import logdate.client.feature.core.generated.resources.disable_biometric_lock_message
@@ -187,7 +175,6 @@ private fun PasskeyOperationLoadingDialog(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PrivacySettingsContent(
     onBack: () -> Unit,
@@ -201,7 +188,6 @@ fun PrivacySettingsContent(
     revocationState: PasskeyRevocationState = PasskeyRevocationState.Idle,
     creationState: PasskeyCreationState = PasskeyCreationState.Idle,
 ) {
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
     val snackbarHostState = remember { SnackbarHostState() }
     var passkeyToDelete by remember { mutableStateOf<PasskeyInfo?>(null) }
     var showDisableBiometricsDialog by remember { mutableStateOf(false) }
@@ -257,104 +243,83 @@ fun PrivacySettingsContent(
         isLoading = creationState == PasskeyCreationState.Creating,
     )
 
-    Scaffold(
-        modifier =
-            Modifier
-                .applyScreenStyles()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            LargeTopAppBar(
-                title = { Text(stringResource(Res.string.privacy_and_security)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
-                    }
-                },
-                scrollBehavior = scrollBehavior,
+    SettingsScaffold(
+        title = stringResource(Res.string.privacy_and_security),
+        onBack = onBack,
+        snackbarHostState = snackbarHostState,
+    ) {
+        // Description
+        item {
+            Text(
+                text = stringResource(Res.string.privacy_security_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = Spacing.lg),
             )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) { paddingValues ->
-        DefaultSettingsContentContainer {
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = paddingValues,
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        }
+
+        // App Security section
+        item {
+            SettingsSection(
+                title = stringResource(Res.string.app_security),
+                modifier = Modifier.padding(horizontal = Spacing.lg),
             ) {
-                // Description
-                item {
-                    Text(
-                        text = stringResource(Res.string.privacy_security_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    )
-                }
+                ToggleSettingsItem(
+                    title = stringResource(Res.string.settings_biometric_label),
+                    description = stringResource(Res.string.settings_biometric_description),
+                    checked = isBiometricsEnabled,
+                    onCheckedChange = { enabled ->
+                        if (enabled) {
+                            onSetBiometricsEnabled(true)
+                        } else {
+                            showDisableBiometricsDialog = true
+                        }
+                    },
+                )
+            }
+        }
 
-                // App Security section
-                item {
-                    SettingsSection(
-                        title = stringResource(Res.string.app_security),
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    ) {
-                        ToggleSettingsItem(
-                            title = stringResource(Res.string.settings_biometric_label),
-                            description = stringResource(Res.string.settings_biometric_description),
-                            checked = isBiometricsEnabled,
-                            onCheckedChange = { enabled ->
-                                if (enabled) {
-                                    onSetBiometricsEnabled(true)
-                                } else {
-                                    showDisableBiometricsDialog = true
-                                }
-                            },
+        // Location Settings Section
+        item {
+            SettingsSection(
+                title = stringResource(Res.string.location_privacy),
+                modifier = Modifier.padding(horizontal = Spacing.lg),
+            ) {
+                ListItem(
+                    headlineContent = { Text(stringResource(Res.string.location_settings)) },
+                    supportingContent = {
+                        Text(
+                            stringResource(Res.string.manage_location_tracking_and_privacy_preferences),
                         )
-                    }
-                }
+                    },
+                    leadingContent = {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    },
+                    trailingContent = {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                            contentDescription = stringResource(Res.string.navigate_to_location_settings),
+                        )
+                    },
+                    modifier = Modifier.clickable(onClick = onNavigateToLocationSettings),
+                )
+            }
+        }
 
-                // Location Settings Section
-                item {
-                    SettingsSection(
-                        title = stringResource(Res.string.location_privacy),
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    ) {
-                        ListItem(
-                            headlineContent = { Text(stringResource(Res.string.location_settings)) },
-                            supportingContent = {
-                                Text(
-                                    stringResource(Res.string.manage_location_tracking_and_privacy_preferences),
-                                )
-                            },
-                            leadingContent = {
-                                Icon(
-                                    imageVector = Icons.Default.LocationOn,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            },
-                            trailingContent = {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                                    contentDescription = stringResource(Res.string.navigate_to_location_settings),
-                                )
-                            },
-                            modifier = Modifier.clickable(onClick = onNavigateToLocationSettings),
-                        )
-                    }
-                }
-
-                // Passkeys management section
-                if (isAuthenticated) {
-                    item {
-                        PasskeysInfoSection(
-                            passkeys = passkeys,
-                            onCreatePasskey = onCreatePasskey,
-                            onRevokePasskey = { passkey -> passkeyToDelete = passkey },
-                            showCreatePasskeyAction = false,
-                            modifier = Modifier.padding(horizontal = Spacing.lg),
-                        )
-                    }
-                }
+        // Passkeys management section
+        if (isAuthenticated) {
+            item {
+                PasskeysInfoSection(
+                    passkeys = passkeys,
+                    onCreatePasskey = onCreatePasskey,
+                    onRevokePasskey = { passkey -> passkeyToDelete = passkey },
+                    showCreatePasskeyAction = false,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
             }
         }
     }

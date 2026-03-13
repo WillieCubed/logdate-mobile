@@ -48,14 +48,6 @@ private val sampleUserProfile =
         isAuthenticated = true,
     )
 
-private val signedOutUserProfile =
-    UserProfile(
-        name = "Local User",
-        username = "",
-        isEditable = true,
-        isAuthenticated = false,
-    )
-
 private val sampleQuota =
     StorageQuotaUi(
         totalBytes = 5_368_709_120L,
@@ -177,39 +169,9 @@ fun S03_AccountSettingsAuthenticated() {
             onCreatePasskey = {},
             userProfile = sampleUserProfile,
             passkeys = samplePasskeys,
-            isAuthenticated = true,
             onRevokePasskey = {},
             onSignOut = { _ -> },
             identityState = sampleIdentityState,
-            onRefreshIdentity = {},
-            onExportSigningKey = {},
-            onRotateSigningKey = {},
-            onImportSigningKey = { _, _ -> },
-            onImportSigningKeyWithRecovery = { _, _, _ -> },
-            onDerivePlcRecoveryKey = {},
-            onRegisterPlcRecoveryKey = {},
-            onRegisterDerivedPlcRecoveryKey = {},
-            onClearIdentityActionState = {},
-            onClearDerivedRecoveryDidKey = {},
-            onClearExportedKeyJson = {},
-        )
-    }
-}
-
-@PreviewTest
-@ScreenshotPreviewMatrix
-@Composable
-fun S04_AccountSettingsSignedOut() {
-    ScreenshotTheme {
-        AccountSettingsContent(
-            onBack = {},
-            onCreatePasskey = {},
-            userProfile = signedOutUserProfile,
-            passkeys = emptyList(),
-            isAuthenticated = false,
-            onRevokePasskey = {},
-            onSignOut = { _ -> },
-            identityState = AccountIdentityState(),
             onRefreshIdentity = {},
             onExportSigningKey = {},
             onRotateSigningKey = {},

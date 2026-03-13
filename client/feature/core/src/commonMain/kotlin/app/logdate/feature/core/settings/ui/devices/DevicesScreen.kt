@@ -12,10 +12,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
@@ -26,16 +24,12 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -45,15 +39,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
-import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.common.MaterialContainer
-import app.logdate.ui.common.applyScreenStyles
+import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.app_version_label
-import logdate.client.feature.core.generated.resources.back
 import logdate.client.feature.core.generated.resources.cancel
 import logdate.client.feature.core.generated.resources.device_name
 import logdate.client.feature.core.generated.resources.devices
@@ -153,8 +144,6 @@ fun DevicesScreenContent(
     onDismissResetDialog: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
-
     if (showRenameDialog && selectedDevice != null) {
         RenameDeviceDialog(
             currentName = newDeviceName.ifBlank { selectedDevice.name },
@@ -179,64 +168,43 @@ fun DevicesScreenContent(
         )
     }
 
-    Scaffold(
-        modifier =
-            modifier
-                .applyScreenStyles()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            LargeTopAppBar(
-                title = { Text(stringResource(Res.string.devices)) },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(Res.string.back),
-                        )
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-            )
-        },
-    ) { paddingValues ->
-        DefaultSettingsContentContainer {
-            if (uiState.isLoading) {
-                LoadingState(modifier = Modifier.padding(paddingValues))
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = paddingValues,
-                    verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-                ) {
-                    // Device list
-                    items(uiState.devices) { device ->
-                        DeviceItem(
-                            device = device,
-                            onRenameClick = { onRenameClick(device) },
-                            onRemoveClick = { onRemoveClick(device) },
-                            modifier = Modifier.padding(horizontal = Spacing.lg),
-                        )
-                    }
+    SettingsScaffold(
+        title = stringResource(Res.string.devices),
+        onBack = onBackClick,
+        modifier = modifier,
+    ) {
+        if (uiState.isLoading) {
+            item {
+                LoadingState()
+            }
+        } else {
+            // Device list
+            items(uiState.devices) { device ->
+                DeviceItem(
+                    device = device,
+                    onRenameClick = { onRenameClick(device) },
+                    onRemoveClick = { onRemoveClick(device) },
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
+            }
 
-                    // Reset Device ID action
-                    item {
-                        Column(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = Spacing.lg),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Button(onClick = onShowResetDialog) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                                Spacer(modifier = Modifier.width(Spacing.sm))
-                                Text(stringResource(Res.string.reset_device_id))
-                            }
-                        }
+            // Reset Device ID action
+            item {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Spacing.lg),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Button(onClick = onShowResetDialog) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(modifier = Modifier.width(Spacing.sm))
+                        Text(stringResource(Res.string.reset_device_id))
                     }
                 }
             }

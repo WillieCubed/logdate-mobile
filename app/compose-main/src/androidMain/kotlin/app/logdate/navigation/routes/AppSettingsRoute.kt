@@ -187,7 +187,6 @@ fun MainAppNavigator.openBirthdaySettings() {
 fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onBack: () -> Unit,
     onAppReset: () -> Unit,
-    onNavigateToCloudAccountCreation: () -> Unit,
     onNavigateToProfile: () -> Unit,
     onNavigateToAccount: () -> Unit,
     onNavigateToDevices: () -> Unit,
@@ -249,7 +248,6 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     ) { _ ->
         AccountSettingsScreen(
             onBack = onBack,
-            onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
         )
     }
 

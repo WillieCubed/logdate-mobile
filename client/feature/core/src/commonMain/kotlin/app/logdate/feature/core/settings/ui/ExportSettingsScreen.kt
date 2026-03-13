@@ -2,30 +2,16 @@
 
 package app.logdate.feature.core.settings.ui
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -33,20 +19,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import app.logdate.feature.core.export.ExportBottomSheet
 import app.logdate.feature.core.export.ExportOptions
 import app.logdate.feature.core.export.ExportState
 import app.logdate.feature.core.export.ExportViewModel
-import app.logdate.ui.common.DefaultSettingsContentContainer
+import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
-import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import kotlinx.coroutines.launch
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.audit_and_repair_local_links_and_sync_metadata
-import logdate.client.feature.core.generated.resources.back
 import logdate.client.feature.core.generated.resources.cancel
 import logdate.client.feature.core.generated.resources.check
 import logdate.client.feature.core.generated.resources.checking
@@ -137,7 +120,6 @@ fun ExportSettingsScreen(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExportSettingsContent(
     onBack: () -> Unit,
@@ -158,258 +140,234 @@ fun ExportSettingsContent(
     onRepairIntegrity: () -> Unit,
     snackbarHostState: SnackbarHostState,
 ) {
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+    if (isExportSheetVisible) {
+        ExportBottomSheet(
+            exportState = exportState,
+            onOptionsChanged = onUpdateExportOptions,
+            onConfirm = onConfirmExport,
+            onCancel = onCancelExport,
+            onRetry = onRetryExport,
+            onDismiss = onDismissExport,
+            onShare = onShareExport,
+        )
+    }
 
-    Scaffold(
-        modifier =
-            Modifier
-                .applyScreenStyles()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            LargeTopAppBar(
-                title = { Text(stringResource(Res.string.export_and_import)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) { paddingValues ->
-        // Export bottom sheet — visibility is independent of export state
-        if (isExportSheetVisible) {
-            ExportBottomSheet(
-                exportState = exportState,
-                onOptionsChanged = onUpdateExportOptions,
-                onConfirm = onConfirmExport,
-                onCancel = onCancelExport,
-                onRetry = onRetryExport,
-                onDismiss = onDismissExport,
-                onShare = onShareExport,
-            )
-        }
-
-        DefaultSettingsContentContainer {
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = paddingValues,
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    SettingsScaffold(
+        title = stringResource(Res.string.export_and_import),
+        onBack = onBack,
+        snackbarHostState = snackbarHostState,
+    ) {
+        item {
+            SettingsSection(
+                title = stringResource(Res.string.data_management),
+                modifier = Modifier.padding(horizontal = Spacing.lg),
             ) {
-                // Data export/import section
-                item {
-                    SettingsSection(
-                        title = stringResource(Res.string.data_management),
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    ) {
-                        Column {
-                            ListItem(
-                                headlineContent = { Text(stringResource(Res.string.settings_export_entries_label)) },
-                                supportingContent = {
-                                    Text(stringResource(Res.string.settings_export_entries_description))
-                                },
-                                trailingContent = {
-                                    Button(onClick = onShowExportOptions) {
-                                        Text(stringResource(Res.string.export))
-                                    }
-                                },
-                            )
-
-                            HorizontalDivider(
-                                modifier = Modifier.padding(horizontal = Spacing.md),
-                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                            )
-
-                            val restoreInProgress = restoreState is RestoreState.Selecting || restoreState is RestoreState.Restoring
-                            ListItem(
-                                headlineContent = { Text(stringResource(Res.string.import_backup)) },
-                                supportingContent = {
-                                    Column {
-                                        Text(stringResource(Res.string.restore_entries_from_a_logdate_export_archive))
-                                        when (val state = restoreState) {
-                                            is RestoreState.Selecting -> {
-                                                Spacer(modifier = Modifier.height(Spacing.xs))
-                                                Text(
-                                                    text = stringResource(Res.string.waiting_for_backup_selection),
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                )
-                                            }
-                                            is RestoreState.Restoring -> {
-                                                Spacer(modifier = Modifier.height(Spacing.xs))
-                                                Text(
-                                                    text = stringResource(Res.string.restoring_backup),
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                )
-                                            }
-                                            is RestoreState.Completed -> {
-                                                Spacer(modifier = Modifier.height(Spacing.xs))
-                                                val exportedAt = state.summary.exportDate?.toReadableDateTimeShort()
-                                                val summaryLine =
-                                                    buildString {
-                                                        if (exportedAt != null) {
-                                                            append(
-                                                                stringResource(
-                                                                    Res.string.exported_label,
-                                                                ),
-                                                            )
-                                                            append(exportedAt)
-                                                            append(
-                                                                stringResource(
-                                                                    Res.string.separator_pipe,
-                                                                ),
-                                                            )
-                                                        }
-                                                        append(
-                                                            stringResource(
-                                                                Res.string.journals_count_with_comma,
-                                                                state.summary.journalsImported,
-                                                            ),
-                                                        )
-                                                        append(
-                                                            stringResource(
-                                                                Res.string.notes_count_with_comma,
-                                                                state.summary.notesImported,
-                                                            ),
-                                                        )
-                                                        append(
-                                                            stringResource(
-                                                                Res.string.media_count,
-                                                                state.summary.mediaImported,
-                                                            ),
-                                                        )
-                                                    }
-                                                Text(
-                                                    text = summaryLine,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                )
-                                                if (state.summary.warnings.isNotEmpty()) {
-                                                    Text(
-                                                        text =
-                                                            stringResource(
-                                                                Res.string.warnings_count,
-                                                                state.summary.warnings.size,
-                                                            ),
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.error,
-                                                    )
-                                                }
-                                            }
-                                            is RestoreState.Failed -> {
-                                                Spacer(modifier = Modifier.height(Spacing.xs))
-                                                Text(
-                                                    text = state.message,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.error,
-                                                )
-                                            }
-                                            else -> Unit
-                                        }
-                                    }
-                                },
-                                trailingContent = {
-                                    Column {
-                                        Button(
-                                            onClick = onRestoreContent,
-                                            enabled = !restoreInProgress,
-                                        ) {
-                                            Text(
-                                                if (restoreInProgress) {
-                                                    stringResource(Res.string.importing)
-                                                } else {
-                                                    stringResource(Res.string.`import`)
-                                                },
-                                            )
-                                        }
-                                        if (restoreInProgress) {
-                                            TextButton(onClick = onCancelRestore) {
-                                                Text(stringResource(Res.string.cancel))
-                                            }
-                                        }
-                                    }
-                                },
-                            )
-
-                            HorizontalDivider(
-                                modifier = Modifier.padding(horizontal = Spacing.md),
-                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                            )
-
-                            val report = integrityState.lastReport
-                            val issueCount =
-                                report?.let {
-                                    it.orphanedJournalLinks +
-                                        it.orphanedContentLinks +
-                                        it.pendingMissingJournals +
-                                        it.pendingMissingNotes +
-                                        it.pendingAssociationMissingLinks +
-                                        it.pendingAssociationMalformed
-                                } ?: 0
-                            ListItem(
-                                headlineContent = { Text(stringResource(Res.string.integrity_check)) },
-                                supportingContent = {
-                                    Column {
-                                        Text(stringResource(Res.string.audit_and_repair_local_links_and_sync_metadata))
-                                        report?.let {
-                                            Spacer(modifier = Modifier.height(Spacing.xs))
-                                            val summary =
-                                                stringResource(
-                                                    Res.string.last_check_issue_count,
-                                                    it.checkedAt.toReadableDateTimeShort(),
-                                                    issueCount,
-                                                )
-                                            Text(
-                                                text = summary,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        }
-                                        integrityState.errorMessage?.let { message ->
-                                            Spacer(modifier = Modifier.height(Spacing.xs))
-                                            Text(
-                                                text = message,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.error,
-                                            )
-                                        }
-                                    }
-                                },
-                                trailingContent = {
-                                    Column {
-                                        Button(
-                                            onClick = onRunIntegrityCheck,
-                                            enabled = !integrityState.isChecking,
-                                        ) {
-                                            Text(
-                                                if (integrityState.isChecking) {
-                                                    stringResource(Res.string.checking)
-                                                } else {
-                                                    stringResource(Res.string.check)
-                                                },
-                                            )
-                                        }
-                                        TextButton(
-                                            onClick = onRepairIntegrity,
-                                            enabled = issueCount > 0 && !integrityState.isRepairing,
-                                        ) {
-                                            Text(
-                                                if (integrityState.isRepairing) {
-                                                    stringResource(Res.string.repairing)
-                                                } else {
-                                                    stringResource(Res.string.repair)
-                                                },
-                                            )
-                                        }
-                                    }
-                                },
-                            )
-                        }
-                    }
+                Column {
+                    ExportDataItem(onShowExportOptions = onShowExportOptions)
+                    ImportBackupItem(
+                        restoreState = restoreState,
+                        onRestoreContent = onRestoreContent,
+                        onCancelRestore = onCancelRestore,
+                    )
+                    IntegrityCheckItem(
+                        integrityState = integrityState,
+                        onRunIntegrityCheck = onRunIntegrityCheck,
+                        onRepairIntegrity = onRepairIntegrity,
+                    )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun ExportDataItem(onShowExportOptions: () -> Unit) {
+    ListItem(
+        headlineContent = { Text(stringResource(Res.string.settings_export_entries_label)) },
+        supportingContent = {
+            Text(stringResource(Res.string.settings_export_entries_description))
+        },
+        trailingContent = {
+            Button(onClick = onShowExportOptions) {
+                Text(stringResource(Res.string.export))
+            }
+        },
+    )
+}
+
+@Composable
+private fun ImportBackupItem(
+    restoreState: RestoreState,
+    onRestoreContent: () -> Unit,
+    onCancelRestore: () -> Unit,
+) {
+    val restoreInProgress = restoreState is RestoreState.Selecting || restoreState is RestoreState.Restoring
+    ListItem(
+        headlineContent = { Text(stringResource(Res.string.import_backup)) },
+        supportingContent = {
+            Column {
+                Text(stringResource(Res.string.restore_entries_from_a_logdate_export_archive))
+                RestoreStatusText(restoreState)
+            }
+        },
+        trailingContent = {
+            Column {
+                Button(
+                    onClick = onRestoreContent,
+                    enabled = !restoreInProgress,
+                ) {
+                    Text(
+                        if (restoreInProgress) {
+                            stringResource(Res.string.importing)
+                        } else {
+                            stringResource(Res.string.`import`)
+                        },
+                    )
+                }
+                if (restoreInProgress) {
+                    TextButton(onClick = onCancelRestore) {
+                        Text(stringResource(Res.string.cancel))
+                    }
+                }
+            }
+        },
+    )
+}
+
+@Composable
+private fun RestoreStatusText(restoreState: RestoreState) {
+    when (val state = restoreState) {
+        is RestoreState.Selecting -> {
+            Spacer(modifier = Modifier.height(Spacing.xs))
+            Text(
+                text = stringResource(Res.string.waiting_for_backup_selection),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        is RestoreState.Restoring -> {
+            Spacer(modifier = Modifier.height(Spacing.xs))
+            Text(
+                text = stringResource(Res.string.restoring_backup),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        is RestoreState.Completed -> {
+            Spacer(modifier = Modifier.height(Spacing.xs))
+            RestoreCompletedSummary(state)
+        }
+        is RestoreState.Failed -> {
+            Spacer(modifier = Modifier.height(Spacing.xs))
+            Text(
+                text = state.message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        else -> Unit
+    }
+}
+
+@Composable
+private fun RestoreCompletedSummary(state: RestoreState.Completed) {
+    val exportedAt = state.summary.exportDate?.toReadableDateTimeShort()
+    val summaryLine =
+        buildString {
+            if (exportedAt != null) {
+                append(stringResource(Res.string.exported_label))
+                append(exportedAt)
+                append(stringResource(Res.string.separator_pipe))
+            }
+            append(stringResource(Res.string.journals_count_with_comma, state.summary.journalsImported))
+            append(stringResource(Res.string.notes_count_with_comma, state.summary.notesImported))
+            append(stringResource(Res.string.media_count, state.summary.mediaImported))
+        }
+    Text(
+        text = summaryLine,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    if (state.summary.warnings.isNotEmpty()) {
+        Text(
+            text = stringResource(Res.string.warnings_count, state.summary.warnings.size),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+        )
+    }
+}
+
+@Composable
+private fun IntegrityCheckItem(
+    integrityState: IntegrityState,
+    onRunIntegrityCheck: () -> Unit,
+    onRepairIntegrity: () -> Unit,
+) {
+    val report = integrityState.lastReport
+    val issueCount =
+        report?.let {
+            it.orphanedJournalLinks +
+                it.orphanedContentLinks +
+                it.pendingMissingJournals +
+                it.pendingMissingNotes +
+                it.pendingAssociationMissingLinks +
+                it.pendingAssociationMalformed
+        } ?: 0
+    ListItem(
+        headlineContent = { Text(stringResource(Res.string.integrity_check)) },
+        supportingContent = {
+            Column {
+                Text(stringResource(Res.string.audit_and_repair_local_links_and_sync_metadata))
+                report?.let {
+                    Spacer(modifier = Modifier.height(Spacing.xs))
+                    Text(
+                        text =
+                            stringResource(
+                                Res.string.last_check_issue_count,
+                                it.checkedAt.toReadableDateTimeShort(),
+                                issueCount,
+                            ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                integrityState.errorMessage?.let { message ->
+                    Spacer(modifier = Modifier.height(Spacing.xs))
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        trailingContent = {
+            Column {
+                Button(
+                    onClick = onRunIntegrityCheck,
+                    enabled = !integrityState.isChecking,
+                ) {
+                    Text(
+                        if (integrityState.isChecking) {
+                            stringResource(Res.string.checking)
+                        } else {
+                            stringResource(Res.string.check)
+                        },
+                    )
+                }
+                TextButton(
+                    onClick = onRepairIntegrity,
+                    enabled = issueCount > 0 && !integrityState.isRepairing,
+                ) {
+                    Text(
+                        if (integrityState.isRepairing) {
+                            stringResource(Res.string.repairing)
+                        } else {
+                            stringResource(Res.string.repair)
+                        },
+                    )
+                }
+            }
+        },
+    )
 }

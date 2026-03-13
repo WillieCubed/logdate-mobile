@@ -30,8 +30,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.save
 import logdate.client.feature.core.generated.resources.server_configuration
+import logdate.client.feature.core.generated.resources.server_connected
+import logdate.client.feature.core.generated.resources.server_connected_version
 import logdate.client.feature.core.generated.resources.server_switching_info
+import logdate.client.feature.core.generated.resources.test_connection
 import logdate.client.feature.core.generated.resources.test_connection_before_saving
 import logdate.client.feature.core.generated.resources.testing_connection
 import logdate.client.feature.core.generated.resources.you_are_using_a_non_production_server_your_data_will_not_sync_with_logdate_cloud
@@ -184,9 +188,10 @@ private fun ValidationStatusSection(
                         Spacer(modifier = Modifier.width(Spacing.xs))
                         Text(
                             text =
-                                buildString {
-                                    append("Connected")
-                                    validationState.serverVersion?.let { append(" (v$it)") }
+                                if (validationState.serverVersion != null) {
+                                    stringResource(Res.string.server_connected_version, validationState.serverVersion)
+                                } else {
+                                    stringResource(Res.string.server_connected)
                                 },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary,
@@ -220,8 +225,8 @@ private fun ValidationStatusSection(
                 Text(
                     text =
                         when (validationState) {
-                            is ServerValidationState.Success -> "Save"
-                            else -> "Test Connection"
+                            is ServerValidationState.Success -> stringResource(Res.string.save)
+                            else -> stringResource(Res.string.test_connection)
                         },
                 )
             }

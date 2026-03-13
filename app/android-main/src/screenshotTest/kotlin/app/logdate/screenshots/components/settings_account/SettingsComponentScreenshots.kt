@@ -119,39 +119,9 @@ fun AccountSettings_Default() {
             onCreatePasskey = {},
             userProfile = sampleUserProfile,
             passkeys = emptyList(),
-            isAuthenticated = true,
             onRevokePasskey = {},
             onSignOut = { _ -> },
             identityState = sampleIdentityState,
-            onRefreshIdentity = {},
-            onExportSigningKey = {},
-            onRotateSigningKey = {},
-            onImportSigningKey = { _, _ -> },
-            onImportSigningKeyWithRecovery = { _, _, _ -> },
-            onDerivePlcRecoveryKey = {},
-            onRegisterPlcRecoveryKey = {},
-            onRegisterDerivedPlcRecoveryKey = {},
-            onClearIdentityActionState = {},
-            onClearDerivedRecoveryDidKey = {},
-            onClearExportedKeyJson = {},
-        )
-    }
-}
-
-@PreviewTest
-@Preview(showBackground = true, device = PHONE)
-@Composable
-fun AccountSettings_NoAccount() {
-    ScreenshotTheme {
-        AccountSettingsContent(
-            onBack = {},
-            onCreatePasskey = {},
-            userProfile = UserProfile(name = "Local User", username = "", isAuthenticated = false),
-            passkeys = emptyList(),
-            isAuthenticated = false,
-            onRevokePasskey = {},
-            onSignOut = { _ -> },
-            identityState = AccountIdentityState(),
             onRefreshIdentity = {},
             onExportSigningKey = {},
             onRotateSigningKey = {},
@@ -363,7 +333,6 @@ fun SettingsListDetail_Landscape_Account() {
                     onCreatePasskey = {},
                     userProfile = sampleUserProfile,
                     passkeys = emptyList(),
-                    isAuthenticated = true,
                     onRevokePasskey = {},
                     onSignOut = { _ -> },
                     identityState = sampleIdentityState,
@@ -410,7 +379,6 @@ fun SettingsListDetail_Tablet_Account() {
                     onCreatePasskey = {},
                     userProfile = sampleUserProfile,
                     passkeys = emptyList(),
-                    isAuthenticated = true,
                     onRevokePasskey = {},
                     onSignOut = { _ -> },
                     identityState = sampleIdentityState,

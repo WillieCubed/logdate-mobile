@@ -4,33 +4,20 @@ package app.logdate.feature.core.settings.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.feature.core.settings.updates.AppUpdateFlowType
 import app.logdate.feature.core.settings.updates.AppUpdateStatus
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
-import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.common.MaterialContainer
-import app.logdate.ui.common.applyScreenStyles
+import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.advanced
@@ -46,7 +33,6 @@ import logdate.client.feature.core.generated.resources.app_update_unsupported
 import logdate.client.feature.core.generated.resources.app_update_up_to_date
 import logdate.client.feature.core.generated.resources.app_updates
 import logdate.client.feature.core.generated.resources.app_version_label
-import logdate.client.feature.core.generated.resources.back
 import logdate.client.feature.core.generated.resources.check_for_updates
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -73,7 +59,6 @@ fun AdvancedSettingsScreen(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdvancedSettingsContent(
     onBack: () -> Unit,
@@ -81,40 +66,17 @@ fun AdvancedSettingsContent(
     onCheckForAppUpdates: () -> Unit,
     onCompleteAppUpdate: () -> Unit,
 ) {
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
-
-    Scaffold(
-        modifier =
-            Modifier
-                .applyScreenStyles()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            LargeTopAppBar(
-                title = { Text(stringResource(Res.string.advanced)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
-                    }
-                },
-                scrollBehavior = scrollBehavior,
+    SettingsScaffold(
+        title = stringResource(Res.string.advanced),
+        onBack = onBack,
+    ) {
+        item {
+            AppUpdateSection(
+                appUpdateUiState = appUpdateUiState,
+                onCheckForAppUpdates = onCheckForAppUpdates,
+                onCompleteAppUpdate = onCompleteAppUpdate,
+                modifier = Modifier.padding(horizontal = Spacing.lg),
             )
-        },
-    ) { paddingValues ->
-        DefaultSettingsContentContainer {
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = paddingValues,
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-            ) {
-                item {
-                    AppUpdateSection(
-                        appUpdateUiState = appUpdateUiState,
-                        onCheckForAppUpdates = onCheckForAppUpdates,
-                        onCompleteAppUpdate = onCompleteAppUpdate,
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    )
-                }
-            }
         }
     }
 }

@@ -8,39 +8,28 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Timeline
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import app.logdate.client.location.settings.LocationTrackingSettings
-import app.logdate.ui.common.DefaultSettingsContentContainer
+import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.ToggleSettingsItem
-import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.back
 import logdate.client.feature.core.generated.resources.location_advanced
 import logdate.client.feature.core.generated.resources.location_advanced_description
 import logdate.client.feature.core.generated.resources.location_background_tracking_description
@@ -88,11 +77,10 @@ fun LocationSettingsScreen(
         onNavigateToTrackingOptions = onNavigateToTrackingOptions,
         onNavigateToInterval = onNavigateToInterval,
         onNavigateToAdvanced = onNavigateToAdvanced,
-        modifier = modifier.applyScreenStyles(),
+        modifier = modifier,
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LocationSettingsContent(
     settings: LocationTrackingSettings,
@@ -104,120 +92,98 @@ fun LocationSettingsContent(
     onNavigateToAdvanced: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+    SettingsScaffold(
+        title = stringResource(Res.string.location_settings),
+        onBack = onBack,
+        modifier = modifier,
+    ) {
+        // Primary background tracking toggle
+        item {
+            SettingsSection(
+                title = stringResource(Res.string.location_services),
+                modifier = Modifier.padding(horizontal = Spacing.lg),
+            ) {
+                ToggleSettingsItem(
+                    title = stringResource(Res.string.location_enable_background_tracking),
+                    description = stringResource(Res.string.location_background_tracking_description),
+                    checked = settings.backgroundTrackingEnabled,
+                    onCheckedChange = onToggleBackgroundTracking,
+                )
 
-    Scaffold(
-        modifier =
-            modifier
-                .applyScreenStyles()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            LargeTopAppBar(
-                title = { Text(stringResource(Res.string.location_settings)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.back))
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-            )
-        },
-    ) { paddingValues ->
-        DefaultSettingsContentContainer {
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = paddingValues,
+                // Navigation to detail screens
+                LocationSettingsNavItem(
+                    title = stringResource(Res.string.location_tracking_options),
+                    description = stringResource(Res.string.location_tracking_options_description),
+                    onClick = onNavigateToTrackingOptions,
+                )
+
+                if (settings.backgroundTrackingEnabled) {
+                    LocationSettingsNavItem(
+                        title = stringResource(Res.string.location_update_interval),
+                        description = stringResource(Res.string.location_update_interval_description),
+                        onClick = onNavigateToInterval,
+                    )
+                    LocationSettingsNavItem(
+                        title = stringResource(Res.string.location_advanced),
+                        description = stringResource(Res.string.location_advanced_description),
+                        onClick = onNavigateToAdvanced,
+                    )
+                }
+            }
+        }
+
+        // Location Timeline Section
+        item {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.lg),
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                // Primary background tracking toggle
-                item {
-                    SettingsSection(
-                        title = stringResource(Res.string.location_services),
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    ) {
-                        ToggleSettingsItem(
-                            title = stringResource(Res.string.location_enable_background_tracking),
-                            description = stringResource(Res.string.location_background_tracking_description),
-                            checked = settings.backgroundTrackingEnabled,
-                            onCheckedChange = onToggleBackgroundTracking,
-                        )
-
-                        // Navigation to detail screens
-                        LocationSettingsNavItem(
-                            title = stringResource(Res.string.location_tracking_options),
-                            description = stringResource(Res.string.location_tracking_options_description),
-                            onClick = onNavigateToTrackingOptions,
-                        )
-
-                        if (settings.backgroundTrackingEnabled) {
-                            LocationSettingsNavItem(
-                                title = stringResource(Res.string.location_update_interval),
-                                description = stringResource(Res.string.location_update_interval_description),
-                                onClick = onNavigateToInterval,
-                            )
-                            LocationSettingsNavItem(
-                                title = stringResource(Res.string.location_advanced),
-                                description = stringResource(Res.string.location_advanced_description),
-                                onClick = onNavigateToAdvanced,
-                            )
-                        }
-                    }
-                }
-
-                // Location Timeline Section
-                item {
-                    Column(
+                Text(
+                    text = stringResource(Res.string.location_timeline),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(vertical = Spacing.sm),
+                )
+                OutlinedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onShowLocationTimeline,
+                ) {
+                    Row(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = Spacing.lg),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+                                .padding(Spacing.md),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
                     ) {
-                        Text(
-                            text = stringResource(Res.string.location_timeline),
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(vertical = Spacing.sm),
+                        Icon(
+                            Icons.Default.Timeline,
+                            contentDescription = stringResource(Res.string.view_timeline),
+                            tint = MaterialTheme.colorScheme.primary,
                         )
-                        OutlinedCard(
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = onShowLocationTimeline,
-                        ) {
-                            Row(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(Spacing.md),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-                            ) {
-                                Icon(
-                                    Icons.Default.Timeline,
-                                    contentDescription = stringResource(Res.string.view_timeline),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
 
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        stringResource(Res.string.view_location_timeline),
-                                        style = MaterialTheme.typography.titleSmall,
-                                    )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                stringResource(Res.string.view_location_timeline),
+                                style = MaterialTheme.typography.titleSmall,
+                            )
 
-                                    Text(
-                                        stringResource(Res.string.location_timeline_description),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
+                            Text(
+                                stringResource(Res.string.location_timeline_description),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
                 }
-
-                // Location Privacy Notes
-                item {
-                    LocationSettingsNotes()
-                }
             }
+        }
+
+        // Location Privacy Notes
+        item {
+            LocationSettingsNotes()
         }
     }
 }
