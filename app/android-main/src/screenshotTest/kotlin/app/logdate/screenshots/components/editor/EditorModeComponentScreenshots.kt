@@ -364,6 +364,8 @@ private fun EditorModeFrame(
                     availableJournals = ScreenshotTestData.sampleJournals,
                     selectedJournalIds = listOf(ScreenshotTestData.sampleJournal.id),
                     onJournalSelectionChanged = {},
+                    journalSelectorExpanded = false,
+                    onJournalSelectorExpandedChange = {},
                 )
             },
         )
