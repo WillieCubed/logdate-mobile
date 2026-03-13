@@ -2,8 +2,8 @@ package app.logdate.client.domain.recommendation
 
 import app.logdate.client.domain.notes.HasNotesForTodayUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
+import app.logdate.client.domain.places.PlaceResolutionCache
 import app.logdate.client.domain.places.PlaceResolutionResult
-import app.logdate.client.domain.places.ResolveLocationToPlaceUseCase
 import app.logdate.client.location.ClientLocationProvider
 import app.logdate.client.location.places.GeocodedAddress
 import app.logdate.client.repository.journals.JournalNote
@@ -11,9 +11,10 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.onStart
 
 /**
@@ -31,14 +32,15 @@ class GetHomeRecommendationUseCase(
     private val fetchMostRecentDraft: FetchMostRecentDraftUseCase,
     private val getMemoryRecall: GetMemoryRecallUseCase,
     private val clientLocationProvider: ClientLocationProvider,
-    private val resolveLocationToPlace: ResolveLocationToPlaceUseCase,
+    private val placeResolutionCache: PlaceResolutionCache,
     private val memoriesSettingsRepository: MemoriesSettingsRepository,
 ) {
     private val locationNameFlow: Flow<String?> =
         clientLocationProvider.currentLocation
-            .map { location ->
+            .distinctUntilChanged { a, b -> a.distanceTo(b) < 100.0 }
+            .mapLatest { location ->
                 try {
-                    when (val result = resolveLocationToPlace(location)) {
+                    when (val result = placeResolutionCache.resolve(location)) {
                         is PlaceResolutionResult.UserDefinedPlace -> result.place.name
                         is PlaceResolutionResult.ExternalSuggestion -> result.suggestion.name
                         is PlaceResolutionResult.CoarseLocation ->

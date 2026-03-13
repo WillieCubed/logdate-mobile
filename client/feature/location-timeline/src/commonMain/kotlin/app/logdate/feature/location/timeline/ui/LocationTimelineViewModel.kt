@@ -10,8 +10,8 @@ import app.logdate.client.domain.location.LocationStop
 import app.logdate.client.domain.location.LocationStopEvidenceKind
 import app.logdate.client.domain.location.ObserveLocationMemoryPlacesUseCase
 import app.logdate.client.domain.location.ObserveLocationStopsUseCase
+import app.logdate.client.domain.places.PlaceResolutionCache
 import app.logdate.client.domain.places.PlaceResolutionResult
-import app.logdate.client.domain.places.ResolveLocationToPlaceUseCase
 import app.logdate.client.domain.world.ObserveLocationUseCase
 import app.logdate.client.location.places.GeocodedAddress
 import app.logdate.client.repository.journals.NoteType
@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.onStart
@@ -58,7 +59,7 @@ class LocationTimelineViewModel(
     private val observeLocationUseCase: ObserveLocationUseCase,
     private val observeLocationStopsUseCase: ObserveLocationStopsUseCase,
     private val observeLocationMemoryPlacesUseCase: ObserveLocationMemoryPlacesUseCase,
-    private val resolveLocationToPlaceUseCase: ResolveLocationToPlaceUseCase,
+    private val placeResolutionCache: PlaceResolutionCache,
     private val deleteLocationRangeUseCase: DeleteLocationRangeUseCase,
     private val captureLocationForTimelineReviewUseCase: CaptureLocationForTimelineReviewUseCase,
 ) : ViewModel() {
@@ -170,6 +171,7 @@ class LocationTimelineViewModel(
 
     private fun observeCurrentLocationState(): Flow<ObservationState<Location?>> =
         observeLocationUseCase()
+            .distinctUntilChanged { a, b -> a.distanceTo(b) < 50.0 }
             .mapLatest<_, ObservationState<Location?>> { ObservationState.Value(it as Location?) }
             .catch { error ->
                 Napier.w("Failed to observe current location", error)
@@ -254,7 +256,7 @@ class LocationTimelineViewModel(
         }
 
     private suspend fun Location.toCurrentLocationUiModel(): CurrentLocationUiModel {
-        val resolvedPlace = resolveLocationToPlaceUseCase(this)
+        val resolvedPlace = placeResolutionCache.resolve(this)
         val title =
             when (resolvedPlace) {
                 is PlaceResolutionResult.UserDefinedPlace -> resolvedPlace.place.name
@@ -279,7 +281,7 @@ class LocationTimelineViewModel(
     }
 
     private suspend fun LocationStop.toUiModel(): LocationStopUiModel {
-        val resolvedPlace = resolveLocationToPlaceUseCase(location)
+        val resolvedPlace = placeResolutionCache.resolve(location)
         val title: String
         val subtitle: String
         val sourceLabel: String
@@ -337,7 +339,7 @@ class LocationTimelineViewModel(
     private suspend fun LocationMemoryPlace.toUiModel(mappedStops: List<LocationStopUiModel>): LocationPlaceUiModel {
         val resolvedPlace =
             if (semanticName.isNullOrBlank()) {
-                resolveLocationToPlaceUseCase(
+                placeResolutionCache.resolve(
                     Location(
                         latitude = latitude,
                         longitude = longitude,

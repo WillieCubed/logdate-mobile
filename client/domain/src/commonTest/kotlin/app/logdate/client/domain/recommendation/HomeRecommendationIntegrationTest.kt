@@ -3,6 +3,7 @@ package app.logdate.client.domain.recommendation
 import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.domain.notes.HasNotesForTodayUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
+import app.logdate.client.domain.places.PlaceResolutionCache
 import app.logdate.client.domain.places.ResolveLocationToPlaceUseCase
 import app.logdate.client.location.places.StubExternalPlacesProvider
 import app.logdate.client.location.places.StubLocationProvider
@@ -39,6 +40,12 @@ class HomeRecommendationIntegrationTest {
     private val notesFlow = MutableStateFlow(emptyList<JournalNote>())
     private val draftsFlow = MutableStateFlow(emptyList<EntryDraft>())
     private val notesRepository = ReactiveNotesRepository(notesFlow)
+    private val resolveLocationToPlaceUseCase =
+        ResolveLocationToPlaceUseCase(
+            userPlacesRepository = EmptyUserPlacesRepository(),
+            externalPlacesProvider = StubExternalPlacesProvider(),
+            reverseGeocodingProvider = StubReverseGeocodingProvider(),
+        )
 
     private val useCase =
         GetHomeRecommendationUseCase(
@@ -46,12 +53,7 @@ class HomeRecommendationIntegrationTest {
             fetchMostRecentDraft = FetchMostRecentDraftUseCase(ReactiveDraftRepository(draftsFlow)),
             getMemoryRecall = GetMemoryRecallUseCase(notesRepository),
             clientLocationProvider = StubLocationProvider,
-            resolveLocationToPlace =
-                ResolveLocationToPlaceUseCase(
-                    userPlacesRepository = EmptyUserPlacesRepository(),
-                    externalPlacesProvider = StubExternalPlacesProvider(),
-                    reverseGeocodingProvider = StubReverseGeocodingProvider(),
-                ),
+            placeResolutionCache = PlaceResolutionCache(resolveLocationToPlaceUseCase),
             memoriesSettingsRepository = DefaultMemoriesSettingsRepository(MockKeyValueStorage()),
         )
 
