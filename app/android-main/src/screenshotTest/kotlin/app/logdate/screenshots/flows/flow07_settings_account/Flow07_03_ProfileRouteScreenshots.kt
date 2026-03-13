@@ -39,7 +39,7 @@ fun S01_ProfileLoading() {
             onStartEditingDisplayName = {},
             onCancelEditing = {},
             onSaveDisplayName = {},
-            onRefresh = {},
+            onSaveBirthday = {},
             snackbarHostState = snackbarHostState,
         )
     }
@@ -62,7 +62,7 @@ fun S02_ProfileDefault() {
             onStartEditingDisplayName = {},
             onCancelEditing = {},
             onSaveDisplayName = {},
-            onRefresh = {},
+            onSaveBirthday = {},
             snackbarHostState = snackbarHostState,
         )
     }
@@ -86,7 +86,7 @@ fun S03_ProfileEditDisplayName() {
             onStartEditingDisplayName = {},
             onCancelEditing = {},
             onSaveDisplayName = {},
-            onRefresh = {},
+            onSaveBirthday = {},
             snackbarHostState = snackbarHostState,
         )
     }
@@ -110,7 +110,7 @@ fun S04_ProfileUpdating() {
             onStartEditingDisplayName = {},
             onCancelEditing = {},
             onSaveDisplayName = {},
-            onRefresh = {},
+            onSaveBirthday = {},
             snackbarHostState = snackbarHostState,
         )
     }
@@ -133,7 +133,7 @@ fun S05_ProfileNoAccount() {
             onStartEditingDisplayName = {},
             onCancelEditing = {},
             onSaveDisplayName = {},
-            onRefresh = {},
+            onSaveBirthday = {},
             snackbarHostState = snackbarHostState,
         )
     }

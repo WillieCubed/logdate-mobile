@@ -85,7 +85,7 @@ internal fun MediaCarouselItem(
             model = imageRequest,
             // TODO: Add image descriptions like "photo of a cat taken on July 4th, 2022"
             contentDescription = null,
-            contentScale = ContentScale.FillHeight,
+            contentScale = ContentScale.Crop,
             modifier =
                 Modifier
                     .background(MaterialTheme.colorScheme.surfaceContainerHighest)

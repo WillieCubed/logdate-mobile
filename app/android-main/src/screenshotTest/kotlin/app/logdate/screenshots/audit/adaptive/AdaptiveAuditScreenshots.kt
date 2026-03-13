@@ -206,7 +206,7 @@ fun A08_ProfileDefault() {
             onStartEditingDisplayName = {},
             onCancelEditing = {},
             onSaveDisplayName = {},
-            onRefresh = {},
+            onSaveBirthday = {},
             snackbarHostState = snackbarHostState,
         )
     }
