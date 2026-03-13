@@ -2,7 +2,6 @@
 
 package app.logdate.feature.timeline.ui.details
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -21,8 +20,7 @@ import androidx.compose.ui.tooling.preview.Preview
 fun TimelineDetailsEmptyPlaceholder(modifier: Modifier = Modifier) {
     Box(
         modifier =
-            modifier
-                .background(MaterialTheme.colorScheme.surface),
+        modifier,
         contentAlignment = Alignment.Center,
     ) {
         Text(

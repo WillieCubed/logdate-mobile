@@ -114,6 +114,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
@@ -123,6 +124,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
@@ -163,6 +165,7 @@ import app.logdate.navigation.routes.core.SettingsOverviewRoute
 import app.logdate.navigation.routes.core.TimelineDetail
 import app.logdate.navigation.routes.core.TimelineListRoute
 import app.logdate.navigation.routes.routeClass
+import app.logdate.ui.theme.Spacing
 import logdate.app.composemain.generated.resources.Res
 import logdate.app.composemain.generated.resources.new_entry
 import logdate.app.composemain.generated.resources.select_an_entry_to_view_details
@@ -616,115 +619,117 @@ class HomeScene<T : NavKey>(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
         ) {
-            // Override surface color so all inner Scaffolds inherit surfaceContainer
-            MaterialTheme(
-                colorScheme = MaterialTheme.colorScheme.copy(surface = MaterialTheme.colorScheme.surfaceContainer),
-            ) {
-                // Use NavigationSuiteScaffold for automatic adaptive navigation
-                NavigationSuiteScaffold(
-                    layoutType =
-                        if (isDetailOnlyView) {
-                            // Hide navigation when showing detail-only views
-                            NavigationSuiteType.None
-                        } else if (isLandscapeCompact) {
-                            // Force navigation rail in landscape mobile
-                            NavigationSuiteType.NavigationRail
-                        } else {
-                            // Let NavigationSuiteScaffold automatically choose based on screen size
-                            // (Bottom bar for small screens, Rail for medium/large)
-                            NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(adaptiveInfo)
-                        },
-                    navigationSuiteItems = {
-                        HomeTab.entries.forEach { tab ->
-                            item(
-                                selected = selectedTab == tab,
-                                onClick = { onTabSelected(tab) },
-                                icon = {
-                                    Icon(
-                                        imageVector = if (selectedTab == tab) tab.selectedIcon else tab.unselectedIcon,
-                                        contentDescription = tab.title,
-                                    )
-                                },
-                                label = { androidx.compose.material3.Text(tab.title) },
-                            )
-                        }
+            // Use NavigationSuiteScaffold for automatic adaptive navigation
+            NavigationSuiteScaffold(
+                containerColor = Color.Transparent,
+                navigationSuiteColors =
+                    NavigationSuiteDefaults.colors(
+                        navigationRailContainerColor = Color.Transparent,
+                        navigationBarContainerColor = Color.Transparent,
+                    ),
+                layoutType =
+                    if (isDetailOnlyView) {
+                        // Hide navigation when showing detail-only views
+                        NavigationSuiteType.None
+                    } else if (isLandscapeCompact) {
+                        // Force navigation rail in landscape mobile
+                        NavigationSuiteType.NavigationRail
+                    } else {
+                        // Let NavigationSuiteScaffold automatically choose based on screen size
+                        // (Bottom bar for small screens, Rail for medium/large)
+                        NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(adaptiveInfo)
                     },
+                navigationSuiteItems = {
+                    HomeTab.entries.forEach { tab ->
+                        item(
+                            selected = selectedTab == tab,
+                            onClick = { onTabSelected(tab) },
+                            icon = {
+                                Icon(
+                                    imageVector = if (selectedTab == tab) tab.selectedIcon else tab.unselectedIcon,
+                                    contentDescription = tab.title,
+                                )
+                            },
+                            label = { androidx.compose.material3.Text(tab.title) },
+                        )
+                    }
+                },
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize(),
                 ) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxSize(),
-                    ) {
-                        if (showTwoPaneLayout) {
-                            // Two-pane layout (large screens or landscape mobile)
-                            val panelShape = MaterialTheme.shapes.extraLarge
-                            Row(
+                    if (showTwoPaneLayout) {
+                        // Two-pane layout (large screens or landscape mobile)
+                        val panelShape = MaterialTheme.shapes.extraLarge
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .statusBarsPadding()
+                                    .padding(top = Spacing.sm)
+                                    .padding(horizontal = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            // Left content
+                            Surface(
                                 modifier =
                                     Modifier
-                                        .fillMaxSize()
-                                        .statusBarsPadding()
-                                        .padding(horizontal = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        .weight(1f)
+                                        .widthIn(min = 320.dp, max = 420.dp)
+                                        .fillMaxHeight()
+                                        .padding(bottom = 8.dp),
+                                shape = panelShape,
+                                color = MaterialTheme.colorScheme.surface,
                             ) {
-                                // Left content
-                                Surface(
-                                    modifier =
-                                        Modifier
-                                            .weight(1f)
-                                            .widthIn(min = 320.dp, max = 420.dp)
-                                            .fillMaxHeight()
-                                            .padding(bottom = 8.dp),
-                                    shape = panelShape,
-                                    color = MaterialTheme.colorScheme.surface,
-                                ) {
-                                    mainEntry.Content()
-                                }
+                                mainEntry.Content()
+                            }
 
-                                // Detail pane (or placeholder)
-                                Surface(
-                                    modifier =
-                                        Modifier
-                                            .weight(1f)
-                                            .fillMaxHeight()
-                                            .padding(bottom = 8.dp),
-                                    shape = panelShape,
-                                    color = MaterialTheme.colorScheme.surface,
+                            // Detail pane (or placeholder)
+                            Surface(
+                                modifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .padding(bottom = 8.dp),
+                                shape = panelShape,
+                                color = MaterialTheme.colorScheme.surface,
+                            ) {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.fillMaxSize(),
                                 ) {
-                                    Box(
-                                        contentAlignment = Alignment.Center,
-                                        modifier = Modifier.fillMaxSize(),
-                                    ) {
-                                        if (detailEntry != null) {
-                                            detailEntry.Content()
-                                        } else {
-                                            DetailPlaceholder()
-                                        }
+                                    if (detailEntry != null) {
+                                        detailEntry.Content()
+                                    } else {
+                                        DetailPlaceholder()
                                     }
                                 }
                             }
-                        } else {
-                            // Single-pane layout (smaller screens or journal details)
-                            Box(modifier = Modifier.fillMaxSize()) {
-                                if (detailEntry != null) {
-                                    // If there's a detail entry but we're in single pane mode,
-                                    // show only the detail entry (fullscreen)
-                                    detailEntry.Content()
-                                } else {
-                                    // Otherwise show the main entry
-                                    mainEntry.Content()
-                                }
+                        }
+                    } else {
+                        // Single-pane layout (smaller screens or journal details)
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            if (detailEntry != null) {
+                                // If there's a detail entry but we're in single pane mode,
+                                // show only the detail entry (fullscreen)
+                                detailEntry.Content()
+                            } else {
+                                // Otherwise show the main entry
+                                mainEntry.Content()
+                            }
 
-                                // Show FAB only when not in detail-only view
-                                if (!isDetailOnlyView) {
-                                    SharedElementFAB(
-                                        onClick = onNewEntry,
-                                        contentDescription = stringResource(Res.string.new_entry),
-                                        modifier =
-                                            Modifier
-                                                .align(Alignment.BottomEnd)
-                                                .padding(16.dp),
-                                    )
-                                }
+                            // Show FAB only when not in detail-only view
+                            if (!isDetailOnlyView) {
+                                SharedElementFAB(
+                                    onClick = onNewEntry,
+                                    contentDescription = stringResource(Res.string.new_entry),
+                                    modifier =
+                                        Modifier
+                                            .align(Alignment.BottomEnd)
+                                            .padding(16.dp),
+                                )
                             }
                         }
                     }
@@ -1036,7 +1041,7 @@ private fun DetailPlaceholder() {
                 .fillMaxSize()
                 .padding(16.dp),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = Color.Transparent,
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),

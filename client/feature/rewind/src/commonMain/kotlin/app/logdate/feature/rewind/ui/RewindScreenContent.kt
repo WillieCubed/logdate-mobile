@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -162,6 +163,7 @@ fun RewindScreenContent(
                 scrollBehavior = scrollBehavior,
             )
         },
+        containerColor = Color.Transparent,
         modifier = modifier,
     ) { paddingValues ->
         // Connect the scroll behavior to the list
