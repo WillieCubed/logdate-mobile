@@ -20,8 +20,8 @@ import app.logdate.client.permissions.PermissionType
 import app.logdate.client.repository.location.LocationCapturePipeline
 import app.logdate.client.repository.location.LocationCaptureSource
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import org.koin.core.qualifier.named
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -105,7 +106,8 @@ class DetailedLocationTrackingService :
         private const val LOCATION_FIX_TIMEOUT_SECONDS = 20L
     }
 
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val ioDispatcher: CoroutineDispatcher by inject(named("io-dispatcher"))
+    private val serviceScope by lazy { CoroutineScope(SupervisorJob() + ioDispatcher) }
     private val locationProvider: ClientLocationProvider by inject()
     private val locationTracker: LocationTracker by inject()
     private var trackingJob: kotlinx.coroutines.Job? = null

@@ -5,6 +5,7 @@ import android.location.Geocoder
 import android.os.Build
 import app.logdate.shared.model.Location
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -14,10 +15,11 @@ import kotlin.coroutines.resume
  * Converts latitude/longitude coordinates into street addresses using the Android [Geocoder].
  *
  * Implements [ReverseGeocodingProvider]. On API 33+ (Android 13) the non-blocking callback API
- * is used; on older versions the call runs on [Dispatchers.IO] because the legacy API blocks.
+ * is used; on older versions the call runs on [ioDispatcher] because the legacy API blocks.
  */
 class AndroidReverseGeocodingProvider(
     private val geocoder: Geocoder,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ReverseGeocodingProvider {
     companion object {
         /** Number of addresses to request from the geocoder (only the best match is needed). */
@@ -41,7 +43,7 @@ class AndroidReverseGeocodingProvider(
                 } else {
                     // API < 33: blocking API
                     @Suppress("DEPRECATION")
-                    withContext(Dispatchers.IO) {
+                    withContext(ioDispatcher) {
                         geocoder
                             .getFromLocation(
                                 location.latitude,

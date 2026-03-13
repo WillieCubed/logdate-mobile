@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import app.logdate.client.location.ClientLocationProvider
+import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
@@ -27,6 +28,8 @@ internal const val OPTIMIZED_BACKGROUND_LOCATION_UPDATE_ACTION =
 class OptimizedBackgroundLocationRegistrar(
     private val context: Context,
     private val locationProvider: ClientLocationProvider,
+    private val fusedLocationClient: FusedLocationProviderClient =
+        LocationServices.getFusedLocationProviderClient(context),
 ) {
     companion object {
         /** Minimum allowed interval between passive updates, in minutes. */
@@ -37,10 +40,6 @@ class OptimizedBackgroundLocationRegistrar(
 
         /** Updates may be batched for up to this multiple of the requested interval. */
         private const val MAX_DELAY_MULTIPLIER = 3
-    }
-
-    private val fusedLocationClient by lazy {
-        LocationServices.getFusedLocationProviderClient(context)
     }
 
     /**

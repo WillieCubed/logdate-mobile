@@ -13,12 +13,13 @@ import app.logdate.shared.model.LocationAltitude
 import com.google.android.gms.location.LocationAvailability
 import com.google.android.gms.location.LocationResult
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import org.koin.core.qualifier.named
 import kotlin.time.Clock
 import kotlin.time.Instant
 import android.location.Location as AndroidLocation
@@ -40,6 +41,8 @@ class OptimizedBackgroundLocationReceiver :
     BroadcastReceiver(),
     KoinComponent {
     private val locationTracker: LocationTracker by inject()
+    private val ioDispatcher: CoroutineDispatcher by inject(named("io-dispatcher"))
+    private val clock: Clock by inject()
 
     override fun onReceive(
         context: Context,
@@ -59,7 +62,7 @@ class OptimizedBackgroundLocationReceiver :
         }
 
         val pendingResult = goAsync()
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+        CoroutineScope(SupervisorJob() + ioDispatcher).launch {
             try {
                 locationResult.locations.forEach { androidLocation ->
                     logPassiveLocation(androidLocation)
@@ -75,7 +78,7 @@ class OptimizedBackgroundLocationReceiver :
             if (androidLocation.time > 0) {
                 Instant.fromEpochMilliseconds(androidLocation.time)
             } else {
-                Clock.System.now()
+                clock.now()
             }
 
         locationTracker
@@ -108,7 +111,7 @@ class OptimizedBackgroundLocationReceiver :
 
     private fun AndroidLocation.toMetadata(): Map<String, Any> =
         buildMap {
-            put("loggedAt", Clock.System.now())
+            put("loggedAt", clock.now())
             put("capturePipeline", LocationCapturePipeline.OPTIMIZED_BACKGROUND)
             put("captureSource", LocationCaptureSource.PASSIVE_UPDATE)
             if (this@toMetadata.hasAccuracy()) {
