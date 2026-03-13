@@ -1,9 +1,5 @@
 package app.logdate.navigation
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.setValue
 import androidx.navigation3.runtime.NavKey
 import io.github.aakira.napier.Napier
 
@@ -16,72 +12,12 @@ import io.github.aakira.napier.Napier
  * 2. Providing safe navigation operations that prevent empty back stack states
  * 3. Supporting specialized navigation patterns for different app sections
  *
- * @param initialRoute The initial route to add to the backstack.
- * @property backStack The navigation back stack containing the history of screens
+ * @property backStack The navigation back stack, typically provided by [rememberNavBackStack]
+ *   so state survives configuration changes and process death.
  */
 class MainAppNavigator(
-    initialRoute: NavKey? = null,
+    val backStack: MutableList<NavKey>,
 ) {
-    /**
-     * The app's navigation back stack. This maintains the full history of screens
-     * and is used by NavDisplay to render the appropriate UI.
-     */
-    val backStack =
-        mutableStateListOf<NavKey>().apply {
-            if (initialRoute != null) {
-                add(initialRoute)
-                Napier.i("Navigation: Initial route set to $initialRoute")
-            }
-        }
-
-    /**
-     * Tracks the current navigation stack size to detect changes
-     */
-    private var currentStackSize by mutableIntStateOf(backStack.size)
-
-    init {
-        // Set up a collector to log navigation changes
-        backStack.onChange {
-            val lastItem = backStack.lastOrNull()
-            Napier.i("Navigation: Changed to $lastItem, stack size: ${backStack.size}")
-        }
-    }
-
-    /**
-     * Extension function to observe list changes
-     */
-    private fun <T> MutableList<T>.onChange(onChange: () -> Unit) {
-        object : MutableList<T> by this {
-            override fun add(element: T): Boolean {
-                val result = this@onChange.add(element)
-                onChange()
-                return result
-            }
-
-            override fun add(
-                index: Int,
-                element: T,
-            ) {
-                this@onChange.add(index, element)
-                onChange()
-            }
-
-            override fun remove(element: T): Boolean {
-                val result = this@onChange.remove(element)
-                if (result) onChange()
-                return result
-            }
-
-            override fun removeAt(index: Int): T {
-                val result = this@onChange.removeAt(index)
-                onChange()
-                return result
-            }
-
-            // Additional methods would need to be implemented for complete coverage
-        }
-    }
-
     /**
      * Safely removes the last entry from the back stack, ensuring we never have
      * an empty stack. If removing the last entry would result in an empty stack,
