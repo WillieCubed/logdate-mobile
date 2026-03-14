@@ -5,7 +5,6 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import app.logdate.feature.core.account.navigation.cloudAccountSetupRoute
 import app.logdate.feature.core.main.homeGraph
 import app.logdate.feature.core.main.navigateHome
 import app.logdate.feature.core.navigation.BaseRoute
@@ -115,11 +114,6 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
         profileRoute(
             onGoBack = { navController.popBackStack() },
             onNavigateToBirthday = { /* TODO: Navigate to birthday detail page */ },
-        )
-
-        cloudAccountSetupRoute(
-            onComplete = { navController.popBackStack() },
-            onSkip = { navController.popBackStack() },
         )
 
         rewindRoutes(

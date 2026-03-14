@@ -80,14 +80,8 @@ import app.logdate.client.sharing.SharingLauncher
 import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.feature.journals.ui.detail.NoteViewerScreen
 import app.logdate.feature.timeline.ui.TimelineLoadingPlaceholder
-import app.logdate.navigation.routes.AccountCreationCompletionRoute
-import app.logdate.navigation.routes.CloudAccountIntroRoute
 import app.logdate.navigation.routes.CloudAccountSetupFlowRoute
-import app.logdate.navigation.routes.DisplayNameSelectionRoute
-import app.logdate.navigation.routes.PasskeyCreationRoute
-import app.logdate.navigation.routes.UsernameSelectionRoute
 import app.logdate.navigation.routes.appSettingsRoutes
-import app.logdate.navigation.routes.cloudAccountSetup
 import app.logdate.navigation.routes.cloudAccountSetupFlow
 import app.logdate.navigation.routes.core.NavigationStart
 import app.logdate.navigation.routes.core.NewJournalRoute
@@ -154,12 +148,7 @@ private fun isMainTabRoute(routeClass: KClass<out NavKey>?): Boolean = HomeTab.e
 
 private val cloudAccountRouteClasses: Set<KClass<out NavKey>> =
     setOf(
-        CloudAccountIntroRoute::class,
         CloudAccountSetupFlowRoute::class,
-        UsernameSelectionRoute::class,
-        DisplayNameSelectionRoute::class,
-        PasskeyCreationRoute::class,
-        AccountCreationCompletionRoute::class,
     )
 
 private fun isCloudAccountRoute(routeClass: KClass<out NavKey>?): Boolean = routeClass in cloudAccountRouteClasses
@@ -659,24 +648,6 @@ fun MainNavigationRoot(
                             onBack = mainAppNavigator::goBack,
                             onSetupCompleted = {
                                 mainAppNavigator.safelyClearBackstack(SettingsOverviewRoute)
-                            },
-                        )
-                        cloudAccountSetup(
-                            onBack = mainAppNavigator::goBack,
-                            onUsernameSelected = {
-                                mainAppNavigator.backStack.add(UsernameSelectionRoute)
-                            },
-                            onDisplayNameSelected = {
-                                mainAppNavigator.backStack.add(DisplayNameSelectionRoute)
-                            },
-                            onPasskeyCreated = {
-                                mainAppNavigator.backStack.add(PasskeyCreationRoute)
-                            },
-                            onSetupCompleted = {
-                                mainAppNavigator.safelyClearBackstack(SettingsOverviewRoute)
-                            },
-                            onSkip = {
-                                mainAppNavigator.goBack()
                             },
                         )
                         editorRoutes(

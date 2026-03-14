@@ -1,12 +1,7 @@
 package app.logdate.navigation.scenes
 
 import androidx.navigation3.runtime.NavKey
-import app.logdate.navigation.routes.AccountCreationCompletionRoute
-import app.logdate.navigation.routes.CloudAccountIntroRoute
 import app.logdate.navigation.routes.CloudAccountSetupFlowRoute
-import app.logdate.navigation.routes.DisplayNameSelectionRoute
-import app.logdate.navigation.routes.PasskeyCreationRoute
-import app.logdate.navigation.routes.UsernameSelectionRoute
 import app.logdate.navigation.routes.core.AccountSettingsRoute
 import app.logdate.navigation.routes.core.AdvancedSettingsRoute
 import app.logdate.navigation.routes.core.DangerZoneSettingsRoute
@@ -125,13 +120,8 @@ object RouteConfig {
             ExportSettingsRoute::class,
             -> return RouteClassification.Excluded
 
-            // Cloud account setup flows
-            CloudAccountIntroRoute::class,
+            // Cloud account setup flow
             CloudAccountSetupFlowRoute::class,
-            UsernameSelectionRoute::class,
-            DisplayNameSelectionRoute::class,
-            PasskeyCreationRoute::class,
-            AccountCreationCompletionRoute::class,
             -> return RouteClassification.Excluded
 
             // Editor flows

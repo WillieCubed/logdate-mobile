@@ -8,7 +8,6 @@ import app.logdate.feature.core.AndroidBiometricGatekeeper
 import app.logdate.feature.core.AppViewModel
 import app.logdate.feature.core.BiometricGatekeeper
 import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
-import app.logdate.feature.core.account.ui.SaveAccountSetupDataUseCase
 import app.logdate.feature.core.export.AndroidExportLauncher
 import app.logdate.feature.core.export.ExportLauncher
 import app.logdate.feature.core.export.ExportViewModel
@@ -29,7 +28,6 @@ import app.logdate.feature.core.settings.updates.AppUpdateController
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.workmanager.dsl.workerOf
 import org.koin.core.module.Module
-import org.koin.core.module.dsl.factoryOf
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
@@ -59,11 +57,9 @@ actual val coreFeatureModule: Module =
         single { AndroidRestoreLauncher(androidContext()) }
         single<RestoreLauncher> { get<AndroidRestoreLauncher>() }
 
-        // Account setup helpers
-        factoryOf(::SaveAccountSetupDataUseCase)
         factory { ServerConfigurationCoordinator(get(), get(), get()) }
 
-        viewModel { AppViewModel(get(), get(), get()) }
+        viewModel { AppViewModel(get(), get(), get(), get(), get()) }
         viewModel {
             AccountSettingsViewModel(
                 get(),

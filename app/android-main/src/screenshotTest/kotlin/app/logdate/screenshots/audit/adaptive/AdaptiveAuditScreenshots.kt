@@ -5,7 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.client.repository.search.SearchResultType
-import app.logdate.feature.core.account.ui.CloudAccountIntroContent
+import app.logdate.feature.core.account.CloudAccountWelcomeContent
+import app.logdate.feature.core.settings.ui.ServerSelectionState
 import app.logdate.feature.core.profile.ui.ProfileScreenContent
 import app.logdate.feature.core.profile.ui.ProfileUiState
 import app.logdate.feature.journals.ui.JournalLayoutMode
@@ -138,11 +139,14 @@ fun A03_CloudAccountSetup() {
 @Composable
 fun A04_CloudAccountIntro() {
     ScreenshotTheme {
-        CloudAccountIntroContent(
-            isFromOnboarding = false,
+        CloudAccountWelcomeContent(
             onContinue = {},
+            onSignIn = {},
             onSkip = {},
-            onBack = {},
+            serverSelectionState = ServerSelectionState(),
+            onSelectServerPreset = {},
+            onCustomServerUrlChange = {},
+            onShowCustomServerInfo = {},
         )
     }
 }

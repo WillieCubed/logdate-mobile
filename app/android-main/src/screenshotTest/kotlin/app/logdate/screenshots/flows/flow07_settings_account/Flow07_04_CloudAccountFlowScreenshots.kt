@@ -6,7 +6,6 @@ import app.logdate.feature.core.account.CloudAccountSignInContent
 import app.logdate.feature.core.account.CloudAccountWelcomeContent
 import app.logdate.feature.core.account.PasskeyAccountCreationFinalContent
 import app.logdate.feature.core.settings.ui.ServerSelectionState
-import app.logdate.feature.core.account.ui.AccountCreationCompletionScreen
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTheme
 import com.android.tools.screenshot.PreviewTest
@@ -176,13 +175,3 @@ fun S08_CloudAccountCreationFinalError() {
     }
 }
 
-// ─── Completion ─────────────────────────────────────────────────────────────────
-
-@PreviewTest
-@Preview(showBackground = true, device = PHONE)
-@Composable
-fun S09_CloudAccountCompletion() {
-    ScreenshotTheme {
-        AccountCreationCompletionScreen(onFinish = {})
-    }
-}
