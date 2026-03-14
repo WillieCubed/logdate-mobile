@@ -7,8 +7,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -34,7 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.journal.generated.resources.Res
 import logdate.client.feature.journal.generated.resources.cd_switch_to_carousel
@@ -174,47 +177,43 @@ private fun SortDropdownChip(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    AssistChip(
-        onClick = { expanded = true },
-        label = { Text(stringResource(Res.string.label_sorting_by, sortChipLabel(sortOption))) },
-        modifier = Modifier.testTag("SortDropdownChip"),
-        trailingIcon = {
-            Icon(
-                Icons.Default.ArrowDropDown,
-                contentDescription = null,
-            )
-        },
-    )
+    Box {
+        AssistChip(
+            onClick = { expanded = true },
+            label = { Text(stringResource(Res.string.label_sorting_by, sortChipLabel(sortOption))) },
+            modifier = Modifier.testTag("SortDropdownChip"),
+            trailingIcon = {
+                Icon(
+                    Icons.Default.ArrowDropDown,
+                    contentDescription = null,
+                )
+            },
+        )
 
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = { expanded = false },
-    ) {
-        JournalSortOption.entries.forEach { option ->
-            val isSelected = option == sortOption
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        text = sortMenuLabel(option),
-                        fontWeight = if (isSelected) FontWeight.Bold else null,
-                    )
-                },
-                onClick = {
-                    onSortOptionSelected(option)
-                    expanded = false
-                },
-                leadingIcon =
-                    if (isSelected) {
-                        {
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            JournalSortOption.entries.forEach { option ->
+                val isSelected = option == sortOption
+                DropdownMenuItem(
+                    text = { Text(text = sortMenuLabel(option)) },
+                    onClick = {
+                        onSortOptionSelected(option)
+                        expanded = false
+                    },
+                    leadingIcon = {
+                        if (isSelected) {
                             Icon(
                                 Icons.Default.Check,
                                 contentDescription = null,
                             )
+                        } else {
+                            Spacer(Modifier.size(24.dp))
                         }
-                    } else {
-                        null
                     },
-            )
+                )
+            }
         }
     }
 }
