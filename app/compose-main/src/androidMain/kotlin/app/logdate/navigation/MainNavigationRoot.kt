@@ -117,6 +117,7 @@ import app.logdate.navigation.routes.openLocationSettings
 import app.logdate.navigation.routes.openLocationTimeline
 import app.logdate.navigation.routes.openLocationTrackingOptions
 import app.logdate.navigation.routes.openMemoriesSettings
+import app.logdate.navigation.routes.openPrivacySettings
 import app.logdate.navigation.routes.openProfile
 import app.logdate.navigation.routes.openRecommendationSettings
 import app.logdate.navigation.routes.openSearch
@@ -627,6 +628,7 @@ fun MainNavigationRoot(
                             onNavigateToDevices = mainAppNavigator::openDevicesSettings,
                             onNavigateToDangerZone = mainAppNavigator::openDangerZoneSettings,
                             onNavigateToLocation = mainAppNavigator::openLocationSettings,
+                            onNavigateToPrivacy = mainAppNavigator::openPrivacySettings,
                             onOpenLocationTimeline = mainAppNavigator::openLocationTimeline,
                             onNavigateToMemories = mainAppNavigator::openMemoriesSettings,
                             onNavigateToRecommendations = mainAppNavigator::openRecommendationSettings,

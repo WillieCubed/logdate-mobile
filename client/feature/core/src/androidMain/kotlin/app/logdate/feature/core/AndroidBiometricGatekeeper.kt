@@ -3,12 +3,12 @@ package app.logdate.feature.core
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
-import android.util.Log
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.lang.ref.WeakReference
@@ -38,8 +38,8 @@ class AndroidBiometricGatekeeper(
                 errString: CharSequence,
             ) {
                 super.onAuthenticationError(errorCode, errString)
-                Log.e("BiometricGatekeeper", "Biometric authentication error: $errorCode, $errString")
-                _authState.value = AppAuthState.UNKNOWN
+                Napier.e("Biometric authentication error: $errorCode, $errString", tag = TAG)
+                _authState.value = AppAuthState.REQUIRE_PROMPT
             }
 
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
@@ -70,7 +70,7 @@ class AndroidBiometricGatekeeper(
             )
         ) {
             BiometricManager.BIOMETRIC_SUCCESS -> {
-                Log.d("BiometricGatekeeper", "App can authenticate using biometrics.")
+                Napier.d("App can authenticate using biometrics.", tag = TAG)
                 BiometricPrompt(activity, executor, biometricRequestCallback).authenticate(
                     BiometricPrompt.PromptInfo
                         .Builder()
@@ -90,9 +90,9 @@ class AndroidBiometricGatekeeper(
             }
 
             BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE ->
-                Log.e(
-                    "BiometricGatekeeper",
+                Napier.e(
                     "Biometric features are currently unavailable.",
+                    tag = TAG,
                 )
 
             BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> {
@@ -106,9 +106,9 @@ class AndroidBiometricGatekeeper(
             BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE,
             BiometricManager.BIOMETRIC_ERROR_UNSUPPORTED,
             -> {
-                Log.d(
-                    "BiometricGatekeeper",
+                Napier.d(
                     "Biometric authentication is not supported on this device.",
+                    tag = TAG,
                 )
                 _authState.value = AppAuthState.UNSUPPORTED
             }
@@ -141,6 +141,10 @@ class AndroidBiometricGatekeeper(
         activityRef.clear()
         activityRef = WeakReference(fragmentActivity)
     }
+
+    private companion object {
+        const val TAG = "BiometricGatekeeper"
+    }
 }
 
 private class BiometricEnrollmentActivityContract : ActivityResultContract<Unit, Unit>() {
@@ -158,6 +162,6 @@ private class BiometricEnrollmentActivityContract : ActivityResultContract<Unit,
         resultCode: Int,
         intent: Intent?,
     ) {
-        Log.d("BiometricEnrollmentActivityContract", "Biometric enrollment result: $resultCode")
+        Napier.d("Biometric enrollment result: $resultCode", tag = "BiometricEnrollment")
     }
 }

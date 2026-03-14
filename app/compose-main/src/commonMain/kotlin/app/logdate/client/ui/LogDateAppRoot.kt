@@ -51,10 +51,16 @@ fun LogDateAppRoot(
             CompositionLocalProvider(
                 LocalSharedTransitionScope provides this,
             ) {
-                AudioPlaybackProvider {
-                    LogDateNavHost(
-                        navController = navController,
-                    )
+                LockableContent(
+                    isLocked = appUiState.requiresUnlock,
+                    displayName = appUiState.displayName,
+                    onUsePasscode = onShowUnlockPrompt,
+                ) {
+                    AudioPlaybackProvider {
+                        LogDateNavHost(
+                            navController = navController,
+                        )
+                    }
                 }
             }
         }

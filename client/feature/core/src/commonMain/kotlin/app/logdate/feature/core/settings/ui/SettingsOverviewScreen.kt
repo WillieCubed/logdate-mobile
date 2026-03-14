@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Sync
@@ -61,6 +62,8 @@ import logdate.client.feature.core.generated.resources.logging_since
 import logdate.client.feature.core.generated.resources.memories
 import logdate.client.feature.core.generated.resources.memories_description
 import logdate.client.feature.core.generated.resources.navigate_to_title
+import logdate.client.feature.core.generated.resources.privacy_and_security
+import logdate.client.feature.core.generated.resources.privacy_security_description
 import logdate.client.feature.core.generated.resources.profile
 import logdate.client.feature.core.generated.resources.profile_settings_description
 import logdate.client.feature.core.generated.resources.screen_title_settings
@@ -90,6 +93,7 @@ fun SettingsOverviewScreen(
     onNavigateToDevices: () -> Unit,
     onNavigateToDangerZone: () -> Unit,
     onNavigateToLocation: () -> Unit,
+    onNavigateToPrivacy: () -> Unit,
     onNavigateToMemories: () -> Unit,
     onNavigateToSync: () -> Unit,
     onNavigateToExport: () -> Unit,
@@ -107,6 +111,7 @@ fun SettingsOverviewScreen(
         onNavigateToDevices = onNavigateToDevices,
         onNavigateToDangerZone = onNavigateToDangerZone,
         onNavigateToLocation = onNavigateToLocation,
+        onNavigateToPrivacy = onNavigateToPrivacy,
         onNavigateToMemories = onNavigateToMemories,
         onNavigateToSync = onNavigateToSync,
         onNavigateToExport = onNavigateToExport,
@@ -131,6 +136,7 @@ fun SettingsOverviewContent(
     onNavigateToDevices: () -> Unit,
     onNavigateToDangerZone: () -> Unit,
     onNavigateToLocation: () -> Unit,
+    onNavigateToPrivacy: () -> Unit,
     onNavigateToMemories: () -> Unit,
     onNavigateToSync: () -> Unit,
     onNavigateToExport: () -> Unit,
@@ -181,6 +187,12 @@ fun SettingsOverviewContent(
                 title = stringResource(Res.string.settings_group_privacy_security),
                 modifier = Modifier.padding(horizontal = Spacing.lg),
             ) {
+                SettingsNavigationItem(
+                    title = stringResource(Res.string.privacy_and_security),
+                    description = stringResource(Res.string.privacy_security_description),
+                    icon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                    onClick = onNavigateToPrivacy,
+                )
                 if (userProfile.isAuthenticated) {
                     SettingsNavigationItem(
                         title = stringResource(Res.string.account_and_sign_in),
@@ -412,6 +424,7 @@ private fun SettingsOverviewScreenPreview() {
         onNavigateToDevices = {},
         onNavigateToDangerZone = {},
         onNavigateToLocation = {},
+        onNavigateToPrivacy = {},
         onNavigateToMemories = {},
         onNavigateToSync = {},
         onNavigateToExport = {},
@@ -434,6 +447,7 @@ private fun SettingsOverviewScreenPreviewNotSignedIn() {
         onNavigateToDevices = {},
         onNavigateToDangerZone = {},
         onNavigateToLocation = {},
+        onNavigateToPrivacy = {},
         onNavigateToMemories = {},
         onNavigateToSync = {},
         onNavigateToExport = {},

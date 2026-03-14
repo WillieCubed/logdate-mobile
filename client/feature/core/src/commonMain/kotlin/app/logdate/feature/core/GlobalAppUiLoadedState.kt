@@ -24,6 +24,10 @@ data class GlobalAppUiLoadedState(
      * If this is false, the user will be prompted to set up the app when they first open it.
      */
     val isOnboarded: Boolean = false,
+    /**
+     * The user's display name, used for the lock screen greeting.
+     */
+    val displayName: String = "",
 ) : GlobalAppUiState
 
 data object GlobalAppUiLoadingState : GlobalAppUiState

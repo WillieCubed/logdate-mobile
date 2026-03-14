@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavKey
 import app.logdate.client.database.DatabaseStartupState
 import app.logdate.client.sharing.SharingLauncher
+import app.logdate.client.ui.LockableContent
 import app.logdate.feature.core.GlobalAppUiLoadedState
 import app.logdate.feature.core.requiresUnlock
 import app.logdate.feature.core.settings.updates.AppUpdateStatus
@@ -134,13 +135,19 @@ fun MainActivityUiRoot(
             CompositionLocalProvider(
                 LocalSharedTransitionScope provides this,
             ) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    MainNavigationRoot(mainAppNavigator, sharingLauncher)
+                LockableContent(
+                    isLocked = appUiState.requiresUnlock,
+                    displayName = appUiState.displayName,
+                    onUsePasscode = onShowUnlockPrompt,
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        MainNavigationRoot(mainAppNavigator, sharingLauncher)
 
-                    SnackbarHost(
-                        hostState = appUpdateSnackbarHostState,
-                        modifier = Modifier.align(Alignment.BottomCenter),
-                    )
+                        SnackbarHost(
+                            hostState = appUpdateSnackbarHostState,
+                            modifier = Modifier.align(Alignment.BottomCenter),
+                        )
+                    }
                 }
 
                 if (databaseStartupState is DatabaseStartupState.RecoveryRequired && !hideRecoveryDialog) {

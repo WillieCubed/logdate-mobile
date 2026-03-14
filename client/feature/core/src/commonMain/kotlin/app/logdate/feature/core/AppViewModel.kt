@@ -54,6 +54,7 @@ class AppViewModel(
                         appLockState = lockState,
                     ),
                 isOnline = networkState is NetworkState.Connected,
+                displayName = userState.displayName,
             )
         }.stateIn(
             scope = viewModelScope,
