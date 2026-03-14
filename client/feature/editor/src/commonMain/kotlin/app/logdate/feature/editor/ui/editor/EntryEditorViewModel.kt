@@ -20,9 +20,11 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.feature.editor.ui.camera.CapturedMediaType
 import app.logdate.feature.editor.ui.editor.delegate.AutoSaveDelegate
 import app.logdate.feature.editor.ui.editor.delegate.JournalSelectionDelegate
+import app.logdate.feature.editor.ui.editor.mediator.EditorActionType
 import app.logdate.feature.editor.ui.editor.mediator.EditorMediator
 import app.logdate.feature.editor.ui.mapper.toDomainBlock
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -70,9 +72,14 @@ class EntryEditorViewModel(
             ),
         )
 
+    // Track the auto-save job so it can be cancelled before a manual save
+    private var autoSaveJob: Job? = null
+
     init {
         // Load default journals using the journal selection delegate
-        journalSelectionDelegate.loadDefaultJournals(mutableEditorState)
+        viewModelScope.launch {
+            journalSelectionDelegate.loadDefaultJournals(mutableEditorState)
+        }
 
         // Set up mediator listener for mediator events
         viewModelScope.launch {
@@ -80,15 +87,13 @@ class EntryEditorViewModel(
                 // Handle save requests from other components
                 if (actions.saveRequested) {
                     saveEntry(editorState.value)
-                    (mediator as? app.logdate.feature.editor.ui.editor.mediator.EditorMediatorImpl)
-                        ?.resetAction(app.logdate.feature.editor.ui.editor.mediator.EditorActionType.SAVE)
+                    mediator.resetAction(EditorActionType.SAVE)
                 }
 
                 // Handle draft load requests from other components
                 actions.draftToLoad?.let { draftId ->
                     loadDraft(draftId)
-                    (mediator as? app.logdate.feature.editor.ui.editor.mediator.EditorMediatorImpl)
-                        ?.resetAction(app.logdate.feature.editor.ui.editor.mediator.EditorActionType.LOAD_DRAFT)
+                    mediator.resetAction(EditorActionType.LOAD_DRAFT)
                 }
             }
         }
@@ -168,8 +173,6 @@ class EntryEditorViewModel(
                     readOnlyBlocks = readOnlyMap,
                     availableJournals = journals,
                     selectedJournalIds = selectedJournalIds,
-                    draftId = null, // Don't auto-select a draft
-                    isDraft = false, // Not a draft by default
                     availableDrafts = allDrafts,
                     isLoadingDrafts = false,
                     isLoading = false,
@@ -377,16 +380,39 @@ class EntryEditorViewModel(
      * Autosaves the current entry state using the AutoSaveDelegate.
      */
     fun autoSaveEntry(state: EditorState) {
-        autoSaveDelegate.autoSaveEntry(state) { newDraftId ->
-            // Update draft ID in state
-            mutableEditorState.update { it.copy(draftId = newDraftId, isDraft = true) }
-        }
+        // Skip auto-save when a manual save is in progress
+        if (state.isSaving) return
+
+        autoSaveJob =
+            viewModelScope.launch {
+                try {
+                    autoSaveDelegate.autoSaveEntry(state)?.let { draftId ->
+                        mutableEditorState.update {
+                            it.copy(draftState = DraftState.Active(draftId))
+                        }
+                    }
+                } catch (e: Exception) {
+                    Napier.e("Failed to auto-save draft: ${e.message}", e)
+                    throw e
+                }
+            }
+    }
+
+    /**
+     * Cancels any in-flight auto-save to prevent race conditions with manual save.
+     */
+    private fun cancelPendingAutoSave() {
+        autoSaveJob?.cancel()
+        autoSaveJob = null
     }
 
     /**
      * Saves the current entry.
      */
     fun saveEntry(state: EditorState) {
+        cancelPendingAutoSave()
+        mutableEditorState.update { it.copy(isSaving = true) }
+
         viewModelScope.launch {
             try {
                 // Convert UI blocks to domain notes
@@ -451,7 +477,7 @@ class EntryEditorViewModel(
                     }
 
                 if (notes.isEmpty()) {
-                    mutableEditorState.update { it.copy(shouldExit = true) }
+                    mutableEditorState.update { it.copy(shouldExit = true, isSaving = false) }
                     return@launch
                 }
 
@@ -465,17 +491,17 @@ class EntryEditorViewModel(
                 )
 
                 // If this was a draft, delete it since we've saved it permanently
-                val draftId = state.draftId
-                if (draftId != null) {
-                    deleteEntryDraft(draftId)
+                when (val draft = state.draftState) {
+                    is DraftState.Active -> deleteEntryDraft(draft.id)
+                    DraftState.None -> {}
                 }
 
                 // Signal to UI that we're done and should exit
-                mutableEditorState.update { it.copy(shouldExit = true) }
+                mutableEditorState.update { it.copy(shouldExit = true, isSaving = false) }
             } catch (e: Exception) {
                 Napier.e("Failed to save entry: ${e.message}", e)
                 mutableEditorState.update {
-                    it.copy(errorMessage = "Failed to save: ${e.message}")
+                    it.copy(errorMessage = "Failed to save: ${e.message}", isSaving = false)
                 }
             }
         }
@@ -557,8 +583,8 @@ class EntryEditorViewModel(
                                 mutableEditorState.update { currentState ->
                                     currentState.copy(
                                         blocks = draftBlocks,
-                                        draftId = draft.id,
-                                        isDraft = true,
+                                        draftState = DraftState.Active(draft.id),
+                                        isModified = true,
                                         errorMessage = null,
                                     )
                                 }
@@ -601,15 +627,19 @@ class EntryEditorViewModel(
      */
     fun deleteAllDrafts() {
         viewModelScope.launch {
-            try {
-                val currentDrafts = editorState.value.availableDrafts
-                currentDrafts.forEach { draft ->
+            val currentDrafts = editorState.value.availableDrafts
+            val failures = mutableListOf<Uuid>()
+            currentDrafts.forEach { draft ->
+                try {
                     deleteEntryDraft(draft.id)
+                } catch (e: Exception) {
+                    Napier.e("Failed to delete draft ${draft.id}: ${e.message}", e)
+                    failures.add(draft.id)
                 }
-            } catch (e: Exception) {
-                Napier.e("Failed to delete all drafts: ${e.message}", e)
+            }
+            if (failures.isNotEmpty()) {
                 mutableEditorState.update {
-                    it.copy(errorMessage = "Failed to delete all drafts: ${e.message}")
+                    it.copy(errorMessage = "Failed to delete ${failures.size} draft(s)")
                 }
             }
         }

@@ -149,6 +149,11 @@ fun EntryEditorContent(
                 showExitConfirmation = false
                 onNavigateBack()
             },
+            onSaveAsDraft = {
+                showExitConfirmation = false
+                viewModel.autoSaveEntry(editorState)
+                onNavigateBack()
+            },
         )
     }
 

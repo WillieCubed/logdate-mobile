@@ -3,17 +3,16 @@ package app.logdate.feature.editor.ui.editor.delegate
 import app.logdate.client.domain.journals.GetDefaultSelectedJournalsUseCase
 import app.logdate.feature.editor.ui.editor.EditorState
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
 
 /**
  * Delegate for handling journal selection in the editor.
  * This separates the journal selection logic from the ViewModel.
+ *
+ * Suspend methods should be called from a lifecycle-bound scope (typically `viewModelScope`).
  */
 class JournalSelectionDelegate(
-    private val scope: CoroutineScope,
     private val getDefaultSelectedJournals: GetDefaultSelectedJournalsUseCase,
 ) {
     /**
@@ -21,16 +20,14 @@ class JournalSelectionDelegate(
      *
      * @param currentState The current editor state flow
      */
-    fun loadDefaultJournals(currentState: MutableStateFlow<EditorState>) {
-        scope.launch {
-            try {
-                val defaultJournals = getDefaultSelectedJournals()
-                // Only set the default journals if no selection has been made yet
-                currentState.updateIfEmpty(defaultJournals)
-            } catch (e: Exception) {
-                Napier.e("Failed to load default journals: ${e.message}", e)
-                // Don't update state on error
-            }
+    suspend fun loadDefaultJournals(currentState: MutableStateFlow<EditorState>) {
+        try {
+            val defaultJournals = getDefaultSelectedJournals()
+            // Only set the default journals if no selection has been made yet
+            currentState.updateIfEmpty(defaultJournals)
+        } catch (e: Exception) {
+            Napier.e("Failed to load default journals: ${e.message}", e)
+            // Don't update state on error
         }
     }
 

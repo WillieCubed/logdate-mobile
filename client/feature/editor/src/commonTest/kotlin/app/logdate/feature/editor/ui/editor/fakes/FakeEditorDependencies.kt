@@ -17,6 +17,7 @@ import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.timeline.ActivityTimelineRepository
 import app.logdate.feature.editor.ui.editor.BlockType
 import app.logdate.feature.editor.ui.editor.EntryBlockUiState
+import app.logdate.feature.editor.ui.editor.mediator.EditorActionType
 import app.logdate.feature.editor.ui.editor.mediator.EditorActions
 import app.logdate.feature.editor.ui.editor.mediator.EditorMediator
 import app.logdate.feature.editor.ui.editor.mediator.NewBlockRequest
@@ -166,6 +167,14 @@ class FakeJournalRepository : JournalRepository {
 
 class FakeEntryDraftRepository : EntryDraftRepository {
     private val drafts = MutableStateFlow<List<EntryDraft>>(emptyList())
+    private val deletionFailures = mutableSetOf<Uuid>()
+
+    /**
+     * Configures [deleteDraft] to throw for the given [draftId].
+     */
+    fun setDeletionFailure(draftId: Uuid) {
+        deletionFailures.add(draftId)
+    }
 
     override fun getDrafts(): Flow<List<EntryDraft>> = drafts
 
@@ -208,6 +217,9 @@ class FakeEntryDraftRepository : EntryDraftRepository {
     }
 
     override suspend fun deleteDraft(uid: Uuid) {
+        if (uid in deletionFailures) {
+            throw IllegalStateException("Simulated deletion failure for draft $uid")
+        }
         drafts.value = drafts.value.filterNot { it.id == uid }
     }
 }
@@ -225,6 +237,8 @@ class FakeClientLocationProvider : ClientLocationProvider {
         }
 
     override val currentLocation: SharedFlow<Location> = locationFlow
+
+    override fun hasLocationPermission(): Boolean = true
 
     override suspend fun getCurrentLocation(): Location = defaultLocation
 
@@ -369,5 +383,17 @@ class FakeEditorMediator : EditorMediator {
 
     override fun onLoadDraftRequested(draftId: Uuid) {
         _editorActions.update { it.copy(draftToLoad = draftId) }
+    }
+
+    override fun resetAction(action: EditorActionType) {
+        _editorActions.update {
+            when (action) {
+                EditorActionType.BLOCK_SELECTED -> it.copy(selectedBlockId = null)
+                EditorActionType.NEW_BLOCK -> it.copy(newBlockRequest = null)
+                EditorActionType.BLOCK_UPDATED -> it.copy(updatedBlock = null)
+                EditorActionType.SAVE -> it.copy(saveRequested = false)
+                EditorActionType.LOAD_DRAFT -> it.copy(draftToLoad = null)
+            }
+        }
     }
 }

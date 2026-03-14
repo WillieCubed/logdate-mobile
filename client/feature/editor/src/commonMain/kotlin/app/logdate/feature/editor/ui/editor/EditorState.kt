@@ -6,6 +6,19 @@ import app.logdate.shared.model.Journal
 import kotlin.uuid.Uuid
 
 /**
+ * Represents whether the editor is working on a draft or starting fresh.
+ */
+sealed interface DraftState {
+    /** No draft is associated with the current editor session. */
+    data object None : DraftState
+
+    /** The editor is backed by a persisted draft with the given [id]. */
+    data class Active(
+        val id: Uuid,
+    ) : DraftState
+}
+
+/**
  * Immutable state class for the editor.
  * This is the single source of truth for all editor state.
  *
@@ -21,8 +34,7 @@ class EditorState(
     val readOnlyBlocks: Map<Uuid, Boolean> = emptyMap(),
     val availableJournals: List<Journal> = emptyList(),
     val selectedJournalIds: List<Uuid> = emptyList(),
-    val draftId: Uuid? = null,
-    val isDraft: Boolean = false,
+    val draftState: DraftState = DraftState.None,
     val availableDrafts: List<EntryDraft> = emptyList(),
     val isLoadingDrafts: Boolean = false,
     val isLoading: Boolean = false,
@@ -30,6 +42,7 @@ class EditorState(
     val shouldExit: Boolean = false,
     val disableEmptyBlockCreation: Boolean = false,
     val isModified: Boolean = false,
+    val isSaving: Boolean = false,
 ) {
     /**
      * Checks if a block is read-only
@@ -93,8 +106,7 @@ class EditorState(
         readOnlyBlocks: Map<Uuid, Boolean> = this.readOnlyBlocks,
         availableJournals: List<Journal> = this.availableJournals,
         selectedJournalIds: List<Uuid> = this.selectedJournalIds,
-        draftId: Uuid? = this.draftId,
-        isDraft: Boolean = this.isDraft,
+        draftState: DraftState = this.draftState,
         availableDrafts: List<EntryDraft> = this.availableDrafts,
         isLoadingDrafts: Boolean = this.isLoadingDrafts,
         isLoading: Boolean = this.isLoading,
@@ -102,6 +114,7 @@ class EditorState(
         shouldExit: Boolean = this.shouldExit,
         disableEmptyBlockCreation: Boolean = this.disableEmptyBlockCreation,
         isModified: Boolean = this.isModified,
+        isSaving: Boolean = this.isSaving,
     ): EditorState =
         EditorState(
             blocks = blocks,
@@ -109,8 +122,7 @@ class EditorState(
             readOnlyBlocks = readOnlyBlocks,
             availableJournals = availableJournals,
             selectedJournalIds = selectedJournalIds,
-            draftId = draftId,
-            isDraft = isDraft,
+            draftState = draftState,
             availableDrafts = availableDrafts,
             isLoadingDrafts = isLoadingDrafts,
             isLoading = isLoading,
@@ -118,6 +130,7 @@ class EditorState(
             shouldExit = shouldExit,
             disableEmptyBlockCreation = disableEmptyBlockCreation,
             isModified = isModified,
+            isSaving = isSaving,
         )
 
     override fun equals(other: Any?): Boolean {
@@ -129,8 +142,7 @@ class EditorState(
         if (readOnlyBlocks != other.readOnlyBlocks) return false
         if (availableJournals != other.availableJournals) return false
         if (selectedJournalIds != other.selectedJournalIds) return false
-        if (draftId != other.draftId) return false
-        if (isDraft != other.isDraft) return false
+        if (draftState != other.draftState) return false
         if (availableDrafts != other.availableDrafts) return false
         if (isLoadingDrafts != other.isLoadingDrafts) return false
         if (isLoading != other.isLoading) return false
@@ -138,6 +150,7 @@ class EditorState(
         if (shouldExit != other.shouldExit) return false
         if (disableEmptyBlockCreation != other.disableEmptyBlockCreation) return false
         if (isModified != other.isModified) return false
+        if (isSaving != other.isSaving) return false
 
         return true
     }
@@ -148,8 +161,7 @@ class EditorState(
         result = 31 * result + readOnlyBlocks.hashCode()
         result = 31 * result + availableJournals.hashCode()
         result = 31 * result + selectedJournalIds.hashCode()
-        result = 31 * result + (draftId?.hashCode() ?: 0)
-        result = 31 * result + isDraft.hashCode()
+        result = 31 * result + draftState.hashCode()
         result = 31 * result + availableDrafts.hashCode()
         result = 31 * result + isLoadingDrafts.hashCode()
         result = 31 * result + isLoading.hashCode()
@@ -157,13 +169,14 @@ class EditorState(
         result = 31 * result + shouldExit.hashCode()
         result = 31 * result + disableEmptyBlockCreation.hashCode()
         result = 31 * result + isModified.hashCode()
+        result = 31 * result + isSaving.hashCode()
         return result
     }
 
     override fun toString(): String =
         "EditorState(blocks=${blocks.size}, expandedBlockId=$expandedBlockId, " +
-            "selectedJournalIds=${selectedJournalIds.size}, draftId=$draftId, " +
-            "isDraft=$isDraft, isModified=$isModified)"
+            "selectedJournalIds=${selectedJournalIds.size}, draftState=$draftState, " +
+            "isModified=$isModified)"
 }
 
 private fun EntryBlockUiState.supportsPickerReturnTransition(): Boolean =

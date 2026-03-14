@@ -30,6 +30,9 @@ interface EditorMediator {
 
     /** Notifies that a draft should be loaded */
     fun onLoadDraftRequested(draftId: Uuid)
+
+    /** Resets an action after it has been handled, preventing duplicate reactions */
+    fun resetAction(action: EditorActionType)
 }
 
 /**
@@ -84,7 +87,7 @@ class EditorMediatorImpl : EditorMediator {
      * Call this after handling an action to reset its state,
      * preventing multiple reactions to the same action.
      */
-    fun resetAction(action: EditorActionType) {
+    override fun resetAction(action: EditorActionType) {
         _editorActions.update {
             when (action) {
                 EditorActionType.BLOCK_SELECTED -> it.copy(selectedBlockId = null)

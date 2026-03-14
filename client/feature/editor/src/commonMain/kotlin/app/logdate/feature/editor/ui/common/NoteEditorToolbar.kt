@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.editor.AutoSaveStatus
 import app.logdate.ui.theme.Spacing
@@ -103,14 +104,20 @@ fun NoteEditorToolbar(
                     )
                 }
 
-                FilledTonalIconButton(onClick = { onShowDrafts() }) {
+                FilledTonalIconButton(
+                    onClick = { onShowDrafts() },
+                    modifier = Modifier.testTag("editor_drafts_button"),
+                ) {
                     Icon(
                         imageVector = Icons.Default.Drafts,
                         contentDescription = stringResource(Res.string.load_drafts),
                     )
                 }
 
-                FilledTonalIconButton(onClick = { onSave() }) {
+                FilledTonalIconButton(
+                    onClick = { onSave() },
+                    modifier = Modifier.testTag("editor_save_button"),
+                ) {
                     Icon(
                         imageVector = Icons.Default.Save,
                         contentDescription = stringResource(Res.string.save_entry),
