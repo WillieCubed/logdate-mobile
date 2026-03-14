@@ -2,22 +2,16 @@
 
 package app.logdate.feature.core.settings.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import app.logdate.ui.common.MaterialContainer
+import app.logdate.ui.common.LinkedToggleSettingsItem
 import app.logdate.ui.common.SettingsScaffold
+import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.memories
@@ -66,36 +60,24 @@ fun MemoriesSettingsContent(
         modifier = modifier,
     ) {
         item {
-            MaterialContainer(modifier = Modifier.padding(horizontal = Spacing.lg)) {
-                SurfaceItem {
-                    ListItem(
-                        headlineContent = {
-                            Text(stringResource(Res.string.recommendations))
-                        },
-                        supportingContent = {
-                            Text(
-                                stringResource(
-                                    if (contextualRecommendationsEnabled) {
-                                        Res.string.recommendations_summary_on
-                                    } else {
-                                        Res.string.recommendations_summary_off
-                                    },
-                                ),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                        leadingContent = {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = null)
-                        },
-                        trailingContent = {
-                            Switch(
-                                checked = contextualRecommendationsEnabled,
-                                onCheckedChange = onToggleContextualRecommendations,
-                            )
-                        },
-                        modifier = Modifier.clickable(onClick = onNavigateToRecommendations),
-                    )
-                }
+            SettingsSection(
+                title = stringResource(Res.string.recommendations),
+                modifier = Modifier.padding(horizontal = Spacing.lg),
+            ) {
+                LinkedToggleSettingsItem(
+                    title = stringResource(Res.string.recommendations),
+                    description =
+                        stringResource(
+                            if (contextualRecommendationsEnabled) {
+                                Res.string.recommendations_summary_on
+                            } else {
+                                Res.string.recommendations_summary_off
+                            },
+                        ),
+                    checked = contextualRecommendationsEnabled,
+                    onCheckedChange = onToggleContextualRecommendations,
+                    onNavigate = onNavigateToRecommendations,
+                )
             }
         }
 
@@ -106,8 +88,6 @@ fun MemoriesSettingsContent(
             ) {
                 Text(
                     text = stringResource(Res.string.recommendations_privacy_note),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(Spacing.lg),
                 )
             }

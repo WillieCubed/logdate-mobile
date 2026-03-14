@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -70,6 +73,8 @@ fun SimpleSettingsItem(
 
 /**
  * A [SimpleSettingsItem] that has a toggleable switch.
+ *
+ * Tapping anywhere on the row toggles the switch.
  */
 @Composable
 fun ToggleSettingsItem(
@@ -78,19 +83,57 @@ fun ToggleSettingsItem(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     overline: String? = null,
-    onClick: () -> Unit = {},
 ) {
     SimpleSettingsItem(
         title = title,
         description = description,
         overline = overline,
-        onClick = onClick,
+        onClick = { onCheckedChange(!checked) },
         action = {
             Switch(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
             )
         },
+    )
+}
+
+/**
+ * A settings item with both a toggleable switch and a separate navigation action.
+ *
+ * Tapping the row (outside the switch) navigates to a detail screen indicated by the
+ * trailing chevron. Tapping the switch independently toggles the setting.
+ */
+@Composable
+fun LinkedToggleSettingsItem(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    onNavigate: () -> Unit,
+    overline: String? = null,
+) {
+    ListItem(
+        headlineContent = { Text(title) },
+        supportingContent = { Text(description) },
+        overlineContent = overline?.let { { Text(it) } },
+        trailingContent = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Switch(
+                    checked = checked,
+                    onCheckedChange = onCheckedChange,
+                )
+            }
+        },
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onNavigate),
     )
 }
 
