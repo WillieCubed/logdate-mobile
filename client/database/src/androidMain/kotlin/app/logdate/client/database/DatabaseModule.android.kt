@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.room.Room
 import app.logdate.client.database.encryption.DatabasePassphraseProvider
+import app.logdate.client.database.encryption.PassphraseBackupStore
 import kotlinx.coroutines.runBlocking
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
@@ -11,7 +12,8 @@ import org.koin.dsl.module
 
 actual val databaseModule: Module =
     module {
-        single { DatabasePassphraseProvider(get()) }
+        single { PassphraseBackupStore(androidContext()) }
+        single { DatabasePassphraseProvider(get(), get()) }
         single { DatabaseStartupMonitor() }
         single { DatabaseRecoveryController(androidContext(), get(), get()) }
         single {

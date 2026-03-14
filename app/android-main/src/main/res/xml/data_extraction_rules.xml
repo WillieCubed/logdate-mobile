@@ -4,8 +4,10 @@
    See https://developer.android.com/about/versions/12/backup-restore#xml-changes
 
    Cloud backup (Google Drive, 25 MB limit):
-     KeyStore keys are NOT included. Encrypted databases and EncryptedSharedPreferences
-     are useless after restore. Only DataStore preferences (lightweight state) are backed up.
+     Includes the encrypted database and the recoverable passphrase backup so
+     small databases survive cloud restore. Android silently drops files that
+     push the total over 25 MB, so large databases will be skipped gracefully.
+     EncryptedSharedPreferences are excluded (KeyStore-bound, useless after restore).
 
    Device-to-device transfer (direct local transfer, 2 GB limit):
      Transfers everything so the app works on the new device with zero friction.
@@ -13,7 +15,8 @@
 <data-extraction-rules>
     <cloud-backup>
         <include domain="file" path="datastore/"/>
-        <exclude domain="database" path="."/>
+        <include domain="file" path="db_recovery/"/>
+        <include domain="database" path="."/>
         <exclude domain="sharedpref" path="."/>
         <exclude domain="file" path="audio_notes/"/>
     </cloud-backup>

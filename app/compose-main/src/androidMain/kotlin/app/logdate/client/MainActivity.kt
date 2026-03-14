@@ -292,13 +292,15 @@ class MainActivity : FragmentActivity() {
 
     /**
      * Runs post-restore detection exactly once per app launch.
-     * For D2D transfers, writes the sentinel immediately since the app works normally.
-     * For cloud restores, defers the sentinel until the user acknowledges the restore state.
      *
-     * Special case: if D2D is detected but the database requires recovery (passphrase lost
-     * because EncryptedSharedPreferences was reset), the encrypted data is unreadable.
-     * Treat this as a cloud restore so the user gets the contextual empty state instead
-     * of the recovery dialog.
+     * D2D transfers should now work transparently thanks to the passphrase backup
+     * store: even when the KeyStore doesn't survive, DatabasePassphraseProvider
+     * recovers the passphrase from the backup file and re-populates SecureStorage.
+     *
+     * If D2D is detected but the database STILL requires recovery (passphrase backup
+     * was also missing — possible on very old installs that predate the backup store),
+     * downgrade to cloud restore UX so the user sees the contextual empty state
+     * instead of the blocking recovery dialog.
      */
     private fun detectPostRestoreOnce(state: GlobalAppUiLoadedState) {
         if (hasDetectedPostRestore) return
@@ -306,15 +308,12 @@ class MainActivity : FragmentActivity() {
 
         var detected = postRestoreDetector.detect(isOnboarded = state.isOnboarded)
 
-        // D2D with a failed database open means the passphrase was lost during
-        // EncryptedSharedPreferences recovery. The database file exists but can't
-        // be decrypted, so treat it like a cloud restore.
         if (detected == PostRestoreType.DEVICE_TRANSFER &&
             databaseStartupState is DatabaseStartupState.RecoveryRequired
         ) {
             Napier.w(
                 "D2D restore detected but database recovery required — " +
-                    "passphrase likely lost, treating as cloud restore",
+                    "passphrase backup was missing, treating as cloud restore",
                 tag = APP_LAUNCH_TAG,
             )
             detected = PostRestoreType.CLOUD_RESTORE
@@ -324,16 +323,14 @@ class MainActivity : FragmentActivity() {
 
         when (detected) {
             PostRestoreType.NONE -> {
-                // Normal launch or fresh install just completed onboarding — ensure sentinel exists.
                 postRestoreDetector.markDeviceInitialized()
             }
             PostRestoreType.DEVICE_TRANSFER -> {
-                Napier.i("D2D restore: app data transferred, writing sentinel", tag = APP_LAUNCH_TAG)
+                Napier.i("D2D restore: database opened successfully, writing sentinel", tag = APP_LAUNCH_TAG)
                 postRestoreDetector.markDeviceInitialized()
             }
             PostRestoreType.CLOUD_RESTORE -> {
-                Napier.i("Cloud restore: database absent, showing contextual UI", tag = APP_LAUNCH_TAG)
-                // Sentinel is written when the user acknowledges the restore state.
+                Napier.i("Cloud restore: showing contextual UI", tag = APP_LAUNCH_TAG)
             }
         }
     }
