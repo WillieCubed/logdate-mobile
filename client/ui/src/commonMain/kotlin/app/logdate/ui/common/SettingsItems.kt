@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import app.logdate.ui.theme.Spacing
 
 /**
@@ -64,7 +65,14 @@ fun SimpleSettingsItem(
 ) {
     ListItem(
         headlineContent = { Text(title) },
-        supportingContent = { Text(description) },
+        supportingContent = {
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
         overlineContent = overline?.let { { Text(it) } },
         trailingContent = action,
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
@@ -115,7 +123,14 @@ fun LinkedToggleSettingsItem(
 ) {
     ListItem(
         headlineContent = { Text(title) },
-        supportingContent = { Text(description) },
+        supportingContent = {
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
         overlineContent = overline?.let { { Text(it) } },
         trailingContent = {
             Row(
