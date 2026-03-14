@@ -18,6 +18,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,11 +75,11 @@ fun MainActivityUiRoot(
     mainAppNavigator: MainAppNavigator = rememberMainAppNavigator(initialRoute = NavigationStart),
     sharingLauncher: SharingLauncher,
 ) {
-    var hasRequestedUnlock by remember { mutableStateOf(false) }
-    var hasHandledInitialNavigation by remember { mutableStateOf(false) }
-    var hasReportedInitialNavigation by remember { mutableStateOf(false) }
-    var showResetConfirmation by remember { mutableStateOf(false) }
-    var hideRecoveryDialog by remember { mutableStateOf(false) }
+    var hasRequestedUnlock by rememberSaveable { mutableStateOf(false) }
+    var hasHandledInitialNavigation by rememberSaveable { mutableStateOf(false) }
+    var hasReportedInitialNavigation by rememberSaveable { mutableStateOf(false) }
+    var showResetConfirmation by rememberSaveable { mutableStateOf(false) }
+    var hideRecoveryDialog by rememberSaveable { mutableStateOf(false) }
     val appUpdateSnackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(appUiState.isOnboarded, appUiState.requiresUnlock, pendingNavKey, databaseStartupState) {
