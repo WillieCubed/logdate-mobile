@@ -93,5 +93,9 @@ class DeleteEntryDraftUseCaseTest {
             uid: Uuid,
             notes: List<JournalNote>,
         ): Uuid = uid
+
+        override suspend fun deleteAllDrafts() {}
+
+        override suspend fun deleteExpiredDrafts(maxAge: kotlin.time.Duration): Int = 0
     }
 }

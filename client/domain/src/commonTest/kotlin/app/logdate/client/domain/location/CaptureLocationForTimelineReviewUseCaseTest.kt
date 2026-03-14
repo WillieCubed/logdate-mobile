@@ -103,6 +103,8 @@ class CaptureLocationForTimelineReviewUseCaseTest {
 
         override val currentLocation: SharedFlow<Location> = MutableSharedFlow(replay = 1)
 
+        override fun hasLocationPermission(): Boolean = true
+
         override suspend fun getCurrentLocation(): Location = location
 
         override suspend fun refreshLocation() = Unit

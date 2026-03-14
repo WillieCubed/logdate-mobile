@@ -27,6 +27,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -343,6 +344,10 @@ class GetHomeRecommendationUseCaseTest {
         ): Uuid = uid
 
         override suspend fun deleteDraft(uid: Uuid) = Unit
+
+        override suspend fun deleteAllDrafts() = Unit
+
+        override suspend fun deleteExpiredDrafts(maxAge: Duration): Int = 0
     }
 
     private class EmptyUserPlacesRepository : UserPlacesRepository {

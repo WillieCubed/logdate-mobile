@@ -4,6 +4,8 @@ import app.logdate.client.domain.app.GetAppInfoUseCase
 import app.logdate.client.domain.di.StubIndexedMediaRepository
 import app.logdate.client.domain.di.healthDomainModule
 import app.logdate.client.domain.di.locationDomainModule
+import app.logdate.client.domain.editor.ObserveEditorDataUseCase
+import app.logdate.client.domain.editor.SaveEntryUseCase
 import app.logdate.client.domain.entities.ExtractPeopleUseCase
 import app.logdate.client.domain.export.ExportUserDataUseCase
 import app.logdate.client.domain.export.GetExportCountsUseCase
@@ -101,6 +103,10 @@ val domainModule: Module =
         factory { FetchMostRecentDraftUseCase(get()) }
         factory { GetAllDraftsUseCase(get()) }
         factory { UpdateEntryDraftUseCase(get()) }
+
+        // Editor
+        factory { ObserveEditorDataUseCase(get(), get(), get(), get()) }
+        factory { SaveEntryUseCase(get(), get()) }
 
         // Rewind
         factory { GetPastRewindsUseCase(get()) }

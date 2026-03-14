@@ -171,5 +171,9 @@ class UpdateEntryDraftUseCaseTest {
         override suspend fun createDraft(notes: List<JournalNote>): Uuid = Uuid.random()
 
         override suspend fun deleteDraft(uid: Uuid) = Unit
+
+        override suspend fun deleteAllDrafts() {}
+
+        override suspend fun deleteExpiredDrafts(maxAge: kotlin.time.Duration): Int = 0
     }
 }

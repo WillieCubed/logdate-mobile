@@ -21,7 +21,7 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NotePlace
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -39,8 +40,10 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
+import kotlin.time.TimeSource
 import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class GetStreamingTimelineUseCaseTest {
     private lateinit var mockNotesRepository: MockJournalNotesRepository
     private lateinit var useCase: GetStreamingTimelineUseCase
@@ -420,14 +423,14 @@ class GetStreamingTimelineUseCaseTest {
                 )
 
             // When - collect first emission and measure time
-            val startTime = System.currentTimeMillis()
+            val mark = TimeSource.Monotonic.markNow()
             useCase(StreamingTimelineRequest.RecentTimeline()).first()
-            val elapsedTime = System.currentTimeMillis() - startTime
+            val elapsed = mark.elapsedNow()
 
             // Then - should emit within 100ms (no network calls, no AI processing)
             assertTrue(
-                elapsedTime < 100,
-                "First emission should be immediate (<100ms), but took ${elapsedTime}ms. " +
+                elapsed.inWholeMilliseconds < 100,
+                "First emission should be immediate (<100ms), but took ${elapsed.inWholeMilliseconds}ms. " +
                     "This suggests blocking on slow operations.",
             )
         }
@@ -543,13 +546,13 @@ class GetStreamingTimelineUseCaseTest {
                 }
 
             // Wait for initial content-first and enrichment emissions
-            delay(50)
+            advanceUntilIdle()
             assertTrue(emissions.size >= 1, "Should have at least one initial emission")
             assertEquals(1, emissions.first().days.size)
 
             // Add a new note
             notesFlow.value = notesFlow.value + createTestNote("New note", Instant.parse("2025-01-16T10:00:00Z"))
-            delay(50)
+            advanceUntilIdle()
 
             // Then - should have re-emitted with updated data
             assertTrue(emissions.size >= 2, "Should re-emit when data changes")

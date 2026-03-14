@@ -37,6 +37,13 @@ class SignOutUseCaseTest {
 
                     override suspend fun deletePasskey(credentialId: String): kotlin.Result<Unit> =
                         kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun createRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun signInWithRestoreKey(): kotlin.Result<LogDateAccount> =
+                        kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun deleteRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
                 }
             val useCase = SignOutUseCase(mockRepository)
 
@@ -77,6 +84,13 @@ class SignOutUseCaseTest {
 
                     override suspend fun deletePasskey(credentialId: String): kotlin.Result<Unit> =
                         kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun createRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun signInWithRestoreKey(): kotlin.Result<LogDateAccount> =
+                        kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun deleteRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
                 }
             val useCase = SignOutUseCase(mockRepository)
 
@@ -118,6 +132,13 @@ class SignOutUseCaseTest {
 
                     override suspend fun deletePasskey(credentialId: String): kotlin.Result<Unit> =
                         kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun createRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun signInWithRestoreKey(): kotlin.Result<LogDateAccount> =
+                        kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun deleteRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
                 }
             val useCase = SignOutUseCase(mockRepository)
 
@@ -158,6 +179,13 @@ class SignOutUseCaseTest {
 
                     override suspend fun deletePasskey(credentialId: String): kotlin.Result<Unit> =
                         kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun createRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun signInWithRestoreKey(): kotlin.Result<LogDateAccount> =
+                        kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun deleteRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
                 }
             val useCase = SignOutUseCase(mockRepository)
 

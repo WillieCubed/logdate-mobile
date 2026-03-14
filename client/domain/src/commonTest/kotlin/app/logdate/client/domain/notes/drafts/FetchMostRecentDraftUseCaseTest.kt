@@ -141,5 +141,9 @@ class FetchMostRecentDraftUseCaseTest {
         ): Uuid = uid
 
         override suspend fun deleteDraft(uid: Uuid) = Unit
+
+        override suspend fun deleteAllDrafts() {}
+
+        override suspend fun deleteExpiredDrafts(maxAge: kotlin.time.Duration): Int = 0
     }
 }

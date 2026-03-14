@@ -1,36 +1,18 @@
 package app.logdate.feature.editor.ui.editor
 
-// Restore imports for the functionality we're implementing
-// import app.logdate.client.domain.world.ObserveLocationUseCase (commented out)
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.logdate.client.domain.journals.GetCurrentUserJournalsUseCase
-import app.logdate.client.domain.journals.GetDefaultSelectedJournalsUseCase
-import app.logdate.client.domain.notes.AddNoteUseCase
-import app.logdate.client.domain.notes.FetchEntryUseCase
-import app.logdate.client.domain.notes.FetchTodayNotesUseCase
-import app.logdate.client.domain.notes.drafts.CleanupExpiredDraftsUseCase
-import app.logdate.client.domain.notes.drafts.CreateEntryDraftUseCase
-import app.logdate.client.domain.notes.drafts.DeleteAllDraftsUseCase
-import app.logdate.client.domain.notes.drafts.DeleteEntryDraftUseCase
-import app.logdate.client.domain.notes.drafts.FetchEntryDraftUseCase
-import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
-import app.logdate.client.domain.notes.drafts.GetAllDraftsUseCase
-import app.logdate.client.domain.notes.drafts.UpdateEntryDraftUseCase
-import app.logdate.client.repository.journals.JournalContentRepository
-import app.logdate.client.repository.journals.JournalNote
-import app.logdate.feature.editor.ui.camera.CapturedMediaType
-import app.logdate.feature.editor.ui.editor.delegate.AutoSaveDelegate
-import app.logdate.feature.editor.ui.editor.delegate.JournalSelectionDelegate
-import app.logdate.feature.editor.ui.editor.mediator.EditorActionType
-import app.logdate.feature.editor.ui.editor.mediator.EditorMediator
+import app.logdate.client.domain.editor.ObserveEditorDataUseCase
+import app.logdate.client.domain.editor.SaveEntryUseCase
+import app.logdate.feature.editor.ui.editor.delegate.ContentLoader
+import app.logdate.feature.editor.ui.editor.delegate.DraftManager
 import app.logdate.feature.editor.ui.mapper.toDomainBlock
+import app.logdate.feature.editor.ui.mapper.toJournalNote
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -44,28 +26,11 @@ import kotlin.uuid.Uuid
  * This attempts to load the entry for the current date. If entries exist, it will add them to the
  * state for editing. If no entries exist, it will create a new entry.
  */
-
 class EntryEditorViewModel(
-    fetchTodayNotes: FetchTodayNotesUseCase,
-    getCurrentUserJournals: GetCurrentUserJournalsUseCase,
-    private val getDefaultSelectedJournals: GetDefaultSelectedJournalsUseCase,
-    private val addNoteUseCase: AddNoteUseCase,
-    private val fetchEntryUseCase: FetchEntryUseCase,
-    private val journalContentRepository: JournalContentRepository,
-    // observeLocation: ObserveLocationUseCase, (commented out)
-    private val updateEntryDraft: UpdateEntryDraftUseCase,
-    private val createEntryDraft: CreateEntryDraftUseCase,
-    private val deleteEntryDraft: DeleteEntryDraftUseCase,
-    private val deleteAllDraftsUseCase: DeleteAllDraftsUseCase,
-    private val fetchEntryDraft: FetchEntryDraftUseCase,
-    fetchMostRecentDraft: FetchMostRecentDraftUseCase,
-    getAllDrafts: GetAllDraftsUseCase,
-    cleanupExpiredDrafts: CleanupExpiredDraftsUseCase,
-    // private val transcriptionService: TranscriptionService,
-    // New dependencies for mediator pattern and delegation
-    private val mediator: EditorMediator,
-    private val autoSaveDelegate: AutoSaveDelegate,
-    private val journalSelectionDelegate: JournalSelectionDelegate,
+    observeEditorData: ObserveEditorDataUseCase,
+    private val saveEntryUseCase: SaveEntryUseCase,
+    private val draftManager: DraftManager,
+    private val contentLoader: ContentLoader,
 ) : ViewModel() {
     // Internal mutable state that can be modified by UI
     private val mutableEditorState =
@@ -80,10 +45,9 @@ class EntryEditorViewModel(
     private var autoSaveJob: Job? = null
 
     init {
-        // Clean up expired drafts on editor open
         viewModelScope.launch {
             try {
-                val deleted = cleanupExpiredDrafts()
+                val deleted = draftManager.cleanupExpired()
                 if (deleted > 0) {
                     Napier.d("Cleaned up $deleted expired draft(s)")
                 }
@@ -92,108 +56,50 @@ class EntryEditorViewModel(
             }
         }
 
-        // Load default journals using the journal selection delegate
         viewModelScope.launch {
-            journalSelectionDelegate.loadDefaultJournals(mutableEditorState)
-        }
-
-        // Set up mediator listener for mediator events
-        viewModelScope.launch {
-            mediator.editorActions.collect { actions ->
-                // Handle save requests from other components
-                if (actions.saveRequested) {
-                    saveEntry(editorState.value)
-                    mediator.resetAction(EditorActionType.SAVE)
-                }
-
-                // Handle draft load requests from other components
-                actions.draftToLoad?.let { draftId ->
-                    loadDraft(draftId)
-                    mediator.resetAction(EditorActionType.LOAD_DRAFT)
+            val defaults = contentLoader.loadDefaultJournals()
+            if (defaults.isNotEmpty()) {
+                mutableEditorState.update { state ->
+                    if (state.selectedJournalIds.isEmpty()) {
+                        state.copy(selectedJournalIds = defaults)
+                    } else {
+                        state
+                    }
                 }
             }
         }
     }
 
-    private val todayNotesFlow =
-        fetchTodayNotes()
-            .catch { e ->
-                Napier.e("Failed to load entries: ${e.message}", e)
-                emit(emptyList())
-            }
-
-    private val journalsFlow =
-        getCurrentUserJournals()
-            .catch { e ->
-                Napier.e("Failed to load journals: ${e.message}", e)
-                emit(emptyList())
-            }
-
-    private val recentDraftFlow =
-        fetchMostRecentDraft()
-            .catch { e ->
-                Napier.e("Failed to load recent draft: ${e.message}", e)
-                emit(null)
-            }
-
-    private val allDraftsFlow =
-        getAllDrafts()
-            .catch { e ->
-                Napier.e("Failed to load all drafts: ${e.message}", e)
-                emit(emptyList())
-            }
-
-    // Location flow commented out
-    // private val locationFlow = observeLocation()
-    //    .catch { e ->
-    //        Napier.e("Failed to observe location: ${e.message}", e)
-    //        // Don't emit null, just don't emit anything on error
-    //    }
-
-    // Combine all data sources into a single editor state
+    // Combine mutable state with external data into a single editor state
     val editorState: StateFlow<EditorState> =
         combine(
             mutableEditorState,
-            todayNotesFlow,
-            journalsFlow,
-            recentDraftFlow,
-            allDraftsFlow,
-        ) { currentState, notes, journals, recentDraft, allDrafts ->
-            // Convert today's notes to UI blocks
-            val todayBlocks = notes.map { it.toDomainBlock() }
+            observeEditorData(),
+        ) { currentState, data ->
+            val todayBlockIds =
+                data.todayNotes
+                    .map { it.toDomainBlock().id }
+                    .toSet()
 
-            // Convert draft notes to UI blocks if we have a draft
-            val draftBlocks = recentDraft?.notes?.map { it.toDomainBlock() } ?: emptyList()
-
-            // IMPORTANT: Always start with user's current blocks and DO NOT auto-populate content
-            // Start with current blocks and ONLY use them - don't auto-populate with drafts or today's notes
             val blocks = currentState.blocks
+            val readOnlyMap = blocks.associate { it.id to (it.id in todayBlockIds) }
 
-            // Mark today's notes as read-only by tracking their IDs
-            val todayBlockIds = todayBlocks.map { it.id }.toSet()
-            val readOnlyMap = blocks.associate { it.id to todayBlockIds.contains(it.id) }
-
-            // Auto-select first journal if none selected and journals are available
-            // This provides a better default experience for users
             val selectedJournalIds =
-                if (currentState.selectedJournalIds.isEmpty() && journals.isNotEmpty()) {
-                    journals.first().id.let(::listOf) // Select the first journal
+                if (currentState.selectedJournalIds.isEmpty() && data.journals.isNotEmpty()) {
+                    listOf(data.journals.first().id)
                 } else {
-                    currentState.selectedJournalIds // Keep existing selection
+                    currentState.selectedJournalIds
                 }
 
-            // Create a new state combining mutable state and data sources
-            val newState =
-                currentState.copy(
-                    blocks = blocks,
-                    readOnlyBlocks = readOnlyMap,
-                    availableJournals = journals,
-                    selectedJournalIds = selectedJournalIds,
-                    availableDrafts = allDrafts,
-                    isLoadingDrafts = false,
-                    isLoading = false,
-                )
-            newState
+            currentState.copy(
+                blocks = blocks,
+                readOnlyBlocks = readOnlyMap,
+                availableJournals = data.journals,
+                selectedJournalIds = selectedJournalIds,
+                availableDrafts = data.allDrafts,
+                isLoadingDrafts = false,
+                isLoading = false,
+            )
         }.stateIn(
             viewModelScope,
             SharingStarted.Eagerly,
@@ -203,77 +109,11 @@ class EntryEditorViewModel(
             ),
         )
 
-    /* Original implementation commented out
-    // Combine internal state with external data sources into a single editor state
-    // This creates a derived state that automatically updates when any of its sources change
-    val editorState: StateFlow<EditorState> = combine(
-        mutableEditorState,
-        todayNotesFlow,
-        journalsFlow,
-        recentDraftFlow,
-        allDraftsFlow
-    ) { currentState, notes, journals, recentDraft, allDrafts ->
-        // Convert today's notes to UI blocks
-        val todayBlocks = notes.map { noteToDomainBlock(it) }
-
-        // Convert draft notes to UI blocks if we have a draft (temporarily empty for debugging)
-        val draftBlocks = emptyList<EntryBlockData>() // TODO: Convert recentDraft?.notes when use cases are re-enabled
-
-        // Start with an empty blocks list
-        var blocks = emptyList<EntryBlockData>()
-
-        // If we have user-modified blocks, keep them as is
-        if (currentState.blocks.isNotEmpty()) {
-            blocks = currentState.blocks
-        }
-        // If we have a recent draft and no user modifications, use the draft
-        else if (recentDraft != null) {
-            blocks = recentDraft.notes.map { noteToDomainBlock(it) }
-        }
-        // Otherwise fall back to today's notes
-        else if (todayBlocks.isNotEmpty()) {
-            blocks = todayBlocks
-        }
-
-        // Mark today's notes as read-only by tracking their IDs
-        val todayBlockIds = todayBlocks.map { it.id }.toSet()
-        val readOnlyMap = blocks.associate { it.id to todayBlockIds.contains(it.id) }
-
-        // Auto-select first journal if none selected and journals are available
-        val selectedJournalIds = if (currentState.selectedJournalIds.isEmpty() && journals.isNotEmpty()) {
-            listOf(journals.first().id)
-        } else {
-            currentState.selectedJournalIds
-        }
-
-        // Create a new state combining mutable state and data sources
-        currentState.copy(
-            blocks = blocks,
-            readOnlyBlocks = readOnlyMap,
-            availableJournals = journals,
-            selectedJournalIds = selectedJournalIds,
-            draftId = recentDraft?.id,
-            isDraft = recentDraft != null,
-            availableDrafts = allDrafts, // TODO: Sort by lastModifiedAt when use cases are re-enabled
-            isLoadingDrafts = false,
-            isLoading = false
-        )
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.Eagerly,
-        EditorState(
-            isLoading = true,
-            disableEmptyBlockCreation = false
-        )
-    )
-     */
-
     /**
      * Sets the journals that this entry is associated with.
-     * Uses the journal selection delegate.
      */
     fun setSelectedJournals(journalIds: List<Uuid>) {
-        journalSelectionDelegate.setSelectedJournals(journalIds, mutableEditorState)
+        mutableEditorState.update { it.copy(selectedJournalIds = journalIds) }
     }
 
     /**
@@ -283,9 +123,7 @@ class EntryEditorViewModel(
         type: BlockType,
         id: Uuid = Uuid.random(),
     ): EntryBlockUiState {
-        // Create a new block based on the specified type
-        // Using null for location instead of real location data
-        val location = null // Location functionality disabled
+        val location = null
         val timestamp = Clock.System.now()
 
         val newBlock =
@@ -393,16 +231,15 @@ class EntryEditorViewModel(
     }
 
     /**
-     * Autosaves the current entry state using the AutoSaveDelegate.
+     * Autosaves the current entry state as a draft.
      */
     fun autoSaveEntry(state: EditorState) {
-        // Skip auto-save when a manual save is in progress
         if (state.isSaving) return
 
         autoSaveJob =
             viewModelScope.launch {
                 try {
-                    autoSaveDelegate.autoSaveEntry(state)?.let { draftId ->
+                    draftManager.autoSave(state)?.let { draftId ->
                         mutableEditorState.update {
                             it.copy(draftState = DraftState.Active(draftId))
                         }
@@ -430,89 +267,20 @@ class EntryEditorViewModel(
         mutableEditorState.update { it.copy(isSaving = true) }
 
         viewModelScope.launch {
+            val notes =
+                state.blocks.mapNotNull { block ->
+                    if (state.isReadOnly(block.id)) return@mapNotNull null
+                    block.toJournalNote()
+                }
+
+            if (notes.isEmpty()) {
+                mutableEditorState.update { it.copy(shouldExit = true, isSaving = false) }
+                return@launch
+            }
+
             try {
-                // Convert UI blocks to domain notes
-                val notes =
-                    state.blocks.mapNotNull { block ->
-                        if (!block.hasContent()) return@mapNotNull null
-
-                        when (block) {
-                            is TextBlockUiState ->
-                                JournalNote.Text(
-                                    uid = block.id,
-                                    creationTimestamp = block.timestamp,
-                                    lastUpdated = Clock.System.now(),
-                                    content = block.content,
-                                )
-                            is ImageBlockUiState ->
-                                JournalNote.Image(
-                                    uid = block.id,
-                                    creationTimestamp = block.timestamp,
-                                    lastUpdated = Clock.System.now(),
-                                    mediaRef = block.uri ?: return@mapNotNull null,
-                                    caption = block.caption,
-                                )
-                            is CameraBlockUiState -> {
-                                val mediaRef = block.uri ?: return@mapNotNull null
-                                when (block.mediaType) {
-                                    CapturedMediaType.PHOTO ->
-                                        JournalNote.Image(
-                                            uid = block.id,
-                                            creationTimestamp = block.timestamp,
-                                            lastUpdated = Clock.System.now(),
-                                            mediaRef = mediaRef,
-                                            caption = block.caption,
-                                        )
-                                    CapturedMediaType.VIDEO ->
-                                        JournalNote.Video(
-                                            uid = block.id,
-                                            creationTimestamp = block.timestamp,
-                                            lastUpdated = Clock.System.now(),
-                                            mediaRef = mediaRef,
-                                            caption = block.caption,
-                                        )
-                                }
-                            }
-                            is VideoBlockUiState ->
-                                JournalNote.Video(
-                                    uid = block.id,
-                                    creationTimestamp = block.timestamp,
-                                    lastUpdated = Clock.System.now(),
-                                    mediaRef = block.uri ?: return@mapNotNull null,
-                                    caption = block.caption,
-                                )
-                            is AudioBlockUiState ->
-                                JournalNote.Audio(
-                                    uid = block.id,
-                                    creationTimestamp = block.timestamp,
-                                    lastUpdated = Clock.System.now(),
-                                    mediaRef = block.uri ?: return@mapNotNull null,
-                                    durationMs = block.duration,
-                                )
-                        }
-                    }
-
-                if (notes.isEmpty()) {
-                    mutableEditorState.update { it.copy(shouldExit = true, isSaving = false) }
-                    return@launch
-                }
-
-                // Add each note and link it to selected journals in a single operation
-                val currentJournals = state.selectedJournalIds
-
-                // Save all notes and associate them with journals in a single call
-                addNoteUseCase(
-                    notes = notes,
-                    journalIds = currentJournals,
-                )
-
-                // If this was a draft, delete it since we've saved it permanently
-                when (val draft = state.draftState) {
-                    is DraftState.Active -> deleteEntryDraft(draft.id)
-                    DraftState.None -> {}
-                }
-
-                // Signal to UI that we're done and should exit
+                val activeDraftId = (state.draftState as? DraftState.Active)?.id
+                saveEntryUseCase(notes, state.selectedJournalIds, activeDraftId)
                 mutableEditorState.update { it.copy(shouldExit = true, isSaving = false) }
             } catch (e: Exception) {
                 Napier.e("Failed to save entry: ${e.message}", e)
@@ -583,42 +351,24 @@ class EntryEditorViewModel(
      */
     fun loadDraft(draftId: Uuid) {
         viewModelScope.launch {
-            try {
-                fetchEntryDraft(draftId)
-                    .catch { e ->
-                        Napier.e("Failed to load draft: ${e.message}", e)
-                        mutableEditorState.update {
-                            it.copy(errorMessage = "Failed to load draft: ${e.message}")
-                        }
-                    }.collect { result ->
-                        result.fold(
-                            onSuccess = { draft ->
-                                // Convert draft notes to UI blocks
-                                val draftBlocks = draft.notes.map { it.toDomainBlock() }
-
-                                mutableEditorState.update { currentState ->
-                                    currentState.copy(
-                                        blocks = draftBlocks,
-                                        draftState = DraftState.Active(draft.id),
-                                        isModified = true,
-                                        errorMessage = null,
-                                    )
-                                }
-                            },
-                            onFailure = { e ->
-                                Napier.e("Failed to load draft: ${e.message}", e)
-                                mutableEditorState.update {
-                                    it.copy(errorMessage = "Failed to load draft: ${e.message}")
-                                }
-                            },
+            draftManager.loadDraft(draftId).fold(
+                onSuccess = { loaded ->
+                    mutableEditorState.update { currentState ->
+                        currentState.copy(
+                            blocks = loaded.blocks,
+                            draftState = DraftState.Active(loaded.draftId),
+                            isModified = true,
+                            errorMessage = null,
                         )
                     }
-            } catch (e: Exception) {
-                Napier.e("Failed to load draft: ${e.message}", e)
-                mutableEditorState.update {
-                    it.copy(errorMessage = "Failed to load draft: ${e.message}")
-                }
-            }
+                },
+                onFailure = { e ->
+                    Napier.e("Failed to load draft: ${e.message}", e)
+                    mutableEditorState.update {
+                        it.copy(errorMessage = "Failed to load draft: ${e.message}")
+                    }
+                },
+            )
         }
     }
 
@@ -627,23 +377,24 @@ class EntryEditorViewModel(
      */
     fun deleteDraft(draftId: Uuid) {
         viewModelScope.launch {
-            try {
-                deleteEntryDraft(draftId)
-                // Clear draftState if we just deleted the active draft
-                mutableEditorState.update {
-                    val newDraftState =
-                        when (val current = it.draftState) {
-                            is DraftState.Active -> if (current.id == draftId) DraftState.None else current
-                            DraftState.None -> DraftState.None
-                        }
-                    it.copy(draftState = newDraftState)
-                }
-            } catch (e: Exception) {
-                Napier.e("Failed to delete draft: ${e.message}", e)
-                mutableEditorState.update {
-                    it.copy(errorMessage = "Failed to delete draft: ${e.message}")
-                }
-            }
+            draftManager.deleteDraft(draftId).fold(
+                onSuccess = {
+                    mutableEditorState.update {
+                        val newDraftState =
+                            when (val current = it.draftState) {
+                                is DraftState.Active -> if (current.id == draftId) DraftState.None else current
+                                DraftState.None -> DraftState.None
+                            }
+                        it.copy(draftState = newDraftState)
+                    }
+                },
+                onFailure = { e ->
+                    Napier.e("Failed to delete draft: ${e.message}", e)
+                    mutableEditorState.update {
+                        it.copy(errorMessage = "Failed to delete draft: ${e.message}")
+                    }
+                },
+            )
         }
     }
 
@@ -652,15 +403,17 @@ class EntryEditorViewModel(
      */
     fun deleteAllDrafts() {
         viewModelScope.launch {
-            try {
-                deleteAllDraftsUseCase()
-                mutableEditorState.update { it.copy(draftState = DraftState.None) }
-            } catch (e: Exception) {
-                Napier.e("Failed to delete all drafts: ${e.message}", e)
-                mutableEditorState.update {
-                    it.copy(errorMessage = "Failed to delete drafts: ${e.message}")
-                }
-            }
+            draftManager.deleteAllDrafts().fold(
+                onSuccess = {
+                    mutableEditorState.update { it.copy(draftState = DraftState.None) }
+                },
+                onFailure = { e ->
+                    Napier.e("Failed to delete all drafts: ${e.message}", e)
+                    mutableEditorState.update {
+                        it.copy(errorMessage = "Failed to delete drafts: ${e.message}")
+                    }
+                },
+            )
         }
     }
 
@@ -677,9 +430,7 @@ class EntryEditorViewModel(
             try {
                 val currentState = mutableEditorState.value
 
-                // Only add initial text if we don't have any blocks yet
                 if (currentState.blocks.isEmpty()) {
-                    // Create a new text block with the initial content
                     val textBlock = createNewBlock(BlockType.TEXT) as TextBlockUiState
                     updateBlock(textBlock.copy(content = content))
                 }
@@ -700,10 +451,7 @@ class EntryEditorViewModel(
 
         viewModelScope.launch {
             try {
-                // Process each attachment and create appropriate blocks
                 attachmentUris.forEach { uri ->
-                    // Determine block type based on URI (simplified logic)
-                    // In a real implementation, you'd analyze the MIME type or URI pattern
                     val blockType =
                         when {
                             uri.contains(".jpg", ignoreCase = true) ||
@@ -719,10 +467,9 @@ class EntryEditorViewModel(
                                 uri.contains(".wav", ignoreCase = true) ||
                                 uri.contains("audio/", ignoreCase = true) -> BlockType.AUDIO
 
-                            else -> BlockType.IMAGE // Default to image for unknown types
+                            else -> BlockType.IMAGE
                         }
 
-                    // Create appropriate block and update it with the URI
                     when (blockType) {
                         BlockType.IMAGE -> {
                             val block = createNewBlock(BlockType.IMAGE) as ImageBlockUiState
@@ -737,7 +484,6 @@ class EntryEditorViewModel(
                             updateBlock(block.copy(uri = uri))
                         }
                         else -> {
-                            // Shouldn't reach here based on our logic above
                             Napier.w("Unhandled attachment type for URI: $uri")
                         }
                     }
@@ -762,49 +508,32 @@ class EntryEditorViewModel(
         journalId: Uuid? = null,
     ) {
         viewModelScope.launch {
-            try {
-                mutableEditorState.update { it.copy(isLoading = true) }
+            mutableEditorState.update { it.copy(isLoading = true) }
 
-                // Fetch the entry
-                val entry = fetchEntryUseCase(entryId)
-
-                if (entry == null) {
-                    Napier.w("EntryEditorViewModel: Entry not found: $entryId")
+            contentLoader.loadEntry(entryId).fold(
+                onSuccess = { block ->
+                    mutableEditorState.update { currentState ->
+                        currentState.copy(
+                            blocks = listOf(block),
+                            isLoading = false,
+                            isModified = false,
+                            errorMessage = null,
+                        )
+                    }
+                    if (journalId != null) {
+                        setSelectedJournals(listOf(journalId))
+                    }
+                },
+                onFailure = { e ->
+                    Napier.e("Failed to load existing entry: $entryId", e)
                     mutableEditorState.update {
                         it.copy(
                             isLoading = false,
-                            errorMessage = "Entry not found",
+                            errorMessage = "Failed to load entry: ${e.message}",
                         )
                     }
-                    return@launch
-                }
-
-                // Convert the entry to a UI block
-                val block = entry.toDomainBlock()
-
-                // Update state with the loaded entry
-                mutableEditorState.update { currentState ->
-                    currentState.copy(
-                        blocks = listOf(block),
-                        isLoading = false,
-                        isModified = false,
-                        errorMessage = null,
-                    )
-                }
-
-                // Set selected journal if provided
-                if (journalId != null) {
-                    setSelectedJournals(listOf(journalId))
-                }
-            } catch (e: Exception) {
-                Napier.e("EntryEditorViewModel: Failed to load existing entry: $entryId", e)
-                mutableEditorState.update {
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = "Failed to load entry: ${e.message}",
-                    )
-                }
-            }
+                },
+            )
         }
     }
 }

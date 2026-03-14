@@ -24,6 +24,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -212,6 +213,10 @@ class HomeRecommendationIntegrationTest {
         ): Uuid = uid
 
         override suspend fun deleteDraft(uid: Uuid) = Unit
+
+        override suspend fun deleteAllDrafts() = Unit
+
+        override suspend fun deleteExpiredDrafts(maxAge: Duration): Int = 0
     }
 
     private class EmptyUserPlacesRepository : UserPlacesRepository {

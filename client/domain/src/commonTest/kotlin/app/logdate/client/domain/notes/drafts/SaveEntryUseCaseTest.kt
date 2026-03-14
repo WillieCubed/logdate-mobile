@@ -187,6 +187,10 @@ class SaveEntryUseCaseTest {
         ): Uuid = uid
 
         override suspend fun deleteDraft(uid: Uuid) = Unit
+
+        override suspend fun deleteAllDrafts() {}
+
+        override suspend fun deleteExpiredDrafts(maxAge: kotlin.time.Duration): Int = 0
     }
 
     private class RecordingJournalNotesRepository : JournalNotesRepository {
@@ -324,6 +328,8 @@ class SaveEntryUseCaseTest {
         override suspend fun getCurrentLocation(): Location = location
 
         override suspend fun refreshLocation() {}
+
+        override fun hasLocationPermission(): Boolean = true
     }
 
     private class FakeActivityTimelineRepository : ActivityTimelineRepository {

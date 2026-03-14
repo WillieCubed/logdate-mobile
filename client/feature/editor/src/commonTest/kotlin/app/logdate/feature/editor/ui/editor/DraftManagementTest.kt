@@ -1,5 +1,7 @@
 package app.logdate.feature.editor.ui.editor
 
+import app.logdate.client.domain.editor.ObserveEditorDataUseCase
+import app.logdate.client.domain.editor.SaveEntryUseCase
 import app.logdate.client.domain.journals.GetCurrentUserJournalsUseCase
 import app.logdate.client.domain.journals.GetDefaultSelectedJournalsUseCase
 import app.logdate.client.domain.location.LocationRetryWorker
@@ -17,11 +19,10 @@ import app.logdate.client.domain.notes.drafts.GetAllDraftsUseCase
 import app.logdate.client.domain.notes.drafts.UpdateEntryDraftUseCase
 import app.logdate.client.domain.world.LogLocationUseCase
 import app.logdate.client.repository.journals.JournalNote
-import app.logdate.feature.editor.ui.editor.delegate.AutoSaveDelegate
-import app.logdate.feature.editor.ui.editor.delegate.JournalSelectionDelegate
+import app.logdate.feature.editor.ui.editor.delegate.ContentLoader
+import app.logdate.feature.editor.ui.editor.delegate.DraftManager
 import app.logdate.feature.editor.ui.editor.fakes.FakeActivityTimelineRepository
 import app.logdate.feature.editor.ui.editor.fakes.FakeClientLocationProvider
-import app.logdate.feature.editor.ui.editor.fakes.FakeEditorMediator
 import app.logdate.feature.editor.ui.editor.fakes.FakeEntryDraftRepository
 import app.logdate.feature.editor.ui.editor.fakes.FakeJournalContentRepository
 import app.logdate.feature.editor.ui.editor.fakes.FakeJournalNotesRepository
@@ -56,7 +57,7 @@ class DraftManagementTest {
     private lateinit var testScope: TestScope
     private lateinit var viewModel: EntryEditorViewModel
     private lateinit var entryDraftRepository: FakeEntryDraftRepository
-    private lateinit var autoSaveDelegate: AutoSaveDelegate
+    private lateinit var draftManager: DraftManager
 
     @BeforeTest
     fun setup() {
@@ -86,13 +87,6 @@ class DraftManagementTest {
             )
         val mediaManager = FakeMediaManager()
 
-        val fetchTodayNotes = FetchTodayNotesUseCase(journalNotesRepository)
-        val getCurrentUserJournals = GetCurrentUserJournalsUseCase(journalRepository)
-        val getDefaultSelectedJournals =
-            GetDefaultSelectedJournalsUseCase(
-                journalNotesRepository,
-                journalContentRepository,
-            )
         val addNoteUseCase =
             AddNoteUseCase(
                 repository = journalNotesRepository,
@@ -102,45 +96,45 @@ class DraftManagementTest {
                 settingsRepository = FakeLocationTrackingSettingsRepository(),
                 mediaManager = mediaManager,
             )
-        val fetchEntryUseCase = FetchEntryUseCase(journalNotesRepository)
-        val updateEntryDraft = UpdateEntryDraftUseCase(entryDraftRepository)
-        val createEntryDraft = CreateEntryDraftUseCase(entryDraftRepository)
         val deleteEntryDraft = DeleteEntryDraftUseCase(entryDraftRepository)
-        val deleteAllDraftsUseCase = DeleteAllDraftsUseCase(entryDraftRepository)
-        val fetchEntryDraft = FetchEntryDraftUseCase(entryDraftRepository)
-        val fetchMostRecentDraft = FetchMostRecentDraftUseCase(entryDraftRepository)
-        val getAllDrafts = GetAllDraftsUseCase(entryDraftRepository)
-        val cleanupExpiredDrafts = CleanupExpiredDraftsUseCase(entryDraftRepository)
 
-        autoSaveDelegate =
-            AutoSaveDelegate(
-                updateEntryDraft = updateEntryDraft,
-                createEntryDraft = createEntryDraft,
+        val observeEditorData =
+            ObserveEditorDataUseCase(
+                fetchTodayNotes = FetchTodayNotesUseCase(journalNotesRepository),
+                getCurrentUserJournals = GetCurrentUserJournalsUseCase(journalRepository),
+                fetchMostRecentDraft = FetchMostRecentDraftUseCase(entryDraftRepository),
+                getAllDrafts = GetAllDraftsUseCase(entryDraftRepository),
             )
-        val journalSelectionDelegate =
-            JournalSelectionDelegate(
-                getDefaultSelectedJournals = getDefaultSelectedJournals,
+        val saveEntryUseCase =
+            SaveEntryUseCase(
+                addNoteUseCase = addNoteUseCase,
+                deleteEntryDraft = deleteEntryDraft,
+            )
+        draftManager =
+            DraftManager(
+                updateEntryDraft = UpdateEntryDraftUseCase(entryDraftRepository),
+                createEntryDraft = CreateEntryDraftUseCase(entryDraftRepository),
+                fetchEntryDraft = FetchEntryDraftUseCase(entryDraftRepository),
+                deleteEntryDraft = deleteEntryDraft,
+                deleteAllDraftsUseCase = DeleteAllDraftsUseCase(entryDraftRepository),
+                cleanupExpiredDraftsUseCase = CleanupExpiredDraftsUseCase(entryDraftRepository),
+            )
+        val contentLoader =
+            ContentLoader(
+                fetchEntryUseCase = FetchEntryUseCase(journalNotesRepository),
+                getDefaultSelectedJournals =
+                    GetDefaultSelectedJournalsUseCase(
+                        journalNotesRepository,
+                        journalContentRepository,
+                    ),
             )
 
         viewModel =
             EntryEditorViewModel(
-                fetchTodayNotes = fetchTodayNotes,
-                getCurrentUserJournals = getCurrentUserJournals,
-                getDefaultSelectedJournals = getDefaultSelectedJournals,
-                addNoteUseCase = addNoteUseCase,
-                fetchEntryUseCase = fetchEntryUseCase,
-                journalContentRepository = journalContentRepository,
-                updateEntryDraft = updateEntryDraft,
-                createEntryDraft = createEntryDraft,
-                deleteEntryDraft = deleteEntryDraft,
-                deleteAllDraftsUseCase = deleteAllDraftsUseCase,
-                fetchEntryDraft = fetchEntryDraft,
-                fetchMostRecentDraft = fetchMostRecentDraft,
-                getAllDrafts = getAllDrafts,
-                cleanupExpiredDrafts = cleanupExpiredDrafts,
-                mediator = FakeEditorMediator(),
-                autoSaveDelegate = autoSaveDelegate,
-                journalSelectionDelegate = journalSelectionDelegate,
+                observeEditorData = observeEditorData,
+                saveEntryUseCase = saveEntryUseCase,
+                draftManager = draftManager,
+                contentLoader = contentLoader,
             )
     }
 

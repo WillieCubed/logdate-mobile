@@ -51,6 +51,13 @@ class AuthenticateWithPasskeyUseCaseTest {
 
                     override suspend fun deletePasskey(credentialId: String): kotlin.Result<Unit> =
                         kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun createRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun signInWithRestoreKey(): kotlin.Result<LogDateAccount> =
+                        kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun deleteRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
                 }
             val useCase = AuthenticateWithPasskeyUseCase(mockRepository)
 
@@ -91,6 +98,13 @@ class AuthenticateWithPasskeyUseCaseTest {
 
                     override suspend fun deletePasskey(credentialId: String): kotlin.Result<Unit> =
                         kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun createRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun signInWithRestoreKey(): kotlin.Result<LogDateAccount> =
+                        kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun deleteRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
                 }
             val useCase = AuthenticateWithPasskeyUseCase(mockRepository)
 
@@ -131,6 +145,13 @@ class AuthenticateWithPasskeyUseCaseTest {
 
                     override suspend fun deletePasskey(credentialId: String): kotlin.Result<Unit> =
                         kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun createRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun signInWithRestoreKey(): kotlin.Result<LogDateAccount> =
+                        kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun deleteRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
                 }
             val useCase = AuthenticateWithPasskeyUseCase(mockRepository)
 
@@ -171,6 +192,13 @@ class AuthenticateWithPasskeyUseCaseTest {
 
                     override suspend fun deletePasskey(credentialId: String): kotlin.Result<Unit> =
                         kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun createRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun signInWithRestoreKey(): kotlin.Result<LogDateAccount> =
+                        kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun deleteRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
                 }
             val useCase = AuthenticateWithPasskeyUseCase(mockRepository)
 
@@ -211,6 +239,13 @@ class AuthenticateWithPasskeyUseCaseTest {
 
                     override suspend fun deletePasskey(credentialId: String): kotlin.Result<Unit> =
                         kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun createRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun signInWithRestoreKey(): kotlin.Result<LogDateAccount> =
+                        kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun deleteRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
                 }
             val useCase = AuthenticateWithPasskeyUseCase(mockRepository)
 
@@ -251,6 +286,13 @@ class AuthenticateWithPasskeyUseCaseTest {
 
                     override suspend fun deletePasskey(credentialId: String): kotlin.Result<Unit> =
                         kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun createRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun signInWithRestoreKey(): kotlin.Result<LogDateAccount> =
+                        kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun deleteRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
                 }
             val useCase = AuthenticateWithPasskeyUseCase(mockRepository)
 

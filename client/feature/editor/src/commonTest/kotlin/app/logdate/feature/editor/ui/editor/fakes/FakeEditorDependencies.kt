@@ -15,12 +15,6 @@ import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.location.LocationHistoryItem
 import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.timeline.ActivityTimelineRepository
-import app.logdate.feature.editor.ui.editor.BlockType
-import app.logdate.feature.editor.ui.editor.EntryBlockUiState
-import app.logdate.feature.editor.ui.editor.mediator.EditorActionType
-import app.logdate.feature.editor.ui.editor.mediator.EditorActions
-import app.logdate.feature.editor.ui.editor.mediator.EditorMediator
-import app.logdate.feature.editor.ui.editor.mediator.NewBlockRequest
 import app.logdate.shared.model.ActivityTimelineItem
 import app.logdate.shared.model.AltitudeUnit
 import app.logdate.shared.model.EditorDraft
@@ -31,11 +25,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.update
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -370,42 +361,5 @@ class FakeLocationTrackingSettingsRepository : LocationTrackingSettingsRepositor
 
     override suspend fun setTrackingInterval(intervalMinutes: Long) {
         // No-op for tests
-    }
-}
-
-class FakeEditorMediator : EditorMediator {
-    private val _editorActions = MutableStateFlow(EditorActions())
-    override val editorActions: StateFlow<EditorActions> = _editorActions.asStateFlow()
-
-    override fun onBlockSelected(blockId: Uuid) {
-        _editorActions.update { it.copy(selectedBlockId = blockId) }
-    }
-
-    override fun onNewBlockRequested(blockType: BlockType) {
-        _editorActions.update { it.copy(newBlockRequest = NewBlockRequest(blockType)) }
-    }
-
-    override fun onBlockUpdated(block: EntryBlockUiState) {
-        _editorActions.update { it.copy(updatedBlock = block) }
-    }
-
-    override fun onSaveRequested() {
-        _editorActions.update { it.copy(saveRequested = true) }
-    }
-
-    override fun onLoadDraftRequested(draftId: Uuid) {
-        _editorActions.update { it.copy(draftToLoad = draftId) }
-    }
-
-    override fun resetAction(action: EditorActionType) {
-        _editorActions.update {
-            when (action) {
-                EditorActionType.BLOCK_SELECTED -> it.copy(selectedBlockId = null)
-                EditorActionType.NEW_BLOCK -> it.copy(newBlockRequest = null)
-                EditorActionType.BLOCK_UPDATED -> it.copy(updatedBlock = null)
-                EditorActionType.SAVE -> it.copy(saveRequested = false)
-                EditorActionType.LOAD_DRAFT -> it.copy(draftToLoad = null)
-            }
-        }
     }
 }

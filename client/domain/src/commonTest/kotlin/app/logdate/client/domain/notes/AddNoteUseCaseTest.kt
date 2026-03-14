@@ -514,6 +514,8 @@ class AddNoteUseCaseTest {
 
         override val currentLocation: SharedFlow<Location> = shared
 
+        override fun hasLocationPermission(): Boolean = true
+
         override suspend fun getCurrentLocation(): Location = location
 
         override suspend fun refreshLocation() {}

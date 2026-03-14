@@ -81,6 +81,8 @@ class LocationRetryWorkerTest {
 private class FakeLocationProvider : ClientLocationProvider {
     override val currentLocation = kotlinx.coroutines.flow.MutableSharedFlow<Location>(replay = 1)
 
+    override fun hasLocationPermission(): Boolean = true
+
     override suspend fun getCurrentLocation(): Location =
         Location(
             latitude = 0.0,
