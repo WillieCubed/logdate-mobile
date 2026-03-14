@@ -9,6 +9,7 @@ import app.logdate.client.domain.account.DeletePasskeyUseCase
 import app.logdate.client.domain.account.GetAccountSetupDataUseCase
 import app.logdate.client.domain.account.GetCurrentAccountUseCase
 import app.logdate.client.domain.account.HasLogDateCloudAccountUseCase
+import app.logdate.client.domain.account.TryRestoreSignInUseCase
 import app.logdate.client.domain.user.GetUserIdUseCase
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -29,6 +30,7 @@ val accountDomainModule: Module =
         factory { CreateRemoteAccountUseCase(get()) }
         factory { CheckUsernameAvailabilityUseCase(get()) }
         factory { AuthenticateWithPasskeyUseCase(get()) }
+        factory { TryRestoreSignInUseCase(get()) }
 
         // User ID - depends on account
         factory { GetUserIdUseCase(get(), get()) }

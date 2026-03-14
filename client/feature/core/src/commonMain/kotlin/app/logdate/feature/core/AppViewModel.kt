@@ -2,16 +2,20 @@ package app.logdate.feature.core
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.domain.account.TryRestoreSignInUseCase
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.networking.NetworkState
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.shared.model.user.AppSecurityLevel
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -22,6 +26,8 @@ class AppViewModel(
     private val userStateRepository: UserStateRepository,
     private val biometricGatekeeper: BiometricGatekeeper,
     networkMonitor: NetworkAvailabilityMonitor,
+    private val sessionStorage: SessionStorage,
+    private val tryRestoreSignInUseCase: TryRestoreSignInUseCase,
 ) : ViewModel() {
     private val biometricState = biometricGatekeeper.authState
     private val appLockState = MutableStateFlow(AppLockState.Unlocked)
@@ -76,6 +82,31 @@ class AppViewModel(
                     appLockState.value = AppLockState.Unlocked
                 }
             }
+        }
+
+        viewModelScope.launch {
+            tryRestoreSignInOnStartup()
+        }
+    }
+
+    /**
+     * Silently attempts to sign into the cloud account using a restore credential from the
+     * device's backup. This runs once on startup when the user is onboarded but has no active
+     * cloud session (e.g. after migrating to a new device and restoring from backup).
+     */
+    private suspend fun tryRestoreSignInOnStartup() {
+        val userData = userStateRepository.userData.first()
+        if (!userData.isOnboarded) return
+        if (sessionStorage.getSession() != null) return
+
+        Napier.i("No cloud session on onboarded device — attempting restore sign-in")
+        when (val result = tryRestoreSignInUseCase()) {
+            is TryRestoreSignInUseCase.Result.Success ->
+                Napier.i("Restore sign-in succeeded for ${result.account.username}")
+            is TryRestoreSignInUseCase.Result.NoCredential ->
+                Napier.d("No restore credential — user will sign in manually if needed")
+            is TryRestoreSignInUseCase.Result.Error ->
+                Napier.w("Restore sign-in failed: ${result.message}")
         }
     }
 

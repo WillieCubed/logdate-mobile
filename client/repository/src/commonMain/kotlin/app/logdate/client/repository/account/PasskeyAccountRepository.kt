@@ -77,6 +77,26 @@ interface PasskeyAccountRepository {
      * @return Result indicating success or failure of the deletion operation
      */
     suspend fun deletePasskey(credentialId: String): Result<Unit>
+
+    /**
+     * Create a restore key backed up to the device's encrypted cloud backup.
+     * Should be called after successful account creation.
+     * Non-fatal — returns success even if the device does not support E2EE backup.
+     */
+    suspend fun createRestoreKey(): Result<Unit>
+
+    /**
+     * Attempt to silently sign in using a restore credential from the device's cloud backup.
+     * Returns failure if no restore credential is available (fresh install, no backup, or
+     * the server does not support restore credentials).
+     */
+    suspend fun signInWithRestoreKey(): Result<LogDateAccount>
+
+    /**
+     * Delete the restore credential. Should be called on sign-out.
+     * Non-fatal — failures are silently ignored.
+     */
+    suspend fun deleteRestoreKey(): Result<Unit>
 }
 
 /**
