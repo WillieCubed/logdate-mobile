@@ -231,6 +231,11 @@
     <string name="settings_group_data_storage">Data &amp; Storage</string>
     <string name="sync_and_backup">Sync &amp; Backup</string>
     <string name="sync_and_backup_description">Sync status, background sync, and conflict resolution</string>
+    <string name="sync_promotion_title">Sync your journals across devices</string>
+    <string name="sync_promotion_description">Sign in to back up your data and access it from anywhere</string>
+    <string name="sync_feature_backup">Automatic cloud backup keeps your data safe</string>
+    <string name="sync_feature_access">Access your journals from any device</string>
+    <string name="sync_feature_sync">Changes sync seamlessly in the background</string>
     <string name="export_and_import">Export &amp; Import</string>
     <string name="export_and_import_description">Export archive, restore from backup, and integrity check</string>
     <string name="profile_settings_description">Name, birthday, and photo</string>

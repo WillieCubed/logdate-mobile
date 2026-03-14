@@ -162,6 +162,33 @@ fun S02_SettingsOverviewEmptyDetail() {
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
+fun S02b_SettingsOverviewUnauthenticated() {
+    ScreenshotTheme {
+        SettingsOverviewContent(
+            onBack = {},
+            onNavigateToProfile = {},
+            onNavigateToAccount = {},
+            onNavigateToDevices = {},
+            onNavigateToDangerZone = {},
+            onNavigateToLocation = {},
+            onNavigateToMemories = {},
+            onNavigateToSync = {},
+            onNavigateToExport = {},
+            onNavigateToCloudAccountCreation = {},
+            onNavigateToSignIn = {},
+            userProfile =
+                UserProfile(
+                    name = "Alex Johnson",
+                    username = "",
+                    isAuthenticated = false,
+                ),
+        )
+    }
+}
+
+@PreviewTest
+@ScreenshotPreviewMatrix
+@Composable
 fun S03_AccountSettingsAuthenticated() {
     ScreenshotTheme {
         AccountSettingsContent(
@@ -255,6 +282,7 @@ fun S07_DataSettingsSignedOut() {
             onSyncNow = {},
             isBackgroundSyncEnabled = false,
             onBackgroundSyncEnabledChange = {},
+            onNavigateToCloudAccountCreation = {},
             onNavigateToSignIn = {},
         )
     }
@@ -293,6 +321,7 @@ fun S08_DataSettingsSignedIn() {
             onSyncNow = {},
             isBackgroundSyncEnabled = true,
             onBackgroundSyncEnabledChange = {},
+            onNavigateToCloudAccountCreation = {},
             onNavigateToSignIn = {},
         )
     }
@@ -344,6 +373,7 @@ fun S09_DataSettingsRestoreCompleted() {
             onSyncNow = {},
             isBackgroundSyncEnabled = true,
             onBackgroundSyncEnabledChange = {},
+            onNavigateToCloudAccountCreation = {},
             onNavigateToSignIn = {},
         )
     }
@@ -387,6 +417,7 @@ fun S10_DataSettingsConflicts() {
             onSyncNow = {},
             isBackgroundSyncEnabled = true,
             onBackgroundSyncEnabledChange = {},
+            onNavigateToCloudAccountCreation = {},
             onNavigateToSignIn = {},
         )
     }
