@@ -22,7 +22,7 @@ interface BiometricGatekeeper {
      */
     fun authenticate(
         title: String = "Making sure it's you",
-        subtitle: String = "Continue using your fingerprint or face ID",
+        subtitle: String = "Use your fingerprint or screen lock to continue",
         cancelLabel: String = "Cancel",
         requireConfirmation: Boolean = false,
         requestEnrollmentIfNecessary: Boolean = true,
