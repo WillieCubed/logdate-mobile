@@ -28,6 +28,7 @@ import app.logdate.server.oauth.OAuthConfig
 import app.logdate.server.oauth.OAuthDpopVerifier
 import app.logdate.server.oauth.OAuthKeyService
 import app.logdate.server.oauth.OAuthNonceService
+import app.logdate.server.passkeys.RestoreCredentialService
 import app.logdate.server.passkeys.WebAuthnConfig
 import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.server.routes.authV1Routes
@@ -127,6 +128,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     val googleIdTokenVerifier: GoogleIdTokenVerifier by inject()
     val sessionManager: SessionManager by inject()
     val webAuthnService: WebAuthnPasskeyService by inject()
+    val restoreCredentialService: RestoreCredentialService by inject()
     val atprotoIdentityService: AtprotoIdentityService by inject()
     val serverDescriptorConfig: ServerDescriptorConfig by inject()
     val signingKeyService: SigningKeyService by inject()
@@ -283,6 +285,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
                 identityRepository = accountIdentityRepository,
                 sessionManager = sessionManager,
                 webAuthnService = webAuthnService,
+                restoreCredentialService = restoreCredentialService,
                 atprotoIdentityService = atprotoIdentityService,
                 tokenService = tokenService,
                 googleIdTokenVerifier = googleIdTokenVerifier,

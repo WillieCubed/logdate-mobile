@@ -49,8 +49,10 @@ import app.logdate.server.database.PostgreSQLLogDateMediaRepository
 import app.logdate.server.database.PostgreSQLOAuthRuntimeStateRepository
 import app.logdate.server.database.PostgreSQLPasskeyRepository
 import app.logdate.server.database.PostgreSQLRepoBlockStore
+import app.logdate.server.database.PostgreSQLRestoreCredentialRepository
 import app.logdate.server.database.PostgreSQLSessionManager
 import app.logdate.server.database.PostgreSQLSigningKeyRepository
+import app.logdate.server.database.RestoreCredentialsTable
 import app.logdate.server.database.SigningKeysTable
 import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.AtprotoIdentityService
@@ -78,7 +80,10 @@ import app.logdate.server.oauth.OAuthKeyService
 import app.logdate.server.oauth.OAuthNonceService
 import app.logdate.server.oauth.OAuthRuntimeStateRepository
 import app.logdate.server.passkeys.InMemoryPasskeyRepository
+import app.logdate.server.passkeys.InMemoryRestoreCredentialRepository
 import app.logdate.server.passkeys.PasskeyRepository
+import app.logdate.server.passkeys.RestoreCredentialRepository
+import app.logdate.server.passkeys.RestoreCredentialService
 import app.logdate.server.passkeys.WebAuthnConfig
 import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.server.sync.AssociationSyncTable
@@ -136,6 +141,7 @@ fun initializeDatabase(): Boolean =
                     OAuthAuthorizationRequestsTable,
                     OAuthAuthorizationCodesTable,
                     OAuthRefreshTokensTable,
+                    RestoreCredentialsTable,
                 )
             }
         } else {
@@ -186,6 +192,10 @@ fun serverModule(isDatabaseAvailable: Boolean) =
             if (isDatabaseAvailable) PostgreSQLPasskeyRepository() else InMemoryPasskeyRepository()
         }
 
+        single<RestoreCredentialRepository> {
+            if (isDatabaseAvailable) PostgreSQLRestoreCredentialRepository() else InMemoryRestoreCredentialRepository()
+        }
+
         single<SigningKeyRepository> {
             if (isDatabaseAvailable) PostgreSQLSigningKeyRepository() else InMemorySigningKeyRepository()
         }
@@ -199,6 +209,15 @@ fun serverModule(isDatabaseAvailable: Boolean) =
             val webAuthnConfig: WebAuthnConfig = get()
             WebAuthnPasskeyService(
                 passkeyRepository = get(),
+                relyingPartyId = webAuthnConfig.relyingPartyId,
+                relyingPartyName = webAuthnConfig.relyingPartyName,
+                origin = webAuthnConfig.origin,
+            )
+        }
+        single {
+            val webAuthnConfig: WebAuthnConfig = get()
+            RestoreCredentialService(
+                restoreCredentialRepository = get(),
                 relyingPartyId = webAuthnConfig.relyingPartyId,
                 relyingPartyName = webAuthnConfig.relyingPartyName,
                 origin = webAuthnConfig.origin,

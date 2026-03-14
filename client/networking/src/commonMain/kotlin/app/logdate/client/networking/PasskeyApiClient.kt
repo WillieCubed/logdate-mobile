@@ -67,6 +67,36 @@ interface PasskeyApiClientContract {
         accessToken: String,
         credentialId: String,
     ): Result<Unit>
+
+    /**
+     * Begin restore key registration. Returns WebAuthn registration options for creating a restore key.
+     * Requires an authenticated session.
+     */
+    suspend fun beginRestoreKeyRegistration(accessToken: String): Result<PasskeyRegistrationOptions>
+
+    /**
+     * Complete restore key registration by sending the credential JSON back to the server.
+     * Requires an authenticated session.
+     *
+     * @param credentialJson The WebAuthn registration response JSON from [RestoreCredentialManager]
+     * @param challenge The challenge that was used during registration (from [beginRestoreKeyRegistration])
+     */
+    suspend fun completeRestoreKeyRegistration(
+        accessToken: String,
+        credentialJson: String,
+        challenge: String,
+    ): Result<Unit>
+
+    /**
+     * Begin restore sign-in. Returns a WebAuthn authentication challenge.
+     * Does not require authentication — called on first launch after device restore.
+     */
+    suspend fun beginRestoreSignIn(): Result<BeginAuthenticationData>
+
+    /**
+     * Complete restore sign-in. Verifies the restore credential and returns tokens.
+     */
+    suspend fun completeRestoreSignIn(request: CompleteAuthenticationRequest): Result<CompleteAuthenticationData>
 }
 
 /**
@@ -311,6 +341,106 @@ class PasskeyApiClient(
             Napier.e("Failed to delete passkey", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to delete passkey", e))
         }
+
+    override suspend fun beginRestoreKeyRegistration(accessToken: String): Result<PasskeyRegistrationOptions> =
+        try {
+            val baseUrl = getBaseUrl()
+            val response =
+                httpClient.post("$baseUrl$AUTH_PATH/restore/register/begin") {
+                    contentType(ContentType.Application.Json)
+                    header("Authorization", "Bearer $accessToken")
+                }
+
+            if (response.status.value in 200..299) {
+                val apiResponse = json.decodeFromString<RestoreRegisterBeginResponseDto>(response.bodyAsText())
+                Result.success(apiResponse.data)
+            } else {
+                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+            }
+        } catch (e: Exception) {
+            Napier.e("Failed to begin restore key registration", e)
+            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to begin restore key registration", e))
+        }
+
+    override suspend fun completeRestoreKeyRegistration(
+        accessToken: String,
+        credentialJson: String,
+        challenge: String,
+    ): Result<Unit> =
+        try {
+            val baseUrl = getBaseUrl()
+            val response =
+                httpClient.post("$baseUrl$AUTH_PATH/restore/register/complete") {
+                    contentType(ContentType.Application.Json)
+                    header("Authorization", "Bearer $accessToken")
+                    setBody(RestoreRegisterCompleteRequestDto(credentialJson, challenge))
+                }
+
+            if (response.status.value in 200..299) {
+                Result.success(Unit)
+            } else {
+                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+            }
+        } catch (e: Exception) {
+            Napier.e("Failed to complete restore key registration", e)
+            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to complete restore key registration", e))
+        }
+
+    override suspend fun beginRestoreSignIn(): Result<BeginAuthenticationData> =
+        try {
+            val baseUrl = getBaseUrl()
+            val response =
+                httpClient.post("$baseUrl$AUTH_PATH/restore/begin") {
+                    contentType(ContentType.Application.Json)
+                }
+
+            if (response.status.value in 200..299) {
+                val apiResponse = json.decodeFromString<SigninPasskeyBeginResponseDto>(response.bodyAsText())
+                Result.success(
+                    BeginAuthenticationData(
+                        challenge = apiResponse.data.challenge,
+                        rpId = apiResponse.data.rpId,
+                        allowCredentials = apiResponse.data.allowCredentials,
+                        timeout = apiResponse.data.timeout,
+                        userVerification = apiResponse.data.userVerification,
+                    ),
+                )
+            } else {
+                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+            }
+        } catch (e: Exception) {
+            Napier.e("Failed to begin restore sign-in", e)
+            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to begin restore sign-in", e))
+        }
+
+    override suspend fun completeRestoreSignIn(request: CompleteAuthenticationRequest): Result<CompleteAuthenticationData> =
+        try {
+            val baseUrl = getBaseUrl()
+            val response =
+                httpClient.post("$baseUrl$AUTH_PATH/restore/complete") {
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+
+            if (response.status.value in 200..299) {
+                val apiResponse = json.decodeFromString<AuthResponseDto>(response.bodyAsText())
+                Result.success(
+                    CompleteAuthenticationData(
+                        account = apiResponse.data.account.toLogDateAccount(),
+                        tokens = apiResponse.data.tokens,
+                    ),
+                )
+            } else {
+                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+            }
+        } catch (e: Exception) {
+            Napier.e("Failed to complete restore sign-in", e)
+            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to complete restore sign-in", e))
+        }
 }
 
 /**
@@ -407,6 +537,18 @@ private data class RefreshTokenResponseV1Dto(
 @Serializable
 private data class RefreshTokenDataV1Dto(
     val accessToken: String,
+)
+
+@Serializable
+private data class RestoreRegisterBeginResponseDto(
+    val success: Boolean,
+    val data: PasskeyRegistrationOptions,
+)
+
+@Serializable
+private data class RestoreRegisterCompleteRequestDto(
+    val credentialJson: String,
+    val challenge: String,
 )
 
 private fun AuthAccountDto.toLogDateAccount(): LogDateAccount =

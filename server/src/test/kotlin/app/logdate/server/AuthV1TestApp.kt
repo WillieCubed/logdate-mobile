@@ -35,6 +35,8 @@ import app.logdate.server.oauth.OAuthConfig
 import app.logdate.server.oauth.OAuthDpopVerifier
 import app.logdate.server.oauth.OAuthKeyService
 import app.logdate.server.oauth.OAuthNonceService
+import app.logdate.server.passkeys.InMemoryRestoreCredentialRepository
+import app.logdate.server.passkeys.RestoreCredentialService
 import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.server.routes.authV1Routes
 import app.logdate.server.routes.identityApiRoutes
@@ -86,6 +88,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
     identityRepository: AccountIdentityRepository = InMemoryAccountIdentityRepository(),
     sessionManager: SessionManager = InMemorySessionManager(),
     webAuthnPasskeyService: WebAuthnPasskeyService = WebAuthnPasskeyService(),
+    restoreCredentialService: RestoreCredentialService = RestoreCredentialService(InMemoryRestoreCredentialRepository()),
     metrics: AuthMetricsRegistry = AuthMetricsRegistry(),
     googleIdTokenVerifier: GoogleIdTokenVerifier? = null,
     googleClaimsByToken: Map<String, GoogleIdTokenClaims> = emptyMap(),
@@ -219,6 +222,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
                     identityRepository = identityRepository,
                     sessionManager = sessionManager,
                     webAuthnService = webAuthnPasskeyService,
+                    restoreCredentialService = restoreCredentialService,
                     atprotoIdentityService = atprotoIdentityService,
                     tokenService = tokenService,
                     googleIdTokenVerifier = verifier,

@@ -16,6 +16,7 @@ import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.SessionType
 import app.logdate.server.auth.TokenService
 import app.logdate.server.identity.AtprotoIdentityService
+import app.logdate.server.passkeys.RestoreCredentialService
 import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.shared.model.AccountInfoResponse
 import app.logdate.shared.model.AccountTokens
@@ -26,6 +27,7 @@ import app.logdate.shared.model.AuthenticatorAttestationResponse
 import app.logdate.shared.model.PasskeyAssertionResponse
 import app.logdate.shared.model.PasskeyAuthenticationResponse
 import app.logdate.shared.model.PasskeyCredentialResponse
+import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.PasskeyRegistrationResponse
 import app.logdate.shared.model.UpdateAccountProfileRequest
 import app.logdate.shared.model.UsernameAvailabilityData
@@ -216,6 +218,18 @@ data class AuthMetricsResponse(
     val data: app.logdate.server.auth.AuthMetricsSnapshot,
 )
 
+@Serializable
+data class RestoreRegisterBeginResponse(
+    val success: Boolean,
+    val data: PasskeyRegistrationOptions,
+)
+
+@Serializable
+data class RestoreRegisterCompleteRequest(
+    val credentialJson: String,
+    val challenge: String,
+)
+
 private data class GoogleResolution(
     val account: Account,
     val identity: AccountIdentity,
@@ -227,6 +241,7 @@ fun Route.authV1Routes(
     identityRepository: AccountIdentityRepository,
     sessionManager: SessionManager,
     webAuthnService: WebAuthnPasskeyService,
+    restoreCredentialService: RestoreCredentialService,
     atprotoIdentityService: AtprotoIdentityService,
     tokenService: TokenService,
     googleIdTokenVerifier: GoogleIdTokenVerifier,
@@ -773,6 +788,126 @@ fun Route.authV1Routes(
                     call.respondForRequestException(e, "Failed to complete Google signin", metrics)
                 } finally {
                     metrics.recordOperation(METRIC_AUTH_SIGNIN_GOOGLE, System.currentTimeMillis() - start, success)
+                }
+            }
+        }
+
+        route("/restore") {
+            post("/register/begin") {
+                try {
+                    val account = resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics) ?: return@post
+                    val options =
+                        restoreCredentialService.generateRegistrationOptions(
+                            userId = account.id,
+                            username = account.username,
+                            displayName = account.displayName,
+                        )
+                    call.respond(HttpStatusCode.OK, RestoreRegisterBeginResponse(success = true, data = options))
+                } catch (e: Exception) {
+                    Napier.e("Failed to begin restore key registration", e)
+                    call.respondForRequestException(e, "Failed to begin restore key registration", metrics)
+                }
+            }
+
+            post("/register/complete") {
+                try {
+                    val account = resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics) ?: return@post
+                    val body = call.receive<RestoreRegisterCompleteRequest>()
+                    val registrationResponse =
+                        kotlinx.serialization.json.Json
+                            .decodeFromString<PasskeyCredentialResponse>(body.credentialJson)
+                            .toPasskeyRegistrationResponse()
+                    val result = restoreCredentialService.verifyRegistration(account.id, body.challenge, registrationResponse)
+                    if (!result.success) {
+                        return@post call.respondApiError(
+                            HttpStatusCode.BadRequest,
+                            "RESTORE_KEY_REGISTRATION_FAILED",
+                            result.error ?: "Failed to verify restore key",
+                            metrics,
+                        )
+                    }
+                    call.respond(HttpStatusCode.OK, mapOf("success" to true))
+                } catch (e: Exception) {
+                    Napier.e("Failed to complete restore key registration", e)
+                    call.respondForRequestException(e, "Failed to complete restore key registration", metrics)
+                }
+            }
+
+            post("/begin") {
+                try {
+                    val options = restoreCredentialService.generateAuthOptions()
+                    call.respond(
+                        HttpStatusCode.OK,
+                        SigninPasskeyBeginResponse(
+                            success = true,
+                            data =
+                                SigninPasskeyBeginData(
+                                    challenge = options.challenge,
+                                    rpId = restoreCredentialService.relyingPartyId,
+                                    allowCredentials = emptyList(),
+                                    timeout = options.timeout,
+                                    userVerification = "discouraged",
+                                ),
+                        ),
+                    )
+                } catch (e: Exception) {
+                    Napier.e("Failed to begin restore sign-in", e)
+                    call.respondForRequestException(e, "Failed to begin restore sign-in", metrics)
+                }
+            }
+
+            post("/complete") {
+                try {
+                    val request = call.receive<SigninPasskeyCompleteRequest>()
+                    val result =
+                        restoreCredentialService.verifyAuthentication(
+                            challenge = request.challenge,
+                            authenticationResponse = request.credential.toPasskeyAuthenticationResponse(),
+                        )
+                    val accountId = result.userId
+                    if (!result.success || accountId == null) {
+                        return@post call.respondApiError(
+                            HttpStatusCode.Unauthorized,
+                            "RESTORE_FAILED",
+                            result.error ?: "Restore sign-in failed",
+                            metrics,
+                        )
+                    }
+                    val account =
+                        accountRepository.findById(accountId)
+                            ?: return@post call.respondApiError(HttpStatusCode.NotFound, "ACCOUNT_NOT_FOUND", "Account not found", metrics)
+                    accountRepository.updateLastSignIn(account.id)
+                    val credentialSubject = result.credentialId ?: request.credential.id
+                    val existing = identityRepository.findByProviderSubject(IdentityProvider.PASSKEY, credentialSubject)
+                    if (existing == null) {
+                        identityRepository.save(
+                            AccountIdentity(
+                                id = Uuid.random(),
+                                accountId = account.id,
+                                provider = IdentityProvider.PASSKEY,
+                                providerSubject = credentialSubject,
+                                email = account.email,
+                                emailVerified = account.emailVerified,
+                                createdAt = Clock.System.now(),
+                                lastSignInAt = Clock.System.now(),
+                            ),
+                        )
+                    } else {
+                        identityRepository.touchLastSignIn(existing.id)
+                    }
+                    val response =
+                        issueAuthResponse(
+                            account,
+                            accountRepository,
+                            identityRepository,
+                            webAuthnService,
+                            atprotoIdentityService,
+                            tokenService,
+                        )
+                    call.respond(HttpStatusCode.OK, response)
+                } catch (e: Exception) {
+                    Napier.e("Failed to complete restore sign-in", e)
+                    call.respondForRequestException(e, "Failed to complete restore sign-in", metrics)
                 }
             }
         }

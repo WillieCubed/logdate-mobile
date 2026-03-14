@@ -187,6 +187,20 @@ object PasskeysTable : Table("passkeys") {
     override val primaryKey = PrimaryKey(id)
 }
 
+@OptIn(ExperimentalUuidApi::class)
+object RestoreCredentialsTable : Table("restore_credentials") {
+    val id = uuid("id").autoGenerate()
+    val accountId = uuid("account_id").references(AccountsTable.id)
+    val credentialId = text("credential_id").uniqueIndex()
+    val publicKey = text("public_key")
+    val signCount = long("sign_count").default(0)
+    val isActive = bool("is_active").default(true)
+    val createdAt = timestamp("created_at")
+    val lastUsedAt = timestamp("last_used_at").nullable()
+
+    override val primaryKey = PrimaryKey(id)
+}
+
 object SessionsTable : Table("sessions") {
     val id = varchar("id", 64)
     val temporaryUserId = uuid("temporary_user_id")
