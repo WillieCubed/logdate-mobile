@@ -55,4 +55,12 @@
     <string name="state_journals_empty_cta">Create one below!</string>
     <string name="state_journals_empty_description">Journals are collections of memories from your timeline, like stories.</string>
     <string name="state_journals_empty_title">No journals</string>
+    <string name="label_sorting_by">Sorting by %1$s</string>
+    <string name="sort_last_updated">last updated</string>
+    <string name="sort_created">date created</string>
+    <string name="sort_title">title</string>
+    <string name="filter_owned_by_me">Owned by me</string>
+    <string name="filter_shared">Shared</string>
+    <string name="cd_switch_to_grid">Switch to grid view</string>
+    <string name="cd_switch_to_carousel">Switch to carousel view</string>
 </resources>

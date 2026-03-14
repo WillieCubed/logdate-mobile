@@ -2,44 +2,25 @@
 
 package app.logdate.feature.journals.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CornerBasedShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.logdate.shared.model.Journal
-import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
-import logdate.client.feature.journal.generated.resources.Res
-import logdate.client.feature.journal.generated.resources.action_browse_journals
-import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
-import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
+/**
+ * Journals overview screen. Wires [JournalsOverviewViewModel] state to the stateless content.
+ */
 @Composable
 fun JournalsOverviewScreen(
     onOpenJournal: JournalClickCallback,
@@ -53,25 +34,45 @@ fun JournalsOverviewScreen(
 
     JournalsOverviewScreenContent(
         journals = state.journals,
+        layoutMode = state.layoutMode,
+        sortOption = state.sortOption,
+        activeFilters = state.activeFilters,
         onOpenJournal = onOpenJournal,
         onBrowseJournals = onBrowseJournals,
         onCreateJournal = onCreateJournal,
         onNavigationClick = onNavigationClick,
+        onToggleLayoutMode = viewModel::toggleLayoutMode,
+        onSortOptionSelected = viewModel::setSortOption,
+        onToggleFilter = viewModel::toggleFilter,
         modifier = modifier,
     )
 }
 
+/**
+ * Stateless journals overview layout.
+ *
+ * Uses a transparent Scaffold so the shell's `surfaceContainer` background shows through
+ * between the search toolbar and the [JournalListPanel] surface below.
+ */
 @Composable
 fun JournalsOverviewScreenContent(
     journals: List<JournalListItemUiState>,
+    layoutMode: JournalLayoutMode,
+    sortOption: JournalSortOption,
+    activeFilters: Set<JournalFilter>,
     onOpenJournal: JournalClickCallback,
     onBrowseJournals: () -> Unit,
     onCreateJournal: () -> Unit,
+    onToggleLayoutMode: () -> Unit,
+    onSortOptionSelected: (JournalSortOption) -> Unit,
+    onToggleFilter: (JournalFilter) -> Unit,
     onNavigationClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
-        modifier = modifier,
+        // Outer nav bar padding handles right-side inset on tablets where the
+        // system navigation bar sits along the edge of the screen.
+        modifier = modifier.navigationBarsPadding(),
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
@@ -85,147 +86,24 @@ fun JournalsOverviewScreenContent(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(paddingValues),
+                    .padding(paddingValues)
+                    .padding(top = Spacing.sm),
             contentAlignment = Alignment.Center,
         ) {
             JournalListPanel(
                 journals = journals,
+                layoutMode = layoutMode,
+                sortOption = sortOption,
+                activeFilters = activeFilters,
                 onOpenJournal = onOpenJournal,
                 onBrowseJournals = onBrowseJournals,
                 onCreateJournal = onCreateJournal,
+                onToggleLayoutMode = onToggleLayoutMode,
+                onSortOptionSelected = onSortOptionSelected,
+                onToggleFilter = onToggleFilter,
                 showLoading = false,
                 modifier = Modifier.fillMaxSize(),
             )
         }
     }
 }
-
-// TODO: Move to :client:ui
-@Composable
-fun JournalListPanel(
-    journals: List<JournalListItemUiState>,
-    onOpenJournal: JournalClickCallback,
-    onBrowseJournals: () -> Unit,
-    onCreateJournal: () -> Unit,
-    modifier: Modifier = Modifier,
-    showLoading: Boolean = false,
-) {
-    Surface(
-        modifier = modifier,
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = JournalsPanelShape,
-    ) {
-        JournalListPlaceholder(isVisible = showLoading)
-        AnimatedVisibility(
-            visible = showLoading.not(),
-            enter = fadeIn(animationSpec = tween(200)),
-            exit = fadeOut(animationSpec = tween(200)),
-        ) {
-            if (journals.isEmpty()) {
-                NoJournalsScreen()
-            } else {
-//                JournalList(state.journals, onOpenJournal, modifier)
-                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                    val reservedForButton = (maxHeight * 0.12f).coerceIn(44.dp, 72.dp)
-                    val contentSpacing = (maxHeight * 0.03f).coerceIn(Spacing.sm, Spacing.lg)
-                    val carouselMaxHeight = (maxHeight - reservedForButton).coerceAtLeast(220.dp)
-
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(contentSpacing, Alignment.CenterVertically),
-                    ) {
-                        JournalCoverFlowCarousel(
-                            journals = journals,
-                            onOpenJournal = onOpenJournal,
-                            onCreateJournal = onCreateJournal,
-                            maxCardHeight = carouselMaxHeight,
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(max = carouselMaxHeight),
-                        )
-                        TextButton(
-                            onClick = onBrowseJournals,
-                            modifier = Modifier.align(Alignment.CenterHorizontally),
-                        ) {
-                            Text(text = stringResource(Res.string.action_browse_journals))
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Preview
-@Composable
-private fun JournalsScreenPreview() {
-    LogDateTheme {
-        JournalsOverviewScreenContent(
-            journals = journalsOverviewPreviewData,
-            onOpenJournal = {},
-            onBrowseJournals = {},
-            onCreateJournal = {},
-            onNavigationClick = {},
-            modifier = Modifier,
-        )
-    }
-}
-
-@Preview
-@Composable
-private fun JournalsScreenPreview_Empty() {
-    LogDateTheme {
-        JournalListPanel(
-            journals = emptyList(),
-            onOpenJournal = {},
-            onBrowseJournals = {},
-            onCreateJournal = {},
-        )
-    }
-}
-
-/**
- * A [CornerBasedShape] that represents the shape of a journal item.
- */
-internal val JournalShape =
-    RoundedCornerShape(
-        topEnd = 16.dp,
-        bottomEnd = 16.dp,
-    )
-
-private val JournalsPanelShape =
-    RoundedCornerShape(
-        topStart = 16.dp,
-        topEnd = 16.dp,
-    )
-
-typealias JournalClickCallback = (journalId: Uuid) -> Unit
-
-private val journalsOverviewPreviewData =
-    listOf(
-        JournalListItemUiState.ExistingJournal(
-            data =
-                Journal(
-                    id = Uuid.parse("00000000-0000-0000-0000-000000000101"),
-                    title = "Daily Reflections",
-                    description = "A space for everyday thoughts",
-                    isFavorited = true,
-                    created = Instant.fromEpochMilliseconds(1_740_000_000_000L),
-                    lastUpdated = Instant.fromEpochMilliseconds(1_740_000_000_000L),
-                ),
-        ),
-        JournalListItemUiState.ExistingJournal(
-            data =
-                Journal(
-                    id = Uuid.parse("00000000-0000-0000-0000-000000000102"),
-                    title = "Travel Log",
-                    description = "Adventures and explorations",
-                    isFavorited = false,
-                    created = Instant.fromEpochMilliseconds(1_740_000_500_000L),
-                    lastUpdated = Instant.fromEpochMilliseconds(1_740_000_500_000L),
-                ),
-        ),
-        JournalListItemUiState.CreateJournalPlaceholder,
-    )

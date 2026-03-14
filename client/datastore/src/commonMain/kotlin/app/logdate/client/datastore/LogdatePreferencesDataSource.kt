@@ -31,6 +31,9 @@ class LogdatePreferencesDataSource(
         val DAY_END_HOUR = intPreferencesKey("day_end_hour")
         val BACKGROUND_SYNC_ENABLED = booleanPreferencesKey("background_sync_enabled")
 
+        // Journal UI keys
+        val JOURNAL_LAYOUT_MODE = stringPreferencesKey("journal_layout_mode")
+
         // Profile keys
         val DISPLAY_NAME = stringPreferencesKey("display_name")
         val PROFILE_PHOTO_URI = stringPreferencesKey("profile_photo_uri")
@@ -63,6 +66,25 @@ class LogdatePreferencesDataSource(
                 profileLastUpdatedAt = millisToInstantOrDistantPast(prefs[PROFILE_LAST_UPDATED_AT]),
             )
         }
+
+    /**
+     * Observes the persisted journal layout mode preference.
+     */
+    fun observeJournalLayoutMode(): Flow<String> =
+        userPreferences.data.map { prefs ->
+            prefs[JOURNAL_LAYOUT_MODE] ?: "CAROUSEL"
+        }
+
+    /**
+     * Persists the journal layout mode preference.
+     */
+    suspend fun setJournalLayoutMode(modeName: String) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                this[JOURNAL_LAYOUT_MODE] = modeName
+            }
+        }
+    }
 
     val backgroundSyncEnabled: Flow<Boolean> =
         userPreferences.data.map { prefs ->

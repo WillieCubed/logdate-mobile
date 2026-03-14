@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,6 +36,15 @@ import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateShort
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
+
+/**
+ * Shape for individual journal cover items (rounded right edges, flat left like a book spine).
+ */
+internal val JournalShape =
+    RoundedCornerShape(
+        topEnd = 16.dp,
+        bottomEnd = 16.dp,
+    )
 
 /**
  * A journal cover that displays basic information about a journal.
@@ -110,16 +120,17 @@ private fun BoxScope.JournalCoverContent(journal: Journal) {
         verticalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.Bottom),
         horizontalAlignment = Alignment.Start,
     ) {
-        // Actual content
         Text(
             text = journal.title,
             modifier = Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onTertiaryContainer,
         )
         Text(
             "Last updated ${journal.lastUpdated.toReadableDateShort()}",
             modifier = Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onTertiaryContainer,
         )
         // TODO: Include people label
     }

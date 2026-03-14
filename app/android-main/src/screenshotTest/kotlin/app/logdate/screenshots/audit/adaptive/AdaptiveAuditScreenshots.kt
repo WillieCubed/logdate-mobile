@@ -8,7 +8,9 @@ import app.logdate.client.repository.search.SearchResultType
 import app.logdate.feature.core.account.ui.CloudAccountIntroContent
 import app.logdate.feature.core.profile.ui.ProfileScreenContent
 import app.logdate.feature.core.profile.ui.ProfileUiState
+import app.logdate.feature.journals.ui.JournalLayoutMode
 import app.logdate.feature.journals.ui.JournalListItemUiState
+import app.logdate.feature.journals.ui.JournalSortOption
 import app.logdate.feature.journals.ui.JournalsOverviewScreenContent
 import app.logdate.feature.journals.ui.detail.EntryDisplayData
 import app.logdate.feature.journals.ui.detail.JournalDetailScreenContent
@@ -168,10 +170,16 @@ fun A06_JournalsOverview() {
     ScreenshotTheme {
         JournalsOverviewScreenContent(
             journals = auditJournals,
+            layoutMode = JournalLayoutMode.CAROUSEL,
+            sortOption = JournalSortOption.LAST_UPDATED,
+            activeFilters = emptySet(),
             onOpenJournal = {},
             onBrowseJournals = {},
             onCreateJournal = {},
             onNavigationClick = {},
+            onToggleLayoutMode = {},
+            onSortOptionSelected = {},
+            onToggleFilter = {},
         )
     }
 }

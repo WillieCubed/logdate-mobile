@@ -2,8 +2,10 @@ package app.logdate.screenshots.flows.flow02_home_timeline
 
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
+import app.logdate.feature.journals.ui.JournalLayoutMode
 import app.logdate.feature.journals.ui.JournalListItemUiState
 import app.logdate.feature.journals.ui.JournalListPanel
+import app.logdate.feature.journals.ui.JournalSortOption
 import app.logdate.feature.rewind.ui.RewindScreenContent
 import app.logdate.feature.rewind.ui.overview.RewindHistoryUiState
 import app.logdate.feature.rewind.ui.overview.RewindOverviewScreenUiState
@@ -347,9 +349,15 @@ fun S07_JournalsEmpty() {
         HomeTabRouteFrame(selectedTab = RoutePreviewTab.JOURNALS) {
             JournalListPanel(
                 journals = emptyList(),
+                layoutMode = JournalLayoutMode.CAROUSEL,
+                sortOption = JournalSortOption.LAST_UPDATED,
+                activeFilters = emptySet(),
                 onOpenJournal = {},
                 onBrowseJournals = {},
                 onCreateJournal = {},
+                onToggleLayoutMode = {},
+                onSortOptionSelected = {},
+                onToggleFilter = {},
             )
         }
     }
@@ -363,9 +371,15 @@ fun S08_JournalsPopulated() {
         HomeTabRouteFrame(selectedTab = RoutePreviewTab.JOURNALS) {
             JournalListPanel(
                 journals = ScreenshotTestData.sampleJournals.map(JournalListItemUiState::ExistingJournal),
+                layoutMode = JournalLayoutMode.CAROUSEL,
+                sortOption = JournalSortOption.LAST_UPDATED,
+                activeFilters = emptySet(),
                 onOpenJournal = {},
                 onBrowseJournals = {},
                 onCreateJournal = {},
+                onToggleLayoutMode = {},
+                onSortOptionSelected = {},
+                onToggleFilter = {},
             )
         }
     }

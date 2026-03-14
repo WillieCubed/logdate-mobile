@@ -1,11 +1,53 @@
 package app.logdate.feature.journals.ui
 
 import app.logdate.shared.model.Journal
+import kotlin.uuid.Uuid
 
+/**
+ * UI state for the journals overview screen.
+ *
+ * Layout mode preference is persisted via DataStore so it survives app restarts.
+ * Sort and filter state is session-scoped and resets when the user leaves the screen.
+ */
 data class JournalsOverviewUiState(
     val journals: List<JournalListItemUiState> = emptyList(),
+    val layoutMode: JournalLayoutMode = JournalLayoutMode.CAROUSEL,
+    val sortOption: JournalSortOption = JournalSortOption.LAST_UPDATED,
+    val activeFilters: Set<JournalFilter> = emptySet(),
 )
 
+/**
+ * How the journal list is visually arranged. Persisted across app restarts.
+ */
+enum class JournalLayoutMode {
+    GRID,
+    CAROUSEL,
+}
+
+/**
+ * Sort orders available in the journal filter bar dropdown.
+ */
+enum class JournalSortOption {
+    LAST_UPDATED,
+    CREATED,
+    TITLE,
+}
+
+/**
+ * Filter options shown as chips in the journal filter bar.
+ *
+ * These are currently UI-only toggles — [OWNED_BY_ME] and [SHARED] don't filter
+ * until the Journal model gains ownership/sharing fields.
+ */
+enum class JournalFilter {
+    OWNED_BY_ME,
+    SHARED,
+}
+
+/**
+ * A single item in the journal list. The list always ends with a [CreateJournalPlaceholder]
+ * so the user has a clear affordance for creating a new journal.
+ */
 sealed interface JournalListItemUiState {
     data class ExistingJournal(
         val data: Journal,
@@ -13,3 +55,5 @@ sealed interface JournalListItemUiState {
 
     data object CreateJournalPlaceholder : JournalListItemUiState
 }
+
+typealias JournalClickCallback = (journalId: Uuid) -> Unit
