@@ -8,7 +8,6 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetRestoreCredentialOption
 import androidx.credentials.RestoreCredential
-import androidx.credentials.TYPE_CLEAR_RESTORE_CREDENTIAL
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
 import androidx.credentials.exceptions.restorecredential.E2eeUnavailableException
@@ -82,7 +81,7 @@ class AndroidRestoreCredentialManager(
 
     override suspend fun clearRestoreCredential(): Result<Unit> =
         try {
-            credentialManager.clearCredentialState(ClearCredentialStateRequest(TYPE_CLEAR_RESTORE_CREDENTIAL))
+            credentialManager.clearCredentialState(ClearCredentialStateRequest(ClearCredentialStateRequest.TYPE_CLEAR_RESTORE_CREDENTIAL))
             Napier.i("Restore credential cleared")
             Result.success(Unit)
         } catch (e: Exception) {
