@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.ViewCarousel
 import androidx.compose.material3.AssistChip
@@ -30,6 +31,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.journal.generated.resources.Res
 import logdate.client.feature.journal.generated.resources.cd_switch_to_carousel
@@ -39,6 +44,9 @@ import logdate.client.feature.journal.generated.resources.filter_shared
 import logdate.client.feature.journal.generated.resources.label_sorting_by
 import logdate.client.feature.journal.generated.resources.sort_created
 import logdate.client.feature.journal.generated.resources.sort_last_updated
+import logdate.client.feature.journal.generated.resources.sort_menu_created
+import logdate.client.feature.journal.generated.resources.sort_menu_last_updated
+import logdate.client.feature.journal.generated.resources.sort_menu_title
 import logdate.client.feature.journal.generated.resources.sort_title
 import org.jetbrains.compose.resources.stringResource
 
@@ -78,22 +86,31 @@ fun JournalFilterBar(
             modifier
                 .background(backgroundColor)
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+                .testTag("JournalFilterBar"),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        FilledTonalIconButton(onClick = onToggleLayoutMode) {
+        val layoutToggleDescription =
+            when (layoutMode) {
+                JournalLayoutMode.CAROUSEL -> stringResource(Res.string.cd_switch_to_grid)
+                JournalLayoutMode.GRID -> stringResource(Res.string.cd_switch_to_carousel)
+            }
+
+        FilledTonalIconButton(
+            onClick = onToggleLayoutMode,
+            modifier =
+                Modifier
+                    .testTag("LayoutModeToggle")
+                    .semantics { stateDescription = layoutMode.name.lowercase() },
+        ) {
             Icon(
                 imageVector =
                     when (layoutMode) {
                         JournalLayoutMode.CAROUSEL -> Icons.Default.GridView
                         JournalLayoutMode.GRID -> Icons.Default.ViewCarousel
                     },
-                contentDescription =
-                    when (layoutMode) {
-                        JournalLayoutMode.CAROUSEL -> stringResource(Res.string.cd_switch_to_grid)
-                        JournalLayoutMode.GRID -> stringResource(Res.string.cd_switch_to_carousel)
-                    },
+                contentDescription = layoutToggleDescription,
             )
         }
 
@@ -106,6 +123,7 @@ fun JournalFilterBar(
             selected = JournalFilter.OWNED_BY_ME in activeFilters,
             onClick = { onToggleFilter(JournalFilter.OWNED_BY_ME) },
             label = { Text(stringResource(Res.string.filter_owned_by_me)) },
+            modifier = Modifier.testTag("FilterChip_OWNED_BY_ME"),
             colors =
                 FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -117,6 +135,7 @@ fun JournalFilterBar(
             selected = JournalFilter.SHARED in activeFilters,
             onClick = { onToggleFilter(JournalFilter.SHARED) },
             label = { Text(stringResource(Res.string.filter_shared)) },
+            modifier = Modifier.testTag("FilterChip_SHARED"),
             colors =
                 FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -126,6 +145,28 @@ fun JournalFilterBar(
     }
 }
 
+/**
+ * Chip label for the sort option (lowercase, for inline "Sorting by …" text).
+ */
+@Composable
+private fun sortChipLabel(option: JournalSortOption): String =
+    when (option) {
+        JournalSortOption.LAST_UPDATED -> stringResource(Res.string.sort_last_updated)
+        JournalSortOption.CREATED -> stringResource(Res.string.sort_created)
+        JournalSortOption.TITLE -> stringResource(Res.string.sort_title)
+    }
+
+/**
+ * Menu item label for the sort option (capitalized, for standalone dropdown items).
+ */
+@Composable
+private fun sortMenuLabel(option: JournalSortOption): String =
+    when (option) {
+        JournalSortOption.LAST_UPDATED -> stringResource(Res.string.sort_menu_last_updated)
+        JournalSortOption.CREATED -> stringResource(Res.string.sort_menu_created)
+        JournalSortOption.TITLE -> stringResource(Res.string.sort_menu_title)
+    }
+
 @Composable
 private fun SortDropdownChip(
     sortOption: JournalSortOption,
@@ -133,16 +174,10 @@ private fun SortDropdownChip(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    val sortLabel =
-        when (sortOption) {
-            JournalSortOption.LAST_UPDATED -> stringResource(Res.string.sort_last_updated)
-            JournalSortOption.CREATED -> stringResource(Res.string.sort_created)
-            JournalSortOption.TITLE -> stringResource(Res.string.sort_title)
-        }
-
     AssistChip(
         onClick = { expanded = true },
-        label = { Text(stringResource(Res.string.label_sorting_by, sortLabel)) },
+        label = { Text(stringResource(Res.string.label_sorting_by, sortChipLabel(sortOption))) },
+        modifier = Modifier.testTag("SortDropdownChip"),
         trailingIcon = {
             Icon(
                 Icons.Default.ArrowDropDown,
@@ -156,18 +191,29 @@ private fun SortDropdownChip(
         onDismissRequest = { expanded = false },
     ) {
         JournalSortOption.entries.forEach { option ->
-            val label =
-                when (option) {
-                    JournalSortOption.LAST_UPDATED -> stringResource(Res.string.sort_last_updated)
-                    JournalSortOption.CREATED -> stringResource(Res.string.sort_created)
-                    JournalSortOption.TITLE -> stringResource(Res.string.sort_title)
-                }
+            val isSelected = option == sortOption
             DropdownMenuItem(
-                text = { Text(label) },
+                text = {
+                    Text(
+                        text = sortMenuLabel(option),
+                        fontWeight = if (isSelected) FontWeight.Bold else null,
+                    )
+                },
                 onClick = {
                     onSortOptionSelected(option)
                     expanded = false
                 },
+                leadingIcon =
+                    if (isSelected) {
+                        {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                            )
+                        }
+                    } else {
+                        null
+                    },
             )
         }
     }

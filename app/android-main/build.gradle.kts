@@ -147,6 +147,7 @@ dependencies {
     testImplementation(projects.client.domain)
     testImplementation(projects.client.healthConnect)
 
+    androidTestImplementation(projects.client.feature.journal)
     androidTestImplementation(projects.client.permissions)
     androidTestImplementation(projects.client.repository)
     androidTestImplementation(libs.kotlin.test.junit)

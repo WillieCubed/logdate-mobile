@@ -59,6 +59,9 @@
     <string name="sort_last_updated">last updated</string>
     <string name="sort_created">date created</string>
     <string name="sort_title">title</string>
+    <string name="sort_menu_last_updated">Last Updated</string>
+    <string name="sort_menu_created">Date Created</string>
+    <string name="sort_menu_title">Title</string>
     <string name="filter_owned_by_me">Owned by me</string>
     <string name="filter_shared">Shared</string>
     <string name="cd_switch_to_grid">Switch to grid view</string>
