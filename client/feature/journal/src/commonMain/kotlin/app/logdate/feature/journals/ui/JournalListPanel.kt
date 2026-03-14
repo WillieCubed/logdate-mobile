@@ -25,27 +25,40 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
+import androidx.window.core.layout.WindowSizeClass.Companion.HEIGHT_DP_MEDIUM_LOWER_BOUND
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
+import app.logdate.ui.theme.Spacing
 
 /**
  * Returns an animated [Shape] for the journal list panel surface.
  *
- * On compact screens the panel has rounded top corners to visually separate it
- * from the background. On expanded screens (tablet / desktop) the panel fills
- * the containing surface, so the corners animate down to zero.
+ * - **Portrait phone**: Rounded top corners, flat bottom (panel extends to screen edge).
+ * - **Landscape phone**: All corners rounded (panel sits inside a padded two-pane layout).
+ * - **Tablet / desktop**: All corners flat (panel fills the containing pane, which clips).
  */
 @Composable
 private fun adaptivePanelShape(): Shape {
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
-    val isExpanded = windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND)
+    val isWide = windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND)
+    val isTall = windowSizeClass.isHeightAtLeastBreakpoint(HEIGHT_DP_MEDIUM_LOWER_BOUND)
 
-    val cornerRadius by animateDpAsState(
-        targetValue = if (isExpanded) 0.dp else 16.dp,
+    val topCorner by animateDpAsState(
+        targetValue = if (isWide && isTall) 0.dp else Spacing.lg,
         animationSpec = tween(300),
-        label = "PanelCornerRadius",
+        label = "PanelTopCornerRadius",
+    )
+    val bottomCorner by animateDpAsState(
+        targetValue = if (isWide && !isTall) Spacing.lg else 0.dp,
+        animationSpec = tween(300),
+        label = "PanelBottomCornerRadius",
     )
 
-    return RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius)
+    return RoundedCornerShape(
+        topStart = topCorner,
+        topEnd = topCorner,
+        bottomStart = bottomCorner,
+        bottomEnd = bottomCorner,
+    )
 }
 
 /**
@@ -55,8 +68,8 @@ private fun adaptivePanelShape(): Shape {
  * background. The top corners animate between rounded (compact, to separate from the
  * background) and square (expanded, where the panel fills the containing pane).
  *
- * System navigation bar insets are handled at two levels: the outer Scaffold handles right-side
- * insets for tablets, while the inner content column handles bottom insets for phones.
+ * System navigation bar insets are handled by the inner content column's `navigationBarsPadding()`,
+ * which covers bottom insets on phones. The parent shell layout handles side insets for tablets.
  */
 @Composable
 fun JournalListPanel(
@@ -131,9 +144,8 @@ private fun JournalListContent(
         }
     }
 
-    // Inner nav bar padding handles bottom inset on phones where the system
-    // navigation bar sits below the content. The outer Scaffold already handles
-    // the right-side inset for tablets.
+    // Handles bottom nav bar inset on phones. The parent shell layout handles
+    // side insets for tablets and landscape.
     Column(modifier = modifier.navigationBarsPadding()) {
         JournalFilterBar(
             layoutMode = layoutMode,

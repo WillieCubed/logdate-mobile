@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -70,9 +69,7 @@ fun JournalsOverviewScreenContent(
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
-        // Outer nav bar padding handles right-side inset on tablets where the
-        // system navigation bar sits along the edge of the screen.
-        modifier = modifier.navigationBarsPadding(),
+        modifier = modifier,
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
