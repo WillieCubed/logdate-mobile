@@ -118,13 +118,21 @@ if [[ -n "$kt_files" ]]; then
         ktlint_tasks=()
         mod=""
         for mod in "${modules[@]}"; do
-            ktlint_tasks+=("${mod}:ktlintCheck")
+            ktlint_tasks+=("${mod}:ktlintFormat")
         done
 
         if [[ ${#ktlint_tasks[@]} -gt 0 ]]; then
             echo "Running ktlint on affected modules: ${modules[*]}"
-            if ! ./gradlew "${ktlint_tasks[@]}" --quiet 2>&1; then
-                errors+=("KTLINT: Kotlin lint check failed. Run './gradlew ktlintFormat' to auto-fix.")
+            ./gradlew "${ktlint_tasks[@]}" --quiet 2>&1 || true
+            # Re-stage files that ktlintFormat may have modified
+            echo "$kt_files" | xargs git add
+            # Verify no remaining lint violations after auto-fix
+            ktlint_check_tasks=()
+            for mod in "${modules[@]}"; do
+                ktlint_check_tasks+=("${mod}:ktlintCheck")
+            done
+            if ! ./gradlew "${ktlint_check_tasks[@]}" --quiet 2>&1; then
+                errors+=("KTLINT: Kotlin lint check failed even after auto-fix.")
                 errors+=("  If a module is missing ktlintCheck, run: ./scripts/verify-ktlint-task-coverage.sh")
             fi
         fi
