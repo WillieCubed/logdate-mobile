@@ -17,6 +17,8 @@ import androidx.compose.material.icons.filled.Drafts
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalIconButton
@@ -64,6 +66,7 @@ fun NoteEditorToolbar(
     onSave: () -> Unit,
     onShowDrafts: () -> Unit,
     modifier: Modifier = Modifier,
+    draftCount: Int = 0,
     autoSaveStatus: AutoSaveStatus? = null,
     actionsVisible: Boolean = true,
 ) {
@@ -104,14 +107,22 @@ fun NoteEditorToolbar(
                     )
                 }
 
-                FilledTonalIconButton(
-                    onClick = { onShowDrafts() },
-                    modifier = Modifier.testTag("editor_drafts_button"),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Drafts,
-                        contentDescription = stringResource(Res.string.load_drafts),
-                    )
+                if (draftCount > 0) {
+                    FilledTonalIconButton(
+                        onClick = { onShowDrafts() },
+                        modifier = Modifier.testTag("editor_drafts_button"),
+                    ) {
+                        BadgedBox(
+                            badge = {
+                                Badge { Text(draftCount.toString()) }
+                            },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Drafts,
+                                contentDescription = stringResource(Res.string.load_drafts),
+                            )
+                        }
+                    }
                 }
 
                 FilledTonalIconButton(

@@ -34,6 +34,7 @@
     <string name="convert_to_text">Convert to Text</string>
     <string name="delete">Delete</string>
     <string name="delete_all_drafts">Delete All Drafts</string>
+    <string name="draft_deleted">Draft deleted</string>
     <string name="delete_image">Delete image</string>
     <string name="delete_media">Delete media</string>
     <string name="delete_video">Delete video</string>
@@ -69,7 +70,8 @@
     <string name="photo_or_video">Photo or video</string>
     <string name="pick_from_your_library_or_browse_all_your_photos">Pick from your library or browse all your photos.</string>
     <string name="play_video">Play video</string>
-    <string name="previous_drafts">Previous Drafts</string>
+    <string name="previous_drafts">Drafts</string>
+    <string name="clear_all">Clear all</string>
     <string name="recent_photos">Recent photos</string>
     <string name="record">Record</string>
     <string name="retake">Retake</string>
@@ -100,6 +102,7 @@
     <string name="try_again">Try again</string>
     <string name="use_photo">Use Photo</string>
     <string name="use_video">Use Video</string>
+    <string name="undo">Undo</string>
     <string name="unsaved_changes">Unsaved Changes</string>
     <string name="video">Video</string>
     <string name="video_not_available_on_desktop">Video not available on Desktop</string>

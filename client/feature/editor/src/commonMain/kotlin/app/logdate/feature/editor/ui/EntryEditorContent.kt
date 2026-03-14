@@ -14,8 +14,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -30,7 +32,7 @@ import androidx.compose.ui.Modifier
 import app.logdate.feature.editor.ui.common.NoteEditorToolbar
 import app.logdate.feature.editor.ui.common.PlatformBackHandler
 import app.logdate.feature.editor.ui.content.EditorBottomContent
-import app.logdate.feature.editor.ui.dialog.DraftsListDialog
+import app.logdate.feature.editor.ui.dialog.DraftsBottomSheet
 import app.logdate.feature.editor.ui.dialog.alert.ConfirmEntryExitDialog
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.feature.editor.ui.editor.rememberEditorAutoSave
@@ -38,6 +40,10 @@ import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
 import app.logdate.feature.editor.ui.state.rememberBlocksUiState
 import app.logdate.ui.common.noteDropTarget
 import kotlinx.coroutines.launch
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.draft_deleted
+import logdate.client.feature.editor.generated.resources.undo
+import org.jetbrains.compose.resources.getString
 import org.koin.compose.viewmodel.koinViewModel
 
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
@@ -158,7 +164,7 @@ fun EntryEditorContent(
     }
 
     if (showDraftsDialog) {
-        DraftsListDialog(
+        DraftsBottomSheet(
             drafts = editorState.availableDrafts,
             isLoading = editorState.isLoadingDrafts,
             onDismiss = { showDraftsDialog = false },
@@ -166,7 +172,20 @@ fun EntryEditorContent(
                 viewModel.loadDraft(draft.id)
                 showDraftsDialog = false
             },
-            onDraftDeleted = viewModel::deleteDraft,
+            onDraftDeleted = { draftId ->
+                viewModel.deleteDraft(draftId)
+                scope.launch {
+                    val result =
+                        snackbarHostState.showSnackbar(
+                            message = getString(Res.string.draft_deleted),
+                            actionLabel = getString(Res.string.undo),
+                            duration = SnackbarDuration.Short,
+                        )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        viewModel.loadDraft(draftId)
+                    }
+                }
+            },
             onDeleteAllDrafts = viewModel::deleteAllDrafts,
         )
     }
@@ -180,6 +199,7 @@ fun EntryEditorContent(
                 onBack = handleEditorBack,
                 onSave = { viewModel.saveEntry(editorState) },
                 onShowDrafts = { showDraftsDialog = true },
+                draftCount = editorState.availableDrafts.size,
                 autoSaveStatus = autoSaveState.status,
                 actionsVisible = !isImmersiveBlockActive,
             )
