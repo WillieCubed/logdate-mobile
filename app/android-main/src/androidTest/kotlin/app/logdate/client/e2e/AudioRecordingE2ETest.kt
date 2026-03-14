@@ -9,6 +9,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.EditorActivity
+import app.logdate.client.media.audio.AudioPlaybackMetadata
 import app.logdate.client.media.audio.AudioRecordingManager
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import app.logdate.client.media.audio.transcription.TranscriptionResult
@@ -141,6 +142,7 @@ private class FakeAudioRecordingManager(
 private class FakeAudioPlaybackManager : AudioPlaybackManager {
     override fun startPlayback(
         uri: String,
+        metadata: AudioPlaybackMetadata?,
         onProgressUpdated: (Float) -> Unit,
         onPlaybackCompleted: () -> Unit
     ) {
@@ -243,6 +245,8 @@ private class GrantedPermissionManager : PermissionManager {
     }
 
     override fun openAppSettings() = Unit
+
+    override fun openPermissionSettings() = Unit
 
     override fun shouldShowRationale(type: PermissionType): Boolean = false
 }

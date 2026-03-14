@@ -54,6 +54,7 @@ class ExportFlowE2ETest {
             DataSettingsContent(
                 onBack = {},
                 quotaUsage = defaultQuota,
+                isQuotaAvailable = true,
                 exportState = ExportState.Idle,
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
@@ -88,6 +89,7 @@ class ExportFlowE2ETest {
             DataSettingsContent(
                 onBack = {},
                 quotaUsage = defaultQuota,
+                isQuotaAvailable = true,
                 exportState = ExportState.Idle,
                 onShowExportOptions = { showOptionsCalled = true },
                 onUpdateExportOptions = {},
@@ -119,6 +121,7 @@ class ExportFlowE2ETest {
             DataSettingsContent(
                 onBack = {},
                 quotaUsage = defaultQuota,
+                isQuotaAvailable = true,
                 exportState = ExportState.Selecting,
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
@@ -149,6 +152,7 @@ class ExportFlowE2ETest {
             DataSettingsContent(
                 onBack = {},
                 quotaUsage = defaultQuota,
+                isQuotaAvailable = true,
                 exportState = ExportState.Exporting(progressPercent = 45, message = "Collecting notes..."),
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
@@ -183,6 +187,7 @@ class ExportFlowE2ETest {
             DataSettingsContent(
                 onBack = {},
                 quotaUsage = defaultQuota,
+                isQuotaAvailable = true,
                 exportState = ExportState.Exporting(progressPercent = 45, message = "Collecting notes..."),
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
@@ -214,6 +219,7 @@ class ExportFlowE2ETest {
             DataSettingsContent(
                 onBack = {},
                 quotaUsage = defaultQuota,
+                isQuotaAvailable = true,
                 exportState = ExportState.Completed(
                     path = "content://downloads/logdate_export.zip",
                     fileName = "logdate_export.zip",
@@ -259,6 +265,7 @@ class ExportFlowE2ETest {
             DataSettingsContent(
                 onBack = {},
                 quotaUsage = defaultQuota,
+                isQuotaAvailable = true,
                 exportState = ExportState.Completed(
                     path = "content://downloads/export.zip",
                     fileName = "export.zip",
@@ -297,6 +304,7 @@ class ExportFlowE2ETest {
             DataSettingsContent(
                 onBack = {},
                 quotaUsage = defaultQuota,
+                isQuotaAvailable = true,
                 exportState = ExportState.Completed(
                     path = "/path/to/export.zip",
                     fileName = "export.zip",
@@ -331,6 +339,7 @@ class ExportFlowE2ETest {
             DataSettingsContent(
                 onBack = {},
                 quotaUsage = defaultQuota,
+                isQuotaAvailable = true,
                 exportState = ExportState.Completed(
                     path = "/path/to/export.zip",
                     fileName = "export.zip",
@@ -370,6 +379,7 @@ class ExportFlowE2ETest {
             DataSettingsContent(
                 onBack = {},
                 quotaUsage = defaultQuota,
+                isQuotaAvailable = true,
                 exportState = ExportState.Failed(
                     reason = "Disk space full",
                     canRetry = true,
@@ -408,6 +418,7 @@ class ExportFlowE2ETest {
             DataSettingsContent(
                 onBack = {},
                 quotaUsage = defaultQuota,
+                isQuotaAvailable = true,
                 exportState = ExportState.Failed(reason = "Error", canRetry = true),
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
@@ -441,6 +452,7 @@ class ExportFlowE2ETest {
             DataSettingsContent(
                 onBack = {},
                 quotaUsage = defaultQuota,
+                isQuotaAvailable = true,
                 exportState = ExportState.Failed(reason = "Error"),
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
@@ -472,6 +484,7 @@ class ExportFlowE2ETest {
             DataSettingsContent(
                 onBack = {},
                 quotaUsage = defaultQuota,
+                isQuotaAvailable = true,
                 exportState = ExportState.Exporting(progressPercent = 0, message = "Starting export..."),
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
@@ -503,6 +516,7 @@ class ExportFlowE2ETest {
             DataSettingsContent(
                 onBack = {},
                 quotaUsage = defaultQuota,
+                isQuotaAvailable = true,
                 exportState = ExportState.Exporting(progressPercent = 100, message = "Finalizing..."),
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
@@ -539,6 +553,7 @@ class ExportFlowE2ETest {
             DataSettingsContent(
                 onBack = {},
                 quotaUsage = defaultQuota,
+                isQuotaAvailable = true,
                 exportState = state,
                 onShowExportOptions = { state = ExportState.Exporting(10, "Starting...") },
                 onUpdateExportOptions = {},
@@ -581,6 +596,7 @@ class ExportFlowE2ETest {
             DataSettingsContent(
                 onBack = {},
                 quotaUsage = defaultQuota,
+                isQuotaAvailable = true,
                 exportState = state,
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
@@ -625,6 +641,7 @@ class ExportFlowE2ETest {
             DataSettingsContent(
                 onBack = {},
                 quotaUsage = defaultQuota,
+                isQuotaAvailable = true,
                 exportState = state,
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
@@ -664,6 +681,7 @@ class ExportFlowE2ETest {
             DataSettingsContent(
                 onBack = {},
                 quotaUsage = defaultQuota,
+                isQuotaAvailable = true,
                 exportState = state,
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
@@ -703,6 +721,7 @@ class ExportFlowE2ETest {
             DataSettingsContent(
                 onBack = {},
                 quotaUsage = defaultQuota,
+                isQuotaAvailable = true,
                 exportState = state,
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
