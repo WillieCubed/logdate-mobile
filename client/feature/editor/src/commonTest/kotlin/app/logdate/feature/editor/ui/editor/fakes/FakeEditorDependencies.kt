@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -221,6 +222,17 @@ class FakeEntryDraftRepository : EntryDraftRepository {
             throw IllegalStateException("Simulated deletion failure for draft $uid")
         }
         drafts.value = drafts.value.filterNot { it.id == uid }
+    }
+
+    override suspend fun deleteAllDrafts() {
+        drafts.value = emptyList()
+    }
+
+    override suspend fun deleteExpiredDrafts(maxAge: Duration): Int {
+        val now = Clock.System.now()
+        val expired = drafts.value.filter { now - it.updatedAt > maxAge }
+        drafts.value = drafts.value - expired.toSet()
+        return expired.size
     }
 }
 

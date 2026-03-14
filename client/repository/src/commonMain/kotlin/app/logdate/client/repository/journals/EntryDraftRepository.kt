@@ -6,6 +6,7 @@ import app.logdate.util.UuidSerializer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
+import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -47,6 +48,18 @@ interface EntryDraftRepository {
      * If no draft with the given UID exists, this is a no-op.
      */
     suspend fun deleteDraft(uid: Uuid)
+
+    /**
+     * Deletes all drafts.
+     */
+    suspend fun deleteAllDrafts()
+
+    /**
+     * Deletes drafts that have not been updated within [maxAge].
+     *
+     * @return The number of drafts deleted.
+     */
+    suspend fun deleteExpiredDrafts(maxAge: Duration): Int
 }
 
 /**

@@ -7,7 +7,9 @@ import app.logdate.client.domain.location.LogCurrentLocationUseCase
 import app.logdate.client.domain.notes.AddNoteUseCase
 import app.logdate.client.domain.notes.FetchEntryUseCase
 import app.logdate.client.domain.notes.FetchTodayNotesUseCase
+import app.logdate.client.domain.notes.drafts.CleanupExpiredDraftsUseCase
 import app.logdate.client.domain.notes.drafts.CreateEntryDraftUseCase
+import app.logdate.client.domain.notes.drafts.DeleteAllDraftsUseCase
 import app.logdate.client.domain.notes.drafts.DeleteEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.FetchEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
@@ -40,7 +42,6 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -105,9 +106,11 @@ class DraftManagementTest {
         val updateEntryDraft = UpdateEntryDraftUseCase(entryDraftRepository)
         val createEntryDraft = CreateEntryDraftUseCase(entryDraftRepository)
         val deleteEntryDraft = DeleteEntryDraftUseCase(entryDraftRepository)
+        val deleteAllDraftsUseCase = DeleteAllDraftsUseCase(entryDraftRepository)
         val fetchEntryDraft = FetchEntryDraftUseCase(entryDraftRepository)
         val fetchMostRecentDraft = FetchMostRecentDraftUseCase(entryDraftRepository)
         val getAllDrafts = GetAllDraftsUseCase(entryDraftRepository)
+        val cleanupExpiredDrafts = CleanupExpiredDraftsUseCase(entryDraftRepository)
 
         autoSaveDelegate =
             AutoSaveDelegate(
@@ -130,9 +133,11 @@ class DraftManagementTest {
                 updateEntryDraft = updateEntryDraft,
                 createEntryDraft = createEntryDraft,
                 deleteEntryDraft = deleteEntryDraft,
+                deleteAllDraftsUseCase = deleteAllDraftsUseCase,
                 fetchEntryDraft = fetchEntryDraft,
                 fetchMostRecentDraft = fetchMostRecentDraft,
                 getAllDrafts = getAllDrafts,
+                cleanupExpiredDrafts = cleanupExpiredDrafts,
                 mediator = FakeEditorMediator(),
                 autoSaveDelegate = autoSaveDelegate,
                 journalSelectionDelegate = journalSelectionDelegate,
@@ -256,61 +261,56 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testDeleteAllDraftsContinuesAfterFailure() =
+    fun testDeleteAllDraftsClearsAllAtOnce() =
         testScope.runTest {
             // Create multiple drafts
-            val draftId1 =
-                entryDraftRepository.createDraft(
-                    listOf(
-                        JournalNote.Text(
-                            uid = Uuid.random(),
-                            creationTimestamp = Clock.System.now(),
-                            lastUpdated = Clock.System.now(),
-                            content = "Draft 1",
-                        ),
+            entryDraftRepository.createDraft(
+                listOf(
+                    JournalNote.Text(
+                        uid = Uuid.random(),
+                        creationTimestamp = Clock.System.now(),
+                        lastUpdated = Clock.System.now(),
+                        content = "Draft 1",
                     ),
-                )
-            val draftId2 =
-                entryDraftRepository.createDraft(
-                    listOf(
-                        JournalNote.Text(
-                            uid = Uuid.random(),
-                            creationTimestamp = Clock.System.now(),
-                            lastUpdated = Clock.System.now(),
-                            content = "Draft 2",
-                        ),
+                ),
+            )
+            entryDraftRepository.createDraft(
+                listOf(
+                    JournalNote.Text(
+                        uid = Uuid.random(),
+                        creationTimestamp = Clock.System.now(),
+                        lastUpdated = Clock.System.now(),
+                        content = "Draft 2",
                     ),
-                )
-            val draftId3 =
-                entryDraftRepository.createDraft(
-                    listOf(
-                        JournalNote.Text(
-                            uid = Uuid.random(),
-                            creationTimestamp = Clock.System.now(),
-                            lastUpdated = Clock.System.now(),
-                            content = "Draft 3",
-                        ),
+                ),
+            )
+            entryDraftRepository.createDraft(
+                listOf(
+                    JournalNote.Text(
+                        uid = Uuid.random(),
+                        creationTimestamp = Clock.System.now(),
+                        lastUpdated = Clock.System.now(),
+                        content = "Draft 3",
                     ),
-                )
+                ),
+            )
             advanceUntilIdle()
 
-            // Configure the second draft to fail on deletion
-            entryDraftRepository.setDeletionFailure(draftId2)
-            advanceUntilIdle()
+            assertEquals(3, viewModel.editorState.value.availableDrafts.size)
 
-            // Delete all drafts
+            // Delete all drafts atomically
             viewModel.deleteAllDrafts()
             advanceUntilIdle()
 
-            // Drafts 1 and 3 should be deleted, draft 2 should remain
+            // All drafts should be gone
             val remaining = viewModel.editorState.value.availableDrafts
-            assertEquals(1, remaining.size, "Only the failing draft should remain")
-            assertEquals(draftId2, remaining.first().id, "The failing draft should be the one remaining")
+            assertTrue(remaining.isEmpty(), "All drafts should be deleted")
 
-            // Error message should indicate partial failure
-            assertNotNull(
-                viewModel.editorState.value.errorMessage,
-                "Should report error for failed deletions",
+            // DraftState should be cleared
+            assertEquals(
+                DraftState.None,
+                viewModel.editorState.value.draftState,
+                "DraftState should be None after deleting all drafts",
             )
         }
 }

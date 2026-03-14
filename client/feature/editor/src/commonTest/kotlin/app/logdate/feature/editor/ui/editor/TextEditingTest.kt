@@ -7,7 +7,9 @@ import app.logdate.client.domain.location.LogCurrentLocationUseCase
 import app.logdate.client.domain.notes.AddNoteUseCase
 import app.logdate.client.domain.notes.FetchEntryUseCase
 import app.logdate.client.domain.notes.FetchTodayNotesUseCase
+import app.logdate.client.domain.notes.drafts.CleanupExpiredDraftsUseCase
 import app.logdate.client.domain.notes.drafts.CreateEntryDraftUseCase
+import app.logdate.client.domain.notes.drafts.DeleteAllDraftsUseCase
 import app.logdate.client.domain.notes.drafts.DeleteEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.FetchEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
@@ -100,9 +102,11 @@ class TextEditingTest {
         val updateEntryDraft = UpdateEntryDraftUseCase(entryDraftRepository)
         val createEntryDraft = CreateEntryDraftUseCase(entryDraftRepository)
         val deleteEntryDraft = DeleteEntryDraftUseCase(entryDraftRepository)
+        val deleteAllDraftsUseCase = DeleteAllDraftsUseCase(entryDraftRepository)
         val fetchEntryDraft = FetchEntryDraftUseCase(entryDraftRepository)
         val fetchMostRecentDraft = FetchMostRecentDraftUseCase(entryDraftRepository)
         val getAllDrafts = GetAllDraftsUseCase(entryDraftRepository)
+        val cleanupExpiredDrafts = CleanupExpiredDraftsUseCase(entryDraftRepository)
 
         val autoSaveDelegate =
             AutoSaveDelegate(
@@ -125,9 +129,11 @@ class TextEditingTest {
                 updateEntryDraft = updateEntryDraft,
                 createEntryDraft = createEntryDraft,
                 deleteEntryDraft = deleteEntryDraft,
+                deleteAllDraftsUseCase = deleteAllDraftsUseCase,
                 fetchEntryDraft = fetchEntryDraft,
                 fetchMostRecentDraft = fetchMostRecentDraft,
                 getAllDrafts = getAllDrafts,
+                cleanupExpiredDrafts = cleanupExpiredDrafts,
                 mediator = FakeEditorMediator(),
                 autoSaveDelegate = autoSaveDelegate,
                 journalSelectionDelegate = journalSelectionDelegate,

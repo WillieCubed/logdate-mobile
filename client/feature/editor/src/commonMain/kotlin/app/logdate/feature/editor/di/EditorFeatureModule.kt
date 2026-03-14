@@ -77,9 +77,11 @@ val editorFeatureModule: Module =
                 updateEntryDraft = get(),
                 createEntryDraft = get(),
                 deleteEntryDraft = get(),
+                deleteAllDraftsUseCase = get(),
                 fetchEntryDraft = get(),
                 fetchMostRecentDraft = get(),
                 getAllDrafts = get(),
+                cleanupExpiredDrafts = get(),
                 // Add mediator and delegates
                 mediator = get(),
                 autoSaveDelegate = get(),

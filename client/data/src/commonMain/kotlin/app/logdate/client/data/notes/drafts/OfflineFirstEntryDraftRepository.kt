@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.uuid.Uuid
 
 /**
@@ -95,5 +96,30 @@ class OfflineFirstEntryDraftRepository(
 
         // Remove from storage
         draftStore.deleteDraft(uid)
+    }
+
+    override suspend fun deleteAllDrafts() {
+        draftsFlow.value = emptyMap()
+        draftStore.clearAllDrafts()
+    }
+
+    override suspend fun deleteExpiredDrafts(maxAge: Duration): Int {
+        val now = Clock.System.now()
+        val currentDrafts = draftsFlow.value
+        val expiredIds =
+            currentDrafts.values
+                .filter { now - it.updatedAt > maxAge }
+                .map { it.id }
+
+        if (expiredIds.isEmpty()) return 0
+
+        val updatedDrafts = currentDrafts.toMutableMap()
+        expiredIds.forEach { id ->
+            updatedDrafts.remove(id)
+            draftStore.deleteDraft(id)
+        }
+        draftsFlow.value = updatedDrafts
+
+        return expiredIds.size
     }
 }

@@ -9,7 +9,9 @@ import app.logdate.client.domain.journals.GetDefaultSelectedJournalsUseCase
 import app.logdate.client.domain.notes.AddNoteUseCase
 import app.logdate.client.domain.notes.FetchEntryUseCase
 import app.logdate.client.domain.notes.FetchTodayNotesUseCase
+import app.logdate.client.domain.notes.drafts.CleanupExpiredDraftsUseCase
 import app.logdate.client.domain.notes.drafts.CreateEntryDraftUseCase
+import app.logdate.client.domain.notes.drafts.DeleteAllDraftsUseCase
 import app.logdate.client.domain.notes.drafts.DeleteEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.FetchEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
@@ -54,9 +56,11 @@ class EntryEditorViewModel(
     private val updateEntryDraft: UpdateEntryDraftUseCase,
     private val createEntryDraft: CreateEntryDraftUseCase,
     private val deleteEntryDraft: DeleteEntryDraftUseCase,
+    private val deleteAllDraftsUseCase: DeleteAllDraftsUseCase,
     private val fetchEntryDraft: FetchEntryDraftUseCase,
     fetchMostRecentDraft: FetchMostRecentDraftUseCase,
     getAllDrafts: GetAllDraftsUseCase,
+    cleanupExpiredDrafts: CleanupExpiredDraftsUseCase,
     // private val transcriptionService: TranscriptionService,
     // New dependencies for mediator pattern and delegation
     private val mediator: EditorMediator,
@@ -76,6 +80,18 @@ class EntryEditorViewModel(
     private var autoSaveJob: Job? = null
 
     init {
+        // Clean up expired drafts on editor open
+        viewModelScope.launch {
+            try {
+                val deleted = cleanupExpiredDrafts()
+                if (deleted > 0) {
+                    Napier.d("Cleaned up $deleted expired draft(s)")
+                }
+            } catch (e: Exception) {
+                Napier.e("Failed to clean up expired drafts: ${e.message}", e)
+            }
+        }
+
         // Load default journals using the journal selection delegate
         viewModelScope.launch {
             journalSelectionDelegate.loadDefaultJournals(mutableEditorState)
@@ -632,27 +648,17 @@ class EntryEditorViewModel(
     }
 
     /**
-     * Deletes all drafts.
+     * Deletes all drafts atomically.
      */
     fun deleteAllDrafts() {
         viewModelScope.launch {
-            val currentDrafts = editorState.value.availableDrafts
-            val failures = mutableListOf<Uuid>()
-            currentDrafts.forEach { draft ->
-                try {
-                    deleteEntryDraft(draft.id)
-                } catch (e: Exception) {
-                    Napier.e("Failed to delete draft ${draft.id}: ${e.message}", e)
-                    failures.add(draft.id)
-                }
-            }
-            // Always clear draftState after deleting all drafts
-            mutableEditorState.update {
-                it.copy(draftState = DraftState.None)
-            }
-            if (failures.isNotEmpty()) {
+            try {
+                deleteAllDraftsUseCase()
+                mutableEditorState.update { it.copy(draftState = DraftState.None) }
+            } catch (e: Exception) {
+                Napier.e("Failed to delete all drafts: ${e.message}", e)
                 mutableEditorState.update {
-                    it.copy(errorMessage = "Failed to delete ${failures.size} draft(s)")
+                    it.copy(errorMessage = "Failed to delete drafts: ${e.message}")
                 }
             }
         }

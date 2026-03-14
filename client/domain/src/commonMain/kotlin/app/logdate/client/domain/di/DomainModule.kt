@@ -21,7 +21,9 @@ import app.logdate.client.domain.notes.FetchTodayNotesUseCase
 import app.logdate.client.domain.notes.GetAllAudioNotesUseCase
 import app.logdate.client.domain.notes.HasNotesForTodayUseCase
 import app.logdate.client.domain.notes.RemoveNoteUseCase
+import app.logdate.client.domain.notes.drafts.CleanupExpiredDraftsUseCase
 import app.logdate.client.domain.notes.drafts.CreateEntryDraftUseCase
+import app.logdate.client.domain.notes.drafts.DeleteAllDraftsUseCase
 import app.logdate.client.domain.notes.drafts.DeleteEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.FetchEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
@@ -91,7 +93,9 @@ val domainModule: Module =
         factory { GetAllAudioNotesUseCase(get()) }
 
         // Drafts
+        factory { CleanupExpiredDraftsUseCase(get()) }
         factory { CreateEntryDraftUseCase(get()) }
+        factory { DeleteAllDraftsUseCase(get()) }
         factory { DeleteEntryDraftUseCase(get()) }
         factory { FetchEntryDraftUseCase(get()) }
         factory { FetchMostRecentDraftUseCase(get()) }
