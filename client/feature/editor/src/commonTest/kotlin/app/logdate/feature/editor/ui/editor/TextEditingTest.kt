@@ -106,13 +106,11 @@ class TextEditingTest {
 
         val autoSaveDelegate =
             AutoSaveDelegate(
-                scope = testScope.backgroundScope,
                 updateEntryDraft = updateEntryDraft,
                 createEntryDraft = createEntryDraft,
             )
         val journalSelectionDelegate =
             JournalSelectionDelegate(
-                scope = testScope.backgroundScope,
                 getDefaultSelectedJournals = getDefaultSelectedJournals,
             )
 
