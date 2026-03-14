@@ -4,18 +4,20 @@ package app.logdate.ui.common
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -109,8 +111,9 @@ fun ToggleSettingsItem(
 /**
  * A settings item with both a toggleable switch and a separate navigation action.
  *
- * Tapping the row (outside the switch) navigates to a detail screen indicated by the
- * trailing chevron. Tapping the switch independently toggles the setting.
+ * The left portion navigates to a detail screen when tapped. A vertical divider separates
+ * the label area from the independently tappable switch on the right, following the Android
+ * system settings pattern.
  */
 @Composable
 fun LinkedToggleSettingsItem(
@@ -121,35 +124,50 @@ fun LinkedToggleSettingsItem(
     onNavigate: () -> Unit,
     overline: String? = null,
 ) {
-    ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = {
+    Row(
+        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .clickable(onClick = onNavigate)
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        ) {
+            if (overline != null) {
+                Text(
+                    text = overline,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        },
-        overlineContent = overline?.let { { Text(it) } },
-        trailingContent = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Switch(
-                    checked = checked,
-                    onCheckedChange = onCheckedChange,
-                )
-            }
-        },
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onNavigate),
-    )
+        }
+        VerticalDivider(modifier = Modifier.fillMaxHeight().padding(vertical = Spacing.sm))
+        Box(
+            modifier =
+                Modifier
+                    .clickable { onCheckedChange(!checked) }
+                    .padding(horizontal = Spacing.lg)
+                    .fillMaxHeight(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
+        }
+    }
 }
 
 /**
