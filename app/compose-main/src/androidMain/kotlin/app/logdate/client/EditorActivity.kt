@@ -108,9 +108,10 @@ class EditorActivity : FragmentActivity() {
     override fun onPause() {
         super.onPause()
         locationTrackingManager.onActivityPaused()
-        // Auto-save content when going to background
+        // Auto-save content when going to background, but not if we're
+        // already saving or about to exit (which would resurrect a deleted draft)
         val editorState = viewModel.editorState.value
-        if (editorState.isDirty) {
+        if (editorState.isDirty && !editorState.shouldExit && !editorState.isSaving) {
             Napier.d("Auto-saving editor content on pause")
             viewModel.autoSaveEntry(editorState)
         }

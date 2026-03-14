@@ -613,6 +613,15 @@ class EntryEditorViewModel(
         viewModelScope.launch {
             try {
                 deleteEntryDraft(draftId)
+                // Clear draftState if we just deleted the active draft
+                mutableEditorState.update {
+                    val newDraftState =
+                        when (val current = it.draftState) {
+                            is DraftState.Active -> if (current.id == draftId) DraftState.None else current
+                            DraftState.None -> DraftState.None
+                        }
+                    it.copy(draftState = newDraftState)
+                }
             } catch (e: Exception) {
                 Napier.e("Failed to delete draft: ${e.message}", e)
                 mutableEditorState.update {
@@ -636,6 +645,10 @@ class EntryEditorViewModel(
                     Napier.e("Failed to delete draft ${draft.id}: ${e.message}", e)
                     failures.add(draft.id)
                 }
+            }
+            // Always clear draftState after deleting all drafts
+            mutableEditorState.update {
+                it.copy(draftState = DraftState.None)
             }
             if (failures.isNotEmpty()) {
                 mutableEditorState.update {
