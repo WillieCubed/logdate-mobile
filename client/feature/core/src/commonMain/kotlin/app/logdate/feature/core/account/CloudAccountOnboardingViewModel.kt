@@ -38,9 +38,34 @@ class CloudAccountOnboardingViewModel(
     val uiState: StateFlow<CloudAccountOnboardingUiState> = _uiState.asStateFlow()
 
     private var usernameCheckJob: Job? = null
+    private var entryStep: OnboardingStep = OnboardingStep.Welcome
 
     init {
         checkPasskeySupport()
+    }
+
+    /**
+     * Sets the initial step for the flow, skipping earlier steps.
+     *
+     * **Side-effects:**
+     * - Updates [CloudAccountOnboardingUiState.currentStep] to [step].
+     * - Records [step] as the entry point: [goToPreviousStep] will set
+     *   [CloudAccountOnboardingUiState.isExitRequested] instead of navigating
+     *   when the user is already at this step.
+     * - When [step] is not [OnboardingStep.Welcome], triggers
+     *   [prepareServerSelection] to validate and persist the server
+     *   configuration (required before DisplayName/SignIn steps can proceed).
+     *   This launches a coroutine that may update [CloudAccountOnboardingUiState.serverSelectionState].
+     *
+     * Should be called once before the composable renders, typically from a
+     * `LaunchedEffect(Unit)` block.
+     */
+    fun setInitialStep(step: OnboardingStep) {
+        entryStep = step
+        _uiState.value = _uiState.value.copy(currentStep = step)
+        if (step != OnboardingStep.Welcome) {
+            prepareServerSelection(step)
+        }
     }
 
     fun goToNextStep() {
@@ -57,14 +82,18 @@ class CloudAccountOnboardingViewModel(
 
     fun goToPreviousStep() {
         val currentStep = _uiState.value.currentStep
+        if (currentStep == entryStep) {
+            _uiState.value = _uiState.value.copy(isExitRequested = true)
+            return
+        }
         val previousStep =
             when (currentStep) {
-                OnboardingStep.Welcome -> OnboardingStep.Welcome // Can't go back from welcome
+                OnboardingStep.Welcome -> OnboardingStep.Welcome
                 OnboardingStep.SignIn -> OnboardingStep.Welcome
                 OnboardingStep.DisplayName -> OnboardingStep.Welcome
                 OnboardingStep.Username -> OnboardingStep.DisplayName
                 OnboardingStep.PasskeyCreation -> OnboardingStep.Username
-                OnboardingStep.Complete -> OnboardingStep.Complete // Can't go back from complete
+                OnboardingStep.Complete -> OnboardingStep.Complete
             }
 
         _uiState.value = _uiState.value.copy(currentStep = previousStep)
@@ -457,6 +486,12 @@ data class CloudAccountOnboardingUiState(
     val isSigningIn: Boolean = false,
     val isSignedIn: Boolean = false,
     val isSkipped: Boolean = false,
+    /**
+     * True when the user pressed back from the entry step set via
+     * [CloudAccountOnboardingViewModel.setInitialStep], signaling
+     * that the host should pop this flow from the navigation stack.
+     */
+    val isExitRequested: Boolean = false,
     val createdAccount: LogDateAccount? = null,
     val errorMessage: String? = null,
 ) {

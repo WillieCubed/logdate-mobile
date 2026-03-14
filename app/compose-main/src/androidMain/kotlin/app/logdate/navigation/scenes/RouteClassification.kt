@@ -3,6 +3,7 @@ package app.logdate.navigation.scenes
 import androidx.navigation3.runtime.NavKey
 import app.logdate.navigation.routes.AccountCreationCompletionRoute
 import app.logdate.navigation.routes.CloudAccountIntroRoute
+import app.logdate.navigation.routes.CloudAccountSetupFlowRoute
 import app.logdate.navigation.routes.DisplayNameSelectionRoute
 import app.logdate.navigation.routes.PasskeyCreationRoute
 import app.logdate.navigation.routes.UsernameSelectionRoute
@@ -126,6 +127,7 @@ object RouteConfig {
 
             // Cloud account setup flows
             CloudAccountIntroRoute::class,
+            CloudAccountSetupFlowRoute::class,
             UsernameSelectionRoute::class,
             DisplayNameSelectionRoute::class,
             PasskeyCreationRoute::class,

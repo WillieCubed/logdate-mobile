@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -22,11 +23,13 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -44,6 +47,7 @@ import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_and_sign_in
 import logdate.client.feature.core.generated.resources.account_settings_description
+import logdate.client.feature.core.generated.resources.create_account
 import logdate.client.feature.core.generated.resources.danger_zone
 import logdate.client.feature.core.generated.resources.danger_zone_description
 import logdate.client.feature.core.generated.resources.devices
@@ -63,8 +67,11 @@ import logdate.client.feature.core.generated.resources.screen_title_settings
 import logdate.client.feature.core.generated.resources.settings_group_data_storage
 import logdate.client.feature.core.generated.resources.settings_group_personal
 import logdate.client.feature.core.generated.resources.settings_group_privacy_security
+import logdate.client.feature.core.generated.resources.sign_in
 import logdate.client.feature.core.generated.resources.sync_and_backup
 import logdate.client.feature.core.generated.resources.sync_and_backup_description
+import logdate.client.feature.core.generated.resources.sync_promotion_description
+import logdate.client.feature.core.generated.resources.sync_promotion_title
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Instant
@@ -86,6 +93,8 @@ fun SettingsOverviewScreen(
     onNavigateToMemories: () -> Unit,
     onNavigateToSync: () -> Unit,
     onNavigateToExport: () -> Unit,
+    onNavigateToCloudAccountCreation: () -> Unit = {},
+    onNavigateToSignIn: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: AccountSettingsViewModel = koinViewModel(),
 ) {
@@ -101,6 +110,8 @@ fun SettingsOverviewScreen(
         onNavigateToMemories = onNavigateToMemories,
         onNavigateToSync = onNavigateToSync,
         onNavigateToExport = onNavigateToExport,
+        onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
+        onNavigateToSignIn = onNavigateToSignIn,
         userProfile =
             UserProfile(
                 name = identity.displayName,
@@ -123,6 +134,8 @@ fun SettingsOverviewContent(
     onNavigateToMemories: () -> Unit,
     onNavigateToSync: () -> Unit,
     onNavigateToExport: () -> Unit,
+    onNavigateToCloudAccountCreation: () -> Unit = {},
+    onNavigateToSignIn: () -> Unit = {},
     userProfile: UserProfile,
     onboardedDate: Instant = Instant.DISTANT_PAST,
     modifier: Modifier = Modifier,
@@ -197,12 +210,20 @@ fun SettingsOverviewContent(
                 title = stringResource(Res.string.settings_group_data_storage),
                 modifier = Modifier.padding(horizontal = Spacing.lg),
             ) {
-                SettingsNavigationItem(
-                    title = stringResource(Res.string.sync_and_backup),
-                    description = stringResource(Res.string.sync_and_backup_description),
-                    icon = { Icon(Icons.Default.Sync, contentDescription = null) },
-                    onClick = onNavigateToSync,
-                )
+                if (userProfile.isAuthenticated) {
+                    SettingsNavigationItem(
+                        title = stringResource(Res.string.sync_and_backup),
+                        description = stringResource(Res.string.sync_and_backup_description),
+                        icon = { Icon(Icons.Default.Sync, contentDescription = null) },
+                        onClick = onNavigateToSync,
+                    )
+                } else {
+                    SyncPromotionCard(
+                        onCreateAccount = onNavigateToCloudAccountCreation,
+                        onSignIn = onNavigateToSignIn,
+                        onNavigateToSync = onNavigateToSync,
+                    )
+                }
                 SettingsNavigationItem(
                     title = stringResource(Res.string.export_and_import),
                     description = stringResource(Res.string.export_and_import_description),
@@ -216,6 +237,51 @@ fun SettingsOverviewContent(
                     onClick = onNavigateToDangerZone,
                     isDangerous = true,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SyncPromotionCard(
+    onCreateAccount: () -> Unit,
+    onSignIn: () -> Unit,
+    onNavigateToSync: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.medium)
+                .background(MaterialTheme.colorScheme.secondaryContainer)
+                .clickable(onClick = onNavigateToSync)
+                .padding(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Icon(
+            imageVector = Icons.Default.Cloud,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+        )
+        Text(
+            text = stringResource(Res.string.sync_promotion_title),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+        )
+        Text(
+            text = stringResource(Res.string.sync_promotion_description),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Button(onClick = onCreateAccount) {
+                Text(stringResource(Res.string.create_account))
+            }
+            OutlinedButton(onClick = onSignIn) {
+                Text(stringResource(Res.string.sign_in))
             }
         }
     }

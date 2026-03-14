@@ -202,6 +202,8 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onNavigateToLocationInterval: () -> Unit,
     onNavigateToLocationAdvanced: () -> Unit,
     onNavigateToBirthday: () -> Unit,
+    onNavigateToCloudAccountCreation: () -> Unit = {},
+    onNavigateToSignIn: () -> Unit = {},
 ) {
     // Main settings overview screen (list pane)
     routeEntry<SettingsOverviewRoute>(
@@ -220,6 +222,8 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
             onNavigateToMemories = onNavigateToMemories,
             onNavigateToSync = onNavigateToSync,
             onNavigateToExport = onNavigateToExport,
+            onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
+            onNavigateToSignIn = onNavigateToSignIn,
         )
     }
 
@@ -276,6 +280,8 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     ) { _ ->
         SyncSettingsScreen(
             onBack = onBack,
+            onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
+            onNavigateToSignIn = onNavigateToSignIn,
         )
     }
 

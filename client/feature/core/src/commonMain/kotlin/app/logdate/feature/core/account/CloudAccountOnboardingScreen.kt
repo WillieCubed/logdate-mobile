@@ -27,11 +27,27 @@ private const val FALLBACK_PRIVACY_POLICY_URL = "https://logdate.app/privacy"
 private const val FALLBACK_TERMS_OF_SERVICE_URL = "https://logdate.app/terms"
 private const val CUSTOM_SERVER_FALLBACK_NAME = "Custom server"
 
+/**
+ * Cloud account onboarding screen reusable from both onboarding and settings.
+ *
+ * By default the flow starts at [OnboardingStep.Welcome]. Call
+ * [CloudAccountOnboardingViewModel.setInitialStep] before this composable
+ * renders to skip the welcome pitch (e.g. when entering from settings where
+ * the user has already seen a promotional screen).
+ *
+ * **Side-effects observed via [LaunchedEffect]:**
+ * - [CloudAccountOnboardingUiState.isAccountCreated] / [CloudAccountOnboardingUiState.isSignedIn] → calls [onAccountCreated]
+ * - [CloudAccountOnboardingUiState.isSkipped] → calls [onSkipOnboarding]
+ * - [CloudAccountOnboardingUiState.isExitRequested] → calls [onBack]
+ *
+ * @param onBack Called when the user navigates back past the entry step.
+ */
 @Composable
 fun CloudAccountOnboardingScreen(
     viewModel: CloudAccountOnboardingViewModel,
     onAccountCreated: () -> Unit,
     onSkipOnboarding: () -> Unit,
+    onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -66,12 +82,14 @@ fun CloudAccountOnboardingScreen(
         )
     }
 
-    // Handle completion
-    LaunchedEffect(uiState.isAccountCreated, uiState.isSignedIn, uiState.isSkipped) {
+    // Handle completion and exit
+    LaunchedEffect(uiState.isAccountCreated, uiState.isSignedIn, uiState.isSkipped, uiState.isExitRequested) {
         if (uiState.isAccountCreated || uiState.isSignedIn) {
             onAccountCreated()
         } else if (uiState.isSkipped) {
             onSkipOnboarding()
+        } else if (uiState.isExitRequested) {
+            onBack()
         }
     }
 
