@@ -41,6 +41,8 @@ import app.logdate.navigation.routes.openExportSettings
 import app.logdate.navigation.routes.openSettings
 import app.logdate.navigation.routes.startOnboarding
 import app.logdate.ui.LocalSharedTransitionScope
+import app.logdate.ui.restore.LocalAcknowledgeCloudRestore
+import app.logdate.ui.restore.LocalIsPostCloudRestore
 import app.logdate.ui.theme.LogDateTheme
 import logdate.app.composemain.generated.resources.Res
 import logdate.app.composemain.generated.resources.cancel
@@ -71,6 +73,8 @@ fun MainActivityUiRoot(
     onInitialNavigationReady: () -> Unit = {},
     databaseStartupState: DatabaseStartupState = DatabaseStartupState.Ready,
     onResetEncryptedStorage: () -> Unit = {},
+    isPostCloudRestore: Boolean = false,
+    onAcknowledgeCloudRestore: () -> Unit = {},
     appUpdateUiState: AppUpdateUiState = AppUpdateUiState(),
     onCompleteAppUpdate: () -> Unit = {},
     mainAppNavigator: MainAppNavigator = rememberMainAppNavigator(initialRoute = NavigationStart),
@@ -134,6 +138,8 @@ fun MainActivityUiRoot(
         SharedTransitionLayout {
             CompositionLocalProvider(
                 LocalSharedTransitionScope provides this,
+                LocalIsPostCloudRestore provides isPostCloudRestore,
+                LocalAcknowledgeCloudRestore provides onAcknowledgeCloudRestore,
             ) {
                 LockableContent(
                     isLocked = appUiState.requiresUnlock,
@@ -150,7 +156,7 @@ fun MainActivityUiRoot(
                     }
                 }
 
-                if (databaseStartupState is DatabaseStartupState.RecoveryRequired && !hideRecoveryDialog) {
+                if (databaseStartupState is DatabaseStartupState.RecoveryRequired && !hideRecoveryDialog && !isPostCloudRestore) {
                     val recovery = databaseStartupState
                     AlertDialog(
                         onDismissRequest = {},

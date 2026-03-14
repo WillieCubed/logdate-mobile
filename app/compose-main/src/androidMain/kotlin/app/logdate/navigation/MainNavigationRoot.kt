@@ -598,6 +598,7 @@ fun MainNavigationRoot(
                                 onOpenSettings = mainAppNavigator::openSettings,
                                 onOpenLocationTimeline = mainAppNavigator::openLocationTimeline,
                                 onOpenSearch = mainAppNavigator::openSearch,
+                                onImportBackup = mainAppNavigator::openExportSettings,
                                 homeViewModel = safeHomeViewModel,
                             )
                         }

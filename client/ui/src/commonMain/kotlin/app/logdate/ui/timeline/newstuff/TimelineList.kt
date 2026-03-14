@@ -60,6 +60,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.applyPaddingIfLast
 import app.logdate.ui.common.formatting.asRelativeDate
+import app.logdate.ui.restore.LocalAcknowledgeCloudRestore
+import app.logdate.ui.restore.LocalIsPostCloudRestore
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.TimelineAudioSectionUiState
 import app.logdate.ui.timeline.TimelineDayCardLayout
@@ -85,6 +87,10 @@ import logdate.client.ui.generated.resources.add_your_birthday_in_settings_to_se
 import logdate.client.ui.generated.resources.congrats_curious_explorer
 import logdate.client.ui.generated.resources.happy_birthday
 import logdate.client.ui.generated.resources.journey_days_count
+import logdate.client.ui.generated.resources.post_restore_import_action
+import logdate.client.ui.generated.resources.post_restore_import_message
+import logdate.client.ui.generated.resources.post_restore_start_fresh
+import logdate.client.ui.generated.resources.post_restore_welcome_back
 import logdate.client.ui.generated.resources.suggestion_draft_fallback
 import logdate.client.ui.generated.resources.youve_reached_the_end
 import org.jetbrains.compose.resources.stringResource
@@ -112,6 +118,7 @@ private enum class TimelineListContentType {
     DAY_EXPANDED,
     GAP,
     SKELETON,
+    EMPTY_STATE,
     APPEND_LOADING,
     APPEND_ERROR,
     END_OF_TIMELINE,
@@ -141,8 +148,10 @@ fun TimelineList(
     onOpenDraft: (draftId: String) -> Unit = {},
     onViewMemoryDay: (LocalDate) -> Unit = {},
     onShareMemory: (LocalDate) -> Unit = {},
+    onImportBackup: () -> Unit = {},
     listState: LazyListState = rememberLazyListState(),
 ) {
+    val isPostCloudRestore = LocalIsPostCloudRestore.current
     val draftFallbackMessage = stringResource(Res.string.suggestion_draft_fallback)
     val suggestionBlockState: TimelineSuggestionBlockUiState? =
         remember(timelineSuggestion, draftFallbackMessage) {
@@ -222,6 +231,18 @@ fun TimelineList(
                     contentType = { TimelineListContentType.SKELETON },
                 ) { layout ->
                     TimelineDaySkeleton(layout = layout)
+                }
+            } else if (items.isEmpty() && loadingState == TimelineLoadingState.Loaded) {
+                item(
+                    contentType = TimelineListContentType.EMPTY_STATE,
+                ) {
+                    if (isPostCloudRestore) {
+                        PostRestoreEmptyState(
+                            onImportBackup = onImportBackup,
+                            onStartWriting = onStartWriting,
+                            modifier = Modifier.padding(Spacing.lg),
+                        )
+                    }
                 }
             } else {
                 itemsIndexed(
@@ -1352,3 +1373,46 @@ private fun LocalDate.shortMonthLabel(): String =
         kotlinx.datetime.Month.NOVEMBER -> "NOV"
         else -> "DEC"
     }
+
+@Composable
+private fun PostRestoreEmptyState(
+    onImportBackup: () -> Unit,
+    onStartWriting: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val acknowledgeRestore = LocalAcknowledgeCloudRestore.current
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(vertical = Spacing.xl),
+    ) {
+        Text(
+            text = stringResource(Res.string.post_restore_welcome_back),
+            style = MaterialTheme.typography.headlineMedium,
+        )
+        Text(
+            text = stringResource(Res.string.post_restore_import_message),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            FilledTonalButton(onClick = {
+                acknowledgeRestore()
+                onImportBackup()
+            }) {
+                Text(stringResource(Res.string.post_restore_import_action))
+            }
+            FilledTonalButton(onClick = {
+                acknowledgeRestore()
+                onStartWriting()
+            }) {
+                Text(stringResource(Res.string.post_restore_start_fresh))
+            }
+        }
+    }
+}

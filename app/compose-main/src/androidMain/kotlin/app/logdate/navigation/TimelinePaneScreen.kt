@@ -34,6 +34,7 @@ fun TimelinePaneScreen(
     onOpenSearch: () -> Unit = {},
     onOpenDraft: (draftId: String) -> Unit = {},
     onShareMemory: (LocalDate) -> Unit = {},
+    onImportBackup: () -> Unit = {},
     viewModel: HomeViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -56,6 +57,7 @@ fun TimelinePaneScreen(
         timelineSuggestion = uiState.timelineSuggestion,
         onOpenDraft = onOpenDraft,
         onShareMemory = onShareMemory,
+        onImportBackup = onImportBackup,
         onHistoryClick = {
             showLocationQuickPeek = true
         },

@@ -47,6 +47,7 @@ fun EntryProviderScope<NavKey>.timelineRoutes(
     onOpenSettings: () -> Unit,
     onOpenLocationTimeline: () -> Unit,
     onOpenSearch: () -> Unit,
+    onImportBackup: () -> Unit,
     homeViewModel: HomeViewModel,
 ) {
     // The home screen
@@ -61,6 +62,7 @@ fun EntryProviderScope<NavKey>.timelineRoutes(
             onOpenSearch = onOpenSearch,
             onOpenDraft = onOpenDraft,
             onShareMemory = { date -> sharingLauncher.shareMemoryDay(date) },
+            onImportBackup = onImportBackup,
             viewModel = homeViewModel,
         )
     }

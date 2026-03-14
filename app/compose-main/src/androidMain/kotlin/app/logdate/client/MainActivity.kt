@@ -21,6 +21,8 @@ import androidx.navigation3.runtime.NavKey
 import app.logdate.client.database.DatabaseRecoveryController
 import app.logdate.client.database.DatabaseStartupMonitor
 import app.logdate.client.database.DatabaseStartupState
+import app.logdate.client.device.restore.PostRestoreDetector
+import app.logdate.client.device.restore.PostRestoreType
 import app.logdate.client.launch.LaunchBootstrapState
 import app.logdate.client.launch.LaunchStage
 import app.logdate.client.launch.LaunchStageSnapshot
@@ -78,6 +80,7 @@ class MainActivity : FragmentActivity() {
     private val androidRestoreLauncher: AndroidRestoreLauncher by inject()
     private val databaseStartupMonitor: DatabaseStartupMonitor by inject()
     private val databaseRecoveryController: DatabaseRecoveryController by inject()
+    private val postRestoreDetector: PostRestoreDetector by inject()
     private val playInAppUpdateController: PlayInAppUpdateController by inject()
     private val locationTrackingManager: LocationTrackingManager by inject()
     private val sharingLauncher: SharingLauncher by inject()
@@ -90,6 +93,8 @@ class MainActivity : FragmentActivity() {
     private var appUpdateUiState by mutableStateOf(AppUpdateUiState())
     private var launchSnapshot by mutableStateOf(LaunchStageSnapshot())
     private var hasCheckedForAppUpdates by mutableStateOf(false)
+    private var postRestoreType by mutableStateOf(PostRestoreType.NONE)
+    private var hasDetectedPostRestore by mutableStateOf(false)
 
     // Register the document picker for export functionality
     private val createDocumentLauncher =
@@ -175,6 +180,7 @@ class MainActivity : FragmentActivity() {
                             appUiState = state
                             if (state is GlobalAppUiLoadedState) {
                                 markLaunchStage(LaunchStage.AppUiLoaded)
+                                detectPostRestoreOnce(state)
                             }
                             maybeCheckForUpdates(state)
                         }.collect {}
@@ -223,6 +229,8 @@ class MainActivity : FragmentActivity() {
                     },
                     databaseStartupState = databaseStartupState,
                     onResetEncryptedStorage = ::resetEncryptedStorageAndRestart,
+                    isPostCloudRestore = postRestoreType == PostRestoreType.CLOUD_RESTORE,
+                    onAcknowledgeCloudRestore = ::acknowledgeCloudRestore,
                     appUpdateUiState = appUpdateUiState,
                     onCompleteAppUpdate = {
                         lifecycleScope.launch {
@@ -280,6 +288,59 @@ class MainActivity : FragmentActivity() {
             // Only clear the reference if it's still pointing to this activity
             activityProvider.currentActivity = null
         }
+    }
+
+    /**
+     * Runs post-restore detection exactly once per app launch.
+     * For D2D transfers, writes the sentinel immediately since the app works normally.
+     * For cloud restores, defers the sentinel until the user acknowledges the restore state.
+     *
+     * Special case: if D2D is detected but the database requires recovery (passphrase lost
+     * because EncryptedSharedPreferences was reset), the encrypted data is unreadable.
+     * Treat this as a cloud restore so the user gets the contextual empty state instead
+     * of the recovery dialog.
+     */
+    private fun detectPostRestoreOnce(state: GlobalAppUiLoadedState) {
+        if (hasDetectedPostRestore) return
+        hasDetectedPostRestore = true
+
+        var detected = postRestoreDetector.detect(isOnboarded = state.isOnboarded)
+
+        // D2D with a failed database open means the passphrase was lost during
+        // EncryptedSharedPreferences recovery. The database file exists but can't
+        // be decrypted, so treat it like a cloud restore.
+        if (detected == PostRestoreType.DEVICE_TRANSFER &&
+            databaseStartupState is DatabaseStartupState.RecoveryRequired
+        ) {
+            Napier.w(
+                "D2D restore detected but database recovery required — " +
+                    "passphrase likely lost, treating as cloud restore",
+                tag = APP_LAUNCH_TAG,
+            )
+            detected = PostRestoreType.CLOUD_RESTORE
+        }
+
+        postRestoreType = detected
+
+        when (detected) {
+            PostRestoreType.NONE -> {
+                // Normal launch or fresh install just completed onboarding — ensure sentinel exists.
+                postRestoreDetector.markDeviceInitialized()
+            }
+            PostRestoreType.DEVICE_TRANSFER -> {
+                Napier.i("D2D restore: app data transferred, writing sentinel", tag = APP_LAUNCH_TAG)
+                postRestoreDetector.markDeviceInitialized()
+            }
+            PostRestoreType.CLOUD_RESTORE -> {
+                Napier.i("Cloud restore: database absent, showing contextual UI", tag = APP_LAUNCH_TAG)
+                // Sentinel is written when the user acknowledges the restore state.
+            }
+        }
+    }
+
+    private fun acknowledgeCloudRestore() {
+        postRestoreDetector.markDeviceInitialized()
+        postRestoreType = PostRestoreType.NONE
     }
 
     private fun resetEncryptedStorageAndRestart() {
