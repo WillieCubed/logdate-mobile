@@ -38,6 +38,8 @@ class IosDeviceIdProviderTest {
             // Given
             val storedUuid = Uuid.random()
             keychainWrapper.values[deviceIdKey] = storedUuid.toString()
+            keychainWrapper.setCalls.clear()
+            val provider = IosDeviceIdProvider(keychainWrapper)
 
             // When
             val deviceId = provider.getDeviceId().first()
@@ -78,6 +80,7 @@ class IosDeviceIdProviderTest {
         runTest {
             // Given
             keychainWrapper.values[deviceIdKey] = "not-a-valid-uuid"
+            val provider = IosDeviceIdProvider(keychainWrapper)
 
             // When
             val deviceId = provider.getDeviceId().first()

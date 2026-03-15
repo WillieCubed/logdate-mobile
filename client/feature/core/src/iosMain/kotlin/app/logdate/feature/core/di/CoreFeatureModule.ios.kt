@@ -64,7 +64,7 @@ actual val coreFeatureModule: Module =
         }
         factory { ServerConfigurationCoordinator(get(), get(), get()) }
 
-        viewModel { AppViewModel(get(), get(), get()) }
+        viewModel { AppViewModel(get(), get(), get(), get(), get()) }
         viewModel {
             AccountSettingsViewModel(
                 get(),

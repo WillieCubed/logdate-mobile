@@ -2,6 +2,7 @@ package app.logdate.client.database
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -60,8 +61,7 @@ class DatabaseIntegrationTest {
                 )
 
             // Insert journal
-            val insertedId = journalDao.create(journal)
-            assertTrue(insertedId > 0)
+            journalDao.create(journal)
 
             // Retrieve and verify
             val allJournals = journalDao.getAll()
@@ -185,7 +185,7 @@ class DatabaseIntegrationTest {
             val journalDao = database.journalDao()
 
             try {
-                database.runInTransaction {
+                database.withTransaction {
                     // Insert a journal
                     val journal =
                         app.logdate.client.database.entities.JournalEntity(

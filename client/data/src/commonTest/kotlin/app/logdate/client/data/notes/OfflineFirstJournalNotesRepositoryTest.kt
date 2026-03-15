@@ -4,6 +4,7 @@ import app.logdate.client.data.fakes.FakeAudioNoteDao
 import app.logdate.client.data.fakes.FakeImageNoteDao
 import app.logdate.client.data.fakes.FakeJournalContentDao
 import app.logdate.client.data.fakes.FakeJournalRepository
+import app.logdate.client.data.fakes.FakeMediaCaptionDao
 import app.logdate.client.data.fakes.FakeSyncManager
 import app.logdate.client.data.fakes.FakeSyncMetadataService
 import app.logdate.client.data.fakes.FakeTextNoteDao
@@ -47,6 +48,7 @@ class OfflineFirstJournalNotesRepositoryTest {
     private lateinit var textNoteDao: FakeTextNoteDao
     private lateinit var imageNoteDao: FakeImageNoteDao
     private lateinit var videoNoteDao: FakeVideoNoteDao
+    private lateinit var mediaCaptionDao: FakeMediaCaptionDao
     private lateinit var journalContentDao: FakeJournalContentDao
     private lateinit var journalRepository: FakeJournalRepository
     private lateinit var syncManager: FakeSyncManager
@@ -58,6 +60,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         textNoteDao = FakeTextNoteDao()
         imageNoteDao = FakeImageNoteDao()
         videoNoteDao = FakeVideoNoteDao()
+        mediaCaptionDao = FakeMediaCaptionDao()
         journalContentDao = FakeJournalContentDao()
         journalRepository = FakeJournalRepository()
         syncManager = FakeSyncManager()
@@ -71,6 +74,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         textNoteDao.clear()
         imageNoteDao.clear()
         videoNoteDao.clear()
+        mediaCaptionDao.clear()
         journalContentDao.clear()
         journalRepository.clear()
         syncManager.reset()
@@ -424,6 +428,7 @@ class OfflineFirstJournalNotesRepositoryTest {
             notePlaceResolver = notePlaceResolver,
             syncManagerProvider = { syncManager },
             syncMetadataService = syncMetadataService,
+            mediaCaptionDao = mediaCaptionDao,
         )
 
     private class FakeNotePlaceResolver(

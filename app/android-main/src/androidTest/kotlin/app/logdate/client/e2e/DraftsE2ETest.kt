@@ -3,7 +3,9 @@ package app.logdate.client.e2e
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -33,6 +35,7 @@ import org.koin.core.context.startKoin
 import org.koin.core.module.Module
 import org.koin.dsl.module
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.uuid.Uuid
 
 /**
@@ -71,9 +74,7 @@ class DraftsE2ETest {
      */
     @Test
     fun writeContentAndSave_draftIsDeletedAfterPublish() {
-        // Tap the text entry tile to start writing
-        composeRule.onNodeWithContentDescription("Start text entry").performClick()
-        composeRule.waitForIdle()
+        startTextEntry()
 
         // Type some content
         composeRule.onNodeWithTag("editor_text_input").performTextInput("My journal entry for today")
@@ -104,31 +105,26 @@ class DraftsE2ETest {
     }
 
     /**
-     * Test: Write content → back → "Save Draft" → draft persists.
+     * Test: Write content → auto-save → back → draft persists.
      *
-     * Tests the new "Save Draft" button in the exit confirmation dialog.
+     * The current editor flow persists drafts via auto-save before exit rather than
+     * requiring an explicit "Save Draft" confirmation.
      */
     @Test
     fun writeContentAndSaveAsDraft_draftPersistsAfterExit() {
-        // Start a text entry
-        composeRule.onNodeWithContentDescription("Start text entry").performClick()
-        composeRule.waitForIdle()
+        startTextEntry()
 
         // Type content
         composeRule.onNodeWithTag("editor_text_input").performTextInput("Draft content to save")
         composeRule.waitForIdle()
 
-        // Press back to trigger exit confirmation
-        composeRule.activity.onBackPressedDispatcher.onBackPressed()
-        composeRule.waitForIdle()
-
-        // Tap "Save Draft" in the exit confirmation dialog
-        composeRule.onNodeWithTag("exit_dialog_save_draft").performClick()
-
-        // Wait for draft to be saved
+        // Wait for auto-save to persist the draft before exiting.
         composeRule.waitUntil(timeoutMillis = 5_000) {
             fakeDraftRepository.currentDrafts.isNotEmpty()
         }
+
+        // Use the toolbar back action so the editor's current exit flow runs.
+        composeRule.onNodeWithContentDescription("Back").performClick()
 
         // Verify draft was saved
         assert(fakeDraftRepository.currentDrafts.isNotEmpty()) {
@@ -137,34 +133,30 @@ class DraftsE2ETest {
     }
 
     /**
-     * Test: Write content → back → "Discard" → no draft persisted.
+     * Test: Write content → back immediately → no draft persisted.
      *
-     * Ensures discarding does not leave orphan drafts (unless auto-save
-     * already fired, which is acceptable).
+     * The current editor exits immediately when unsaved text has not yet been auto-saved,
+     * so this verifies that the quick-exit path does not create an orphan draft.
      */
     @Test
     fun writeContentAndDiscard_noNewDraftsAfterDiscard() {
         val draftsBeforeTest = fakeDraftRepository.currentDrafts.size
 
-        // Start a text entry
-        composeRule.onNodeWithContentDescription("Start text entry").performClick()
-        composeRule.waitForIdle()
+        startTextEntry()
 
         // Type content quickly (before auto-save debounce fires)
         composeRule.onNodeWithTag("editor_text_input").performTextInput("Temporary content")
         composeRule.waitForIdle()
 
-        // Immediately press back
-        composeRule.activity.onBackPressedDispatcher.onBackPressed()
-        composeRule.waitForIdle()
+        // Use the toolbar back action so the editor's current exit flow runs.
+        composeRule.onNodeWithContentDescription("Back").performClick()
 
-        // Tap "Discard" in the exit confirmation dialog
-        composeRule.onNodeWithTag("exit_dialog_discard").performClick()
-        composeRule.waitForIdle()
+        // Give the auto-save debounce window time to expire after exit.
+        Thread.sleep(3_000)
 
-        // The test verifies the discard path completes without crashing.
-        // Auto-save may or may not have fired depending on timing,
-        // so we verify the discard dialog worked, not the exact draft count.
+        assert(fakeDraftRepository.currentDrafts.size == draftsBeforeTest) {
+            "Expected no new drafts after quick exit, but found ${fakeDraftRepository.currentDrafts.size - draftsBeforeTest} new draft(s)"
+        }
     }
 
     /**
@@ -178,9 +170,7 @@ class DraftsE2ETest {
         val draftContent = "Previously saved draft content"
         val draftId = fakeDraftRepository.seedDraft(draftContent)
 
-        // Open the drafts dialog
-        composeRule.onNodeWithTag("editor_drafts_button").performClick()
-        composeRule.waitForIdle()
+        openDraftsDialog()
 
         // Verify draft appears in the list with correct preview text
         composeRule.onNodeWithText(draftContent, substring = true).assertIsDisplayed()
@@ -215,12 +205,30 @@ class DraftsE2ETest {
         // Ensure no drafts exist
         assert(fakeDraftRepository.currentDrafts.isEmpty())
 
-        // Open the drafts dialog
-        composeRule.onNodeWithTag("editor_drafts_button").performClick()
-        composeRule.waitForIdle()
+        openDraftsDialog()
 
         // Verify empty state is displayed
         composeRule.onNodeWithTag("drafts_empty_state").assertIsDisplayed()
+    }
+
+    private fun openDraftsDialog() {
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithContentDescription("More options")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("More options").performClick()
+        composeRule.onNodeWithText("Manage drafts").performClick()
+        composeRule.waitForIdle()
+    }
+
+    private fun startTextEntry() {
+        composeRule.onNodeWithContentDescription("Start text entry").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("editor_text_input")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
     }
 }
 
@@ -292,6 +300,12 @@ private class FakeDraftRepository : EntryDraftRepository {
     override suspend fun deleteDraft(uid: Uuid) {
         drafts.value = drafts.value.filterNot { it.id == uid }
     }
+
+    override suspend fun deleteAllDrafts() {
+        drafts.value = emptyList()
+    }
+
+    override suspend fun deleteExpiredDrafts(maxAge: Duration): Int = 0
 }
 
 private class DraftsKoinModuleOverrideRule(

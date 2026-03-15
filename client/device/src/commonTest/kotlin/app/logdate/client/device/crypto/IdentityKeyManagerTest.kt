@@ -271,7 +271,7 @@ private class FakePlcRecoveryKeySupport : PlcRecoveryKeySupport {
     override fun isValidPrivateKey(privateKeyMaterial: ByteArray): Boolean = privateKeyMaterial.any { it != 0.toByte() }
 
     override fun didKey(privateKeyMaterial: ByteArray): String =
-        "did:key:z${privateKeyMaterial.take(4).joinToString("") { "%02x".format(it.toInt() and 0xff) }}".also {
+        "did:key:z${privateKeyMaterial.take(4).joinToString("") { it.toHexByte() }}".also {
             lastDerivedDidKey = it
         }
 
@@ -280,6 +280,8 @@ private class FakePlcRecoveryKeySupport : PlcRecoveryKeySupport {
         payload: ByteArray,
     ): String {
         val didKey = didKey(privateKeyMaterial)
-        return "sig-$didKey-${payload.joinToString("") { "%02x".format(it.toInt() and 0xff) }}"
+        return "sig-$didKey-${payload.joinToString("") { it.toHexByte() }}"
     }
 }
+
+private fun Byte.toHexByte(): String = (toInt() and 0xff).toString(16).padStart(2, '0')

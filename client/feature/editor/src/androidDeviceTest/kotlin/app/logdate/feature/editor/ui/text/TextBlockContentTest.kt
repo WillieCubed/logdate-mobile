@@ -1,11 +1,13 @@
 package app.logdate.feature.editor.ui.text
 
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTextInput
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Rule
 import org.junit.Test
 
@@ -59,7 +61,7 @@ class TextBlockContentTest {
         }
 
         // Input text
-        composeTestRule.onNodeWithText("What's on your mind?").performTextInput("Hello, world!")
+        composeTestRule.onNodeWithTag("editor_text_input").performTextInput("Hello, world!")
 
         // Verify callback was triggered with correct text
         assertEquals(1, textChangeTracker.changeCount)
@@ -83,7 +85,9 @@ class TextBlockContentTest {
         }
 
         // Attempt to input text
-        composeTestRule.onNodeWithText("Read-only content").performTextInput(" additional")
+        assertThrows(AssertionError::class.java) {
+            composeTestRule.onNodeWithTag("editor_text_input").performTextInput(" additional")
+        }
 
         // Verify no callback was triggered
         assertEquals(0, textChangeTracker.changeCount)

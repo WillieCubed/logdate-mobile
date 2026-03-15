@@ -67,12 +67,12 @@ class FakeJournalNotesDao : JournalNotesDao {
         journalId: Uuid,
         noteId: Uuid,
     ) {
-        journalNotes.removeIf { it.journalId == journalId && it.noteId == noteId }
+        journalNotes.removeAll { it.journalId == journalId && it.noteId == noteId }
         updateJournalNotesFlow()
     }
 
     override suspend fun deleteNoteFromAllJournals(noteId: Uuid) {
-        journalNotes.removeIf { it.noteId == noteId }
+        journalNotes.removeAll { it.noteId == noteId }
         updateJournalNotesFlow()
     }
 

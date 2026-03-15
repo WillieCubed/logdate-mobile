@@ -22,15 +22,16 @@ import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NotePlace
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
@@ -538,27 +539,22 @@ class GetStreamingTimelineUseCaseTest {
                 }
             val reactiveUseCase = GetStreamingTimelineUseCase(reactiveRepository, buildTimelineDayUseCase())
 
-            // When - collect emissions
-            val emissions = mutableListOf<Timeline>()
-            val job =
-                launch {
-                    reactiveUseCase(StreamingTimelineRequest.RecentTimeline()).collect { emissions.add(it) }
+            // When - collect the initial and updated day counts deterministically
+            val dayCounts =
+                async {
+                    reactiveUseCase(StreamingTimelineRequest.RecentTimeline())
+                        .map { it.days.size }
+                        .take(2)
+                        .toList()
                 }
-
-            // Wait for initial content-first and enrichment emissions
             advanceUntilIdle()
-            assertTrue(emissions.size >= 1, "Should have at least one initial emission")
-            assertEquals(1, emissions.first().days.size)
 
             // Add a new note
             notesFlow.value = notesFlow.value + createTestNote("New note", Instant.parse("2025-01-16T10:00:00Z"))
             advanceUntilIdle()
 
             // Then - should have re-emitted with updated data
-            assertTrue(emissions.size >= 2, "Should re-emit when data changes")
-            assertEquals(2, emissions.last().days.size, "Updated emission should have 2 days")
-
-            job.cancel()
+            assertEquals(listOf(1, 2), dayCounts.await(), "Should re-emit when data changes")
         }
 
     private fun createTestNote(

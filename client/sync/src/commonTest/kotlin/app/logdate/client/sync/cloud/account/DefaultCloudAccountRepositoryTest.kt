@@ -16,6 +16,7 @@ import app.logdate.client.sync.cloud.JournalUploadResponse
 import app.logdate.client.sync.cloud.MediaDownloadResponse
 import app.logdate.client.sync.cloud.MediaUploadRequest
 import app.logdate.client.sync.cloud.MediaUploadResponse
+import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.model.BeginAccountCreationRequest
 import app.logdate.shared.model.BeginAccountCreationResponse
 import app.logdate.shared.model.CompleteAccountCreationRequest
@@ -36,6 +37,7 @@ class DefaultCloudAccountRepositoryTest {
     fun `complete account creation stores did and handle for later load`() =
         runTest {
             val storage = InMemoryKeyValueStorage()
+            val configRepository = DefaultLogDateConfigRepository(initialBackendUrl = "https://test.logdate.app")
             val repository =
                 DefaultCloudAccountRepository(
                     apiClient =
@@ -65,6 +67,7 @@ class DefaultCloudAccountRepositoryTest {
                                 ),
                         ),
                     secureStorage = storage,
+                    configRepository = configRepository,
                     coroutineScope = TestScope(StandardTestDispatcher(testScheduler)),
                 )
 
@@ -75,13 +78,20 @@ class DefaultCloudAccountRepositoryTest {
                 attestationObject = "attestation",
             )
 
-            assertEquals("did:web:tester.logdate.app", storage.getString("cloud_account_did"))
-            assertEquals("tester.logdate.app", storage.getString("cloud_account_handle"))
+            assertEquals(
+                "did:web:tester.logdate.app",
+                storage.getString(scopedKey("cloud_account_did", configRepository.getCurrentBackendUrl())),
+            )
+            assertEquals(
+                "tester.logdate.app",
+                storage.getString(scopedKey("cloud_account_handle", configRepository.getCurrentBackendUrl())),
+            )
 
             val reloaded =
                 DefaultCloudAccountRepository(
                     apiClient = FakeCloudApiClient(),
                     secureStorage = storage,
+                    configRepository = configRepository,
                     coroutineScope = TestScope(StandardTestDispatcher(testScheduler)),
                 )
             testScheduler.advanceUntilIdle()
@@ -95,22 +105,35 @@ class DefaultCloudAccountRepositoryTest {
     fun `sign out clears persisted did and handle`() =
         runTest {
             val storage = InMemoryKeyValueStorage()
-            storage.putString("cloud_account_did", "did:web:tester.logdate.app")
-            storage.putString("cloud_account_handle", "tester.logdate.app")
+            val configRepository = DefaultLogDateConfigRepository(initialBackendUrl = "https://test.logdate.app")
+            storage.putString(
+                scopedKey("cloud_account_did", configRepository.getCurrentBackendUrl()),
+                "did:web:tester.logdate.app",
+            )
+            storage.putString(
+                scopedKey("cloud_account_handle", configRepository.getCurrentBackendUrl()),
+                "tester.logdate.app",
+            )
 
             val repository =
                 DefaultCloudAccountRepository(
                     apiClient = FakeCloudApiClient(),
                     secureStorage = storage,
+                    configRepository = configRepository,
                     coroutineScope = TestScope(StandardTestDispatcher(testScheduler)),
                 )
 
             repository.signOut()
 
-            assertNull(storage.getString("cloud_account_did"))
-            assertNull(storage.getString("cloud_account_handle"))
+            assertNull(storage.getString(scopedKey("cloud_account_did", configRepository.getCurrentBackendUrl())))
+            assertNull(storage.getString(scopedKey("cloud_account_handle", configRepository.getCurrentBackendUrl())))
         }
 }
+
+private fun scopedKey(
+    baseKey: String,
+    backendUrl: String,
+): String = "${baseKey}_${backendUrl.trim().removePrefix("https://").removePrefix("http://").replace(Regex("[^A-Za-z0-9]"), "_")}"
 
 private class FakeCloudApiClient(
     private val completeAccountCreationResult: CompleteAccountCreationResponse? = null,

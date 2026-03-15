@@ -106,6 +106,9 @@ val MIGRATION_4_5 =
 val MIGRATION_5_6 =
     object : Migration(5, 6) {
         override fun migrate(connection: SQLiteConnection) {
+            // Version 5 shipped a malformed legacy table with the entity class name.
+            connection.execSQL("DROP TABLE IF EXISTS JournalContentEntityLink")
+
             // Create the journal_content_links table
             connection.execSQL(
                 """

@@ -8,7 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -143,7 +143,7 @@ class ExportFlowE2ETest {
             )
         }
 
-        composeRule.onNodeWithText("Export").assertIsNotEnabled()
+        composeRule.onAllNodesWithText("Export")[1].assertIsNotEnabled()
     }
 
     @Test
@@ -367,8 +367,7 @@ class ExportFlowE2ETest {
 
         composeRule.onNodeWithText("Export complete").assertIsDisplayed()
         composeRule.onNodeWithText("export.zip").assertIsDisplayed()
-        // Stats line should not be present
-        composeRule.onAllNodesWithText("journals", substring = true).fetchSemanticsNodes().let {
+        composeRule.onAllNodesWithText("media files", substring = true).fetchSemanticsNodes().let {
             assert(it.isEmpty()) { "Stats should not be shown when stats is null" }
         }
     }

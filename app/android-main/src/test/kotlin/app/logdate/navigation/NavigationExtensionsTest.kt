@@ -1,5 +1,6 @@
 package app.logdate.navigation
 
+import androidx.navigation3.runtime.NavKey
 import app.logdate.navigation.routes.core.EntryEditor
 import app.logdate.navigation.routes.core.JournalList
 import app.logdate.navigation.routes.core.LocationRoute
@@ -20,11 +21,9 @@ import kotlin.uuid.Uuid
 
 class NavigationExtensionsTest {
 
-    // goBack tests
-
     @Test
     fun `goBack removes last entry when backstack has multiple entries`() {
-        val navigator = MainAppNavigator(TimelineListRoute)
+        val navigator = navigatorOf(TimelineListRoute)
         navigator.backStack.add(EntryEditor())
 
         navigator.goBack()
@@ -35,7 +34,7 @@ class NavigationExtensionsTest {
 
     @Test
     fun `goBack navigates to Timeline when backstack has single non-main-tab entry`() {
-        val navigator = MainAppNavigator(SettingsOverviewRoute)
+        val navigator = navigatorOf(SettingsOverviewRoute)
 
         navigator.goBack()
 
@@ -45,7 +44,7 @@ class NavigationExtensionsTest {
 
     @Test
     fun `goBack keeps existing main tab when backstack has single main tab entry`() {
-        val navigator = MainAppNavigator(JournalList)
+        val navigator = navigatorOf(JournalList)
 
         navigator.goBack()
 
@@ -55,7 +54,7 @@ class NavigationExtensionsTest {
 
     @Test
     fun `goBack uses first main tab found when backstack has mixed entries`() {
-        val navigator = MainAppNavigator(RewindList)
+        val navigator = navigatorOf(RewindList)
         navigator.backStack.clear()
         navigator.backStack.add(SettingsOverviewRoute)
 
@@ -67,7 +66,7 @@ class NavigationExtensionsTest {
 
     @Test
     fun `goBack works correctly through multiple calls`() {
-        val navigator = MainAppNavigator(TimelineListRoute)
+        val navigator = navigatorOf(TimelineListRoute)
         navigator.backStack.add(JournalList)
         navigator.backStack.add(EntryEditor())
 
@@ -84,11 +83,9 @@ class NavigationExtensionsTest {
         assertEquals(TimelineListRoute, navigator.backStack.first())
     }
 
-    // openEntryEditor tests
-
     @Test
     fun `openEntryEditor adds new editor to backstack`() {
-        val navigator = MainAppNavigator(TimelineListRoute)
+        val navigator = navigatorOf(TimelineListRoute)
 
         navigator.openEntryEditor()
 
@@ -98,7 +95,7 @@ class NavigationExtensionsTest {
 
     @Test
     fun `openEntryEditor with id adds editor with that id`() {
-        val navigator = MainAppNavigator(TimelineListRoute)
+        val navigator = navigatorOf(TimelineListRoute)
         val entryId = Uuid.random()
 
         navigator.openEntryEditor(entryId)
@@ -110,7 +107,7 @@ class NavigationExtensionsTest {
 
     @Test
     fun `openEntryEditor without id adds editor with null id`() {
-        val navigator = MainAppNavigator(TimelineListRoute)
+        val navigator = navigatorOf(TimelineListRoute)
 
         navigator.openEntryEditor()
 
@@ -118,11 +115,9 @@ class NavigationExtensionsTest {
         assertEquals(null, editor.id)
     }
 
-    // navigateHomeFromOnboarding tests
-
     @Test
     fun `navigateHomeFromOnboarding clears backstack and sets Timeline`() {
-        val navigator = MainAppNavigator(OnboardingStart)
+        val navigator = navigatorOf(OnboardingStart)
         navigator.backStack.add(NavigationStart)
 
         navigator.navigateHomeFromOnboarding()
@@ -133,7 +128,7 @@ class NavigationExtensionsTest {
 
     @Test
     fun `navigateHomeFromOnboarding works when Timeline already in backstack`() {
-        val navigator = MainAppNavigator(OnboardingStart)
+        val navigator = navigatorOf(OnboardingStart)
         navigator.backStack.add(TimelineListRoute)
         navigator.backStack.add(SettingsOverviewRoute)
 
@@ -143,11 +138,9 @@ class NavigationExtensionsTest {
         assertEquals(TimelineListRoute, navigator.backStack.first())
     }
 
-    // switchToTab tests
-
     @Test
     fun `switchToTab replaces current main tab with new tab`() {
-        val navigator = MainAppNavigator(TimelineListRoute)
+        val navigator = navigatorOf(TimelineListRoute)
 
         navigator.switchToTab(HomeTab.JOURNALS)
 
@@ -157,7 +150,7 @@ class NavigationExtensionsTest {
 
     @Test
     fun `switchToTab does nothing when already on that tab`() {
-        val navigator = MainAppNavigator(TimelineListRoute)
+        val navigator = navigatorOf(TimelineListRoute)
 
         navigator.switchToTab(HomeTab.TIMELINE)
 
@@ -167,7 +160,7 @@ class NavigationExtensionsTest {
 
     @Test
     fun `switchToTab removes other main tabs from backstack`() {
-        val navigator = MainAppNavigator(TimelineListRoute)
+        val navigator = navigatorOf(TimelineListRoute)
         navigator.backStack.add(JournalList)
         navigator.backStack.add(EntryEditor())
 
@@ -180,7 +173,7 @@ class NavigationExtensionsTest {
 
     @Test
     fun `switchToTab pops to existing tab if already in backstack`() {
-        val navigator = MainAppNavigator(TimelineListRoute)
+        val navigator = navigatorOf(TimelineListRoute)
         navigator.backStack.add(JournalList)
         navigator.backStack.add(EntryEditor())
 
@@ -193,7 +186,7 @@ class NavigationExtensionsTest {
 
     @Test
     fun `switchToTab from non-main-tab entry clears stack and sets new tab`() {
-        val navigator = MainAppNavigator(SettingsOverviewRoute)
+        val navigator = navigatorOf(SettingsOverviewRoute)
 
         navigator.switchToTab(HomeTab.TIMELINE)
 
@@ -203,7 +196,7 @@ class NavigationExtensionsTest {
 
     @Test
     fun `switchToTab cycles through all tabs correctly`() {
-        val navigator = MainAppNavigator(TimelineListRoute)
+        val navigator = navigatorOf(TimelineListRoute)
 
         navigator.switchToTab(HomeTab.LOCATION)
         assertEquals(LocationRoute, navigator.backStack.last())
@@ -217,4 +210,6 @@ class NavigationExtensionsTest {
         navigator.switchToTab(HomeTab.TIMELINE)
         assertEquals(TimelineListRoute, navigator.backStack.last())
     }
+
+    private fun navigatorOf(vararg entries: NavKey): MainAppNavigator = MainAppNavigator(entries.toMutableList())
 }

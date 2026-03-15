@@ -19,7 +19,6 @@ import kotlinx.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
-import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -72,11 +71,7 @@ class NetworkErrorHandlingTest {
             engine {
                 addHandler { request ->
                     if (delayMs > 0) {
-                        // Simulate network delay using a blocking delay for all platforms
-                        val startTime = Clock.System.now()
-                        while ((Clock.System.now() - startTime).inWholeMilliseconds < delayMs) {
-                            // Busy wait (not ideal but works cross-platform for tests)
-                        }
+                        delay(delayMs)
                     }
                     respond(
                         content = responseBody,

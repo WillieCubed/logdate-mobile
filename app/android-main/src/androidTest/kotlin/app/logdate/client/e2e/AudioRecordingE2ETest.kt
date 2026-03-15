@@ -2,9 +2,12 @@ package app.logdate.client.e2e
 
 import android.content.Context
 import androidx.compose.ui.test.assertTextEquals
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -17,24 +20,27 @@ import app.logdate.client.permissions.PermissionManager
 import app.logdate.client.permissions.PermissionResult
 import app.logdate.client.permissions.PermissionStatus
 import app.logdate.client.permissions.PermissionType
+import app.logdate.client.repository.journals.EntryDraft
+import app.logdate.client.repository.journals.EntryDraftRepository
+import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.transcription.TranscriptionData
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.transcription.TranscriptionStatus
-import app.logdate.di.appModule
 import app.logdate.client.media.audio.AudioPlaybackManager
+import app.logdate.di.appModule
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlin.time.Clock
+import kotlinx.coroutines.flow.flowOf
 import org.junit.Rule
 import org.junit.Test
-import org.junit.runner.RunWith
 import org.junit.rules.RuleChain
 import org.junit.rules.TestRule
 import org.junit.runner.Description
+import org.junit.runner.RunWith
 import org.junit.runners.model.Statement
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.GlobalContext
@@ -42,6 +48,7 @@ import org.koin.core.context.loadKoinModules
 import org.koin.core.context.startKoin
 import org.koin.core.module.Module
 import org.koin.dsl.module
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
@@ -60,6 +67,7 @@ class AudioRecordingE2ETest {
         single<TranscriptionRepository> { FakeTranscriptionRepository() }
         single<TranscriptionService> { FakeTranscriptionService() }
         single<PermissionManager> { GrantedPermissionManager() }
+        single<EntryDraftRepository> { EmptyEntryDraftRepository() }
     }
 
     private val koinRule = KoinModuleOverrideRule(testModule)
@@ -71,11 +79,20 @@ class AudioRecordingE2ETest {
     @Test
     fun recordAudioShowsDurationInBlock() {
         composeRule.onNodeWithTag("editor_start_audio_block").performClick()
-        composeRule.onNodeWithTag("audio_record_start_button").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithTag("audio_record_stop_button").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithTag("audio_record_start_button").fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodesWithText("Finish").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithTag("audio_record_stop_button").performClick()
+
+        if (composeRule.onAllNodesWithTag("audio_record_start_button").fetchSemanticsNodes().isNotEmpty()) {
+            composeRule.onNodeWithTag("audio_record_start_button").performClick()
+        }
+
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("audio_record_start_button").fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.onNodeWithText("Finish").assertIsDisplayed()
+        composeRule.onNodeWithText("Finish").performClick()
 
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("audio_block_duration").fetchSemanticsNodes().isNotEmpty()
@@ -156,6 +173,23 @@ private class FakeAudioPlaybackManager : AudioPlaybackManager {
     override fun seekTo(position: Float) = Unit
 
     override fun release() = Unit
+}
+
+private class EmptyEntryDraftRepository : EntryDraftRepository {
+    override fun getDrafts(): Flow<List<EntryDraft>> = flowOf(emptyList())
+
+    override fun getDraft(uid: Uuid): Flow<Result<EntryDraft>> =
+        flowOf(Result.failure(NoSuchElementException("Draft not found")))
+
+    override suspend fun createDraft(notes: List<JournalNote>): Uuid = Uuid.random()
+
+    override suspend fun updateDraft(uid: Uuid, notes: List<JournalNote>): Uuid = uid
+
+    override suspend fun deleteDraft(uid: Uuid) = Unit
+
+    override suspend fun deleteAllDrafts() = Unit
+
+    override suspend fun deleteExpiredDrafts(maxAge: Duration): Int = 0
 }
 
 private class FakeTranscriptionService : TranscriptionService {

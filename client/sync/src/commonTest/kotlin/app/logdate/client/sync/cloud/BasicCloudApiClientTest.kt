@@ -79,6 +79,8 @@ class BasicCloudApiClientTest {
                                     "sessionToken": "sess123",
                                     "registrationOptions": {
                                       "challenge": "challenge123",
+                                      "rpId": "logdate.app",
+                                      "rpName": "LogDate",
                                       "user": {"id":"u","name":"newuser","displayName":"New User"},
                                       "timeout": 300000
                                     }

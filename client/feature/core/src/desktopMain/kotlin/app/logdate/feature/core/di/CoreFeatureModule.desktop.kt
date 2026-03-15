@@ -48,7 +48,7 @@ actual val coreFeatureModule: Module =
         single<RestoreLauncher> { DesktopRestoreLauncher() }
         factory { ServerConfigurationCoordinator(get(), get(), get()) }
 
-        viewModel { AppViewModel(get(), get(), get()) }
+        viewModel { AppViewModel(get(), get(), get(), get(), get()) }
         viewModel {
             AccountSettingsViewModel(
                 get(),

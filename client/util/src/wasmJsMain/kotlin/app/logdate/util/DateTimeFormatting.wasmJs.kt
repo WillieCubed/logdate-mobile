@@ -2,7 +2,9 @@ package app.logdate.util
 
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.number
+import kotlinx.datetime.format.MonthNames
+import kotlinx.datetime.format.Padding
+import kotlinx.datetime.format.char
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
 
@@ -27,19 +29,16 @@ actual val Instant.asTime: String
         return "$hour:$minute $amPm"
     }
 
-/**
- * Wasm/JS implementation of localized date formatting.
- * Uses the Intl.DateTimeFormat API for proper localization.
- */
-@JsExport
 actual fun formatDateLocalized(date: LocalDate): String {
-    // JavaScript date expects a zero-based month (January is 0)
-    val jsMonth = date.month.number - 1
-    val jsDate = js("new Date(date.year, jsMonth, date.day)")
+    val format =
+        LocalDate.Format {
+            monthName(MonthNames.ENGLISH_FULL)
+            char(' ')
+            day(Padding.NONE)
+            char(',')
+            char(' ')
+            year()
+        }
 
-    // Use Intl.DateTimeFormat for proper localization
-    // This will use the browser's locale settings
-    val formattedDate = js("new Intl.DateTimeFormat(undefined, { dateStyle: 'long' }).format(jsDate)")
-
-    return formattedDate.toString()
+    return format.format(date)
 }

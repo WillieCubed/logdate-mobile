@@ -31,6 +31,18 @@ class FakeImageNoteDao : ImageNoteDao {
             notes.sortedByDescending { it.created }.take(limit)
         }
 
+    override suspend fun getRecentNotesBefore(
+        beforeTimestamp: Long,
+        limit: Int,
+    ): List<ImageNoteEntity> =
+        notes.values
+            .filter { it.created.toEpochMilliseconds() < beforeTimestamp }
+            .sortedByDescending { it.created }
+            .take(limit)
+
+    override suspend fun hasNotesBefore(beforeTimestamp: Long): Boolean =
+        notes.values.any { it.created.toEpochMilliseconds() < beforeTimestamp }
+
     override fun getNotesPage(
         limit: Int,
         offset: Int,

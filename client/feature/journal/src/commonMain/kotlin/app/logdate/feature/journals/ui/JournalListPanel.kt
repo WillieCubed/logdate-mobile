@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass.Companion.HEIGHT_DP_MEDIUM_LOWER_BOUND
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
@@ -37,10 +39,23 @@ import app.logdate.ui.theme.Spacing
  * - **Tablet / desktop**: All corners flat (panel fills the containing pane, which clips).
  */
 @Composable
-private fun adaptivePanelShape(): Shape {
-    val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
-    val isWide = windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND)
-    val isTall = windowSizeClass.isHeightAtLeastBreakpoint(HEIGHT_DP_MEDIUM_LOWER_BOUND)
+private fun adaptivePanelShape(
+    fallbackWidth: androidx.compose.ui.unit.Dp,
+    fallbackHeight: androidx.compose.ui.unit.Dp,
+): Shape {
+    val isInspectionMode = LocalInspectionMode.current
+    val windowSizeClass =
+        if (isInspectionMode) {
+            null
+        } else {
+            currentWindowAdaptiveInfo().windowSizeClass
+        }
+    val isWide =
+        windowSizeClass?.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND)
+            ?: (fallbackWidth >= WIDTH_DP_EXPANDED_LOWER_BOUND.dp)
+    val isTall =
+        windowSizeClass?.isHeightAtLeastBreakpoint(HEIGHT_DP_MEDIUM_LOWER_BOUND)
+            ?: (fallbackHeight >= HEIGHT_DP_MEDIUM_LOWER_BOUND.dp)
 
     val topCorner by animateDpAsState(
         targetValue = if (isWide && isTall) 0.dp else Spacing.lg,
@@ -86,34 +101,36 @@ fun JournalListPanel(
     modifier: Modifier = Modifier,
     showLoading: Boolean = false,
 ) {
-    Surface(
-        modifier = modifier,
-        color = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = adaptivePanelShape(),
-    ) {
-        JournalListPlaceholder(isVisible = showLoading)
-        AnimatedVisibility(
-            visible = showLoading.not(),
-            enter = fadeIn(animationSpec = tween(200)),
-            exit = fadeOut(animationSpec = tween(200)),
+    BoxWithConstraints(modifier = modifier) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            shape = adaptivePanelShape(maxWidth, maxHeight),
         ) {
-            if (journals.isEmpty()) {
-                NoJournalsScreen()
-            } else {
-                JournalListContent(
-                    journals = journals,
-                    layoutMode = layoutMode,
-                    sortOption = sortOption,
-                    activeFilters = activeFilters,
-                    onOpenJournal = onOpenJournal,
-                    onBrowseJournals = onBrowseJournals,
-                    onCreateJournal = onCreateJournal,
-                    onToggleLayoutMode = onToggleLayoutMode,
-                    onSortOptionSelected = onSortOptionSelected,
-                    onToggleFilter = onToggleFilter,
-                    modifier = Modifier.fillMaxSize(),
-                )
+            JournalListPlaceholder(isVisible = showLoading)
+            AnimatedVisibility(
+                visible = showLoading.not(),
+                enter = fadeIn(animationSpec = tween(200)),
+                exit = fadeOut(animationSpec = tween(200)),
+            ) {
+                if (journals.isEmpty()) {
+                    NoJournalsScreen()
+                } else {
+                    JournalListContent(
+                        journals = journals,
+                        layoutMode = layoutMode,
+                        sortOption = sortOption,
+                        activeFilters = activeFilters,
+                        onOpenJournal = onOpenJournal,
+                        onBrowseJournals = onBrowseJournals,
+                        onCreateJournal = onCreateJournal,
+                        onToggleLayoutMode = onToggleLayoutMode,
+                        onSortOptionSelected = onSortOptionSelected,
+                        onToggleFilter = onToggleFilter,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
         }
     }

@@ -203,10 +203,17 @@ class OfflineFirstJournalRepositoryTest {
     @Test
     fun getLatestDraft_returnsCorrectDraft() =
         runTest(testDispatcher) {
-            val draft1 = createTestDraft()
+            val olderTimestamp = Clock.System.now()
+            val newerTimestamp = olderTimestamp.plus(kotlin.time.Duration.parse("1s"))
+            val draft1 =
+                createTestDraft().copy(
+                    createdAt = olderTimestamp,
+                    lastModifiedAt = olderTimestamp,
+                )
             val draft2 =
                 createTestDraft().copy(
-                    lastModifiedAt = Clock.System.now(),
+                    createdAt = newerTimestamp,
+                    lastModifiedAt = newerTimestamp,
                 )
 
             draftRepository.saveDraft(draft1)

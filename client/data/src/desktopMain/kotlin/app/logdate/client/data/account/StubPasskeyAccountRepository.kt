@@ -74,6 +74,16 @@ class StubPasskeyAccountRepository : PasskeyAccountRepository {
         return Result.success(Unit)
     }
 
+    override suspend fun createRestoreKey(): Result<Unit> = Result.success(Unit)
+
+    override suspend fun signInWithRestoreKey(): Result<LogDateAccount> {
+        val account = _currentAccount.value ?: return Result.failure(Exception("No account available"))
+        _isAuthenticated.value = true
+        return Result.success(account)
+    }
+
+    override suspend fun deleteRestoreKey(): Result<Unit> = Result.success(Unit)
+
     override suspend fun deletePasskey(credentialId: String): Result<Unit> {
         val account = _currentAccount.value ?: return Result.failure(Exception("No account available"))
 

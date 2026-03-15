@@ -2,14 +2,24 @@ package app.logdate.feature.core.main
 
 import app.logdate.client.domain.notes.HasNotesForTodayUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
+import app.logdate.client.domain.places.PlaceResolutionCache
+import app.logdate.client.domain.places.ResolveLocationToPlaceUseCase
 import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
+import app.logdate.client.domain.recommendation.GetMemoryRecallUseCase
+import app.logdate.client.domain.recommendation.MemoriesSettings
+import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.client.domain.timeline.GetTimelinePageUseCase
 import app.logdate.client.domain.timeline.Timeline
 import app.logdate.client.domain.timeline.TimelinePageRequest
+import app.logdate.client.location.places.StubExternalPlacesProvider
+import app.logdate.client.location.places.StubLocationProvider
+import app.logdate.client.location.places.StubReverseGeocodingProvider
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.places.UserPlacesRepository
+import app.logdate.shared.model.Place
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -30,6 +40,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -125,6 +136,17 @@ class HomeViewModelTest {
             GetHomeRecommendationUseCase(
                 hasNotesForToday = HasNotesForTodayUseCase(notesRepository),
                 fetchMostRecentDraft = FetchMostRecentDraftUseCase(EmptyEntryDraftRepository),
+                getMemoryRecall = GetMemoryRecallUseCase(notesRepository),
+                clientLocationProvider = StubLocationProvider,
+                placeResolutionCache =
+                    PlaceResolutionCache(
+                        ResolveLocationToPlaceUseCase(
+                            userPlacesRepository = EmptyUserPlacesRepository(),
+                            externalPlacesProvider = StubExternalPlacesProvider(),
+                            reverseGeocodingProvider = StubReverseGeocodingProvider(),
+                        ),
+                    ),
+                memoriesSettingsRepository = FakeMemoriesSettingsRepository(),
             )
 
         return HomeViewModel(
@@ -238,5 +260,51 @@ class HomeViewModelTest {
         ): Uuid = uid
 
         override suspend fun deleteDraft(uid: Uuid) = Unit
+
+        override suspend fun deleteAllDrafts() = Unit
+
+        override suspend fun deleteExpiredDrafts(maxAge: Duration): Int = 0
+    }
+
+    private class EmptyUserPlacesRepository : UserPlacesRepository {
+        override suspend fun getAllPlaces(): List<Place> = emptyList()
+
+        override fun observeAllPlaces(): Flow<List<Place>> = flowOf(emptyList())
+
+        override suspend fun getPlacesNear(
+            latitude: Double,
+            longitude: Double,
+            radiusMeters: Double,
+        ): List<Place> = emptyList()
+
+        override suspend fun getPlaceById(placeId: String): Place? = null
+
+        override suspend fun createPlace(place: Place): Result<Place> = Result.success(place)
+
+        override suspend fun updatePlace(place: Place): Result<Place> = Result.success(place)
+
+        override suspend fun deletePlace(placeId: String): Result<Unit> = Result.success(Unit)
+
+        override suspend fun searchPlaces(query: String): List<Place> = emptyList()
+    }
+
+    private class FakeMemoriesSettingsRepository : MemoriesSettingsRepository {
+        private val settings = MutableStateFlow(MemoriesSettings())
+
+        override suspend fun getSettings(): MemoriesSettings = settings.value
+
+        override fun observeSettings(): Flow<MemoriesSettings> = settings
+
+        override suspend fun updateSettings(settings: MemoriesSettings) {
+            this.settings.value = settings
+        }
+
+        override suspend fun setContextualRecommendationsEnabled(enabled: Boolean) {
+            settings.value = settings.value.copy(contextualRecommendationsEnabled = enabled)
+        }
+
+        override suspend fun setAiRecallEnabled(enabled: Boolean) {
+            settings.value = settings.value.copy(aiRecallEnabled = enabled)
+        }
     }
 }

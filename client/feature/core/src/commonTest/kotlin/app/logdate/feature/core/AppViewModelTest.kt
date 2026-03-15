@@ -1,8 +1,15 @@
 package app.logdate.feature.core
 
+import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.datastore.UserSession
+import app.logdate.client.domain.account.TryRestoreSignInUseCase
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.networking.NetworkState
+import app.logdate.client.permissions.RestoreCredentialError
+import app.logdate.client.repository.account.AccountCreationRequest
+import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.client.repository.user.UserStateRepository
+import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.user.UserData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -44,6 +51,8 @@ class AppViewModelTest {
                     userStateRepository = FakeUserStateRepository(UserData(isOnboarded = true)),
                     biometricGatekeeper = FakeBiometricGatekeeper(),
                     networkMonitor = FakeNetworkAvailabilityMonitor(isAvailable = true),
+                    sessionStorage = FakeSessionStorage(),
+                    tryRestoreSignInUseCase = TryRestoreSignInUseCase(FakePasskeyAccountRepository()),
                 )
 
             advanceUntilIdle()
@@ -61,6 +70,8 @@ class AppViewModelTest {
                     userStateRepository = FakeUserStateRepository(UserData(isOnboarded = false)),
                     biometricGatekeeper = FakeBiometricGatekeeper(),
                     networkMonitor = FakeNetworkAvailabilityMonitor(isAvailable = false),
+                    sessionStorage = FakeSessionStorage(),
+                    tryRestoreSignInUseCase = TryRestoreSignInUseCase(FakePasskeyAccountRepository()),
                 )
 
             advanceUntilIdle()
@@ -116,5 +127,45 @@ class AppViewModelTest {
         override fun isNetworkAvailable(): Boolean = isAvailable
 
         override fun observeNetwork(): SharedFlow<NetworkState> = networkState
+    }
+
+    private class FakeSessionStorage : SessionStorage {
+        override fun getSession(): UserSession? = null
+
+        override fun getSessionFlow(): StateFlow<UserSession?> = MutableStateFlow(null)
+
+        override suspend fun hasValidSession(): Boolean = false
+
+        override fun saveSession(session: UserSession) {}
+
+        override fun clearSession() {}
+    }
+
+    private class FakePasskeyAccountRepository : PasskeyAccountRepository {
+        override val currentAccount: StateFlow<LogDateAccount?> = MutableStateFlow(null)
+        override val isAuthenticated: StateFlow<Boolean> = MutableStateFlow(false)
+
+        override suspend fun createAccountWithPasskey(request: AccountCreationRequest): Result<LogDateAccount> =
+            Result.failure(NotImplementedError())
+
+        override suspend fun authenticateWithPasskey(username: String?): Result<LogDateAccount> = Result.failure(NotImplementedError())
+
+        override suspend fun checkUsernameAvailability(username: String): Result<Boolean> = Result.success(true)
+
+        override suspend fun signOut(): Result<Unit> = Result.success(Unit)
+
+        override suspend fun getCurrentAccount(): LogDateAccount? = null
+
+        override suspend fun getAccountInfo(): Result<LogDateAccount> = Result.failure(NotImplementedError())
+
+        override suspend fun refreshAuthentication(): Result<Unit> = Result.success(Unit)
+
+        override suspend fun deletePasskey(credentialId: String): Result<Unit> = Result.success(Unit)
+
+        override suspend fun createRestoreKey(): Result<Unit> = Result.success(Unit)
+
+        override suspend fun signInWithRestoreKey(): Result<LogDateAccount> = Result.failure(RestoreCredentialError.NoCredential())
+
+        override suspend fun deleteRestoreKey(): Result<Unit> = Result.success(Unit)
     }
 }

@@ -1,11 +1,15 @@
 package app.logdate.client.data.di
 
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
 import app.logdate.client.data.notes.DatabaseNotePlaceResolver
 import app.logdate.client.data.notes.NotePlaceResolver
 import app.logdate.client.database.dao.PlaceDao
 import app.logdate.client.database.entities.PlaceEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import org.koin.core.qualifier.named
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import kotlin.test.Test
@@ -22,6 +26,7 @@ class DataModuleTest {
                     dataModule,
                     module {
                         single<PlaceDao> { FakePlaceDao() }
+                        single<DataStore<Preferences>>(named("mainDataStore")) { FakePreferencesDataStore() }
                     },
                 )
             }
@@ -32,6 +37,18 @@ class DataModuleTest {
         } finally {
             koinApplication.close()
         }
+    }
+}
+
+private class FakePreferencesDataStore : DataStore<Preferences> {
+    private val state = MutableStateFlow<Preferences>(emptyPreferences())
+
+    override val data: Flow<Preferences> = state
+
+    override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences {
+        val updated = transform(state.value)
+        state.value = updated
+        return updated
     }
 }
 

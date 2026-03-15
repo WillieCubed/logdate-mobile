@@ -7,9 +7,14 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.logdate.client.database.entities.JournalEntity
 import app.logdate.client.database.entities.TextNoteEntity
-import app.logdate.client.database.migrations.AppDatabaseMigrations
 import app.logdate.client.database.migrations.MIGRATION_25_26
 import app.logdate.client.database.migrations.MIGRATION_26_27
+import app.logdate.client.database.migrations.MIGRATION_5_6
+import app.logdate.client.database.migrations.MIGRATION_6_7
+import app.logdate.client.database.migrations.MIGRATION_7_8
+import app.logdate.client.database.migrations.MIGRATION_8_9
+import app.logdate.client.database.migrations.MIGRATION_9_10
+import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -40,19 +45,14 @@ class DatabaseMigrationIntegrationTest {
         var db =
             helper.createDatabase(testDatabaseName, 5).apply {
                 // Insert test data in version 5 schema
-                execSQL(
-                    """
-                INSERT INTO journals (id, title, description, icon, created_at, updated_at, is_default, color)
-                VALUES ('test-journal-id', 'Test Journal', 'Test Description', 'book', 1640995200000, 1640995200000, 1, '#FF5722')
-            """,
-                )
+                insertLegacyIntegerJournal(id = 1, title = "Test Journal", description = "Test Description")
                 close()
             }
 
-        db = helper.runMigrationsAndValidate(testDatabaseName, 6, true, AppDatabaseMigrations.MIGRATION_5_6)
+        db = helper.runMigrationsAndValidate(testDatabaseName, 6, true, MIGRATION_5_6)
 
         // Verify data integrity after migration
-        val cursor = db.query("SELECT * FROM journals WHERE id = 'test-journal-id'")
+        val cursor = db.query("SELECT * FROM journals WHERE title = 'Test Journal'")
         assertTrue(cursor.moveToFirst())
         assertEquals("Test Journal", cursor.getString(cursor.getColumnIndexOrThrow("title")))
         assertEquals("Test Description", cursor.getString(cursor.getColumnIndexOrThrow("description")))
@@ -64,19 +64,14 @@ class DatabaseMigrationIntegrationTest {
         var db =
             helper.createDatabase(testDatabaseName, 6).apply {
                 // Insert test data in version 6 schema
-                execSQL(
-                    """
-                INSERT INTO journals (id, title, description, icon, created_at, updated_at, is_default, color)
-                VALUES ('test-journal-id', 'Test Journal', 'Test Description', 'book', 1640995200000, 1640995200000, 1, '#FF5722')
-            """,
-                )
+                insertLegacyIntegerJournal(id = 1, title = "Test Journal", description = "Test Description")
                 close()
             }
 
-        db = helper.runMigrationsAndValidate(testDatabaseName, 7, true, AppDatabaseMigrations.MIGRATION_6_7)
+        db = helper.runMigrationsAndValidate(testDatabaseName, 7, true, MIGRATION_6_7)
 
         // Verify data integrity after migration
-        val cursor = db.query("SELECT * FROM journals WHERE id = 'test-journal-id'")
+        val cursor = db.query("SELECT * FROM journals WHERE title = 'Test Journal'")
         assertTrue(cursor.moveToFirst())
         assertEquals("Test Journal", cursor.getString(cursor.getColumnIndexOrThrow("title")))
         cursor.close()
@@ -87,19 +82,14 @@ class DatabaseMigrationIntegrationTest {
         var db =
             helper.createDatabase(testDatabaseName, 7).apply {
                 // Insert test data in version 7 schema
-                execSQL(
-                    """
-                INSERT INTO journals (id, title, description, icon, created_at, updated_at, is_default, color)
-                VALUES ('test-journal-id', 'Test Journal', 'Test Description', 'book', 1640995200000, 1640995200000, 1, '#FF5722')
-            """,
-                )
+                insertLegacyTextJournal(id = "1", title = "Test Journal", description = "Test Description")
                 close()
             }
 
-        db = helper.runMigrationsAndValidate(testDatabaseName, 8, true, AppDatabaseMigrations.MIGRATION_7_8)
+        db = helper.runMigrationsAndValidate(testDatabaseName, 8, true, MIGRATION_7_8)
 
         // Verify data integrity after migration
-        val cursor = db.query("SELECT * FROM journals WHERE id = 'test-journal-id'")
+        val cursor = db.query("SELECT * FROM journals WHERE title = 'Test Journal'")
         assertTrue(cursor.moveToFirst())
         assertEquals("Test Journal", cursor.getString(cursor.getColumnIndexOrThrow("title")))
         cursor.close()
@@ -110,30 +100,20 @@ class DatabaseMigrationIntegrationTest {
         var db =
             helper.createDatabase(testDatabaseName, 8).apply {
                 // Insert test data in version 8 schema
-                execSQL(
-                    """
-                INSERT INTO journals (id, title, description, icon, created_at, updated_at, is_default, color)
-                VALUES ('test-journal-id', 'Test Journal', 'Test Description', 'book', 1640995200000, 1640995200000, 1, '#FF5722')
-            """,
-                )
-                execSQL(
-                    """
-                INSERT INTO text_notes (id, content, created_at, updated_at, journal_id, order_index)
-                VALUES ('test-note-id', 'Test content', 1640995200000, 1640995200000, 'test-journal-id', 0)
-            """,
-                )
+                insertLegacyTextJournal(id = "1", title = "Test Journal", description = "Test Description")
+                insertLegacyTextNote(uid = "1", content = "Test content")
                 close()
             }
 
-        db = helper.runMigrationsAndValidate(testDatabaseName, 9, true, AppDatabaseMigrations.MIGRATION_8_9)
+        db = helper.runMigrationsAndValidate(testDatabaseName, 9, true, MIGRATION_8_9)
 
         // Verify data integrity after migration
-        val journalCursor = db.query("SELECT * FROM journals WHERE id = 'test-journal-id'")
+        val journalCursor = db.query("SELECT * FROM journals WHERE title = 'Test Journal'")
         assertTrue(journalCursor.moveToFirst())
         assertEquals("Test Journal", journalCursor.getString(journalCursor.getColumnIndexOrThrow("title")))
         journalCursor.close()
 
-        val noteCursor = db.query("SELECT * FROM text_notes WHERE id = 'test-note-id'")
+        val noteCursor = db.query("SELECT * FROM text_notes WHERE content = 'Test content'")
         assertTrue(noteCursor.moveToFirst())
         assertEquals("Test content", noteCursor.getString(noteCursor.getColumnIndexOrThrow("content")))
         noteCursor.close()
@@ -144,30 +124,20 @@ class DatabaseMigrationIntegrationTest {
         var db =
             helper.createDatabase(testDatabaseName, 9).apply {
                 // Insert test data in version 9 schema
-                execSQL(
-                    """
-                INSERT INTO journals (id, title, description, icon, created_at, updated_at, is_default, color)
-                VALUES ('test-journal-id', 'Test Journal', 'Test Description', 'book', 1640995200000, 1640995200000, 1, '#FF5722')
-            """,
-                )
-                execSQL(
-                    """
-                INSERT INTO text_notes (id, content, created_at, updated_at, journal_id, order_index)
-                VALUES ('test-note-id', 'Test content', 1640995200000, 1640995200000, 'test-journal-id', 0)
-            """,
-                )
+                insertLegacyTextJournal(id = "1", title = "Test Journal", description = "Test Description")
+                insertLegacyTextNote(uid = "1", content = "Test content")
                 close()
             }
 
-        db = helper.runMigrationsAndValidate(testDatabaseName, 10, true, AppDatabaseMigrations.MIGRATION_9_10)
+        db = helper.runMigrationsAndValidate(testDatabaseName, 10, true, MIGRATION_9_10)
 
         // Verify data integrity after migration
-        val journalCursor = db.query("SELECT * FROM journals WHERE id = 'test-journal-id'")
+        val journalCursor = db.query("SELECT * FROM journals WHERE title = 'Test Journal'")
         assertTrue(journalCursor.moveToFirst())
         assertEquals("Test Journal", journalCursor.getString(journalCursor.getColumnIndexOrThrow("title")))
         journalCursor.close()
 
-        val noteCursor = db.query("SELECT * FROM text_notes WHERE id = 'test-note-id'")
+        val noteCursor = db.query("SELECT * FROM text_notes WHERE content = 'Test content'")
         assertTrue(noteCursor.moveToFirst())
         assertEquals("Test content", noteCursor.getString(noteCursor.getColumnIndexOrThrow("content")))
         noteCursor.close()
@@ -178,17 +148,19 @@ class DatabaseMigrationIntegrationTest {
         var db =
             helper.createDatabase(testDatabaseName, 5).apply {
                 // Insert comprehensive test data in version 5 schema
-                execSQL(
-                    """
-                INSERT INTO journals (id, title, description, icon, created_at, updated_at, is_default, color)
-                VALUES ('test-journal-1', 'Journal One', 'First journal', 'book', 1640995200000, 1640995200000, 1, '#FF5722')
-            """,
+                insertLegacyIntegerJournal(
+                    id = 1,
+                    title = "Journal One",
+                    description = "First journal",
+                    created = 1640995200000,
+                    lastUpdated = 1640995200000,
                 )
-                execSQL(
-                    """
-                INSERT INTO journals (id, title, description, icon, created_at, updated_at, is_default, color)
-                VALUES ('test-journal-2', 'Journal Two', 'Second journal', 'note', 1640995300000, 1640995300000, 0, '#2196F3')
-            """,
+                insertLegacyIntegerJournal(
+                    id = 2,
+                    title = "Journal Two",
+                    description = "Second journal",
+                    created = 1640995300000,
+                    lastUpdated = 1640995300000,
                 )
                 close()
             }
@@ -199,123 +171,156 @@ class DatabaseMigrationIntegrationTest {
                 testDatabaseName,
                 10,
                 true,
-                AppDatabaseMigrations.MIGRATION_5_6,
-                AppDatabaseMigrations.MIGRATION_6_7,
-                AppDatabaseMigrations.MIGRATION_7_8,
-                AppDatabaseMigrations.MIGRATION_8_9,
-                AppDatabaseMigrations.MIGRATION_9_10,
+                MIGRATION_5_6,
+                MIGRATION_6_7,
+                MIGRATION_7_8,
+                MIGRATION_8_9,
+                MIGRATION_9_10,
             )
 
         // Verify all data survived the complete migration chain
-        val cursor = db.query("SELECT * FROM journals ORDER BY created_at")
+        val cursor = db.query("SELECT * FROM journals ORDER BY created")
         assertTrue(cursor.moveToFirst())
 
         // First journal
-        assertEquals("test-journal-1", cursor.getString(cursor.getColumnIndexOrThrow("id")))
         assertEquals("Journal One", cursor.getString(cursor.getColumnIndexOrThrow("title")))
         assertEquals("First journal", cursor.getString(cursor.getColumnIndexOrThrow("description")))
-        assertEquals("book", cursor.getString(cursor.getColumnIndexOrThrow("icon")))
-        assertEquals("#FF5722", cursor.getString(cursor.getColumnIndexOrThrow("color")))
-        assertEquals(1, cursor.getInt(cursor.getColumnIndexOrThrow("is_default")))
 
         // Second journal
         assertTrue(cursor.moveToNext())
-        assertEquals("test-journal-2", cursor.getString(cursor.getColumnIndexOrThrow("id")))
         assertEquals("Journal Two", cursor.getString(cursor.getColumnIndexOrThrow("title")))
         assertEquals("Second journal", cursor.getString(cursor.getColumnIndexOrThrow("description")))
-        assertEquals("note", cursor.getString(cursor.getColumnIndexOrThrow("icon")))
-        assertEquals("#2196F3", cursor.getString(cursor.getColumnIndexOrThrow("color")))
-        assertEquals(0, cursor.getInt(cursor.getColumnIndexOrThrow("is_default")))
 
         cursor.close()
     }
 
-    @Test
-    fun testDataIntegrityWithFullDatabaseOperations() {
-        // Create database with latest schema and perform full CRUD operations
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val database =
-            Room
-                .inMemoryDatabaseBuilder(context, LogDateDatabase::class.java)
-                .allowMainThreadQueries()
-                .build()
-
-        try {
-            val journalDao = database.journalDao()
-            val textNoteDao = database.textNoteDao()
-            val currentTime = Clock.System.now()
-
-            // Create test journal
-            val journal =
-                JournalEntity(
-                    id = Uuid.random(),
-                    title = "Integration Test Journal",
-                    description = "Testing data integrity",
-                    icon = "test",
-                    createdAt = currentTime,
-                    updatedAt = currentTime,
-                    isDefault = false,
-                    color = "#4CAF50",
-                )
-            journalDao.insert(journal)
-
-            // Create test notes
-            val note1 =
-                TextNoteEntity(
-                    id = Uuid.random(),
-                    content = "First test note content",
-                    createdAt = currentTime,
-                    updatedAt = currentTime,
-                    journalId = journal.id,
-                    orderIndex = 0,
-                )
-            val note2 =
-                TextNoteEntity(
-                    id = Uuid.random(),
-                    content = "Second test note content",
-                    createdAt = currentTime,
-                    updatedAt = currentTime,
-                    journalId = journal.id,
-                    orderIndex = 1,
-                )
-            textNoteDao.insert(note1)
-            textNoteDao.insert(note2)
-
-            // Verify journal retrieval
-            val retrievedJournal = journalDao.getJournal(journal.id)
-            assertNotNull(retrievedJournal)
-            assertEquals(journal.title, retrievedJournal.title)
-            assertEquals(journal.description, retrievedJournal.description)
-
-            // Verify notes retrieval
-            val retrievedNotes = textNoteDao.getNotesForJournal(journal.id)
-            assertEquals(2, retrievedNotes.size)
-            assertEquals("First test note content", retrievedNotes.find { it.orderIndex == 0 }?.content)
-            assertEquals("Second test note content", retrievedNotes.find { it.orderIndex == 1 }?.content)
-
-            // Test journal with notes query
-            val journalWithNotes = journalDao.getJournalWithNotes(journal.id)
-            assertNotNull(journalWithNotes)
-            assertEquals(journal.title, journalWithNotes.journal.title)
-            assertEquals(2, journalWithNotes.textNotes.size)
-
-            // Test update operations
-            val updatedJournal = journal.copy(title = "Updated Title")
-            journalDao.update(updatedJournal)
-
-            val reRetrievedJournal = journalDao.getJournal(journal.id)
-            assertNotNull(reRetrievedJournal)
-            assertEquals("Updated Title", reRetrievedJournal.title)
-
-            // Test delete operations
-            textNoteDao.delete(note1)
-            val remainingNotes = textNoteDao.getNotesForJournal(journal.id)
-            assertEquals(1, remainingNotes.size)
-            assertEquals(note2.content, remainingNotes.first().content)
-        } finally {
-            database.close()
-        }
+    private fun androidx.sqlite.db.SupportSQLiteDatabase.insertLegacyIntegerJournal(
+        id: Int,
+        title: String,
+        description: String,
+        created: Long = 1640995200000,
+        lastUpdated: Long = created,
+    ) {
+        execSQL(
+            """
+            INSERT INTO journals (id, title, description, created, lastUpdated)
+            VALUES ($id, '$title', '$description', $created, $lastUpdated)
+            """.trimIndent(),
+        )
     }
+
+    private fun androidx.sqlite.db.SupportSQLiteDatabase.insertLegacyTextJournal(
+        id: String,
+        title: String,
+        description: String,
+        created: Long = 1640995200000,
+        lastUpdated: Long = created,
+    ) {
+        execSQL(
+            """
+            INSERT INTO journals (id, title, description, created, lastUpdated)
+            VALUES ('$id', '$title', '$description', $created, $lastUpdated)
+            """.trimIndent(),
+        )
+    }
+
+    private fun androidx.sqlite.db.SupportSQLiteDatabase.insertLegacyTextNote(
+        uid: String,
+        content: String,
+        created: Long = 1640995200000,
+        lastUpdated: Long = created,
+    ) {
+        execSQL(
+            """
+            INSERT INTO text_notes (uid, content, lastUpdated, created)
+            VALUES ('$uid', '$content', $lastUpdated, $created)
+            """.trimIndent(),
+        )
+    }
+
+    @Test
+    fun testDataIntegrityWithFullDatabaseOperations() =
+        runTest {
+            // Create database with latest schema and perform full CRUD operations
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            val database =
+                Room
+                    .inMemoryDatabaseBuilder(context, LogDateDatabase::class.java)
+                    .allowMainThreadQueries()
+                    .build()
+
+            try {
+                val journalDao = database.journalDao()
+                val textNoteDao = database.textNoteDao()
+                val currentTime = Clock.System.now()
+
+                // Create test journal
+                val journal =
+                    JournalEntity(
+                        id = Uuid.random(),
+                        title = "Integration Test Journal",
+                        description = "Testing data integrity",
+                        created = currentTime,
+                        lastUpdated = currentTime,
+                    )
+                journalDao.create(journal)
+
+                // Create test notes
+                val note1 =
+                    TextNoteEntity(
+                        content = "First test note content",
+                        uid = Uuid.random(),
+                        created = currentTime,
+                        lastUpdated = currentTime,
+                    )
+                val note2 =
+                    TextNoteEntity(
+                        content = "Second test note content",
+                        uid = Uuid.random(),
+                        created = currentTime,
+                        lastUpdated = currentTime,
+                    )
+                textNoteDao.addNote(note1)
+                textNoteDao.addNote(note2)
+                database.journalNotesDao().addNoteToJournal(journal.id, note1.uid)
+                database.journalNotesDao().addNoteToJournal(journal.id, note2.uid)
+
+                // Verify journal retrieval
+                val retrievedJournal = journalDao.getJournalById(journal.id)
+                assertNotNull(retrievedJournal)
+                assertEquals(journal.title, retrievedJournal.title)
+                assertEquals(journal.description, retrievedJournal.description)
+
+                // Verify notes retrieval
+                val journalWithNotes = database.journalNotesDao().getAll().single()
+                assertEquals(2, journalWithNotes.textNotes.size)
+                assertTrue(
+                    journalWithNotes.textNotes.any { it.uid == note1.uid && it.content == note1.content },
+                )
+                assertTrue(
+                    journalWithNotes.textNotes.any { it.uid == note2.uid && it.content == note2.content },
+                )
+
+                // Test journal with notes query
+                assertEquals(journal.title, journalWithNotes.journal.title)
+
+                // Test update operations
+                val updatedJournal = journal.copy(title = "Updated Title")
+                journalDao.update(updatedJournal)
+
+                val reRetrievedJournal = journalDao.getJournalById(journal.id)
+                assertNotNull(reRetrievedJournal)
+                assertEquals("Updated Title", reRetrievedJournal.title)
+
+                // Test delete operations
+                textNoteDao.removeNote(note1.uid)
+                val remainingNotes = textNoteDao.getAll()
+                assertEquals(1, remainingNotes.size)
+                assertEquals(note2.content, remainingNotes.single().content)
+            } finally {
+                database.close()
+            }
+        }
 
     @Test
     fun testMigrationFrom25To26BackfillsLocationSampleMetadata() {

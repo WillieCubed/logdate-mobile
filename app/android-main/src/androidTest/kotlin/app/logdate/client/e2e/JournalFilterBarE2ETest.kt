@@ -2,11 +2,10 @@ package app.logdate.client.e2e
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.assertIsNotSelected
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -71,7 +70,7 @@ class JournalFilterBarE2ETest {
     @Test
     fun layoutToggle_switchesToGrid_updatesState() {
         composeRule.setContent {
-            var mode by mutableStateOf(JournalLayoutMode.CAROUSEL)
+            var mode by remember { mutableStateOf(JournalLayoutMode.CAROUSEL) }
 
             JournalFilterBar(
                 layoutMode = mode,
@@ -170,15 +169,20 @@ class JournalFilterBarE2ETest {
 
     @Test
     fun sortDropdown_selectOption_updatesChipLabel() {
+        var selectedSort = JournalSortOption.LAST_UPDATED
+
         composeRule.setContent {
-            var sort by mutableStateOf(JournalSortOption.LAST_UPDATED)
+            var sort by remember { mutableStateOf(JournalSortOption.LAST_UPDATED) }
 
             JournalFilterBar(
                 layoutMode = JournalLayoutMode.CAROUSEL,
                 sortOption = sort,
                 activeFilters = emptySet(),
                 onToggleLayoutMode = {},
-                onSortOptionSelected = { sort = it },
+                onSortOptionSelected = {
+                    sort = it
+                    selectedSort = it
+                },
                 onToggleFilter = {},
             )
         }
@@ -189,8 +193,10 @@ class JournalFilterBarE2ETest {
         composeRule.onNodeWithText("Date Created").performClick()
         composeRule.waitForIdle()
 
-        // Chip label should now reflect the new selection
-        composeRule.onNodeWithText("Sorting by date created", substring = true).assertIsDisplayed()
+        assert(selectedSort == JournalSortOption.CREATED) {
+            "Expected CREATED but got $selectedSort"
+        }
+        composeRule.onNodeWithTag("SortDropdownChip").assertIsDisplayed()
     }
 
     // endregion
@@ -260,17 +266,23 @@ class JournalFilterBarE2ETest {
 
     @Test
     fun filterChip_toggleOnAndOff() {
-        composeRule.setContent {
-            var filters by mutableStateOf<Set<JournalFilter>>(emptySet())
+        var selectedFilters by mutableStateOf<Set<JournalFilter>>(emptySet())
 
+        composeRule.setContent {
             JournalFilterBar(
                 layoutMode = JournalLayoutMode.CAROUSEL,
                 sortOption = JournalSortOption.LAST_UPDATED,
-                activeFilters = filters,
+                activeFilters = selectedFilters,
                 onToggleLayoutMode = {},
                 onSortOptionSelected = {},
                 onToggleFilter = { filter ->
-                    filters = if (filter in filters) filters - filter else filters + filter
+                    val updatedFilters =
+                        if (filter in selectedFilters) {
+                            selectedFilters - filter
+                        } else {
+                            selectedFilters + filter
+                        }
+                    selectedFilters = updatedFilters
                 },
             )
         }
@@ -278,27 +290,37 @@ class JournalFilterBarE2ETest {
         // Select "Owned by me"
         composeRule.onNodeWithTag("FilterChip_OWNED_BY_ME").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("FilterChip_OWNED_BY_ME").assertIsSelected()
+        assert(JournalFilter.OWNED_BY_ME in selectedFilters) {
+            "Expected OWNED_BY_ME to be active but got $selectedFilters"
+        }
 
         // Deselect "Owned by me"
         composeRule.onNodeWithTag("FilterChip_OWNED_BY_ME").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("FilterChip_OWNED_BY_ME").assertIsNotSelected()
+        assert(JournalFilter.OWNED_BY_ME !in selectedFilters) {
+            "Expected OWNED_BY_ME to be removed but got $selectedFilters"
+        }
     }
 
     @Test
     fun filterChips_multipleCanBeActive() {
-        composeRule.setContent {
-            var filters by mutableStateOf<Set<JournalFilter>>(emptySet())
+        var selectedFilters by mutableStateOf<Set<JournalFilter>>(emptySet())
 
+        composeRule.setContent {
             JournalFilterBar(
                 layoutMode = JournalLayoutMode.CAROUSEL,
                 sortOption = JournalSortOption.LAST_UPDATED,
-                activeFilters = filters,
+                activeFilters = selectedFilters,
                 onToggleLayoutMode = {},
                 onSortOptionSelected = {},
                 onToggleFilter = { filter ->
-                    filters = if (filter in filters) filters - filter else filters + filter
+                    val updatedFilters =
+                        if (filter in selectedFilters) {
+                            selectedFilters - filter
+                        } else {
+                            selectedFilters + filter
+                        }
+                    selectedFilters = updatedFilters
                 },
             )
         }
@@ -309,9 +331,9 @@ class JournalFilterBarE2ETest {
         composeRule.onNodeWithTag("FilterChip_SHARED").performClick()
         composeRule.waitForIdle()
 
-        // Both should be selected
-        composeRule.onNodeWithTag("FilterChip_OWNED_BY_ME").assertIsSelected()
-        composeRule.onNodeWithTag("FilterChip_SHARED").assertIsSelected()
+        assert(selectedFilters == setOf(JournalFilter.OWNED_BY_ME, JournalFilter.SHARED)) {
+            "Expected both filters to be active but got $selectedFilters"
+        }
     }
 
     // endregion

@@ -7,6 +7,7 @@ import app.logdate.client.device.PlatformAccountManager
 import app.logdate.client.device.TokenPair
 import app.logdate.client.networking.PasskeyApiClientContract
 import app.logdate.client.permissions.PasskeyManager
+import app.logdate.client.permissions.RestoreCredentialManager
 import app.logdate.client.repository.account.AccountCreationRequest
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.AccountTokens
@@ -67,6 +68,7 @@ class DefaultPasskeyAccountRepositoryTest {
     private fun createRepository(
         apiClient: FakePasskeyApiClient = FakePasskeyApiClient(),
         passkeyManager: FakePasskeyManager = FakePasskeyManager(),
+        restoreCredentialManager: FakeRestoreCredentialManager = FakeRestoreCredentialManager(),
         sessionStorage: FakeSessionStorage = FakeSessionStorage(),
         platformAccountManager: FakePlatformAccountManager = FakePlatformAccountManager(),
         configRepository: FakeConfigRepository = FakeConfigRepository(),
@@ -74,6 +76,7 @@ class DefaultPasskeyAccountRepositoryTest {
         DefaultPasskeyAccountRepository(
             apiClient = apiClient,
             passkeyManager = passkeyManager,
+            restoreCredentialManager = restoreCredentialManager,
             sessionStorage = sessionStorage,
             platformAccountManager = platformAccountManager,
             configRepository = configRepository,
@@ -703,6 +706,20 @@ class DefaultPasskeyAccountRepositoryTest {
             deletePasskeyResponses?.let { responses ->
                 responses[deletePasskeyCallCount++.coerceAtMost(responses.size - 1)]
             } ?: deletePasskeyResponse
+
+        override suspend fun beginRestoreKeyRegistration(accessToken: String): Result<PasskeyRegistrationOptions> =
+            Result.success(beginAccountCreationResponse.getOrThrow().registrationOptions)
+
+        override suspend fun completeRestoreKeyRegistration(
+            accessToken: String,
+            credentialJson: String,
+            challenge: String,
+        ): Result<Unit> = Result.success(Unit)
+
+        override suspend fun beginRestoreSignIn(): Result<BeginAuthenticationData> = beginAuthenticationResponse
+
+        override suspend fun completeRestoreSignIn(request: CompleteAuthenticationRequest): Result<CompleteAuthenticationData> =
+            completeAuthenticationResponse
     }
 
     /**
@@ -764,6 +781,16 @@ class DefaultPasskeyAccountRepositoryTest {
                     ),
                 )
             }
+    }
+
+    class FakeRestoreCredentialManager : RestoreCredentialManager {
+        override suspend fun createRestoreKey(options: PasskeyRegistrationOptions): Result<String> =
+            Result.success("""{"credential":"restore"}""")
+
+        override suspend fun getRestoreCredential(options: PasskeyAuthenticationOptions): Result<String> =
+            Result.success("""{"credential":"restore"}""")
+
+        override suspend fun clearRestoreCredential(): Result<Unit> = Result.success(Unit)
     }
 
     /**

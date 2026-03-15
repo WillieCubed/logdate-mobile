@@ -17,8 +17,6 @@
         <include domain="file" path="datastore/"/>
         <include domain="file" path="db_recovery/"/>
         <include domain="database" path="."/>
-        <exclude domain="sharedpref" path="."/>
-        <exclude domain="file" path="audio_notes/"/>
     </cloud-backup>
     <device-transfer>
         <include domain="file" path="."/>
