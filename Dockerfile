@@ -12,11 +12,15 @@ ENV GRADLE_USER_HOME=/home/gradle/.gradle
 COPY --link gradle/ gradle/
 COPY --link gradlew gradlew.bat gradle.properties settings.gradle.kts ./
 COPY --link gradle/libs.versions.toml gradle/libs.versions.toml
+COPY --link build-logic/ build-logic/
 
 # Copy project structure and build files
 COPY --link build.gradle.kts ./
+COPY --link app/ app/
+COPY --link client/ client/
+COPY --link integration/ integration/
+COPY --link samples/ samples/
 COPY --link shared/ shared/
-COPY --link client/util/ client/util/
 COPY --link server/ server/
 
 # Build the application with cached Gradle dependencies

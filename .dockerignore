@@ -48,8 +48,6 @@ Thumbs.db
 **/*.log
 
 # Android specific (not needed for server)
-app/
-client/
 **/*.apk
 **/*.aab
 **/proguard/
@@ -76,6 +74,11 @@ client/
 !settings.gradle.kts
 !build.gradle.kts
 !gradle/libs.versions.toml
+!build-logic/
+!app/
+!client/
+!integration/
+!samples/
 !server/
 !shared/
 !client/util/
