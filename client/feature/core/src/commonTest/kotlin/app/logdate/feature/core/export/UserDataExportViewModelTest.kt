@@ -1,6 +1,7 @@
 package app.logdate.feature.core.export
 
 import app.logdate.client.domain.export.ExportCounts
+import app.logdate.client.domain.export.ExportStats
 import app.logdate.client.domain.export.GetExportCountsUseCase
 import app.logdate.client.domain.notes.GetAllAudioNotesUseCase
 import app.logdate.client.repository.journals.JournalNote
@@ -197,12 +198,12 @@ private fun createFailingGetExportCountsUseCase(): GetExportCountsUseCase {
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class ExportViewModelTest {
+class UserDataExportViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private val testScope = TestScope(testDispatcher)
 
     private lateinit var fakeExportLauncher: FakeExportLauncher
-    private lateinit var viewModel: ExportViewModel
+    private lateinit var viewModel: UserDataExportViewModel
 
     @BeforeTest
     fun setup() {
@@ -217,8 +218,8 @@ class ExportViewModelTest {
 
     private fun createViewModel(
         getExportCountsUseCase: GetExportCountsUseCase = createSuccessfulGetExportCountsUseCase(),
-    ): ExportViewModel =
-        ExportViewModel(
+    ): UserDataExportViewModel =
+        UserDataExportViewModel(
             exportLauncher = fakeExportLauncher,
             getExportCountsUseCase = getExportCountsUseCase,
         )
@@ -539,6 +540,14 @@ class ExportViewModelTest {
             viewModel.showExportOptions()
             viewModel.confirmExport()
 
+            val testStats =
+                ExportStats(
+                    journalCount = 3,
+                    noteCount = 12,
+                    draftCount = 2,
+                    mediaCount = 5,
+                )
+
             // Simulate worker sending completion directly through progress
             fakeExportLauncher.emitProgress(
                 ExportProgressInfo(
@@ -546,6 +555,7 @@ class ExportViewModelTest {
                     progressPercent = 100,
                     message = "Export completed",
                     completedFilePath = "/storage/exports/logdate-export.zip",
+                    stats = testStats,
                 ),
             )
             advanceUntilIdle()
@@ -554,6 +564,7 @@ class ExportViewModelTest {
             assertIs<ExportState.Completed>(state)
             assertEquals("/storage/exports/logdate-export.zip", state.path)
             assertEquals("logdate-export.zip", state.fileName)
+            assertEquals(testStats, state.stats)
         }
 
     @Test

@@ -11,9 +11,6 @@ import app.logdate.client.domain.quota.ObserveCloudQuotaUseCase
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.conflict.SyncConflictRecord
 import app.logdate.client.sync.conflict.SyncConflictStore
-import app.logdate.feature.core.restore.RestoreLauncher
-import app.logdate.feature.core.restore.RestoreOutcome
-import app.logdate.feature.core.restore.RestoreSummary
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.CloudStorageQuota
@@ -36,31 +33,12 @@ import kotlin.time.Instant
 data class DataSettingsState(
     val quotaState: CloudStorageQuota,
     val isQuotaAvailable: Boolean,
-    val restoreState: RestoreState,
     val integrityState: IntegrityState,
     val conflictsState: ConflictsState,
     val syncStatus: app.logdate.client.sync.SyncStatus?,
     val isAuthenticated: Boolean,
     val isBackgroundSyncEnabled: Boolean,
 )
-
-sealed class RestoreState {
-    data object Idle : RestoreState()
-
-    data object Selecting : RestoreState()
-
-    data object Restoring : RestoreState()
-
-    data class Completed(
-        val summary: RestoreSummary,
-        val showSnackbar: Boolean = true,
-    ) : RestoreState()
-
-    data class Failed(
-        val message: String,
-        val showSnackbar: Boolean = true,
-    ) : RestoreState()
-}
 
 data class IntegrityState(
     val isChecking: Boolean = false,
@@ -79,7 +57,6 @@ data class ConflictsState(
 
 class DataSettingsViewModel(
     observeCloudQuotaUseCase: ObserveCloudQuotaUseCase,
-    private val restoreLauncher: RestoreLauncher,
     private val syncManager: SyncManager,
     private val sessionStorage: SessionStorage,
     private val preferencesDataSource: LogdatePreferencesDataSource,
@@ -87,9 +64,6 @@ class DataSettingsViewModel(
     private val dataIntegrityService: DataIntegrityService,
     private val conflictStore: SyncConflictStore,
 ) : ViewModel() {
-    private val _restoreState = MutableStateFlow<RestoreState>(RestoreState.Idle)
-    val restoreState: StateFlow<RestoreState> = _restoreState.asStateFlow()
-
     private val _integrityState = MutableStateFlow(IntegrityState())
     val integrityState: StateFlow<IntegrityState> = _integrityState.asStateFlow()
 
@@ -122,14 +96,12 @@ class DataSettingsViewModel(
         combine(
             quotaFlow,
             quotaAvailabilityFlow,
-            _restoreState,
             _integrityState,
             _conflictsState,
-        ) { quotaState, isQuotaAvailable, restoreState, integrityState, conflictsState ->
+        ) { quotaState, isQuotaAvailable, integrityState, conflictsState ->
             DataSettingsState(
                 quotaState = quotaState.orDefault(),
                 isQuotaAvailable = isQuotaAvailable,
-                restoreState = restoreState,
                 integrityState = integrityState,
                 conflictsState = conflictsState,
                 syncStatus = null,
@@ -156,7 +128,6 @@ class DataSettingsViewModel(
             DataSettingsState(
                 quotaState = (null as CloudStorageQuota?).orDefault(),
                 isQuotaAvailable = true,
-                restoreState = RestoreState.Idle,
                 integrityState = IntegrityState(),
                 conflictsState = ConflictsState(),
                 syncStatus = null,
@@ -166,42 +137,7 @@ class DataSettingsViewModel(
         )
 
     init {
-        restoreLauncher.setRestoreCompletionCallback { outcome ->
-            when (outcome) {
-                is RestoreOutcome.Started -> _restoreState.update { RestoreState.Restoring }
-                is RestoreOutcome.Cancelled -> _restoreState.update { RestoreState.Idle }
-                is RestoreOutcome.Success -> {
-                    _restoreState.update { RestoreState.Completed(outcome.summary, true) }
-                    runIntegrityCheck()
-                }
-                is RestoreOutcome.Failure ->
-                    _restoreState.update {
-                        RestoreState.Failed(outcome.message, true)
-                    }
-            }
-        }
-
         startConflictPolling()
-    }
-
-    fun restoreContent() {
-        _restoreState.update { RestoreState.Selecting }
-        restoreLauncher.startRestore()
-    }
-
-    fun cancelRestore() {
-        restoreLauncher.cancelRestore()
-        _restoreState.update { RestoreState.Idle }
-    }
-
-    fun markRestoreSnackbarShown() {
-        _restoreState.update {
-            when (it) {
-                is RestoreState.Completed -> it.copy(showSnackbar = false)
-                is RestoreState.Failed -> it.copy(showSnackbar = false)
-                else -> it
-            }
-        }
     }
 
     fun runIntegrityCheck() {

@@ -8,12 +8,13 @@ import app.logdate.feature.core.BiometricGatekeeper
 import app.logdate.feature.core.IosBiometricGatekeeper
 import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
 import app.logdate.feature.core.export.ExportLauncher
-import app.logdate.feature.core.export.ExportViewModel
 import app.logdate.feature.core.export.IosExportLauncher
+import app.logdate.feature.core.export.UserDataExportViewModel
 import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.feature.core.profile.ui.ProfileViewModel
 import app.logdate.feature.core.restore.IosRestoreLauncher
 import app.logdate.feature.core.restore.RestoreLauncher
+import app.logdate.feature.core.restore.UserDataRestoreViewModel
 import app.logdate.feature.core.settings.ui.AccountSettingsViewModel
 import app.logdate.feature.core.settings.ui.AdvancedSettingsViewModel
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsViewModel
@@ -95,10 +96,10 @@ actual val coreFeatureModule: Module =
                 get(),
                 get(),
                 get(),
-                get(),
             )
         }
-        viewModel { ExportViewModel(get(), get()) }
+        viewModel { UserDataExportViewModel(get(), get()) }
+        viewModel { UserDataRestoreViewModel(get()) }
         viewModel { AdvancedSettingsViewModel(get(), get()) }
         viewModel {
             DangerZoneSettingsViewModel(

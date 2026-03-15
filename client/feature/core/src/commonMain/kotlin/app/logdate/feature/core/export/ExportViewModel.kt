@@ -39,7 +39,7 @@ sealed class ExportState {
     ) : ExportState()
 }
 
-class ExportViewModel(
+class UserDataExportViewModel(
     private val exportLauncher: ExportLauncher,
     private val getExportCountsUseCase: GetExportCountsUseCase,
 ) : ViewModel() {
@@ -84,6 +84,7 @@ class ExportViewModel(
                         ExportState.Completed(
                             path = completedPath,
                             fileName = fileName,
+                            stats = progressInfo.stats,
                         )
                     }
                     _isSheetVisible.value = true
