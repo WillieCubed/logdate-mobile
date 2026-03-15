@@ -81,6 +81,11 @@ while IFS= read -r file; do
         continue
     fi
 
+    # Skip test source sets — test fixtures routinely contain fake credentials
+    if echo "$file" | grep -qE '/src/(test|androidTest|commonTest|iosTest|desktopTest|wasmJsTest|androidDeviceTest|screenshotTest)/'; then
+        continue
+    fi
+
     added_lines="$(git diff --cached --no-color -U0 -- "$file" | grep -E '^\+[^+]' | sed 's/^+//' || true)"
     [[ -z "$added_lines" ]] && continue
 
