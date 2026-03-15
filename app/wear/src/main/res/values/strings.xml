@@ -1,11 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">LogDate Wear</string>
-    <string name="complication_label">Example complication</string>
-    <string name="hello_world">From the Square world,\nHello, %1$s!</string>
     <string name="cancel">Cancel</string>
     <string name="record_audio_2">Record Audio</string>
-    <string name="tile_label">Example tile</string>
     <string name="wear_recording_channel_description">Audio recording notifications</string>
     <string name="wear_recording_channel_name">Recording</string>
     <string name="wear_recording_in_progress">Recording in progress on your watch</string>
@@ -21,6 +18,31 @@
     <!-- Entry Count Complication -->
     <string name="wear_complication_entry_count_label">Entry Count</string>
     <string name="wear_complication_entry_count_description">Today\'s journal entries</string>
+
+    <!-- Mood Complication -->
+    <string name="wear_complication_mood_label">Current Mood</string>
+    <string name="wear_complication_mood_description">Your mood today</string>
+    <string name="wear_complication_mood_current">Feeling %1$s</string>
+    <string name="wear_complication_mood_none">No mood logged</string>
+
+    <!-- Streak Complication -->
+    <string name="wear_complication_streak_label">Streak</string>
+    <string name="wear_complication_streak_description">Your journaling streak</string>
+    <string name="wear_complication_streak_short">%1$dd</string>
+
+    <!-- Quick Capture Complication -->
+    <string name="wear_complication_quick_capture_label">Quick Capture</string>
+    <string name="wear_complication_quick_capture_description">Record a voice note</string>
+
+    <!-- Today\'s Summary Tile -->
+    <string name="wear_tile_summary_label">Today\'s Summary</string>
+    <string name="wear_tile_summary_title">Today</string>
+    <string name="wear_tile_summary_open">Open LogDate</string>
+    <string name="wear_tile_summary_mood">%1$s %2$s</string>
+    <string name="wear_tile_summary_latest">"%1$s"</string>
+    <string name="wear_tile_summary_voice_note">Voice note</string>
+    <string name="wear_tile_summary_photo">Photo</string>
+    <string name="wear_tile_summary_video">Video</string>
 
     <!-- Timeline -->
     <string name="wear_timeline_title">Timeline</string>
@@ -62,5 +84,9 @@
     <plurals name="wear_complication_entry_count_full">
         <item quantity="one">%d journal entry today</item>
         <item quantity="other">%d journal entries today</item>
+    </plurals>
+    <plurals name="wear_complication_streak_full">
+        <item quantity="one">%d day streak</item>
+        <item quantity="other">%d day streak</item>
     </plurals>
 </resources>

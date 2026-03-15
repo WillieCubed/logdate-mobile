@@ -133,11 +133,80 @@
                 android:value="900" />
         </service>
 
+        <!-- Mood complication: shows today's mood emoji -->
+        <service
+            android:name=".complication.MoodComplicationService"
+            android:exported="true"
+            android:label="@string/wear_complication_mood_label"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SHORT_TEXT" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="900" />
+        </service>
+
+        <!-- Streak complication: shows consecutive journaling day count -->
+        <service
+            android:name=".complication.StreakComplicationService"
+            android:exported="true"
+            android:label="@string/wear_complication_streak_label"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SHORT_TEXT,LONG_TEXT" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="21600" />
+        </service>
+
+        <!-- Quick Capture complication: mic icon to start voice recording -->
+        <service
+            android:name=".complication.QuickCaptureComplicationService"
+            android:exported="true"
+            android:label="@string/wear_complication_quick_capture_label"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SMALL_IMAGE" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="0" />
+        </service>
+
         <!-- Quick Capture tile: four capture buttons + entry count -->
         <service
             android:name=".tile.QuickCaptureTileService"
             android:exported="true"
             android:label="@string/wear_tile_quick_capture_label"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+            </intent-filter>
+
+            <meta-data
+                android:name="androidx.wear.tiles.PREVIEW"
+                android:resource="@drawable/tile_preview" />
+        </service>
+
+        <!-- Today's Summary tile: entry count, mood, latest entry -->
+        <service
+            android:name=".tile.TodaySummaryTileService"
+            android:exported="true"
+            android:label="@string/wear_tile_summary_label"
             android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
             <intent-filter>
                 <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
