@@ -60,10 +60,20 @@ dependencies {
     // Kotlinx coroutines
     implementation(libs.kotlinx.coroutines.android)
 
-    // Minimal client dependencies for Wear - reuse shared repository models.
+    // Client dependencies for Wear - shared data infrastructure
     implementation(projects.client.repository)
+    implementation(projects.client.data)
+    implementation(projects.client.database)
+    implementation(projects.client.device)
+    implementation(projects.client.logdateDatastore)
+    implementation(projects.client.sync)
+    implementation(projects.shared.config)
+    implementation(projects.shared.model)
     implementation(projects.client.feature.editor)
     implementation(projects.client.media)
+
+    // Serialization (required by LocalFirstDraftRepository)
+    implementation(libs.kotlinx.serialization.json)
 
     // Add navigation for Wear
     implementation(libs.androidx.navigation3.runtime)
@@ -96,6 +106,7 @@ dependencies {
     implementation(libs.horologist.compose.tools)
     implementation(libs.horologist.tiles)
     implementation(libs.androidx.watchface.complications.data.source.ktx)
+    // Instrumented test dependencies
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.androidx.ui.test.junit4)

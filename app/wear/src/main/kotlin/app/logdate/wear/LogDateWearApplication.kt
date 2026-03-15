@@ -2,6 +2,7 @@ package app.logdate.wear
 
 import android.app.Application
 import app.logdate.wear.di.wearAudioModule
+import app.logdate.wear.di.wearDataModule
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
 import org.koin.android.ext.koin.androidContext
@@ -31,8 +32,8 @@ class LogDateWearApplication : Application() {
             androidLogger(Level.ERROR) // Minimize logging overhead on Wear OS
             androidContext(this@LogDateWearApplication)
             modules(
+                wearDataModule,
                 wearAudioModule,
-                // Add more modules as needed
             )
         }
         

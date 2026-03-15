@@ -4,9 +4,9 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.data.storage.StorageSpaceChecker
 import app.logdate.wear.recording.WearAudioRecordingManager
-import app.logdate.wear.repository.WearJournalNotesRepository
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
@@ -24,7 +24,7 @@ import kotlin.uuid.Uuid
 class AudioRecordingViewModel(
     application: Application,
     private val recordingManager: WearAudioRecordingManager,
-    private val notesRepository: WearJournalNotesRepository,
+    private val notesRepository: JournalNotesRepository,
     private val storageChecker: StorageSpaceChecker
 ) : AndroidViewModel(application) {
 
