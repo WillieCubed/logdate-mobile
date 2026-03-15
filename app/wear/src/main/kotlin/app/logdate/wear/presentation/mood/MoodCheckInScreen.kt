@@ -55,12 +55,12 @@ fun MoodCheckInScreen(
             onAttachVoice = viewModel::attachVoice,
             onSkip = viewModel::skipVoiceAttachment,
         )
-        MoodCheckInStep.SAVED -> SavedContent()
+        MoodCheckInStep.SAVED -> MoodSavedContent()
     }
 }
 
 @Composable
-private fun SelectMoodContent(
+internal fun SelectMoodContent(
     onMoodSelected: (MoodOption) -> Unit,
 ) {
     ScreenScaffold {
@@ -89,7 +89,7 @@ private fun SelectMoodContent(
 }
 
 @Composable
-private fun VoicePromptContent(
+internal fun VoicePromptContent(
     selectedMood: MoodOption?,
     onAttachVoice: () -> Unit,
     onSkip: () -> Unit,
@@ -130,7 +130,7 @@ private fun VoicePromptContent(
 }
 
 @Composable
-private fun SavedContent() {
+internal fun MoodSavedContent() {
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,

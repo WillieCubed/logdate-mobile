@@ -39,6 +39,27 @@ fun WearHomeScreen(
     viewModel: WearHomeViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    WearHomeContent(
+        uiState = uiState,
+        onNavigateToWalkieTalkie = onNavigateToWalkieTalkie,
+        onNavigateToVoiceNote = onNavigateToVoiceNote,
+        onNavigateToMoodCheckIn = onNavigateToMoodCheckIn,
+        onNavigateToQuickText = onNavigateToQuickText,
+        onNavigateToTimeline = onNavigateToTimeline,
+        onNavigateToSettings = onNavigateToSettings,
+    )
+}
+
+@Composable
+internal fun WearHomeContent(
+    uiState: WearHomeUiState,
+    onNavigateToWalkieTalkie: () -> Unit = {},
+    onNavigateToVoiceNote: () -> Unit = {},
+    onNavigateToMoodCheckIn: () -> Unit = {},
+    onNavigateToQuickText: () -> Unit = {},
+    onNavigateToTimeline: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
+) {
     val listState = rememberScalingLazyListState()
 
     ScreenScaffold(

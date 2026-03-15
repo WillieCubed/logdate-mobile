@@ -4,6 +4,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.screenshot)
 }
 
 extensions.configure<ApplicationExtension> {
@@ -16,6 +17,7 @@ extensions.configure<ApplicationExtension> {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -36,6 +38,7 @@ extensions.configure<ApplicationExtension> {
         // Enable core library desugaring for health-connect
         isCoreLibraryDesugaringEnabled = true
     }
+    experimentalProperties["android.experimental.enableScreenshotTest"] = true
 }
 
 kotlin {
@@ -113,10 +116,14 @@ dependencies {
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.mockk)
 
+    // Screenshot test dependencies
+    screenshotTestImplementation(libs.screenshot.validation.api)
+
     // Instrumented test dependencies
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.androidx.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.ext.junit)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
     debugImplementation(libs.androidx.tiles.tooling)

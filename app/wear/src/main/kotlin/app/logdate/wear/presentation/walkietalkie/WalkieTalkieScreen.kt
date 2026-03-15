@@ -76,15 +76,15 @@ fun WalkieTalkieScreen(
                 onTouchUp = viewModel::onTouchUp,
             )
             WalkieTalkiePhase.SAVING -> SavingContent()
-            WalkieTalkiePhase.SAVED -> SavedContent(durationMs = uiState.savedDurationMs)
+            WalkieTalkiePhase.SAVED -> WalkieTalkieSavedContent(durationMs = uiState.savedDurationMs)
             WalkieTalkiePhase.TOO_SHORT -> TooShortContent()
-            WalkieTalkiePhase.ERROR -> ErrorContent(message = uiState.errorMessage)
+            WalkieTalkiePhase.ERROR -> WalkieTalkieErrorContent(message = uiState.errorMessage)
         }
     }
 }
 
 @Composable
-private fun ReadyContent(
+internal fun ReadyContent(
     onTouchDown: () -> Unit,
     onTouchUp: () -> Unit,
 ) {
@@ -123,7 +123,7 @@ private fun ReadyContent(
 }
 
 @Composable
-private fun RecordingContent(
+internal fun RecordingContent(
     durationMs: Long,
     audioLevels: List<Float>,
     onTouchUp: () -> Unit,
@@ -165,7 +165,7 @@ private fun RecordingContent(
 }
 
 @Composable
-private fun SavingContent() {
+internal fun SavingContent() {
     Text(
         text = "Saving...",
         style = MaterialTheme.typography.bodyMedium,
@@ -174,7 +174,7 @@ private fun SavingContent() {
 }
 
 @Composable
-private fun SavedContent(durationMs: Long) {
+internal fun WalkieTalkieSavedContent(durationMs: Long) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -200,7 +200,7 @@ private fun SavedContent(durationMs: Long) {
 }
 
 @Composable
-private fun TooShortContent() {
+internal fun TooShortContent() {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -220,7 +220,7 @@ private fun TooShortContent() {
 }
 
 @Composable
-private fun ErrorContent(message: String?) {
+internal fun WalkieTalkieErrorContent(message: String?) {
     Text(
         text = message ?: "Something went wrong",
         style = MaterialTheme.typography.bodySmall,
@@ -230,7 +230,7 @@ private fun ErrorContent(message: String?) {
     )
 }
 
-private fun formatDuration(ms: Long): String {
+internal fun formatDuration(ms: Long): String {
     val totalSeconds = ms / 1000
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
