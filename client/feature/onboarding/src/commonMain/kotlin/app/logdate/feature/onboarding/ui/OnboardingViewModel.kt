@@ -3,6 +3,8 @@ package app.logdate.feature.onboarding.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.billing.model.LogDateBackupPlanOption
+import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
+import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.user.UserStateRepository
@@ -10,6 +12,7 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -21,12 +24,24 @@ import kotlin.time.Instant
 class OnboardingViewModel(
     private val journalNotesRepository: JournalNotesRepository,
     private val userStateRepository: UserStateRepository,
-//    private val notifier: Notifier,
+    private val memoriesSettingsRepository: MemoriesSettingsRepository,
+    private val locationTrackingSettingsRepository: LocationTrackingSettingsRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(OnboardingUiState())
 
     val uiState: StateFlow<OnboardingUiState> =
         _uiState.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), OnboardingUiState())
+
+    /**
+     * Whether contextual recommendations are currently enabled.
+     *
+     * Used by the notifications screen to adapt its messaging.
+     */
+    val recommendationsEnabled: StateFlow<Boolean> =
+        memoriesSettingsRepository
+            .observeSettings()
+            .map { it.contextualRecommendationsEnabled }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(), true)
 
     /**
      * Creates a new journal entry.
@@ -68,6 +83,24 @@ class OnboardingViewModel(
     fun updateBirthday(birthday: Instant) {
         viewModelScope.launch {
             userStateRepository.setBirthday(birthday)
+        }
+    }
+
+    /**
+     * Enables or disables contextual recommendations.
+     */
+    fun setRecommendationsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            memoriesSettingsRepository.setContextualRecommendationsEnabled(enabled)
+        }
+    }
+
+    /**
+     * Enables background location tracking after the user opts in.
+     */
+    fun enableLocationTracking() {
+        viewModelScope.launch {
+            locationTrackingSettingsRepository.setBackgroundTrackingEnabled(true)
         }
     }
 

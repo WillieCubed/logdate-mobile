@@ -1,6 +1,5 @@
 package app.logdate.feature.onboarding.navigation
 
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
@@ -11,10 +10,12 @@ import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
 import app.logdate.feature.onboarding.ui.MemoriesImportInfoScreen
 import app.logdate.feature.onboarding.ui.MemorySelectionScreen
 import app.logdate.feature.onboarding.ui.MemorySelectionViewModel
+import app.logdate.feature.onboarding.ui.OnboardingBirthdayScreen
 import app.logdate.feature.onboarding.ui.OnboardingCompletionScreen
-import app.logdate.feature.onboarding.ui.OnboardingNotificationConfirmationScreen
-import app.logdate.feature.onboarding.ui.OnboardingNotificationScreen
+import app.logdate.feature.onboarding.ui.OnboardingLocationScreen
+import app.logdate.feature.onboarding.ui.OnboardingNotificationsScreen
 import app.logdate.feature.onboarding.ui.OnboardingOverviewScreen
+import app.logdate.feature.onboarding.ui.OnboardingRecommendationsScreen
 import app.logdate.feature.onboarding.ui.OnboardingStartScreen
 import app.logdate.feature.onboarding.ui.PersonalIntroScreen
 import app.logdate.feature.onboarding.ui.WelcomeBackScreen
@@ -56,14 +57,17 @@ data object AccountCreation : OnboardingBaseRoute
 @Serializable
 data object SignIn : OnboardingBaseRoute
 
-/**
- * Screen to configure preferences including notifications.
- */
 @Serializable
-data object OnboardingPreferences : OnboardingBaseRoute
+data object BirthdayIntro : OnboardingBaseRoute
 
 @Serializable
-data object ConfirmPreferences : OnboardingBaseRoute
+data object FeatureRecommendations : OnboardingBaseRoute
+
+@Serializable
+data object FeatureLocationTimeline : OnboardingBaseRoute
+
+@Serializable
+data object FeatureNotifications : OnboardingBaseRoute
 
 @Serializable
 data object OnboardingComplete : OnboardingBaseRoute
@@ -120,19 +124,6 @@ fun NavGraphBuilder.onboardingGraph(
                 },
             )
         }
-        composable<FirstEntry> {
-            // TODO: Re-add entry creation during onboarding
-//            EntryCreationScreenWrapper(
-//                onBack = onNavigateBack,
-//                onNext = {
-//                    onGoToItem(ONBOARDING_ENABLE_NOTIFICATIONS)
-//                },
-//                useCompactLayout = useCompactLayout,
-//            )
-            LaunchedEffect(Unit) {
-                onGoToItem(OnboardingPreferences)
-            }
-        }
         composable<CloudSync> { }
         composable<MemoryImport> {
             MemoriesImportInfoScreen(
@@ -156,30 +147,42 @@ fun NavGraphBuilder.onboardingGraph(
             )
         }
         composable<AccountCreation> {
-            // Use the existing CloudAccountOnboardingScreen from core feature
             CloudAccountOnboardingScreen(
                 viewModel = koinViewModel<CloudAccountOnboardingViewModel>(),
                 onAccountCreated = {
-                    onGoToItem(OnboardingPreferences)
+                    onGoToItem(BirthdayIntro)
                 },
                 onSkipOnboarding = {
-                    onGoToItem(OnboardingPreferences)
+                    onGoToItem(BirthdayIntro)
                 },
             )
         }
-        composable<OnboardingPreferences> {
-            OnboardingNotificationScreen(
-                onBack = {
-                    onNavigateBack()
-                },
+        composable<BirthdayIntro> {
+            OnboardingBirthdayScreen(
+                onBack = onNavigateBack,
                 onNext = {
-                    onGoToItem(ConfirmPreferences)
+                    onGoToItem(FeatureRecommendations)
                 },
             )
         }
-        composable<ConfirmPreferences> {
-            OnboardingNotificationConfirmationScreen(
-                // TODO: Skip ONBOARDING_ENABLE_NOTIFICATIONS if notifications are already enabled
+        composable<FeatureRecommendations> {
+            OnboardingRecommendationsScreen(
+                onBack = onNavigateBack,
+                onNext = {
+                    onGoToItem(FeatureLocationTimeline)
+                },
+            )
+        }
+        composable<FeatureLocationTimeline> {
+            OnboardingLocationScreen(
+                onBack = onNavigateBack,
+                onNext = {
+                    onGoToItem(FeatureNotifications)
+                },
+            )
+        }
+        composable<FeatureNotifications> {
+            OnboardingNotificationsScreen(
                 onBack = onNavigateBack,
                 onNext = {
                     onGoToItem(OnboardingComplete)

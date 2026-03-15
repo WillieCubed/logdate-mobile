@@ -7,6 +7,12 @@ import androidx.compose.runtime.Composable
 @Composable
 expect fun rememberNotificationPermissionState(): NotificationPermissionState
 
+/**
+ * Represents the state of notification permission.
+ */
 data class NotificationPermissionState(
-    val permissionId: String,
+    val hasPermission: Boolean,
+    val shouldShowRationale: Boolean,
+    val permissionRequested: Boolean,
+    val requestPermission: () -> Unit,
 )

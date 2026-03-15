@@ -56,6 +56,8 @@ kotlin {
             implementation(projects.client.billing)
             implementation(projects.client.media)
             implementation(projects.client.intelligence)
+            implementation(projects.client.permissions)
+            implementation(projects.client.location)
             implementation(projects.client.feature.core)
             // Compose plugin dependencies
             implementation(libs.compose.runtime)
@@ -78,6 +80,11 @@ kotlin {
             implementation(libs.koin.core)
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)
+        }
+
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
         }
 
         androidMain.dependencies {

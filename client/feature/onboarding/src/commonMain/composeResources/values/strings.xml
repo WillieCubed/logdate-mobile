@@ -77,4 +77,44 @@
     <string name="warning_recovery_phrase_never_share">Never share your recovery phrase with anyone</string>
     <string name="warning_recovery_phrase_store_safe">Store it in a safe place</string>
     <string name="warning_recovery_phrase_write_on_paper">Write it down on paper - don&apos;t save digitally</string>
+
+    <!-- Birthday screen -->
+    <string name="onboarding_birthday_title">When&apos;s your birthday?</string>
+    <string name="onboarding_birthday_body">Your birthday unlocks something special: every year on your birthday, you&apos;ll get a personalized Rewind of your favorite memories. It also marks the very beginning of your story on your timeline.</string>
+    <string name="onboarding_birthday_set">Set my birthday</string>
+    <string name="onboarding_birthday_skip">Skip for now</string>
+    <string name="onboarding_birthday_set_label">Birthday</string>
+    <string name="onboarding_birthday_card_rewind_title">Birthday Rewind</string>
+    <string name="onboarding_birthday_card_rewind_description">Every year, relive your best moments in a personalized birthday celebration.</string>
+    <string name="onboarding_birthday_card_origin_title">Your story&apos;s beginning</string>
+    <string name="onboarding_birthday_card_origin_description">Your birthday marks the start of your personal timeline \u2014 the origin of your story.</string>
+    <string name="onboarding_birthday_confirm">Confirm</string>
+    <string name="onboarding_birthday_cancel">Cancel</string>
+
+    <!-- Recommendations screen -->
+    <string name="onboarding_recommendations_title">Personalized suggestions</string>
+    <string name="onboarding_recommendations_body">LogDate learns when and how you like to capture memories, then gives you a gentle nudge at just the right moment.</string>
+    <string name="onboarding_recommendations_card_drafts_title">Finish what you started</string>
+    <string name="onboarding_recommendations_card_drafts_description">If you leave a draft unfinished, we&apos;ll remind you so nothing gets lost.</string>
+    <string name="onboarding_recommendations_card_recall_title">Remember your past</string>
+    <string name="onboarding_recommendations_card_recall_description">On this day last year, something happened. We&apos;ll help you rediscover it.</string>
+    <string name="onboarding_recommendations_keep_on">Keep suggestions on</string>
+    <string name="onboarding_recommendations_turn_off">Turn off</string>
+    <string name="onboarding_recommendations_privacy">Suggestions are generated entirely on your device.</string>
+
+    <!-- Location screen -->
+    <string name="onboarding_location_title">Your places, your timeline</string>
+    <string name="onboarding_location_body">LogDate can remember the places that matter to you \u2014 the coffee shop where you had that great conversation, the park where you watched the sunset. Build a timeline of everywhere you&apos;ve been.</string>
+    <string name="onboarding_location_card_title">Location Timeline</string>
+    <string name="onboarding_location_card_description">See everywhere you&apos;ve been and the memories you made there, all stored privately on your device.</string>
+    <string name="onboarding_location_enable">Enable location</string>
+    <string name="onboarding_location_not_now">Not now</string>
+    <string name="onboarding_location_privacy">Your location data is stored locally on your device and is never shared without your explicit consent.</string>
+
+    <!-- Notifications screen -->
+    <string name="onboarding_notifications_title">Stay in the loop</string>
+    <string name="onboarding_notifications_body_with_recommendations">Get a gentle nudge when it&apos;s the perfect time to capture a memory, plus progress updates when exporting or restoring your data.</string>
+    <string name="onboarding_notifications_body_without_recommendations">Get progress updates when exporting or restoring your data, so you always know when your memories are ready.</string>
+    <string name="onboarding_notifications_enable">Enable notifications</string>
+    <string name="onboarding_notifications_not_now">Not now</string>
 </resources>
