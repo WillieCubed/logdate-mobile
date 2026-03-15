@@ -12,12 +12,11 @@ import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
 import app.logdate.wear.R
+import app.logdate.wear.haptic.WearHapticEngine
 import io.github.aakira.napier.Napier
+import org.koin.android.ext.android.inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -93,8 +92,8 @@ class WearAudioRecordingService : Service() {
     // Wake lock to keep recording when the screen is off
     private var wakeLock: PowerManager.WakeLock? = null
     
-    // Vibrator for haptic feedback
-    private lateinit var vibrator: Vibrator
+    // Haptic feedback engine
+    private val hapticEngine: WearHapticEngine by inject()
     
     // State flow for UI updates
     private val _recordingState = MutableStateFlow(WearRecordingState())
@@ -102,19 +101,7 @@ class WearAudioRecordingService : Service() {
     
     override fun onCreate() {
         super.onCreate()
-        
-        // Initialize vibrator
-        vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-            vibratorManager.defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-        }
-        
-        // Create notification channel
         createNotificationChannel()
-        
         Napier.d("Wear OS audio recording service created")
     }
     
@@ -124,23 +111,23 @@ class WearAudioRecordingService : Service() {
                 Napier.d("Starting Wear OS audio recording service")
                 val outputPath = intent.getStringExtra(EXTRA_OUTPUT_PATH)
                 startForegroundRecording(outputPath)
-                vibrateStart()
+                hapticEngine.startRecording()
             }
             ACTION_STOP -> {
                 Napier.d("Stopping Wear OS audio recording service")
-                vibrateStop()
+                hapticEngine.stopRecording()
                 stopRecording()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
             ACTION_PAUSE -> {
                 Napier.d("Pausing Wear OS audio recording")
-                vibratePause()
+                hapticEngine.pause()
                 pauseRecording()
             }
             ACTION_RESUME -> {
                 Napier.d("Resuming Wear OS audio recording")
-                vibrateResume()
+                hapticEngine.resume()
                 resumeRecording()
             }
         }
@@ -468,65 +455,6 @@ class WearAudioRecordingService : Service() {
         }
     }
     
-    /**
-     * Haptic feedback for recording start
-     */
-    private fun vibrateStart() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Strong click effect for start
-            val effect = VibrationEffect.createOneShot(100, VibrationEffect.DEFAULT_AMPLITUDE)
-            vibrator.vibrate(effect)
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(100)
-        }
-    }
-    
-    /**
-     * Haptic feedback for recording stop
-     */
-    private fun vibrateStop() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Double click effect for stop
-            val timings = longArrayOf(0, 80, 80, 80)
-            val amplitudes = intArrayOf(0, 255, 0, 255)
-            val effect = VibrationEffect.createWaveform(timings, amplitudes, -1)
-            vibrator.vibrate(effect)
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(longArrayOf(0, 80, 80, 80), -1)
-        }
-    }
-    
-    /**
-     * Haptic feedback for recording pause
-     */
-    private fun vibratePause() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Light click for pause
-            val effect = VibrationEffect.createOneShot(40, VibrationEffect.EFFECT_TICK)
-            vibrator.vibrate(effect)
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(40)
-        }
-    }
-    
-    /**
-     * Haptic feedback for recording resume
-     */
-    private fun vibrateResume() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Light double click for resume
-            val timings = longArrayOf(0, 40, 40, 40)
-            val amplitudes = intArrayOf(0, 80, 0, 80)
-            val effect = VibrationEffect.createWaveform(timings, amplitudes, -1)
-            vibrator.vibrate(effect)
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(longArrayOf(0, 40, 40, 40), -1)
-        }
-    }
 }
 
 /**
