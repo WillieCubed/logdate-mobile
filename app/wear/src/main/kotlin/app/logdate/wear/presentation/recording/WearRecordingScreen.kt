@@ -24,11 +24,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
+import app.logdate.wear.R
 import app.logdate.wear.presentation.audio.components.AudioWaveform
 import app.logdate.wear.presentation.audio.components.RecordingTimer
 import kotlinx.coroutines.flow.collectLatest
@@ -108,7 +110,7 @@ internal fun ReadyContent() {
     )
 
     Text(
-        text = "HOLD TO\nRECORD",
+        text = stringResource(R.string.wear_recording_hold_to_record),
         style = MaterialTheme.typography.titleSmall,
         textAlign = TextAlign.Center,
         color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
@@ -134,7 +136,7 @@ internal fun ActiveRecordingContent(
             modifier = Modifier.padding(top = 8.dp),
         )
         Text(
-            text = "RECORDING",
+            text = stringResource(R.string.wear_recording_active),
             style = MaterialTheme.typography.labelSmall,
             color = Color.White.copy(alpha = 0.7f),
             modifier = Modifier.padding(top = 4.dp),
@@ -145,7 +147,7 @@ internal fun ActiveRecordingContent(
 @Composable
 internal fun SavingContent() {
     Text(
-        text = "Saving...",
+        text = stringResource(R.string.wear_recording_saving),
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurface,
     )
@@ -159,12 +161,12 @@ internal fun SavedContent(durationMs: Long) {
     ) {
         Icon(
             imageVector = Icons.Default.Check,
-            contentDescription = "Saved",
+            contentDescription = stringResource(R.string.wear_recording_saved),
             tint = Color.White,
             modifier = Modifier.size(48.dp),
         )
         Text(
-            text = "Saved",
+            text = stringResource(R.string.wear_recording_saved),
             style = MaterialTheme.typography.titleSmall,
             color = Color.White,
             modifier = Modifier.padding(top = 4.dp),
@@ -184,12 +186,12 @@ internal fun TooShortContent() {
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = "Too short",
+            text = stringResource(R.string.wear_recording_too_short),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
-            text = "Hold longer",
+            text = stringResource(R.string.wear_recording_hold_longer),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 2.dp),
@@ -200,7 +202,7 @@ internal fun TooShortContent() {
 @Composable
 internal fun RecordingErrorContent(message: String?) {
     Text(
-        text = message ?: "Something went wrong",
+        text = message ?: stringResource(R.string.wear_recording_error),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.error,
         textAlign = TextAlign.Center,

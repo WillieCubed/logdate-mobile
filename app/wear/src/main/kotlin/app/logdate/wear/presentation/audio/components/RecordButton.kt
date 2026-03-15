@@ -13,9 +13,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import app.logdate.wear.R
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Stop
 import androidx.wear.compose.material3.MaterialTheme
@@ -32,7 +34,9 @@ fun RecordButton(
     enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
-    val contentDesc = if (isRecording) "Stop Recording" else "Start Recording"
+    val contentDesc = stringResource(
+        if (isRecording) R.string.wear_recording_stop else R.string.wear_recording_start,
+    )
     
     Box(
         modifier = modifier

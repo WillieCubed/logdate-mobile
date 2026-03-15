@@ -84,6 +84,28 @@
     <string name="wear_settings_about">About</string>
     <string name="wear_settings_version">LogDate Wear</string>
 
+    <!-- Mood Check-in -->
+    <string name="wear_mood_title">How are you feeling?</string>
+    <string name="wear_mood_add_voice">Add voice note</string>
+    <string name="wear_mood_skip">Skip</string>
+    <string name="wear_mood_saved">Saved</string>
+
+    <!-- Recording -->
+    <string name="wear_recording_hold_to_record">HOLD TO\nRECORD</string>
+    <string name="wear_recording_active">RECORDING</string>
+    <string name="wear_recording_saving">Saving\u2026</string>
+    <string name="wear_recording_saved">Saved</string>
+    <string name="wear_recording_too_short">Too short</string>
+    <string name="wear_recording_hold_longer">Hold longer</string>
+    <string name="wear_recording_error">Something went wrong</string>
+    <string name="wear_recording_start">Start Recording</string>
+    <string name="wear_recording_stop">Stop Recording</string>
+    <string name="wear_recording_pause">Pause</string>
+    <string name="wear_recording_resume">Resume</string>
+
+    <!-- Quick Text -->
+    <string name="wear_quick_text_prompt">What\'s on your mind?</string>
+
     <!-- Onboarding -->
     <string name="wear_onboarding_welcome_title">LogDate</string>
     <string name="wear_onboarding_welcome_subtitle">Your journal, on your wrist</string>

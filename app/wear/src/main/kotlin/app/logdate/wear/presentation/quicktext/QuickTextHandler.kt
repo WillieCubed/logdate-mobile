@@ -8,6 +8,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.res.stringResource
+import app.logdate.wear.R
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import io.github.aakira.napier.Napier
@@ -55,13 +57,14 @@ fun QuickTextLauncher(
         onDone()
     }
 
+    val prompt = stringResource(R.string.wear_quick_text_prompt)
     LaunchedEffect(Unit) {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(
                 RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                 RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
             )
-            putExtra(RecognizerIntent.EXTRA_PROMPT, "What's on your mind?")
+            putExtra(RecognizerIntent.EXTRA_PROMPT, prompt)
         }
         launcher.launch(intent)
     }

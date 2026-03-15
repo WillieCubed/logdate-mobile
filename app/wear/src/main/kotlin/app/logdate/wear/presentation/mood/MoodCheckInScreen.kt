@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
@@ -26,6 +27,7 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.OutlinedButton
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
+import app.logdate.wear.R
 import kotlinx.coroutines.flow.collectLatest
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -70,7 +72,7 @@ internal fun SelectMoodContent(
         ) {
             item {
                 Text(
-                    text = "How are you feeling?",
+                    text = stringResource(R.string.wear_mood_title),
                     style = MaterialTheme.typography.titleSmall,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(bottom = 4.dp),
@@ -116,7 +118,7 @@ internal fun VoicePromptContent(
             onClick = onAttachVoice,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(text = "Add voice note")
+            Text(text = stringResource(R.string.wear_mood_add_voice))
         }
         OutlinedButton(
             onClick = onSkip,
@@ -124,7 +126,7 @@ internal fun VoicePromptContent(
                 .fillMaxWidth()
                 .padding(top = 8.dp),
         ) {
-            Text(text = "Skip")
+            Text(text = stringResource(R.string.wear_mood_skip))
         }
     }
 }
@@ -138,12 +140,12 @@ internal fun MoodSavedContent() {
     ) {
         Icon(
             imageVector = Icons.Default.Check,
-            contentDescription = "Saved",
+            contentDescription = stringResource(R.string.wear_mood_saved),
             tint = Color(0xFF4CAF50),
             modifier = Modifier.size(48.dp),
         )
         Text(
-            text = "Saved",
+            text = stringResource(R.string.wear_mood_saved),
             style = MaterialTheme.typography.titleSmall,
             modifier = Modifier.padding(top = 4.dp),
         )

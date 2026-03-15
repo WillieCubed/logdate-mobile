@@ -144,7 +144,9 @@ fun AudioRecordingScreen(
                                         Icons.Filled.PlayArrow 
                                     else 
                                         Icons.Filled.Pause,
-                                    contentDescription = if (uiState.isPaused) "Resume" else "Pause"
+                                    contentDescription = stringResource(
+                                        if (uiState.isPaused) R.string.wear_recording_resume else R.string.wear_recording_pause,
+                                    )
                                 )
                             }
                             
