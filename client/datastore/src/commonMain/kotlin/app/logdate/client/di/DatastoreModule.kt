@@ -44,7 +44,7 @@ val commonDatastoreModule =
             LogdatePreferencesDataSource(get(named("mainDataStore")))
         }
 
-        single(createdAtStart = true) {
+        single {
             LogDateConfigDataSource(
                 dataStore = get(named("mainDataStore")),
                 configRepository = get(),

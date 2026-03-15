@@ -72,7 +72,6 @@ dependencies {
     implementation(projects.client.sync)
     implementation(projects.shared.config)
     implementation(projects.shared.model)
-    implementation(projects.client.feature.editor)
     implementation(projects.client.media)
 
     // Serialization (required by LocalFirstDraftRepository)

@@ -71,7 +71,7 @@ internal fun WearHomeContent(
             modifier = Modifier.fillMaxWidth(),
         ) {
             // Greeting card
-            item {
+            item(key = "greeting") {
                 Text(
                     text = uiState.greeting,
                     style = MaterialTheme.typography.titleSmall,
@@ -81,7 +81,7 @@ internal fun WearHomeContent(
                         .padding(bottom = 4.dp),
                 )
             }
-            item {
+            item(key = "entryCount") {
                 Text(
                     text = uiState.entryCountLabel,
                     style = MaterialTheme.typography.bodySmall,
@@ -94,7 +94,7 @@ internal fun WearHomeContent(
             }
 
             // Walkie-Talkie hero chip
-            item {
+            item(key = "walkieTalkie") {
                 Button(
                     onClick = onNavigateToWalkieTalkie,
                     modifier = Modifier.fillMaxWidth(),
@@ -104,7 +104,7 @@ internal fun WearHomeContent(
             }
 
             // Voice Note
-            item {
+            item(key = "voiceNote") {
                 FilledTonalButton(
                     onClick = onNavigateToVoiceNote,
                     modifier = Modifier.fillMaxWidth(),
@@ -114,7 +114,7 @@ internal fun WearHomeContent(
             }
 
             // Mood Check-in
-            item {
+            item(key = "moodCheckIn") {
                 FilledTonalButton(
                     onClick = onNavigateToMoodCheckIn,
                     modifier = Modifier.fillMaxWidth(),
@@ -124,7 +124,7 @@ internal fun WearHomeContent(
             }
 
             // Quick Text
-            item {
+            item(key = "quickText") {
                 OutlinedButton(
                     onClick = onNavigateToQuickText,
                     modifier = Modifier.fillMaxWidth(),
@@ -134,7 +134,7 @@ internal fun WearHomeContent(
             }
 
             // Timeline
-            item {
+            item(key = "timeline") {
                 OutlinedButton(
                     onClick = onNavigateToTimeline,
                     modifier = Modifier.fillMaxWidth(),
@@ -144,7 +144,7 @@ internal fun WearHomeContent(
             }
 
             // Settings
-            item {
+            item(key = "settings") {
                 OutlinedButton(
                     onClick = onNavigateToSettings,
                     modifier = Modifier.fillMaxWidth(),

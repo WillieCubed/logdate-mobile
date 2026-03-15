@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
@@ -202,16 +203,19 @@ class WalkieTalkieViewModel(
     private fun startAudioLevelCollection() {
         audioLevelJob?.cancel()
         audioLevelJob = viewModelScope.launch {
-            recordingManager.getAudioLevelFlow().collect { level ->
-                _uiState.update { state ->
-                    val levels = (state.audioLevels + level).takeLast(50)
-                    val durationMs = clock.now().toEpochMilliseconds() - recordingStartTimeMs
-                    state.copy(
-                        audioLevels = levels,
-                        recordingDurationMs = durationMs,
-                    )
+            @OptIn(kotlinx.coroutines.FlowPreview::class)
+            recordingManager.getAudioLevelFlow()
+                .sample(periodMillis = 100)
+                .collect { level ->
+                    _uiState.update { state ->
+                        val levels = (state.audioLevels + level).takeLast(50)
+                        val durationMs = clock.now().toEpochMilliseconds() - recordingStartTimeMs
+                        state.copy(
+                            audioLevels = levels,
+                            recordingDurationMs = durationMs,
+                        )
+                    }
                 }
-            }
         }
     }
 

@@ -1,12 +1,9 @@
 package app.logdate.wear.presentation.audio.components
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -17,78 +14,56 @@ import androidx.wear.compose.material3.MaterialTheme
 /**
  * Audio waveform visualization optimized for Wear OS.
  * Displays audio levels as vertical bars with a simplified design suitable for small screens.
+ *
+ * Draws levels directly on the Canvas without per-element animations to avoid creating
+ * N independent animation states (one per audio sample), which causes severe frame drops
+ * on constrained Wear OS hardware.
  */
 @Composable
 fun AudioWaveform(
     audioLevels: List<Float>,
     modifier: Modifier = Modifier,
     barColor: Color = MaterialTheme.colorScheme.primary,
-    barWidth: Float = 3f
+    barWidth: Float = 3f,
 ) {
-    // For very small screens, we use a simpler representation with fewer bars
-    val levels = if (audioLevels.isEmpty()) {
-        listOf(0f)
-    } else {
-        audioLevels
-    }
-
-    val animatedLevels = levels.mapIndexed { index, level ->
-        animateFloatAsState(
-            targetValue = level,
-            animationSpec = tween(durationMillis = 100),
-            label = "audio level $index"
-        )
-    }
-    
     Canvas(
         modifier = modifier
             .fillMaxWidth()
-            .height(24.dp)
+            .height(24.dp),
     ) {
         val width = size.width
         val height = size.height
         val centerY = height / 2
-        
-        // For a single audio level (most common case), create a symmetrical waveform
-        if (levels.size == 1) {
-            val animatedLevel = animatedLevels[0].value
-            
-            // Number of bars in the waveform - adapt based on screen width
+
+        if (audioLevels.isEmpty() || audioLevels.size == 1) {
+            val level = audioLevels.firstOrNull() ?: 0f
             val barCount = (width / (barWidth * 2)).toInt().coerceAtMost(15)
-            
-            // Create a simple waveform with a center peak
+
             for (i in 0 until barCount) {
-                // Calculate bar height based on position (center bars higher)
                 val distanceFromCenter = kotlin.math.abs(i - barCount / 2f) / (barCount / 2f)
-                val barLevel = animatedLevel * (1f - distanceFromCenter * 0.8f)
-                
-                // Calculate x position
+                val barLevel = level * (1f - distanceFromCenter * 0.8f)
                 val x = width * i / barCount + barWidth
-                
-                // Draw vertical line with varying height
+
                 drawLine(
                     color = barColor,
                     start = Offset(x, centerY + height * 0.4f * barLevel),
                     end = Offset(x, centerY - height * 0.4f * barLevel),
                     strokeWidth = barWidth,
-                    cap = StrokeCap.Round
+                    cap = StrokeCap.Round,
                 )
             }
         } else {
-            // If we have multiple levels, draw them directly (more complex visualization)
-            val barSpacing = width / levels.size.coerceAtLeast(1)
-            
-            levels.forEachIndexed { index, _ ->
-                val animatedLevel = animatedLevels[index].value
-                
+            val barSpacing = width / audioLevels.size.coerceAtLeast(1)
+
+            audioLevels.forEachIndexed { index, level ->
                 val x = barSpacing * (index + 0.5f)
-                
+
                 drawLine(
                     color = barColor,
-                    start = Offset(x, centerY + height * 0.4f * animatedLevel),
-                    end = Offset(x, centerY - height * 0.4f * animatedLevel),
+                    start = Offset(x, centerY + height * 0.4f * level),
+                    end = Offset(x, centerY - height * 0.4f * level),
                     strokeWidth = barWidth,
-                    cap = StrokeCap.Round
+                    cap = StrokeCap.Round,
                 )
             }
         }

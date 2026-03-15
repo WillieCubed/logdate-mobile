@@ -9,9 +9,10 @@ import app.logdate.wear.data.storage.StorageSpaceChecker
 import app.logdate.wear.recording.WearAudioRecordingManager
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
@@ -245,23 +246,28 @@ class AudioRecordingViewModel(
         return availableSpace >= requiredSpace
     }
 
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
     private fun startRecordingCollectors() {
         audioLevelJob?.cancel()
         durationJob?.cancel()
 
         audioLevelJob = viewModelScope.launch {
-            recordingManager.getAudioLevelFlow().collect { level ->
-                _uiState.update { state ->
-                    val levels = (state.audioLevels + level).takeLast(50)
-                    state.copy(audioLevels = levels)
+            combine(
+                recordingManager.getAudioLevelFlow(),
+                recordingManager.getRecordingDurationFlow(),
+            ) { level, duration ->
+                level to duration.inWholeMilliseconds
+            }
+                .sample(periodMillis = 100)
+                .collect { (level, durationMs) ->
+                    _uiState.update { state ->
+                        val levels = (state.audioLevels + level).takeLast(50)
+                        state.copy(
+                            audioLevels = levels,
+                            durationMs = durationMs,
+                        )
+                    }
                 }
-            }
-        }
-
-        durationJob = viewModelScope.launch {
-            recordingManager.getRecordingDurationFlow().collect { duration ->
-                _uiState.update { it.copy(durationMs = duration.inWholeMilliseconds) }
-            }
         }
     }
 

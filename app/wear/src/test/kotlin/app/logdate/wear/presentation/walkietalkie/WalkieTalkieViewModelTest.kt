@@ -12,11 +12,15 @@ import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import androidx.lifecycle.viewModelScope
 import kotlin.time.Instant
 import org.junit.After
 import org.junit.Before
@@ -31,7 +35,7 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalCoroutinesApi::class)
 class WalkieTalkieViewModelTest {
 
-    private val testDispatcher = UnconfinedTestDispatcher()
+    private val testDispatcher = StandardTestDispatcher()
     private lateinit var recordingManager: WearAudioRecordingManager
     private lateinit var notesRepository: JournalNotesRepository
     private lateinit var storageChecker: StorageSpaceChecker
@@ -67,6 +71,15 @@ class WalkieTalkieViewModelTest {
         return WalkieTalkieViewModel(recordingManager, notesRepository, storageChecker, testClock)
     }
 
+    /**
+     * Cancel the ViewModel's coroutine scope to stop the sample() timer and auto-stop timer.
+     * Must be called before runTest cleanup, which calls advanceUntilIdle() and would hang
+     * on the never-ending sample() operator.
+     */
+    private fun WalkieTalkieViewModel.cancelScope() {
+        viewModelScope.cancel()
+    }
+
     // -----------------------------------------------------------------------
     // Initial state
     // -----------------------------------------------------------------------
@@ -92,32 +105,31 @@ class WalkieTalkieViewModelTest {
     fun `touch down transitions to RECORDING when storage available`() = runTest {
         val viewModel = createViewModel()
 
-        viewModel.uiState.test {
-            skipItems(1) // initial READY
+        viewModel.onTouchDown()
+        advanceTimeBy(200)
 
-            viewModel.onTouchDown()
-
-            val state = awaitItem()
-            assertEquals(WalkieTalkiePhase.RECORDING, state.phase)
-
-            cancelAndConsumeRemainingEvents()
-        }
+        assertEquals(WalkieTalkiePhase.RECORDING, viewModel.uiState.value.phase)
+        viewModel.cancelScope()
     }
 
     @Test
     fun `touch down starts recording via manager`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTouchDown()
+        advanceTimeBy(200)
 
         coVerify { recordingManager.startRecording() }
+        viewModel.cancelScope()
     }
 
     @Test
     fun `touch down checks storage space before recording`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTouchDown()
+        advanceTimeBy(200)
 
         coVerify { storageChecker.getAvailableStorageSpace() }
+        viewModel.cancelScope()
     }
 
     // -----------------------------------------------------------------------
@@ -129,15 +141,11 @@ class WalkieTalkieViewModelTest {
         coEvery { storageChecker.getAvailableStorageSpace() } returns insufficientStorage
         val viewModel = createViewModel()
 
-        viewModel.uiState.test {
-            skipItems(1) // initial READY
+        viewModel.onTouchDown()
+        advanceUntilIdle()
 
-            viewModel.onTouchDown()
-
-            val state = awaitItem()
-            assertEquals(WalkieTalkiePhase.ERROR, state.phase)
-            assertNotNull(state.errorMessage)
-        }
+        assertEquals(WalkieTalkiePhase.ERROR, viewModel.uiState.value.phase)
+        assertNotNull(viewModel.uiState.value.errorMessage)
     }
 
     @Test
@@ -146,6 +154,7 @@ class WalkieTalkieViewModelTest {
         val viewModel = createViewModel()
 
         viewModel.onTouchDown()
+        advanceUntilIdle()
 
         coVerify(exactly = 0) { recordingManager.startRecording() }
     }
@@ -159,15 +168,11 @@ class WalkieTalkieViewModelTest {
         coEvery { recordingManager.startRecording() } returns false
         val viewModel = createViewModel()
 
-        viewModel.uiState.test {
-            skipItems(1) // initial READY
+        viewModel.onTouchDown()
+        advanceUntilIdle()
 
-            viewModel.onTouchDown()
-
-            val state = awaitItem()
-            assertEquals(WalkieTalkiePhase.ERROR, state.phase)
-            assertNotNull(state.errorMessage)
-        }
+        assertEquals(WalkieTalkiePhase.ERROR, viewModel.uiState.value.phase)
+        assertNotNull(viewModel.uiState.value.errorMessage)
     }
 
     @Test
@@ -175,15 +180,11 @@ class WalkieTalkieViewModelTest {
         coEvery { recordingManager.startRecording() } throws RuntimeException("mic unavailable")
         val viewModel = createViewModel()
 
-        viewModel.uiState.test {
-            skipItems(1) // initial READY
+        viewModel.onTouchDown()
+        advanceUntilIdle()
 
-            viewModel.onTouchDown()
-
-            val state = awaitItem()
-            assertEquals(WalkieTalkiePhase.ERROR, state.phase)
-            assertNotNull(state.errorMessage)
-        }
+        assertEquals(WalkieTalkiePhase.ERROR, viewModel.uiState.value.phase)
+        assertNotNull(viewModel.uiState.value.errorMessage)
     }
 
     // -----------------------------------------------------------------------
@@ -193,13 +194,16 @@ class WalkieTalkieViewModelTest {
     @Test
     fun `touch down is ignored when not in READY phase`() = runTest {
         val viewModel = createViewModel()
-        viewModel.onTouchDown() // transitions to RECORDING
+        viewModel.onTouchDown()
+        advanceTimeBy(200)
 
         coVerify(exactly = 1) { recordingManager.startRecording() }
 
         viewModel.onTouchDown() // should be ignored
+        advanceTimeBy(200)
 
         coVerify(exactly = 1) { recordingManager.startRecording() }
+        viewModel.cancelScope()
     }
 
     // -----------------------------------------------------------------------
@@ -210,9 +214,11 @@ class WalkieTalkieViewModelTest {
     fun `touch up stops recording via manager`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTouchDown()
+        advanceTimeBy(200)
         testClock.advanceBy(1000)
 
         viewModel.onTouchUp()
+        advanceTimeBy(2000)
 
         coVerify { recordingManager.stopRecording() }
     }
@@ -221,9 +227,11 @@ class WalkieTalkieViewModelTest {
     fun `touch up creates audio note in repository`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTouchDown()
+        advanceTimeBy(200)
         testClock.advanceBy(1000)
 
         viewModel.onTouchUp()
+        advanceTimeBy(2000)
 
         coVerify {
             notesRepository.create(match { note ->
@@ -236,32 +244,13 @@ class WalkieTalkieViewModelTest {
     fun `touch up transitions to SAVED with sufficient duration`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTouchDown()
+        advanceTimeBy(200)
         testClock.advanceBy(1000)
 
-        viewModel.uiState.test {
-            // Consume current RECORDING state(s)
-            var state = awaitItem()
-            while (state.phase == WalkieTalkiePhase.RECORDING) {
-                state = awaitItem()
-            }
+        viewModel.onTouchUp()
+        advanceTimeBy(2000)
 
-            // If we jumped straight to SAVED or went through SAVING first
-            if (state.phase == WalkieTalkiePhase.SAVING) {
-                viewModel.onTouchUp()
-                state = awaitItem()
-            } else {
-                // onTouchUp may have already been processed by UnconfinedTestDispatcher
-                viewModel.onTouchUp()
-                // Collect until SAVED
-                while (state.phase != WalkieTalkiePhase.SAVED) {
-                    state = awaitItem()
-                }
-            }
-
-            cancelAndConsumeRemainingEvents()
-        }
-
-        // Verify the note was saved
+        assertEquals(WalkieTalkiePhase.SAVED, viewModel.uiState.value.phase)
         coVerify { notesRepository.create(any<JournalNote>()) }
     }
 
@@ -269,12 +258,13 @@ class WalkieTalkieViewModelTest {
     fun `saved state includes correct duration`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTouchDown()
+        advanceTimeBy(200)
         testClock.advanceBy(2500) // 2.5 seconds
+
         viewModel.onTouchUp()
+        advanceTimeBy(2000)
 
         val state = viewModel.uiState.value
-        // After onTouchUp with sufficient duration, we should reach SAVED
-        // The exact phase depends on timing but savedDurationMs should be set
         if (state.phase == WalkieTalkiePhase.SAVED) {
             assertEquals(2500, state.savedDurationMs)
         }
@@ -288,37 +278,46 @@ class WalkieTalkieViewModelTest {
     fun `touch up shows TOO_SHORT when duration under threshold`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTouchDown()
-        // Do NOT advance clock — duration stays at 0ms (< 500ms threshold)
+        advanceTimeBy(200)
+        // Do NOT advance test clock — duration stays at 0ms (< 500ms threshold)
         viewModel.onTouchUp()
+        advanceTimeBy(50)
 
         // No note should be created when too short
         coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
 
         // State should be TOO_SHORT (auto-transition to READY after display delay)
         assertEquals(WalkieTalkiePhase.TOO_SHORT, viewModel.uiState.value.phase)
+        viewModel.cancelScope()
     }
 
     @Test
     fun `touch up resets to READY after showing TOO_SHORT`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTouchDown()
+        advanceTimeBy(200)
         viewModel.onTouchUp()
+        advanceTimeBy(50)
 
-        // Immediately after onTouchUp, state is TOO_SHORT
+        // After onTouchUp with short duration, state is TOO_SHORT
         assertEquals(WalkieTalkiePhase.TOO_SHORT, viewModel.uiState.value.phase)
 
-        // After the display delay elapses, state returns to READY
-        testScheduler.advanceUntilIdle()
+        // After the display delay elapses (1200ms), state returns to READY
+        advanceTimeBy(2000)
         assertEquals(WalkieTalkiePhase.READY, viewModel.uiState.value.phase)
+        viewModel.cancelScope()
     }
 
     @Test
     fun `touch up does not save note when duration is too short`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTouchDown()
+        advanceTimeBy(200)
         viewModel.onTouchUp() // immediate release, duration 0ms
+        advanceTimeBy(2000)
 
         coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
+        viewModel.cancelScope()
     }
 
     // -----------------------------------------------------------------------
@@ -330,11 +329,14 @@ class WalkieTalkieViewModelTest {
         coEvery { recordingManager.stopRecording() } returns null
         val viewModel = createViewModel()
         viewModel.onTouchDown()
+        advanceTimeBy(200)
         testClock.advanceBy(1000) // sufficient duration
         viewModel.onTouchUp()
+        advanceTimeBy(2000)
 
         assertEquals(WalkieTalkiePhase.ERROR, viewModel.uiState.value.phase)
         assertNotNull(viewModel.uiState.value.errorMessage)
+        viewModel.cancelScope()
     }
 
     // -----------------------------------------------------------------------
@@ -346,6 +348,7 @@ class WalkieTalkieViewModelTest {
         val viewModel = createViewModel()
 
         viewModel.onTouchUp()
+        advanceUntilIdle()
 
         coVerify(exactly = 0) { recordingManager.stopRecording() }
     }
@@ -359,11 +362,14 @@ class WalkieTalkieViewModelTest {
         coEvery { recordingManager.stopRecording() } throws RuntimeException("IO failure")
         val viewModel = createViewModel()
         viewModel.onTouchDown()
+        advanceTimeBy(200)
         testClock.advanceBy(1000)
         viewModel.onTouchUp()
+        advanceTimeBy(2000)
 
         assertEquals(WalkieTalkiePhase.ERROR, viewModel.uiState.value.phase)
         assertNotNull(viewModel.uiState.value.errorMessage)
+        viewModel.cancelScope()
     }
 
     // -----------------------------------------------------------------------
@@ -374,10 +380,12 @@ class WalkieTalkieViewModelTest {
     fun `NavigateBack event is emitted after successful save`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTouchDown()
+        advanceTimeBy(200)
         testClock.advanceBy(1000) // sufficient duration
 
         viewModel.events.test {
             viewModel.onTouchUp()
+            advanceTimeBy(2000)
 
             assertEquals(WalkieTalkieEvent.NavigateBack, awaitItem())
         }
@@ -387,12 +395,15 @@ class WalkieTalkieViewModelTest {
     fun `no NavigateBack event when recording too short`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTouchDown()
+        advanceTimeBy(200)
 
         viewModel.events.test {
             viewModel.onTouchUp() // 0ms duration
+            advanceTimeBy(50)
 
             expectNoEvents()
         }
+        viewModel.cancelScope()
     }
 
     // -----------------------------------------------------------------------
@@ -404,17 +415,15 @@ class WalkieTalkieViewModelTest {
         coEvery { recordingManager.startRecording() } returns false
         val viewModel = createViewModel()
         viewModel.onTouchDown()
+        advanceUntilIdle()
 
-        viewModel.uiState.test {
-            val error = awaitItem()
-            assertEquals(WalkieTalkiePhase.ERROR, error.phase)
+        assertEquals(WalkieTalkiePhase.ERROR, viewModel.uiState.value.phase)
 
-            viewModel.onNavigatedBack()
+        viewModel.onNavigatedBack()
+        advanceUntilIdle()
 
-            val ready = awaitItem()
-            assertEquals(WalkieTalkiePhase.READY, ready.phase)
-            assertNull(ready.errorMessage)
-        }
+        assertEquals(WalkieTalkiePhase.READY, viewModel.uiState.value.phase)
+        assertNull(viewModel.uiState.value.errorMessage)
     }
 
     // -----------------------------------------------------------------------
@@ -425,30 +434,38 @@ class WalkieTalkieViewModelTest {
     fun `audio level flow collection starts on touch down`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTouchDown()
+        advanceTimeBy(200)
 
         verify { recordingManager.getAudioLevelFlow() }
+        viewModel.cancelScope()
     }
 
     @Test
     fun `audio levels are collected while recording`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTouchDown()
+        advanceTimeBy(200)
 
         audioLevelFlow.value = 0.5f
+        advanceTimeBy(150) // advance past the sample(100ms) window
         audioLevelFlow.value = 0.8f
+        advanceTimeBy(150)
 
         val state = viewModel.uiState.value
         assertEquals(WalkieTalkiePhase.RECORDING, state.phase)
         assertTrue(state.audioLevels.isNotEmpty(), "Expected audio levels to be collected")
+        viewModel.cancelScope()
     }
 
     @Test
     fun `audio levels list is bounded to last 50 entries`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTouchDown()
+        advanceTimeBy(200)
 
         repeat(60) { i ->
             audioLevelFlow.value = i / 60f
+            advanceTimeBy(150) // advance past sample window each time
         }
 
         val state = viewModel.uiState.value
@@ -456,6 +473,7 @@ class WalkieTalkieViewModelTest {
             state.audioLevels.size <= 50,
             "Expected at most 50 audio levels but got ${state.audioLevels.size}",
         )
+        viewModel.cancelScope()
     }
 
     // -----------------------------------------------------------------------

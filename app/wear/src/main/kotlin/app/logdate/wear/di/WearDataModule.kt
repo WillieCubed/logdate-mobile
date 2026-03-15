@@ -35,6 +35,7 @@ val wearDataModule = module {
     includes(configModule)
     includes(conflictResolverModule)
 
+
     // JSON serialization
     single {
         Json {
