@@ -24,7 +24,7 @@ import app.logdate.feature.core.settings.ui.DataSettingsContent
 import app.logdate.feature.core.settings.ui.IntegrityState
 import app.logdate.feature.core.settings.ui.LocationSettingsContent
 import app.logdate.feature.core.settings.ui.PrivacySettingsContent
-import app.logdate.feature.core.settings.ui.RestoreState
+import app.logdate.feature.core.restore.RestoreState
 import app.logdate.feature.core.settings.ui.SettingsOverviewContent
 import app.logdate.feature.core.settings.ui.StorageQuotaUi
 import app.logdate.feature.core.settings.ui.UserProfile
@@ -174,10 +174,13 @@ fun DataSettings() {
             onCancelExport = {},
             onRetryExport = {},
             onDismissExport = {},
-            onShareExport = {},
-            onRestoreContent = {},
-            onCancelRestore = {},
+            onBrowseExport = {},
             restoreState = RestoreState.Idle,
+            onShowRestoreSheet = {},
+            onConfirmRestore = {},
+            onCancelRestore = {},
+            onRetryRestore = {},
+            onDismissRestore = {},
             integrityState = IntegrityState(),
             onRunIntegrityCheck = {},
             onRepairIntegrity = {},

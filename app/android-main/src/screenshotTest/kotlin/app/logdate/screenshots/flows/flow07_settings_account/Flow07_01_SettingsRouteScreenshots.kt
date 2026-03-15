@@ -13,7 +13,7 @@ import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.client.repository.account.AccountIdentityStatus
 import app.logdate.client.sync.SyncStatus
 import app.logdate.client.sync.conflict.SyncConflictRecord
-import app.logdate.feature.core.restore.RestoreSummary
+import app.logdate.feature.core.restore.RestoreState
 import app.logdate.feature.core.settings.ui.AccountIdentityState
 import app.logdate.feature.core.settings.ui.AccountSettingsContent
 import app.logdate.feature.core.settings.ui.AdvancedSettingsContent
@@ -26,7 +26,6 @@ import app.logdate.feature.core.settings.ui.PasskeyCreationState
 import app.logdate.feature.core.settings.ui.PasskeyInfo
 import app.logdate.feature.core.settings.ui.PasskeyRevocationState
 import app.logdate.feature.core.settings.ui.PrivacySettingsContent
-import app.logdate.feature.core.settings.ui.RestoreState
 import app.logdate.feature.core.settings.ui.SettingsOverviewContent
 import app.logdate.feature.core.settings.ui.StorageQuotaUi
 import app.logdate.feature.core.settings.ui.UserProfile
@@ -269,10 +268,13 @@ fun S07_DataSettingsSignedOut() {
             onCancelExport = {},
             onRetryExport = {},
             onDismissExport = {},
-            onShareExport = {},
-            onRestoreContent = {},
-            onCancelRestore = {},
+            onBrowseExport = {},
             restoreState = RestoreState.Idle,
+            onShowRestoreSheet = {},
+            onConfirmRestore = {},
+            onCancelRestore = {},
+            onRetryRestore = {},
+            onDismissRestore = {},
             integrityState = IntegrityState(),
             onRunIntegrityCheck = {},
             onRepairIntegrity = {},
@@ -308,62 +310,13 @@ fun S08_DataSettingsSignedIn() {
             onCancelExport = {},
             onRetryExport = {},
             onDismissExport = {},
-            onShareExport = {},
-            onRestoreContent = {},
-            onCancelRestore = {},
+            onBrowseExport = {},
             restoreState = RestoreState.Idle,
-            integrityState = IntegrityState(),
-            onRunIntegrityCheck = {},
-            onRepairIntegrity = {},
-            conflictsState = ConflictsState(),
-            onClearConflicts = {},
-            onRefreshConflicts = {},
-            snackbarHostState = snackbarHostState,
-            syncStatus = sampleSyncStatus,
-            isAuthenticated = true,
-            onSyncNow = {},
-            isBackgroundSyncEnabled = true,
-            onBackgroundSyncEnabledChange = {},
-            onNavigateToCloudAccountCreation = {},
-            onNavigateToSignIn = {},
-        )
-    }
-}
-
-@PreviewTest
-@ScreenshotPreviewMatrix
-@Composable
-fun S09_DataSettingsRestoreCompleted() {
-    val snackbarHostState = remember { SnackbarHostState() }
-    ScreenshotTheme {
-        DataSettingsContent(
-            onBack = {},
-            quotaUsage = sampleQuota,
-            isQuotaAvailable = true,
-            exportState = app.logdate.feature.core.export.ExportState.Idle,
-            onShowExportOptions = {},
-            onUpdateExportOptions = {},
-            onConfirmExport = {},
-            onCancelExport = {},
-            onRetryExport = {},
-            onDismissExport = {},
-            onShareExport = {},
-            onRestoreContent = {},
+            onShowRestoreSheet = {},
+            onConfirmRestore = {},
             onCancelRestore = {},
-            restoreState =
-                RestoreState.Completed(
-                    summary =
-                        RestoreSummary(
-                            source = "preview",
-                            exportDate = ScreenshotTestData.baseInstant,
-                            journalsImported = 3,
-                            notesImported = 18,
-                            draftsImported = 0,
-                            journalLinksImported = 18,
-                            mediaImported = 4,
-                        ),
-                    showSnackbar = false,
-                ),
+            onRetryRestore = {},
+            onDismissRestore = {},
             integrityState = IntegrityState(),
             onRunIntegrityCheck = {},
             onRepairIntegrity = {},
@@ -399,10 +352,13 @@ fun S10_DataSettingsConflicts() {
             onCancelExport = {},
             onRetryExport = {},
             onDismissExport = {},
-            onShareExport = {},
-            onRestoreContent = {},
-            onCancelRestore = {},
+            onBrowseExport = {},
             restoreState = RestoreState.Idle,
+            onShowRestoreSheet = {},
+            onConfirmRestore = {},
+            onCancelRestore = {},
+            onRetryRestore = {},
+            onDismissRestore = {},
             integrityState = IntegrityState(),
             onRunIntegrityCheck = {},
             onRepairIntegrity = {},
