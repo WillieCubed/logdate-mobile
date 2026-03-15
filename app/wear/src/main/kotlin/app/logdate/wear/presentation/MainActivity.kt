@@ -29,9 +29,11 @@ import app.logdate.wear.presentation.navigation.WearTimelineDayDetailRoute
 import app.logdate.wear.presentation.navigation.WearTimelineRoute
 import app.logdate.wear.presentation.quicktext.QuickTextLauncher
 import app.logdate.wear.presentation.recording.WearRecordingScreen
+import app.logdate.wear.presentation.navigation.WearSettingsRoute
 import app.logdate.wear.presentation.rewind.WearRewindListScreen
 import app.logdate.wear.presentation.rewind.WearRewindPlaybackScreen
 import app.logdate.wear.presentation.rewind.WearRewindViewModel
+import app.logdate.wear.presentation.settings.WearSettingsScreen
 import app.logdate.wear.presentation.theme.LogDateTheme
 import app.logdate.wear.presentation.timeline.WearDayDetailScreen
 import app.logdate.wear.presentation.timeline.WearTimelineScreen
@@ -108,7 +110,9 @@ fun WearApp() {
                         onNavigateToTimeline = {
                             backStack.add(WearTimelineRoute)
                         },
-                        onNavigateToSettings = { /* Phase 10 */ },
+                        onNavigateToSettings = {
+                            backStack.add(WearSettingsRoute)
+                        },
                     )
                 }
                 entry<WearAudioRecordingRoute> {
@@ -164,6 +168,9 @@ fun WearApp() {
                         viewModel = rewindViewModel,
                         onExit = navigateBack,
                     )
+                }
+                entry<WearSettingsRoute> {
+                    WearSettingsScreen(onNavigateBack = navigateBack)
                 }
             },
         )

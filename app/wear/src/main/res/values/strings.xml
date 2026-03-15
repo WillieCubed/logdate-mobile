@@ -42,6 +42,14 @@
     <string name="wear_prompt_channel_name">Journal reminders</string>
     <string name="wear_prompt_channel_description">Morning and evening journaling reminders</string>
 
+    <!-- Settings -->
+    <string name="wear_settings_title">Settings</string>
+    <string name="wear_settings_notifications">Notifications</string>
+    <string name="wear_settings_morning_prompt">Morning prompt</string>
+    <string name="wear_settings_evening_prompt">Evening prompt</string>
+    <string name="wear_settings_about">About</string>
+    <string name="wear_settings_version">LogDate Wear</string>
+
     <!-- Rewind -->
     <string name="wear_rewind_title">Rewinds</string>
     <string name="wear_rewind_empty">No rewinds yet</string>
