@@ -115,6 +115,15 @@ class IosExportLauncher(
                                         presentShareSheet(exportDirPath)
 
                                         Napier.i("iOS: Export completed and share sheet presented")
+                                        updateProgress(
+                                            ExportProgressInfo(
+                                                isActive = false,
+                                                progressPercent = 100,
+                                                message = "Export completed",
+                                                completedFilePath = exportDirPath,
+                                                stats = progress.result.stats,
+                                            ),
+                                        )
                                         completionCallback?.invoke(exportDirPath)
                                     } catch (e: Exception) {
                                         Napier.e("iOS: Failed to save or share export", e)

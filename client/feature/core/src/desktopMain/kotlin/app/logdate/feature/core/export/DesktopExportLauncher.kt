@@ -135,6 +135,15 @@ class DesktopExportLauncher :
                                             }
                                         Napier.i("Desktop: Export completed successfully to $zipPath")
                                         showExportSuccessDialog(zipPath)
+                                        updateProgress(
+                                            ExportProgressInfo(
+                                                isActive = false,
+                                                progressPercent = 100,
+                                                message = "Export completed",
+                                                completedFilePath = zipPath,
+                                                stats = progress.result.stats,
+                                            ),
+                                        )
                                         completionCallback?.invoke(zipPath)
                                     } catch (e: Exception) {
                                         Napier.e("Desktop: Failed to save file", e)

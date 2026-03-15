@@ -122,6 +122,7 @@ class ExportWorker(
                                         progressPercent = 100,
                                         message = "Export completed",
                                         completedFilePath = filePath,
+                                        stats = progress.result.stats,
                                     ),
                                 )
 

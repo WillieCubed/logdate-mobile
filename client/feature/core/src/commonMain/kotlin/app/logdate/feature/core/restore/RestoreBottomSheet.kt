@@ -63,6 +63,7 @@ internal fun RestoreBottomSheet(
             AnimatedContent(
                 targetState = restoreState,
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
+                contentKey = { it::class },
                 label = "restore-sheet-state",
             ) { state ->
                 when (state) {

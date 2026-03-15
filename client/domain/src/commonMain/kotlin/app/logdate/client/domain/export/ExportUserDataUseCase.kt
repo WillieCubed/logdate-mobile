@@ -229,6 +229,7 @@ class ExportUserDataUseCase(
                         drafts = draftsJson,
                         mediaFiles = mediaFiles,
                         mediaManifest = mediaManifestJson,
+                        stats = stats,
                     )
 
                 emit(ExportProgress.Completed(exportData))
@@ -407,6 +408,7 @@ data class ExportResult(
     val drafts: String,
     val mediaFiles: List<ExportMediaFile>,
     val mediaManifest: String? = null,
+    val stats: ExportStats,
 )
 
 /**

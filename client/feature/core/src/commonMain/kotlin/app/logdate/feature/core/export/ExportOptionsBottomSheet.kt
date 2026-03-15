@@ -3,6 +3,7 @@
 package app.logdate.feature.core.export
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -15,7 +16,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
@@ -23,12 +26,9 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import app.logdate.client.domain.export.ExportCounts
@@ -86,6 +86,7 @@ internal fun ExportBottomSheet(
             AnimatedContent(
                 targetState = exportState,
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
+                contentKey = { it::class },
                 label = "export-sheet-state",
             ) { state ->
                 when (state) {
@@ -163,6 +164,16 @@ private fun ExportConfigContent(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        Spacer(modifier = Modifier.height(Spacing.lg))
+
+        // Date range selector
+        DateRangeSelector(
+            dateRange = options.dateRange,
+            onDateRangeChanged = { onOptionsChanged(options.copy(dateRange = it)) },
+            enabled = buttonsEnabled,
+        )
+
         Spacer(modifier = Modifier.height(Spacing.lg))
 
         // Category toggles
@@ -204,15 +215,6 @@ private fun ExportConfigContent(
             count = counts?.mediaCount,
             checked = options.includeMedia,
             onCheckedChange = { onOptionsChanged(options.copy(includeMedia = it)) },
-            enabled = buttonsEnabled,
-        )
-
-        Spacer(modifier = Modifier.height(Spacing.lg))
-
-        // Date range selector
-        DateRangeSelector(
-            dateRange = options.dateRange,
-            onDateRangeChanged = { onOptionsChanged(options.copy(dateRange = it)) },
             enabled = buttonsEnabled,
         )
 
@@ -282,9 +284,15 @@ private fun DateRangeSelector(
     onDateRangeChanged: (ExportDateRange) -> Unit,
     enabled: Boolean = true,
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    val options =
+        listOf(
+            stringResource(Res.string.export_date_range_all_time) to ExportDateRange.AllTime,
+            stringResource(Res.string.export_date_range_last_30_days) to ExportDateRange.Last30Days,
+            stringResource(Res.string.export_date_range_last_90_days) to ExportDateRange.Last90Days,
+            stringResource(Res.string.export_date_range_last_year) to ExportDateRange.LastYear,
+        )
 
-    Column {
+    Column(modifier = Modifier.animateContentSize()) {
         Text(
             text = stringResource(Res.string.export_date_range_label),
             style = MaterialTheme.typography.titleSmall,
@@ -292,51 +300,61 @@ private fun DateRangeSelector(
         )
         Spacer(modifier = Modifier.height(Spacing.sm))
 
-        val options =
-            listOf(
-                stringResource(Res.string.export_date_range_all_time) to ExportDateRange.AllTime,
-                stringResource(Res.string.export_date_range_last_30_days) to ExportDateRange.Last30Days,
-                stringResource(Res.string.export_date_range_last_90_days) to ExportDateRange.Last90Days,
-                stringResource(Res.string.export_date_range_last_year) to ExportDateRange.LastYear,
-            )
+        DateRangeButtonGroup(
+            options = options,
+            selectedRange = dateRange,
+            onDateRangeChanged = onDateRangeChanged,
+            enabled = enabled,
+        )
 
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            options.forEach { (label, range) ->
-                val isSelected = dateRange == range
-                if (isSelected) {
-                    Button(
-                        onClick = {},
-                        enabled = enabled,
-                    ) {
-                        Text(label)
-                    }
-                } else {
-                    TextButton(
-                        onClick = { onDateRangeChanged(range) },
-                        enabled = enabled,
-                    ) {
-                        Text(label)
-                    }
-                }
+        val hintText =
+            when (dateRange) {
+                is ExportDateRange.AllTime -> stringResource(Res.string.export_date_range_all_time_hint)
+                is ExportDateRange.Custom -> null
+                else -> stringResource(Res.string.export_date_range_filtered_hint)
             }
+        if (hintText != null) {
+            Spacer(modifier = Modifier.height(Spacing.xs))
+            Text(
+                text = hintText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
+    }
+}
 
-        if (dateRange is ExportDateRange.AllTime) {
-            Spacer(modifier = Modifier.height(Spacing.xs))
-            Text(
-                text = stringResource(Res.string.export_date_range_all_time_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else if (dateRange !is ExportDateRange.Custom) {
-            Spacer(modifier = Modifier.height(Spacing.xs))
-            Text(
-                text = stringResource(Res.string.export_date_range_filtered_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+/**
+ * A connected button group for single-choice selection, using the
+ * Material 3 Expressive connected button group pattern with [ToggleButton].
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun DateRangeButtonGroup(
+    options: List<Pair<String, ExportDateRange>>,
+    selectedRange: ExportDateRange,
+    onDateRangeChanged: (ExportDateRange) -> Unit,
+    enabled: Boolean = true,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+    ) {
+        options.forEachIndexed { index, (label, range) ->
+            ToggleButton(
+                checked = selectedRange == range,
+                onCheckedChange = { onDateRangeChanged(range) },
+                modifier = Modifier.weight(1f),
+                enabled = enabled,
+                shapes =
+                    when (index) {
+                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                        options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                    },
+            ) {
+                Text(label, maxLines = 1)
+            }
         }
     }
 }

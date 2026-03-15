@@ -51,11 +51,11 @@ internal fun ExportProgressCard(
             ) {
                 Text(
                     text = stringResource(Res.string.export_progress_title),
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.titleMedium,
                 )
                 Text(
                     text = "$progressPercent%",
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
@@ -79,7 +79,7 @@ internal fun ExportProgressCard(
                     Spacer(modifier = Modifier.height(Spacing.sm))
                     Text(
                         text = message,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }

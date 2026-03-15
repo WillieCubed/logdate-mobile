@@ -1,5 +1,6 @@
 package app.logdate.feature.core.export
 
+import app.logdate.client.domain.export.ExportStats
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.time.Instant
 
@@ -49,6 +50,7 @@ data class ExportProgressInfo(
     val progressPercent: Int = 0,
     val message: String = "",
     val completedFilePath: String? = null,
+    val stats: ExportStats? = null,
 )
 
 /**
