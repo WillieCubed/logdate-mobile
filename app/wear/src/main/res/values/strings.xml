@@ -80,6 +80,19 @@
     <string name="wear_settings_about">About</string>
     <string name="wear_settings_version">LogDate Wear</string>
 
+    <!-- Onboarding -->
+    <string name="wear_onboarding_welcome_title">LogDate</string>
+    <string name="wear_onboarding_welcome_subtitle">Your journal, on your wrist</string>
+    <string name="wear_onboarding_welcome_button">Get Started</string>
+    <string name="wear_onboarding_permissions_title">Permissions</string>
+    <string name="wear_onboarding_permissions_mic">Microphone access lets you capture voice notes</string>
+    <string name="wear_onboarding_permissions_allow">Allow</string>
+    <string name="wear_onboarding_permissions_skip">Skip</string>
+    <string name="wear_onboarding_permissions_granted">Granted</string>
+    <string name="wear_onboarding_done_title">You\'re all set</string>
+    <string name="wear_onboarding_done_subtitle">Try recording a voice note</string>
+    <string name="wear_onboarding_done_button">Start</string>
+
     <!-- Rewind -->
     <string name="wear_rewind_title">Rewinds</string>
     <string name="wear_rewind_empty">No rewinds yet</string>
