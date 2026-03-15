@@ -8,20 +8,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.wear.compose.material3.MaterialTheme
-import app.logdate.wear.presentation.walkietalkie.ReadyContent
-import app.logdate.wear.presentation.walkietalkie.RecordingContent
-import app.logdate.wear.presentation.walkietalkie.SavingContent
-import app.logdate.wear.presentation.walkietalkie.TooShortContent
-import app.logdate.wear.presentation.walkietalkie.WalkieTalkieErrorContent
-import app.logdate.wear.presentation.walkietalkie.WalkieTalkieSavedContent
+import app.logdate.wear.presentation.recording.ActiveRecordingContent
+import app.logdate.wear.presentation.recording.ReadyContent
+import app.logdate.wear.presentation.recording.RecordingErrorContent
+import app.logdate.wear.presentation.recording.SavedContent
+import app.logdate.wear.presentation.recording.SavingContent
+import app.logdate.wear.presentation.recording.TooShortContent
 import com.android.tools.screenshot.PreviewTest
 
-class WalkieTalkieScreenshots {
+class WearRecordingScreenshots {
 
     @PreviewTest
     @WearScreenshotPreviewMatrix
     @Composable
-    fun S01_WalkieTalkieReady() {
+    fun S01_RecordingReady() {
         MaterialTheme {
             Box(
                 modifier = Modifier
@@ -29,7 +29,7 @@ class WalkieTalkieScreenshots {
                     .background(MaterialTheme.colorScheme.background),
                 contentAlignment = Alignment.Center,
             ) {
-                ReadyContent(onTouchDown = {}, onTouchUp = {})
+                ReadyContent()
             }
         }
     }
@@ -37,7 +37,7 @@ class WalkieTalkieScreenshots {
     @PreviewTest
     @WearScreenshotPreviewMatrix
     @Composable
-    fun S02_WalkieTalkieRecording() {
+    fun S02_RecordingActive() {
         MaterialTheme {
             Box(
                 modifier = Modifier
@@ -45,13 +45,12 @@ class WalkieTalkieScreenshots {
                     .background(Color(0xFF8B1A1A)),
                 contentAlignment = Alignment.Center,
             ) {
-                RecordingContent(
+                ActiveRecordingContent(
                     durationMs = 4_200,
                     audioLevels = listOf(
                         0.3f, 0.5f, 0.7f, 0.4f, 0.8f,
                         0.6f, 0.9f, 0.5f, 0.3f, 0.7f,
                     ),
-                    onTouchUp = {},
                 )
             }
         }
@@ -60,7 +59,7 @@ class WalkieTalkieScreenshots {
     @PreviewTest
     @WearScreenshotPreviewMatrix
     @Composable
-    fun S03_WalkieTalkieRecordingLong() {
+    fun S03_RecordingActiveLong() {
         MaterialTheme {
             Box(
                 modifier = Modifier
@@ -68,10 +67,9 @@ class WalkieTalkieScreenshots {
                     .background(Color(0xFF8B1A1A)),
                 contentAlignment = Alignment.Center,
             ) {
-                RecordingContent(
+                ActiveRecordingContent(
                     durationMs = 58_000,
                     audioLevels = List(50) { it / 50f },
-                    onTouchUp = {},
                 )
             }
         }
@@ -80,7 +78,7 @@ class WalkieTalkieScreenshots {
     @PreviewTest
     @WearScreenshotPreviewMatrix
     @Composable
-    fun S04_WalkieTalkieSaving() {
+    fun S04_RecordingSaving() {
         MaterialTheme {
             Box(
                 modifier = Modifier
@@ -96,7 +94,7 @@ class WalkieTalkieScreenshots {
     @PreviewTest
     @WearScreenshotPreviewMatrix
     @Composable
-    fun S05_WalkieTalkieSaved() {
+    fun S05_RecordingSaved() {
         MaterialTheme {
             Box(
                 modifier = Modifier
@@ -104,7 +102,7 @@ class WalkieTalkieScreenshots {
                     .background(Color(0xFF1B5E20)),
                 contentAlignment = Alignment.Center,
             ) {
-                WalkieTalkieSavedContent(durationMs = 4_200)
+                SavedContent(durationMs = 4_200)
             }
         }
     }
@@ -112,7 +110,7 @@ class WalkieTalkieScreenshots {
     @PreviewTest
     @WearScreenshotPreviewMatrix
     @Composable
-    fun S06_WalkieTalkieTooShort() {
+    fun S06_RecordingTooShort() {
         MaterialTheme {
             Box(
                 modifier = Modifier
@@ -128,7 +126,7 @@ class WalkieTalkieScreenshots {
     @PreviewTest
     @WearScreenshotPreviewMatrix
     @Composable
-    fun S07_WalkieTalkieError() {
+    fun S07_RecordingError() {
         MaterialTheme {
             Box(
                 modifier = Modifier
@@ -136,7 +134,7 @@ class WalkieTalkieScreenshots {
                     .background(MaterialTheme.colorScheme.background),
                 contentAlignment = Alignment.Center,
             ) {
-                WalkieTalkieErrorContent(message = "Microphone unavailable")
+                RecordingErrorContent(message = "Microphone unavailable")
             }
         }
     }
@@ -144,7 +142,7 @@ class WalkieTalkieScreenshots {
     @PreviewTest
     @WearScreenshotPreviewMatrix
     @Composable
-    fun S08_WalkieTalkieErrorNull() {
+    fun S08_RecordingErrorNull() {
         MaterialTheme {
             Box(
                 modifier = Modifier
@@ -152,7 +150,7 @@ class WalkieTalkieScreenshots {
                     .background(MaterialTheme.colorScheme.background),
                 contentAlignment = Alignment.Center,
             ) {
-                WalkieTalkieErrorContent(message = null)
+                RecordingErrorContent(message = null)
             }
         }
     }

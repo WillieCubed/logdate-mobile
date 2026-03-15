@@ -1,4 +1,4 @@
-package app.logdate.wear.presentation.walkietalkie
+package app.logdate.wear.presentation.recording
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
-enum class WalkieTalkiePhase {
+enum class RecordingPhase {
     READY,
     RECORDING,
     SAVING,
@@ -30,19 +30,19 @@ enum class WalkieTalkiePhase {
     ERROR,
 }
 
-data class WalkieTalkieUiState(
-    val phase: WalkieTalkiePhase = WalkieTalkiePhase.READY,
+data class RecordingUiState(
+    val phase: RecordingPhase = RecordingPhase.READY,
     val recordingDurationMs: Long = 0,
     val audioLevels: List<Float> = emptyList(),
     val savedDurationMs: Long = 0,
     val errorMessage: String? = null,
 )
 
-sealed interface WalkieTalkieEvent {
-    data object NavigateBack : WalkieTalkieEvent
+sealed interface RecordingScreenEvent {
+    data object NavigateBack : RecordingScreenEvent
 }
 
-class WalkieTalkieViewModel(
+class WearRecordingViewModel(
     private val recordingManager: WearAudioRecordingManager,
     private val notesRepository: JournalNotesRepository,
     private val storageChecker: StorageSpaceChecker,
@@ -58,11 +58,11 @@ class WalkieTalkieViewModel(
         private const val SAVED_DISPLAY_MS = 800L
     }
 
-    private val _uiState = MutableStateFlow(WalkieTalkieUiState())
-    val uiState: StateFlow<WalkieTalkieUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(RecordingUiState())
+    val uiState: StateFlow<RecordingUiState> = _uiState.asStateFlow()
 
-    private val _events = MutableSharedFlow<WalkieTalkieEvent>(extraBufferCapacity = 1)
-    val events: SharedFlow<WalkieTalkieEvent> = _events.asSharedFlow()
+    private val _events = MutableSharedFlow<RecordingScreenEvent>(extraBufferCapacity = 1)
+    val events: SharedFlow<RecordingScreenEvent> = _events.asSharedFlow()
 
     private var recordingStartTimeMs: Long = 0
     private var audioLevelJob: Job? = null
@@ -76,7 +76,7 @@ class WalkieTalkieViewModel(
     }
 
     fun onTouchDown() {
-        if (_uiState.value.phase != WalkieTalkiePhase.READY) return
+        if (_uiState.value.phase != RecordingPhase.READY) return
 
         viewModelScope.launch {
             try {
@@ -85,7 +85,7 @@ class WalkieTalkieViewModel(
                 if (availableSpace < requiredSpace) {
                     _uiState.update {
                         it.copy(
-                            phase = WalkieTalkiePhase.ERROR,
+                            phase = RecordingPhase.ERROR,
                             errorMessage = "Not enough storage space",
                         )
                     }
@@ -96,7 +96,7 @@ class WalkieTalkieViewModel(
                 if (!started) {
                     _uiState.update {
                         it.copy(
-                            phase = WalkieTalkiePhase.ERROR,
+                            phase = RecordingPhase.ERROR,
                             errorMessage = "Failed to start recording",
                         )
                     }
@@ -106,7 +106,7 @@ class WalkieTalkieViewModel(
                 recordingStartTimeMs = clock.now().toEpochMilliseconds()
                 _uiState.update {
                     it.copy(
-                        phase = WalkieTalkiePhase.RECORDING,
+                        phase = RecordingPhase.RECORDING,
                         recordingDurationMs = 0,
                         audioLevels = emptyList(),
                     )
@@ -115,12 +115,12 @@ class WalkieTalkieViewModel(
                 startAudioLevelCollection()
                 startAutoStopTimer()
 
-                Napier.d("Walkie-talkie recording started")
+                Napier.d("Push-to-record recording started")
             } catch (e: Exception) {
-                Napier.e("Failed to start walkie-talkie recording", e)
+                Napier.e("Failed to start recording", e)
                 _uiState.update {
                     it.copy(
-                        phase = WalkieTalkiePhase.ERROR,
+                        phase = RecordingPhase.ERROR,
                         errorMessage = "Failed to start: ${e.message}",
                     )
                 }
@@ -129,7 +129,7 @@ class WalkieTalkieViewModel(
     }
 
     fun onTouchUp() {
-        if (_uiState.value.phase != WalkieTalkiePhase.RECORDING) return
+        if (_uiState.value.phase != RecordingPhase.RECORDING) return
 
         autoStopJob?.cancel()
         autoStopJob = null
@@ -143,10 +143,10 @@ class WalkieTalkieViewModel(
 
                 if (durationMs < MIN_DURATION_MS) {
                     Napier.d("Recording too short: ${durationMs}ms")
-                    _uiState.update { it.copy(phase = WalkieTalkiePhase.TOO_SHORT) }
+                    _uiState.update { it.copy(phase = RecordingPhase.TOO_SHORT) }
                     delay(TOO_SHORT_DISPLAY_MS)
                     _uiState.update {
-                        WalkieTalkieUiState(phase = WalkieTalkiePhase.READY)
+                        RecordingUiState(phase = RecordingPhase.READY)
                     }
                     return@launch
                 }
@@ -154,14 +154,14 @@ class WalkieTalkieViewModel(
                 if (filePath == null) {
                     _uiState.update {
                         it.copy(
-                            phase = WalkieTalkiePhase.ERROR,
+                            phase = RecordingPhase.ERROR,
                             errorMessage = "Failed to save recording",
                         )
                     }
                     return@launch
                 }
 
-                _uiState.update { it.copy(phase = WalkieTalkiePhase.SAVING) }
+                _uiState.update { it.copy(phase = RecordingPhase.SAVING) }
 
                 val now = clock.now()
                 val audioNote = JournalNote.Audio(
@@ -175,20 +175,20 @@ class WalkieTalkieViewModel(
 
                 _uiState.update {
                     it.copy(
-                        phase = WalkieTalkiePhase.SAVED,
+                        phase = RecordingPhase.SAVED,
                         savedDurationMs = durationMs,
                     )
                 }
 
-                Napier.d("Walkie-talkie note saved: $filePath (${durationMs}ms)")
+                Napier.d("Audio note saved: $filePath (${durationMs}ms)")
 
                 delay(SAVED_DISPLAY_MS)
-                _events.emit(WalkieTalkieEvent.NavigateBack)
+                _events.emit(RecordingScreenEvent.NavigateBack)
             } catch (e: Exception) {
-                Napier.e("Failed to save walkie-talkie recording", e)
+                Napier.e("Failed to save recording", e)
                 _uiState.update {
                     it.copy(
-                        phase = WalkieTalkiePhase.ERROR,
+                        phase = RecordingPhase.ERROR,
                         errorMessage = "Failed to save: ${e.message}",
                     )
                 }
@@ -197,7 +197,7 @@ class WalkieTalkieViewModel(
     }
 
     fun onNavigatedBack() {
-        _uiState.update { WalkieTalkieUiState(phase = WalkieTalkiePhase.READY) }
+        _uiState.update { RecordingUiState(phase = RecordingPhase.READY) }
     }
 
     private fun startAudioLevelCollection() {
@@ -228,7 +228,7 @@ class WalkieTalkieViewModel(
         autoStopJob?.cancel()
         autoStopJob = viewModelScope.launch {
             delay(MAX_DURATION_MS)
-            Napier.d("Walkie-talkie auto-stop at ${MAX_DURATION_MS}ms")
+            Napier.d("Auto-stop at ${MAX_DURATION_MS}ms")
             onTouchUp()
         }
     }

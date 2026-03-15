@@ -11,7 +11,8 @@ import app.logdate.wear.haptic.WearHapticEngine
 import app.logdate.wear.presentation.audio.AudioRecordingViewModel
 import app.logdate.wear.presentation.home.WearHomeViewModel
 import app.logdate.wear.presentation.mood.MoodCheckInViewModel
-import app.logdate.wear.presentation.walkietalkie.WalkieTalkieViewModel
+import app.logdate.wear.presentation.recording.WearRecordingViewModel
+import app.logdate.wear.presentation.timeline.WearTimelineViewModel
 import app.logdate.wear.recording.WearAudioRecordingManager
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
@@ -37,7 +38,7 @@ val wearAudioModule = module {
         )
     }
     viewModel {
-        WalkieTalkieViewModel(
+        WearRecordingViewModel(
             get<WearAudioRecordingManager>(),
             get<JournalNotesRepository>(),
             get<StorageSpaceChecker>(),
@@ -50,6 +51,11 @@ val wearAudioModule = module {
     }
     viewModel {
         WearHomeViewModel(
+            get<JournalNotesRepository>(),
+        )
+    }
+    viewModel {
+        WearTimelineViewModel(
             get<JournalNotesRepository>(),
         )
     }

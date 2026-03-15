@@ -11,20 +11,20 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.wear.compose.material3.MaterialTheme
-import app.logdate.wear.presentation.walkietalkie.ReadyContent
-import app.logdate.wear.presentation.walkietalkie.RecordingContent
-import app.logdate.wear.presentation.walkietalkie.SavingContent
-import app.logdate.wear.presentation.walkietalkie.TooShortContent
-import app.logdate.wear.presentation.walkietalkie.WalkieTalkieErrorContent
-import app.logdate.wear.presentation.walkietalkie.WalkieTalkieSavedContent
-import app.logdate.wear.presentation.walkietalkie.formatDuration
+import app.logdate.wear.presentation.recording.ActiveRecordingContent
+import app.logdate.wear.presentation.recording.ReadyContent
+import app.logdate.wear.presentation.recording.RecordingErrorContent
+import app.logdate.wear.presentation.recording.SavedContent
+import app.logdate.wear.presentation.recording.SavingContent
+import app.logdate.wear.presentation.recording.TooShortContent
+import app.logdate.wear.presentation.recording.formatDuration
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.Assert.assertEquals
 
 @RunWith(AndroidJUnit4::class)
-class WalkieTalkieScreenTest {
+class WearRecordingScreenTest {
 
     @get:Rule
     val composeRule = createComposeRule()
@@ -41,7 +41,7 @@ class WalkieTalkieScreenTest {
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    ReadyContent(onTouchDown = {}, onTouchUp = {})
+                    ReadyContent()
                 }
             }
         }
@@ -63,10 +63,9 @@ class WalkieTalkieScreenTest {
                         .background(Color(0xFF8B1A1A)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    RecordingContent(
+                    ActiveRecordingContent(
                         durationMs = 4_200,
                         audioLevels = listOf(0.3f, 0.5f, 0.7f),
-                        onTouchUp = {},
                     )
                 }
             }
@@ -83,10 +82,9 @@ class WalkieTalkieScreenTest {
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    RecordingContent(
+                    ActiveRecordingContent(
                         durationMs = 10_000,
                         audioLevels = List(20) { it / 20f },
-                        onTouchUp = {},
                     )
                 }
             }
@@ -103,10 +101,9 @@ class WalkieTalkieScreenTest {
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    RecordingContent(
+                    ActiveRecordingContent(
                         durationMs = 0,
                         audioLevels = emptyList(),
-                        onTouchUp = {},
                     )
                 }
             }
@@ -149,7 +146,7 @@ class WalkieTalkieScreenTest {
                         .background(Color(0xFF1B5E20)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    WalkieTalkieSavedContent(durationMs = 4_200)
+                    SavedContent(durationMs = 4_200)
                 }
             }
         }
@@ -166,7 +163,7 @@ class WalkieTalkieScreenTest {
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    WalkieTalkieSavedContent(durationMs = 58_000)
+                    SavedContent(durationMs = 58_000)
                 }
             }
         }
@@ -207,7 +204,7 @@ class WalkieTalkieScreenTest {
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    WalkieTalkieErrorContent(message = "Microphone unavailable")
+                    RecordingErrorContent(message = "Microphone unavailable")
                 }
             }
         }
@@ -223,7 +220,7 @@ class WalkieTalkieScreenTest {
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    WalkieTalkieErrorContent(message = null)
+                    RecordingErrorContent(message = null)
                 }
             }
         }

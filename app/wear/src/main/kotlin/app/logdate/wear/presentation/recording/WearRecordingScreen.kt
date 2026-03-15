@@ -1,4 +1,4 @@
-package app.logdate.wear.presentation.walkietalkie
+package app.logdate.wear.presentation.recording
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
@@ -7,7 +7,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -35,59 +35,67 @@ import kotlinx.coroutines.flow.collectLatest
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
-fun WalkieTalkieScreen(
+fun WearRecordingScreen(
     onNavigateBack: () -> Unit,
-    viewModel: WalkieTalkieViewModel = koinViewModel(),
+    viewModel: WearRecordingViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.events.collectLatest { event ->
             when (event) {
-                WalkieTalkieEvent.NavigateBack -> onNavigateBack()
+                RecordingScreenEvent.NavigateBack -> onNavigateBack()
             }
         }
     }
 
     val backgroundColor by animateColorAsState(
         targetValue = when (uiState.phase) {
-            WalkieTalkiePhase.RECORDING -> Color(0xFF8B1A1A)
-            WalkieTalkiePhase.SAVED -> Color(0xFF1B5E20)
+            RecordingPhase.RECORDING -> Color(0xFF8B1A1A)
+            RecordingPhase.SAVED -> Color(0xFF1B5E20)
             else -> MaterialTheme.colorScheme.background
         },
         animationSpec = tween(200),
         label = "bg",
     )
 
+    // Gesture detection lives on the outer Box so it persists across phase
+    // transitions.  When the phase flips from READY → RECORDING, the inner
+    // content composables swap, but this pointer-input scope stays alive,
+    // so the finger-up event is never lost.
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(backgroundColor),
+            .background(backgroundColor)
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        when (event.type) {
+                            PointerEventType.Press -> viewModel.onTouchDown()
+                            PointerEventType.Release -> viewModel.onTouchUp()
+                        }
+                    }
+                }
+            },
         contentAlignment = Alignment.Center,
     ) {
         when (uiState.phase) {
-            WalkieTalkiePhase.READY -> ReadyContent(
-                onTouchDown = viewModel::onTouchDown,
-                onTouchUp = viewModel::onTouchUp,
-            )
-            WalkieTalkiePhase.RECORDING -> RecordingContent(
+            RecordingPhase.READY -> ReadyContent()
+            RecordingPhase.RECORDING -> ActiveRecordingContent(
                 durationMs = uiState.recordingDurationMs,
                 audioLevels = uiState.audioLevels,
-                onTouchUp = viewModel::onTouchUp,
             )
-            WalkieTalkiePhase.SAVING -> SavingContent()
-            WalkieTalkiePhase.SAVED -> WalkieTalkieSavedContent(durationMs = uiState.savedDurationMs)
-            WalkieTalkiePhase.TOO_SHORT -> TooShortContent()
-            WalkieTalkiePhase.ERROR -> WalkieTalkieErrorContent(message = uiState.errorMessage)
+            RecordingPhase.SAVING -> SavingContent()
+            RecordingPhase.SAVED -> SavedContent(durationMs = uiState.savedDurationMs)
+            RecordingPhase.TOO_SHORT -> TooShortContent()
+            RecordingPhase.ERROR -> RecordingErrorContent(message = uiState.errorMessage)
         }
     }
 }
 
 @Composable
-internal fun ReadyContent(
-    onTouchDown: () -> Unit,
-    onTouchUp: () -> Unit,
-) {
+internal fun ReadyContent() {
     val transition = rememberInfiniteTransition(label = "pulse")
     val alpha by transition.animateFloat(
         initialValue = 0.6f,
@@ -99,68 +107,38 @@ internal fun ReadyContent(
         label = "textAlpha",
     )
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onPress = {
-                        onTouchDown()
-                        tryAwaitRelease()
-                        onTouchUp()
-                    },
-                )
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = "HOLD TO\nRECORD",
-            style = MaterialTheme.typography.titleSmall,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
-        )
-    }
+    Text(
+        text = "HOLD TO\nRECORD",
+        style = MaterialTheme.typography.titleSmall,
+        textAlign = TextAlign.Center,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
+    )
 }
 
 @Composable
-internal fun RecordingContent(
+internal fun ActiveRecordingContent(
     durationMs: Long,
     audioLevels: List<Float>,
-    onTouchUp: () -> Unit,
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onPress = {
-                        tryAwaitRelease()
-                        onTouchUp()
-                    },
-                )
-            },
-        contentAlignment = Alignment.Center,
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            AudioWaveform(
-                audioLevels = audioLevels,
-                modifier = Modifier.padding(horizontal = 24.dp),
-            )
-            RecordingTimer(
-                durationMs = durationMs,
-                isRecording = true,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-            Text(
-                text = "RECORDING",
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.7f),
-                modifier = Modifier.padding(top = 4.dp),
-            )
-        }
+        AudioWaveform(
+            audioLevels = audioLevels,
+            modifier = Modifier.padding(horizontal = 24.dp),
+        )
+        RecordingTimer(
+            durationMs = durationMs,
+            isRecording = true,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        Text(
+            text = "RECORDING",
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.7f),
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }
 
@@ -174,7 +152,7 @@ internal fun SavingContent() {
 }
 
 @Composable
-internal fun WalkieTalkieSavedContent(durationMs: Long) {
+internal fun SavedContent(durationMs: Long) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -220,7 +198,7 @@ internal fun TooShortContent() {
 }
 
 @Composable
-internal fun WalkieTalkieErrorContent(message: String?) {
+internal fun RecordingErrorContent(message: String?) {
     Text(
         text = message ?: "Something went wrong",
         style = MaterialTheme.typography.bodySmall,

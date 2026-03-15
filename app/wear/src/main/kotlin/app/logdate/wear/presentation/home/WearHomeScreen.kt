@@ -30,7 +30,7 @@ import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun WearHomeScreen(
-    onNavigateToWalkieTalkie: () -> Unit,
+    onNavigateToRecordAudio: () -> Unit,
     onNavigateToVoiceNote: () -> Unit,
     onNavigateToMoodCheckIn: () -> Unit,
     onNavigateToQuickText: () -> Unit,
@@ -41,7 +41,7 @@ fun WearHomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     WearHomeContent(
         uiState = uiState,
-        onNavigateToWalkieTalkie = onNavigateToWalkieTalkie,
+        onNavigateToRecordAudio = onNavigateToRecordAudio,
         onNavigateToVoiceNote = onNavigateToVoiceNote,
         onNavigateToMoodCheckIn = onNavigateToMoodCheckIn,
         onNavigateToQuickText = onNavigateToQuickText,
@@ -53,7 +53,7 @@ fun WearHomeScreen(
 @Composable
 internal fun WearHomeContent(
     uiState: WearHomeUiState,
-    onNavigateToWalkieTalkie: () -> Unit = {},
+    onNavigateToRecordAudio: () -> Unit = {},
     onNavigateToVoiceNote: () -> Unit = {},
     onNavigateToMoodCheckIn: () -> Unit = {},
     onNavigateToQuickText: () -> Unit = {},
@@ -93,12 +93,12 @@ internal fun WearHomeContent(
                 )
             }
 
-            // Walkie-Talkie hero chip
-            item(key = "walkieTalkie") {
+            // Record Audio hero chip
+            item(key = "recordAudio") {
                 Button(
-                    onClick = onNavigateToWalkieTalkie,
+                    onClick = onNavigateToRecordAudio,
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Walkie-Talkie") },
+                    label = { Text("Record Audio") },
                     icon = { Icon(Icons.Default.Mic, contentDescription = null) },
                 )
             }

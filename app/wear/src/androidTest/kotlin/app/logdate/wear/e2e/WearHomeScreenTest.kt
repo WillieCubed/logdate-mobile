@@ -101,7 +101,7 @@ class WearHomeScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Walkie-Talkie").assertIsDisplayed()
+        composeRule.onNodeWithText("Record Audio").assertIsDisplayed()
         composeRule.onNodeWithText("Voice Note").assertIsDisplayed()
         composeRule.onNodeWithText("Mood Check-in").assertIsDisplayed()
         composeRule.onNodeWithText("Quick Text").assertIsDisplayed()
@@ -114,19 +114,19 @@ class WearHomeScreenTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun homeScreen_walkieTalkieChipTriggersNavigation() {
+    fun homeScreen_recordAudioChipTriggersNavigation() {
         var navigated = false
         composeRule.setContent {
             MaterialTheme {
                 WearHomeContent(
                     uiState = WearHomeUiState(greeting = "Good morning"),
-                    onNavigateToWalkieTalkie = { navigated = true },
+                    onNavigateToRecordAudio = { navigated = true },
                 )
             }
         }
 
-        composeRule.onNodeWithText("Walkie-Talkie").performClick()
-        assertTrue("Walkie-Talkie chip should trigger navigation", navigated)
+        composeRule.onNodeWithText("Record Audio").performClick()
+        assertTrue("Record Audio chip should trigger navigation", navigated)
     }
 
     @Test
