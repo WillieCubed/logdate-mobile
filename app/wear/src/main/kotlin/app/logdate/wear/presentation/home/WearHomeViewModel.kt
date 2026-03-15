@@ -22,35 +22,35 @@ class WearHomeViewModel(
         .observeNotesForDay(today)
         .map { notes ->
             WearHomeUiState(
-                greeting = greetingForTimeOfDay(),
+                timeOfDay = currentTimeOfDay(),
                 entryCount = notes.size,
-                entryCountLabel = when (notes.size) {
-                    0 -> "No entries yet"
-                    1 -> "1 entry today"
-                    else -> "${notes.size} entries today"
-                },
             )
         }
         .stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5_000),
-            WearHomeUiState(greeting = greetingForTimeOfDay()),
+            WearHomeUiState(timeOfDay = currentTimeOfDay()),
         )
 
-    private fun greetingForTimeOfDay(): String {
+    private fun currentTimeOfDay(): TimeOfDay {
         val hour = Clock.System.now()
             .toLocalDateTime(TimeZone.currentSystemDefault())
             .hour
         return when {
-            hour < 12 -> "Good morning"
-            hour < 17 -> "Good afternoon"
-            else -> "Good evening"
+            hour < 12 -> TimeOfDay.MORNING
+            hour < 17 -> TimeOfDay.AFTERNOON
+            else -> TimeOfDay.EVENING
         }
     }
 }
 
+enum class TimeOfDay {
+    MORNING,
+    AFTERNOON,
+    EVENING,
+}
+
 data class WearHomeUiState(
-    val greeting: String = "",
+    val timeOfDay: TimeOfDay = TimeOfDay.MORNING,
     val entryCount: Int = 0,
-    val entryCountLabel: String = "No entries yet",
 )

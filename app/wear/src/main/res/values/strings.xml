@@ -5,6 +5,10 @@
     <string name="record_audio_2">Record Audio</string>
 
     <!-- Home Screen -->
+    <string name="wear_home_greeting_morning">Good morning</string>
+    <string name="wear_home_greeting_afternoon">Good afternoon</string>
+    <string name="wear_home_greeting_evening">Good evening</string>
+    <string name="wear_home_no_entries">No entries yet</string>
     <string name="wear_home_record_audio">Record Audio</string>
     <string name="wear_home_voice_note">Voice Note</string>
     <string name="wear_home_mood_checkin">Mood Check-in</string>

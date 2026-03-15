@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -74,8 +75,13 @@ internal fun WearHomeContent(
         ) {
             // Greeting card
             item(key = "greeting") {
+                val greetingText = when (uiState.timeOfDay) {
+                    TimeOfDay.MORNING -> stringResource(R.string.wear_home_greeting_morning)
+                    TimeOfDay.AFTERNOON -> stringResource(R.string.wear_home_greeting_afternoon)
+                    TimeOfDay.EVENING -> stringResource(R.string.wear_home_greeting_evening)
+                }
                 Text(
-                    text = uiState.greeting,
+                    text = greetingText,
                     style = MaterialTheme.typography.titleSmall,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
@@ -84,8 +90,18 @@ internal fun WearHomeContent(
                 )
             }
             item(key = "entryCount") {
+                val context = LocalContext.current
+                val entryCountLabel = if (uiState.entryCount == 0) {
+                    stringResource(R.string.wear_home_no_entries)
+                } else {
+                    context.resources.getQuantityString(
+                        R.plurals.wear_tile_entry_count,
+                        uiState.entryCount,
+                        uiState.entryCount,
+                    )
+                }
                 Text(
-                    text = uiState.entryCountLabel,
+                    text = entryCountLabel,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
