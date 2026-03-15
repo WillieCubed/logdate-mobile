@@ -381,9 +381,19 @@ class OfflineFirstJournalNotesRepository(
     override suspend fun createFromSync(note: JournalNote) {
         when (note) {
             is JournalNote.Text -> textNoteDao.addNote(note.toEntity())
-            is JournalNote.Image -> imageNoteDao.addNote(note.toEntity())
+            is JournalNote.Image -> {
+                imageNoteDao.addNote(note.toEntity())
+                if (note.caption.isNotEmpty()) {
+                    mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
+                }
+            }
             is JournalNote.Audio -> audioNoteDao.addNote(note.toEntity())
-            is JournalNote.Video -> videoNoteDao.addNote(note.toEntity())
+            is JournalNote.Video -> {
+                videoNoteDao.addNote(note.toEntity())
+                if (note.caption.isNotEmpty()) {
+                    mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
+                }
+            }
         }
     }
 
