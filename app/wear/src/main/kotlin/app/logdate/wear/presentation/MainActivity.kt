@@ -23,10 +23,15 @@ import app.logdate.wear.presentation.navigation.WearHomeRoute
 import app.logdate.wear.presentation.navigation.WearMoodCheckInRoute
 import app.logdate.wear.presentation.navigation.WearQuickTextRoute
 import app.logdate.wear.presentation.navigation.WearQuickRecordRoute
+import app.logdate.wear.presentation.navigation.WearRewindListRoute
+import app.logdate.wear.presentation.navigation.WearRewindPlaybackRoute
 import app.logdate.wear.presentation.navigation.WearTimelineDayDetailRoute
 import app.logdate.wear.presentation.navigation.WearTimelineRoute
 import app.logdate.wear.presentation.quicktext.QuickTextLauncher
 import app.logdate.wear.presentation.recording.WearRecordingScreen
+import app.logdate.wear.presentation.rewind.WearRewindListScreen
+import app.logdate.wear.presentation.rewind.WearRewindPlaybackScreen
+import app.logdate.wear.presentation.rewind.WearRewindViewModel
 import app.logdate.wear.presentation.theme.LogDateTheme
 import app.logdate.wear.presentation.timeline.WearDayDetailScreen
 import app.logdate.wear.presentation.timeline.WearTimelineScreen
@@ -142,6 +147,23 @@ fun WearApp() {
                 entry<WearTimelineDayDetailRoute> {
                     val timelineViewModel = koinViewModel<WearTimelineViewModel>()
                     WearDayDetailScreen(viewModel = timelineViewModel)
+                }
+                entry<WearRewindListRoute> {
+                    val rewindViewModel = koinViewModel<WearRewindViewModel>()
+                    WearRewindListScreen(
+                        viewModel = rewindViewModel,
+                        onSelectRewind = { uid ->
+                            rewindViewModel.selectRewind(uid)
+                            backStack.add(WearRewindPlaybackRoute)
+                        },
+                    )
+                }
+                entry<WearRewindPlaybackRoute> {
+                    val rewindViewModel = koinViewModel<WearRewindViewModel>()
+                    WearRewindPlaybackScreen(
+                        viewModel = rewindViewModel,
+                        onExit = navigateBack,
+                    )
                 }
             },
         )

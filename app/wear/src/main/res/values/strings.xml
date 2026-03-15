@@ -42,6 +42,10 @@
     <string name="wear_prompt_channel_name">Journal reminders</string>
     <string name="wear_prompt_channel_description">Morning and evening journaling reminders</string>
 
+    <!-- Rewind -->
+    <string name="wear_rewind_title">Rewinds</string>
+    <string name="wear_rewind_empty">No rewinds yet</string>
+
     <!-- Plurals -->
     <plurals name="wear_tile_entry_count">
         <item quantity="one">%d entry today</item>

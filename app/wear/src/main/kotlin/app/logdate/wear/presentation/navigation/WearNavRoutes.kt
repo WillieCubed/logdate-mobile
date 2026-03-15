@@ -17,4 +17,8 @@ data object WearTimelineRoute : NavKey
 
 data class WearTimelineDayDetailRoute(val date: LocalDate) : NavKey
 
+data object WearRewindListRoute : NavKey
+
+data object WearRewindPlaybackRoute : NavKey
+
 data object WearSettingsRoute : NavKey
