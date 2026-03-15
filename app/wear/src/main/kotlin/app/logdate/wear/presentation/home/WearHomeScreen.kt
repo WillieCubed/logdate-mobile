@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
@@ -26,6 +27,7 @@ import androidx.wear.compose.material3.OutlinedButton
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
+import app.logdate.wear.R
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -98,7 +100,7 @@ internal fun WearHomeContent(
                 Button(
                     onClick = onNavigateToRecordAudio,
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Record Audio") },
+                    label = { Text(stringResource(R.string.wear_home_record_audio)) },
                     icon = { Icon(Icons.Default.Mic, contentDescription = null) },
                 )
             }
@@ -108,7 +110,7 @@ internal fun WearHomeContent(
                 FilledTonalButton(
                     onClick = onNavigateToVoiceNote,
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Voice Note") },
+                    label = { Text(stringResource(R.string.wear_home_voice_note)) },
                     icon = { Icon(Icons.Default.MicNone, contentDescription = null) },
                 )
             }
@@ -118,7 +120,7 @@ internal fun WearHomeContent(
                 FilledTonalButton(
                     onClick = onNavigateToMoodCheckIn,
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Mood Check-in") },
+                    label = { Text(stringResource(R.string.wear_home_mood_checkin)) },
                     icon = { Icon(Icons.Default.Mood, contentDescription = null) },
                 )
             }
@@ -128,7 +130,7 @@ internal fun WearHomeContent(
                 OutlinedButton(
                     onClick = onNavigateToQuickText,
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Quick Text") },
+                    label = { Text(stringResource(R.string.wear_home_quick_text)) },
                     icon = { Icon(Icons.Default.TextFields, contentDescription = null) },
                 )
             }
@@ -138,7 +140,7 @@ internal fun WearHomeContent(
                 OutlinedButton(
                     onClick = onNavigateToTimeline,
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Timeline") },
+                    label = { Text(stringResource(R.string.wear_home_timeline)) },
                     icon = { Icon(Icons.Default.ViewTimeline, contentDescription = null) },
                 )
             }
@@ -148,7 +150,7 @@ internal fun WearHomeContent(
                 OutlinedButton(
                     onClick = onNavigateToSettings,
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Settings") },
+                    label = { Text(stringResource(R.string.wear_home_settings)) },
                     icon = { Icon(Icons.Default.Settings, contentDescription = null) },
                     colors = ButtonDefaults.outlinedButtonColors(),
                 )

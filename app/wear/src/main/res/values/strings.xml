@@ -3,6 +3,14 @@
     <string name="app_name">LogDate Wear</string>
     <string name="cancel">Cancel</string>
     <string name="record_audio_2">Record Audio</string>
+
+    <!-- Home Screen -->
+    <string name="wear_home_record_audio">Record Audio</string>
+    <string name="wear_home_voice_note">Voice Note</string>
+    <string name="wear_home_mood_checkin">Mood Check-in</string>
+    <string name="wear_home_quick_text">Quick Text</string>
+    <string name="wear_home_timeline">Timeline</string>
+    <string name="wear_home_settings">Settings</string>
     <string name="wear_recording_channel_description">Audio recording notifications</string>
     <string name="wear_recording_channel_name">Recording</string>
     <string name="wear_recording_in_progress">Recording in progress on your watch</string>
