@@ -116,7 +116,14 @@ class ExportWorker(
                                     }
 
                                 trySetForeground(notificationHelper.createCompletionInfo(filePath))
-                                emitProgress(100, "Export completed")
+                                exportLauncher.updateProgress(
+                                    ExportProgressInfo(
+                                        isActive = false,
+                                        progressPercent = 100,
+                                        message = "Export completed",
+                                        completedFilePath = filePath,
+                                    ),
+                                )
 
                                 finalResult =
                                     Result.success(

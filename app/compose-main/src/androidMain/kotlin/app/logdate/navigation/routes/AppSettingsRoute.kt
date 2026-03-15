@@ -294,18 +294,17 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
         val context = LocalContext.current
         ExportSettingsScreen(
             onBack = onBack,
-            onShareFile = { path ->
+            onBrowseFile = { path ->
                 try {
                     val uri = Uri.parse(path)
-                    val shareIntent =
-                        Intent(Intent.ACTION_SEND).apply {
-                            type = "application/zip"
-                            putExtra(Intent.EXTRA_STREAM, uri)
+                    val browseIntent =
+                        Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(uri, "application/zip")
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         }
-                    context.startActivity(Intent.createChooser(shareIntent, null))
+                    context.startActivity(browseIntent)
                 } catch (e: Exception) {
-                    Napier.e("Failed to share export file", e)
+                    Napier.e("Failed to open export file", e)
                 }
             },
         )

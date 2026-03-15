@@ -531,6 +531,56 @@ class ExportViewModelTest {
         }
 
     @Test
+    fun `direct completion via progress channel transitions to Completed`() =
+        testScope.runTest {
+            viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.showExportOptions()
+            viewModel.confirmExport()
+
+            // Simulate worker sending completion directly through progress
+            fakeExportLauncher.emitProgress(
+                ExportProgressInfo(
+                    isActive = false,
+                    progressPercent = 100,
+                    message = "Export completed",
+                    completedFilePath = "/storage/exports/logdate-export.zip",
+                ),
+            )
+            advanceUntilIdle()
+
+            val state = viewModel.exportState.value
+            assertIs<ExportState.Completed>(state)
+            assertEquals("/storage/exports/logdate-export.zip", state.path)
+            assertEquals("logdate-export.zip", state.fileName)
+        }
+
+    @Test
+    fun `direct completion is not overwritten by late callback`() =
+        testScope.runTest {
+            viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.showExportOptions()
+            viewModel.confirmExport()
+
+            // Direct completion fires first
+            fakeExportLauncher.emitProgress(
+                ExportProgressInfo(
+                    isActive = false,
+                    completedFilePath = "/storage/exports/logdate-export.zip",
+                ),
+            )
+            advanceUntilIdle()
+            assertIs<ExportState.Completed>(viewModel.exportState.value)
+
+            // Late WorkManager callback should be ignored
+            fakeExportLauncher.triggerCompletion(null)
+            assertIs<ExportState.Completed>(viewModel.exportState.value)
+        }
+
+    @Test
     fun `fileName extraction works for file paths`() =
         testScope.runTest {
             viewModel = createViewModel()

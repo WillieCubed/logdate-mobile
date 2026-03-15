@@ -27,10 +27,11 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.export.ExportStats
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.action_browse
 import logdate.client.feature.core.generated.resources.action_done
 import logdate.client.feature.core.generated.resources.action_retry
-import logdate.client.feature.core.generated.resources.action_share
 import logdate.client.feature.core.generated.resources.dismiss
+import logdate.client.feature.core.generated.resources.export_complete_description
 import logdate.client.feature.core.generated.resources.export_complete_title
 import logdate.client.feature.core.generated.resources.export_failed_title
 import logdate.client.feature.core.generated.resources.export_stats_summary
@@ -40,14 +41,14 @@ import org.jetbrains.compose.resources.stringResource
 internal fun ExportSuccessCard(
     fileName: String,
     stats: ExportStats?,
-    onShare: () -> Unit,
+    onBrowse: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.primaryContainer,
+        tonalElevation = 2.dp,
     ) {
         Column(
             modifier = Modifier.padding(Spacing.lg),
@@ -60,21 +61,20 @@ internal fun ExportSuccessCard(
                     imageVector = Icons.Rounded.CheckCircle,
                     contentDescription = null,
                     modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    tint = MaterialTheme.colorScheme.primary,
                 )
                 Text(
                     text = stringResource(Res.string.export_complete_title),
                     style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
 
             Spacer(modifier = Modifier.height(Spacing.sm))
 
             Text(
-                text = fileName,
+                text = stringResource(Res.string.export_complete_description),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             stats?.let {
@@ -89,7 +89,7 @@ internal fun ExportSuccessCard(
                             it.mediaCount,
                         ),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -103,10 +103,10 @@ internal fun ExportSuccessCard(
                     Text(stringResource(Res.string.action_done))
                 }
                 Button(
-                    onClick = onShare,
+                    onClick = onBrowse,
                     modifier = Modifier.padding(start = Spacing.sm),
                 ) {
-                    Text(stringResource(Res.string.action_share))
+                    Text(stringResource(Res.string.action_browse))
                 }
             }
         }

@@ -60,7 +60,7 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun ExportSettingsScreen(
     onBack: () -> Unit,
-    onShareFile: (String) -> Unit = {},
+    onBrowseFile: (String) -> Unit = {},
     viewModel: DataSettingsViewModel = koinViewModel(),
     exportViewModel: ExportViewModel = koinViewModel(),
 ) {
@@ -109,7 +109,7 @@ fun ExportSettingsScreen(
         onCancelExport = exportViewModel::cancelExport,
         onRetryExport = exportViewModel::retryExport,
         onDismissExport = exportViewModel::dismissSheet,
-        onShareExport = { path -> onShareFile(path) },
+        onBrowseExport = { path -> onBrowseFile(path) },
         onRestoreContent = viewModel::restoreContent,
         onCancelRestore = viewModel::cancelRestore,
         restoreState = uiState.restoreState,
@@ -131,7 +131,7 @@ fun ExportSettingsContent(
     onCancelExport: () -> Unit,
     onRetryExport: () -> Unit,
     onDismissExport: () -> Unit,
-    onShareExport: (String) -> Unit,
+    onBrowseExport: (String) -> Unit,
     onRestoreContent: () -> Unit,
     onCancelRestore: () -> Unit,
     restoreState: RestoreState,
@@ -148,7 +148,7 @@ fun ExportSettingsContent(
             onCancel = onCancelExport,
             onRetry = onRetryExport,
             onDismiss = onDismissExport,
-            onShare = onShareExport,
+            onBrowse = onBrowseExport,
         )
     }
 

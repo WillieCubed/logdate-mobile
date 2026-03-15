@@ -38,11 +38,17 @@ interface ExportLauncher {
 
 /**
  * Progress information for an active export operation.
+ *
+ * When [completedFilePath] is non-null, the export has finished and the file
+ * has been written. This field is used to signal completion directly from the
+ * worker, bypassing any asynchronous delivery mechanism (e.g. WorkManager
+ * LiveData) that might introduce a visible delay.
  */
 data class ExportProgressInfo(
     val isActive: Boolean = false,
     val progressPercent: Int = 0,
     val message: String = "",
+    val completedFilePath: String? = null,
 )
 
 /**

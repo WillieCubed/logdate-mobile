@@ -68,7 +68,7 @@ internal fun ExportBottomSheet(
     onCancel: () -> Unit,
     onRetry: () -> Unit,
     onDismiss: () -> Unit,
-    onShare: (String) -> Unit,
+    onBrowse: (String) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -120,7 +120,7 @@ internal fun ExportBottomSheet(
                         ExportSuccessCard(
                             fileName = state.fileName,
                             stats = state.stats,
-                            onShare = { onShare(state.path) },
+                            onBrowse = { onBrowse(state.path) },
                             onDismiss = onDismiss,
                         )
                     }

@@ -53,6 +53,7 @@ class ExportViewModel(
 
     init {
         exportLauncher.setExportCompletionCallback { path ->
+            if (_exportState.value is ExportState.Completed) return@setExportCompletionCallback
             if (path == null) {
                 val current = _exportState.value
                 if (current is ExportState.Exporting) {
@@ -76,7 +77,17 @@ class ExportViewModel(
 
         viewModelScope.launch {
             exportLauncher.exportProgress.collect { progressInfo ->
-                if (progressInfo.isActive) {
+                val completedPath = progressInfo.completedFilePath
+                if (completedPath != null) {
+                    val fileName = completedPath.substringAfterLast("/").substringAfterLast(":")
+                    _exportState.update {
+                        ExportState.Completed(
+                            path = completedPath,
+                            fileName = fileName,
+                        )
+                    }
+                    _isSheetVisible.value = true
+                } else if (progressInfo.isActive) {
                     _exportState.update { current ->
                         if (current !is ExportState.Completed) {
                             ExportState.Exporting(

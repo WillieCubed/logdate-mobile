@@ -115,7 +115,7 @@ fun DataSettingsScreen(
     onBack: () -> Unit,
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit = {},
-    onShareFile: (String) -> Unit = {},
+    onBrowseFile: (String) -> Unit = {},
     viewModel: DataSettingsViewModel = koinViewModel(),
     exportViewModel: ExportViewModel = koinViewModel(),
 ) {
@@ -166,7 +166,7 @@ fun DataSettingsScreen(
         onCancelExport = exportViewModel::cancelExport,
         onRetryExport = exportViewModel::retryExport,
         onDismissExport = exportViewModel::dismissSheet,
-        onShareExport = { path -> onShareFile(path) },
+        onBrowseExport = { path -> onBrowseFile(path) },
         onRestoreContent = viewModel::restoreContent,
         onCancelRestore = viewModel::cancelRestore,
         restoreState = uiState.restoreState,
@@ -200,7 +200,7 @@ fun DataSettingsContent(
     onCancelExport: () -> Unit,
     onRetryExport: () -> Unit,
     onDismissExport: () -> Unit,
-    onShareExport: (String) -> Unit,
+    onBrowseExport: (String) -> Unit,
     onRestoreContent: () -> Unit,
     onCancelRestore: () -> Unit,
     restoreState: RestoreState,
@@ -227,7 +227,7 @@ fun DataSettingsContent(
             onCancel = onCancelExport,
             onRetry = onRetryExport,
             onDismiss = onDismissExport,
-            onShare = onShareExport,
+            onBrowse = onBrowseExport,
         )
     }
 
@@ -782,7 +782,7 @@ private fun DataSettingsScreenPreview() {
         onCancelExport = {},
         onRetryExport = {},
         onDismissExport = {},
-        onShareExport = {},
+        onBrowseExport = {},
         onRestoreContent = {},
         onCancelRestore = {},
         restoreState = RestoreState.Idle,
