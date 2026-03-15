@@ -12,6 +12,7 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.repository.journals.NotePlace
 import app.logdate.client.repository.journals.SyncableJournalContentRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.repository.journals.SyncableJournalRepository
@@ -260,6 +261,7 @@ class RestoreUserDataUseCase(
                     creationTimestamp = createdAt,
                     lastUpdated = updatedAt,
                     mediaRef = (mediaUri ?: mediaPath)?.takeIf { it.isNotBlank() } ?: return null,
+                    caption = caption.orEmpty(),
                     location = location,
                 )
             "video" ->
@@ -268,6 +270,7 @@ class RestoreUserDataUseCase(
                     creationTimestamp = createdAt,
                     lastUpdated = updatedAt,
                     mediaRef = (mediaUri ?: mediaPath)?.takeIf { it.isNotBlank() } ?: return null,
+                    caption = caption.orEmpty(),
                     location = location,
                 )
             "audio" ->
@@ -283,10 +286,19 @@ class RestoreUserDataUseCase(
         }
     }
 
-    private fun app.logdate.client.domain.export.ExportLocation.toNoteLocation(): NoteLocation =
-        NoteLocation(
-            coordinates = NoteCoordinates(latitude, longitude),
-        )
+    private fun app.logdate.client.domain.export.ExportLocation.toNoteLocation(): NoteLocation {
+        val coords = NoteCoordinates(latitude, longitude)
+        val place =
+            placeName?.let {
+                NotePlace(
+                    id = Uuid.random(),
+                    name = it,
+                    latitude = latitude,
+                    longitude = longitude,
+                )
+            }
+        return NoteLocation(coordinates = coords, place = place)
+    }
 }
 
 interface MediaImporter {
