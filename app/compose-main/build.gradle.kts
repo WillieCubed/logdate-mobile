@@ -72,6 +72,7 @@ kotlin {
             implementation(projects.client.intelligence)
             implementation(projects.client.domain)
             implementation(projects.client.repository)
+            implementation(projects.client.logdateDatastore)
             implementation(projects.client.location)
             implementation(projects.client.media)
             implementation(projects.client.sharing)
@@ -120,6 +121,7 @@ kotlin {
             implementation(libs.play.app.update.ktx)
             implementation(libs.coil.compose)
             implementation(libs.coil.video)
+            implementation(libs.play.services.wearable)
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)

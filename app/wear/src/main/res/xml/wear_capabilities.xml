@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Advertises this watch app's capability so the phone app can discover it. -->
+    <string-array name="android_wear_capabilities">
+        <item>logdate_wear_app</item>
+    </string-array>
+</resources>

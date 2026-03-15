@@ -131,6 +131,19 @@
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             android:foregroundServiceType="dataSync"
             tools:node="merge" />
+
+        <!-- Data Layer sync listener: receives notes from paired Wear OS watch -->
+        <service
+            android:name="app.logdate.client.sync.PhoneDataLayerListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/logdate/notes" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

@@ -12,11 +12,14 @@ import app.logdate.client.di.datastoreModule
 import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
-import app.logdate.client.sync.NoOpSyncManager
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.di.conflictResolverModule
 import app.logdate.shared.config.configModule
 import app.logdate.shared.model.Journal
+import app.logdate.wear.sync.GoogleWearDataLayerClient
+import app.logdate.wear.sync.NoteDataMapper
+import app.logdate.wear.sync.WearDataLayerClient
+import app.logdate.wear.sync.WearDataLayerSyncManager
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.json.Json
 import org.koin.dsl.module
@@ -35,7 +38,6 @@ val wearDataModule = module {
     includes(configModule)
     includes(conflictResolverModule)
 
-
     // JSON serialization
     single {
         Json {
@@ -46,8 +48,17 @@ val wearDataModule = module {
         }
     }
 
-    // Sync: no-op for now, replaced by real sync in Phase 4
-    single<SyncManager> { NoOpSyncManager }
+    // Data Layer sync: watch <-> phone via Wearable Data API
+    single<WearDataLayerClient> { GoogleWearDataLayerClient(get()) }
+    single { NoteDataMapper(get()) }
+    single<SyncManager> {
+        WearDataLayerSyncManager(
+            dataLayerClient = get(),
+            syncMetadataService = get(),
+            notesRepository = get(),
+            noteDataMapper = get(),
+        )
+    }
 
     // Stub remote data source (no Firebase on Wear)
     factory<RemoteJournalDataSource> { NoOpRemoteJournalDataSource }
