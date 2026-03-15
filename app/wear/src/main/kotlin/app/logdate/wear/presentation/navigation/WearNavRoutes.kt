@@ -7,3 +7,5 @@ data object WearHomeRoute : NavKey
 data object WearAudioRecordingRoute : NavKey
 
 data object WearWalkieTalkieRoute : NavKey
+
+data object WearMoodCheckInRoute : NavKey

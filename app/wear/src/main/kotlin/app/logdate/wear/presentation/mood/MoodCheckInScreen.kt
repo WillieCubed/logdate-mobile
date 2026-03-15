@@ -1,0 +1,151 @@
+package app.logdate.wear.presentation.mood
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.items
+import androidx.wear.compose.material3.Button
+import androidx.wear.compose.material3.FilledTonalButton
+import androidx.wear.compose.material3.Icon
+import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.OutlinedButton
+import androidx.wear.compose.material3.ScreenScaffold
+import androidx.wear.compose.material3.Text
+import kotlinx.coroutines.flow.collectLatest
+import org.koin.compose.viewmodel.koinViewModel
+
+@Composable
+fun MoodCheckInScreen(
+    onNavigateBack: () -> Unit,
+    onNavigateToVoiceNote: () -> Unit,
+    viewModel: MoodCheckInViewModel = koinViewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.events.collectLatest { event ->
+            when (event) {
+                MoodCheckInEvent.NavigateBack -> onNavigateBack()
+                MoodCheckInEvent.NavigateToVoiceNote -> onNavigateToVoiceNote()
+            }
+        }
+    }
+
+    when (uiState.step) {
+        MoodCheckInStep.SELECT_MOOD -> SelectMoodContent(
+            onMoodSelected = viewModel::selectMood,
+        )
+        MoodCheckInStep.VOICE_PROMPT -> VoicePromptContent(
+            selectedMood = uiState.selectedMood,
+            onAttachVoice = viewModel::attachVoice,
+            onSkip = viewModel::skipVoiceAttachment,
+        )
+        MoodCheckInStep.SAVED -> SavedContent()
+    }
+}
+
+@Composable
+private fun SelectMoodContent(
+    onMoodSelected: (MoodOption) -> Unit,
+) {
+    ScreenScaffold {
+        ScalingLazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            item {
+                Text(
+                    text = "How are you feeling?",
+                    style = MaterialTheme.typography.titleSmall,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+            }
+            items(MoodOption.entries.toList()) { mood ->
+                FilledTonalButton(
+                    onClick = { onMoodSelected(mood) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(text = "${mood.emoji} ${mood.label}")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VoicePromptContent(
+    selectedMood: MoodOption?,
+    onAttachVoice: () -> Unit,
+    onSkip: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        if (selectedMood != null) {
+            Text(
+                text = selectedMood.emoji,
+                style = MaterialTheme.typography.displaySmall,
+            )
+            Text(
+                text = selectedMood.label,
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+            )
+        }
+        Button(
+            onClick = onAttachVoice,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(text = "Add voice note")
+        }
+        OutlinedButton(
+            onClick = onSkip,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+        ) {
+            Text(text = "Skip")
+        }
+    }
+}
+
+@Composable
+private fun SavedContent() {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Default.Check,
+            contentDescription = "Saved",
+            tint = Color(0xFF4CAF50),
+            modifier = Modifier.size(48.dp),
+        )
+        Text(
+            text = "Saved",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
+}

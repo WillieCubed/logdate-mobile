@@ -9,6 +9,7 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.data.storage.StorageSpaceChecker
 import app.logdate.wear.haptic.WearHapticEngine
 import app.logdate.wear.presentation.audio.AudioRecordingViewModel
+import app.logdate.wear.presentation.mood.MoodCheckInViewModel
 import app.logdate.wear.presentation.walkietalkie.WalkieTalkieViewModel
 import app.logdate.wear.recording.WearAudioRecordingManager
 import org.koin.core.module.dsl.viewModel
@@ -39,6 +40,11 @@ val wearAudioModule = module {
             get<WearAudioRecordingManager>(),
             get<JournalNotesRepository>(),
             get<StorageSpaceChecker>(),
+        )
+    }
+    viewModel {
+        MoodCheckInViewModel(
+            get<JournalNotesRepository>(),
         )
     }
 }
