@@ -60,6 +60,7 @@ kotlin {
             implementation(projects.client.feature.editor)
             implementation(projects.client.feature.timeline)
             implementation(projects.client.feature.journal)
+            implementation(projects.client.feature.library)
             implementation(projects.client.feature.rewind)
             implementation(projects.client.feature.locationTimeline)
             implementation(projects.client.feature.search)

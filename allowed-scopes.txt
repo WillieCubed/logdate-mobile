@@ -10,6 +10,7 @@ export  # Data export options, progress, and results
 profile  # User profile display, editing, avatar
 settings  # App settings screens (data, privacy, danger zone, devices)
 journal  # Journal list, journal detail, journal management
+library  # Media library browsing, detail view, metadata display
 location-timeline  # Location history visualization and map views
 onboarding  # First-run experience and app introduction
 rewind  # Year-in-review and memory highlights

@@ -8,6 +8,7 @@ import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.client.repository.media.IndexedMediaRepository
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlin.time.Clock
@@ -180,6 +181,25 @@ class OfflineIndexedMediaRepository(
         Napier.d("Caption updates not yet supported in the new entity model")
         return null
     }
+
+    override fun observeAllMedia(): Flow<List<IndexedMedia>> =
+        combine(
+            indexedMediaDao.getAllIndexedImages(),
+            indexedMediaDao.getAllIndexedVideos(),
+        ) { images, videos ->
+            val result = mutableListOf<IndexedMedia>()
+            result.addAll(images.map { mapToIndexedImage(it) })
+            result.addAll(videos.map { mapToIndexedVideo(it) })
+            result.sortedByDescending { it.timestamp }
+        }
+
+    override fun getMediaCount(): Flow<Int> =
+        combine(
+            indexedMediaDao.getAllIndexedImages(),
+            indexedMediaDao.getAllIndexedVideos(),
+        ) { images, videos ->
+            images.size + videos.size
+        }
 
     // Helper methods to map database entities to domain models
 

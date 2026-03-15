@@ -438,6 +438,10 @@ class GetRewindUseCaseTest {
             uid: Uuid,
             caption: String?,
         ): IndexedMedia? = null
+
+        override fun observeAllMedia(): Flow<List<IndexedMedia>> = flowOf(emptyList())
+
+        override fun getMediaCount(): Flow<Int> = flowOf(0)
     }
 
     private class FakeMediaManager : MediaManager {

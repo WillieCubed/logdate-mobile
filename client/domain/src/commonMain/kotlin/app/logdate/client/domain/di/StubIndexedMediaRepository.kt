@@ -4,6 +4,7 @@ import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.client.repository.media.IndexedMediaRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -54,4 +55,8 @@ class StubIndexedMediaRepository : IndexedMediaRepository {
     ): IndexedMedia? = null
 
     override suspend fun remove(uid: Uuid): Boolean = false
+
+    override fun observeAllMedia(): Flow<List<IndexedMedia>> = flowOf(emptyList())
+
+    override fun getMediaCount(): Flow<Int> = flowOf(0)
 }

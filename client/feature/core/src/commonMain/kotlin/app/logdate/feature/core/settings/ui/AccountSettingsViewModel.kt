@@ -141,6 +141,17 @@ class AccountSettingsViewModel(
                 ),
             )
 
+    val isLibraryEnabled: StateFlow<Boolean> =
+        preferencesDataSource
+            .observeLibraryEnabled()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun setLibraryEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesDataSource.setLibraryEnabled(enabled)
+        }
+    }
+
     init {
         viewModelScope.launch {
             sessionStorage.getSessionFlow().collect { session ->

@@ -61,6 +61,8 @@ import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneSt
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -76,6 +78,7 @@ import androidx.navigation3.scene.Scene
 import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.scene.SceneStrategyScope
 import androidx.navigation3.ui.NavDisplay
+import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.sharing.SharingLauncher
 import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.feature.journals.ui.detail.NoteViewerScreen
@@ -101,6 +104,7 @@ import app.logdate.navigation.routes.core.switchToTab
 import app.logdate.navigation.routes.editorRoutes
 import app.logdate.navigation.routes.finishJournalCreation
 import app.logdate.navigation.routes.journalRoutes
+import app.logdate.navigation.routes.libraryRoutes
 import app.logdate.navigation.routes.locationRoutes
 import app.logdate.navigation.routes.onboarding
 import app.logdate.navigation.routes.openAccountSettings
@@ -111,11 +115,13 @@ import app.logdate.navigation.routes.openDevicesSettings
 import app.logdate.navigation.routes.openExportSettings
 import app.logdate.navigation.routes.openJournalDetail
 import app.logdate.navigation.routes.openJournalSettings
+import app.logdate.navigation.routes.openLibrarySettings
 import app.logdate.navigation.routes.openLocationAdvanced
 import app.logdate.navigation.routes.openLocationInterval
 import app.logdate.navigation.routes.openLocationSettings
 import app.logdate.navigation.routes.openLocationTimeline
 import app.logdate.navigation.routes.openLocationTrackingOptions
+import app.logdate.navigation.routes.openMediaDetail
 import app.logdate.navigation.routes.openMemoriesSettings
 import app.logdate.navigation.routes.openPrivacySettings
 import app.logdate.navigation.routes.openProfile
@@ -400,6 +406,7 @@ private fun createPredictiveBackTransitionSpec(): AnimatedContentTransitionScope
 private fun createSceneStrategy(
     mainAppNavigator: MainAppNavigator,
     selectedTab: MutableState<HomeTab>,
+    isLibraryEnabled: Boolean,
 ): SceneStrategy<NavKey> {
     // Remember the callbacks to avoid recreating strategy on every recomposition
     val onTabSelected =
@@ -420,13 +427,22 @@ private fun createSceneStrategy(
             { selectedTab.value }
         }
 
+    val visibleTabs =
+        if (isLibraryEnabled) HomeTab.entries else HomeTab.visibleEntries
+
+    val getVisibleTabs =
+        remember(visibleTabs) {
+            { visibleTabs }
+        }
+
     // Now remember the strategy with stable callbacks
     val homeStrategy =
-        remember(onTabSelected, onNewEntry, getSelectedTab) {
+        remember(onTabSelected, onNewEntry, getSelectedTab, getVisibleTabs) {
             HomeSceneStrategy<NavKey>(
                 onTabSelected = onTabSelected,
                 onNewEntry = onNewEntry,
                 getSelectedTab = getSelectedTab,
+                getVisibleTabs = getVisibleTabs,
             )
         }
 
@@ -484,6 +500,7 @@ fun MainNavigationRoot(
     mainAppNavigator: MainAppNavigator,
     sharingLauncher: SharingLauncher,
 ) {
+    val preferencesDataSource: LogdatePreferencesDataSource = org.koin.compose.koinInject()
     val hasTimelineRoute =
         mainAppNavigator.backStack.any { route ->
             route is TimelineListRoute || route is TimelineDetail
@@ -501,10 +518,14 @@ fun MainNavigationRoot(
     // Remember the selected tab across recompositions
     val selectedTab = rememberSaveable { mutableStateOf(HomeTab.TIMELINE) }
 
+    val isLibraryEnabled by preferencesDataSource
+        .observeLibraryEnabled()
+        .collectAsState(initial = false)
+
     SharedTransitionLayout {
         CompositionLocalProvider(LocalSharedTransitionScope provides this) {
             // Create the scene strategy with proper memoization to avoid recomposition loops
-            val sceneStrategy = createSceneStrategy(mainAppNavigator, selectedTab)
+            val sceneStrategy = createSceneStrategy(mainAppNavigator, selectedTab, isLibraryEnabled)
 
             NavDisplay(
                 transitionSpec = createForwardTransitionSpec(),
@@ -607,6 +628,11 @@ fun MainNavigationRoot(
                                 mainAppNavigator.backStack.add(NoteViewerRoute(noteId))
                             },
                         )
+                        libraryRoutes(
+                            onOpenMediaDetail = mainAppNavigator::openMediaDetail,
+                            onBack = mainAppNavigator::goBack,
+                            onNavigateToJournal = mainAppNavigator::openJournalDetail,
+                        )
                         searchRoutes(
                             onBack = mainAppNavigator::goBack,
                             onNavigateToDay = mainAppNavigator::openTimelineDetail,
@@ -631,6 +657,7 @@ fun MainNavigationRoot(
                             onNavigateToLocation = mainAppNavigator::openLocationSettings,
                             onNavigateToPrivacy = mainAppNavigator::openPrivacySettings,
                             onOpenLocationTimeline = mainAppNavigator::openLocationTimeline,
+                            onNavigateToLibrarySettings = mainAppNavigator::openLibrarySettings,
                             onNavigateToMemories = mainAppNavigator::openMemoriesSettings,
                             onNavigateToRecommendations = mainAppNavigator::openRecommendationSettings,
                             onNavigateToAdvanced = mainAppNavigator::openAdvancedSettings,

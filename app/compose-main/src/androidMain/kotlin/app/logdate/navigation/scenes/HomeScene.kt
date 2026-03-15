@@ -48,6 +48,7 @@ class HomeScene<T : NavKey>(
     val onTabSelected: (HomeTab) -> Unit,
     val onNewEntry: () -> Unit,
     val selectedTab: HomeTab,
+    val visibleTabs: List<HomeTab> = HomeTab.visibleEntries,
 ) : Scene<T> {
     override val entries: List<NavEntry<T>> = listOf(mainEntry)
 
@@ -76,6 +77,7 @@ class HomeScene<T : NavKey>(
             onTabSelected = onTabSelected,
             isDetailOnlyView = false,
             snackbarHostState = snackbarHostState,
+            visibleTabs = visibleTabs,
         ) {
             if (showTwoPaneWithPlaceholder) {
                 val panelShape = MaterialTheme.shapes.extraLarge
@@ -150,6 +152,7 @@ internal fun <T : NavKey> createMainTabHomeScene(
     tab: HomeTab,
     onTabSelected: (HomeTab) -> Unit,
     onNewEntry: () -> Unit,
+    visibleTabs: List<HomeTab> = HomeTab.visibleEntries,
 ): HomeScene<T> =
     HomeScene(
         key = Pair("HomeScene", entry.contentKey),
@@ -158,6 +161,7 @@ internal fun <T : NavKey> createMainTabHomeScene(
         onTabSelected = onTabSelected,
         onNewEntry = onNewEntry,
         selectedTab = tab,
+        visibleTabs = visibleTabs,
     )
 
 /**
@@ -169,6 +173,7 @@ internal fun <T : NavKey> createFullscreenHomeScene(
     tab: HomeTab,
     onTabSelected: (HomeTab) -> Unit,
     onNewEntry: () -> Unit,
+    visibleTabs: List<HomeTab> = HomeTab.visibleEntries,
 ): HomeScene<T> =
     HomeScene(
         key = Pair("HomeScene", entry.contentKey),
@@ -177,4 +182,5 @@ internal fun <T : NavKey> createFullscreenHomeScene(
         onTabSelected = onTabSelected,
         onNewEntry = onNewEntry,
         selectedTab = tab,
+        visibleTabs = visibleTabs,
     )

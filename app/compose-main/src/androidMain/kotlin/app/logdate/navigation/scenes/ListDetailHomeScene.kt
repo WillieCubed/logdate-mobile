@@ -39,6 +39,7 @@ class ListDetailHomeScene<T : NavKey>(
     val onTabSelected: (HomeTab) -> Unit,
     val onNewEntry: () -> Unit,
     val selectedTab: HomeTab,
+    val visibleTabs: List<HomeTab> = HomeTab.visibleEntries,
 ) : Scene<T> {
     override val entries: List<NavEntry<T>> = listOf(mainEntry, detailEntry)
 
@@ -68,6 +69,7 @@ class ListDetailHomeScene<T : NavKey>(
             onTabSelected = onTabSelected,
             isDetailOnlyView = isDetailOnlyView,
             snackbarHostState = snackbarHostState,
+            visibleTabs = visibleTabs,
         ) {
             if (showTwoPane) {
                 val panelShape = MaterialTheme.shapes.extraLarge
@@ -123,6 +125,7 @@ internal fun <T : NavKey> createTwoPaneHomeScene(
     tab: HomeTab,
     onTabSelected: (HomeTab) -> Unit,
     onNewEntry: () -> Unit,
+    visibleTabs: List<HomeTab> = HomeTab.visibleEntries,
 ): ListDetailHomeScene<T> =
     ListDetailHomeScene(
         key = Triple("ListDetailHomeScene", mainEntry.contentKey, detailEntry.contentKey),
@@ -132,4 +135,5 @@ internal fun <T : NavKey> createTwoPaneHomeScene(
         onTabSelected = onTabSelected,
         onNewEntry = onNewEntry,
         selectedTab = tab,
+        visibleTabs = visibleTabs,
     )

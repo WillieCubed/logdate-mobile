@@ -76,6 +76,7 @@ include(":client:feature:timeline")
 include(":client:feature:location-timeline") // TODO: Probably consolidate into timeline at some point
 include(":client:feature:onboarding")
 include(":client:feature:search")
+include(":client:feature:library")
 // Shared cross-platform modules
 include(":shared:activitypub")
 include(":shared:atproto-crypto")

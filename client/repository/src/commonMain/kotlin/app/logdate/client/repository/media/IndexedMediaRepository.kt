@@ -112,6 +112,23 @@ interface IndexedMediaRepository {
         uid: Uuid,
         caption: String?,
     ): IndexedMedia?
+
+    /**
+     * Observes all indexed media items, ordered by timestamp descending.
+     *
+     * This provides a reactive stream of all media in the index, suitable for
+     * displaying a full library grid view.
+     *
+     * @return Flow emitting the complete list of indexed media, newest first
+     */
+    fun observeAllMedia(): Flow<List<IndexedMedia>>
+
+    /**
+     * Observes the total count of indexed media items.
+     *
+     * @return Flow emitting the current count of all indexed images and videos
+     */
+    fun getMediaCount(): Flow<Int>
 }
 
 /**

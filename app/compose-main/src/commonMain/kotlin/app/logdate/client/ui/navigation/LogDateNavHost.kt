@@ -20,6 +20,7 @@ import app.logdate.feature.journals.navigation.navigateToJournalsOverview
 import app.logdate.feature.journals.navigation.navigateToNoteDetail
 import app.logdate.feature.journals.navigation.newJournalRoute
 import app.logdate.feature.journals.navigation.noteDetailRoute
+import app.logdate.feature.library.navigation.libraryRoute
 import app.logdate.feature.onboarding.navigation.onboardingGraph
 import app.logdate.feature.rewind.navigation.navigateToRewind
 import app.logdate.feature.rewind.navigation.rewindRoutes
@@ -92,6 +93,9 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
             onCreateJournal = { journalId ->
                 navController.navigateToJournal(journalId)
             },
+        )
+        libraryRoute(
+            onOpenMediaDetail = { /* Media detail handled by Navigation 3 on Android */ },
         )
         // Use a composable instead of editorDestination
         composable("editor") {

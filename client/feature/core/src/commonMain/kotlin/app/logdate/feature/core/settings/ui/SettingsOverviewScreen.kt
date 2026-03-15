@@ -95,6 +95,7 @@ fun SettingsOverviewScreen(
     onNavigateToDangerZone: () -> Unit,
     onNavigateToLocation: () -> Unit,
     onNavigateToPrivacy: () -> Unit,
+    onNavigateToLibrarySettings: () -> Unit,
     onNavigateToMemories: () -> Unit,
     onNavigateToSync: () -> Unit,
     onNavigateToExport: () -> Unit,
@@ -113,6 +114,7 @@ fun SettingsOverviewScreen(
         onNavigateToDangerZone = onNavigateToDangerZone,
         onNavigateToLocation = onNavigateToLocation,
         onNavigateToPrivacy = onNavigateToPrivacy,
+        onNavigateToLibrarySettings = onNavigateToLibrarySettings,
         onNavigateToMemories = onNavigateToMemories,
         onNavigateToSync = onNavigateToSync,
         onNavigateToExport = onNavigateToExport,
@@ -143,6 +145,7 @@ fun SettingsOverviewContent(
     onNavigateToExport: () -> Unit,
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit = {},
+    onNavigateToLibrarySettings: () -> Unit = {},
     userProfile: UserProfile,
     onboardedDate: Instant = Instant.DISTANT_PAST,
     modifier: Modifier = Modifier,
@@ -178,6 +181,12 @@ fun SettingsOverviewContent(
                     description = stringResource(Res.string.memories_description),
                     icon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
                     onClick = onNavigateToMemories,
+                )
+                SettingsNavigationItem(
+                    title = "Your library",
+                    description = "Browse and manage your photos and videos",
+                    icon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
+                    onClick = onNavigateToLibrarySettings,
                 )
             }
         }

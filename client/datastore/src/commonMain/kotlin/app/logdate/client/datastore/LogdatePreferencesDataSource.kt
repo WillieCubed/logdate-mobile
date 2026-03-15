@@ -31,6 +31,9 @@ class LogdatePreferencesDataSource(
         val DAY_END_HOUR = intPreferencesKey("day_end_hour")
         val BACKGROUND_SYNC_ENABLED = booleanPreferencesKey("background_sync_enabled")
 
+        // Feature flags
+        val LIBRARY_ENABLED = booleanPreferencesKey("library_enabled")
+
         // Journal UI keys
         val JOURNAL_LAYOUT_MODE = stringPreferencesKey("journal_layout_mode")
 
@@ -66,6 +69,25 @@ class LogdatePreferencesDataSource(
                 profileLastUpdatedAt = millisToInstantOrDistantPast(prefs[PROFILE_LAST_UPDATED_AT]),
             )
         }
+
+    /**
+     * Observes whether the Library feature is enabled.
+     */
+    fun observeLibraryEnabled(): Flow<Boolean> =
+        userPreferences.data.map { prefs ->
+            prefs[LIBRARY_ENABLED] ?: false
+        }
+
+    /**
+     * Sets whether the Library feature is enabled.
+     */
+    suspend fun setLibraryEnabled(enabled: Boolean) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                this[LIBRARY_ENABLED] = enabled
+            }
+        }
+    }
 
     /**
      * Observes the persisted journal layout mode preference.

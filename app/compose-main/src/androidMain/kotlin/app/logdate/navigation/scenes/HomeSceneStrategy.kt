@@ -17,6 +17,7 @@ class HomeSceneStrategy<T : NavKey>(
     private val onTabSelected: (HomeTab) -> Unit,
     private val onNewEntry: () -> Unit,
     private val getSelectedTab: () -> HomeTab,
+    private val getVisibleTabs: () -> List<HomeTab> = { HomeTab.visibleEntries },
 ) : SceneStrategy<T> {
     override fun SceneStrategyScope<T>.calculateScene(entries: List<NavEntry<T>>): Scene<T>? {
         if (entries.isEmpty()) return null
@@ -38,6 +39,7 @@ class HomeSceneStrategy<T : NavKey>(
                     tab = classification.tab,
                     onTabSelected = onTabSelected,
                     onNewEntry = onNewEntry,
+                    visibleTabs = getVisibleTabs(),
                 )
             }
 
@@ -50,6 +52,7 @@ class HomeSceneStrategy<T : NavKey>(
                         tab = classification.parentTab,
                         onTabSelected = onTabSelected,
                         onNewEntry = onNewEntry,
+                        visibleTabs = getVisibleTabs(),
                     )
                 } else {
                     createFullscreenHomeScene(
@@ -58,6 +61,7 @@ class HomeSceneStrategy<T : NavKey>(
                         tab = classification.parentTab,
                         onTabSelected = onTabSelected,
                         onNewEntry = onNewEntry,
+                        visibleTabs = getVisibleTabs(),
                     )
                 }
             }

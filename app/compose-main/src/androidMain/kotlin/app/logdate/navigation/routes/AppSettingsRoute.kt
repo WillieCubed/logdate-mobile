@@ -3,7 +3,6 @@
 package app.logdate.navigation.routes
 
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.runtime.getValue
@@ -19,6 +18,7 @@ import app.logdate.feature.core.settings.ui.AdvancedSettingsScreen
 import app.logdate.feature.core.settings.ui.BirthdaySettingsScreen
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsScreen
 import app.logdate.feature.core.settings.ui.ExportSettingsScreen
+import app.logdate.feature.core.settings.ui.LibrarySettingsScreen
 import app.logdate.feature.core.settings.ui.LocationAdvancedScreen
 import app.logdate.feature.core.settings.ui.LocationIntervalScreen
 import app.logdate.feature.core.settings.ui.LocationSettingsScreen
@@ -37,6 +37,7 @@ import app.logdate.navigation.routes.core.BirthdaySettingsRoute
 import app.logdate.navigation.routes.core.DangerZoneSettingsRoute
 import app.logdate.navigation.routes.core.DevicesSettingsRoute
 import app.logdate.navigation.routes.core.ExportSettingsRoute
+import app.logdate.navigation.routes.core.LibrarySettingsRoute
 import app.logdate.navigation.routes.core.LocationAdvancedRoute
 import app.logdate.navigation.routes.core.LocationIntervalRoute
 import app.logdate.navigation.routes.core.LocationSettingsRoute
@@ -111,6 +112,13 @@ fun MainAppNavigator.openDevicesSettings() {
  */
 fun MainAppNavigator.openDangerZoneSettings() {
     backStack.add(DangerZoneSettingsRoute)
+}
+
+/**
+ * Opens the library settings screen.
+ */
+fun MainAppNavigator.openLibrarySettings() {
+    backStack.add(LibrarySettingsRoute)
 }
 
 /**
@@ -194,6 +202,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onNavigateToLocation: () -> Unit,
     onNavigateToPrivacy: () -> Unit,
     onOpenLocationTimeline: () -> Unit,
+    onNavigateToLibrarySettings: () -> Unit,
     onNavigateToMemories: () -> Unit,
     onNavigateToRecommendations: () -> Unit,
     onNavigateToAdvanced: () -> Unit,
@@ -221,6 +230,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
             onNavigateToDangerZone = onNavigateToDangerZone,
             onNavigateToLocation = onNavigateToLocation,
             onNavigateToPrivacy = onNavigateToPrivacy,
+            onNavigateToLibrarySettings = onNavigateToLibrarySettings,
             onNavigateToMemories = onNavigateToMemories,
             onNavigateToSync = onNavigateToSync,
             onNavigateToExport = onNavigateToExport,
@@ -296,15 +306,14 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
             onBack = onBack,
             onBrowseFile = { path ->
                 try {
-                    val uri = Uri.parse(path)
+                    // Open the system Downloads folder so the user can see the exported file.
+                    // ACTION_VIEW_DOWNLOADS is the most reliable way to open the
+                    // containing folder rather than trying to extract the ZIP.
                     val browseIntent =
-                        Intent(Intent.ACTION_VIEW).apply {
-                            setDataAndType(uri, "application/zip")
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
+                        Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS)
                     context.startActivity(browseIntent)
                 } catch (e: Exception) {
-                    Napier.e("Failed to open export file", e)
+                    Napier.e("Failed to open downloads folder", e)
                 }
             },
         )
@@ -373,6 +382,15 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
         metadata = ListDetailSceneStrategy.detailPane(),
     ) { _ ->
         LocationAdvancedScreen(
+            onBack = onBack,
+        )
+    }
+
+    // Library settings (detail pane)
+    routeEntry<LibrarySettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        LibrarySettingsScreen(
             onBack = onBack,
         )
     }

@@ -11,6 +11,8 @@ import app.logdate.navigation.routes.core.EntryEditor
 import app.logdate.navigation.routes.core.ExportSettingsRoute
 import app.logdate.navigation.routes.core.JournalDetail
 import app.logdate.navigation.routes.core.JournalList
+import app.logdate.navigation.routes.core.LibraryListRoute
+import app.logdate.navigation.routes.core.LibraryMediaDetailRoute
 import app.logdate.navigation.routes.core.LocationAdvancedRoute
 import app.logdate.navigation.routes.core.LocationIntervalRoute
 import app.logdate.navigation.routes.core.LocationSettingsRoute
@@ -142,6 +144,12 @@ object RouteConfig {
                 if (previousRouteClass == JournalList::class) {
                     val journalsTab = HomeTab.entries.first { it.route::class == JournalList::class }
                     return RouteClassification.TwoPaneDetail(journalsTab)
+                }
+            }
+            LibraryMediaDetailRoute::class -> {
+                if (previousRouteClass == LibraryListRoute::class) {
+                    val libraryTab = HomeTab.entries.first { it.route::class == LibraryListRoute::class }
+                    return RouteClassification.TwoPaneDetail(libraryTab)
                 }
             }
         }

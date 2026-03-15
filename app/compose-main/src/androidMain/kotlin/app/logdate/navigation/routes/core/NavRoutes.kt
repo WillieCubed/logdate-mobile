@@ -116,6 +116,18 @@ data class NoteViewerRoute(
 ) : NavKey
 
 /**
+ * Routes for the library feature
+ */
+@Serializable
+data object LibraryListRoute : NavKey
+
+@Serializable
+data class LibraryMediaDetailRoute(
+    @Serializable(with = UuidSerializer::class)
+    val mediaId: Uuid,
+) : NavKey
+
+/**
  * Routes for the rewind feature
  */
 @Serializable
@@ -168,6 +180,12 @@ data object DevicesSettingsRoute : NavKey
  */
 @Serializable
 data object MemoriesSettingsRoute : NavKey
+
+/**
+ * Navigation route for library settings screen.
+ */
+@Serializable
+data object LibrarySettingsRoute : NavKey
 
 /**
  * Navigation route for the recommendations detail settings screen.

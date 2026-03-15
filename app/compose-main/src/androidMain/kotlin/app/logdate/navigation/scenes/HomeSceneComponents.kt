@@ -65,6 +65,7 @@ internal fun NavigationShell(
     onTabSelected: (HomeTab) -> Unit,
     isDetailOnlyView: Boolean,
     snackbarHostState: SnackbarHostState,
+    visibleTabs: List<HomeTab> = HomeTab.visibleEntries,
     content: @Composable () -> Unit,
 ) {
     val adaptiveInfo = currentWindowAdaptiveInfo()
@@ -95,7 +96,7 @@ internal fun NavigationShell(
                     NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(adaptiveInfo)
                 },
             navigationSuiteItems = {
-                HomeTab.entries.forEach { tab ->
+                visibleTabs.forEach { tab ->
                     item(
                         selected = selectedTab == tab,
                         onClick = { onTabSelected(tab) },
