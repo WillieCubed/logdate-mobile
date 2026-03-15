@@ -77,11 +77,15 @@ class ExportViewModel(
         viewModelScope.launch {
             exportLauncher.exportProgress.collect { progressInfo ->
                 if (progressInfo.isActive) {
-                    _exportState.update {
-                        ExportState.Exporting(
-                            progressPercent = progressInfo.progressPercent,
-                            message = progressInfo.message,
-                        )
+                    _exportState.update { current ->
+                        if (current !is ExportState.Completed) {
+                            ExportState.Exporting(
+                                progressPercent = progressInfo.progressPercent,
+                                message = progressInfo.message,
+                            )
+                        } else {
+                            current
+                        }
                     }
                 }
             }
