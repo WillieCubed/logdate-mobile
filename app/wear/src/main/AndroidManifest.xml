@@ -115,10 +115,11 @@
             </intent-filter>
         </service>
             
+        <!-- Entry Count complication: shows today's journal entry count -->
         <service
-            android:name=".complication.MainComplicationService"
+            android:name=".complication.EntryCountComplicationService"
             android:exported="true"
-            android:label="@string/complication_label"
+            android:label="@string/wear_complication_entry_count_label"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
                 <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
@@ -129,12 +130,14 @@
                 android:value="SHORT_TEXT" />
             <meta-data
                 android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
-                android:value="0" />
+                android:value="900" />
         </service>
+
+        <!-- Quick Capture tile: four capture buttons + entry count -->
         <service
-            android:name=".tile.MainTileService"
+            android:name=".tile.QuickCaptureTileService"
             android:exported="true"
-            android:label="@string/tile_label"
+            android:label="@string/wear_tile_quick_capture_label"
             android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
             <intent-filter>
                 <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />

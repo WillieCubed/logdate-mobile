@@ -11,6 +11,17 @@
     <string name="wear_recording_in_progress">Recording in progress on your watch</string>
     <string name="wear_recording_title">Recording Audio</string>
 
+    <!-- Quick Capture Tile -->
+    <string name="wear_tile_quick_capture_label">Quick Capture</string>
+    <string name="wear_tile_record">Rec</string>
+    <string name="wear_tile_voice">Mic</string>
+    <string name="wear_tile_mood">Mood</string>
+    <string name="wear_tile_text">Text</string>
+
+    <!-- Entry Count Complication -->
+    <string name="wear_complication_entry_count_label">Entry Count</string>
+    <string name="wear_complication_entry_count_description">Today\'s journal entries</string>
+
     <!-- Timeline -->
     <string name="wear_timeline_title">Timeline</string>
     <string name="wear_timeline_empty">No entries yet</string>
@@ -26,4 +37,14 @@
     <string name="wear_day_detail_voice_note">Voice note %1$s</string>
     <string name="wear_day_detail_photo">Photo</string>
     <string name="wear_day_detail_video">Video</string>
+
+    <!-- Plurals -->
+    <plurals name="wear_tile_entry_count">
+        <item quantity="one">%d entry today</item>
+        <item quantity="other">%d entries today</item>
+    </plurals>
+    <plurals name="wear_complication_entry_count_full">
+        <item quantity="one">%d journal entry today</item>
+        <item quantity="other">%d journal entries today</item>
+    </plurals>
 </resources>
