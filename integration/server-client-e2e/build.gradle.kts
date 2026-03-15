@@ -16,6 +16,7 @@ java {
 dependencies {
     testImplementation(projects.server)
     testImplementation(projects.client.sync)
+    testImplementation(projects.shared.config)
     testImplementation(projects.shared.model)
 
     testImplementation(libs.kotlin.test.junit)

@@ -132,6 +132,7 @@ configurations.all {
 dependencies {
     implementation(projects.app.composeMain)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
+    implementation(libs.androidx.work.runtime)
 
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
@@ -159,6 +160,7 @@ dependencies {
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.androidx.ui.test.junit4)
     androidTestImplementation(libs.androidx.activity.compose)
     androidTestImplementation(libs.compose.material3)

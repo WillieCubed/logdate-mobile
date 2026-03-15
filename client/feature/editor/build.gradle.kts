@@ -119,6 +119,7 @@ kotlin {
             implementation(libs.androidx.test.core)
             implementation(libs.androidx.test.runner)
             implementation(libs.androidx.test.ext.junit)
+            implementation(libs.androidx.test.espresso.core)
             implementation(libs.androidx.ui.test.junit4)
         }
     }
