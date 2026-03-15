@@ -1,8 +1,3 @@
-/* While this template provides a good starting point for using Wear Compose, you can always
- * take a look at https://github.com/android/wear-os-samples/tree/main/ComposeStarter to find the
- * most up to date changes to the libraries and their usages.
- */
-
 package app.logdate.wear.presentation
 
 import android.Manifest
@@ -11,44 +6,35 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
-import androidx.wear.compose.material3.Button
-import androidx.wear.compose.material3.MaterialTheme
-import androidx.wear.compose.material3.Text
-import androidx.wear.compose.material3.TimeText
-import androidx.wear.compose.material3.ScreenScaffold
-import app.logdate.wear.R
+import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.presentation.audio.AudioRecordingScreen
+import app.logdate.wear.presentation.home.WearHomeScreen
+import app.logdate.wear.presentation.mood.MoodCheckInScreen
 import app.logdate.wear.presentation.navigation.WearAudioRecordingRoute
 import app.logdate.wear.presentation.navigation.WearHomeRoute
+import app.logdate.wear.presentation.navigation.WearMoodCheckInRoute
+import app.logdate.wear.presentation.navigation.WearQuickTextRoute
+import app.logdate.wear.presentation.navigation.WearWalkieTalkieRoute
+import app.logdate.wear.presentation.quicktext.QuickTextLauncher
 import app.logdate.wear.presentation.theme.LogDateTheme
+import app.logdate.wear.presentation.walkietalkie.WalkieTalkieScreen
 import io.github.aakira.napier.Napier
+import org.koin.compose.koinInject
 
 class MainActivity : ComponentActivity() {
-    
+
     private val requiredPermissions = arrayOf(
-        Manifest.permission.RECORD_AUDIO
+        Manifest.permission.RECORD_AUDIO,
     )
-    
+
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -59,26 +45,21 @@ class MainActivity : ComponentActivity() {
             Napier.w("Some permissions were denied: $permissions")
         }
     }
-    
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
-        
-        // Check and request permissions
         checkAndRequestPermissions()
-        
         setTheme(android.R.style.Theme_DeviceDefault)
-        
         setContent {
             WearApp()
         }
     }
-    
+
     private fun checkAndRequestPermissions() {
         val permissionsToRequest = requiredPermissions.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }.toTypedArray()
-        
         if (permissionsToRequest.isNotEmpty()) {
             permissionLauncher.launch(permissionsToRequest)
         }
@@ -89,66 +70,57 @@ class MainActivity : ComponentActivity() {
 fun WearApp() {
     LogDateTheme {
         val backStack = remember { mutableStateListOf<NavKey>(WearHomeRoute) }
-        
+        val navigateBack: () -> Unit = {
+            if (backStack.size > 1) {
+                backStack.removeAt(backStack.lastIndex)
+            }
+        }
+
         NavDisplay(
             backStack = backStack,
-            onBack = {
-                if (backStack.size > 1) {
-                    backStack.removeAt(backStack.lastIndex)
-                }
-            },
+            onBack = navigateBack,
             entryProvider = entryProvider {
                 entry<WearHomeRoute> {
-                    HomeScreen(
-                        onNavigateToAudio = { backStack.add(WearAudioRecordingRoute) }
+                    WearHomeScreen(
+                        onNavigateToWalkieTalkie = {
+                            backStack.add(WearWalkieTalkieRoute)
+                        },
+                        onNavigateToVoiceNote = {
+                            backStack.add(WearAudioRecordingRoute)
+                        },
+                        onNavigateToMoodCheckIn = {
+                            backStack.add(WearMoodCheckInRoute)
+                        },
+                        onNavigateToQuickText = {
+                            backStack.add(WearQuickTextRoute)
+                        },
+                        onNavigateToTimeline = { /* Phase 5 */ },
+                        onNavigateToSettings = { /* Phase 10 */ },
                     )
                 }
                 entry<WearAudioRecordingRoute> {
-                    AudioRecordingScreen(
-                        onNavigateBack = {
-                            if (backStack.size > 1) {
-                                backStack.removeAt(backStack.lastIndex)
-                            }
-                        }
+                    AudioRecordingScreen(onNavigateBack = navigateBack)
+                }
+                entry<WearWalkieTalkieRoute> {
+                    WalkieTalkieScreen(onNavigateBack = navigateBack)
+                }
+                entry<WearMoodCheckInRoute> {
+                    MoodCheckInScreen(
+                        onNavigateBack = navigateBack,
+                        onNavigateToVoiceNote = {
+                            navigateBack()
+                            backStack.add(WearAudioRecordingRoute)
+                        },
                     )
                 }
-            }
-        )
-    }
-}
-
-@Composable
-fun HomeScreen(onNavigateToAudio: () -> Unit) {
-    ScreenScaffold(
-        timeText = { TimeText() }
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.primary,
-                    text = stringResource(R.string.hello_world, "LogDate")
-                )
-                
-                Button(
-                    onClick = onNavigateToAudio,
-                    modifier = Modifier.padding(top = 16.dp)
-                ) {
-                    Text(stringResource(R.string.record_audio_2))
+                entry<WearQuickTextRoute> {
+                    val notesRepository = koinInject<JournalNotesRepository>()
+                    QuickTextLauncher(
+                        notesRepository = notesRepository,
+                        onDone = navigateBack,
+                    )
                 }
-            }
-        }
+            },
+        )
     }
 }
