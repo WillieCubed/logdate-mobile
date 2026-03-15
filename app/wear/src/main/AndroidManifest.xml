@@ -148,6 +148,11 @@
                 android:resource="@drawable/tile_preview" />
         </service>
 
+        <!-- Journal prompt alarm receiver -->
+        <receiver
+            android:name=".notification.WearPromptReceiver"
+            android:exported="false" />
+
         <uses-library
             android:name="com.google.android.wearable"
             android:required="true" />

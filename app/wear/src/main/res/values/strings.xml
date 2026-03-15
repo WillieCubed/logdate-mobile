@@ -38,6 +38,10 @@
     <string name="wear_day_detail_photo">Photo</string>
     <string name="wear_day_detail_video">Video</string>
 
+    <!-- Journal Prompt Notifications -->
+    <string name="wear_prompt_channel_name">Journal reminders</string>
+    <string name="wear_prompt_channel_description">Morning and evening journaling reminders</string>
+
     <!-- Plurals -->
     <plurals name="wear_tile_entry_count">
         <item quantity="one">%d entry today</item>

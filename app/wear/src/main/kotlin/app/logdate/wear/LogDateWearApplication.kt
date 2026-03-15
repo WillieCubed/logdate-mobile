@@ -4,6 +4,7 @@ import android.app.Application
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.wear.di.wearAudioModule
 import app.logdate.wear.di.wearDataModule
+import app.logdate.wear.notification.WearPromptScheduler
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
 import org.koin.android.ext.koin.androidContext
@@ -35,6 +36,9 @@ class LogDateWearApplication : Application() {
                 wearAudioModule,
             )
         }
+
+        // Schedule morning/evening journal prompt alarms.
+        WearPromptScheduler(this).scheduleAll()
 
         // Trigger database initialization on a background thread.
         // The database singleton uses runBlocking for SQLCipher passphrase retrieval
