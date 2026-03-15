@@ -22,7 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.client.repository.journals.EntryDraft
-import app.logdate.feature.editor.ui.dialog.DraftsListDialog
+import app.logdate.feature.editor.ui.dialog.DraftsBottomSheet
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTestData.baseInstant
 import app.logdate.screenshots.common.ScreenshotTheme
@@ -36,12 +36,12 @@ import kotlin.uuid.Uuid
 @Composable
 fun DraftsList_Loading() {
     ScreenshotTheme {
-        DraftsListDialog(
+        DraftsBottomSheet(
             drafts = emptyList(),
             isLoading = true,
             onDismiss = {},
-            onDraftSelected = {},
-            onDraftDeleted = {},
+            onDraftSelected = { _: EntryDraft -> },
+            onDraftDeleted = { _: Uuid -> },
             onDeleteAllDrafts = {},
         )
     }
@@ -110,7 +110,7 @@ fun DraftsList_NoItems() {
 @Composable
 fun DraftsList_Populated() {
     ScreenshotTheme {
-        DraftsListDialog(
+        DraftsBottomSheet(
             drafts = listOf(
                 EntryDraft(
                     id = Uuid.parse("00000000-0000-0000-0000-000000000010"),
@@ -133,8 +133,8 @@ fun DraftsList_Populated() {
             ),
             isLoading = false,
             onDismiss = {},
-            onDraftSelected = {},
-            onDraftDeleted = {},
+            onDraftSelected = { _: EntryDraft -> },
+            onDraftDeleted = { _: Uuid -> },
             onDeleteAllDrafts = {},
         )
     }

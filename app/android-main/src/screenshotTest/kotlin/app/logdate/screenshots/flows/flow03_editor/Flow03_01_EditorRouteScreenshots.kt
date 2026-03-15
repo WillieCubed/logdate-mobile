@@ -10,7 +10,7 @@ import app.logdate.feature.editor.ui.MainEditorContent
 import app.logdate.feature.editor.ui.common.NoteEditorToolbar
 import app.logdate.feature.editor.ui.content.EditorBottomContent
 import app.logdate.feature.editor.ui.content.EmptyEditorStateContent
-import app.logdate.feature.editor.ui.dialog.DraftsListDialog
+import app.logdate.feature.editor.ui.dialog.DraftsBottomSheet
 import app.logdate.feature.editor.ui.dialog.alert.ExitConfirmationDialog
 import app.logdate.feature.editor.ui.editor.BlockType
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
@@ -149,11 +149,11 @@ fun S05_EntryEditorDraftsDialog() {
             onDismissExpanded = {},
             modifier = Modifier.fillMaxSize(),
         )
-        DraftsListDialog(
+        DraftsBottomSheet(
             drafts = sampleDrafts,
             onDismiss = {},
-            onDraftSelected = {},
-            onDraftDeleted = {},
+            onDraftSelected = { _: EntryDraft -> },
+            onDraftDeleted = { _: Uuid -> },
             onDeleteAllDrafts = {},
         )
     }
