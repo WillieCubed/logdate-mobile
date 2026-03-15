@@ -15,9 +15,14 @@ This assumes you have Android Studio installed and set up.
 For information on how to build the app for Android, see
 the [Android documentation][android-publishing-tutorial].
 
-#### WearOS App
+#### Wear OS App
 
-[TBD]
+```shell
+./gradlew :app:wear:assembleRelease
+```
+
+The Wear OS APK is built and distributed independently from the phone app. For development
+installation on a physical watch, see the [Wear OS README](../app/wear/README.md#installing-on-a-physical-watch).
 
 ### Desktop (macOS, Linux, Windows)
 

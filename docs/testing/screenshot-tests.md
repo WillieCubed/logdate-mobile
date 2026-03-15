@@ -105,6 +105,13 @@ app/android-main/src/screenshotTest/kotlin/app/logdate/screenshots/
 ├── JournalScreenshots.kt      # Journal management screenshots
 ├── RewindScreenshots.kt       # Rewind feature screenshots
 └── ComponentsScreenshots.kt   # Reusable component screenshots
+
+app/wear/src/screenshotTest/kotlin/app/logdate/wear/screenshots/
+├── WearScreenshotPreviewMatrix.kt  # Multi-preview for small + large round
+├── WearHomeScreenshots.kt          # Home hub states
+├── WalkieTalkieScreenshots.kt      # All walkie-talkie phases
+├── AudioRecordingScreenshots.kt    # Recording screen states
+└── MoodCheckInScreenshots.kt       # Mood check-in flow
 ```
 
 Each file groups related preview functions for a feature or screen.
@@ -169,11 +176,15 @@ adb -s emulator-5554 devices
 Create or update reference images for the first time or after intentional changes:
 
 ```bash
-# Update all baselines
+# Update baselines — phone app
 ./gradlew :app:android-main:updateDebugScreenshotTest
 
-# This generates images in: app/android-main/src/screenshotTestDebug/reference/
+# Update baselines — Wear OS app
+./gradlew :app:wear:updateDebugScreenshotTest
 ```
+
+Phone baselines: `app/android-main/src/screenshotTestDebug/reference/`
+Wear baselines: `app/wear/src/screenshotTestDebug/reference/`
 
 **In CI/CD**: Commit baseline images to version control alongside your code.
 
@@ -182,11 +193,11 @@ Create or update reference images for the first time or after intentional change
 Check if current screenshots match baselines:
 
 ```bash
-# Validate all screenshots
+# Validate — phone app
 ./gradlew :app:android-main:validateDebugScreenshotTest
 
-# Validate specific screenshot (if supported)
-./gradlew :app:android-main:validateDebugScreenshotTest --tests "OnboardingScreenshots.onboardingStart"
+# Validate — Wear OS app
+./gradlew :app:wear:validateDebugScreenshotTest
 ```
 
 **In CI/CD**: This command runs automatically on pull requests.
@@ -359,7 +370,43 @@ fun JournalDetailEmpty() {
 }
 ```
 
-## KMP Considerations
+## Wear OS screenshots
+
+Wear OS screenshot tests render on round watch displays instead of rectangular phone screens.
+A custom multi-preview annotation targets both supported form factors:
+
+```kotlin
+// app/wear/src/screenshotTest/.../WearScreenshotPreviewMatrix.kt
+@Preview(name = "Small Round", device = "id:wearos_small_round", showBackground = true)
+@Preview(name = "Large Round", device = "id:wearos_large_round", showBackground = true)
+annotation class WearScreenshotPreviewMatrix
+```
+
+Use `@WearScreenshotPreviewMatrix` instead of `@PreviewLightDark` for Wear OS screens:
+
+```kotlin
+@PreviewTest
+@WearScreenshotPreviewMatrix
+@Composable
+fun S01_WalkieTalkieReady() {
+    MaterialTheme {
+        ReadyContent(onTouchDown = {}, onTouchUp = {})
+    }
+}
+```
+
+Each preview generates two baselines (small round + large round). Wrap content in Wear
+`MaterialTheme` (not phone `LogDateTheme`).
+
+```bash
+# Generate Wear OS baselines
+./gradlew :app:wear:updateDebugScreenshotTest
+
+# Validate Wear OS screenshots
+./gradlew :app:wear:validateDebugScreenshotTest
+```
+
+## KMP considerations
 
 Google Compose Screenshot Testing works with Android targets only. For iOS/Desktop:
 
@@ -386,6 +433,7 @@ on:
   pull_request:
     paths:
       - 'app/android-main/**'
+      - 'app/wear/**'
       - 'app/compose-main/**'
       - 'client/feature/**'
 
@@ -394,14 +442,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate Screenshots
+      - name: Validate phone screenshots
         run: ./gradlew :app:android-main:validateDebugScreenshotTest
-      - name: Upload Results
+      - name: Validate Wear OS screenshots
+        run: ./gradlew :app:wear:validateDebugScreenshotTest
+      - name: Upload results
         if: failure()
         uses: actions/upload-artifact@v3
         with:
           name: screenshot-diffs
-          path: app/android-main/build/outputs/screenshotTest-results/
+          path: |
+            app/android-main/build/outputs/screenshotTest-results/
+            app/wear/build/outputs/screenshotTest-results/
 ```
 
 ## Troubleshooting
@@ -410,8 +462,13 @@ jobs:
 
 Baseline images missing. Generate them:
 ```bash
+# Phone
 ./gradlew :app:android-main:updateDebugScreenshotTest
 git add app/android-main/src/screenshotTestDebug/reference/
+
+# Wear OS
+./gradlew :app:wear:updateDebugScreenshotTest
+git add app/wear/src/screenshotTestDebug/reference/
 ```
 
 ### "Images do not match"
@@ -421,7 +478,8 @@ Visual changes detected. Options:
 1. If changes are unintended: Fix the UI code
 2. If changes are intentional: Update baseline
    ```bash
-   ./gradlew :app:android-main:updateDebugScreenshotTest
+   ./gradlew :app:android-main:updateDebugScreenshotTest  # phone
+   ./gradlew :app:wear:updateDebugScreenshotTest           # wear
    ```
 
 ### Screenshot filename confusion

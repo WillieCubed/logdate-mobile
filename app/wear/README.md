@@ -1,175 +1,273 @@
-# `:app:wear`
+# `:app:wear` — Wear OS App
 
-**Android Wear OS companion application**
+LogDate on your wrist. Record a thought with a tap, log your mood with an emoji, or hold the
+screen and talk walkie-talkie style — your journal captures it all without pulling out your phone.
 
-## Overview
+**Min SDK**: 31 (Wear OS 3+) | **Target SDK**: 35 | **Compile SDK**: 36
 
-Companion application for Wear OS devices that provides quick journaling capabilities directly from the wrist. Allows users to capture quick thoughts, voice notes, and view recent entries in a streamlined interface optimized for small screens.
+## Getting started
 
-## Current Status
+### Prerequisites
 
-**🚀 Active Development**: Basic functionality implemented with modern Material 3 for Wear OS.
+- Android Studio with Wear OS system images (API 33+ round)
+- `adb` available on PATH ([setup](../../docs/environment/setup.md))
+- A Wear OS emulator **or** a physical watch with developer options enabled
 
-## Key Components
-
-### Entry Points
-- **MainActivity.kt** - Main application activity
-- **MainComplicationService.kt** - Watch face complication provider
-- **MainTileService.kt** - Quick access tile implementation
-
-### UI Components
-- **Theme.kt** - Material 3 for Wear OS theming
-
-## Technology Stack
-
-- **Material 3 for Wear OS**: Modern, expressive UI components designed specifically for wearables
-- **Compose for Wear OS**: Declarative UI framework optimized for watch form factors
-- **Dynamic Color**: Adapts to watch faces and system themes for cohesive visual integration
-- **Horologist**: Specialized Compose components for Wear OS
-- **Wear Tiles API**: For quick access tiles
-
-## Build and Installation
-
-To build and run the Wear OS app:
+### Build and install
 
 ```bash
 # Build debug APK
 ./gradlew :app:wear:assembleDebug
 
-# Install on connected Wear OS device/emulator
+# Install on a connected Wear OS device or emulator
 ./gradlew :app:wear:installDebug
 ```
 
-For testing:
-- Basic UI testing can be done on the emulator
-- **Note**: Voice input and microphone features require a physical Wear OS device for testing
-- Health Services integration also requires physical hardware
+### Installing on a physical watch
+
+1. **Enable developer options** on the watch:
+   Settings > System > About > tap "Build number" 7 times.
+
+2. **Enable ADB debugging**:
+   Settings > Developer options > ADB debugging > ON.
+
+3. **Connect over Wi-Fi** (watches rarely have USB ports):
+   - On the watch: Settings > Developer options > Wireless debugging > ON.
+     Note the IP address and port shown (e.g., `192.168.1.42:5555`).
+   - On your machine:
+     ```bash
+     adb connect 192.168.1.42:5555
+     ```
+   - Accept the debugging prompt on the watch.
+
+4. **Install**:
+   ```bash
+   ./gradlew :app:wear:installDebug
+   ```
+   Or install the APK directly:
+   ```bash
+   adb -s 192.168.1.42:5555 install app/wear/build/outputs/apk/debug/wear-debug.apk
+   ```
+
+5. **View logs**:
+   ```bash
+   adb -s 192.168.1.42:5555 logcat -s LogDate
+   ```
+
+> **Bluetooth debugging** (alternative): On watches without Wi-Fi debugging, pair through
+> the Wear OS companion app on your phone, then enable Debug over Bluetooth in Developer
+> options. See the [official guide][wear-debug-docs].
+
+### Using the emulator
+
+```bash
+# Create a Wear OS AVD (round, API 34)
+# Android Studio > Device Manager > Create Device > Wear OS > Small Round > API 34
+
+# Or via command line
+avdmanager create avd -n WearOS_Round -k "system-images;android-34;google_apis;x86_64" -d "wearos_small_round"
+emulator -avd WearOS_Round
+```
+
+After the emulator boots:
+```bash
+./gradlew :app:wear:installDebug
+```
+
+> **Limitations**: Microphone input and Health Services require a physical watch. The
+> emulator works for UI development, navigation, and screenshot tests.
 
 ## Features
 
-### Implemented Features
-- Basic Material 3 UI for Wear OS
-- Core application structure
+### Implemented
 
-### Planned Features
-- Quick note creation with voice-to-text
-- Recent entries viewing
-- Simple text input for brief entries
-- Sync with main phone application
-- Watch complications for quick access
-- Haptic feedback for interactions
-- Gesture-based navigation
-- Always-on display support
+| Feature | Description | Entry point |
+|---------|-------------|-------------|
+| **Walkie-Talkie** | Push-to-talk: hold the screen, speak, release to save | Home > Walkie-Talkie |
+| **Voice Note** | Full recording studio with pause/resume and waveform | Home > Voice Note |
+| **Mood Check-in** | Tap an emoji, optionally attach a voice note | Home > Mood Check-in |
+| **Quick Text** | System speech-to-text, saved as a text note | Home > Quick Text |
+| **Home Hub** | Greeting, entry count, capture chips, navigation | App launch |
+| **Haptic Feedback** | Distinct vibration patterns for every interaction | Automatic |
 
-### Health Integration (Future)
-- Automatic activity logging
-- Heart rate context for entries
-- Steps and exercise correlation
-- Sleep pattern integration
+### Planned (not yet implemented)
 
-## Target Architecture
+- Timeline browser (day-by-day entry viewing)
+- Phone sync via Data Layer API
+- Health Services integration (heart rate, steps, sleep)
+- Tiles and complications
+- On-device transcription
+
+## Architecture
 
 ```
-Wear App
-├── UI Layer (Compose for Wear)
-│   ├── Main Activity
-│   ├── Note Creation Screen
-│   └── Entry List Screen
-├── ViewModel Layer
-│   ├── Entry ViewModel
-│   └── Sync ViewModel
-├── Local Data Cache
-│   ├── Room Database
-│   └── DataStore Preferences
-└── Sync with Phone App
-    ├── Data Layer API
-    └── Message Passing
+app/wear/src/main/kotlin/app/logdate/wear/
+├── LogDateWearApplication.kt        Koin setup (wearDataModule + wearAudioModule)
+├── di/
+│   ├── WearDataModule.kt            Room DB, repositories, DataStore
+│   └── AudioModule.kt               ViewModels, recording infrastructure
+├── haptic/
+│   └── WearHapticEngine.kt          Centralized haptic patterns
+├── recording/
+│   ├── WearAudioRecordingService.kt Foreground service for mic recording
+│   ├── WearAudioRecordingManager.kt Manages MediaRecorder lifecycle
+│   ├── StubAudioPlaybackManager.kt  No-op (playback not yet on watch)
+│   └── WearStubTranscriptionRepository.kt  No-op (transcription not yet on watch)
+├── data/storage/
+│   └── StorageSpaceChecker.kt       Pre-recording space validation
+├── presentation/
+│   ├── MainActivity.kt              Single activity, hosts NavDisplay
+│   ├── theme/Theme.kt               Material 3 for Wear OS
+│   ├── navigation/WearNavRoutes.kt  NavKey route definitions
+│   ├── home/                        Hub screen + ViewModel
+│   ├── walkietalkie/                Push-to-talk screen + ViewModel
+│   ├── audio/                       Full recording screen + ViewModel + components
+│   ├── mood/                        Emoji picker + ViewModel
+│   └── quicktext/                   System STT handler
+├── complication/
+│   └── MainComplicationService.kt   Day-of-week complication (placeholder)
+└── tile/
+    └── MainTileService.kt           Placeholder tile
 ```
 
-## Dependencies
+### Data layer
 
-### Wear OS
-- Compose for Wear OS
-- Wear OS Health Services
-- Horologist Compose components
-- Wear Input libraries
+The watch runs the **same Room schema** as the phone (all entities, all migrations, SqlCipher
+encryption). Most tables are simply empty on the watch. This eliminates sync impedance.
 
-### Communication
-- Data Layer API for phone sync
-- Wear Connectivity APIs
+Key shared modules wired into the Wear app:
+- `client/database` — Room DB + SqlCipher + DAOs
+- `client/data` — `OfflineFirstJournalNotesRepository`
+- `client/datastore` — User preferences
+- `client/device` — `DatabasePassphraseProvider` (Android KeyStore)
 
-### Core Features
-- Voice recognition APIs
-- Local storage (minimal)
-- Background sync services
+### Dependency injection
 
-## Technical Considerations
+Two Koin modules loaded in `LogDateWearApplication`:
 
-### Performance
-- Minimal UI for battery efficiency
-- Aggressive data caching
-- Smart sync scheduling
-- Low animation overhead
+- **`wearDataModule`** — Database, repositories, DataStore, passphrase provider
+- **`wearAudioModule`** — ViewModels, `WearAudioRecordingManager`, `StorageSpaceChecker`, `WearHapticEngine`
 
-### User Experience
-- Large touch targets
-- Clear visual hierarchy
-- Voice-first interactions
-- Quick gestures
-- Minimalist design
+### Navigation
 
-## Implementation Roadmap
+Flat, single-level navigation from the home hub. All routes are defined as `NavKey` objects
+in `WearNavRoutes.kt`. Back always returns home or exits. The app uses Navigation 3's
+`NavDisplay` with `SwipeDismissableEntry` for swipe-to-dismiss.
 
-### Phase 1: Basic Functionality
-- [x] Set up Compose for Wear UI framework
-- [x] Implement Material 3 theming
-- [ ] Implement basic note creation screen
-- [ ] Add voice-to-text integration (requires physical device for testing)
-- [ ] Create simple entry list view
-- [ ] Implement data sync with phone app
+## Permissions
 
-### Phase 2: Wear OS Integration
-- [ ] Add watch complications
-- [ ] Implement haptic feedback patterns
-- [ ] Add gesture-based navigation
-- [ ] Create custom watch faces integration
-- [ ] Implement always-on display optimization
+Declared in `AndroidManifest.xml`:
 
-### Phase 3: Health & Context
-- [ ] Integrate health data (heart rate, steps) - requires physical device
-- [ ] Add activity recognition for auto-logging
-- [ ] Implement location context for entries
-- [ ] Add mood tracking with health correlation
-- [ ] Create health insights and summaries
+| Permission | Purpose |
+|------------|---------|
+| `RECORD_AUDIO` | Microphone access for voice notes |
+| `FOREGROUND_SERVICE` | Background recording |
+| `FOREGROUND_SERVICE_MICROPHONE` | Foreground service type |
+| `WAKE_LOCK` | Keep recording when screen is off |
+| `VIBRATE` | Haptic feedback |
 
-### Phase 4: Advanced Features
-- [ ] Add offline voice processing
-- [ ] Implement smart entry suggestions
-- [ ] Add social features (sharing, collaboration)
-- [ ] Create custom workout logging
-- [ ] Implement emergency contact features
+## Testing
 
-## Design Guidelines
+Three test layers cover every screen:
 
-### UI Principles
-- Follow Wear OS design guidelines
-- Optimize for glanceable information
-- Minimize interaction steps
-- Support both touch and voice input
-- Use high contrast for outdoor visibility
+### Unit tests (`src/test/`)
 
-### Performance Guidelines
-- Keep UI animations under 16ms
-- Minimize background processing
-- Use efficient data structures
-- Implement smart caching strategies
-- Limit network requests
+```bash
+./gradlew :app:wear:test
+```
 
-## Testing Strategy
+| File | Tests | Covers |
+|------|-------|--------|
+| `WalkieTalkieViewModelTest` | 15 | State machine, duration gate, auto-stop |
+| `MoodCheckInViewModelTest` | 11 | Mood selection, note creation, voice attachment |
+| `WearHapticEngineTest` | 16 | Pattern selection, preference-aware suppression |
 
-- [ ] Unit tests for business logic
-- [ ] Wear OS emulator testing for basic UI
-- [ ] Physical device testing for voice input and sensors
-- [ ] Testing across different watch form factors (round, square)
-- [ ] Battery life impact testing
-- [ ] Sync reliability testing
+### Screenshot tests (`src/screenshotTest/`)
+
+Render every screen state on small round and large round watch displays. No device needed.
+
+```bash
+# Generate or update baseline images
+./gradlew :app:wear:updateDebugScreenshotTest
+
+# Validate current screenshots match baselines
+./gradlew :app:wear:validateDebugScreenshotTest
+```
+
+Baselines live in `src/screenshotTestDebug/reference/` and are committed to git.
+
+| File | Previews | States covered |
+|------|----------|----------------|
+| `WearHomeScreenshots` | 3 | Empty, populated, single entry |
+| `WalkieTalkieScreenshots` | 8 | Ready, recording, long recording, saving, saved, too short, error, null error |
+| `MoodCheckInScreenshots` | 5 | Emoji picker, voice prompt (great/sad/null), saved |
+| `AudioRecordingScreenshots` | 4 | Idle, active, paused, error |
+
+Each preview generates 2 PNGs (small + large round) = **40 baseline images** total.
+
+The `@WearScreenshotPreviewMatrix` annotation applies both device specs automatically:
+```kotlin
+@Preview(name = "Small Round", device = "id:wearos_small_round")
+@Preview(name = "Large Round", device = "id:wearos_large_round")
+annotation class WearScreenshotPreviewMatrix
+```
+
+### Instrumented E2E tests (`src/androidTest/`)
+
+Require a connected Wear OS device or emulator.
+
+```bash
+./gradlew :app:wear:connectedAndroidTest
+```
+
+| File | Tests | Covers |
+|------|-------|--------|
+| `WearHomeScreenTest` | 12 | Greeting, entry count, all chips, navigation callbacks |
+| `WalkieTalkieScreenTest` | 14 | All screen states, duration formatting |
+| `MoodCheckInScreenTest` | 11 | Mood selection, voice prompt, saved confirmation |
+| `AudioRecordingScreenTest` | 8 | Idle, recording, paused, error, button callbacks |
+
+These tests render stateless content composables (`WearHomeContent`, `ReadyContent`, etc.)
+with controlled state, avoiding the need for bound services or ViewModels.
+
+### Test totals
+
+| Layer | Tests | Requires device |
+|-------|-------|-----------------|
+| Unit | 42 | No |
+| Screenshot | 40 baselines | No |
+| E2E instrumented | 45 | Yes |
+
+## Quick reference
+
+```bash
+# Build
+./gradlew :app:wear:assembleDebug
+
+# Install on connected device
+./gradlew :app:wear:installDebug
+
+# Run unit tests
+./gradlew :app:wear:test
+
+# Generate screenshot baselines
+./gradlew :app:wear:updateDebugScreenshotTest
+
+# Validate screenshots
+./gradlew :app:wear:validateDebugScreenshotTest
+
+# Run E2E tests on device
+./gradlew :app:wear:connectedAndroidTest
+
+# Lint
+./gradlew :app:wear:ktlintCheck
+```
+
+## Further reading
+
+- [Audio recording feature](../../docs/feature-design/wear-audio-recording.md) — recording service, storage, battery
+- [Testing strategy](../../docs/testing/introduction.md) — project-wide testing approach
+- [Screenshot tests](../../docs/testing/screenshot-tests.md) — visual regression guide
+- [Wear OS debugging][wear-debug-docs] — official setup docs
+
+[wear-debug-docs]: https://developer.android.com/training/wearables/get-started/debugging

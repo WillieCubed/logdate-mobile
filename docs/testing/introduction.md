@@ -170,10 +170,12 @@ module/src/
 
 ```bash
 # Update baseline screenshots
-./gradlew :app:android-main:updateDebugScreenshotTest
+./gradlew :app:android-main:updateDebugScreenshotTest  # phone
+./gradlew :app:wear:updateDebugScreenshotTest           # Wear OS
 
 # Validate against baseline
-./gradlew :app:android-main:validateDebugScreenshotTest
+./gradlew :app:android-main:validateDebugScreenshotTest  # phone
+./gradlew :app:wear:validateDebugScreenshotTest           # Wear OS
 ```
 
 ### Coverage Reports
@@ -262,7 +264,8 @@ Tests run automatically on pull requests and main branch:
 | Stage | Tests | Command |
 |-------|-------|---------|
 | **Pull Request** | Unit + Integration | `./gradlew test` |
-| **Pull Request** | Screenshots | `validateDebugScreenshotTest` |
+| **Pull Request** | Phone screenshots | `:app:android-main:validateDebugScreenshotTest` |
+| **Pull Request** | Wear OS screenshots | `:app:wear:validateDebugScreenshotTest` |
 | **Main Branch** | Full suite | All tests + coverage checks |
 
 Configuration: `.github/workflows/ci.yml`
