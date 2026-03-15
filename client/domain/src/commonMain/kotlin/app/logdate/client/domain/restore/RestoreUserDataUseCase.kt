@@ -21,6 +21,7 @@ import app.logdate.shared.model.Journal
 import app.logdate.shared.model.SerializableCameraBlock
 import app.logdate.shared.model.SerializableEntryBlock
 import app.logdate.shared.model.SerializableTextBlock
+import io.github.aakira.napier.Napier
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -63,100 +64,141 @@ class RestoreUserDataUseCase(
         var mediaImported = 0
         val warnings = mutableListOf<String>()
 
-        for (journal in journalsPayload.journals) {
-            val existing = journalRepository.getJournalById(journal.id)
-            val shouldWrite = shouldOverwrite(existing?.lastUpdated, journal.lastUpdated, options.strategy)
-            if (existing == null) {
-                if (syncableJournals != null) {
-                    syncableJournals.createFromSync(journal)
-                } else {
-                    journalRepository.create(journal)
-                }
-                journalsImported++
-            } else if (shouldWrite) {
-                if (syncableJournals != null) {
-                    syncableJournals.updateFromSync(journal)
-                } else {
-                    journalRepository.update(journal)
-                }
-                journalsImported++
-            }
-        }
+        val createdJournalIds = mutableListOf<Uuid>()
+        val createdNoteIds = mutableListOf<Uuid>()
+        val createdLinks = mutableListOf<Pair<Uuid, Uuid>>()
+        val createdDraftIds = mutableListOf<Uuid>()
 
-        for (note in notesPayload.notes) {
-            val parsedId = parseUuid(note.id, warnings) ?: continue
-            val mediaResolution = resolveMediaReference(note.mediaPath, manifestIndex, mediaImporter)
-            if (mediaResolution.imported) {
-                mediaImported++
-            }
-            val restored = note.toJournalNote(parsedId, mediaResolution.uri)
-            if (restored == null) {
-                val normalizedType = note.type.lowercase()
-                val message =
-                    if (normalizedType == "image" || normalizedType == "video" || normalizedType == "audio") {
-                        "Missing media reference for note ${note.id}"
+        try {
+            for (journal in journalsPayload.journals) {
+                val existing = journalRepository.getJournalById(journal.id)
+                val shouldWrite = shouldOverwrite(existing?.lastUpdated, journal.lastUpdated, options.strategy)
+                if (existing == null) {
+                    if (syncableJournals != null) {
+                        syncableJournals.createFromSync(journal)
                     } else {
-                        "Unsupported note type: ${note.type}"
+                        journalRepository.create(journal)
                     }
-                warnings.add(message)
-                continue
-            }
-
-            val existing = journalNotesRepository.getNoteById(parsedId)
-            val shouldWrite = shouldOverwrite(existing?.lastUpdated, restored.lastUpdated, options.strategy)
-            if (existing == null) {
-                if (syncableNotes != null) {
-                    syncableNotes.createFromSync(restored)
-                } else {
-                    journalNotesRepository.create(restored)
+                    createdJournalIds.add(journal.id)
+                    journalsImported++
+                } else if (shouldWrite) {
+                    if (syncableJournals != null) {
+                        syncableJournals.updateFromSync(journal)
+                    } else {
+                        journalRepository.update(journal)
+                    }
+                    journalsImported++
                 }
-                notesImported++
-            } else if (shouldWrite) {
-                if (syncableNotes != null) {
-                    syncableNotes.deleteFromSync(parsedId)
-                    syncableNotes.createFromSync(restored)
-                } else {
-                    journalNotesRepository.removeById(parsedId)
-                    journalNotesRepository.create(restored)
+            }
+
+            for (note in notesPayload.notes) {
+                val parsedId = parseUuid(note.id, warnings) ?: continue
+                val mediaResolution = resolveMediaReference(note.mediaPath, manifestIndex, mediaImporter)
+                if (mediaResolution.imported) {
+                    mediaImported++
                 }
-                notesImported++
-            }
-        }
-
-        for (relation in journalNotesPayload.journalNotes) {
-            val journalId = parseUuid(relation.journalId, warnings) ?: continue
-            val noteId = parseUuid(relation.noteId, warnings) ?: continue
-
-            if (syncableContent != null) {
-                syncableContent.addContentToJournalFromSync(noteId, journalId)
-            } else {
-                journalContentRepository.addContentToJournal(noteId, journalId)
-            }
-            linksImported++
-        }
-
-        if (options.includeDrafts) {
-            for (draft in draftsPayload.drafts) {
-                val restored =
-                    restoreDraft(draft, manifestIndex, mediaImporter) { imported ->
-                        if (imported) {
-                            mediaImported++
+                val restored = note.toJournalNote(parsedId, mediaResolution.uri)
+                if (restored == null) {
+                    val normalizedType = note.type.lowercase()
+                    val message =
+                        if (normalizedType == "image" || normalizedType == "video" || normalizedType == "audio") {
+                            "Missing media reference for note ${note.id}"
+                        } else {
+                            "Unsupported note type: ${note.type}"
                         }
-                    }
-                journalRepository.saveDraft(restored)
-                draftsImported++
-            }
-        }
+                    warnings.add(message)
+                    continue
+                }
 
-        return RestoreResult(
-            metadata = metadata,
-            journalsImported = journalsImported,
-            notesImported = notesImported,
-            draftsImported = draftsImported,
-            journalLinksImported = linksImported,
-            mediaImported = mediaImported,
-            warnings = warnings,
+                val existing = journalNotesRepository.getNoteById(parsedId)
+                val shouldWrite = shouldOverwrite(existing?.lastUpdated, restored.lastUpdated, options.strategy)
+                if (existing == null) {
+                    if (syncableNotes != null) {
+                        syncableNotes.createFromSync(restored)
+                    } else {
+                        journalNotesRepository.create(restored)
+                    }
+                    createdNoteIds.add(parsedId)
+                    notesImported++
+                } else if (shouldWrite) {
+                    if (syncableNotes != null) {
+                        syncableNotes.deleteFromSync(parsedId)
+                        syncableNotes.createFromSync(restored)
+                    } else {
+                        journalNotesRepository.removeById(parsedId)
+                        journalNotesRepository.create(restored)
+                    }
+                    notesImported++
+                }
+            }
+
+            for (relation in journalNotesPayload.journalNotes) {
+                val journalId = parseUuid(relation.journalId, warnings) ?: continue
+                val noteId = parseUuid(relation.noteId, warnings) ?: continue
+
+                if (syncableContent != null) {
+                    syncableContent.addContentToJournalFromSync(noteId, journalId)
+                } else {
+                    journalContentRepository.addContentToJournal(noteId, journalId)
+                }
+                createdLinks.add(noteId to journalId)
+                linksImported++
+            }
+
+            if (options.includeDrafts) {
+                for (draft in draftsPayload.drafts) {
+                    val restored =
+                        restoreDraft(draft, manifestIndex, mediaImporter) { imported ->
+                            if (imported) {
+                                mediaImported++
+                            }
+                        }
+                    journalRepository.saveDraft(restored)
+                    createdDraftIds.add(restored.id)
+                    draftsImported++
+                }
+            }
+
+            return RestoreResult(
+                metadata = metadata,
+                journalsImported = journalsImported,
+                notesImported = notesImported,
+                draftsImported = draftsImported,
+                journalLinksImported = linksImported,
+                mediaImported = mediaImported,
+                warnings = warnings,
+            )
+        } catch (e: Exception) {
+            rollback(createdLinks, createdNoteIds, createdJournalIds, createdDraftIds)
+            throw e
+        }
+    }
+
+    private suspend fun rollback(
+        links: List<Pair<Uuid, Uuid>>,
+        noteIds: List<Uuid>,
+        journalIds: List<Uuid>,
+        draftIds: List<Uuid>,
+    ) {
+        Napier.w(
+            "Restore failed, rolling back ${links.size} links, ${noteIds.size} notes, ${journalIds.size} journals, ${draftIds.size} drafts",
         )
+        for ((contentId, journalId) in links) {
+            runCatching { journalContentRepository.removeContentFromJournal(contentId, journalId) }
+                .onFailure { Napier.e("Rollback: failed to remove link $contentId->$journalId", it) }
+        }
+        for (noteId in noteIds) {
+            runCatching { journalNotesRepository.removeById(noteId) }
+                .onFailure { Napier.e("Rollback: failed to remove note $noteId", it) }
+        }
+        for (journalId in journalIds) {
+            runCatching { journalRepository.delete(journalId) }
+                .onFailure { Napier.e("Rollback: failed to delete journal $journalId", it) }
+        }
+        for (draftId in draftIds) {
+            runCatching { journalRepository.deleteDraft(draftId) }
+                .onFailure { Napier.e("Rollback: failed to delete draft $draftId", it) }
+        }
     }
 
     private fun shouldOverwrite(

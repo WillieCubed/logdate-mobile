@@ -534,6 +534,36 @@ class RestoreUserDataUseCaseTest {
 
     // endregion
 
+    // region Rollback
+
+    @Test
+    fun `restore rolls back created entities on failure`() =
+        runTest {
+            val journalId = Uuid.random()
+            val noteId1 = Uuid.random()
+            val noteId2 = Uuid.random()
+
+            notesRepo.throwAfterCreates = 1
+
+            val bundle =
+                buildBundle(
+                    journals = listOf(testJournal(journalId)),
+                    notes =
+                        listOf(
+                            testTextNote(noteId1, content = "First note"),
+                            testTextNote(noteId2, content = "Second note will fail"),
+                        ),
+                )
+
+            val exception = runCatching { useCase.restore(bundle) }.exceptionOrNull()
+
+            assertTrue(exception is RuntimeException, "Should propagate exception")
+            assertTrue(journalRepo.deleted.contains(journalId), "Created journal should be rolled back")
+            assertTrue(notesRepo.removed.contains(noteId1), "Created note should be rolled back")
+        }
+
+    // endregion
+
     // region Edge cases
 
     @Test
@@ -698,7 +728,9 @@ class RestoreUserDataUseCaseTest {
         val existingJournals = mutableMapOf<Uuid, Journal>()
         val created = mutableListOf<Journal>()
         val updated = mutableListOf<Journal>()
+        val deleted = mutableListOf<Uuid>()
         val savedDrafts = mutableListOf<EditorDraft>()
+        val deletedDrafts = mutableListOf<Uuid>()
 
         override val allJournalsObserved: Flow<List<Journal>> = flowOf(emptyList())
 
@@ -718,6 +750,7 @@ class RestoreUserDataUseCaseTest {
         }
 
         override suspend fun delete(journalId: Uuid) {
+            deleted.add(journalId)
             existingJournals.remove(journalId)
         }
 
@@ -732,6 +765,7 @@ class RestoreUserDataUseCaseTest {
         override suspend fun getDraft(id: Uuid): EditorDraft? = null
 
         override suspend fun deleteDraft(id: Uuid) {
+            deletedDrafts.add(id)
             savedDrafts.removeAll { it.id == id }
         }
     }
@@ -740,6 +774,7 @@ class RestoreUserDataUseCaseTest {
         val existingNotes = mutableMapOf<Uuid, JournalNote>()
         val created = mutableListOf<JournalNote>()
         val removed = mutableListOf<Uuid>()
+        var throwAfterCreates: Int = Int.MAX_VALUE
 
         override val allNotesObserved: Flow<List<JournalNote>> = flowOf(emptyList())
 
@@ -762,6 +797,9 @@ class RestoreUserDataUseCaseTest {
         override suspend fun getNoteById(noteId: Uuid): JournalNote? = existingNotes[noteId]
 
         override suspend fun create(note: JournalNote): Uuid {
+            if (created.size >= throwAfterCreates) {
+                throw RuntimeException("Simulated failure after ${created.size} creates")
+            }
             created.add(note)
             existingNotes[note.uid] = note
             return note.uid
@@ -781,6 +819,9 @@ class RestoreUserDataUseCaseTest {
             note: JournalNote,
             journalId: Uuid,
         ) {
+            if (created.size >= throwAfterCreates) {
+                throw RuntimeException("Simulated failure after ${created.size} creates")
+            }
             created.add(note)
             existingNotes[note.uid] = note
         }
@@ -793,6 +834,7 @@ class RestoreUserDataUseCaseTest {
 
     private class FakeJournalContentRepository : JournalContentRepository {
         val links = mutableListOf<Pair<Uuid, Uuid>>()
+        val removedLinks = mutableListOf<Pair<Uuid, Uuid>>()
 
         override fun observeContentForJournal(journalId: Uuid): Flow<List<JournalNote>> = flowOf(emptyList())
 
@@ -809,6 +851,7 @@ class RestoreUserDataUseCaseTest {
             contentId: Uuid,
             journalId: Uuid,
         ) {
+            removedLinks.add(contentId to journalId)
             links.removeAll { it.first == contentId && it.second == journalId }
         }
 
