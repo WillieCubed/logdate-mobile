@@ -20,10 +20,14 @@ import kotlinx.coroutines.launch
  * `/logdate/notes/<noteId>` (or `/logdate/notes/<noteId>/delete`). This service
  * deserializes the note and inserts it via [SyncableJournalNotesRepository.createFromSync]
  * to avoid re-triggering outbound sync.
+ *
+ * For new notes, a notification is posted so the user can tap to expand the note
+ * in the editor (entry handoff).
  */
 class PhoneDataLayerListenerService : WearableListenerService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val noteDataMapper = NoteDataMapper()
+    private val notificationHelper by lazy { WearSyncNotificationHelper(applicationContext) }
 
     override fun onDataChanged(dataEvents: DataEventBuffer) {
         val notesRepository =
@@ -93,6 +97,8 @@ class PhoneDataLayerListenerService : WearableListenerService() {
                 } else {
                     notesRepository.create(note)
                 }
+                // Notify the user so they can expand the note in the editor
+                notificationHelper.notifyNoteReceived(note)
             } catch (e: Exception) {
                 Napier.w("Failed to process synced note from watch at path: $path", e)
             }
