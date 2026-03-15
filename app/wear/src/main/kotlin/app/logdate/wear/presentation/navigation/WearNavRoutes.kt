@@ -5,3 +5,5 @@ import androidx.navigation3.runtime.NavKey
 data object WearHomeRoute : NavKey
 
 data object WearAudioRecordingRoute : NavKey
+
+data object WearWalkieTalkieRoute : NavKey
