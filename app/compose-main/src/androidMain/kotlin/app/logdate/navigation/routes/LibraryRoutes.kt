@@ -1,11 +1,9 @@
 package app.logdate.navigation.routes
 
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.library.ui.LibraryScreen
+import app.logdate.feature.library.ui.detail.MediaDetailScreen
 import app.logdate.navigation.MainAppNavigator
 import app.logdate.navigation.routes.core.LibraryListRoute
 import app.logdate.navigation.routes.core.LibraryMediaDetailRoute
@@ -31,19 +29,10 @@ fun EntryProviderScope<NavKey>.libraryRoutes(
     }
 
     routeEntry<LibraryMediaDetailRoute> { route ->
-        // Placeholder for media detail — will be implemented in Phase 5
-        MediaDetailPlaceholder(mediaId = route.mediaId)
+        MediaDetailScreen(
+            mediaId = route.mediaId,
+            onBack = onBack,
+            onNavigateToJournal = onNavigateToJournal,
+        )
     }
-}
-
-@Suppress("ktlint:standard:function-naming")
-@Composable
-private fun MediaDetailPlaceholder(
-    mediaId: Uuid,
-    modifier: Modifier = Modifier,
-) {
-    Text(
-        text = "Media Detail: $mediaId",
-        modifier = modifier,
-    )
 }
