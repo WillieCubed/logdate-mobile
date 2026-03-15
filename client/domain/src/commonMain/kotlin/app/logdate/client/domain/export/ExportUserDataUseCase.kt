@@ -6,6 +6,7 @@ import app.logdate.client.domain.notes.GetAllAudioNotesUseCase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.SerializableAudioBlock
@@ -130,14 +131,17 @@ class ExportUserDataUseCase(
                                     content = note.content,
                                     createdAt = note.creationTimestamp,
                                     updatedAt = note.lastUpdated,
+                                    location = note.location?.toExportLocation(),
                                 )
                             is JournalNote.Image ->
                                 ExportNote(
                                     id = note.uid.toString(),
                                     type = "image",
                                     mediaPath = note.mediaRef,
+                                    caption = note.caption.takeIf { it.isNotEmpty() },
                                     createdAt = note.creationTimestamp,
                                     updatedAt = note.lastUpdated,
+                                    location = note.location?.toExportLocation(),
                                 )
                             is JournalNote.Audio ->
                                 ExportNote(
@@ -146,14 +150,17 @@ class ExportUserDataUseCase(
                                     mediaPath = note.mediaRef,
                                     createdAt = note.creationTimestamp,
                                     updatedAt = note.lastUpdated,
+                                    location = note.location?.toExportLocation(),
                                 )
                             is JournalNote.Video ->
                                 ExportNote(
                                     id = note.uid.toString(),
                                     type = "video",
                                     mediaPath = note.mediaRef,
+                                    caption = note.caption.takeIf { it.isNotEmpty() },
                                     createdAt = note.creationTimestamp,
                                     updatedAt = note.lastUpdated,
+                                    location = note.location?.toExportLocation(),
                                 )
                         }
                     }
@@ -297,6 +304,12 @@ class ExportUserDataUseCase(
         return mediaFilesByPath.map { (exportPath, sourceUri) ->
             ExportMediaFile(exportPath, sourceUri)
         }
+    }
+
+    private fun NoteLocation.toExportLocation(): ExportLocation? {
+        val lat = effectiveLatitude ?: return null
+        val lng = effectiveLongitude ?: return null
+        return ExportLocation(lat, lng, displayName)
     }
 
     private fun EditorDraft.toExportDraft(): ExportDraft {

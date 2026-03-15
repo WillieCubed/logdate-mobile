@@ -7,6 +7,8 @@ import app.logdate.client.domain.notes.GetAllAudioNotesUseCase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.journals.NoteCoordinates
+import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
@@ -562,6 +564,95 @@ class ExportUserDataUseCaseTest {
             // Metadata should still be valid
             assertTrue(metadata.userId.isNotEmpty(), "User ID should be present in metadata")
             assertTrue(metadata.appVersion.isNotEmpty(), "App version should be present in metadata")
+        }
+
+    @Test
+    fun `exportUserData includes location in exported notes`() =
+        runTest {
+            val location =
+                NoteLocation(
+                    coordinates = NoteCoordinates(latitude = 37.7749, longitude = -122.4194),
+                )
+            val textNote =
+                JournalNote.Text(
+                    uid = Uuid.random(),
+                    creationTimestamp = Clock.System.now(),
+                    lastUpdated = Clock.System.now(),
+                    content = "At the park",
+                    location = location,
+                )
+            val imageNote =
+                JournalNote.Image(
+                    uid = Uuid.random(),
+                    creationTimestamp = Clock.System.now(),
+                    lastUpdated = Clock.System.now(),
+                    mediaRef = "file:///photo.jpg",
+                    location = location,
+                )
+
+            mockNotesRepository.testNotes = listOf(textNote, imageNote)
+
+            val progressUpdates = useCase.exportUserData().toList()
+            val result = (progressUpdates.last() as ExportProgress.Completed).result
+
+            val json = Json { ignoreUnknownKeys = true }
+            val notesPayload = json.decodeFromString<Map<String, List<ExportNote>>>(result.notes)
+            val exportedNotes = notesPayload.getValue("notes")
+
+            val exportedText = exportedNotes.first { it.type == "text" }
+            assertEquals(37.7749, exportedText.location?.latitude)
+            assertEquals(-122.4194, exportedText.location?.longitude)
+
+            val exportedImage = exportedNotes.first { it.type == "image" }
+            assertEquals(37.7749, exportedImage.location?.latitude)
+            assertEquals(-122.4194, exportedImage.location?.longitude)
+        }
+
+    @Test
+    fun `exportUserData includes caption in exported image and video notes`() =
+        runTest {
+            val imageNote =
+                JournalNote.Image(
+                    uid = Uuid.random(),
+                    creationTimestamp = Clock.System.now(),
+                    lastUpdated = Clock.System.now(),
+                    mediaRef = "file:///photo.jpg",
+                    caption = "Sunset at the beach",
+                )
+            val videoNote =
+                JournalNote.Video(
+                    uid = Uuid.random(),
+                    creationTimestamp = Clock.System.now(),
+                    lastUpdated = Clock.System.now(),
+                    mediaRef = "file:///clip.mp4",
+                    caption = "Birthday party",
+                )
+            val noCaptionImage =
+                JournalNote.Image(
+                    uid = Uuid.random(),
+                    creationTimestamp = Clock.System.now(),
+                    lastUpdated = Clock.System.now(),
+                    mediaRef = "file:///other.jpg",
+                    caption = "",
+                )
+
+            mockNotesRepository.testNotes = listOf(imageNote, videoNote, noCaptionImage)
+
+            val progressUpdates = useCase.exportUserData().toList()
+            val result = (progressUpdates.last() as ExportProgress.Completed).result
+
+            val json = Json { ignoreUnknownKeys = true }
+            val notesPayload = json.decodeFromString<Map<String, List<ExportNote>>>(result.notes)
+            val exportedNotes = notesPayload.getValue("notes")
+
+            val exportedImage = exportedNotes.first { it.id == imageNote.uid.toString() }
+            assertEquals("Sunset at the beach", exportedImage.caption)
+
+            val exportedVideo = exportedNotes.first { it.id == videoNote.uid.toString() }
+            assertEquals("Birthday party", exportedVideo.caption)
+
+            val exportedNoCaption = exportedNotes.first { it.id == noCaptionImage.uid.toString() }
+            assertEquals(null, exportedNoCaption.caption, "Empty caption should export as null")
         }
 
     @Test
