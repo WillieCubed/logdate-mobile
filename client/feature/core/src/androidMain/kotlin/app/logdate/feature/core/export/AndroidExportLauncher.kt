@@ -12,6 +12,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import app.logdate.client.domain.export.ExportFormat
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -125,13 +126,13 @@ class AndroidExportLauncher(
                     )}_${it.hour.toString().padStart(2, '0')}-${it.minute.toString().padStart(2, '0')}"
                 }
 
-        val defaultFileName = "logdate_export_$timestamp.json"
+        val defaultFileName = "logdate_export_$timestamp.${ExportFormat.FILE_EXTENSION}"
 
         // Create an intent to show the file picker
         val intent =
             Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
-                type = "application/json"
+                type = ExportFormat.MIME_TYPE
                 putExtra(Intent.EXTRA_TITLE, defaultFileName)
             }
 

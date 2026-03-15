@@ -12,6 +12,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import app.logdate.client.domain.export.ExportFormat
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -102,7 +103,7 @@ class AndroidRestoreLauncher(
             Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
                 type = "*/*"
-                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/zip", "application/octet-stream"))
+                putExtra(Intent.EXTRA_MIME_TYPES, ExportFormat.ACCEPTED_IMPORT_MIME_TYPES)
             }
 
         try {

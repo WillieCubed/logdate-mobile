@@ -96,6 +96,31 @@ data class ExportJournalNoteRelation(
 )
 
 /**
+ * Constants for the LogDate export file format.
+ *
+ * Both the export and import pipelines reference these constants
+ * to keep MIME types and file extensions in sync.
+ */
+object ExportFormat {
+    const val FILE_EXTENSION = "zip"
+    const val MIME_TYPE = "application/zip"
+
+    /**
+     * MIME types the import picker should accept.
+     *
+     * Includes the canonical [MIME_TYPE] plus legacy/alternative types
+     * to handle files from older app versions or renamed archives.
+     */
+    val ACCEPTED_IMPORT_MIME_TYPES =
+        arrayOf(
+            MIME_TYPE,
+            "application/x-zip-compressed",
+            "application/json",
+            "application/octet-stream",
+        )
+}
+
+/**
  * Export file structure definition.
  */
 data class ExportFileStructure(
