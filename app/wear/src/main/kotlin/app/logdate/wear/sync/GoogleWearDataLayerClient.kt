@@ -26,9 +26,7 @@ class GoogleWearDataLayerClient(
                 data.forEach { (key, value) ->
                     dataMap.putString(key, value)
                 }
-                // Force update even if data hasn't changed (timestamp ensures uniqueness)
-                dataMap.putLong("_syncTimestamp", System.currentTimeMillis())
-            }.asPutDataRequest().setUrgent()
+            }.asPutDataRequest()
 
             dataClient.putDataItem(request).await()
             Napier.d("Data item put at path: $path")
