@@ -4,6 +4,7 @@ import android.app.Application
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.data.storage.StorageSpaceChecker
+import app.logdate.wear.health.NoteHealthAnnotator
 import app.logdate.wear.recording.WearAudioRecordingManager
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -39,6 +40,7 @@ class AudioRecordingViewModelTest {
     private lateinit var recordingManager: WearAudioRecordingManager
     private lateinit var notesRepository: JournalNotesRepository
     private lateinit var storageChecker: StorageSpaceChecker
+    private lateinit var noteHealthAnnotator: NoteHealthAnnotator
 
     private val audioLevelFlow = MutableStateFlow(0f)
 
@@ -53,6 +55,7 @@ class AudioRecordingViewModelTest {
         recordingManager = mockk(relaxed = true)
         notesRepository = mockk(relaxed = true)
         storageChecker = mockk(relaxed = true)
+        noteHealthAnnotator = mockk(relaxed = true)
 
         every { recordingManager.getAudioLevelFlow() } returns audioLevelFlow
         coEvery { notesRepository.create(any<JournalNote>()) } returns Uuid.random()
@@ -69,7 +72,7 @@ class AudioRecordingViewModelTest {
     }
 
     private fun createViewModel(): AudioRecordingViewModel {
-        return AudioRecordingViewModel(application, recordingManager, notesRepository, storageChecker)
+        return AudioRecordingViewModel(application, recordingManager, notesRepository, storageChecker, noteHealthAnnotator)
     }
 
     private fun AudioRecordingViewModel.cancelScope() {
@@ -223,6 +226,19 @@ class AudioRecordingViewModelTest {
                 note is JournalNote.Audio && note.mediaRef == "/fake/audio.m4a"
             })
         }
+        viewModel.cancelScope()
+    }
+
+    @Test
+    fun `stopRecording annotates note with health data`() = runTest {
+        val viewModel = createViewModel()
+        viewModel.startRecording()
+        advanceTimeBy(200)
+
+        viewModel.stopRecording()
+        advanceTimeBy(200)
+
+        coVerify { noteHealthAnnotator.annotate(any()) }
         viewModel.cancelScope()
     }
 

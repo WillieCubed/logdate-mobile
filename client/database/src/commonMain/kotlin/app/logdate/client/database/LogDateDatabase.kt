@@ -12,6 +12,7 @@ import app.logdate.client.database.converters.MediaDimensionsConverter
 import app.logdate.client.database.converters.TimestampConverter
 import app.logdate.client.database.converters.UuidConverter
 import app.logdate.client.database.dao.AudioNoteDao
+import app.logdate.client.database.dao.HealthSnapshotDao
 import app.logdate.client.database.dao.ImageNoteDao
 import app.logdate.client.database.dao.JournalDao
 import app.logdate.client.database.dao.JournalNotesDao
@@ -34,6 +35,7 @@ import app.logdate.client.database.dao.rewind.CachedRewindDao
 import app.logdate.client.database.dao.rewind.RewindGenerationRequestDao
 import app.logdate.client.database.dao.sync.SyncMetadataDao
 import app.logdate.client.database.entities.AudioNoteEntity
+import app.logdate.client.database.entities.HealthSnapshotEntity
 import app.logdate.client.database.entities.ImageNoteEntity
 import app.logdate.client.database.entities.JournalEntity
 import app.logdate.client.database.entities.JournalNoteCrossRef
@@ -78,6 +80,7 @@ import app.logdate.client.database.migrations.MIGRATION_25_26
 import app.logdate.client.database.migrations.MIGRATION_26_27
 import app.logdate.client.database.migrations.MIGRATION_27_28
 import app.logdate.client.database.migrations.MIGRATION_28_29
+import app.logdate.client.database.migrations.MIGRATION_29_30
 import app.logdate.client.database.migrations.MIGRATION_2_3
 import app.logdate.client.database.migrations.MIGRATION_3_4
 import app.logdate.client.database.migrations.MIGRATION_4_5
@@ -130,8 +133,9 @@ import kotlinx.coroutines.IO
         UserPlaceEntity::class,
         MediaCaptionEntity::class,
         MediaExifMetadataEntity::class,
+        HealthSnapshotEntity::class,
     ],
-    version = 29,
+    version = 30,
     exportSchema = true,
 )
 @TypeConverters(
@@ -186,6 +190,8 @@ abstract class LogDateDatabase : RoomDatabase() {
     abstract fun mediaCaptionDao(): MediaCaptionDao
 
     abstract fun mediaExifDao(): MediaExifDao
+
+    abstract fun healthSnapshotDao(): HealthSnapshotDao
 }
 
 /**
@@ -250,6 +256,7 @@ fun getRoomDatabase(
                 MIGRATION_26_27,
                 MIGRATION_27_28,
                 MIGRATION_28_29,
+                MIGRATION_29_30,
             ).fallbackToDestructiveMigration(destroyTablesOnUpgrade)
             .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)
             .setQueryCoroutineContext(dispatcher)

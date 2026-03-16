@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.data.storage.StorageSpaceChecker
+import app.logdate.wear.health.NoteHealthAnnotator
 import app.logdate.wear.recording.WearAudioRecordingManager
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -39,6 +40,7 @@ class WearRecordingViewModelTest {
     private lateinit var recordingManager: WearAudioRecordingManager
     private lateinit var notesRepository: JournalNotesRepository
     private lateinit var storageChecker: StorageSpaceChecker
+    private lateinit var noteHealthAnnotator: NoteHealthAnnotator
     private lateinit var testClock: TestClock
 
     private val audioLevelFlow = MutableStateFlow(0f)
@@ -53,6 +55,7 @@ class WearRecordingViewModelTest {
         recordingManager = mockk(relaxed = true)
         notesRepository = mockk(relaxed = true)
         storageChecker = mockk(relaxed = true)
+        noteHealthAnnotator = mockk(relaxed = true)
         testClock = TestClock()
 
         every { recordingManager.getAudioLevelFlow() } returns audioLevelFlow
@@ -70,7 +73,7 @@ class WearRecordingViewModelTest {
     }
 
     private fun createViewModel(): WearRecordingViewModel {
-        return WearRecordingViewModel(recordingManager, notesRepository, storageChecker, testClock)
+        return WearRecordingViewModel(recordingManager, notesRepository, storageChecker, noteHealthAnnotator, testClock)
     }
 
     /**
@@ -480,6 +483,21 @@ class WearRecordingViewModelTest {
 
             assertEquals(RecordingScreenEvent.NavigateBack, awaitItem())
         }
+    }
+
+    @Test
+    fun `save annotates note with health data`() = runTest {
+        val viewModel = createViewModel()
+        viewModel.onTouchDown()
+        advanceTimeBy(200)
+        testClock.advanceBy(2000)
+        viewModel.onTouchUp()
+        advanceTimeBy(200)
+
+        viewModel.save()
+        advanceTimeBy(2000)
+
+        coVerify { noteHealthAnnotator.annotate(any()) }
     }
 
     @Test

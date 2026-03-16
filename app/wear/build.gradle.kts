@@ -109,6 +109,8 @@ dependencies {
     implementation(libs.horologist.compose.tools)
     implementation(libs.horologist.tiles)
     implementation(libs.androidx.watchface.complications.data.source.ktx)
+    implementation(libs.androidx.health.services.client)
+
     // Unit test dependencies
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

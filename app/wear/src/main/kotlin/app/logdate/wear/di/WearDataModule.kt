@@ -16,6 +16,10 @@ import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.di.conflictResolverModule
 import app.logdate.shared.config.configModule
 import app.logdate.shared.model.Journal
+import app.logdate.wear.health.HealthServicesWearHealthSensorManager
+import app.logdate.wear.health.NoteHealthAnnotator
+import app.logdate.wear.health.StubWearHealthSensorManager
+import app.logdate.wear.health.WearHealthSensorManager
 import app.logdate.wear.sync.GoogleWearDataLayerClient
 import app.logdate.wear.sync.NoteDataMapper
 import app.logdate.wear.sync.WearDataLayerClient
@@ -59,6 +63,17 @@ val wearDataModule = module {
             noteDataMapper = get(),
         )
     }
+
+    // Health sensor manager: uses Health Services if available, stub otherwise
+    single<WearHealthSensorManager> {
+        try {
+            HealthServicesWearHealthSensorManager(get())
+        } catch (e: Exception) {
+            Napier.w("Health Services not available, using stub", e)
+            StubWearHealthSensorManager()
+        }
+    }
+    single { NoteHealthAnnotator(get(), get()) }
 
     // Stub remote data source (no Firebase on Wear)
     factory<RemoteJournalDataSource> { NoOpRemoteJournalDataSource }

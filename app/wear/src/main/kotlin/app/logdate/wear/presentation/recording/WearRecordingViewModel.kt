@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.data.storage.StorageSpaceChecker
+import app.logdate.wear.health.NoteHealthAnnotator
 import app.logdate.wear.recording.WearAudioRecordingManager
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
@@ -47,6 +48,7 @@ class WearRecordingViewModel(
     private val recordingManager: WearAudioRecordingManager,
     private val notesRepository: JournalNotesRepository,
     private val storageChecker: StorageSpaceChecker,
+    private val noteHealthAnnotator: NoteHealthAnnotator,
     private val clock: Clock = Clock.System,
 ) : ViewModel() {
 
@@ -256,6 +258,7 @@ class WearRecordingViewModel(
                     durationMs = accumulatedDurationMs,
                 )
                 notesRepository.create(audioNote)
+                noteHealthAnnotator.annotate(audioNote.uid)
 
                 _uiState.update {
                     it.copy(

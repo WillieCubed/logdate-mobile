@@ -9,6 +9,7 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.rewind.RewindRepository
 import app.logdate.wear.data.storage.StorageSpaceChecker
 import app.logdate.wear.haptic.WearHapticEngine
+import app.logdate.wear.health.NoteHealthAnnotator
 import app.logdate.wear.presentation.audio.AudioRecordingViewModel
 import app.logdate.wear.presentation.home.WearHomeViewModel
 import app.logdate.wear.presentation.mood.MoodCheckInViewModel
@@ -37,6 +38,7 @@ val wearAudioModule = module {
             get<WearAudioRecordingManager>(),
             get<JournalNotesRepository>(),
             get<StorageSpaceChecker>(),
+            get<NoteHealthAnnotator>(),
         )
     }
     viewModel {
@@ -44,6 +46,7 @@ val wearAudioModule = module {
             get<WearAudioRecordingManager>(),
             get<JournalNotesRepository>(),
             get<StorageSpaceChecker>(),
+            get<NoteHealthAnnotator>(),
         )
     }
     viewModel {

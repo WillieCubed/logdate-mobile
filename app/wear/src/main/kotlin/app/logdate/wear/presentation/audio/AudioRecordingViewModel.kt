@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.data.storage.StorageSpaceChecker
+import app.logdate.wear.health.NoteHealthAnnotator
 import app.logdate.wear.recording.WearAudioRecordingManager
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
@@ -25,7 +26,8 @@ class AudioRecordingViewModel(
     application: Application,
     private val recordingManager: WearAudioRecordingManager,
     private val notesRepository: JournalNotesRepository,
-    private val storageChecker: StorageSpaceChecker
+    private val storageChecker: StorageSpaceChecker,
+    private val noteHealthAnnotator: NoteHealthAnnotator,
 ) : AndroidViewModel(application) {
 
     companion object {
@@ -136,7 +138,8 @@ class AudioRecordingViewModel(
                     
                     // Save to repository
                     notesRepository.create(audioNote)
-                    
+                    noteHealthAnnotator.annotate(audioNote.uid)
+
                     // Navigate back
                     _uiState.update { 
                         it.copy(
