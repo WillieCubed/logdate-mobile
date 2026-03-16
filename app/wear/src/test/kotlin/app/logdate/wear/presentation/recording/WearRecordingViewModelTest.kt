@@ -59,6 +59,8 @@ class WearRecordingViewModelTest {
         coEvery { notesRepository.create(any<JournalNote>()) } returns Uuid.random()
         coEvery { storageChecker.getAvailableStorageSpace() } returns plentyOfStorage
         coEvery { recordingManager.startRecording() } returns true
+        coEvery { recordingManager.pauseRecording() } returns true
+        coEvery { recordingManager.resumeRecording() } returns true
         coEvery { recordingManager.stopRecording() } returns "/fake/audio.aac"
     }
 
@@ -192,7 +194,7 @@ class WearRecordingViewModelTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `touch down is ignored when not in READY phase`() = runTest {
+    fun `touch down is ignored when in RECORDING phase`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTouchDown()
         advanceTimeBy(200)
@@ -207,67 +209,63 @@ class WearRecordingViewModelTest {
     }
 
     // -----------------------------------------------------------------------
-    // onTouchUp -- saves note (with sufficient duration via TestClock)
+    // onTouchUp -- pauses recording (release to pause)
     // -----------------------------------------------------------------------
 
     @Test
-    fun `touch up stops recording via manager`() = runTest {
+    fun `touch up pauses recording via manager`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTouchDown()
         advanceTimeBy(200)
         testClock.advanceBy(1000)
 
         viewModel.onTouchUp()
-        advanceTimeBy(2000)
+        advanceTimeBy(200)
 
-        coVerify { recordingManager.stopRecording() }
+        coVerify { recordingManager.pauseRecording() }
+        viewModel.cancelScope()
     }
 
     @Test
-    fun `touch up creates audio note in repository`() = runTest {
+    fun `touch up transitions to PAUSED with sufficient duration`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTouchDown()
         advanceTimeBy(200)
         testClock.advanceBy(1000)
 
         viewModel.onTouchUp()
-        advanceTimeBy(2000)
+        advanceTimeBy(200)
 
-        coVerify {
-            notesRepository.create(match { note ->
-                note is JournalNote.Audio && note.mediaRef == "/fake/audio.aac"
-            })
-        }
+        assertEquals(RecordingPhase.PAUSED, viewModel.uiState.value.phase)
+        viewModel.cancelScope()
     }
 
     @Test
-    fun `touch up transitions to SAVED with sufficient duration`() = runTest {
+    fun `paused state includes accumulated duration`() = runTest {
+        val viewModel = createViewModel()
+        viewModel.onTouchDown()
+        advanceTimeBy(200)
+        testClock.advanceBy(2500)
+
+        viewModel.onTouchUp()
+        advanceTimeBy(200)
+
+        assertEquals(2500, viewModel.uiState.value.recordingDurationMs)
+        viewModel.cancelScope()
+    }
+
+    @Test
+    fun `touch up does not create note in repository`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTouchDown()
         advanceTimeBy(200)
         testClock.advanceBy(1000)
 
         viewModel.onTouchUp()
-        advanceTimeBy(2000)
-
-        assertEquals(RecordingPhase.SAVED, viewModel.uiState.value.phase)
-        coVerify { notesRepository.create(any<JournalNote>()) }
-    }
-
-    @Test
-    fun `saved state includes correct duration`() = runTest {
-        val viewModel = createViewModel()
-        viewModel.onTouchDown()
         advanceTimeBy(200)
-        testClock.advanceBy(2500) // 2.5 seconds
 
-        viewModel.onTouchUp()
-        advanceTimeBy(2000)
-
-        val state = viewModel.uiState.value
-        if (state.phase == RecordingPhase.SAVED) {
-            assertEquals(2500, state.savedDurationMs)
-        }
+        coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
+        viewModel.cancelScope()
     }
 
     // -----------------------------------------------------------------------
@@ -283,10 +281,7 @@ class WearRecordingViewModelTest {
         viewModel.onTouchUp()
         advanceTimeBy(50)
 
-        // No note should be created when too short
         coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
-
-        // State should be TOO_SHORT (auto-transition to READY after display delay)
         assertEquals(RecordingPhase.TOO_SHORT, viewModel.uiState.value.phase)
         viewModel.cancelScope()
     }
@@ -299,10 +294,8 @@ class WearRecordingViewModelTest {
         viewModel.onTouchUp()
         advanceTimeBy(50)
 
-        // After onTouchUp with short duration, state is TOO_SHORT
         assertEquals(RecordingPhase.TOO_SHORT, viewModel.uiState.value.phase)
 
-        // After the display delay elapses (1200ms), state returns to READY
         advanceTimeBy(2000)
         assertEquals(RecordingPhase.READY, viewModel.uiState.value.phase)
         viewModel.cancelScope()
@@ -313,7 +306,7 @@ class WearRecordingViewModelTest {
         val viewModel = createViewModel()
         viewModel.onTouchDown()
         advanceTimeBy(200)
-        viewModel.onTouchUp() // immediate release, duration 0ms
+        viewModel.onTouchUp()
         advanceTimeBy(2000)
 
         coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
@@ -321,21 +314,21 @@ class WearRecordingViewModelTest {
     }
 
     // -----------------------------------------------------------------------
-    // onTouchUp -- null file path with sufficient duration
+    // onTouchUp -- pause fails
     // -----------------------------------------------------------------------
 
     @Test
-    fun `touch up transitions to ERROR when file path is null and duration sufficient`() = runTest {
-        coEvery { recordingManager.stopRecording() } returns null
+    fun `touch up transitions to ERROR when pause fails`() = runTest {
+        coEvery { recordingManager.pauseRecording() } returns false
         val viewModel = createViewModel()
         viewModel.onTouchDown()
         advanceTimeBy(200)
-        testClock.advanceBy(1000) // sufficient duration
+        testClock.advanceBy(1000)
+
         viewModel.onTouchUp()
-        advanceTimeBy(2000)
+        advanceTimeBy(200)
 
         assertEquals(RecordingPhase.ERROR, viewModel.uiState.value.phase)
-        assertNotNull(viewModel.uiState.value.errorMessage)
         viewModel.cancelScope()
     }
 
@@ -350,41 +343,139 @@ class WearRecordingViewModelTest {
         viewModel.onTouchUp()
         advanceUntilIdle()
 
+        coVerify(exactly = 0) { recordingManager.pauseRecording() }
         coVerify(exactly = 0) { recordingManager.stopRecording() }
     }
 
     // -----------------------------------------------------------------------
-    // onTouchUp -- exception during save
+    // Resume from PAUSED (touch down while paused)
     // -----------------------------------------------------------------------
 
     @Test
-    fun `touch up transitions to ERROR when stopRecording throws`() = runTest {
-        coEvery { recordingManager.stopRecording() } throws RuntimeException("IO failure")
+    fun `touch down from PAUSED resumes recording`() = runTest {
+        val viewModel = createViewModel()
+        // Start -> pause
+        viewModel.onTouchDown()
+        advanceTimeBy(200)
+        testClock.advanceBy(1000)
+        viewModel.onTouchUp()
+        advanceTimeBy(200)
+        assertEquals(RecordingPhase.PAUSED, viewModel.uiState.value.phase)
+
+        // Resume
+        viewModel.onTouchDown()
+        advanceTimeBy(200)
+
+        coVerify { recordingManager.resumeRecording() }
+        assertEquals(RecordingPhase.RECORDING, viewModel.uiState.value.phase)
+        viewModel.cancelScope()
+    }
+
+    @Test
+    fun `duration accumulates across pause-resume cycles`() = runTest {
+        val viewModel = createViewModel()
+        // First segment: 1000ms
+        viewModel.onTouchDown()
+        advanceTimeBy(200)
+        testClock.advanceBy(1000)
+        viewModel.onTouchUp()
+        advanceTimeBy(200)
+        assertEquals(1000, viewModel.uiState.value.recordingDurationMs)
+
+        // Second segment: 500ms
+        testClock.advanceBy(5000) // paused time doesn't count
+        viewModel.onTouchDown()
+        advanceTimeBy(200)
+        testClock.advanceBy(500)
+        viewModel.onTouchUp()
+        advanceTimeBy(200)
+
+        assertEquals(1500, viewModel.uiState.value.recordingDurationMs)
+        viewModel.cancelScope()
+    }
+
+    @Test
+    fun `touch down from PAUSED transitions to ERROR when resume fails`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTouchDown()
         advanceTimeBy(200)
         testClock.advanceBy(1000)
         viewModel.onTouchUp()
-        advanceTimeBy(2000)
+        advanceTimeBy(200)
+
+        coEvery { recordingManager.resumeRecording() } returns false
+        viewModel.onTouchDown()
+        advanceTimeBy(200)
 
         assertEquals(RecordingPhase.ERROR, viewModel.uiState.value.phase)
-        assertNotNull(viewModel.uiState.value.errorMessage)
         viewModel.cancelScope()
     }
 
     // -----------------------------------------------------------------------
-    // NavigateBack event
+    // save() -- explicit save from PAUSED
     // -----------------------------------------------------------------------
 
     @Test
-    fun `NavigateBack event is emitted after successful save`() = runTest {
+    fun `save stops recording and creates audio note`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTouchDown()
         advanceTimeBy(200)
-        testClock.advanceBy(1000) // sufficient duration
+        testClock.advanceBy(2000)
+        viewModel.onTouchUp()
+        advanceTimeBy(200)
+
+        viewModel.save()
+        advanceTimeBy(2000)
+
+        coVerify { recordingManager.stopRecording() }
+        coVerify {
+            notesRepository.create(match { note ->
+                note is JournalNote.Audio && note.mediaRef == "/fake/audio.aac"
+            })
+        }
+    }
+
+    @Test
+    fun `save transitions through SAVING to SAVED`() = runTest {
+        val viewModel = createViewModel()
+        viewModel.onTouchDown()
+        advanceTimeBy(200)
+        testClock.advanceBy(2000)
+        viewModel.onTouchUp()
+        advanceTimeBy(200)
+
+        viewModel.save()
+        advanceTimeBy(2000)
+
+        assertEquals(RecordingPhase.SAVED, viewModel.uiState.value.phase)
+    }
+
+    @Test
+    fun `save includes accumulated duration`() = runTest {
+        val viewModel = createViewModel()
+        viewModel.onTouchDown()
+        advanceTimeBy(200)
+        testClock.advanceBy(3000)
+        viewModel.onTouchUp()
+        advanceTimeBy(200)
+
+        viewModel.save()
+        advanceTimeBy(2000)
+
+        assertEquals(3000, viewModel.uiState.value.savedDurationMs)
+    }
+
+    @Test
+    fun `save emits NavigateBack after delay`() = runTest {
+        val viewModel = createViewModel()
+        viewModel.onTouchDown()
+        advanceTimeBy(200)
+        testClock.advanceBy(1000)
+        viewModel.onTouchUp()
+        advanceTimeBy(200)
 
         viewModel.events.test {
-            viewModel.onTouchUp()
+            viewModel.save()
             advanceTimeBy(2000)
 
             assertEquals(RecordingScreenEvent.NavigateBack, awaitItem())
@@ -392,18 +483,61 @@ class WearRecordingViewModelTest {
     }
 
     @Test
-    fun `no NavigateBack event when recording too short`() = runTest {
+    fun `save is ignored when not PAUSED`() = runTest {
+        val viewModel = createViewModel()
+
+        viewModel.save()
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { recordingManager.stopRecording() }
+    }
+
+    @Test
+    fun `save transitions to ERROR when file path is null`() = runTest {
+        coEvery { recordingManager.stopRecording() } returns null
         val viewModel = createViewModel()
         viewModel.onTouchDown()
         advanceTimeBy(200)
+        testClock.advanceBy(1000)
+        viewModel.onTouchUp()
+        advanceTimeBy(200)
 
-        viewModel.events.test {
-            viewModel.onTouchUp() // 0ms duration
-            advanceTimeBy(50)
+        viewModel.save()
+        advanceTimeBy(200)
 
-            expectNoEvents()
-        }
+        assertEquals(RecordingPhase.ERROR, viewModel.uiState.value.phase)
         viewModel.cancelScope()
+    }
+
+    // -----------------------------------------------------------------------
+    // discard()
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `discard stops recording and resets to READY`() = runTest {
+        val viewModel = createViewModel()
+        viewModel.onTouchDown()
+        advanceTimeBy(200)
+        testClock.advanceBy(1000)
+        viewModel.onTouchUp()
+        advanceTimeBy(200)
+
+        viewModel.discard()
+        advanceTimeBy(200)
+
+        coVerify { recordingManager.stopRecording() }
+        assertEquals(RecordingPhase.READY, viewModel.uiState.value.phase)
+        coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
+    }
+
+    @Test
+    fun `discard is ignored when in READY phase`() = runTest {
+        val viewModel = createViewModel()
+
+        viewModel.discard()
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { recordingManager.stopRecording() }
     }
 
     // -----------------------------------------------------------------------

@@ -171,7 +171,7 @@ fun AudioRecordingScreen(
                 }
                 
                 // Loading indicator (for storage check or initialization)
-                if (!uiState.isRecording && uiState.errorMessage == null && !uiState.navigateBack) {
+                if (uiState.isLoading) {
                     CircularProgressIndicator(
                         modifier = Modifier.align(Alignment.Center),
                         colors = ProgressIndicatorDefaults.colors(

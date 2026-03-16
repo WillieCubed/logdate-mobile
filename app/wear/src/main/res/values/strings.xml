@@ -98,6 +98,8 @@
     <string name="wear_recording_too_short">Too short</string>
     <string name="wear_recording_hold_longer">Hold longer</string>
     <string name="wear_recording_error">Something went wrong</string>
+    <string name="wear_recording_paused">PAUSED</string>
+    <string name="wear_recording_save">Save</string>
     <string name="wear_recording_start">Start Recording</string>
     <string name="wear_recording_stop">Stop Recording</string>
     <string name="wear_recording_pause">Pause</string>

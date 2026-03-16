@@ -11,7 +11,6 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -251,20 +250,18 @@ class AudioRecordingViewModel(
         audioLevelJob?.cancel()
         durationJob?.cancel()
 
+        val recordingStartMs = Clock.System.now().toEpochMilliseconds()
+
         audioLevelJob = viewModelScope.launch {
-            combine(
-                recordingManager.getAudioLevelFlow(),
-                recordingManager.getRecordingDurationFlow(),
-            ) { level, duration ->
-                level to duration.inWholeMilliseconds
-            }
+            recordingManager.getAudioLevelFlow()
                 .sample(periodMillis = 100)
-                .collect { (level, durationMs) ->
+                .collect { level ->
                     _uiState.update { state ->
                         val levels = (state.audioLevels + level).takeLast(50)
+                        val elapsed = Clock.System.now().toEpochMilliseconds() - recordingStartMs
                         state.copy(
                             audioLevels = levels,
-                            durationMs = durationMs,
+                            durationMs = elapsed,
                         )
                     }
                 }

@@ -24,6 +24,7 @@ import kotlin.uuid.Uuid
 enum class RecordingPhase {
     READY,
     RECORDING,
+    PAUSED,
     SAVING,
     SAVED,
     TOO_SHORT,
@@ -65,6 +66,7 @@ class WearRecordingViewModel(
     val events: SharedFlow<RecordingScreenEvent> = _events.asSharedFlow()
 
     private var recordingStartTimeMs: Long = 0
+    private var accumulatedDurationMs: Long = 0
     private var audioLevelJob: Job? = null
     private var autoStopJob: Job? = null
 
@@ -76,8 +78,15 @@ class WearRecordingViewModel(
     }
 
     fun onTouchDown() {
-        if (_uiState.value.phase != RecordingPhase.READY) return
+        val currentPhase = _uiState.value.phase
+        when (currentPhase) {
+            RecordingPhase.READY -> startFreshRecording()
+            RecordingPhase.PAUSED -> resumeRecording()
+            else -> return
+        }
+    }
 
+    private fun startFreshRecording() {
         viewModelScope.launch {
             try {
                 val availableSpace = storageChecker.getAvailableStorageSpace()
@@ -104,6 +113,7 @@ class WearRecordingViewModel(
                 }
 
                 recordingStartTimeMs = clock.now().toEpochMilliseconds()
+                accumulatedDurationMs = 0
                 _uiState.update {
                     it.copy(
                         phase = RecordingPhase.RECORDING,
@@ -128,28 +138,102 @@ class WearRecordingViewModel(
         }
     }
 
+    private fun resumeRecording() {
+        viewModelScope.launch {
+            try {
+                val resumed = recordingManager.resumeRecording()
+                if (!resumed) {
+                    _uiState.update {
+                        it.copy(
+                            phase = RecordingPhase.ERROR,
+                            errorMessage = "Failed to resume recording",
+                        )
+                    }
+                    return@launch
+                }
+
+                recordingStartTimeMs = clock.now().toEpochMilliseconds()
+                _uiState.update {
+                    it.copy(phase = RecordingPhase.RECORDING)
+                }
+
+                startAudioLevelCollection()
+                startAutoStopTimer()
+
+                Napier.d("Push-to-record recording resumed")
+            } catch (e: Exception) {
+                Napier.e("Failed to resume recording", e)
+                _uiState.update {
+                    it.copy(
+                        phase = RecordingPhase.ERROR,
+                        errorMessage = "Failed to resume: ${e.message}",
+                    )
+                }
+            }
+        }
+    }
+
     fun onTouchUp() {
         if (_uiState.value.phase != RecordingPhase.RECORDING) return
 
         autoStopJob?.cancel()
         autoStopJob = null
 
+        val segmentDurationMs = clock.now().toEpochMilliseconds() - recordingStartTimeMs
+        val totalDurationMs = accumulatedDurationMs + segmentDurationMs
+
         viewModelScope.launch {
             try {
-                val filePath = recordingManager.stopRecording()
-                stopAudioLevelCollection()
-
-                val durationMs = clock.now().toEpochMilliseconds() - recordingStartTimeMs
-
-                if (durationMs < MIN_DURATION_MS) {
-                    Napier.d("Recording too short: ${durationMs}ms")
+                if (totalDurationMs < MIN_DURATION_MS) {
+                    recordingManager.stopRecording()
+                    stopAudioLevelCollection()
+                    Napier.d("Recording too short: ${totalDurationMs}ms")
                     _uiState.update { it.copy(phase = RecordingPhase.TOO_SHORT) }
                     delay(TOO_SHORT_DISPLAY_MS)
+                    _uiState.update { RecordingUiState(phase = RecordingPhase.READY) }
+                    return@launch
+                }
+
+                val paused = recordingManager.pauseRecording()
+                if (!paused) {
                     _uiState.update {
-                        RecordingUiState(phase = RecordingPhase.READY)
+                        it.copy(
+                            phase = RecordingPhase.ERROR,
+                            errorMessage = "Failed to pause recording",
+                        )
                     }
                     return@launch
                 }
+
+                stopAudioLevelCollection()
+                accumulatedDurationMs = totalDurationMs
+
+                _uiState.update {
+                    it.copy(
+                        phase = RecordingPhase.PAUSED,
+                        recordingDurationMs = totalDurationMs,
+                    )
+                }
+
+                Napier.d("Recording paused at ${totalDurationMs}ms")
+            } catch (e: Exception) {
+                Napier.e("Failed to pause recording", e)
+                _uiState.update {
+                    it.copy(
+                        phase = RecordingPhase.ERROR,
+                        errorMessage = "Failed to pause: ${e.message}",
+                    )
+                }
+            }
+        }
+    }
+
+    fun save() {
+        if (_uiState.value.phase != RecordingPhase.PAUSED) return
+
+        viewModelScope.launch {
+            try {
+                val filePath = recordingManager.stopRecording()
 
                 if (filePath == null) {
                     _uiState.update {
@@ -169,18 +253,18 @@ class WearRecordingViewModel(
                     uid = Uuid.random(),
                     creationTimestamp = now,
                     lastUpdated = now,
-                    durationMs = durationMs,
+                    durationMs = accumulatedDurationMs,
                 )
                 notesRepository.create(audioNote)
 
                 _uiState.update {
                     it.copy(
                         phase = RecordingPhase.SAVED,
-                        savedDurationMs = durationMs,
+                        savedDurationMs = accumulatedDurationMs,
                     )
                 }
 
-                Napier.d("Audio note saved: $filePath (${durationMs}ms)")
+                Napier.d("Audio note saved: $filePath (${accumulatedDurationMs}ms)")
 
                 delay(SAVED_DISPLAY_MS)
                 _events.emit(RecordingScreenEvent.NavigateBack)
@@ -193,6 +277,21 @@ class WearRecordingViewModel(
                     )
                 }
             }
+        }
+    }
+
+    fun discard() {
+        val phase = _uiState.value.phase
+        if (phase != RecordingPhase.PAUSED && phase != RecordingPhase.RECORDING) return
+
+        viewModelScope.launch {
+            autoStopJob?.cancel()
+            autoStopJob = null
+            stopAudioLevelCollection()
+            recordingManager.stopRecording()
+            accumulatedDurationMs = 0
+            _uiState.update { RecordingUiState(phase = RecordingPhase.READY) }
+            Napier.d("Recording discarded")
         }
     }
 
@@ -209,7 +308,8 @@ class WearRecordingViewModel(
                 .collect { level ->
                     _uiState.update { state ->
                         val levels = (state.audioLevels + level).takeLast(50)
-                        val durationMs = clock.now().toEpochMilliseconds() - recordingStartTimeMs
+                        val segmentMs = clock.now().toEpochMilliseconds() - recordingStartTimeMs
+                        val durationMs = accumulatedDurationMs + segmentMs
                         state.copy(
                             audioLevels = levels,
                             recordingDurationMs = durationMs,
@@ -226,9 +326,10 @@ class WearRecordingViewModel(
 
     private fun startAutoStopTimer() {
         autoStopJob?.cancel()
+        val remainingMs = MAX_DURATION_MS - accumulatedDurationMs
         autoStopJob = viewModelScope.launch {
-            delay(MAX_DURATION_MS)
-            Napier.d("Auto-stop at ${MAX_DURATION_MS}ms")
+            delay(remainingMs)
+            Napier.d("Auto-pause at ${MAX_DURATION_MS}ms")
             onTouchUp()
         }
     }

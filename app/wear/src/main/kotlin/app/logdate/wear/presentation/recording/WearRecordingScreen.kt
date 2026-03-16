@@ -10,11 +10,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -27,6 +32,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.wear.compose.material3.Button
+import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
@@ -61,25 +68,32 @@ fun WearRecordingScreen(
         label = "bg",
     )
 
-    // Gesture detection lives on the outer Box so it persists across phase
-    // transitions.  When the phase flips from READY → RECORDING, the inner
-    // content composables swap, but this pointer-input scope stays alive,
-    // so the finger-up event is never lost.
+    // Full-screen touch handler is only active during READY and RECORDING.
+    // In PAUSED state, buttons handle interaction directly.
+    val useTouchHandler = uiState.phase == RecordingPhase.READY ||
+        uiState.phase == RecordingPhase.RECORDING
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(backgroundColor)
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        when (event.type) {
-                            PointerEventType.Press -> viewModel.onTouchDown()
-                            PointerEventType.Release -> viewModel.onTouchUp()
+            .then(
+                if (useTouchHandler) {
+                    Modifier.pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                when (event.type) {
+                                    PointerEventType.Press -> viewModel.onTouchDown()
+                                    PointerEventType.Release -> viewModel.onTouchUp()
+                                }
+                            }
                         }
                     }
-                }
-            },
+                } else {
+                    Modifier
+                },
+            ),
         contentAlignment = Alignment.Center,
     ) {
         when (uiState.phase) {
@@ -87,6 +101,12 @@ fun WearRecordingScreen(
             RecordingPhase.RECORDING -> ActiveRecordingContent(
                 durationMs = uiState.recordingDurationMs,
                 audioLevels = uiState.audioLevels,
+            )
+            RecordingPhase.PAUSED -> PausedContent(
+                durationMs = uiState.recordingDurationMs,
+                onResume = viewModel::onTouchDown,
+                onSave = viewModel::save,
+                onDiscard = viewModel::discard,
             )
             RecordingPhase.SAVING -> SavingContent()
             RecordingPhase.SAVED -> SavedContent(durationMs = uiState.savedDurationMs)
@@ -141,6 +161,69 @@ internal fun ActiveRecordingContent(
             color = Color.White.copy(alpha = 0.7f),
             modifier = Modifier.padding(top = 4.dp),
         )
+    }
+}
+
+@Composable
+internal fun PausedContent(
+    durationMs: Long,
+    onResume: () -> Unit,
+    onSave: () -> Unit,
+    onDiscard: () -> Unit,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = stringResource(R.string.wear_recording_paused),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = formatDuration(durationMs),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            Button(
+                onClick = onResume,
+                modifier = Modifier.size(48.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = stringResource(R.string.wear_recording_resume),
+                )
+            }
+            Button(
+                onClick = onSave,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                ),
+                modifier = Modifier.size(48.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Save,
+                    contentDescription = stringResource(R.string.wear_recording_save),
+                )
+            }
+            Button(
+                onClick = onDiscard,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                ),
+                modifier = Modifier.size(48.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = stringResource(R.string.cancel),
+                )
+            }
+        }
     }
 }
 
