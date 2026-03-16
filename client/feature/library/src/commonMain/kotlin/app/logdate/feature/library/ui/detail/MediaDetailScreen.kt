@@ -1,7 +1,9 @@
 @file:Suppress("ktlint:standard:function-naming")
+@file:OptIn(ExperimentalSharedTransitionApi::class)
 
 package app.logdate.feature.library.ui.detail
 
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +50,9 @@ import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.feature.editor.ui.video.VideoPlayerContent
+import app.logdate.feature.library.ui.components.LIBRARY_MEDIA_TRANSITION_KEY
+import app.logdate.ui.LocalNavAnimatedVisibilityScope
+import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
@@ -136,6 +141,7 @@ fun MediaDetailContent(
             MediaDetailLayout(
                 mediaRef = state.mediaRef,
                 isVideo = false,
+                noteId = state.noteId,
                 createdAt = state.createdAt,
                 location = state.location,
                 journals = state.journals,
@@ -152,6 +158,7 @@ fun MediaDetailContent(
             MediaDetailLayout(
                 mediaRef = state.mediaRef,
                 isVideo = true,
+                noteId = state.noteId,
                 createdAt = state.createdAt,
                 location = state.location,
                 journals = state.journals,
@@ -170,6 +177,7 @@ fun MediaDetailContent(
 private fun MediaDetailLayout(
     mediaRef: String,
     isVideo: Boolean,
+    noteId: Uuid,
     createdAt: Instant,
     location: NoteLocation?,
     journals: List<JournalReference>,
@@ -187,7 +195,7 @@ private fun MediaDetailLayout(
                 modifier = Modifier.weight(2f).fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
-                MediaContent(mediaRef = mediaRef, isVideo = isVideo)
+                MediaContent(mediaRef = mediaRef, isVideo = isVideo, noteId = noteId)
             }
             Column(
                 modifier =
@@ -215,6 +223,7 @@ private fun MediaDetailLayout(
             MediaContent(
                 mediaRef = mediaRef,
                 isVideo = isVideo,
+                noteId = noteId,
                 modifier = Modifier.fillMaxSize(),
             )
 
@@ -270,8 +279,24 @@ private fun MediaDetailLayout(
 private fun MediaContent(
     mediaRef: String,
     isVideo: Boolean,
+    noteId: Uuid? = null,
     modifier: Modifier = Modifier,
 ) {
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
+
+    val sharedModifier =
+        if (noteId != null && sharedTransitionScope != null && animatedVisibilityScope != null) {
+            with(sharedTransitionScope) {
+                Modifier.sharedElement(
+                    rememberSharedContentState(key = "$LIBRARY_MEDIA_TRANSITION_KEY-$noteId"),
+                    animatedVisibilityScope,
+                )
+            }
+        } else {
+            Modifier
+        }
+
     if (isVideo) {
         VideoPlayerContent(
             uri = mediaRef,
@@ -282,7 +307,7 @@ private fun MediaContent(
             model = mediaRef,
             contentDescription = "Photo",
             contentScale = ContentScale.Fit,
-            modifier = modifier.fillMaxSize(),
+            modifier = sharedModifier.then(modifier).fillMaxSize(),
         )
     }
 }
