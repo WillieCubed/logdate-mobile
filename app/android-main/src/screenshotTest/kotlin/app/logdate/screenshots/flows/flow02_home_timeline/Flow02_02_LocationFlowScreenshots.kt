@@ -142,7 +142,10 @@ private val samplePlaces =
     )
 
 private val sampleLocationSelectedState =
-    LocationTimelineUiState.Success(
+    LocationTimelineUiState.Content(
+        isLoadingCurrentLocation = false,
+        isLoadingPlaces = false,
+        isLoadingStops = false,
         currentLocation = sampleCurrentLocation,
         selectedFilter = LocationMemoryTimeFilter.Last30Days,
         places = samplePlaces,
@@ -152,7 +155,10 @@ private val sampleLocationSelectedState =
     )
 
 private val sampleLocationEmptyState =
-    LocationTimelineUiState.Success(
+    LocationTimelineUiState.Content(
+        isLoadingCurrentLocation = false,
+        isLoadingPlaces = false,
+        isLoadingStops = false,
         currentLocation = null,
         selectedFilter = LocationMemoryTimeFilter.Last30Days,
         places = emptyList(),
@@ -301,7 +307,7 @@ fun S05_LocationQuickPeekEmpty() {
 fun S06_LocationQuickPeekLoading() {
     ScreenshotTheme {
         LocationTimelineQuickPeekSheet(
-            uiState = LocationTimelineUiState.Loading,
+            uiState = LocationTimelineUiState.Content(),
             onDismissRequest = {},
             onOpenFullTimeline = {},
             onSelectPlace = {},

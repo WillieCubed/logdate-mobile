@@ -2,9 +2,13 @@
 
 package app.logdate.feature.location.timeline.ui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -14,6 +18,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,12 +31,12 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -59,6 +64,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.client.domain.location.LocationMemoryTimeFilter
@@ -69,7 +75,6 @@ import app.logdate.feature.location.timeline.ui.model.LocationPlaceUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationStopUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineErrorUiState
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineUiState
-import io.github.aakira.napier.Napier
 import logdate.client.feature.location.timeline.generated.resources.Res
 import logdate.client.feature.location.timeline.generated.resources.all_time
 import logdate.client.feature.location.timeline.generated.resources.cancel
@@ -154,10 +159,9 @@ fun LocationTimelineContent(
     modifier: Modifier = Modifier,
 ) {
     when (uiState) {
-        is LocationTimelineUiState.Loading -> LoadingState(modifier)
         is LocationTimelineUiState.Error -> ErrorState(error = uiState.error, onRetry = onRetry, modifier = modifier)
-        is LocationTimelineUiState.Success ->
-            SuccessState(
+        is LocationTimelineUiState.Content ->
+            ContentState(
                 uiState = uiState,
                 onSelectPlace = onSelectPlace,
                 onDismissPlaceDetail = onDismissPlaceDetail,
@@ -167,16 +171,6 @@ fun LocationTimelineContent(
                 onOpenNote = onOpenNote,
                 modifier = modifier,
             )
-    }
-}
-
-@Composable
-private fun LoadingState(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
-        CircularProgressIndicator()
     }
 }
 
@@ -283,8 +277,8 @@ internal fun LocationTimelineErrorCard(
 }
 
 @Composable
-private fun SuccessState(
-    uiState: LocationTimelineUiState.Success,
+private fun ContentState(
+    uiState: LocationTimelineUiState.Content,
     onSelectPlace: (String) -> Unit,
     onDismissPlaceDetail: () -> Unit,
     onDeleteStop: (String) -> Unit,
@@ -293,23 +287,35 @@ private fun SuccessState(
     onOpenNote: (Uuid) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (uiState.visiblePlaces.isEmpty() && uiState.recentStops.isEmpty() && uiState.currentLocation == null) {
+    if (uiState.isFullyLoaded && uiState.visiblePlaces.isEmpty() && uiState.recentStops.isEmpty() && uiState.currentLocation == null) {
         EmptyLocationTimeline(modifier = modifier)
         return
     }
 
     val listState = rememberLazyListState()
+    val hasMapData = uiState.currentLocation != null || uiState.visiblePlaces.isNotEmpty()
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val useTwoPane = maxWidth >= 840.dp
 
-        if (useTwoPane) {
-            Row(modifier = Modifier.fillMaxSize()) {
+        @Composable
+        fun MapOrPlaceholder(modifier: Modifier) {
+            if (hasMapData) {
                 LocationTimelineMap(
                     places = uiState.visiblePlaces,
                     currentLocation = uiState.currentLocation,
                     selectedPlaceId = uiState.selectedPlaceId,
                     onSelectPlace = onSelectPlace,
+                    modifier = modifier,
+                )
+            } else {
+                MapPlaceholder(modifier = modifier)
+            }
+        }
+
+        if (useTwoPane) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                MapOrPlaceholder(
                     modifier =
                         Modifier
                             .weight(1f)
@@ -358,11 +364,7 @@ private fun SuccessState(
             )
 
             Column(modifier = Modifier.fillMaxSize()) {
-                LocationTimelineMap(
-                    places = uiState.visiblePlaces,
-                    currentLocation = uiState.currentLocation,
-                    selectedPlaceId = uiState.selectedPlaceId,
-                    onSelectPlace = onSelectPlace,
+                MapOrPlaceholder(
                     modifier =
                         Modifier
                             .fillMaxWidth()
@@ -394,7 +396,7 @@ private fun SuccessState(
 
 @Composable
 private fun PlacesAndHistoryList(
-    uiState: LocationTimelineUiState.Success,
+    uiState: LocationTimelineUiState.Content,
     onSelectPlace: (String) -> Unit,
     onDeleteStop: (String) -> Unit,
     onSelectFilter: (LocationMemoryTimeFilter) -> Unit,
@@ -415,9 +417,23 @@ private fun PlacesAndHistoryList(
             )
         }
 
-        uiState.currentLocation?.let { currentLocation ->
-            item {
-                CurrentLocationCard(currentLocation = currentLocation)
+        // Current location section
+        item {
+            AnimatedVisibility(
+                visible = !uiState.isLoadingCurrentLocation && uiState.currentLocation != null,
+                enter = fadeIn(tween(200)),
+                exit = fadeOut(tween(150)),
+            ) {
+                uiState.currentLocation?.let { currentLocation ->
+                    CurrentLocationCard(currentLocation = currentLocation)
+                }
+            }
+            AnimatedVisibility(
+                visible = uiState.isLoadingCurrentLocation,
+                enter = fadeIn(tween(200)),
+                exit = fadeOut(tween(150)),
+            ) {
+                CurrentLocationPlaceholder()
             }
         }
 
@@ -428,7 +444,14 @@ private fun PlacesAndHistoryList(
             )
         }
 
-        if (uiState.visiblePlaces.isEmpty()) {
+        // Places section
+        if (uiState.isLoadingPlaces && uiState.visiblePlaces.isEmpty()) {
+            items(3) {
+                PlacePlaceholder()
+            }
+        }
+
+        if (!uiState.isLoadingPlaces && uiState.visiblePlaces.isEmpty()) {
             item {
                 Card {
                     Column(
@@ -474,6 +497,19 @@ private fun PlacesAndHistoryList(
             }
         }
 
+        // Stops section
+        if (uiState.isLoadingStops && uiState.recentStops.isEmpty()) {
+            item {
+                SectionHeader(
+                    title = stringResource(Res.string.recent_stays),
+                    subtitle = "",
+                )
+            }
+            items(2) {
+                StopPlaceholder()
+            }
+        }
+
         if (uiState.recentStops.isNotEmpty()) {
             item {
                 SectionHeader(
@@ -509,13 +545,10 @@ private fun PlacesFilterRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         for (filter in LocationMemoryTimeFilter.Presets) {
-            val currentFilter = filter
             FilterChip(
-                selected = currentFilter == selectedFilter,
-                onClick = { onSelectFilter(currentFilter) },
-                label = {
-                    Text(FilterLabel(currentFilter))
-                },
+                selected = filter == selectedFilter,
+                onClick = { onSelectFilter(filter) },
+                label = { Text(FilterLabel(filter)) },
             )
         }
     }
@@ -523,19 +556,12 @@ private fun PlacesFilterRow(
 
 @Composable
 private fun FilterLabel(filter: LocationMemoryTimeFilter): String =
-    if (filter == LocationMemoryTimeFilter.Last30Days) {
-        stringResource(Res.string.last_30_days)
-    } else if (filter == LocationMemoryTimeFilter.Last90Days) {
-        stringResource(Res.string.last_90_days)
-    } else if (filter == LocationMemoryTimeFilter.YearToDate) {
-        stringResource(Res.string.year_to_date)
-    } else if (filter == LocationMemoryTimeFilter.AllTime) {
-        stringResource(Res.string.all_time)
-    } else if (filter is LocationMemoryTimeFilter.Custom) {
-        stringResource(Res.string.custom_range)
-    } else {
-        Napier.w("Unexpected location filter shown in UI: $filter")
-        stringResource(Res.string.custom_range)
+    when (filter) {
+        LocationMemoryTimeFilter.Last30Days -> stringResource(Res.string.last_30_days)
+        LocationMemoryTimeFilter.Last90Days -> stringResource(Res.string.last_90_days)
+        LocationMemoryTimeFilter.YearToDate -> stringResource(Res.string.year_to_date)
+        LocationMemoryTimeFilter.AllTime -> stringResource(Res.string.all_time)
+        is LocationMemoryTimeFilter.Custom -> stringResource(Res.string.custom_range)
     }
 
 @Composable
@@ -553,11 +579,13 @@ private fun SectionHeader(
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (subtitle.isNotEmpty()) {
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -926,5 +954,90 @@ private fun EmptyLocationTimeline(modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+// ─── Skeleton Placeholders ──────────────────────────────────────────────────────
+
+@Composable
+private fun MapPlaceholder(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        shape = RoundedCornerShape(24.dp),
+    ) {
+        Box(modifier = Modifier.fillMaxSize())
+    }
+}
+
+@Composable
+private fun CurrentLocationPlaceholder(modifier: Modifier = Modifier) {
+    Card(modifier = modifier) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            PlaceholderLine(width = 96.dp)
+            PlaceholderLine(width = 200.dp, height = 18.dp)
+            PlaceholderLine(width = 160.dp)
+        }
+    }
+}
+
+@Composable
+private fun PlacePlaceholder(modifier: Modifier = Modifier) {
+    Card(modifier = modifier) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            PlaceholderLine(width = 180.dp, height = 18.dp)
+            PlaceholderLine(width = 240.dp)
+            PlaceholderLine(width = 80.dp)
+            PlaceholderLine(width = 120.dp)
+        }
+    }
+}
+
+@Composable
+private fun StopPlaceholder(modifier: Modifier = Modifier) {
+    Card(modifier = modifier) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            PlaceholderLine(width = 160.dp, height = 18.dp)
+            PlaceholderLine(width = 200.dp)
+            PlaceholderLine(width = 140.dp)
+            PlaceholderLine(width = 100.dp)
+        }
+    }
+}
+
+@Composable
+private fun PlaceholderLine(
+    width: Dp,
+    height: Dp = 14.dp,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier =
+            modifier
+                .widthIn(max = width)
+                .fillMaxWidth()
+                .height(height),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Spacer(Modifier)
     }
 }

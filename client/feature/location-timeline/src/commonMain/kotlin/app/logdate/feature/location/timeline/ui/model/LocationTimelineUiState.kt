@@ -5,23 +5,29 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 sealed interface LocationTimelineUiState {
-    data object Loading : LocationTimelineUiState
-
     data class Error(
         val error: LocationTimelineErrorUiState,
     ) : LocationTimelineUiState
 
-    data class Success(
-        val currentLocation: CurrentLocationUiModel?,
-        val selectedFilter: LocationMemoryTimeFilter,
-        val places: List<LocationPlaceUiModel>,
-        val visiblePlaces: List<LocationPlaceUiModel>,
-        val recentStops: List<LocationStopUiModel>,
-        val selectedPlaceId: String? = visiblePlaces.firstOrNull()?.id,
+    data class Content(
+        val isLoadingCurrentLocation: Boolean = true,
+        val isLoadingPlaces: Boolean = true,
+        val isLoadingStops: Boolean = true,
+        val currentLocation: CurrentLocationUiModel? = null,
+        val selectedFilter: LocationMemoryTimeFilter = LocationMemoryTimeFilter.Last30Days,
+        val places: List<LocationPlaceUiModel> = emptyList(),
+        val visiblePlaces: List<LocationPlaceUiModel> = emptyList(),
+        val recentStops: List<LocationStopUiModel> = emptyList(),
+        val selectedPlaceId: String? = null,
         val canLoadMorePlaces: Boolean = false,
     ) : LocationTimelineUiState {
         val selectedPlace: LocationPlaceUiModel?
-            get() = visiblePlaces.firstOrNull { it.id == selectedPlaceId } ?: visiblePlaces.firstOrNull()
+            get() =
+                visiblePlaces.firstOrNull { it.id == selectedPlaceId }
+                    ?: visiblePlaces.firstOrNull()
+
+        val isFullyLoaded: Boolean
+            get() = !isLoadingCurrentLocation && !isLoadingPlaces && !isLoadingStops
     }
 }
 

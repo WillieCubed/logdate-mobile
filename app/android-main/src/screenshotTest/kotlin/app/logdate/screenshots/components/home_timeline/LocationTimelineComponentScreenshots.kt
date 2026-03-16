@@ -125,8 +125,11 @@ internal val samplePlaces = listOf(
     ),
 )
 
-internal val sampleLocationSuccessState =
-    LocationTimelineUiState.Success(
+internal val sampleLocationContentState =
+    LocationTimelineUiState.Content(
+        isLoadingCurrentLocation = false,
+        isLoadingPlaces = false,
+        isLoadingStops = false,
         currentLocation = sampleCurrentLocation,
         selectedFilter = LocationMemoryTimeFilter.Last30Days,
         places = samplePlaces,
@@ -137,7 +140,10 @@ internal val sampleLocationSuccessState =
     )
 
 internal val sampleLocationSelectedState =
-    LocationTimelineUiState.Success(
+    LocationTimelineUiState.Content(
+        isLoadingCurrentLocation = false,
+        isLoadingPlaces = false,
+        isLoadingStops = false,
         currentLocation = sampleCurrentLocation,
         selectedFilter = LocationMemoryTimeFilter.Last30Days,
         places = samplePlaces,
@@ -147,7 +153,10 @@ internal val sampleLocationSelectedState =
     )
 
 internal val sampleLocationEmptyState =
-    LocationTimelineUiState.Success(
+    LocationTimelineUiState.Content(
+        isLoadingCurrentLocation = false,
+        isLoadingPlaces = false,
+        isLoadingStops = false,
         currentLocation = null,
         selectedFilter = LocationMemoryTimeFilter.Last30Days,
         places = emptyList(),
@@ -163,7 +172,7 @@ internal val sampleLocationEmptyState =
 fun LocationTimeline_Loading() {
     ScreenshotTheme {
         LocationTimelineContent(
-            uiState = LocationTimelineUiState.Loading,
+            uiState = LocationTimelineUiState.Content(),
             onSelectPlace = {},
             onDismissPlaceDetail = {},
             onDeleteStop = {},
@@ -176,10 +185,34 @@ fun LocationTimeline_Loading() {
 @PreviewTest
 @Preview(showBackground = true, device = PHONE)
 @Composable
-fun LocationTimeline_Success() {
+fun LocationTimeline_PartiallyLoaded() {
     ScreenshotTheme {
         LocationTimelineContent(
-            uiState = sampleLocationSuccessState,
+            uiState = LocationTimelineUiState.Content(
+                isLoadingCurrentLocation = false,
+                isLoadingPlaces = false,
+                isLoadingStops = true,
+                currentLocation = sampleCurrentLocation,
+                places = samplePlaces,
+                visiblePlaces = samplePlaces,
+                selectedPlaceId = samplePlaces.first().id,
+            ),
+            onSelectPlace = {},
+            onDismissPlaceDetail = {},
+            onDeleteStop = {},
+            onSelectFilter = {},
+            onLoadMorePlaces = {},
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun LocationTimeline_Content() {
+    ScreenshotTheme {
+        LocationTimelineContent(
+            uiState = sampleLocationContentState,
             onSelectPlace = {},
             onDismissPlaceDetail = {},
             onDeleteStop = {},
@@ -192,10 +225,10 @@ fun LocationTimeline_Success() {
 @PreviewTest
 @Preview(showBackground = true, device = PHONE, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
-fun LocationTimeline_Success_Dark() {
+fun LocationTimeline_Content_Dark() {
     ScreenshotTheme(darkTheme = true) {
         LocationTimelineContent(
-            uiState = sampleLocationSuccessState,
+            uiState = sampleLocationContentState,
             onSelectPlace = {},
             onDismissPlaceDetail = {},
             onDeleteStop = {},

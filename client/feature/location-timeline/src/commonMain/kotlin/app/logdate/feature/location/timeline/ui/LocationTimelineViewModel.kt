@@ -21,6 +21,7 @@ import app.logdate.feature.location.timeline.ui.model.LocationMemoryKind
 import app.logdate.feature.location.timeline.ui.model.LocationMemoryPreviewUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationPlaceUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationStopUiModel
+import app.logdate.feature.location.timeline.ui.model.LocationTimelineErrorUiState
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineUiState
 import app.logdate.feature.location.timeline.ui.model.toLocationTimelineErrorUiState
 import app.logdate.shared.model.AltitudeUnit
@@ -63,17 +64,23 @@ class LocationTimelineViewModel(
     private val deleteLocationRangeUseCase: DeleteLocationRangeUseCase,
     private val captureLocationForTimelineReviewUseCase: CaptureLocationForTimelineReviewUseCase,
 ) : ViewModel() {
-    private sealed interface ObservationState<out T> {
-        data class Value<T>(
-            val value: T,
-        ) : ObservationState<T>
+    private sealed interface SectionState<out T> {
+        data object Loading : SectionState<Nothing>
 
-        data class Failure(
+        data class Loaded<T>(
+            val value: T,
+        ) : SectionState<T>
+
+        data class Failed(
             val throwable: Throwable,
-        ) : ObservationState<Nothing>
+        ) : SectionState<Nothing>
+
+        val isLoading get() = this is Loading
+
+        fun valueOrNull(): T? = (this as? Loaded)?.value
     }
 
-    private val _uiState = MutableStateFlow<LocationTimelineUiState>(LocationTimelineUiState.Loading)
+    private val _uiState = MutableStateFlow<LocationTimelineUiState>(LocationTimelineUiState.Content())
     val uiState: StateFlow<LocationTimelineUiState> = _uiState.asStateFlow()
     private val selectedFilter = MutableStateFlow<LocationMemoryTimeFilter>(LocationMemoryTimeFilter.Last30Days)
     private val visiblePlaceCount = MutableStateFlow(DEFAULT_PLACE_PAGE_SIZE)
@@ -85,13 +92,11 @@ class LocationTimelineViewModel(
     }
 
     fun selectPlace(placeId: String) {
-        val state = _uiState.value as? LocationTimelineUiState.Success ?: return
-        _uiState.value = state.copy(selectedPlaceId = placeId)
+        transformContentState { copy(selectedPlaceId = placeId) }
     }
 
     fun dismissPlaceDetail() {
-        val state = _uiState.value as? LocationTimelineUiState.Success ?: return
-        _uiState.value = state.copy(selectedPlaceId = null)
+        transformContentState { copy(selectedPlaceId = null) }
     }
 
     fun selectFilter(filter: LocationMemoryTimeFilter) {
@@ -100,30 +105,34 @@ class LocationTimelineViewModel(
     }
 
     fun loadMorePlaces() {
-        val state = _uiState.value as? LocationTimelineUiState.Success ?: return
-        if (!state.canLoadMorePlaces) {
-            return
+        withContentState {
+            if (canLoadMorePlaces) visiblePlaceCount.value += DEFAULT_PLACE_PAGE_SIZE
         }
-
-        visiblePlaceCount.value += DEFAULT_PLACE_PAGE_SIZE
     }
 
     fun deleteStop(stopId: String) {
-        val state = _uiState.value as? LocationTimelineUiState.Success ?: return
-        val stop = state.recentStops.firstOrNull { it.id == stopId } ?: return
-
-        viewModelScope.launch {
-            deleteLocationRangeUseCase(
-                startTime = stop.startTime,
-                endTime = stop.endTime + 1.milliseconds,
-            ).onFailure { error ->
-                Napier.e("Failed to delete location stop ${stop.id}", error)
+        withContentState {
+            val stop = recentStops.firstOrNull { it.id == stopId } ?: return@withContentState
+            viewModelScope.launch {
+                deleteLocationRangeUseCase(
+                    startTime = stop.startTime,
+                    endTime = stop.endTime + 1.milliseconds,
+                ).onFailure { Napier.e("Failed to delete location stop ${stop.id}", it) }
             }
         }
     }
 
+    private inline fun transformContentState(transform: LocationTimelineUiState.Content.() -> LocationTimelineUiState.Content) {
+        val state = _uiState.value as? LocationTimelineUiState.Content ?: return
+        _uiState.value = state.transform()
+    }
+
+    private inline fun withContentState(block: LocationTimelineUiState.Content.() -> Unit) {
+        (_uiState.value as? LocationTimelineUiState.Content)?.block()
+    }
+
     fun retry() {
-        _uiState.value = LocationTimelineUiState.Loading
+        _uiState.value = LocationTimelineUiState.Content()
         observeTimeline()
     }
 
@@ -145,19 +154,16 @@ class LocationTimelineViewModel(
                     observeCurrentLocationState(),
                     observeLocationStopsState(),
                     selectedFilter.flatMapLatest { filter ->
-                        observeLocationMemoryPlacesUseCase(filter)
-                            .catch { error ->
-                                Napier.w("Failed to observe location memory places", error)
-                                emit(emptyList())
-                            }.mapLatest { places -> filter to places }
+                        observeLocationMemoryPlacesState(filter)
+                            .mapLatest { placesState -> filter to placesState }
                     },
                     visiblePlaceCount,
-                ) { currentLocation, stops, filterAndPlaces, visibleCount ->
+                ) { currentLocationState, stopsState, filterAndPlacesState, visibleCount ->
                     buildUiState(
-                        currentLocationState = currentLocation,
-                        stopsState = stops,
-                        selectedFilter = filterAndPlaces.first,
-                        memoryPlaces = filterAndPlaces.second,
+                        currentLocationState = currentLocationState,
+                        stopsState = stopsState,
+                        selectedFilter = filterAndPlacesState.first,
+                        placesState = filterAndPlacesState.second,
                         visibleCount = visibleCount,
                     )
                 }.catch { error ->
@@ -169,71 +175,51 @@ class LocationTimelineViewModel(
             }
     }
 
-    private fun observeCurrentLocationState(): Flow<ObservationState<Location?>> =
+    private fun observeCurrentLocationState(): Flow<SectionState<Location?>> =
         observeLocationUseCase()
             .distinctUntilChanged { a, b -> a.distanceTo(b) < 50.0 }
-            .mapLatest<_, ObservationState<Location?>> { ObservationState.Value(it as Location?) }
-            .catch { error ->
-                Napier.w("Failed to observe current location", error)
-                emit(ObservationState.Failure(error))
-            }.onStart { emit(ObservationState.Value(null)) }
+            .toSectionState()
 
-    private fun observeLocationStopsState(): Flow<ObservationState<List<LocationStop>>> =
-        observeLocationStopsUseCase()
-            .mapLatest<_, ObservationState<List<LocationStop>>> { ObservationState.Value(it) }
+    private fun observeLocationStopsState(): Flow<SectionState<List<LocationStop>>> = observeLocationStopsUseCase().toSectionState()
+
+    private fun observeLocationMemoryPlacesState(filter: LocationMemoryTimeFilter) =
+        observeLocationMemoryPlacesUseCase(filter).toSectionState()
+
+    private fun <T> Flow<T>.toSectionState(): Flow<SectionState<T>> =
+        mapLatest<T, SectionState<T>> { SectionState.Loaded(it) }
             .catch { error ->
-                Napier.w("Failed to observe location stops", error)
-                emit(ObservationState.Failure(error))
-            }.onStart { emit(ObservationState.Value(emptyList())) }
+                Napier.w("Failed to observe section", error)
+                emit(SectionState.Failed(error))
+            }.onStart { emit(SectionState.Loading) }
 
     private suspend fun buildUiState(
-        currentLocationState: ObservationState<Location?>,
-        stopsState: ObservationState<List<LocationStop>>,
+        currentLocationState: SectionState<Location?>,
+        stopsState: SectionState<List<LocationStop>>,
         selectedFilter: LocationMemoryTimeFilter,
-        memoryPlaces: List<LocationMemoryPlace>,
+        placesState: SectionState<List<LocationMemoryPlace>>,
         visibleCount: Int,
     ): LocationTimelineUiState {
-        val currentLocation = (currentLocationState as? ObservationState.Value)?.value
-        val stops = (stopsState as? ObservationState.Value)?.value.orEmpty()
-
-        if (currentLocation == null && stops.isEmpty() && memoryPlaces.isEmpty()) {
-            val fatalError =
-                when {
-                    stopsState is ObservationState.Failure -> stopsState.throwable
-                    currentLocationState is ObservationState.Failure -> currentLocationState.throwable
-                    else -> null
-                }
-
-            if (fatalError != null) {
-                return LocationTimelineUiState.Error(fatalError.toLocationTimelineErrorUiState())
-            }
+        detectBlockingError(currentLocationState, stopsState)?.let { error ->
+            return LocationTimelineUiState.Error(error)
         }
 
-        return buildSuccessState(
-            currentLocation = currentLocation,
-            stops = stops,
-            memoryPlaces = memoryPlaces,
-            selectedFilter = selectedFilter,
-            visibleCount = visibleCount,
-        )
-    }
+        val currentLocation = currentLocationState.valueOrNull()
+        val stops = stopsState.valueOrNull().orEmpty()
+        val memoryPlaces = placesState.valueOrNull().orEmpty()
 
-    private suspend fun buildSuccessState(
-        currentLocation: Location?,
-        stops: List<LocationStop>,
-        memoryPlaces: List<LocationMemoryPlace>,
-        selectedFilter: LocationMemoryTimeFilter,
-        visibleCount: Int,
-    ): LocationTimelineUiState {
         val mappedStops = stops.map { stop -> stop.toUiModel() }
         val mappedPlaces = memoryPlaces.map { place -> place.toUiModel(mappedStops) }
         val mappedCurrentLocation = currentLocation?.toCurrentLocationUiModel()
         val visiblePlaces = mappedPlaces.take(visibleCount.coerceAtLeast(DEFAULT_PLACE_PAGE_SIZE))
-        val existingSelection = (_uiState.value as? LocationTimelineUiState.Success)?.selectedPlaceId
+        val existingSelection = (_uiState.value as? LocationTimelineUiState.Content)?.selectedPlaceId
         val selectedPlaceId =
-            visiblePlaces.firstOrNull { it.id == existingSelection }?.id ?: visiblePlaces.firstOrNull()?.id
+            visiblePlaces.firstOrNull { it.id == existingSelection }?.id
+                ?: visiblePlaces.firstOrNull()?.id
 
-        return LocationTimelineUiState.Success(
+        return LocationTimelineUiState.Content(
+            isLoadingCurrentLocation = currentLocationState.isLoading,
+            isLoadingPlaces = placesState.isLoading,
+            isLoadingStops = stopsState.isLoading,
             currentLocation = mappedCurrentLocation,
             selectedFilter = selectedFilter,
             places = mappedPlaces,
@@ -243,6 +229,18 @@ class LocationTimelineViewModel(
             canLoadMorePlaces = mappedPlaces.size > visiblePlaces.size,
         )
     }
+
+    private fun detectBlockingError(
+        currentLocationState: SectionState<Location?>,
+        stopsState: SectionState<List<LocationStop>>,
+    ): LocationTimelineErrorUiState? =
+        sequenceOf(currentLocationState, stopsState)
+            .filterIsInstance<SectionState.Failed>()
+            .map { it.throwable.toLocationTimelineErrorUiState() }
+            .firstOrNull {
+                it is LocationTimelineErrorUiState.PermissionRequired ||
+                    it is LocationTimelineErrorUiState.LocationServicesDisabled
+            }
 
     private fun formatCoarseLocation(address: GeocodedAddress): String =
         when {

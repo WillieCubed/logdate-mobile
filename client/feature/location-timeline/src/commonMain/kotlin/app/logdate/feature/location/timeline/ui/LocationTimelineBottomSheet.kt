@@ -4,7 +4,6 @@ package app.logdate.feature.location.timeline.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -13,7 +12,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -139,10 +137,9 @@ fun LocationTimelineQuickPeekSheetContent(
         }
 
         when (uiState) {
-            is LocationTimelineUiState.Loading -> QuickPeekLoadingState()
             is LocationTimelineUiState.Error -> QuickPeekErrorState(error = uiState.error, onRetry = onRetry)
-            is LocationTimelineUiState.Success ->
-                QuickPeekSuccessState(
+            is LocationTimelineUiState.Content ->
+                QuickPeekContentState(
                     uiState = uiState,
                     onSelectPlace = onSelectPlace,
                 )
@@ -154,19 +151,6 @@ fun LocationTimelineQuickPeekSheetContent(
         ) {
             Text(stringResource(Res.string.open_full_location_timeline))
         }
-    }
-}
-
-@Composable
-private fun QuickPeekLoadingState() {
-    Box(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(220.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        CircularProgressIndicator()
     }
 }
 
@@ -183,13 +167,14 @@ private fun QuickPeekErrorState(
 }
 
 @Composable
-private fun QuickPeekSuccessState(
-    uiState: LocationTimelineUiState.Success,
+private fun QuickPeekContentState(
+    uiState: LocationTimelineUiState.Content,
     onSelectPlace: (String) -> Unit,
 ) {
     val previewPlaces = uiState.visiblePlaces.take(3)
+    val hasNoData = uiState.currentLocation == null && previewPlaces.isEmpty()
 
-    if (uiState.currentLocation == null && previewPlaces.isEmpty()) {
+    if (hasNoData && !uiState.isLoadingPlaces) {
         Card {
             Column(
                 modifier =
@@ -212,16 +197,18 @@ private fun QuickPeekSuccessState(
         return
     }
 
-    LocationTimelineMap(
-        places = previewPlaces,
-        currentLocation = uiState.currentLocation,
-        selectedPlaceId = uiState.selectedPlace?.id,
-        onSelectPlace = onSelectPlace,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(220.dp),
-    )
+    if (!hasNoData) {
+        LocationTimelineMap(
+            places = previewPlaces,
+            currentLocation = uiState.currentLocation,
+            selectedPlaceId = uiState.selectedPlace?.id,
+            onSelectPlace = onSelectPlace,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(220.dp),
+        )
+    }
 
     uiState.currentLocation?.let { currentLocation ->
         QuickPeekCurrentLocationCard(currentLocation)
