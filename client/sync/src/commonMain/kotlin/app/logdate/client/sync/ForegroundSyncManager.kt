@@ -92,7 +92,10 @@ class ForegroundSyncManager(
         periodicJob =
             syncScope.launch {
                 while (isActive) {
-                    defaultSyncManager.fullSync()
+                    val status = defaultSyncManager.getSyncStatus()
+                    if (status.pendingUploads > 0 || status.hasErrors) {
+                        defaultSyncManager.fullSync()
+                    }
                     delay(PERIODIC_SYNC_INTERVAL_MS)
                 }
             }
@@ -114,6 +117,6 @@ class ForegroundSyncManager(
     }
 
     companion object {
-        private const val PERIODIC_SYNC_INTERVAL_MS = 15 * 60 * 1000L
+        private const val PERIODIC_SYNC_INTERVAL_MS = 30 * 60 * 1000L
     }
 }
