@@ -16,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
@@ -93,6 +94,7 @@ fun MediaDetailContent(
     state: MediaDetailUiState,
     isExpanded: Boolean,
     onBack: () -> Unit,
+    onNavigateToJournal: (Uuid) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     when (state) {
@@ -129,8 +131,10 @@ fun MediaDetailContent(
                 isVideo = false,
                 createdAt = state.createdAt,
                 location = state.location,
+                journals = state.journals,
                 isExpanded = isExpanded,
                 onBack = onBack,
+                onNavigateToJournal = onNavigateToJournal,
                 modifier = modifier,
             )
         }
@@ -141,8 +145,10 @@ fun MediaDetailContent(
                 isVideo = true,
                 createdAt = state.createdAt,
                 location = state.location,
+                journals = state.journals,
                 isExpanded = isExpanded,
                 onBack = onBack,
+                onNavigateToJournal = onNavigateToJournal,
                 modifier = modifier,
             )
         }
@@ -156,8 +162,10 @@ private fun MediaDetailLayout(
     isVideo: Boolean,
     createdAt: Instant,
     location: NoteLocation?,
+    journals: List<JournalReference>,
     isExpanded: Boolean,
     onBack: () -> Unit,
+    onNavigateToJournal: (Uuid) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (isExpanded) {
@@ -181,6 +189,8 @@ private fun MediaDetailLayout(
                     createdAt = createdAt,
                     location = location,
                     isVideo = isVideo,
+                    journals = journals,
+                    onNavigateToJournal = onNavigateToJournal,
                 )
             }
         }
@@ -271,6 +281,8 @@ private fun MetadataContent(
     createdAt: Instant,
     location: NoteLocation?,
     isVideo: Boolean,
+    journals: List<JournalReference> = emptyList(),
+    onNavigateToJournal: (Uuid) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -312,6 +324,46 @@ private fun MetadataContent(
                 label = "Location",
                 value = locationText,
             )
+        }
+
+        // Appears in journals
+        if (journals.isNotEmpty()) {
+            AppearsInSection(
+                journals = journals,
+                onNavigateToJournal = onNavigateToJournal,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppearsInSection(
+    journals: List<JournalReference>,
+    onNavigateToJournal: (Uuid) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Text(
+            text = "Appears in",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        journals.forEach { journal ->
+            TextButton(onClick = { onNavigateToJournal(journal.id) }) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Book,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(text = journal.title)
+                }
+            }
         }
     }
 }

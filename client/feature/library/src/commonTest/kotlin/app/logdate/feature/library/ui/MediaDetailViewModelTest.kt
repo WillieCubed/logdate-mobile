@@ -3,9 +3,11 @@ package app.logdate.feature.library.ui
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.feature.library.fakes.FakeJournalContentRepository
 import app.logdate.feature.library.fakes.FakeJournalNotesRepository
 import app.logdate.feature.library.ui.detail.MediaDetailUiState
 import app.logdate.feature.library.ui.detail.MediaDetailViewModel
+import app.logdate.shared.model.Journal
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -25,6 +27,7 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalCoroutinesApi::class)
 class MediaDetailViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
+    private val contentRepository = FakeJournalContentRepository()
 
     @BeforeTest
     fun setUp() {
@@ -41,7 +44,7 @@ class MediaDetailViewModelTest {
         runTest(testDispatcher) {
             val repository = FakeJournalNotesRepository(emptyList())
             val noteId = Uuid.random()
-            val viewModel = MediaDetailViewModel(noteId, repository)
+            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository)
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -64,7 +67,7 @@ class MediaDetailViewModelTest {
                     ),
                 )
             val repository = FakeJournalNotesRepository(notes)
-            val viewModel = MediaDetailViewModel(noteId, repository)
+            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository)
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -90,7 +93,7 @@ class MediaDetailViewModelTest {
                     ),
                 )
             val repository = FakeJournalNotesRepository(notes)
-            val viewModel = MediaDetailViewModel(noteId, repository)
+            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository)
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -120,7 +123,7 @@ class MediaDetailViewModelTest {
                     ),
                 )
             val repository = FakeJournalNotesRepository(notes)
-            val viewModel = MediaDetailViewModel(noteId, repository)
+            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository)
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -145,12 +148,55 @@ class MediaDetailViewModelTest {
                     ),
                 )
             val repository = FakeJournalNotesRepository(notes)
-            val viewModel = MediaDetailViewModel(noteId, repository)
+            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository)
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
 
             assertIs<MediaDetailUiState.Error>(viewModel.uiState.value)
+            collectJob.cancel()
+        }
+
+    @Test
+    fun crossReferencesPopulatedFromJournals() =
+        runTest(testDispatcher) {
+            val noteId = Uuid.random()
+            val journalId = Uuid.random()
+            val now = Instant.fromEpochMilliseconds(1710000000000)
+
+            val notes =
+                listOf(
+                    JournalNote.Image(
+                        uid = noteId,
+                        creationTimestamp = now,
+                        lastUpdated = now,
+                        mediaRef = "content://media/external/images/1",
+                    ),
+                )
+
+            contentRepository.setJournalsForContent(
+                noteId,
+                listOf(
+                    Journal(
+                        id = journalId,
+                        title = "Trip to Paris",
+                        created = now,
+                        lastUpdated = now,
+                    ),
+                ),
+            )
+
+            val repository = FakeJournalNotesRepository(notes)
+            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository)
+
+            val collectJob = launch { viewModel.uiState.collect {} }
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertIs<MediaDetailUiState.ImageContent>(state)
+            assertEquals(1, state.journals.size)
+            assertEquals("Trip to Paris", state.journals[0].title)
+            assertEquals(journalId, state.journals[0].id)
             collectJob.cancel()
         }
 }

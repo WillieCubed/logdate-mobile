@@ -17,6 +17,7 @@ val libraryFeatureModule: Module =
             MediaDetailViewModel(
                 noteId = noteId,
                 notesRepository = get(),
+                journalContentRepository = get(),
             )
         }
     }

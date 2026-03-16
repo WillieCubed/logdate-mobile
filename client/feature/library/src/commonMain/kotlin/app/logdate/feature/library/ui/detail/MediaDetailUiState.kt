@@ -19,6 +19,7 @@ sealed interface MediaDetailUiState {
         val mediaRef: String,
         val createdAt: Instant,
         val location: NoteLocation?,
+        val journals: List<JournalReference> = emptyList(),
     ) : MediaDetailUiState
 
     data class VideoContent(
@@ -26,5 +27,14 @@ sealed interface MediaDetailUiState {
         val mediaRef: String,
         val createdAt: Instant,
         val location: NoteLocation?,
+        val journals: List<JournalReference> = emptyList(),
     ) : MediaDetailUiState
 }
+
+/**
+ * A journal that contains this media item, used for "Appears in" cross-references.
+ */
+data class JournalReference(
+    val id: Uuid,
+    val title: String,
+)
