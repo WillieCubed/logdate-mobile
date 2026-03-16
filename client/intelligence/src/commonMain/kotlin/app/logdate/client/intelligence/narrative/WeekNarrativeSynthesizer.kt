@@ -13,6 +13,7 @@ import app.logdate.client.intelligence.generativeai.GenerativeAIResponseFormat
 import app.logdate.client.intelligence.structured.JsonStructuredOutputParser
 import app.logdate.client.intelligence.structured.StructuredOutputResult
 import app.logdate.client.intelligence.unavailableReason
+import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.media.IndexedMedia
@@ -44,6 +45,7 @@ class WeekNarrativeSynthesizer(
     private val generativeAICache: GenerativeAICache,
     private val genAIClient: GenerativeAIChatClient,
     private val networkAvailabilityMonitor: NetworkAvailabilityMonitor,
+    private val dataUsagePolicy: DataUsagePolicy,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private companion object {
@@ -200,7 +202,7 @@ Respond ONLY with valid JSON in this format. No additional text."""
             }
 
             Napier.d("Generating narrative for $weekId with ${textEntries.size} entries, ${media.size} media items")
-            val unavailableReason = networkAvailabilityMonitor.unavailableReason()
+            val unavailableReason = unavailableReason(networkAvailabilityMonitor, dataUsagePolicy)
             if (unavailableReason != null) {
                 return@withContext AIResult.Unavailable(unavailableReason)
             }

@@ -8,6 +8,7 @@ import app.logdate.client.domain.notes.RemoveNoteUseCase
 import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
 import app.logdate.client.domain.recommendation.HomeRecommendation
 import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
+import app.logdate.client.domain.timeline.Moment
 import app.logdate.client.domain.timeline.StreamingTimelineRequest
 import app.logdate.client.domain.timeline.TimelineDay
 import app.logdate.client.domain.timeline.TimelinePlaceVisit
@@ -20,12 +21,16 @@ import app.logdate.ui.profiles.toUiState
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.HomeTimelineUiState
 import app.logdate.ui.timeline.ImageNoteUiState
+import app.logdate.ui.timeline.MomentAudioUiState
+import app.logdate.ui.timeline.MomentMediaUiState
+import app.logdate.ui.timeline.MomentUiState
 import app.logdate.ui.timeline.TextNoteUiState
 import app.logdate.ui.timeline.TimelineDaySelection
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelineLoadingState
 import app.logdate.ui.timeline.TimelineSuggestionBlock
 import app.logdate.ui.timeline.VideoNoteUiState
+import app.logdate.ui.timeline.createSemanticTimelineDayUiState
 import app.logdate.ui.timeline.createTimelineDayUiState
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +42,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlin.uuid.Uuid
 
 /**
@@ -190,17 +197,71 @@ class TimelineViewModel(
             longitude = longitude,
         )
 
-    private fun TimelineDay.toUiState(): TimelineDayUiState =
-        createTimelineDayUiState(
-            summary = tldr,
-            date = date,
-            people = people.map(Person::toUiState),
-            events = events,
-            placesVisited = placesVisited.map { place -> place.toUiState() },
-            notes = entries.toUiState(),
-            isLoadingSummary = tldr.isEmpty(),
-            isLoadingPeople = people.isEmpty() && tldr.isEmpty(),
+    private fun TimelineDay.toUiState(): TimelineDayUiState {
+        val noteUiStates = entries.toUiState()
+        val placeUiStates = placesVisited.map { place -> place.toUiState() }
+        val peopleUiStates = people.map(Person::toUiState)
+
+        return if (moments.isNotEmpty()) {
+            val momentUiStates = moments.toMomentUiStates()
+            createSemanticTimelineDayUiState(
+                summary = tldr,
+                date = date,
+                moments = momentUiStates,
+                people = peopleUiStates,
+                notes = noteUiStates,
+                placesVisited = placeUiStates,
+                isLoadingSummary = tldr.isEmpty(),
+                isLoadingPeople = people.isEmpty() && tldr.isEmpty(),
+            )
+        } else {
+            createTimelineDayUiState(
+                summary = tldr,
+                date = date,
+                people = peopleUiStates,
+                events = events,
+                placesVisited = placeUiStates,
+                notes = noteUiStates,
+                isLoadingSummary = tldr.isEmpty(),
+                isLoadingPeople = people.isEmpty() && tldr.isEmpty(),
+            )
+        }
+    }
+
+    private fun List<Moment>.toMomentUiStates(): List<MomentUiState> {
+        val heroIndex = selectHeroIndex(this)
+        return mapIndexed { index, moment -> moment.toMomentUiState(isHero = index == heroIndex) }
+    }
+
+    private fun Moment.toMomentUiState(isHero: Boolean): MomentUiState {
+        val timezone = TimeZone.currentSystemDefault()
+        val startLocal = estimatedStart.toLocalDateTime(timezone)
+        val timeOfDay =
+            when (startLocal.hour) {
+                in 0..11 -> "morning"
+                in 12..17 -> "afternoon"
+                else -> "evening"
+            }
+        return MomentUiState(
+            id = id.toString(),
+            label = label,
+            timeOfDay = timeOfDay,
+            textSnippet = textFragments.firstOrNull()?.text?.take(140),
+            media = media.map { MomentMediaUiState(uri = it.uri, isVideo = it.isVideo) },
+            audio = audio.firstOrNull()?.let { MomentAudioUiState(uri = it.uri, durationMs = it.durationMs) },
+            places = places.map { PlaceUiState(id = it.id, title = it.name, latitude = it.latitude, longitude = it.longitude) },
+            people = people,
+            isHero = isHero,
         )
+    }
+
+    private fun selectHeroIndex(moments: List<Moment>): Int {
+        if (moments.isEmpty()) return -1
+        return moments.indices.maxByOrNull { index ->
+            val m = moments[index]
+            m.media.size * 3 + m.textFragments.size * 2 + m.audio.size
+        } ?: 0
+    }
 
     private fun HomeRecommendation.toTimelineSuggestionBlock(): TimelineSuggestionBlock? =
         when (this) {
@@ -212,7 +273,6 @@ class TimelineViewModel(
             is HomeRecommendation.CompleteYourDraft ->
                 TimelineSuggestionBlock.CompleteDraft(
                     draftId = draftId.toString(),
-                    notePreview = notePreview?.takeIf(String::isNotBlank),
                 )
             is HomeRecommendation.MemoryRecall ->
                 TimelineSuggestionBlock.MemoryRecall(

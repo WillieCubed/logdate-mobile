@@ -2,6 +2,7 @@ package app.logdate.ui.timeline
 
 import app.logdate.ui.location.PlaceUiState
 import app.logdate.ui.profiles.PersonUiState
+import kotlinx.datetime.LocalDate
 import kotlin.time.Instant
 
 private val hiddenSummaryValues =
@@ -220,3 +221,56 @@ private fun List<NoteUiState>.visualNotes(): List<VisualNoteUiState> =
             }
         }
     }
+
+// region Semantic Timeline factory
+
+private const val STACKED_MOMENT_THRESHOLD = 5
+private const val STACKED_NOTE_THRESHOLD = 10
+
+/**
+ * Creates a [TimelineDayUiState] with moment-based rendering for the Semantic Timeline.
+ *
+ * This populates the [TimelineDayUiState.moments] and [TimelineDayUiState.dayPresentation]
+ * fields while still producing valid legacy section fields for backward compatibility.
+ *
+ * The [moments] parameter should already be mapped to [MomentUiState] by the caller
+ * (typically the ViewModel, which has access to domain types).
+ */
+fun createSemanticTimelineDayUiState(
+    summary: String,
+    date: LocalDate,
+    moments: List<MomentUiState>,
+    people: List<PersonUiState> = emptyList(),
+    notes: List<NoteUiState> = emptyList(),
+    placesVisited: List<PlaceUiState> = emptyList(),
+    isBirthday: Boolean = false,
+    isLoadingSummary: Boolean = false,
+    isLoadingPeople: Boolean = false,
+): TimelineDayUiState {
+    val dayPresentation =
+        when {
+            isBirthday -> DayPresentation.STACKED
+            moments.size >= STACKED_MOMENT_THRESHOLD -> DayPresentation.STACKED
+            notes.size >= STACKED_NOTE_THRESHOLD -> DayPresentation.STACKED
+            else -> DayPresentation.FLOWING
+        }
+
+    // Also produce legacy fields so existing rendering still works during migration.
+    val legacyState =
+        createTimelineDayUiState(
+            summary = summary,
+            date = date,
+            people = people,
+            placesVisited = placesVisited,
+            notes = notes,
+            isLoadingSummary = isLoadingSummary,
+            isLoadingPeople = isLoadingPeople,
+        )
+
+    return legacyState.copy(
+        moments = moments,
+        dayPresentation = dayPresentation,
+    )
+}
+
+// endregion

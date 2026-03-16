@@ -86,6 +86,7 @@ data class TimelineDay(
     val people: List<Person> = emptyList(),
     val events: List<String> = emptyList(), // TODO: Actually include events
     val placesVisited: List<TimelinePlaceVisit> = emptyList(),
+    val moments: List<Moment> = emptyList(),
     val parts: List<DayPart> = emptyList(),
     val entries: List<JournalNote> = emptyList(),
 //    val mediaUris: List<MediaObjectUiState> = emptyList(), // TODO: Actually include media
@@ -121,6 +122,7 @@ class GetTimelineDayUseCase(
     private val summarizeJournalEntriesUseCase: SummarizeJournalEntriesUseCase,
     private val getMediaUrisUseCase: GetMediaUrisUseCase,
     private val extractPeopleUseCase: ExtractPeopleUseCase,
+    private val inferMomentsUseCase: InferMomentsUseCase,
 ) {
     /**
      * Creates a TimelineDay from journal entries for a specific date.
@@ -160,13 +162,17 @@ class GetTimelineDayUseCase(
         // Keep the media lookup warm for downstream screens even though the list cards rely on raw notes.
         getMediaUrisUseCase(date)
 
+        val placesVisited = extractPlacesVisited(entries)
+        val moments = inferMomentsUseCase(date, entries, placesVisited)
+
         return TimelineDay(
             tldr = summary,
             date = date,
             start = entries.minOf { entry -> entry.creationTimestamp },
             end = entries.maxOf { it.creationTimestamp },
             people = people,
-            placesVisited = extractPlacesVisited(entries),
+            placesVisited = placesVisited,
+            moments = moments,
             parts = extractDayParts(entries),
             entries = entries.sortedByDescending { entry -> entry.creationTimestamp },
         )

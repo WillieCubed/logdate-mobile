@@ -1,6 +1,7 @@
 package app.logdate.client.intelligence
 
 import app.logdate.client.intelligence.entity.people.PeopleExtractor
+import app.logdate.client.intelligence.fakes.FakeDataUsagePolicy
 import app.logdate.client.intelligence.fakes.FakeGenerativeAICache
 import app.logdate.client.intelligence.fakes.FakeGenerativeAIChatClient
 import app.logdate.client.networking.NetworkAvailabilityMonitor
@@ -23,12 +24,14 @@ class TextProcessingAccuracyTest {
     private val fakeCache = FakeGenerativeAICache()
     private val fakeAIClient = FakeGenerativeAIChatClient()
     private val fakeNetworkMonitor = TestNetworkAvailabilityMonitor()
+    private val fakeDataUsagePolicy = FakeDataUsagePolicy()
 
     private val entrySummarizer =
         EntrySummarizer(
             generativeAICache = fakeCache,
             genAIClient = fakeAIClient,
             networkAvailabilityMonitor = fakeNetworkMonitor,
+            dataUsagePolicy = fakeDataUsagePolicy,
             ioDispatcher = testDispatcher,
         )
 
@@ -37,6 +40,7 @@ class TextProcessingAccuracyTest {
             generativeAICache = fakeCache,
             generativeAIChatClient = fakeAIClient,
             networkAvailabilityMonitor = fakeNetworkMonitor,
+            dataUsagePolicy = fakeDataUsagePolicy,
             ioDispatcher = testDispatcher,
         )
 

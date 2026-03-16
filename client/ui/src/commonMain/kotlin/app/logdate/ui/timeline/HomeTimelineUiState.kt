@@ -36,6 +36,9 @@ data class TimelineDayUiState(
     val supportingSections: List<TimelineDaySectionUiState> = emptyList(),
     val isLoadingSummary: Boolean = false,
     val isLoadingPeople: Boolean = false,
+    // Semantic Timeline fields
+    val moments: List<MomentUiState> = emptyList(),
+    val dayPresentation: DayPresentation = DayPresentation.FLOWING,
 )
 
 enum class TimelineDayCardLayout {
@@ -83,6 +86,70 @@ data class TimelinePlaceSectionUiState(
     override val label: String,
     val places: List<PlaceUiState>,
 ) : TimelineDaySectionUiState
+
+// region Semantic Timeline (moment-based)
+
+/**
+ * Presentation mode for a day in the Semantic Timeline.
+ */
+enum class DayPresentation {
+    /** Moments flow inline with contextual labels as dividers. */
+    FLOWING,
+
+    /** Moments are distinct card surfaces (for birthdays, Rewinds, high-activity days). */
+    STACKED,
+}
+
+/**
+ * A single moment within a day — a semantically coherent experience.
+ */
+data class MomentUiState(
+    val id: String,
+    /**
+     * Contextual label: "At Houndstooth Coffee", "That evening", "Morning run".
+     */
+    val label: String,
+    /**
+     * Subtle time-of-day hint: "morning", "afternoon".
+     */
+    val timeOfDay: String? = null,
+    /**
+     * Best text snippet for this moment, truncated.
+     */
+    val textSnippet: String? = null,
+    /**
+     * Photos and videos in this moment.
+     */
+    val media: List<MomentMediaUiState> = emptyList(),
+    /**
+     * Audio recording in this moment, if any.
+     */
+    val audio: MomentAudioUiState? = null,
+    /**
+     * Places associated with this moment.
+     */
+    val places: List<PlaceUiState> = emptyList(),
+    /**
+     * People mentioned in this moment.
+     */
+    val people: List<String> = emptyList(),
+    /**
+     * Whether this is the hero (most significant) moment in the day.
+     */
+    val isHero: Boolean = false,
+)
+
+data class MomentMediaUiState(
+    val uri: String,
+    val isVideo: Boolean = false,
+)
+
+data class MomentAudioUiState(
+    val uri: String,
+    val durationMs: Long = 0,
+)
+
+// endregion
 
 enum class TimelineLoadingState {
     /** Initial state - show skeleton UI immediately */

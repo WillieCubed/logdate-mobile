@@ -19,6 +19,8 @@ sealed interface AIResult<out T> {
 sealed interface AIUnavailableReason {
     data object NoNetwork : AIUnavailableReason
 
+    data object DataSaverActive : AIUnavailableReason
+
     data object ProviderDisabled : AIUnavailableReason
 
     data object MissingCredentials : AIUnavailableReason

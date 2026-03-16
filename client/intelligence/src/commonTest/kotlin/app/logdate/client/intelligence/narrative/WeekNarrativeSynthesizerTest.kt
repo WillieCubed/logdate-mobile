@@ -4,6 +4,7 @@ import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.cache.AICachePolicy
 import app.logdate.client.intelligence.cache.GenerativeAICacheContentType
 import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
+import app.logdate.client.intelligence.fakes.FakeDataUsagePolicy
 import app.logdate.client.intelligence.fakes.FakeGenerativeAICache
 import app.logdate.client.intelligence.fakes.FakeGenerativeAIChatClient
 import app.logdate.client.networking.NetworkAvailabilityMonitor
@@ -28,11 +29,14 @@ class WeekNarrativeSynthesizerTest {
     private val fakeAIClient = FakeGenerativeAIChatClient()
     private val fakeNetworkMonitor = TestNetworkAvailabilityMonitor()
 
+    private val fakeDataUsagePolicy = FakeDataUsagePolicy()
+
     private val synthesizer =
         WeekNarrativeSynthesizer(
             generativeAICache = fakeCache,
             genAIClient = fakeAIClient,
             networkAvailabilityMonitor = fakeNetworkMonitor,
+            dataUsagePolicy = fakeDataUsagePolicy,
             ioDispatcher = testDispatcher,
         )
 

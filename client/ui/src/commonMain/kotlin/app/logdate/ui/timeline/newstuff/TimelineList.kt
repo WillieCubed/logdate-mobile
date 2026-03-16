@@ -4,6 +4,12 @@
 package app.logdate.ui.timeline.newstuff
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateBounds
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -47,13 +53,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -63,6 +72,10 @@ import app.logdate.ui.common.formatting.asRelativeDate
 import app.logdate.ui.restore.LocalAcknowledgeCloudRestore
 import app.logdate.ui.restore.LocalIsPostCloudRestore
 import app.logdate.ui.theme.Spacing
+import app.logdate.ui.timeline.DayPresentation
+import app.logdate.ui.timeline.MomentAudioUiState
+import app.logdate.ui.timeline.MomentMediaUiState
+import app.logdate.ui.timeline.MomentUiState
 import app.logdate.ui.timeline.TimelineAudioSectionUiState
 import app.logdate.ui.timeline.TimelineDayCardLayout
 import app.logdate.ui.timeline.TimelineDayRecapUiState
@@ -152,14 +165,14 @@ fun TimelineList(
     listState: LazyListState = rememberLazyListState(),
 ) {
     val isPostCloudRestore = LocalIsPostCloudRestore.current
-    val draftFallbackMessage = stringResource(Res.string.suggestion_draft_fallback)
+    val draftMessage = stringResource(Res.string.suggestion_draft_fallback)
     val suggestionBlockState: TimelineSuggestionBlockUiState? =
-        remember(timelineSuggestion, draftFallbackMessage) {
+        remember(timelineSuggestion, draftMessage) {
             when (timelineSuggestion) {
                 is TimelineSuggestionBlock.CompleteDraft ->
                     TimelineSuggestionBlockUiState(
                         type = TimelineSuggestionBlockType.COMPLETE_DRAFT,
-                        message = timelineSuggestion.notePreview ?: draftFallbackMessage,
+                        message = draftMessage,
                         draftId = timelineSuggestion.draftId,
                     )
                 is TimelineSuggestionBlock.EmptyDay ->
@@ -180,6 +193,11 @@ fun TimelineList(
                 null -> null
             }
         }
+    // Retain the last non-null state so the exit animation has content to render.
+    var lastSuggestion by remember { mutableStateOf(suggestionBlockState) }
+    if (suggestionBlockState != null) {
+        lastSuggestion = suggestionBlockState
+    }
 
     BoxWithConstraints(modifier = modifier) {
         val layoutMode = maxWidth.toTimelineLayoutMode()
@@ -210,8 +228,12 @@ fun TimelineList(
             item(
                 contentType = TimelineListContentType.SUGGESTION,
             ) {
-                AnimatedVisibility(visible = suggestionBlockState != null) {
-                    suggestionBlockState?.let { blockState ->
+                AnimatedVisibility(
+                    visible = suggestionBlockState != null,
+                    enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+                    exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+                ) {
+                    lastSuggestion?.let { blockState ->
                         TimelineSuggestionBlock(
                             state = blockState,
                             onStartWriting = onStartWriting,
@@ -422,16 +444,31 @@ private fun TimelineDayListItem(
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
             modifier = Modifier.weight(1f),
         ) {
-            TimelineDayHeader(
-                item = item,
-                style = style,
-                layoutMode = layoutMode,
-            )
-            TimelineDayContent(
-                item = item,
-                style = style,
-                layoutMode = layoutMode,
-            )
+            if (item.moments.isNotEmpty()) {
+                // Semantic Timeline: narrative header + moment-based content
+                SemanticTimelineDayHeader(
+                    item = item,
+                    style = style,
+                    layoutMode = layoutMode,
+                )
+                SemanticTimelineDayContent(
+                    item = item,
+                    style = style,
+                    layoutMode = layoutMode,
+                )
+            } else {
+                // Legacy rendering
+                TimelineDayHeader(
+                    item = item,
+                    style = style,
+                    layoutMode = layoutMode,
+                )
+                TimelineDayContent(
+                    item = item,
+                    style = style,
+                    layoutMode = layoutMode,
+                )
+            }
         }
     }
 }
@@ -681,6 +718,475 @@ private fun TimelineSupportingFlow(
         }
     }
 }
+
+// region Semantic Timeline composables
+
+@Composable
+private fun SemanticTimelineDayHeader(
+    item: TimelineDayUiState,
+    style: TimelineDayStyle,
+    layoutMode: TimelineDayLayoutMode,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        modifier = modifier,
+    ) {
+        Text(
+            text = item.date.asRelativeDate(),
+            style = MaterialTheme.typography.labelLarge,
+            color = style.accentColor,
+            fontWeight = FontWeight.SemiBold,
+        )
+
+        item.supportingSummary?.let { summary ->
+            Text(
+                text = summary,
+                style =
+                    when (layoutMode) {
+                        TimelineDayLayoutMode.COMPACT -> MaterialTheme.typography.titleLarge
+                        TimelineDayLayoutMode.MEDIUM -> MaterialTheme.typography.headlineSmall
+                        TimelineDayLayoutMode.EXPANDED -> MaterialTheme.typography.headlineMedium
+                    },
+                maxLines = if (layoutMode == TimelineDayLayoutMode.COMPACT) 3 else 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SemanticTimelineDayContent(
+    item: TimelineDayUiState,
+    style: TimelineDayStyle,
+    layoutMode: TimelineDayLayoutMode,
+    modifier: Modifier = Modifier,
+) {
+    val isCompact = layoutMode == TimelineDayLayoutMode.COMPACT
+    val gap =
+        when (layoutMode) {
+            TimelineDayLayoutMode.COMPACT -> Spacing.lg
+            TimelineDayLayoutMode.MEDIUM -> Spacing.lg
+            TimelineDayLayoutMode.EXPANDED -> Spacing.xl
+        }
+    val momentMinWidth =
+        when (layoutMode) {
+            TimelineDayLayoutMode.COMPACT -> 0.dp
+            TimelineDayLayoutMode.MEDIUM -> 260.dp
+            TimelineDayLayoutMode.EXPANDED -> 300.dp
+        }
+
+    LookaheadScope {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(gap),
+            verticalArrangement = Arrangement.spacedBy(gap),
+            modifier = modifier.fillMaxWidth(),
+        ) {
+            item.moments.forEach { moment ->
+                val itemModifier =
+                    if (moment.isHero || isCompact) {
+                        Modifier
+                            .fillMaxWidth()
+                            .animateBounds(this@LookaheadScope)
+                    } else {
+                        Modifier
+                            .widthIn(min = momentMinWidth)
+                            .weight(1f, fill = true)
+                            .animateBounds(this@LookaheadScope)
+                    }
+
+                when (item.dayPresentation) {
+                    DayPresentation.FLOWING ->
+                        FlowingMomentItem(
+                            moment = moment,
+                            style = style,
+                            layoutMode = layoutMode,
+                            modifier = itemModifier,
+                        )
+                    DayPresentation.STACKED ->
+                        StackedMomentCard(
+                            moment = moment,
+                            style = style,
+                            layoutMode = layoutMode,
+                            modifier = itemModifier,
+                        )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FlowingMomentItem(
+    moment: MomentUiState,
+    style: TimelineDayStyle,
+    layoutMode: TimelineDayLayoutMode,
+    modifier: Modifier = Modifier,
+) {
+    val hasSingleMedia = moment.media.size == 1
+    val hasText = moment.textSnippet != null
+    val useInlineLayout = hasSingleMedia && hasText && !moment.isHero
+
+    // Adapt proportions: on wider screens the image gets relatively smaller
+    val imageWeight =
+        when (layoutMode) {
+            TimelineDayLayoutMode.COMPACT -> 0.4f
+            TimelineDayLayoutMode.MEDIUM -> 0.35f
+            TimelineDayLayoutMode.EXPANDED -> 0.3f
+        }
+    val textWeight = 1f - imageWeight
+
+    val textStyle =
+        when {
+            moment.isHero && layoutMode == TimelineDayLayoutMode.EXPANDED ->
+                MaterialTheme.typography.headlineSmall
+            moment.isHero -> MaterialTheme.typography.titleLarge
+            else -> MaterialTheme.typography.bodyLarge
+        }
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .animateContentSize(),
+    ) {
+        // Contextual label
+        MomentLabel(
+            label = moment.label,
+            timeOfDay = moment.timeOfDay,
+            color = style.accentColor,
+        )
+
+        if (useInlineLayout) {
+            // Side-by-side: single image with text beside it
+            Row(
+                horizontalArrangement =
+                    Arrangement.spacedBy(
+                        if (layoutMode == TimelineDayLayoutMode.COMPACT) Spacing.md else Spacing.lg,
+                    ),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                TimelineMediaTile(
+                    media =
+                        TimelineMediaItemUiState(
+                            uri = moment.media.first().uri,
+                            isVideo = moment.media.first().isVideo,
+                        ),
+                    aspectRatio = 1f,
+                    modifier = Modifier.weight(imageWeight),
+                )
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    modifier = Modifier.weight(textWeight),
+                ) {
+                    Text(
+                        text = moment.textSnippet ?: "",
+                        style = textStyle,
+                        maxLines = if (layoutMode == TimelineDayLayoutMode.COMPACT) 4 else 6,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    MomentPeopleInline(moment.people)
+                }
+            }
+        } else {
+            // Vertical stack for hero moments, multi-media, or text-only
+
+            if (moment.media.isNotEmpty()) {
+                MomentMediaGrid(
+                    media = moment.media,
+                    layoutMode = layoutMode,
+                    emphasized = moment.isHero,
+                )
+            }
+
+            moment.audio?.let { audio ->
+                MomentAudioInline(audio = audio, style = style)
+            }
+
+            moment.textSnippet?.let { snippet ->
+                Text(
+                    text = snippet,
+                    style = textStyle,
+                    maxLines = if (moment.isHero) 4 else 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            MomentPeopleInline(moment.people)
+        }
+    }
+}
+
+@Composable
+private fun StackedMomentCard(
+    moment: MomentUiState,
+    style: TimelineDayStyle,
+    layoutMode: TimelineDayLayoutMode,
+    modifier: Modifier = Modifier,
+) {
+    val cardPadding =
+        when (layoutMode) {
+            TimelineDayLayoutMode.COMPACT -> Spacing.md
+            TimelineDayLayoutMode.MEDIUM -> Spacing.lg
+            TimelineDayLayoutMode.EXPANDED -> Spacing.xl
+        }
+
+    Surface(
+        color = style.softAccentColor,
+        shape = RoundedCornerShape(24.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .animateContentSize(),
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            modifier = Modifier.padding(cardPadding),
+        ) {
+            MomentLabel(
+                label = moment.label,
+                timeOfDay = moment.timeOfDay,
+                color = style.accentColor,
+            )
+
+            if (moment.media.isNotEmpty()) {
+                MomentMediaGrid(
+                    media = moment.media,
+                    layoutMode = layoutMode,
+                    emphasized = moment.isHero,
+                )
+            }
+
+            moment.audio?.let { audio ->
+                MomentAudioInline(audio = audio, style = style)
+            }
+
+            moment.textSnippet?.let { snippet ->
+                Text(
+                    text = snippet,
+                    style =
+                        when (layoutMode) {
+                            TimelineDayLayoutMode.EXPANDED -> MaterialTheme.typography.titleMedium
+                            else -> MaterialTheme.typography.bodyLarge
+                        },
+                    maxLines = if (layoutMode == TimelineDayLayoutMode.COMPACT) 4 else 6,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            MomentCardMetadata(moment = moment, style = style)
+        }
+    }
+}
+
+/**
+ * Embedded metadata row for stacked cards: place + people, integrated into the surface.
+ */
+@Composable
+private fun MomentCardMetadata(
+    moment: MomentUiState,
+    style: TimelineDayStyle,
+    modifier: Modifier = Modifier,
+) {
+    if (moment.places.isEmpty() && moment.people.isEmpty()) return
+
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        modifier = modifier,
+    ) {
+        moment.places.firstOrNull()?.let { place ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = style.accentColor,
+                )
+                Text(
+                    text = place.title,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (moment.places.isNotEmpty() && moment.people.isNotEmpty()) {
+            Text(
+                text = "\u00b7",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (moment.people.isNotEmpty()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PeopleAlt,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = style.accentColor,
+                )
+                Text(
+                    text = moment.people.joinToString(", "),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MomentPeopleInline(
+    people: List<String>,
+    modifier: Modifier = Modifier,
+) {
+    if (people.isNotEmpty()) {
+        Text(
+            text = "with ${people.joinToString(", ")}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+private fun MomentLabel(
+    label: String,
+    timeOfDay: String?,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    val displayText =
+        if (timeOfDay != null && !label.lowercase().contains(timeOfDay)) {
+            "$label \u00b7 $timeOfDay"
+        } else {
+            label
+        }
+    Text(
+        text = displayText,
+        style = MaterialTheme.typography.labelLarge,
+        color = color,
+        fontWeight = FontWeight.SemiBold,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun MomentMediaGrid(
+    media: List<MomentMediaUiState>,
+    layoutMode: TimelineDayLayoutMode,
+    emphasized: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    // Reuse the same asymmetric layout from MediaSection
+    when (media.size) {
+        0 -> Unit
+        1 ->
+            TimelineMediaTile(
+                media = TimelineMediaItemUiState(uri = media.first().uri, isVideo = media.first().isVideo),
+                aspectRatio = if (emphasized) 1.2f else 1.05f,
+                modifier = modifier.fillMaxWidth(),
+            )
+        2 ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                modifier = modifier.fillMaxWidth(),
+            ) {
+                TimelineMediaTile(
+                    media = TimelineMediaItemUiState(uri = media[0].uri, isVideo = media[0].isVideo),
+                    aspectRatio = if (emphasized) 0.95f else 1f,
+                    modifier = Modifier.weight(1.2f),
+                )
+                TimelineMediaTile(
+                    media = TimelineMediaItemUiState(uri = media[1].uri, isVideo = media[1].isVideo),
+                    aspectRatio = if (layoutMode == TimelineDayLayoutMode.COMPACT) 0.95f else 1.15f,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        else ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                modifier = modifier.fillMaxWidth(),
+            ) {
+                TimelineMediaTile(
+                    media = TimelineMediaItemUiState(uri = media.first().uri, isVideo = media.first().isVideo),
+                    aspectRatio = if (emphasized) 0.9f else 1.05f,
+                    modifier = Modifier.weight(1.35f),
+                )
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    media.drop(1).take(2).forEach { item ->
+                        TimelineMediaTile(
+                            media = TimelineMediaItemUiState(uri = item.uri, isVideo = item.isVideo),
+                            aspectRatio = 1.2f,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            }
+    }
+}
+
+@Composable
+private fun MomentAudioInline(
+    audio: MomentAudioUiState,
+    style: TimelineDayStyle,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(28.dp))
+                .background(style.softAccentColor)
+                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(style.accentColor.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Default.GraphicEq,
+                contentDescription = null,
+                tint = style.accentColor,
+            )
+        }
+        Column(
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+            modifier = Modifier.weight(1f),
+        ) {
+            Text(
+                text = "Voice note",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            AudioWaveBars(accentColor = style.accentColor)
+        }
+        Text(
+            text = audio.durationMs.toDurationLabel(),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+// endregion
 
 @Composable
 private fun TimelineSection(

@@ -17,6 +17,8 @@ import app.logdate.client.intelligence.narrative.WeekNarrativeSynthesizer
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
 import app.logdate.client.media.MediaPayload
+import app.logdate.client.networking.DataUsageMode
+import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.media.IndexedMedia
@@ -26,6 +28,7 @@ import app.logdate.client.repository.rewind.RewindRepository
 import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindGenerationRequest
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -56,11 +59,18 @@ class GetRewindUseCaseTest {
                 indexedMediaRepository = indexedMediaRepository,
             )
         val networkMonitor = FakeNetworkAvailabilityMonitor()
+        val dataUsagePolicy =
+            object : DataUsagePolicy {
+                override val policy = MutableStateFlow(DataUsageMode.Unrestricted)
+
+                override suspend fun currentMode() = DataUsageMode.Unrestricted
+            }
         val narrativeSynthesizer =
             WeekNarrativeSynthesizer(
                 generativeAICache = FakeGenerativeAICache(),
                 genAIClient = FakeGenerativeAIChatClient(NARRATIVE_RESPONSE),
                 networkAvailabilityMonitor = networkMonitor,
+                dataUsagePolicy = dataUsagePolicy,
             )
         val rewindSequencer = RewindSequencer()
         val peopleExtractor =
@@ -68,6 +78,7 @@ class GetRewindUseCaseTest {
                 generativeAICache = FakeGenerativeAICache(),
                 generativeAIChatClient = FakeGenerativeAIChatClient(null),
                 networkAvailabilityMonitor = networkMonitor,
+                dataUsagePolicy = dataUsagePolicy,
             )
         val generateBasicRewindUseCase =
             GenerateBasicRewindUseCase(

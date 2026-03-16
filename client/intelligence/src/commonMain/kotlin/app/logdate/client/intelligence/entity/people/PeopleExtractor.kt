@@ -13,6 +13,7 @@ import app.logdate.client.intelligence.generativeai.GenerativeAIResponseFormat
 import app.logdate.client.intelligence.structured.JsonStructuredOutputParser
 import app.logdate.client.intelligence.structured.StructuredOutputResult
 import app.logdate.client.intelligence.unavailableReason
+import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.shared.model.Person
 import io.github.aakira.napier.Napier
@@ -32,6 +33,7 @@ class PeopleExtractor(
     private val generativeAICache: GenerativeAICache,
     private val generativeAIChatClient: GenerativeAIChatClient,
     private val networkAvailabilityMonitor: NetworkAvailabilityMonitor,
+    private val dataUsagePolicy: DataUsagePolicy,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     companion object {
@@ -104,7 +106,7 @@ If no names are present, return an empty array.
                     Napier.w(tag = "PeopleExtractor", message = "Cached people response was invalid for $documentId")
                 }
             }
-            val unavailableReason = networkAvailabilityMonitor.unavailableReason()
+            val unavailableReason = unavailableReason(networkAvailabilityMonitor, dataUsagePolicy)
             if (unavailableReason != null) {
                 return@withContext AIResult.Unavailable(unavailableReason)
             }

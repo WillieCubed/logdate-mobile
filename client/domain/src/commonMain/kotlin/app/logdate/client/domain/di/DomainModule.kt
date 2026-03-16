@@ -51,6 +51,7 @@ import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
 import app.logdate.client.domain.timeline.GetTimelineDayUseCase
 import app.logdate.client.domain.timeline.GetTimelinePageUseCase
 import app.logdate.client.domain.timeline.GetTimelineUseCase
+import app.logdate.client.domain.timeline.InferMomentsUseCase
 import app.logdate.client.domain.timeline.SummarizeJournalEntriesUseCase
 import app.logdate.client.repository.media.IndexedMediaRepository
 import app.logdate.client.repository.rewind.RewindGenerationManager
@@ -130,7 +131,8 @@ val domainModule: Module =
         factory { GetTimelineUseCase(get(), get()) }
         factory { GetStreamingTimelineUseCase(get(), get()) }
         factory { GetTimelinePageUseCase(get()) }
-        factory { GetTimelineDayUseCase(get(), get(), get()) }
+        factory { InferMomentsUseCase(get()) }
+        factory { GetTimelineDayUseCase(get(), get(), get(), get()) }
         factory { SummarizeJournalEntriesUseCase(get()) }
 
         // Include health domain module

@@ -7,6 +7,7 @@ import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
 import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
+import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
@@ -25,6 +26,7 @@ class EntrySummarizer(
     private val generativeAICache: GenerativeAICache,
     private val genAIClient: GenerativeAIChatClient,
     private val networkAvailabilityMonitor: NetworkAvailabilityMonitor,
+    private val dataUsagePolicy: DataUsagePolicy,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private companion object {
@@ -75,7 +77,7 @@ class EntrySummarizer(
                 tag = "EntrySummarizer",
                 message = "No cached response for $summaryId, generating new response",
             )
-            val unavailableReason = networkAvailabilityMonitor.unavailableReason()
+            val unavailableReason = unavailableReason(networkAvailabilityMonitor, dataUsagePolicy)
             if (unavailableReason != null) {
                 return@withContext AIResult.Unavailable(unavailableReason)
             }

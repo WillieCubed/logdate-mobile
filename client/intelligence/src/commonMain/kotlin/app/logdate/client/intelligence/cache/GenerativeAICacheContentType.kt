@@ -19,6 +19,10 @@ sealed interface GenerativeAICacheContentType {
         override val id: String = "onboarding"
     }
 
+    data object Moments : GenerativeAICacheContentType {
+        override val id: String = "moments"
+    }
+
     companion object {
         fun fromId(id: String): GenerativeAICacheContentType? =
             when (id) {
@@ -26,6 +30,7 @@ sealed interface GenerativeAICacheContentType {
                 People.id -> People
                 Narrative.id -> Narrative
                 Onboarding.id -> Onboarding
+                Moments.id -> Moments
                 else -> null
             }
     }

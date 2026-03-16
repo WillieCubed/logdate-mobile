@@ -7,6 +7,7 @@ import app.logdate.client.intelligence.EntrySummarizer
 import app.logdate.client.intelligence.cache.GenerativeAICache
 import app.logdate.client.intelligence.cache.GenerativeAICacheEntry
 import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
+import app.logdate.client.intelligence.entity.moments.MomentExtractor
 import app.logdate.client.intelligence.entity.people.PeopleExtractor
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
@@ -14,6 +15,8 @@ import app.logdate.client.intelligence.generativeai.GenerativeAIResponse
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
 import app.logdate.client.media.MediaPayload
+import app.logdate.client.networking.DataUsageMode
+import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.networking.NetworkState
 import app.logdate.client.repository.journals.JournalNote
@@ -576,6 +579,12 @@ class GetStreamingTimelineUseCaseTest {
                 generativeAICache = cache,
                 genAIClient = chatClient,
                 networkAvailabilityMonitor = networkMonitor,
+                dataUsagePolicy =
+                    object : DataUsagePolicy {
+                        override val policy = MutableStateFlow(DataUsageMode.Unrestricted)
+
+                        override suspend fun currentMode() = DataUsageMode.Unrestricted
+                    },
             )
         val summarizeUseCase =
             SummarizeJournalEntriesUseCase(
@@ -590,12 +599,34 @@ class GetStreamingTimelineUseCaseTest {
                         generativeAICache = cache,
                         generativeAIChatClient = FakeGenerativeAIChatClient(response = null),
                         networkAvailabilityMonitor = networkMonitor,
+                        dataUsagePolicy =
+                            object : DataUsagePolicy {
+                                override val policy = MutableStateFlow(DataUsageMode.Unrestricted)
+
+                                override suspend fun currentMode() = DataUsageMode.Unrestricted
+                            },
+                    ),
+            )
+        val inferMomentsUseCase =
+            InferMomentsUseCase(
+                momentExtractor =
+                    MomentExtractor(
+                        generativeAICache = cache,
+                        generativeAIChatClient = FakeGenerativeAIChatClient(response = null),
+                        networkAvailabilityMonitor = networkMonitor,
+                        dataUsagePolicy =
+                            object : DataUsagePolicy {
+                                override val policy = MutableStateFlow(DataUsageMode.Unrestricted)
+
+                                override suspend fun currentMode() = DataUsageMode.Unrestricted
+                            },
                     ),
             )
         return GetTimelineDayUseCase(
             summarizeJournalEntriesUseCase = summarizeUseCase,
             getMediaUrisUseCase = getMediaUrisUseCase,
             extractPeopleUseCase = extractPeopleUseCase,
+            inferMomentsUseCase = inferMomentsUseCase,
         )
     }
 

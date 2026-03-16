@@ -13,10 +13,13 @@ import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
 import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
 import app.logdate.client.intelligence.generativeai.GenerativeAIResponse
+import app.logdate.client.networking.DataUsageMode
+import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.networking.NetworkState
 import app.logdate.client.repository.journals.JournalNote
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
@@ -46,6 +49,12 @@ class SummarizeJournalEntriesUseCaseTest {
                         generativeAICache = fakeCache,
                         genAIClient = fakeChatClient,
                         networkAvailabilityMonitor = mockNetworkMonitor,
+                        dataUsagePolicy =
+                            object : DataUsagePolicy {
+                                override val policy = MutableStateFlow(DataUsageMode.Unrestricted)
+
+                                override suspend fun currentMode() = DataUsageMode.Unrestricted
+                            },
                     ),
             )
     }
