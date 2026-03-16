@@ -43,18 +43,16 @@ class AndroidLocationProvider(
 
     private val locationRequest =
         LocationRequest
-            .Builder(Priority.PRIORITY_HIGH_ACCURACY, 30_000L)
+            .Builder(Priority.PRIORITY_BALANCED_POWER_ACCURACY, 60_000L)
             .setWaitForAccurateLocation(false)
-            .setMinUpdateIntervalMillis(10_000L)
-            .setMaxUpdateDelayMillis(60_000L)
+            .setMinUpdateIntervalMillis(30_000L)
+            .setMaxUpdateDelayMillis(120_000L)
             .build()
 
     private var locationCallback: LocationCallback? = null
     private var isLocationUpdatesActive = false
 
     init {
-        startLocationUpdates()
-        // Try to emit last known location immediately if available
         tryEmitLastKnownLocation()
     }
 
@@ -70,7 +68,7 @@ class AndroidLocationProvider(
             try {
                 fusedLocationClient
                     .getCurrentLocation(
-                        Priority.PRIORITY_HIGH_ACCURACY,
+                        Priority.PRIORITY_BALANCED_POWER_ACCURACY,
                         cancellationTokenSource.token,
                     ).addOnSuccessListener { androidLocation ->
                         if (androidLocation != null) {
@@ -99,8 +97,12 @@ class AndroidLocationProvider(
 
     /**
      * Starts continuous location updates for personal location logging.
+     *
+     * Must be called explicitly by the component that owns this provider's lifecycle.
+     * Updates are not started automatically on construction to avoid unnecessary
+     * GPS activation.
      */
-    private fun startLocationUpdates() {
+    fun startLocationUpdates() {
         if (!hasLocationPermission() || isLocationUpdatesActive) return
 
         locationCallback =
