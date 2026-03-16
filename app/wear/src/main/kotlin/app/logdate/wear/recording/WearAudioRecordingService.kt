@@ -188,21 +188,6 @@ class WearAudioRecordingService : Service() {
             }
             
             startRecording(outputPath)
-            
-            // Update recording state in background
-            serviceScope.launch {
-                var elapsedTimeSeconds = 0
-                while (_recordingState.value.isRecording) {
-                    kotlinx.coroutines.delay(1000)
-                    if (!isPaused) {
-                        elapsedTimeSeconds++
-                    }
-                    
-                    _recordingState.update {
-                        it.copy(durationSeconds = elapsedTimeSeconds)
-                    }
-                }
-            }
         } catch (e: Exception) {
             Napier.e("Error starting Wear OS foreground service", e)
             stopSelf()
@@ -276,23 +261,26 @@ class WearAudioRecordingService : Service() {
                         )
                     }
                     
-                    // Monitor audio levels
+                    // Monitor audio levels and duration in a single loop
                     serviceScope.launch {
                         while (_recordingState.value.isRecording) {
                             if (!isPaused) {
                                 try {
                                     val amplitude = mediaRecorder?.maxAmplitude ?: 0
-                                    // Convert to 0-1 range
                                     val level = (amplitude / 32768f).coerceIn(0f, 1f)
-                                    
+                                    val elapsed = ((System.currentTimeMillis() - recordingStartTime) / 1000).toInt()
+
                                     _recordingState.update {
-                                        it.copy(audioLevel = level)
+                                        it.copy(
+                                            audioLevel = level,
+                                            durationSeconds = elapsed,
+                                        )
                                     }
                                 } catch (e: Exception) {
                                     Napier.e("Error getting audio level", e)
                                 }
                             }
-                            kotlinx.coroutines.delay(100)
+                            kotlinx.coroutines.delay(250)
                         }
                     }
                     
