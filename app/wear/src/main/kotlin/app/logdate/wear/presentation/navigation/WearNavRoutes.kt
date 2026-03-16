@@ -21,6 +21,8 @@ data object WearRewindListRoute : NavKey
 
 data object WearRewindPlaybackRoute : NavKey
 
+data object WearRemoteCameraRoute : NavKey
+
 data object WearSettingsRoute : NavKey
 
 data object WearOnboardingRoute : NavKey

@@ -1,10 +1,13 @@
 package app.logdate.client.sync
 
+import android.content.Intent
+import android.provider.MediaStore
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
+import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.WearableListenerService
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
@@ -28,6 +31,40 @@ class PhoneDataLayerListenerService : WearableListenerService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val noteDataMapper = NoteDataMapper()
     private val notificationHelper by lazy { WearSyncNotificationHelper(applicationContext) }
+
+    companion object {
+        private const val PATH_CAMERA_OPEN = "/logdate/camera/open"
+        private const val PATH_CAMERA_CAPTURE = "/logdate/camera/capture"
+        private const val PATH_CAMERA_CLOSE = "/logdate/camera/close"
+    }
+
+    override fun onMessageReceived(messageEvent: MessageEvent) {
+        when (messageEvent.path) {
+            PATH_CAMERA_OPEN -> {
+                Napier.d("Watch requested camera open")
+                try {
+                    val cameraIntent =
+                        Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                    startActivity(cameraIntent)
+                } catch (e: Exception) {
+                    Napier.w("Failed to open camera from watch request", e)
+                }
+            }
+            PATH_CAMERA_CAPTURE -> {
+                Napier.d("Watch requested photo capture")
+                // The system camera handles capture via its own UI.
+                // The photo is saved to the device's media store.
+            }
+            PATH_CAMERA_CLOSE -> {
+                Napier.d("Watch requested camera close")
+            }
+            else -> {
+                Napier.d("Unknown message path: ${messageEvent.path}")
+            }
+        }
+    }
 
     override fun onDataChanged(dataEvents: DataEventBuffer) {
         val notesRepository =

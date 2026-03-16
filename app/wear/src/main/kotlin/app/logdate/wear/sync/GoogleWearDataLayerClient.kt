@@ -73,6 +73,24 @@ class GoogleWearDataLayerClient(
         }
     }
 
+    override suspend fun sendMessage(path: String, data: ByteArray): Boolean {
+        return try {
+            val nodes = nodeClient.connectedNodes.await()
+            val phoneNode = nodes.firstOrNull() ?: run {
+                Napier.w("No connected nodes for message")
+                return false
+            }
+            Wearable.getMessageClient(context)
+                .sendMessage(phoneNode.id, path, data)
+                .await()
+            Napier.d("Message sent to phone: $path")
+            true
+        } catch (e: Exception) {
+            Napier.w("Failed to send message: $path", e)
+            false
+        }
+    }
+
     override suspend fun sendFile(channelPath: String, localFilePath: String): Boolean {
         return try {
             val nodes = nodeClient.connectedNodes.await()

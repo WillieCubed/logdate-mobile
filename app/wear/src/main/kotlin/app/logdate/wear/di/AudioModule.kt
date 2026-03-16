@@ -11,6 +11,7 @@ import app.logdate.wear.data.storage.StorageSpaceChecker
 import app.logdate.wear.haptic.WearHapticEngine
 import app.logdate.wear.health.NoteHealthAnnotator
 import app.logdate.wear.presentation.audio.AudioRecordingViewModel
+import app.logdate.wear.presentation.camera.WearRemoteCameraViewModel
 import app.logdate.wear.presentation.home.WearHomeViewModel
 import app.logdate.wear.presentation.mood.MoodCheckInViewModel
 import app.logdate.wear.presentation.recording.WearRecordingViewModel
@@ -67,6 +68,11 @@ val wearAudioModule = module {
     viewModel {
         WearRewindViewModel(
             get<RewindRepository>(),
+        )
+    }
+    viewModel {
+        WearRemoteCameraViewModel(
+            get(),
         )
     }
 }

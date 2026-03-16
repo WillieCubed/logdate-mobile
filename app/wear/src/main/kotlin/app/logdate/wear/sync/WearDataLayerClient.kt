@@ -31,6 +31,12 @@ interface WearDataLayerClient {
      */
     suspend fun sendFile(channelPath: String, localFilePath: String): Boolean
 
+    /**
+     * Sends a message to the connected phone node at the given [path].
+     * Returns true if the message was delivered.
+     */
+    suspend fun sendMessage(path: String, data: ByteArray = byteArrayOf()): Boolean
+
     companion object {
         const val PHONE_CAPABILITY = "logdate_phone_app"
     }
