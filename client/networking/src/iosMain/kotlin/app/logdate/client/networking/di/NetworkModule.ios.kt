@@ -1,5 +1,7 @@
 package app.logdate.client.networking.di
 
+import app.logdate.client.networking.DataUsagePolicy
+import app.logdate.client.networking.DefaultDataUsagePolicy
 import app.logdate.client.networking.DefaultServerDiscoveryClient
 import app.logdate.client.networking.DefaultServerHealthChecker
 import app.logdate.client.networking.IosNetworkAvailabilityMonitor
@@ -15,5 +17,6 @@ actual val networkingModule: Module =
         single { httpClient }
         single<ServerHealthChecker> { DefaultServerHealthChecker(get()) }
         single<NetworkAvailabilityMonitor> { IosNetworkAvailabilityMonitor() }
+        single<DataUsagePolicy> { DefaultDataUsagePolicy(get()) }
         single<ServerDiscoveryClient> { DefaultServerDiscoveryClient(get()) }
     }
