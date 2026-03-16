@@ -46,6 +46,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
 import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.feature.editor.ui.video.VideoPlayerContent
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
@@ -268,18 +269,10 @@ private fun MediaContent(
     modifier: Modifier = Modifier,
 ) {
     if (isVideo) {
-        // Video playback placeholder — will be replaced in task #6
-        Box(
+        VideoPlayerContent(
+            uri = mediaRef,
             modifier = modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Videocam,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        )
     } else {
         AsyncImage(
             model = mediaRef,

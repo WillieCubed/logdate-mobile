@@ -48,6 +48,7 @@ kotlin {
             implementation(projects.client.repository)
             implementation(projects.client.media)
             implementation(projects.client.util)
+            implementation(projects.client.feature.editor)
             // Compose
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
