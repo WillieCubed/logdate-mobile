@@ -1,9 +1,7 @@
 @file:Suppress("ktlint:standard:function-naming")
-@file:OptIn(ExperimentalSharedTransitionApi::class)
 
 package app.logdate.feature.library.ui.detail
 
-import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,25 +20,27 @@ import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.rememberBottomSheetScaffoldState
+import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,9 +50,6 @@ import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.feature.editor.ui.video.VideoPlayerContent
-import app.logdate.feature.library.ui.components.LIBRARY_MEDIA_TRANSITION_KEY
-import app.logdate.ui.LocalNavAnimatedVisibilityScope
-import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
@@ -141,7 +138,6 @@ fun MediaDetailContent(
             MediaDetailLayout(
                 mediaRef = state.mediaRef,
                 isVideo = false,
-                noteId = state.noteId,
                 createdAt = state.createdAt,
                 location = state.location,
                 journals = state.journals,
@@ -158,7 +154,6 @@ fun MediaDetailContent(
             MediaDetailLayout(
                 mediaRef = state.mediaRef,
                 isVideo = true,
-                noteId = state.noteId,
                 createdAt = state.createdAt,
                 location = state.location,
                 journals = state.journals,
@@ -177,7 +172,6 @@ fun MediaDetailContent(
 private fun MediaDetailLayout(
     mediaRef: String,
     isVideo: Boolean,
-    noteId: Uuid,
     createdAt: Instant,
     location: NoteLocation?,
     journals: List<JournalReference>,
@@ -195,7 +189,7 @@ private fun MediaDetailLayout(
                 modifier = Modifier.weight(2f).fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
-                MediaContent(mediaRef = mediaRef, isVideo = isVideo, noteId = noteId)
+                MediaContent(mediaRef = mediaRef, isVideo = isVideo)
             }
             Column(
                 modifier =
@@ -216,60 +210,80 @@ private fun MediaDetailLayout(
             }
         }
     } else {
-        // Compact: fullscreen media + bottom sheet for metadata
-        var showMetadata by remember { mutableStateOf(false) }
-
-        Box(modifier = modifier.fillMaxSize()) {
-            MediaContent(
-                mediaRef = mediaRef,
-                isVideo = isVideo,
-                noteId = noteId,
-                modifier = Modifier.fillMaxSize(),
+        // Compact: fullscreen media + swipeable bottom sheet for metadata
+        val scaffoldState =
+            rememberBottomSheetScaffoldState(
+                bottomSheetState = rememberStandardBottomSheetState(initialValue = SheetValue.PartiallyExpanded),
             )
 
-            TopAppBar(
-                title = {},
-                navigationIcon = {
-                    FilledTonalIconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                        )
-                    }
-                },
-                actions = {
-                    FilledTonalIconButton(onClick = onShare) {
-                        Icon(
-                            imageVector = Icons.Filled.Share,
-                            contentDescription = "Share",
-                        )
-                    }
-                    TextButton(onClick = { showMetadata = true }) {
-                        Text("Info")
-                    }
-                },
-                colors =
-                    TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                    ),
-            )
-        }
-
-        if (showMetadata) {
-            ModalBottomSheet(onDismissRequest = { showMetadata = false }) {
+        BottomSheetScaffold(
+            modifier = modifier,
+            scaffoldState = scaffoldState,
+            sheetPeekHeight = 72.dp,
+            sheetContainerColor = MaterialTheme.colorScheme.surface,
+            containerColor = Color.Black,
+            sheetContent = {
                 Column(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(Spacing.lg)
+                            .padding(horizontal = Spacing.lg)
                             .padding(bottom = Spacing.xl),
                 ) {
                     MetadataContent(
                         createdAt = createdAt,
                         location = location,
                         isVideo = isVideo,
+                        journals = journals,
+                        exif = exif,
+                        onNavigateToJournal = onNavigateToJournal,
                     )
                 }
+            },
+            topBar = {
+                TopAppBar(
+                    title = {},
+                    navigationIcon = {
+                        FilledTonalIconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                            )
+                        }
+                    },
+                    actions = {
+                        FilledTonalIconButton(onClick = onShare) {
+                            Icon(
+                                imageVector = Icons.Filled.Share,
+                                contentDescription = "Share",
+                            )
+                        }
+                        FilledTonalIconButton(onClick = { /* TODO: delete action */ }) {
+                            Icon(
+                                imageVector = Icons.Filled.Info,
+                                contentDescription = "Details",
+                            )
+                        }
+                    },
+                    colors =
+                        TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent,
+                        ),
+                )
+            },
+        ) { innerPadding ->
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                contentAlignment = Alignment.Center,
+            ) {
+                MediaContent(
+                    mediaRef = mediaRef,
+                    isVideo = isVideo,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
     }
@@ -279,24 +293,8 @@ private fun MediaDetailLayout(
 private fun MediaContent(
     mediaRef: String,
     isVideo: Boolean,
-    noteId: Uuid? = null,
     modifier: Modifier = Modifier,
 ) {
-    val sharedTransitionScope = LocalSharedTransitionScope.current
-    val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
-
-    val sharedModifier =
-        if (noteId != null && sharedTransitionScope != null && animatedVisibilityScope != null) {
-            with(sharedTransitionScope) {
-                Modifier.sharedElement(
-                    rememberSharedContentState(key = "$LIBRARY_MEDIA_TRANSITION_KEY-$noteId"),
-                    animatedVisibilityScope,
-                )
-            }
-        } else {
-            Modifier
-        }
-
     if (isVideo) {
         VideoPlayerContent(
             uri = mediaRef,
@@ -307,7 +305,7 @@ private fun MediaContent(
             model = mediaRef,
             contentDescription = "Photo",
             contentScale = ContentScale.Fit,
-            modifier = sharedModifier.then(modifier).fillMaxSize(),
+            modifier = modifier.fillMaxSize(),
         )
     }
 }
