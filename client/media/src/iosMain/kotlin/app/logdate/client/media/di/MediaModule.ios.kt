@@ -4,6 +4,8 @@ import app.logdate.client.media.IosMediaManager
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.audio.transcription.IosTranscriptionManager
 import app.logdate.client.media.audio.transcription.TranscriptionManager
+import app.logdate.client.media.display.RemoteDisplayManager
+import app.logdate.client.media.display.StubRemoteDisplayManager
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -21,4 +23,6 @@ actual val mediaModule: Module =
         single<TranscriptionManager> {
             IosTranscriptionManager(get())
         }
+
+        single<RemoteDisplayManager> { StubRemoteDisplayManager() }
     }

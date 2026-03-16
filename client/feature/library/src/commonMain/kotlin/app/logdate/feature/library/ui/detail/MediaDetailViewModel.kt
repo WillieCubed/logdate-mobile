@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.places.PlaceResolutionResult
 import app.logdate.client.domain.places.ResolveLocationToPlaceUseCase
+import app.logdate.client.media.display.RemoteDisplayManager
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -16,10 +17,13 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
 
@@ -35,12 +39,84 @@ class MediaDetailViewModel(
     private val journalContentRepository: JournalContentRepository,
     private val indexedMediaRepository: IndexedMediaRepository,
     private val resolveLocationToPlaceUseCase: ResolveLocationToPlaceUseCase,
+    private val remoteDisplayManager: RemoteDisplayManager,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<MediaDetailUiState>(MediaDetailUiState.Loading)
     val uiState: StateFlow<MediaDetailUiState> = _uiState.asStateFlow()
 
+    /** All media notes for presenter navigation. */
+    private val allMediaNotes = MutableStateFlow<List<JournalNote>>(emptyList())
+
+    /** Presenter mode state. */
+    val presenterState: StateFlow<PresenterState> =
+        combine(
+            remoteDisplayManager.observeExternalDisplays(),
+            remoteDisplayManager.observeIsPresenting(),
+            allMediaNotes,
+        ) { displays, isPresenting, mediaNotes ->
+            val items =
+                mediaNotes.map { note ->
+                    PresenterMediaItem(
+                        uid = note.uid,
+                        uri =
+                            when (note) {
+                                is JournalNote.Image -> note.mediaRef
+                                is JournalNote.Video -> note.mediaRef
+                                else -> ""
+                            },
+                        isVideo = note is JournalNote.Video,
+                    )
+                }
+            val currentIndex = items.indexOfFirst { it.uid == noteId }.coerceAtLeast(0)
+            PresenterState(
+                isExternalDisplayAvailable = displays.isNotEmpty(),
+                isPresenting = isPresenting,
+                currentIndex = currentIndex,
+                totalItems = items.size,
+                mediaItems = items,
+            )
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            PresenterState(),
+        )
+
     init {
         observeNote()
+    }
+
+    /** Start presenting the current media on the first available external display. */
+    fun startPresenting() {
+        viewModelScope.launch {
+            try {
+                val displays = remoteDisplayManager.observeExternalDisplays().first()
+                val displayId = displays.firstOrNull()?.id ?: return@launch
+                val state = presenterState.value
+                val item = state.mediaItems.getOrNull(state.currentIndex) ?: return@launch
+                val mimeType = if (item.isVideo) "video/*" else "image/*"
+                remoteDisplayManager.present(displayId, item.uri, mimeType)
+            } catch (e: Exception) {
+                Napier.e("Failed to start presenting", e)
+            }
+        }
+    }
+
+    /** Navigate to a specific item in presenter mode and update the external display. */
+    fun presentItem(index: Int) {
+        val items = presenterState.value.mediaItems
+        val item = items.getOrNull(index) ?: return
+        val mimeType = if (item.isVideo) "video/*" else "image/*"
+        remoteDisplayManager.updatePresentation(item.uri, mimeType)
+    }
+
+    /** Stop presenting and dismiss the external display. */
+    fun stopPresenting() {
+        remoteDisplayManager.dismiss()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        remoteDisplayManager.dismiss()
     }
 
     private fun observeNote() {
@@ -50,6 +126,12 @@ class MediaDetailViewModel(
                     Napier.e("Failed to load media detail", error)
                     _uiState.value = MediaDetailUiState.Error("Could not load this photo or video.")
                 }.collect { notes ->
+                    // Update the media notes list for presenter navigation
+                    allMediaNotes.value =
+                        notes
+                            .filter { it is JournalNote.Image || it is JournalNote.Video }
+                            .sortedByDescending { it.creationTimestamp }
+
                     val note = notes.find { it.uid == noteId }
                     if (note == null) {
                         _uiState.value = MediaDetailUiState.Error("Media not found.")

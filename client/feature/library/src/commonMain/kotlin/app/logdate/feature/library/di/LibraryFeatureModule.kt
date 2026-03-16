@@ -20,6 +20,7 @@ val libraryFeatureModule: Module =
                 journalContentRepository = get(),
                 indexedMediaRepository = get(),
                 resolveLocationToPlaceUseCase = get(),
+                remoteDisplayManager = get(),
             )
         }
     }

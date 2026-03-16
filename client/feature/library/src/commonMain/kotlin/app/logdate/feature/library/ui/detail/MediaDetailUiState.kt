@@ -53,3 +53,23 @@ data class ExifDisplayData(
     val focalLength: Double? = null,
     val shutterSpeed: String? = null,
 )
+
+/**
+ * State for presenter mode — showing media on an external display.
+ */
+data class PresenterState(
+    val isExternalDisplayAvailable: Boolean = false,
+    val isPresenting: Boolean = false,
+    val currentIndex: Int = 0,
+    val totalItems: Int = 0,
+    val mediaItems: List<PresenterMediaItem> = emptyList(),
+)
+
+/**
+ * A media item in the presenter navigation strip.
+ */
+data class PresenterMediaItem(
+    val uid: Uuid,
+    val uri: String,
+    val isVideo: Boolean,
+)

@@ -4,6 +4,7 @@ import app.logdate.client.domain.places.ResolveLocationToPlaceUseCase
 import app.logdate.client.location.places.GeocodedAddress
 import app.logdate.client.location.places.PlaceSuggestion
 import app.logdate.client.location.places.ReverseGeocodingProvider
+import app.logdate.client.media.display.StubRemoteDisplayManager
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
@@ -37,6 +38,7 @@ class MediaDetailViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
     private val contentRepository = FakeJournalContentRepository()
     private val indexedMediaRepository = FakeIndexedMediaRepository()
+    private val remoteDisplayManager = StubRemoteDisplayManager()
     private val resolveLocationUseCase =
         ResolveLocationToPlaceUseCase(
             userPlacesRepository =
@@ -86,7 +88,15 @@ class MediaDetailViewModelTest {
         runTest(testDispatcher) {
             val repository = FakeJournalNotesRepository(emptyList())
             val noteId = Uuid.random()
-            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository, resolveLocationUseCase)
+            val viewModel =
+                MediaDetailViewModel(
+                    noteId,
+                    repository,
+                    contentRepository,
+                    indexedMediaRepository,
+                    resolveLocationUseCase,
+                    remoteDisplayManager,
+                )
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -109,7 +119,15 @@ class MediaDetailViewModelTest {
                     ),
                 )
             val repository = FakeJournalNotesRepository(notes)
-            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository, resolveLocationUseCase)
+            val viewModel =
+                MediaDetailViewModel(
+                    noteId,
+                    repository,
+                    contentRepository,
+                    indexedMediaRepository,
+                    resolveLocationUseCase,
+                    remoteDisplayManager,
+                )
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -135,7 +153,15 @@ class MediaDetailViewModelTest {
                     ),
                 )
             val repository = FakeJournalNotesRepository(notes)
-            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository, resolveLocationUseCase)
+            val viewModel =
+                MediaDetailViewModel(
+                    noteId,
+                    repository,
+                    contentRepository,
+                    indexedMediaRepository,
+                    resolveLocationUseCase,
+                    remoteDisplayManager,
+                )
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -165,7 +191,15 @@ class MediaDetailViewModelTest {
                     ),
                 )
             val repository = FakeJournalNotesRepository(notes)
-            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository, resolveLocationUseCase)
+            val viewModel =
+                MediaDetailViewModel(
+                    noteId,
+                    repository,
+                    contentRepository,
+                    indexedMediaRepository,
+                    resolveLocationUseCase,
+                    remoteDisplayManager,
+                )
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -190,7 +224,15 @@ class MediaDetailViewModelTest {
                     ),
                 )
             val repository = FakeJournalNotesRepository(notes)
-            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository, resolveLocationUseCase)
+            val viewModel =
+                MediaDetailViewModel(
+                    noteId,
+                    repository,
+                    contentRepository,
+                    indexedMediaRepository,
+                    resolveLocationUseCase,
+                    remoteDisplayManager,
+                )
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -229,7 +271,15 @@ class MediaDetailViewModelTest {
             )
 
             val repository = FakeJournalNotesRepository(notes)
-            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository, resolveLocationUseCase)
+            val viewModel =
+                MediaDetailViewModel(
+                    noteId,
+                    repository,
+                    contentRepository,
+                    indexedMediaRepository,
+                    resolveLocationUseCase,
+                    remoteDisplayManager,
+                )
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()

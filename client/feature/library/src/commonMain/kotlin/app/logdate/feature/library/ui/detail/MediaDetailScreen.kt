@@ -2,9 +2,12 @@
 
 package app.logdate.feature.library.ui.detail
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,7 +15,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -20,13 +25,15 @@ import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.ScreenShare
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.StopScreenShare
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -42,6 +49,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
@@ -72,6 +80,7 @@ fun MediaDetailScreen(
         ),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val presenterState by viewModel.presenterState.collectAsStateWithLifecycle()
 
     val isExpanded =
         currentWindowAdaptiveInfo()
@@ -80,10 +89,17 @@ fun MediaDetailScreen(
 
     MediaDetailContent(
         state = uiState,
+        presenterState = presenterState,
         isExpanded = isExpanded,
-        onBack = onBack,
+        onBack = {
+            viewModel.stopPresenting()
+            onBack()
+        },
         onNavigateToJournal = onNavigateToJournal,
         onShare = onShare,
+        onStartPresenting = viewModel::startPresenting,
+        onStopPresenting = viewModel::stopPresenting,
+        onPresentItem = viewModel::presentItem,
         modifier = modifier,
     )
 }
@@ -98,10 +114,14 @@ fun MediaDetailScreen(
 @Composable
 fun MediaDetailContent(
     state: MediaDetailUiState,
+    presenterState: PresenterState = PresenterState(),
     isExpanded: Boolean,
     onBack: () -> Unit,
     onNavigateToJournal: (Uuid) -> Unit = {},
     onShare: (String) -> Unit = {},
+    onStartPresenting: () -> Unit = {},
+    onStopPresenting: () -> Unit = {},
+    onPresentItem: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     when (state) {
@@ -144,6 +164,10 @@ fun MediaDetailContent(
                 onBack = onBack,
                 onNavigateToJournal = onNavigateToJournal,
                 onShare = { onShare(state.mediaRef) },
+                presenterState = presenterState,
+                onStartPresenting = onStartPresenting,
+                onStopPresenting = onStopPresenting,
+                onPresentItem = onPresentItem,
                 modifier = modifier,
             )
         }
@@ -159,6 +183,10 @@ fun MediaDetailContent(
                 onBack = onBack,
                 onNavigateToJournal = onNavigateToJournal,
                 onShare = { onShare(state.mediaRef) },
+                presenterState = presenterState,
+                onStartPresenting = onStartPresenting,
+                onStopPresenting = onStopPresenting,
+                onPresentItem = onPresentItem,
                 modifier = modifier,
             )
         }
@@ -178,6 +206,10 @@ private fun MediaDetailLayout(
     onBack: () -> Unit,
     onNavigateToJournal: (Uuid) -> Unit = {},
     onShare: () -> Unit = {},
+    presenterState: PresenterState = PresenterState(),
+    onStartPresenting: () -> Unit = {},
+    onStopPresenting: () -> Unit = {},
+    onPresentItem: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (isExpanded) {
@@ -250,16 +282,32 @@ private fun MediaDetailLayout(
                         }
                     },
                     actions = {
+                        if (presenterState.isExternalDisplayAvailable) {
+                            FilledTonalIconButton(
+                                onClick = {
+                                    if (presenterState.isPresenting) {
+                                        onStopPresenting()
+                                    } else {
+                                        onStartPresenting()
+                                    }
+                                },
+                            ) {
+                                Icon(
+                                    imageVector =
+                                        if (presenterState.isPresenting) {
+                                            Icons.Filled.StopScreenShare
+                                        } else {
+                                            Icons.Filled.ScreenShare
+                                        },
+                                    contentDescription =
+                                        if (presenterState.isPresenting) "Stop presenting" else "Present",
+                                )
+                            }
+                        }
                         FilledTonalIconButton(onClick = onShare) {
                             Icon(
                                 imageVector = Icons.Filled.Share,
                                 contentDescription = "Share",
-                            )
-                        }
-                        FilledTonalIconButton(onClick = { /* TODO: delete action */ }) {
-                            Icon(
-                                imageVector = Icons.Filled.Info,
-                                contentDescription = "Details",
                             )
                         }
                     },
@@ -270,18 +318,104 @@ private fun MediaDetailLayout(
                 )
             },
         ) { innerPadding ->
-            Box(
+            Column(
                 modifier =
                     Modifier
                         .fillMaxSize()
                         .padding(innerPadding),
-                contentAlignment = Alignment.Center,
             ) {
-                MediaContent(
-                    mediaRef = mediaRef,
-                    isVideo = isVideo,
-                    modifier = Modifier.fillMaxSize(),
-                )
+                // Presenter navigation strip
+                if (presenterState.isPresenting && presenterState.mediaItems.size > 1) {
+                    PresenterNavigationStrip(
+                        items = presenterState.mediaItems,
+                        currentIndex = presenterState.currentIndex,
+                        onSelectItem = onPresentItem,
+                    )
+                }
+
+                Box(
+                    modifier = Modifier.weight(1f).fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    MediaContent(
+                        mediaRef = mediaRef,
+                        isVideo = isVideo,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+
+                // Stop presenting button
+                if (presenterState.isPresenting) {
+                    FilledTonalButton(
+                        onClick = onStopPresenting,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                    ) {
+                        Icon(Icons.Filled.StopScreenShare, contentDescription = null)
+                        Spacer(
+                            modifier = Modifier.size(Spacing.sm),
+                        )
+                        Text("Stop Presenting")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PresenterNavigationStrip(
+    items: List<PresenterMediaItem>,
+    currentIndex: Int,
+    onSelectItem: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = "Presenting \u2022 ${currentIndex + 1} of ${items.size}",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            modifier = Modifier.padding(vertical = Spacing.xs),
+        )
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+            contentPadding = PaddingValues(horizontal = Spacing.md),
+        ) {
+            val thumbnailShape = RoundedCornerShape(6.dp)
+            items.forEachIndexed { index, item ->
+                item(key = item.uid) {
+                    val isSelected = index == currentIndex
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(if (isSelected) 56.dp else 48.dp)
+                                .clip(thumbnailShape)
+                                .then(
+                                    if (isSelected) {
+                                        Modifier.border(
+                                            2.dp,
+                                            MaterialTheme.colorScheme.primary,
+                                            thumbnailShape,
+                                        )
+                                    } else {
+                                        Modifier
+                                    },
+                                ).clickable { onSelectItem(index) },
+                    ) {
+                        AsyncImage(
+                            model = item.uri,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
             }
         }
     }
