@@ -6,7 +6,6 @@ import app.logdate.client.domain.places.PlaceResolutionCache
 import app.logdate.client.domain.places.PlaceResolutionResult
 import app.logdate.client.location.ClientLocationProvider
 import app.logdate.client.location.places.GeocodedAddress
-import app.logdate.client.repository.journals.JournalNote
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -79,11 +78,6 @@ class GetHomeRecommendationUseCase(
                     recentDraft != null ->
                         HomeRecommendation.CompleteYourDraft(
                             draftId = recentDraft.id,
-                            notePreview =
-                                recentDraft.notes
-                                    .filterIsInstance<JournalNote.Text>()
-                                    .firstOrNull()
-                                    ?.content,
                         )
                     recall != null ->
                         HomeRecommendation.MemoryRecall(

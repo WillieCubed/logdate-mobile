@@ -48,17 +48,25 @@ fun NoteEditorScreen(
     onEntrySaved: () -> Unit,
     modifier: Modifier = Modifier,
     entryId: Uuid? = null,
+    draftId: Uuid? = null,
     journalId: Uuid? = null,
     initialTextContent: String? = null,
     attachments: List<String> = emptyList(),
     viewModel: EntryEditorViewModel = koinViewModel(),
 ) {
-    // Load existing entry if ID is provided
-    LaunchedEffect(entryId) {
-        entryId?.let {
+    // Load an existing draft or journal entry when provided
+    LaunchedEffect(entryId, draftId) {
+        if (draftId != null) {
             try {
-                Napier.d("NoteEditorScreen: Loading existing entry: $it")
-                viewModel.loadExistingEntry(it, journalId)
+                Napier.d("NoteEditorScreen: Loading draft: $draftId")
+                viewModel.loadDraft(draftId)
+            } catch (e: Exception) {
+                Napier.e("Failed to load draft: $draftId", e)
+            }
+        } else if (entryId != null) {
+            try {
+                Napier.d("NoteEditorScreen: Loading existing entry: $entryId")
+                viewModel.loadExistingEntry(entryId, journalId)
             } catch (e: Exception) {
                 Napier.e("Failed to load existing entry: $entryId", e)
             }

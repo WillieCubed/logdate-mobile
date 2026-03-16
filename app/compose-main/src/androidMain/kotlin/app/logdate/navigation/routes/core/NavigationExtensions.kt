@@ -42,6 +42,15 @@ fun MainAppNavigator.openEntryEditor(entryId: Uuid? = null) {
 }
 
 /**
+ * Opens the entry editor and loads the given draft.
+ */
+fun MainAppNavigator.openDraft(draftId: Uuid) {
+    backStack.add(
+        EntryEditor(draftId = draftId),
+    )
+}
+
+/**
  * Navigates to the home screen from the onboarding flow.
  * This clears the backstack to prevent navigation back to onboarding.
  */

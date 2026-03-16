@@ -99,11 +99,15 @@ data class ShareJournal(
 ) : NavKey
 
 /**
- * Routes for the editor feature
+ * Routes for the editor feature.
+ *
+ * @param id An existing journal entry to edit, or null for a new entry.
+ * @param draftId A draft to resume, or null when not opening a draft.
  */
 @Serializable
 data class EntryEditor(
     val id: Uuid? = null,
+    val draftId: Uuid? = null,
 ) : NavKey
 
 /**

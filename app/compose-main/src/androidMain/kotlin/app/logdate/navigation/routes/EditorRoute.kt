@@ -38,7 +38,7 @@ fun EntryProviderScope<NavKey>.editorRoutes(
     onBack: () -> Unit,
     onSave: () -> Unit,
 ) {
-    routeEntry<EntryEditor> {
+    routeEntry<EntryEditor> { route ->
         val navigationScope = NavigationLocalSharedTransitionScope.current
         val animatedContentScope = LocalNavAnimatedContentScope.current
 
@@ -63,6 +63,8 @@ fun EntryProviderScope<NavKey>.editorRoutes(
             NoteEditorScreen(
                 onNavigateBack = onBack,
                 onEntrySaved = onSave,
+                entryId = route.id,
+                draftId = route.draftId,
                 modifier = sharedBoundsModifier,
             )
         }

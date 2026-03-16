@@ -25,7 +25,6 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -118,30 +117,6 @@ class GetHomeRecommendationUseCaseTest {
             val result = useCase().first() as HomeRecommendation.CompleteYourDraft
 
             assertEquals(draft.id, result.draftId)
-        }
-
-    @Test
-    fun `CompleteYourDraft preview comes from first text note in draft`() =
-        runTest {
-            val draft = createDraftWithText("My draft content")
-            mockNotesRepository.notesForRange = emptyList()
-            mockDraftRepository.drafts = listOf(draft)
-
-            val result = useCase().first() as HomeRecommendation.CompleteYourDraft
-
-            assertEquals("My draft content", result.notePreview)
-        }
-
-    @Test
-    fun `CompleteYourDraft preview is null when draft has no text notes`() =
-        runTest {
-            val draft = createDraftWithAudioOnly()
-            mockNotesRepository.notesForRange = emptyList()
-            mockDraftRepository.drafts = listOf(draft)
-
-            val result = useCase().first() as HomeRecommendation.CompleteYourDraft
-
-            assertNull(result.notePreview)
         }
 
     // --- Priority ---

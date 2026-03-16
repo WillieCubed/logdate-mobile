@@ -506,7 +506,6 @@ class HomeViewModel(
             is HomeRecommendation.CompleteYourDraft ->
                 TimelineSuggestionBlock.CompleteDraft(
                     draftId = draftId.toString(),
-                    notePreview = notePreview?.takeIf(String::isNotBlank),
                 )
             is HomeRecommendation.MemoryRecall ->
                 TimelineSuggestionBlock.MemoryRecall(

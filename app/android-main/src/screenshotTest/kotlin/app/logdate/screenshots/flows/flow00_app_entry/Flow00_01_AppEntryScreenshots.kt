@@ -140,7 +140,6 @@ private fun RootPreviewFrame(
                 timelineSuggestion =
                     TimelineSuggestionBlock.CompleteDraft(
                         draftId = "draft-1",
-                        notePreview = "You have an unfinished memory from this afternoon.",
                     ),
             )
         }

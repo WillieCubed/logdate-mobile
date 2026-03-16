@@ -99,6 +99,7 @@ import app.logdate.navigation.routes.core.TimelineDetail
 import app.logdate.navigation.routes.core.TimelineListRoute
 import app.logdate.navigation.routes.core.goBack
 import app.logdate.navigation.routes.core.navigateHomeFromOnboarding
+import app.logdate.navigation.routes.core.openDraft
 import app.logdate.navigation.routes.core.openEntryEditor
 import app.logdate.navigation.routes.core.switchToTab
 import app.logdate.navigation.routes.editorRoutes
@@ -609,8 +610,8 @@ fun MainNavigationRoot(
                             timelineRoutes(
                                 openEntryEditor = mainAppNavigator::openEntryEditor,
                                 onOpenDraft = { draftId ->
-                                    mainAppNavigator.openEntryEditor(
-                                        entryId = kotlin.uuid.Uuid.parse(draftId),
+                                    mainAppNavigator.openDraft(
+                                        draftId = kotlin.uuid.Uuid.parse(draftId),
                                     )
                                 },
                                 sharingLauncher = sharingLauncher,

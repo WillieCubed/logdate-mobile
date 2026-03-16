@@ -28,7 +28,6 @@ sealed class HomeRecommendation {
     /** The user has an unfinished draft that has not been saved as a journal entry. */
     data class CompleteYourDraft(
         val draftId: Uuid,
-        val notePreview: String?,
     ) : HomeRecommendation()
 
     /** Past entries worth revisiting — "on this day" style recall. */

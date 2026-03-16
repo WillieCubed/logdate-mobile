@@ -49,7 +49,6 @@ sealed interface TimelineSuggestionBlock {
      */
     data class CompleteDraft(
         val draftId: String,
-        val notePreview: String?,
     ) : TimelineSuggestionBlock
 
     /**
@@ -360,7 +359,7 @@ private fun TimelineSuggestionBlockPreview_CompleteDraft() {
     val state =
         TimelineSuggestionBlockUiState(
             type = TimelineSuggestionBlockType.COMPLETE_DRAFT,
-            message = "Had a great time at the park today with...",
+            message = "Finish your draft while it's still fresh.",
             draftId = "draft-1",
         )
     TimelineSuggestionBlock(
