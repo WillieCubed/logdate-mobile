@@ -100,7 +100,7 @@ class DetailedLocationTrackingService :
         const val ACTION_STOP = "app.logdate.location.action.STOP_DETAILED_TRACKING"
         private const val CHANNEL_ID = "logdate_location_detail_tracking"
         private const val NOTIFICATION_ID = 1904
-        private const val SAMPLE_INTERVAL_SECONDS = 15L
+        private const val SAMPLE_INTERVAL_SECONDS = 60L
 
         /** Maximum time to wait for a single location fix before skipping the sample. */
         private const val LOCATION_FIX_TIMEOUT_SECONDS = 20L
@@ -164,7 +164,6 @@ class DetailedLocationTrackingService :
             serviceScope.launch {
                 while (isActive) {
                     runCatching {
-                        locationProvider.refreshLocation()
                         val location =
                             withTimeoutOrNull(LOCATION_FIX_TIMEOUT_SECONDS.seconds) {
                                 locationProvider.getCurrentLocation()
