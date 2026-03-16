@@ -250,7 +250,7 @@ class AndroidSyncManager(
             Constraints
                 .Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
-                .setRequiresBatteryNotLow(false) // Allow on low battery for critical sync
+                .setRequiresBatteryNotLow(true)
                 .build()
 
         val inputData =
