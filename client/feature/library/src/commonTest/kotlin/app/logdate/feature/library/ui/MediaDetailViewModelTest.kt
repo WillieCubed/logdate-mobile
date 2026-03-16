@@ -1,14 +1,21 @@
 package app.logdate.feature.library.ui
 
+import app.logdate.client.domain.places.ResolveLocationToPlaceUseCase
+import app.logdate.client.location.places.GeocodedAddress
+import app.logdate.client.location.places.PlaceSuggestion
+import app.logdate.client.location.places.ReverseGeocodingProvider
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.repository.places.UserPlacesRepository
 import app.logdate.feature.library.fakes.FakeIndexedMediaRepository
 import app.logdate.feature.library.fakes.FakeJournalContentRepository
 import app.logdate.feature.library.fakes.FakeJournalNotesRepository
 import app.logdate.feature.library.ui.detail.MediaDetailUiState
 import app.logdate.feature.library.ui.detail.MediaDetailViewModel
 import app.logdate.shared.model.Journal
+import app.logdate.shared.model.Location
+import app.logdate.shared.model.Place
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -30,6 +37,39 @@ class MediaDetailViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
     private val contentRepository = FakeJournalContentRepository()
     private val indexedMediaRepository = FakeIndexedMediaRepository()
+    private val resolveLocationUseCase =
+        ResolveLocationToPlaceUseCase(
+            userPlacesRepository =
+                object : UserPlacesRepository {
+                    override suspend fun getAllPlaces(): List<Place> = emptyList()
+
+                    override fun observeAllPlaces() = kotlinx.coroutines.flow.flowOf(emptyList<Place>())
+
+                    override suspend fun getPlacesNear(
+                        latitude: Double,
+                        longitude: Double,
+                        radiusMeters: Double,
+                    ): List<Place> = emptyList()
+
+                    override suspend fun getPlaceById(placeId: String): Place? = null
+
+                    override suspend fun createPlace(place: Place): Result<Place> = Result.success(place)
+
+                    override suspend fun updatePlace(place: Place): Result<Place> = Result.success(place)
+
+                    override suspend fun deletePlace(placeId: String): Result<Unit> = Result.success(Unit)
+
+                    override suspend fun searchPlaces(query: String): List<Place> = emptyList()
+                },
+            externalPlacesProvider =
+                object : app.logdate.client.location.places.ExternalPlacesProvider {
+                    override suspend fun searchNearbyPlaces(location: Location): List<PlaceSuggestion> = emptyList()
+                },
+            reverseGeocodingProvider =
+                object : ReverseGeocodingProvider {
+                    override suspend fun reverseGeocode(location: Location): GeocodedAddress? = null
+                },
+        )
 
     @BeforeTest
     fun setUp() {
@@ -46,7 +86,7 @@ class MediaDetailViewModelTest {
         runTest(testDispatcher) {
             val repository = FakeJournalNotesRepository(emptyList())
             val noteId = Uuid.random()
-            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository)
+            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository, resolveLocationUseCase)
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -69,7 +109,7 @@ class MediaDetailViewModelTest {
                     ),
                 )
             val repository = FakeJournalNotesRepository(notes)
-            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository)
+            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository, resolveLocationUseCase)
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -95,7 +135,7 @@ class MediaDetailViewModelTest {
                     ),
                 )
             val repository = FakeJournalNotesRepository(notes)
-            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository)
+            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository, resolveLocationUseCase)
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -125,7 +165,7 @@ class MediaDetailViewModelTest {
                     ),
                 )
             val repository = FakeJournalNotesRepository(notes)
-            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository)
+            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository, resolveLocationUseCase)
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -150,7 +190,7 @@ class MediaDetailViewModelTest {
                     ),
                 )
             val repository = FakeJournalNotesRepository(notes)
-            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository)
+            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository, resolveLocationUseCase)
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -189,7 +229,7 @@ class MediaDetailViewModelTest {
             )
 
             val repository = FakeJournalNotesRepository(notes)
-            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository)
+            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository, resolveLocationUseCase)
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()

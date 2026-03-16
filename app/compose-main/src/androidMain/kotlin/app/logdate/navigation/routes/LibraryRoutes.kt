@@ -4,11 +4,8 @@ package app.logdate.navigation.routes
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -16,24 +13,17 @@ import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import app.logdate.feature.library.ui.LibraryScreen
-import app.logdate.feature.library.ui.components.LIBRARY_MEDIA_TRANSITION_KEY
+import app.logdate.feature.library.ui.components.MediaBoundsTransform
 import app.logdate.feature.library.ui.detail.MediaDetailScreen
 import app.logdate.navigation.MainAppNavigator
 import app.logdate.navigation.routes.core.LibraryListRoute
 import app.logdate.navigation.routes.core.LibraryMediaDetailRoute
 import app.logdate.navigation.scenes.HomeScene
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
+import app.logdate.ui.common.transitions.TransitionKeys
 import kotlin.uuid.Uuid
 import app.logdate.navigation.LocalSharedTransitionScope as NavigationSharedTransitionScope
 import app.logdate.ui.LocalSharedTransitionScope as FeatureSharedTransitionScope
-
-/**
- * Bounds transform matching the thumbnail's transition curve.
- */
-private val MediaBoundsTransform =
-    BoundsTransform { _, _ ->
-        tween(durationMillis = 400, easing = FastOutSlowInEasing)
-    }
 
 fun MainAppNavigator.openMediaDetail(mediaId: Uuid) {
     backStack.add(LibraryMediaDetailRoute(mediaId))
@@ -68,7 +58,7 @@ fun EntryProviderScope<NavKey>.libraryRoutes(
                 with(navigationScope) {
                     Modifier.sharedBounds(
                         rememberSharedContentState(
-                            key = "$LIBRARY_MEDIA_TRANSITION_KEY-${route.mediaId}",
+                            key = "${TransitionKeys.LIBRARY_MEDIA_TRANSITION}-${route.mediaId}",
                         ),
                         animatedVisibilityScope = animatedContentScope,
                         boundsTransform = MediaBoundsTransform,

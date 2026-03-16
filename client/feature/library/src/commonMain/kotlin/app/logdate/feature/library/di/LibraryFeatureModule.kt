@@ -19,6 +19,7 @@ val libraryFeatureModule: Module =
                 notesRepository = get(),
                 journalContentRepository = get(),
                 indexedMediaRepository = get(),
+                resolveLocationToPlaceUseCase = get(),
             )
         }
     }

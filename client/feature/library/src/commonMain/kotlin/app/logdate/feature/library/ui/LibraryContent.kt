@@ -3,7 +3,6 @@
 package app.logdate.feature.library.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -16,72 +15,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.window.core.layout.WindowSizeClass.Companion.HEIGHT_DP_MEDIUM_LOWER_BOUND
-import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
 import app.logdate.feature.library.ui.components.MediaThumbnailGrid
-import app.logdate.ui.theme.Spacing
+import app.logdate.ui.common.adaptivePanelShape
 import kotlin.uuid.Uuid
-
-/**
- * Returns an animated [Shape] for the library panel surface.
- *
- * - **Portrait phone**: Rounded top corners, flat bottom.
- * - **Landscape phone**: All corners rounded.
- * - **Tablet / desktop**: All corners flat.
- */
-@Composable
-private fun adaptivePanelShape(
-    fallbackWidth: androidx.compose.ui.unit.Dp,
-    fallbackHeight: androidx.compose.ui.unit.Dp,
-): Shape {
-    val isInspectionMode = LocalInspectionMode.current
-    val windowSizeClass =
-        if (isInspectionMode) {
-            null
-        } else {
-            currentWindowAdaptiveInfo().windowSizeClass
-        }
-    val isWide =
-        windowSizeClass?.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND)
-            ?: (fallbackWidth >= WIDTH_DP_EXPANDED_LOWER_BOUND.dp)
-    val isTall =
-        windowSizeClass?.isHeightAtLeastBreakpoint(HEIGHT_DP_MEDIUM_LOWER_BOUND)
-            ?: (fallbackHeight >= HEIGHT_DP_MEDIUM_LOWER_BOUND.dp)
-
-    val topCorner by animateDpAsState(
-        targetValue = if (isWide && isTall) 0.dp else Spacing.lg,
-        animationSpec = tween(300),
-        label = "PanelTopCornerRadius",
-    )
-    val bottomCorner by animateDpAsState(
-        targetValue = if (isWide && !isTall) Spacing.lg else 0.dp,
-        animationSpec = tween(300),
-        label = "PanelBottomCornerRadius",
-    )
-
-    return RoundedCornerShape(
-        topStart = topCorner,
-        topEnd = topCorner,
-        bottomStart = bottomCorner,
-        bottomEnd = bottomCorner,
-    )
-}
 
 /**
  * The main content surface for the library.

@@ -46,6 +46,7 @@ kotlin {
             implementation(projects.client.ui)
             implementation(projects.client.domain)
             implementation(projects.client.repository)
+            implementation(projects.client.location)
             implementation(projects.client.media)
             implementation(projects.client.util)
             implementation(projects.client.feature.editor)

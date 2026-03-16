@@ -19,6 +19,7 @@ sealed interface MediaDetailUiState {
         val mediaRef: String,
         val createdAt: Instant,
         val location: NoteLocation?,
+        val locationDisplayName: String? = null,
         val journals: List<JournalReference> = emptyList(),
         val exif: ExifDisplayData? = null,
     ) : MediaDetailUiState
@@ -28,6 +29,7 @@ sealed interface MediaDetailUiState {
         val mediaRef: String,
         val createdAt: Instant,
         val location: NoteLocation?,
+        val locationDisplayName: String? = null,
         val journals: List<JournalReference> = emptyList(),
     ) : MediaDetailUiState
 }

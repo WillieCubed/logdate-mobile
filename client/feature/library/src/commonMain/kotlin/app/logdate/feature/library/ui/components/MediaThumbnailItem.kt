@@ -27,19 +27,15 @@ import androidx.compose.ui.unit.dp
 import app.logdate.feature.library.ui.LibraryMediaItem
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
+import app.logdate.ui.common.transitions.TransitionKeys
 import coil3.compose.AsyncImage
 import kotlin.uuid.Uuid
-
-/**
- * Shared element key prefix for library media transitions.
- */
-const val LIBRARY_MEDIA_TRANSITION_KEY = "library-media"
 
 /**
  * Bounds transform for the thumbnail-to-detail transition.
  * Uses a smooth ease-in-out curve for a polished feel.
  */
-private val MediaBoundsTransform =
+val MediaBoundsTransform =
     BoundsTransform { _, _ ->
         tween(durationMillis = 400, easing = FastOutSlowInEasing)
     }
@@ -64,7 +60,7 @@ fun MediaThumbnailItem(
         if (sharedTransitionScope != null && animatedVisibilityScope != null) {
             with(sharedTransitionScope) {
                 Modifier.sharedBounds(
-                    rememberSharedContentState(key = "$LIBRARY_MEDIA_TRANSITION_KEY-${item.uid}"),
+                    rememberSharedContentState(key = "${TransitionKeys.LIBRARY_MEDIA_TRANSITION}-${item.uid}"),
                     animatedVisibilityScope,
                     boundsTransform = MediaBoundsTransform,
                     clipInOverlayDuringTransition =

@@ -39,16 +39,14 @@ import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
-import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.feature.editor.ui.video.VideoPlayerContent
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
@@ -73,7 +71,7 @@ fun MediaDetailScreen(
             parameters = { parametersOf(mediaId) },
         ),
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val isExpanded =
         currentWindowAdaptiveInfo()
@@ -139,7 +137,7 @@ fun MediaDetailContent(
                 mediaRef = state.mediaRef,
                 isVideo = false,
                 createdAt = state.createdAt,
-                location = state.location,
+                locationDisplayName = state.locationDisplayName,
                 journals = state.journals,
                 exif = state.exif,
                 isExpanded = isExpanded,
@@ -155,7 +153,7 @@ fun MediaDetailContent(
                 mediaRef = state.mediaRef,
                 isVideo = true,
                 createdAt = state.createdAt,
-                location = state.location,
+                locationDisplayName = state.locationDisplayName,
                 journals = state.journals,
                 isExpanded = isExpanded,
                 onBack = onBack,
@@ -173,7 +171,7 @@ private fun MediaDetailLayout(
     mediaRef: String,
     isVideo: Boolean,
     createdAt: Instant,
-    location: NoteLocation?,
+    locationDisplayName: String? = null,
     journals: List<JournalReference>,
     exif: ExifDisplayData? = null,
     isExpanded: Boolean,
@@ -201,7 +199,7 @@ private fun MediaDetailLayout(
             ) {
                 MetadataContent(
                     createdAt = createdAt,
-                    location = location,
+                    locationDisplayName = locationDisplayName,
                     isVideo = isVideo,
                     journals = journals,
                     exif = exif,
@@ -232,7 +230,7 @@ private fun MediaDetailLayout(
                 ) {
                     MetadataContent(
                         createdAt = createdAt,
-                        location = location,
+                        locationDisplayName = locationDisplayName,
                         isVideo = isVideo,
                         journals = journals,
                         exif = exif,
@@ -313,7 +311,7 @@ private fun MediaContent(
 @Composable
 private fun MetadataContent(
     createdAt: Instant,
-    location: NoteLocation?,
+    locationDisplayName: String? = null,
     isVideo: Boolean,
     journals: List<JournalReference> = emptyList(),
     exif: ExifDisplayData? = null,
@@ -349,15 +347,11 @@ private fun MetadataContent(
         )
 
         // Location
-        location?.let { loc ->
-            val locationText =
-                loc.displayName
-                    ?: loc.coordinates?.let { "${it.latitude}, ${it.longitude}" }
-                    ?: "Unknown location"
+        locationDisplayName?.let { name ->
             MetadataRow(
                 icon = { Icon(Icons.Filled.LocationOn, contentDescription = null) },
                 label = "Location",
-                value = locationText,
+                value = name,
             )
         }
 

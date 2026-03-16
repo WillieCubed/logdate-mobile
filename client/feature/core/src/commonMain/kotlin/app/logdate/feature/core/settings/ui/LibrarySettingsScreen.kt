@@ -4,9 +4,9 @@ package app.logdate.feature.core.settings.ui
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.ToggleSettingsItem
@@ -25,7 +25,7 @@ fun LibrarySettingsScreen(
     modifier: Modifier = Modifier,
     viewModel: AccountSettingsViewModel = koinViewModel(),
 ) {
-    val isLibraryEnabled by viewModel.isLibraryEnabled.collectAsState()
+    val isLibraryEnabled by viewModel.isLibraryEnabled.collectAsStateWithLifecycle()
 
     LibrarySettingsContent(
         onBack = onBack,
