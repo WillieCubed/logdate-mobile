@@ -1,5 +1,6 @@
 package app.logdate.client.domain.di
 
+import app.logdate.client.repository.media.ExifMetadata
 import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.client.repository.media.IndexedMediaRepository
 import kotlinx.coroutines.flow.Flow
@@ -59,4 +60,6 @@ class StubIndexedMediaRepository : IndexedMediaRepository {
     override fun observeAllMedia(): Flow<List<IndexedMedia>> = flowOf(emptyList())
 
     override fun getMediaCount(): Flow<Int> = flowOf(0)
+
+    override suspend fun getExifMetadata(uid: Uuid): ExifMetadata? = null
 }

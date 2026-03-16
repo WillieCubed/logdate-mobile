@@ -123,7 +123,7 @@ actual val dataModule: Module =
         single<RewindGenerationManager> { DefaultRewindGenerationManager(get()) }
 
         // Media
-        single<IndexedMediaRepository> { OfflineIndexedMediaRepository(get()) }
+        single<IndexedMediaRepository> { OfflineIndexedMediaRepository(get(), get()) }
 
         // Timeline
         single<ActivityTimelineRepository> { OfflineFirstActivityTimelineRepository() }

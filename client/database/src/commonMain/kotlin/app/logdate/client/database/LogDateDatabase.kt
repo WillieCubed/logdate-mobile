@@ -29,6 +29,7 @@ import app.logdate.client.database.dao.VideoNoteDao
 import app.logdate.client.database.dao.journals.JournalContentDao
 import app.logdate.client.database.dao.maintenance.IntegrityDao
 import app.logdate.client.database.dao.media.IndexedMediaDao
+import app.logdate.client.database.dao.media.MediaExifDao
 import app.logdate.client.database.dao.rewind.CachedRewindDao
 import app.logdate.client.database.dao.rewind.RewindGenerationRequestDao
 import app.logdate.client.database.dao.sync.SyncMetadataDao
@@ -48,6 +49,7 @@ import app.logdate.client.database.entities.VideoNoteEntity
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.database.entities.media.IndexedImageEntity
 import app.logdate.client.database.entities.media.IndexedVideoEntity
+import app.logdate.client.database.entities.media.MediaExifMetadataEntity
 import app.logdate.client.database.entities.media.MediaImageEntity
 import app.logdate.client.database.entities.rewind.RewindEntity
 import app.logdate.client.database.entities.rewind.RewindGenerationRequestEntity
@@ -75,6 +77,7 @@ import app.logdate.client.database.migrations.MIGRATION_24_25
 import app.logdate.client.database.migrations.MIGRATION_25_26
 import app.logdate.client.database.migrations.MIGRATION_26_27
 import app.logdate.client.database.migrations.MIGRATION_27_28
+import app.logdate.client.database.migrations.MIGRATION_28_29
 import app.logdate.client.database.migrations.MIGRATION_2_3
 import app.logdate.client.database.migrations.MIGRATION_3_4
 import app.logdate.client.database.migrations.MIGRATION_4_5
@@ -126,8 +129,9 @@ import kotlinx.coroutines.IO
         PlaceEntity::class,
         UserPlaceEntity::class,
         MediaCaptionEntity::class,
+        MediaExifMetadataEntity::class,
     ],
-    version = 28,
+    version = 29,
     exportSchema = true,
 )
 @TypeConverters(
@@ -180,6 +184,8 @@ abstract class LogDateDatabase : RoomDatabase() {
     abstract fun userPlaceDao(): UserPlaceDao
 
     abstract fun mediaCaptionDao(): MediaCaptionDao
+
+    abstract fun mediaExifDao(): MediaExifDao
 }
 
 /**
@@ -243,6 +249,7 @@ fun getRoomDatabase(
                 MIGRATION_25_26,
                 MIGRATION_26_27,
                 MIGRATION_27_28,
+                MIGRATION_28_29,
             ).fallbackToDestructiveMigration(destroyTablesOnUpgrade)
             .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)
             .setQueryCoroutineContext(dispatcher)

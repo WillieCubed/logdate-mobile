@@ -392,6 +392,8 @@ class GetWeekRewindUseCaseTest {
         override fun observeAllMedia(): Flow<List<IndexedMedia>> = flowOf(emptyList())
 
         override fun getMediaCount(): Flow<Int> = flowOf(0)
+
+        override suspend fun getExifMetadata(uid: Uuid): app.logdate.client.repository.media.ExifMetadata? = null
     }
 
     private class FakeMediaManager : MediaManager {

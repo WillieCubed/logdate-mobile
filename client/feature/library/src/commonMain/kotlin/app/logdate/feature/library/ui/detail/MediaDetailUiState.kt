@@ -20,6 +20,7 @@ sealed interface MediaDetailUiState {
         val createdAt: Instant,
         val location: NoteLocation?,
         val journals: List<JournalReference> = emptyList(),
+        val exif: ExifDisplayData? = null,
     ) : MediaDetailUiState
 
     data class VideoContent(
@@ -37,4 +38,16 @@ sealed interface MediaDetailUiState {
 data class JournalReference(
     val id: Uuid,
     val title: String,
+)
+
+/**
+ * Camera metadata extracted from EXIF for display in the detail view.
+ */
+data class ExifDisplayData(
+    val cameraMake: String? = null,
+    val cameraModel: String? = null,
+    val aperture: Double? = null,
+    val iso: Int? = null,
+    val focalLength: Double? = null,
+    val shutterSpeed: String? = null,
 )

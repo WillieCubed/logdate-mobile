@@ -29,4 +29,5 @@ val daosModule: Module =
         single { get<LogDateDatabase>().placeDao() }
         single { get<LogDateDatabase>().userPlaceDao() }
         single { get<LogDateDatabase>().mediaCaptionDao() }
+        single { get<LogDateDatabase>().mediaExifDao() }
     }

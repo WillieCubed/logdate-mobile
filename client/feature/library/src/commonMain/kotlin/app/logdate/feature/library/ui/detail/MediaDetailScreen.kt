@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Share
@@ -138,6 +139,7 @@ fun MediaDetailContent(
                 createdAt = state.createdAt,
                 location = state.location,
                 journals = state.journals,
+                exif = state.exif,
                 isExpanded = isExpanded,
                 onBack = onBack,
                 onNavigateToJournal = onNavigateToJournal,
@@ -171,6 +173,7 @@ private fun MediaDetailLayout(
     createdAt: Instant,
     location: NoteLocation?,
     journals: List<JournalReference>,
+    exif: ExifDisplayData? = null,
     isExpanded: Boolean,
     onBack: () -> Unit,
     onNavigateToJournal: (Uuid) -> Unit = {},
@@ -199,6 +202,7 @@ private fun MediaDetailLayout(
                     location = location,
                     isVideo = isVideo,
                     journals = journals,
+                    exif = exif,
                     onNavigateToJournal = onNavigateToJournal,
                 )
             }
@@ -289,6 +293,7 @@ private fun MetadataContent(
     location: NoteLocation?,
     isVideo: Boolean,
     journals: List<JournalReference> = emptyList(),
+    exif: ExifDisplayData? = null,
     onNavigateToJournal: (Uuid) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -331,6 +336,29 @@ private fun MetadataContent(
                 label = "Location",
                 value = locationText,
             )
+        }
+
+        // Camera info
+        exif?.let { data ->
+            val cameraName =
+                listOfNotNull(data.cameraMake, data.cameraModel)
+                    .joinToString(" ")
+                    .ifEmpty { null }
+            val settings =
+                listOfNotNull(
+                    data.aperture?.let { "f/$it" },
+                    data.shutterSpeed,
+                    data.iso?.let { "ISO $it" },
+                    data.focalLength?.let { "${it}mm" },
+                ).joinToString("  ·  ")
+
+            if (cameraName != null || settings.isNotEmpty()) {
+                MetadataRow(
+                    icon = { Icon(Icons.Filled.CameraAlt, contentDescription = null) },
+                    label = "Camera",
+                    value = listOfNotNull(cameraName, settings.ifEmpty { null }).joinToString("\n"),
+                )
+            }
         }
 
         // Appears in journals

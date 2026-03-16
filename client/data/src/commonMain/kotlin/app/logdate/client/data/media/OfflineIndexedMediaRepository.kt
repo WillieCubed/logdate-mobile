@@ -1,9 +1,11 @@
 package app.logdate.client.data.media
 
 import app.logdate.client.database.dao.media.IndexedMediaDao
+import app.logdate.client.database.dao.media.MediaExifDao
 import app.logdate.client.database.entities.media.IndexedImageEntity
 import app.logdate.client.database.entities.media.IndexedVideoEntity
 import app.logdate.client.database.entities.media.MediaDimensions
+import app.logdate.client.repository.media.ExifMetadata
 import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.client.repository.media.IndexedMediaRepository
 import io.github.aakira.napier.Napier
@@ -24,6 +26,7 @@ import kotlin.uuid.Uuid
  */
 class OfflineIndexedMediaRepository(
     private val indexedMediaDao: IndexedMediaDao,
+    private val mediaExifDao: MediaExifDao,
 ) : IndexedMediaRepository {
     override suspend fun indexImage(
         uri: String,
@@ -199,6 +202,23 @@ class OfflineIndexedMediaRepository(
             indexedMediaDao.getAllIndexedVideos(),
         ) { images, videos ->
             images.size + videos.size
+        }
+
+    override suspend fun getExifMetadata(uid: Uuid): ExifMetadata? =
+        try {
+            mediaExifDao.getByMediaUid(uid)?.let { entity ->
+                ExifMetadata(
+                    cameraMake = entity.cameraMake,
+                    cameraModel = entity.cameraModel,
+                    aperture = entity.aperture,
+                    iso = entity.iso,
+                    focalLength = entity.focalLength,
+                    shutterSpeed = entity.shutterSpeed,
+                )
+            }
+        } catch (e: Exception) {
+            Napier.e("Failed to load EXIF metadata", e)
+            null
         }
 
     // Helper methods to map database entities to domain models

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.media.IndexedMediaRepository
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,12 +19,13 @@ import kotlin.uuid.Uuid
  * ViewModel for the media detail screen.
  *
  * Loads a single image or video note by its ID and exposes its content, metadata,
- * and the journals it appears in.
+ * the journals it appears in, and camera EXIF data when available.
  */
 class MediaDetailViewModel(
     private val noteId: Uuid,
     private val notesRepository: JournalNotesRepository,
     private val journalContentRepository: JournalContentRepository,
+    private val indexedMediaRepository: IndexedMediaRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<MediaDetailUiState>(MediaDetailUiState.Loading)
     val uiState: StateFlow<MediaDetailUiState> = _uiState.asStateFlow()
@@ -61,6 +63,27 @@ class MediaDetailViewModel(
                 emptyList()
             }
 
+        val exif =
+            if (note is JournalNote.Image) {
+                try {
+                    indexedMediaRepository.getExifMetadata(note.uid)?.let { metadata ->
+                        ExifDisplayData(
+                            cameraMake = metadata.cameraMake,
+                            cameraModel = metadata.cameraModel,
+                            aperture = metadata.aperture,
+                            iso = metadata.iso,
+                            focalLength = metadata.focalLength,
+                            shutterSpeed = metadata.shutterSpeed,
+                        )
+                    }
+                } catch (e: Exception) {
+                    Napier.e("Failed to load EXIF data", e)
+                    null
+                }
+            } else {
+                null
+            }
+
         _uiState.value =
             when (note) {
                 is JournalNote.Image ->
@@ -70,6 +93,7 @@ class MediaDetailViewModel(
                         createdAt = note.creationTimestamp,
                         location = note.location,
                         journals = journals,
+                        exif = exif,
                     )
                 is JournalNote.Video ->
                     MediaDetailUiState.VideoContent(

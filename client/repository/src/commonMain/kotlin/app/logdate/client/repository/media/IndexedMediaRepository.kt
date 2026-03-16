@@ -129,7 +129,27 @@ interface IndexedMediaRepository {
      * @return Flow emitting the current count of all indexed images and videos
      */
     fun getMediaCount(): Flow<Int>
+
+    /**
+     * Retrieves EXIF/camera metadata for a media item, if previously extracted.
+     *
+     * @param uid The unique identifier of the media item
+     * @return The EXIF metadata, or null if not yet extracted
+     */
+    suspend fun getExifMetadata(uid: Uuid): ExifMetadata?
 }
+
+/**
+ * Camera metadata extracted from a media file's EXIF data.
+ */
+data class ExifMetadata(
+    val cameraMake: String? = null,
+    val cameraModel: String? = null,
+    val aperture: Double? = null,
+    val iso: Int? = null,
+    val focalLength: Double? = null,
+    val shutterSpeed: String? = null,
+)
 
 /**
  * Represents a media item that has been indexed by the app.

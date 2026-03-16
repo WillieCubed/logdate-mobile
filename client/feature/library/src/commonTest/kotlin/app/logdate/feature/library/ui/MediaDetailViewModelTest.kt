@@ -3,6 +3,7 @@ package app.logdate.feature.library.ui
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.feature.library.fakes.FakeIndexedMediaRepository
 import app.logdate.feature.library.fakes.FakeJournalContentRepository
 import app.logdate.feature.library.fakes.FakeJournalNotesRepository
 import app.logdate.feature.library.ui.detail.MediaDetailUiState
@@ -28,6 +29,7 @@ import kotlin.uuid.Uuid
 class MediaDetailViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
     private val contentRepository = FakeJournalContentRepository()
+    private val indexedMediaRepository = FakeIndexedMediaRepository()
 
     @BeforeTest
     fun setUp() {
@@ -44,7 +46,7 @@ class MediaDetailViewModelTest {
         runTest(testDispatcher) {
             val repository = FakeJournalNotesRepository(emptyList())
             val noteId = Uuid.random()
-            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository)
+            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository)
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -67,7 +69,7 @@ class MediaDetailViewModelTest {
                     ),
                 )
             val repository = FakeJournalNotesRepository(notes)
-            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository)
+            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository)
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -93,7 +95,7 @@ class MediaDetailViewModelTest {
                     ),
                 )
             val repository = FakeJournalNotesRepository(notes)
-            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository)
+            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository)
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -123,7 +125,7 @@ class MediaDetailViewModelTest {
                     ),
                 )
             val repository = FakeJournalNotesRepository(notes)
-            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository)
+            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository)
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -148,7 +150,7 @@ class MediaDetailViewModelTest {
                     ),
                 )
             val repository = FakeJournalNotesRepository(notes)
-            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository)
+            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository)
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -187,7 +189,7 @@ class MediaDetailViewModelTest {
             )
 
             val repository = FakeJournalNotesRepository(notes)
-            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository)
+            val viewModel = MediaDetailViewModel(noteId, repository, contentRepository, indexedMediaRepository)
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()

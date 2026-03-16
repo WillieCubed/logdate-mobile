@@ -66,4 +66,6 @@ class FakeIndexedMediaRepository(
     override fun observeAllMedia(): Flow<List<IndexedMedia>> = mediaFlow.map { it.sortedByDescending { item -> item.timestamp } }
 
     override fun getMediaCount(): Flow<Int> = mediaFlow.map { it.size }
+
+    override suspend fun getExifMetadata(uid: Uuid): app.logdate.client.repository.media.ExifMetadata? = null
 }

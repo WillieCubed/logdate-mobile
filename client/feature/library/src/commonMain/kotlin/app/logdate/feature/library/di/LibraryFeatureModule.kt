@@ -18,6 +18,7 @@ val libraryFeatureModule: Module =
                 noteId = noteId,
                 notesRepository = get(),
                 journalContentRepository = get(),
+                indexedMediaRepository = get(),
             )
         }
     }
