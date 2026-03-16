@@ -153,7 +153,8 @@ class OfflineFirstJournalRepository(
 
     override suspend fun createFromSync(journal: Journal) =
         withContext(dispatcher) {
-            journalDao.create(journal.toEntity())
+            // Use upsert to be idempotent — the Data Layer may deliver duplicates
+            journalDao.update(journal.toEntity())
         }
 
     override suspend fun updateFromSync(journal: Journal) =

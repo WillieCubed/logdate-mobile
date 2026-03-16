@@ -1,12 +1,19 @@
 package app.logdate.wear.sync
 
+import app.logdate.client.database.dao.HealthSnapshotDao
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.sync.datalayer.AssociationDataMapper
+import app.logdate.client.sync.datalayer.HealthSnapshotDataMapper
+import app.logdate.client.sync.datalayer.JournalDataMapper
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.PendingUpload
+import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -38,7 +45,11 @@ class AudioSyncFlowTest {
 
     private lateinit var dataLayerClient: WearDataLayerClient
     private lateinit var syncMetadataService: SyncMetadataService
+    private lateinit var retryScheduleStore: SyncRetryScheduleStore
+    private lateinit var deadLetterStore: SyncDeadLetterStore
     private lateinit var notesRepository: JournalNotesRepository
+    private lateinit var journalRepository: JournalRepository
+    private lateinit var healthSnapshotDao: HealthSnapshotDao
     private lateinit var syncManager: WearDataLayerSyncManager
 
     private val noteDataMapper = NoteDataMapper()
@@ -48,18 +59,32 @@ class AudioSyncFlowTest {
     fun setUp() {
         dataLayerClient = mockk(relaxed = true)
         syncMetadataService = mockk(relaxed = true)
+        retryScheduleStore = mockk(relaxed = true)
+        deadLetterStore = mockk(relaxed = true)
         notesRepository = mockk(relaxed = true)
+        journalRepository = mockk(relaxed = true)
+        healthSnapshotDao = mockk(relaxed = true)
 
         coEvery { dataLayerClient.isPhoneConnected(any()) } returns true
         coEvery { dataLayerClient.putDataItem(any(), any()) } returns true
         coEvery { dataLayerClient.sendFile(any(), any()) } returns true
         every { syncMetadataService.observePendingCount() } returns MutableStateFlow(0)
+        coEvery { healthSnapshotDao.getAfter(any()) } returns emptyList()
+        coEvery { retryScheduleStore.nextAttemptAt(any(), any()) } returns null
+        coEvery { deadLetterStore.list() } returns emptyList()
 
         syncManager = WearDataLayerSyncManager(
             dataLayerClient = dataLayerClient,
             syncMetadataService = syncMetadataService,
+            retryScheduleStore = retryScheduleStore,
+            deadLetterStore = deadLetterStore,
             notesRepository = notesRepository,
+            journalRepository = journalRepository,
+            healthSnapshotDao = healthSnapshotDao,
             noteDataMapper = noteDataMapper,
+            journalDataMapper = JournalDataMapper(),
+            associationDataMapper = AssociationDataMapper(),
+            healthSnapshotDataMapper = HealthSnapshotDataMapper(),
         )
     }
 

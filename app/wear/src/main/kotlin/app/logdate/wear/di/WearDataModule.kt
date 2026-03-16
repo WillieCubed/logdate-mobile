@@ -13,7 +13,14 @@ import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.sync.SyncManager
+import app.logdate.client.sync.datalayer.AssociationDataMapper
+import app.logdate.client.sync.datalayer.HealthSnapshotDataMapper
+import app.logdate.client.sync.datalayer.JournalDataMapper
 import app.logdate.client.sync.di.conflictResolverModule
+import app.logdate.client.sync.metadata.KeyValueSyncDeadLetterStore
+import app.logdate.client.sync.metadata.KeyValueSyncRetryScheduleStore
+import app.logdate.client.sync.metadata.SyncDeadLetterStore
+import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import app.logdate.shared.config.configModule
 import app.logdate.shared.model.Journal
 import app.logdate.wear.health.HealthServicesWearHealthSensorManager
@@ -55,12 +62,24 @@ val wearDataModule = module {
     // Data Layer sync: watch <-> phone via Wearable Data API
     single<WearDataLayerClient> { GoogleWearDataLayerClient(get()) }
     single { NoteDataMapper(get()) }
+    single { JournalDataMapper(get()) }
+    single { AssociationDataMapper() }
+    single { HealthSnapshotDataMapper(get()) }
+    single<SyncDeadLetterStore> { KeyValueSyncDeadLetterStore(get()) }
+    single<SyncRetryScheduleStore> { KeyValueSyncRetryScheduleStore(get()) }
     single<SyncManager> {
         WearDataLayerSyncManager(
             dataLayerClient = get(),
             syncMetadataService = get(),
+            retryScheduleStore = get(),
+            deadLetterStore = get(),
             notesRepository = get(),
+            journalRepository = get(),
+            healthSnapshotDao = get(),
             noteDataMapper = get(),
+            journalDataMapper = get(),
+            associationDataMapper = get(),
+            healthSnapshotDataMapper = get(),
         )
     }
 

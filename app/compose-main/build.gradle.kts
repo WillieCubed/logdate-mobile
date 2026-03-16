@@ -80,6 +80,7 @@ kotlin {
             implementation(projects.client.sync)
             implementation(projects.client.healthConnect)
             implementation(projects.client.util)
+            implementation(projects.shared.model)
             // External dependencies
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)

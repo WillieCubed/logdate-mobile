@@ -90,4 +90,5 @@ enum class EntityType {
     NOTE,
     ASSOCIATION,
     MEDIA,
+    HEALTH,
 }

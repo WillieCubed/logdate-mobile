@@ -36,4 +36,7 @@ interface HealthSnapshotDao {
 
     @Query("DELETE FROM health_snapshots WHERE note_id = :noteId")
     suspend fun deleteByNoteId(noteId: Uuid)
+
+    @Query("SELECT * FROM health_snapshots WHERE timestamp > :since ORDER BY timestamp ASC")
+    suspend fun getAfter(since: Long): List<HealthSnapshotEntity>
 }

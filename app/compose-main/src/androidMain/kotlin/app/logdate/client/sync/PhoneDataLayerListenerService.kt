@@ -2,8 +2,18 @@ package app.logdate.client.sync
 
 import android.content.Intent
 import android.provider.MediaStore
+import app.logdate.client.database.dao.HealthSnapshotDao
+import app.logdate.client.database.dao.journals.JournalContentDao
+import app.logdate.client.database.entities.HealthSnapshotEntity
+import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.journals.SyncableJournalContentRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
+import app.logdate.client.repository.journals.SyncableJournalRepository
+import app.logdate.client.sync.datalayer.AssociationDataMapper
+import app.logdate.client.sync.datalayer.HealthSnapshotDataMapper
+import app.logdate.client.sync.datalayer.JournalDataMapper
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
@@ -12,30 +22,40 @@ import com.google.android.gms.wearable.WearableListenerService
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Receives data items from the paired Wear OS watch via the Data Layer API.
  *
- * When the watch creates, updates, or deletes a note, it puts a DataItem at
- * `/logdate/notes/<noteId>` (or `/logdate/notes/<noteId>/delete`). This service
- * deserializes the note and inserts it via [SyncableJournalNotesRepository.createFromSync]
+ * Handles notes, journals, journal-content associations, and health snapshots.
+ * Uses sync-aware repository methods (e.g. [SyncableJournalNotesRepository.createFromSync])
  * to avoid re-triggering outbound sync.
  *
  * For new notes, a notification is posted so the user can tap to expand the note
  * in the editor (entry handoff).
+ *
+ * Koin resilience: If DI is not ready when data arrives, retries up to
+ * [MAX_KOIN_RETRIES] times with a short delay before dropping the event.
  */
 class PhoneDataLayerListenerService : WearableListenerService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val noteDataMapper = NoteDataMapper()
+    private val journalDataMapper = JournalDataMapper()
+    private val associationDataMapper = AssociationDataMapper()
+    private val healthSnapshotDataMapper = HealthSnapshotDataMapper()
     private val notificationHelper by lazy { WearSyncNotificationHelper(applicationContext) }
 
     companion object {
         private const val PATH_CAMERA_OPEN = "/logdate/camera/open"
         private const val PATH_CAMERA_CAPTURE = "/logdate/camera/capture"
         private const val PATH_CAMERA_CLOSE = "/logdate/camera/close"
+        private const val MAX_KOIN_RETRIES = 3
+        private const val KOIN_RETRY_DELAY_MS = 500L
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
@@ -54,8 +74,6 @@ class PhoneDataLayerListenerService : WearableListenerService() {
             }
             PATH_CAMERA_CAPTURE -> {
                 Napier.d("Watch requested photo capture")
-                // The system camera handles capture via its own UI.
-                // The photo is saved to the device's media store.
             }
             PATH_CAMERA_CLOSE -> {
                 Napier.d("Watch requested camera close")
@@ -67,27 +85,60 @@ class PhoneDataLayerListenerService : WearableListenerService() {
     }
 
     override fun onDataChanged(dataEvents: DataEventBuffer) {
-        val notesRepository =
-            try {
-                org.koin.java.KoinJavaComponent
-                    .getKoin()
-                    .get<JournalNotesRepository>()
-            } catch (e: Exception) {
-                Napier.w("Koin not ready in PhoneDataLayerListenerService", e)
-                return
-            }
-
+        // Snapshot events before they are recycled by the system
+        val events = mutableListOf<SnapshotDataEvent>()
         for (event in dataEvents) {
             val path = event.dataItem.uri.path ?: continue
+            val stringMap = extractStringMap(event)
+            events.add(SnapshotDataEvent(path, stringMap))
+        }
 
-            when {
-                NoteDataMapper.isDeletePath(path) -> handleDelete(path, notesRepository)
-                NoteDataMapper.isNotePath(path) -> handleNoteSync(event, path, notesRepository)
+        if (events.isEmpty()) return
+
+        serviceScope.launch {
+            val koin = resolveKoin()
+            if (koin == null) {
+                Napier.e("Koin unavailable after $MAX_KOIN_RETRIES retries, dropping ${events.size} data events")
+                return@launch
+            }
+
+            val notesRepository = koin.get<JournalNotesRepository>()
+            val journalRepository = koin.get<JournalRepository>()
+
+            for (event in events) {
+                processEvent(event, koin, notesRepository, journalRepository)
             }
         }
     }
 
-    private fun handleDelete(
+    /**
+     * Processes a single data event. Runs inside [NonCancellable] to ensure
+     * database writes complete even if the service is destroyed mid-flight.
+     */
+    private suspend fun processEvent(
+        event: SnapshotDataEvent,
+        koin: org.koin.core.Koin,
+        notesRepository: JournalNotesRepository,
+        journalRepository: JournalRepository,
+    ) = withContext(NonCancellable) {
+        val path = event.path
+
+        try {
+            when {
+                NoteDataMapper.isDeletePath(path) -> handleNoteDelete(path, notesRepository)
+                NoteDataMapper.isNotePath(path) -> handleNoteSync(event, path, notesRepository)
+                JournalDataMapper.isDeletePath(path) -> handleJournalDelete(path, journalRepository)
+                JournalDataMapper.isJournalPath(path) -> handleJournalSync(event, path, journalRepository)
+                AssociationDataMapper.isDeletePath(path) -> handleAssociationDelete(path, koin)
+                AssociationDataMapper.isAssociationPath(path) -> handleAssociationSync(event, path, koin)
+                HealthSnapshotDataMapper.isHealthPath(path) -> handleHealthSync(event, path, koin)
+            }
+        } catch (e: Exception) {
+            Napier.e("Unhandled error processing sync event at path: $path", e)
+        }
+    }
+
+    private suspend fun handleNoteDelete(
         path: String,
         notesRepository: JournalNotesRepository,
     ) {
@@ -100,50 +151,191 @@ class PhoneDataLayerListenerService : WearableListenerService() {
             }
 
         Napier.d("Received delete signal from watch for note: $noteId")
-        serviceScope.launch {
-            try {
-                if (notesRepository is SyncableJournalNotesRepository) {
-                    notesRepository.deleteFromSync(noteId)
-                } else {
-                    notesRepository.removeById(noteId)
-                }
-            } catch (e: Exception) {
-                Napier.w("Failed to delete synced note from watch: $noteId", e)
+        try {
+            if (notesRepository is SyncableJournalNotesRepository) {
+                notesRepository.deleteFromSync(noteId)
+            } else {
+                notesRepository.removeById(noteId)
             }
+        } catch (e: Exception) {
+            Napier.w("Failed to delete synced note from watch: $noteId", e)
         }
     }
 
-    private fun handleNoteSync(
-        event: com.google.android.gms.wearable.DataEvent,
+    private suspend fun handleNoteSync(
+        event: SnapshotDataEvent,
         path: String,
         notesRepository: JournalNotesRepository,
     ) {
+        try {
+            val note = noteDataMapper.fromDataMap(event.data)
+            Napier.d("Received note from watch: ${note.uid} (${note.type})")
+            if (notesRepository is SyncableJournalNotesRepository) {
+                notesRepository.createFromSync(note)
+            } else {
+                notesRepository.create(note)
+            }
+            notificationHelper.notifyNoteReceived(note)
+        } catch (e: Exception) {
+            Napier.w("Failed to process synced note from watch at path: $path", e)
+        }
+    }
+
+    private suspend fun handleJournalDelete(
+        path: String,
+        journalRepository: JournalRepository,
+    ) {
+        val journalId =
+            try {
+                JournalDataMapper.journalIdFromPath(path)
+            } catch (e: IllegalArgumentException) {
+                Napier.w("Invalid journal ID in delete path: $path", e)
+                return
+            }
+
+        Napier.d("Received delete signal from watch for journal: $journalId")
+        try {
+            if (journalRepository is SyncableJournalRepository) {
+                journalRepository.deleteFromSync(journalId)
+            } else {
+                journalRepository.delete(journalId)
+            }
+        } catch (e: Exception) {
+            Napier.w("Failed to delete synced journal from watch: $journalId", e)
+        }
+    }
+
+    private suspend fun handleJournalSync(
+        event: SnapshotDataEvent,
+        path: String,
+        journalRepository: JournalRepository,
+    ) {
+        try {
+            val journal = journalDataMapper.fromDataMap(event.data)
+            Napier.d("Received journal from watch: ${journal.id}")
+            if (journalRepository is SyncableJournalRepository) {
+                // createFromSync uses upsert — safe for duplicates and updates
+                journalRepository.createFromSync(journal)
+            } else {
+                journalRepository.create(journal)
+            }
+        } catch (e: Exception) {
+            Napier.w("Failed to process synced journal from watch at path: $path", e)
+        }
+    }
+
+    private suspend fun handleAssociationDelete(
+        path: String,
+        koin: org.koin.core.Koin,
+    ) {
+        val (journalId, contentId) =
+            try {
+                AssociationDataMapper.idsFromPath(path)
+            } catch (e: Exception) {
+                Napier.w("Invalid association path: $path", e)
+                return
+            }
+
+        Napier.d("Received association delete from watch: journal=$journalId, content=$contentId")
+        try {
+            val contentRepo = koin.getOrNull<SyncableJournalContentRepository>()
+            if (contentRepo != null) {
+                contentRepo.removeContentFromJournalFromSync(contentId, journalId)
+            } else {
+                val dao = koin.get<JournalContentDao>()
+                dao.removeContentFromJournal(journalId, contentId)
+            }
+        } catch (e: Exception) {
+            Napier.w("Failed to delete synced association: $path", e)
+        }
+    }
+
+    private suspend fun handleAssociationSync(
+        event: SnapshotDataEvent,
+        path: String,
+        koin: org.koin.core.Koin,
+    ) {
+        try {
+            val (journalId, contentId) = associationDataMapper.fromDataMap(event.data)
+            Napier.d("Received association from watch: journal=$journalId, content=$contentId")
+            val contentRepo = koin.getOrNull<SyncableJournalContentRepository>()
+            if (contentRepo != null) {
+                contentRepo.addContentToJournalFromSync(contentId, journalId)
+            } else {
+                val dao = koin.get<JournalContentDao>()
+                dao.addContentToJournal(JournalContentEntityLink(journalId, contentId))
+            }
+        } catch (e: Exception) {
+            Napier.w("Failed to process synced association from watch at path: $path", e)
+        }
+    }
+
+    private suspend fun handleHealthSync(
+        event: SnapshotDataEvent,
+        path: String,
+        koin: org.koin.core.Koin,
+    ) {
+        try {
+            val syncData = healthSnapshotDataMapper.fromDataMap(event.data)
+            Napier.d("Received health snapshot from watch: ${syncData.id}")
+            val dao = koin.get<HealthSnapshotDao>()
+            dao.insert(
+                HealthSnapshotEntity(
+                    id = syncData.id,
+                    noteId = syncData.noteId,
+                    heartRateBpm = syncData.heartRateBpm,
+                    heartRateVariabilityMs = syncData.heartRateVariabilityMs,
+                    stepCount = syncData.stepCount,
+                    stressLevel = syncData.stressLevel,
+                    cumulativeCalories = syncData.cumulativeCalories,
+                    timestamp = syncData.timestamp,
+                    source = syncData.source,
+                ),
+            )
+        } catch (e: Exception) {
+            Napier.w("Failed to process synced health snapshot from watch at path: $path", e)
+        }
+    }
+
+    /**
+     * Resolves the Koin instance, retrying with a short delay if DI isn't ready yet.
+     */
+    private suspend fun resolveKoin(): org.koin.core.Koin? {
+        repeat(MAX_KOIN_RETRIES) { attempt ->
+            try {
+                return org.koin.java.KoinJavaComponent
+                    .getKoin()
+            } catch (e: Exception) {
+                if (attempt < MAX_KOIN_RETRIES - 1) {
+                    Napier.d("Koin not ready (attempt ${attempt + 1}/$MAX_KOIN_RETRIES), retrying...")
+                    delay(KOIN_RETRY_DELAY_MS)
+                }
+            }
+        }
+        return null
+    }
+
+    private fun extractStringMap(event: com.google.android.gms.wearable.DataEvent): Map<String, String> {
         val dataMap = DataMapItem.fromDataItem(event.dataItem).dataMap
         val stringMap = mutableMapOf<String, String>()
         for (key in dataMap.keySet()) {
-            if (key.startsWith("_")) continue // skip internal keys like _syncTimestamp
+            if (key.startsWith("_")) continue
             dataMap.getString(key)?.let { stringMap[key] = it }
         }
-
-        serviceScope.launch {
-            try {
-                val note = noteDataMapper.fromDataMap(stringMap)
-                Napier.d("Received note from watch: ${note.uid} (${note.type})")
-                if (notesRepository is SyncableJournalNotesRepository) {
-                    notesRepository.createFromSync(note)
-                } else {
-                    notesRepository.create(note)
-                }
-                // Notify the user so they can expand the note in the editor
-                notificationHelper.notifyNoteReceived(note)
-            } catch (e: Exception) {
-                Napier.w("Failed to process synced note from watch at path: $path", e)
-            }
-        }
+        return stringMap
     }
 
     override fun onDestroy() {
         super.onDestroy()
         serviceScope.cancel()
     }
+
+    /**
+     * Snapshot of a data event's path and payload.
+     * Created before [DataEventBuffer] is recycled by the system.
+     */
+    private data class SnapshotDataEvent(
+        val path: String,
+        val data: Map<String, String>,
+    )
 }

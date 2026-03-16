@@ -132,7 +132,7 @@
             android:foregroundServiceType="dataSync"
             tools:node="merge" />
 
-        <!-- Data Layer sync listener: receives notes and messages from paired Wear OS watch -->
+        <!-- Data Layer sync listener: receives notes, journals, associations, health data, and messages from paired Wear OS watch -->
         <service
             android:name="app.logdate.client.sync.PhoneDataLayerListenerService"
             android:exported="true">
@@ -142,6 +142,18 @@
                     android:scheme="wear"
                     android:host="*"
                     android:pathPrefix="/logdate/notes" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/logdate/journals" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/logdate/associations" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/logdate/health" />
             </intent-filter>
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />

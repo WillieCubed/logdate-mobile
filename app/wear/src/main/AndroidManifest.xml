@@ -102,7 +102,7 @@
             android:enabled="true"
             android:exported="false" />
 
-        <!-- Data Layer sync listener: receives notes from paired phone -->
+        <!-- Data Layer sync listener: receives notes, journals, and associations from paired phone -->
         <service
             android:name=".sync.WearDataLayerListenerService"
             android:exported="true">
@@ -112,6 +112,14 @@
                     android:scheme="wear"
                     android:host="*"
                     android:pathPrefix="/logdate/notes" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/logdate/journals" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/logdate/associations" />
             </intent-filter>
         </service>
             
