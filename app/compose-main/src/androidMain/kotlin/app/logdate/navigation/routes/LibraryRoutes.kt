@@ -1,5 +1,8 @@
 package app.logdate.navigation.routes
 
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.library.ui.LibraryScreen
@@ -29,10 +32,20 @@ fun EntryProviderScope<NavKey>.libraryRoutes(
     }
 
     routeEntry<LibraryMediaDetailRoute> { route ->
+        val context = LocalContext.current
         MediaDetailScreen(
             mediaId = route.mediaId,
             onBack = onBack,
             onNavigateToJournal = onNavigateToJournal,
+            onShare = { mediaUri ->
+                val shareIntent =
+                    Intent(Intent.ACTION_SEND).apply {
+                        type = "image/*"
+                        putExtra(Intent.EXTRA_STREAM, Uri.parse(mediaUri))
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                context.startActivity(Intent.createChooser(shareIntent, null))
+            },
         )
     }
 }

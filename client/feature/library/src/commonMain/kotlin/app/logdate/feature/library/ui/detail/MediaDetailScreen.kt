@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -61,6 +62,7 @@ fun MediaDetailScreen(
     mediaId: Uuid,
     onBack: () -> Unit,
     onNavigateToJournal: (Uuid) -> Unit = {},
+    onShare: (String) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: MediaDetailViewModel =
         koinViewModel(
@@ -78,6 +80,8 @@ fun MediaDetailScreen(
         state = uiState,
         isExpanded = isExpanded,
         onBack = onBack,
+        onNavigateToJournal = onNavigateToJournal,
+        onShare = onShare,
         modifier = modifier,
     )
 }
@@ -95,6 +99,7 @@ fun MediaDetailContent(
     isExpanded: Boolean,
     onBack: () -> Unit,
     onNavigateToJournal: (Uuid) -> Unit = {},
+    onShare: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     when (state) {
@@ -135,6 +140,7 @@ fun MediaDetailContent(
                 isExpanded = isExpanded,
                 onBack = onBack,
                 onNavigateToJournal = onNavigateToJournal,
+                onShare = { onShare(state.mediaRef) },
                 modifier = modifier,
             )
         }
@@ -149,6 +155,7 @@ fun MediaDetailContent(
                 isExpanded = isExpanded,
                 onBack = onBack,
                 onNavigateToJournal = onNavigateToJournal,
+                onShare = { onShare(state.mediaRef) },
                 modifier = modifier,
             )
         }
@@ -166,6 +173,7 @@ private fun MediaDetailLayout(
     isExpanded: Boolean,
     onBack: () -> Unit,
     onNavigateToJournal: (Uuid) -> Unit = {},
+    onShare: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (isExpanded) {
@@ -216,6 +224,12 @@ private fun MediaDetailLayout(
                     }
                 },
                 actions = {
+                    FilledTonalIconButton(onClick = onShare) {
+                        Icon(
+                            imageVector = Icons.Filled.Share,
+                            contentDescription = "Share",
+                        )
+                    }
                     TextButton(onClick = { showMetadata = true }) {
                         Text("Info")
                     }
