@@ -47,7 +47,7 @@ class TryRestoreSignInUseCase(
                 }
             }
         } catch (e: Exception) {
-            Napier.e("Unexpected error during restore sign-in", e)
+            Napier.w("Unexpected error during restore sign-in", e)
             Result.Error(e.message ?: "Unexpected error")
         }
 }

@@ -134,7 +134,7 @@ class PasskeyApiClient(
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
             }
         } catch (e: Exception) {
-            Napier.e("Failed to check username availability", e)
+            Napier.w("Failed to check username availability", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to check username availability", e))
         }
 
@@ -166,7 +166,7 @@ class PasskeyApiClient(
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
             }
         } catch (e: Exception) {
-            Napier.e("Failed to begin account creation", e)
+            Napier.w("Failed to begin account creation", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to begin account creation", e))
         }
 
@@ -192,7 +192,7 @@ class PasskeyApiClient(
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
             }
         } catch (e: Exception) {
-            Napier.e("Failed to complete account creation", e)
+            Napier.w("Failed to complete account creation", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to complete account creation", e))
         }
 
@@ -221,7 +221,7 @@ class PasskeyApiClient(
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
             }
         } catch (e: Exception) {
-            Napier.e("Failed to begin authentication", e)
+            Napier.w("Failed to begin authentication", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to begin authentication", e))
         }
 
@@ -247,7 +247,7 @@ class PasskeyApiClient(
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
             }
         } catch (e: Exception) {
-            Napier.e("Failed to complete authentication", e)
+            Napier.w("Failed to complete authentication", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to complete authentication", e))
         }
 
@@ -267,7 +267,7 @@ class PasskeyApiClient(
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
             }
         } catch (e: Exception) {
-            Napier.e("Failed to get account info", e)
+            Napier.w("Failed to get account info", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to get account info", e))
         }
 
@@ -295,7 +295,7 @@ class PasskeyApiClient(
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
             }
         } catch (e: Exception) {
-            Napier.e("Failed to update account profile", e)
+            Napier.w("Failed to update account profile", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to update account profile", e))
         }
 
@@ -316,7 +316,7 @@ class PasskeyApiClient(
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
             }
         } catch (e: Exception) {
-            Napier.e("Failed to refresh token", e)
+            Napier.w("Failed to refresh token", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to refresh token", e))
         }
 
@@ -338,7 +338,7 @@ class PasskeyApiClient(
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
             }
         } catch (e: Exception) {
-            Napier.e("Failed to delete passkey", e)
+            Napier.w("Failed to delete passkey", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to delete passkey", e))
         }
 
@@ -359,7 +359,7 @@ class PasskeyApiClient(
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
             }
         } catch (e: Exception) {
-            Napier.e("Failed to begin restore key registration", e)
+            Napier.w("Failed to begin restore key registration", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to begin restore key registration", e))
         }
 
@@ -384,7 +384,7 @@ class PasskeyApiClient(
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
             }
         } catch (e: Exception) {
-            Napier.e("Failed to complete restore key registration", e)
+            Napier.w("Failed to complete restore key registration", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to complete restore key registration", e))
         }
 
@@ -412,7 +412,7 @@ class PasskeyApiClient(
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
             }
         } catch (e: Exception) {
-            Napier.e("Failed to begin restore sign-in", e)
+            Napier.w("Failed to begin restore sign-in", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to begin restore sign-in", e))
         }
 
@@ -438,7 +438,7 @@ class PasskeyApiClient(
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
             }
         } catch (e: Exception) {
-            Napier.e("Failed to complete restore sign-in", e)
+            Napier.w("Failed to complete restore sign-in", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to complete restore sign-in", e))
         }
 }

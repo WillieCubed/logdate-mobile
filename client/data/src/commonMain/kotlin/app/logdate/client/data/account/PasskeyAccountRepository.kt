@@ -82,7 +82,7 @@ class DefaultPasskeyAccountRepository(
             val result = apiClient.checkUsernameAvailability(username)
             result.map { it.available }
         } catch (e: Exception) {
-            Napier.e("Failed to check username availability", e)
+            Napier.w("Failed to check username availability", e)
             Result.failure(e)
         }
 
@@ -160,7 +160,7 @@ class DefaultPasskeyAccountRepository(
             Napier.i("Account created successfully for user: ${completeData.account.username}")
             Result.success(completeData.account)
         } catch (e: Exception) {
-            Napier.e("Failed to create account with passkey", e)
+            Napier.w("Failed to create account with passkey", e)
             Result.failure(e)
         }
     }
@@ -238,7 +238,7 @@ class DefaultPasskeyAccountRepository(
             Napier.i("Authentication successful for user: ${completeData.account.username}")
             Result.success(completeData.account)
         } catch (e: Exception) {
-            Napier.e("Failed to authenticate with passkey", e)
+            Napier.w("Failed to authenticate with passkey", e)
             Result.failure(e)
         }
     }
@@ -273,7 +273,7 @@ class DefaultPasskeyAccountRepository(
             Napier.i("User signed out successfully")
             Result.success(Unit)
         } catch (e: Exception) {
-            Napier.e("Failed to sign out", e)
+            Napier.w("Failed to sign out", e)
             Result.failure(e)
         }
 
@@ -315,7 +315,7 @@ class DefaultPasskeyAccountRepository(
             Napier.i("Authentication refreshed successfully")
             Result.success(Unit)
         } catch (e: Exception) {
-            Napier.e("Failed to refresh authentication", e)
+            Napier.w("Failed to refresh authentication", e)
             signOut() // Clear session on error
             Result.failure(e)
         }
@@ -347,7 +347,7 @@ class DefaultPasskeyAccountRepository(
                 return result
             }
         } catch (e: Exception) {
-            Napier.e("Failed to get account info", e)
+            Napier.w("Failed to get account info", e)
             Result.failure(e)
         }
     }
@@ -378,7 +378,7 @@ class DefaultPasskeyAccountRepository(
                 return result
             }
         } catch (e: Exception) {
-            Napier.e("Failed to delete passkey: $credentialId", e)
+            Napier.w("Failed to delete passkey: $credentialId", e)
             Result.failure(e)
         }
     }
@@ -487,7 +487,7 @@ class DefaultPasskeyAccountRepository(
             Napier.i("Restore sign-in successful for user: ${completeData.account.username}")
             Result.success(completeData.account)
         } catch (e: Exception) {
-            Napier.e("Restore sign-in failed", e)
+            Napier.w("Restore sign-in failed", e)
             Result.failure(e)
         }
     }
