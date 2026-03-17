@@ -5,10 +5,15 @@ package app.logdate.client
 import android.app.Application
 import android.content.Context
 import android.util.Log
+import app.logdate.client.image.DataSaverImageInterceptor
 import app.logdate.client.location.tracking.LocationTrackingManager
+import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.di.initializeKoin
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
+import coil3.disk.DiskCache
+import coil3.disk.directory
+import coil3.memory.MemoryCache
 import coil3.video.VideoFrameDecoder
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
@@ -29,6 +34,18 @@ class LogdateApplication :
             .Builder(context)
             .components {
                 add(VideoFrameDecoder.Factory())
+                add(DataSaverImageInterceptor(get<DataUsagePolicy>()))
+            }.memoryCache {
+                MemoryCache
+                    .Builder()
+                    .maxSizePercent(context, percent = 0.25)
+                    .build()
+            }.diskCache {
+                DiskCache
+                    .Builder()
+                    .directory(context.cacheDir.resolve(IMAGE_CACHE_DIR))
+                    .maxSizeBytes(IMAGE_CACHE_MAX_BYTES)
+                    .build()
             }.build()
 
     override fun onCreate() {
@@ -47,3 +64,5 @@ class LogdateApplication :
 }
 
 private const val APP_STARTUP_TAG = "LogDateStartup"
+private const val IMAGE_CACHE_DIR = "image_cache"
+private const val IMAGE_CACHE_MAX_BYTES = 250L * 1024 * 1024 // 250 MB

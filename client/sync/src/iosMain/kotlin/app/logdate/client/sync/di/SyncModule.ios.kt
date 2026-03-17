@@ -52,9 +52,10 @@ actual val syncModule: Module =
                 retryScheduleStore = get(),
                 syncMetadataService = get(),
                 transactionManager = get(),
+                dataUsagePolicy = get(),
             )
         }
-        single<SyncManager> { ForegroundSyncManager(get(), get(), get(), get()) }
+        single<SyncManager> { ForegroundSyncManager(get(), get(), get(), get(), get()) }
         includes(
             quotaModule,
             cloudAccountModule,

@@ -3,6 +3,8 @@ package app.logdate.client.sync
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaPayload
+import app.logdate.client.networking.DataUsagePolicy
+import app.logdate.client.networking.shouldSyncMedia
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -71,6 +73,7 @@ class DefaultSyncManager(
     private val retryScheduleStore: SyncRetryScheduleStore,
     private val syncMetadataService: SyncMetadataService,
     private val transactionManager: SyncTransactionManager,
+    private val dataUsagePolicy: DataUsagePolicy,
     private val syncScope: CoroutineScope = CoroutineScope(Dispatchers.IO),
 ) : SyncManager {
     // Thread-safe state management using StateFlow and Mutex
@@ -1063,22 +1066,26 @@ class DefaultSyncManager(
                         val mediaRef = note.mediaRefOrNull()
                         val uploadReadyNote =
                             if (mediaRef != null && !isRemoteMediaRef(mediaRef)) {
-                                val mediaUpload = uploadMediaIfNeeded(accessToken, note)
-                                if (mediaUpload.isFailure) {
-                                    val error = mediaUpload.exceptionOrNull()
-                                    errors.add(
-                                        SyncError(
-                                            SyncErrorType.STORAGE_ERROR,
-                                            "Failed to upload media for note ${note.uid}: ${error?.message}",
-                                            error,
-                                            retryable = true,
-                                        ),
-                                    )
-                                    Napier.w("Skipping note ${note.uid} sync; media upload failed", error)
-                                    continue
+                                if (!dataUsagePolicy.currentMode().shouldSyncMedia()) {
+                                    Napier.d("Deferring media upload for note ${note.uid} — data usage policy restricts media sync")
+                                    note
+                                } else {
+                                    val mediaUpload = uploadMediaIfNeeded(accessToken, note)
+                                    if (mediaUpload.isFailure) {
+                                        val error = mediaUpload.exceptionOrNull()
+                                        errors.add(
+                                            SyncError(
+                                                SyncErrorType.STORAGE_ERROR,
+                                                "Failed to upload media for note ${note.uid}: ${error?.message}",
+                                                error,
+                                                retryable = true,
+                                            ),
+                                        )
+                                        Napier.w("Skipping note ${note.uid} sync; media upload failed", error)
+                                        continue
+                                    }
+                                    mediaUpload.getOrThrow()
                                 }
-                                val updated = mediaUpload.getOrThrow()
-                                updated
                             } else {
                                 note
                             }

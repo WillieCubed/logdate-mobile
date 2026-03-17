@@ -14,6 +14,8 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.networking.DataUsageMode
+import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.networking.NetworkState
 import io.github.aakira.napier.Napier
@@ -129,6 +131,7 @@ class AndroidSyncManager(
     private val sessionStorage: SessionStorage,
     private val preferencesDataSource: LogdatePreferencesDataSource,
     private val networkMonitor: NetworkAvailabilityMonitor,
+    private val dataUsagePolicy: DataUsagePolicy,
 ) : SyncManager {
     private val workManager = WorkManager.getInstance(applicationContext)
     private val supervisorJob = SupervisorJob()
@@ -169,6 +172,16 @@ class AndroidSyncManager(
                         handleNetworkRestored()
                     }
                     lastNetworkState = currentState
+                }
+        }
+
+        // Observe data usage policy changes and re-enqueue periodic sync with updated constraints
+        scope.launch {
+            dataUsagePolicy.policy
+                .distinctUntilChanged()
+                .collect { mode ->
+                    Napier.d("Data usage policy changed to $mode, updating periodic sync constraints")
+                    setupPeriodicSync(mode)
                 }
         }
     }
@@ -240,16 +253,21 @@ class AndroidSyncManager(
     /**
      * Sets up periodic background sync using WorkManager.
      *
-     * - Runs every 15 minutes (minimum allowed)
-     * - Only when network is available
-     * - Prefers unmetered network (WiFi) but allows metered if needed
-     * - Respects battery optimization settings
+     * Constraints adapt to the current data usage mode:
+     * - [DataUsageMode.Restricted]: Require unmetered network (WiFi only)
+     * - [DataUsageMode.Conservative] / [DataUsageMode.Unrestricted]: Any connected network
      */
-    private fun setupPeriodicSync() {
+    private fun setupPeriodicSync(mode: DataUsageMode = DataUsageMode.Unrestricted) {
+        val networkType =
+            when (mode) {
+                is DataUsageMode.Restricted -> NetworkType.UNMETERED
+                else -> NetworkType.CONNECTED
+            }
+
         val constraints =
             Constraints
                 .Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .setRequiredNetworkType(networkType)
                 .setRequiresBatteryNotLow(true)
                 .build()
 
@@ -271,14 +289,14 @@ class AndroidSyncManager(
                     TimeUnit.MINUTES,
                 ).build()
 
-        // Use KEEP policy to avoid canceling existing work
+        // Use REPLACE so constraint changes take effect immediately
         workManager.enqueueUniquePeriodicWork(
             AndroidLogDateSyncWorker.WORK_NAME_PERIODIC_SYNC,
-            ExistingPeriodicWorkPolicy.KEEP,
+            ExistingPeriodicWorkPolicy.REPLACE,
             periodicRequest,
         )
 
-        Napier.d("Setup periodic sync work")
+        Napier.d("Setup periodic sync work (networkType=$networkType)")
     }
 
     /**

@@ -2,8 +2,11 @@ package app.logdate.client.sync
 
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.networking.DataUsageMode
+import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.networking.NetworkState
+import app.logdate.client.networking.shouldSyncMetadata
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +30,7 @@ class ForegroundSyncManager(
     private val sessionStorage: SessionStorage,
     private val preferencesDataSource: LogdatePreferencesDataSource,
     private val networkMonitor: NetworkAvailabilityMonitor,
+    private val dataUsagePolicy: DataUsagePolicy,
     private val syncScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) : SyncManager {
     private var periodicJob: Job? = null
@@ -92,11 +96,21 @@ class ForegroundSyncManager(
         periodicJob =
             syncScope.launch {
                 while (isActive) {
-                    val status = defaultSyncManager.getSyncStatus()
-                    if (status.pendingUploads > 0 || status.hasErrors) {
-                        defaultSyncManager.fullSync()
+                    val mode = dataUsagePolicy.currentMode()
+                    if (mode.shouldSyncMetadata()) {
+                        val status = defaultSyncManager.getSyncStatus()
+                        if (status.pendingUploads > 0 || status.hasErrors) {
+                            defaultSyncManager.fullSync()
+                        }
+                    } else {
+                        Napier.d("Skipping periodic sync cycle — data usage policy restricts metadata sync")
                     }
-                    delay(PERIODIC_SYNC_INTERVAL_MS)
+                    val interval =
+                        when (mode) {
+                            is DataUsageMode.Restricted -> RESTRICTED_SYNC_INTERVAL_MS
+                            else -> PERIODIC_SYNC_INTERVAL_MS
+                        }
+                    delay(interval)
                 }
             }
         Napier.d("Foreground sync scheduler enabled")
@@ -118,5 +132,6 @@ class ForegroundSyncManager(
 
     companion object {
         private const val PERIODIC_SYNC_INTERVAL_MS = 30 * 60 * 1000L
+        private const val RESTRICTED_SYNC_INTERVAL_MS = 60 * 60 * 1000L
     }
 }

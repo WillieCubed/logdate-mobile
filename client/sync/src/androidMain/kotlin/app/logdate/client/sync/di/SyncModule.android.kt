@@ -55,6 +55,7 @@ actual val syncModule: Module =
                 retryScheduleStore = get(),
                 syncMetadataService = get(),
                 transactionManager = get(),
+                dataUsagePolicy = get(),
             )
         }
         single<SyncManager> {
@@ -64,6 +65,7 @@ actual val syncModule: Module =
                 get(),
                 get(),
                 get<NetworkAvailabilityMonitor>(),
+                get(),
             )
         }
         includes(
