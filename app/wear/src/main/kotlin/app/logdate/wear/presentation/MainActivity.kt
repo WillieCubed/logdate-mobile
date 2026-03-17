@@ -12,10 +12,8 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import app.logdate.client.repository.journals.JournalNotesRepository
-import app.logdate.wear.presentation.audio.AudioRecordingScreen
 import app.logdate.wear.presentation.home.WearHomeScreen
 import app.logdate.wear.presentation.mood.MoodCheckInScreen
-import app.logdate.wear.presentation.navigation.WearAudioRecordingRoute
 import app.logdate.wear.presentation.navigation.WearHomeRoute
 import app.logdate.wear.presentation.navigation.WearMoodCheckInRoute
 import app.logdate.wear.presentation.navigation.WearOnboardingRoute
@@ -83,12 +81,6 @@ fun WearApp() {
                 }
                 entry<WearHomeRoute> {
                     WearHomeScreen(
-                        onNavigateToRecordAudio = {
-                            backStack.add(WearQuickRecordRoute)
-                        },
-                        onNavigateToVoiceNote = {
-                            backStack.add(WearAudioRecordingRoute)
-                        },
                         onNavigateToMoodCheckIn = {
                             backStack.add(WearMoodCheckInRoute)
                         },
@@ -103,9 +95,6 @@ fun WearApp() {
                         },
                     )
                 }
-                entry<WearAudioRecordingRoute> {
-                    AudioRecordingScreen(onNavigateBack = navigateBack)
-                }
                 entry<WearQuickRecordRoute> {
                     WearRecordingScreen(onNavigateBack = navigateBack)
                 }
@@ -114,7 +103,7 @@ fun WearApp() {
                         onNavigateBack = navigateBack,
                         onNavigateToVoiceNote = {
                             navigateBack()
-                            backStack.add(WearAudioRecordingRoute)
+                            backStack.add(WearQuickRecordRoute)
                         },
                     )
                 }

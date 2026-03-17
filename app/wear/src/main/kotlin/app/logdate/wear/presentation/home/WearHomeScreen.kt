@@ -1,176 +1,336 @@
 package app.logdate.wear.presentation.home
 
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MicNone
 import androidx.compose.material.icons.filled.Mood
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.ViewTimeline
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
-import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.material3.Button
-import androidx.wear.compose.material3.ButtonDefaults
-import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
+import androidx.wear.compose.material3.IconButton
+import androidx.wear.compose.material3.IconButtonDefaults
 import androidx.wear.compose.material3.MaterialTheme
-import androidx.wear.compose.material3.OutlinedButton
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
 import app.logdate.wear.R
+import app.logdate.wear.presentation.common.SaveFeedback
+import app.logdate.wear.presentation.recording.RecordingPhase
+import app.logdate.wear.presentation.recording.WearRecordingViewModel
+import app.logdate.wear.presentation.recording.formatDuration
+import kotlinx.coroutines.flow.collectLatest
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun WearHomeScreen(
-    onNavigateToRecordAudio: () -> Unit,
-    onNavigateToVoiceNote: () -> Unit,
     onNavigateToMoodCheckIn: () -> Unit,
     onNavigateToQuickText: () -> Unit,
     onNavigateToTimeline: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    viewModel: WearHomeViewModel = koinViewModel(),
+    homeViewModel: WearHomeViewModel = koinViewModel(),
+    recordingViewModel: WearRecordingViewModel = koinViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    WearHomeContent(
-        uiState = uiState,
-        onNavigateToRecordAudio = onNavigateToRecordAudio,
-        onNavigateToVoiceNote = onNavigateToVoiceNote,
-        onNavigateToMoodCheckIn = onNavigateToMoodCheckIn,
-        onNavigateToQuickText = onNavigateToQuickText,
-        onNavigateToTimeline = onNavigateToTimeline,
-        onNavigateToSettings = onNavigateToSettings,
-    )
-}
+    val homeState by homeViewModel.uiState.collectAsState()
+    val recordingState by recordingViewModel.uiState.collectAsState()
 
-@Composable
-internal fun WearHomeContent(
-    uiState: WearHomeUiState,
-    onNavigateToRecordAudio: () -> Unit = {},
-    onNavigateToVoiceNote: () -> Unit = {},
-    onNavigateToMoodCheckIn: () -> Unit = {},
-    onNavigateToQuickText: () -> Unit = {},
-    onNavigateToTimeline: () -> Unit = {},
-    onNavigateToSettings: () -> Unit = {},
-) {
-    val listState = rememberScalingLazyListState()
+    // Auto-save when recording pauses (hold-to-record-and-save)
+    LaunchedEffect(recordingState.phase) {
+        if (recordingState.phase == RecordingPhase.PAUSED) {
+            recordingViewModel.save()
+        }
+    }
+
+    // Reset after saved display completes (instead of navigating back)
+    LaunchedEffect(Unit) {
+        recordingViewModel.events.collectLatest {
+            recordingViewModel.onNavigatedBack()
+        }
+    }
+
+    val isRecording = recordingState.phase == RecordingPhase.RECORDING
+    val isIdle = recordingState.phase == RecordingPhase.READY
 
     ScreenScaffold(
         timeText = { TimeText() },
-        scrollState = listState,
     ) {
-        ScalingLazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxWidth(),
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
         ) {
-            // Greeting card
-            item(key = "greeting") {
-                val greetingText = when (uiState.timeOfDay) {
-                    TimeOfDay.MORNING -> stringResource(R.string.wear_home_greeting_morning)
-                    TimeOfDay.AFTERNOON -> stringResource(R.string.wear_home_greeting_afternoon)
-                    TimeOfDay.EVENING -> stringResource(R.string.wear_home_greeting_evening)
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                // Top text — greeting or recording status
+                when (recordingState.phase) {
+                    RecordingPhase.READY -> {
+                        val greetingText = when (homeState.timeOfDay) {
+                            TimeOfDay.MORNING -> stringResource(R.string.wear_home_greeting_morning)
+                            TimeOfDay.AFTERNOON -> stringResource(R.string.wear_home_greeting_afternoon)
+                            TimeOfDay.EVENING -> stringResource(R.string.wear_home_greeting_evening)
+                        }
+                        Text(
+                            text = greetingText,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                        if (homeState.syncBadge != SyncBadge.NONE) {
+                            val (badgeText, badgeColor) = when (homeState.syncBadge) {
+                                SyncBadge.SYNCING -> stringResource(R.string.wear_home_syncing) to
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                SyncBadge.ERROR -> stringResource(R.string.wear_home_sync_issue) to
+                                    MaterialTheme.colorScheme.error
+                                SyncBadge.NONE -> "" to MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                            Text(
+                                text = badgeText,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = badgeColor,
+                            )
+                        }
+                    }
+                    RecordingPhase.RECORDING -> {
+                        Text(
+                            text = formatDuration(recordingState.recordingDurationMs),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    RecordingPhase.SAVING, RecordingPhase.PAUSED -> {
+                        Text(
+                            text = stringResource(R.string.wear_recording_saving),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    RecordingPhase.SAVED -> {
+                        val feedbackText = when (recordingState.saveFeedback) {
+                            SaveFeedback.SYNCING_TO_PHONE -> stringResource(R.string.wear_saved_syncing_to_phone)
+                            SaveFeedback.SAVED_LOCALLY -> stringResource(R.string.wear_saved_on_watch)
+                            null -> stringResource(R.string.wear_recording_saved)
+                        }
+                        Text(
+                            text = feedbackText,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    RecordingPhase.TOO_SHORT -> {
+                        Text(
+                            text = stringResource(R.string.wear_recording_hold_longer),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    RecordingPhase.ERROR -> {
+                        Text(
+                            text = recordingState.errorMessage
+                                ?: stringResource(R.string.wear_recording_error),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                 }
-                Text(
-                    text = greetingText,
-                    style = MaterialTheme.typography.titleSmall,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 4.dp),
+
+                // Center surface — the recorder
+                RecordSurface(
+                    phase = recordingState.phase,
+                    onTouchDown = recordingViewModel::onTouchDown,
+                    onTouchUp = recordingViewModel::onTouchUp,
+                    modifier = Modifier.padding(vertical = 8.dp),
                 )
             }
-            item(key = "entryCount") {
-                val context = LocalContext.current
-                val entryCountLabel = if (uiState.entryCount == 0) {
-                    stringResource(R.string.wear_home_no_entries)
-                } else {
-                    context.resources.getQuantityString(
-                        R.plurals.wear_tile_entry_count,
-                        uiState.entryCount,
-                        uiState.entryCount,
-                    )
+
+            // Bottom action row — hidden during recording
+            val bottomAlpha by animateFloatAsState(
+                targetValue = if (isIdle) 1f else 0f,
+                animationSpec = tween(150),
+                label = "bottomAlpha",
+            )
+            if (bottomAlpha > 0f) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 16.dp)
+                        .alpha(bottomAlpha),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    IconButton(
+                        onClick = onNavigateToMoodCheckIn,
+                        modifier = Modifier.size(36.dp),
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        ),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Mood,
+                            contentDescription = stringResource(R.string.wear_home_mood_checkin),
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    IconButton(
+                        onClick = onNavigateToQuickText,
+                        modifier = Modifier.size(36.dp),
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        ),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.TextFields,
+                            contentDescription = stringResource(R.string.wear_home_quick_text),
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    IconButton(
+                        onClick = onNavigateToTimeline,
+                        modifier = Modifier.size(36.dp),
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        ),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ViewTimeline,
+                            contentDescription = stringResource(R.string.wear_home_timeline),
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    IconButton(
+                        onClick = onNavigateToSettings,
+                        modifier = Modifier.size(36.dp),
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        ),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.wear_home_settings),
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
                 }
-                Text(
-                    text = entryCountLabel,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                )
-            }
-
-            // Record Audio hero chip
-            item(key = "recordAudio") {
-                Button(
-                    onClick = onNavigateToRecordAudio,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.wear_home_record_audio)) },
-                    icon = { Icon(Icons.Default.Mic, contentDescription = null) },
-                )
-            }
-
-            // Voice Note
-            item(key = "voiceNote") {
-                FilledTonalButton(
-                    onClick = onNavigateToVoiceNote,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.wear_home_voice_note)) },
-                    icon = { Icon(Icons.Default.MicNone, contentDescription = null) },
-                )
-            }
-
-            // Mood Check-in
-            item(key = "moodCheckIn") {
-                FilledTonalButton(
-                    onClick = onNavigateToMoodCheckIn,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.wear_home_mood_checkin)) },
-                    icon = { Icon(Icons.Default.Mood, contentDescription = null) },
-                )
-            }
-
-            // Quick Text
-            item(key = "quickText") {
-                OutlinedButton(
-                    onClick = onNavigateToQuickText,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.wear_home_quick_text)) },
-                    icon = { Icon(Icons.Default.TextFields, contentDescription = null) },
-                )
-            }
-
-            // Timeline
-            item(key = "timeline") {
-                OutlinedButton(
-                    onClick = onNavigateToTimeline,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.wear_home_timeline)) },
-                    icon = { Icon(Icons.Default.ViewTimeline, contentDescription = null) },
-                )
-            }
-
-            // Settings
-            item(key = "settings") {
-                OutlinedButton(
-                    onClick = onNavigateToSettings,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.wear_home_settings)) },
-                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                    colors = ButtonDefaults.outlinedButtonColors(),
-                )
             }
         }
+    }
+}
+
+/**
+ * Circular surface that IS the recorder.
+ *
+ * Resting state: mic icon on a surface. Press and hold: expands, turns red,
+ * becomes the active recording target. Release: auto-saves.
+ */
+@Composable
+private fun RecordSurface(
+    phase: RecordingPhase,
+    onTouchDown: () -> Unit,
+    onTouchUp: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val isRecording = phase == RecordingPhase.RECORDING
+    val isSaved = phase == RecordingPhase.SAVED
+
+    val scale by animateFloatAsState(
+        targetValue = when {
+            isRecording -> 1.4f
+            isSaved -> 1.1f
+            else -> 1f
+        },
+        animationSpec = tween(durationMillis = 150),
+        label = "recordScale",
+    )
+
+    val bgColor by animateColorAsState(
+        targetValue = when {
+            isRecording -> Color(0xFF8B1A1A)
+            isSaved -> MaterialTheme.colorScheme.primaryContainer
+            else -> MaterialTheme.colorScheme.surfaceContainerHigh
+        },
+        animationSpec = tween(durationMillis = 150),
+        label = "recordBg",
+    )
+
+    val iconTint by animateColorAsState(
+        targetValue = when {
+            isRecording -> Color.White
+            isSaved -> MaterialTheme.colorScheme.onPrimaryContainer
+            else -> MaterialTheme.colorScheme.onSurface
+        },
+        animationSpec = tween(durationMillis = 150),
+        label = "iconTint",
+    )
+
+    val icon = when {
+        isSaved -> Icons.Default.Check
+        else -> Icons.Default.Mic
+    }
+
+    val touchActive = phase == RecordingPhase.READY || phase == RecordingPhase.RECORDING
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(80.dp)
+            .scale(scale)
+            .clip(CircleShape)
+            .background(color = bgColor, shape = CircleShape)
+            .then(
+                if (touchActive) {
+                    Modifier.pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                when (event.type) {
+                                    PointerEventType.Press -> onTouchDown()
+                                    PointerEventType.Release -> onTouchUp()
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Modifier
+                },
+            ),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = stringResource(R.string.wear_home_record_audio),
+            tint = iconTint,
+            modifier = Modifier.size(32.dp),
+        )
     }
 }
