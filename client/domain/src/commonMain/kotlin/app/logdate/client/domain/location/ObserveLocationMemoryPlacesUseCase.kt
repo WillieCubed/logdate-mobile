@@ -124,13 +124,14 @@ sealed class LocationMemoryTimeFilter {
     }
 
     companion object {
-        val Presets: List<LocationMemoryTimeFilter> =
-            listOf(
-                Last30Days,
-                Last90Days,
-                YearToDate,
-                AllTime,
-            )
+        val Presets: List<LocationMemoryTimeFilter>
+            get() =
+                listOf(
+                    Last30Days,
+                    Last90Days,
+                    YearToDate,
+                    AllTime,
+                )
     }
 }
 

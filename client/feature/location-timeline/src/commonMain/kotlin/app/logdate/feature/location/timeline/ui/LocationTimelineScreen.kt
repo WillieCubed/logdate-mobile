@@ -557,10 +557,10 @@ private fun PlacesFilterRow(
 @Composable
 private fun FilterLabel(filter: LocationMemoryTimeFilter): String =
     when (filter) {
-        LocationMemoryTimeFilter.Last30Days -> stringResource(Res.string.last_30_days)
-        LocationMemoryTimeFilter.Last90Days -> stringResource(Res.string.last_90_days)
-        LocationMemoryTimeFilter.YearToDate -> stringResource(Res.string.year_to_date)
-        LocationMemoryTimeFilter.AllTime -> stringResource(Res.string.all_time)
+        is LocationMemoryTimeFilter.Last30Days -> stringResource(Res.string.last_30_days)
+        is LocationMemoryTimeFilter.Last90Days -> stringResource(Res.string.last_90_days)
+        is LocationMemoryTimeFilter.YearToDate -> stringResource(Res.string.year_to_date)
+        is LocationMemoryTimeFilter.AllTime -> stringResource(Res.string.all_time)
         is LocationMemoryTimeFilter.Custom -> stringResource(Res.string.custom_range)
     }
 
