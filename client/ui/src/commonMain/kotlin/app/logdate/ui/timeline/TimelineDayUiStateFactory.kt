@@ -228,10 +228,9 @@ private const val STACKED_MOMENT_THRESHOLD = 5
 private const val STACKED_NOTE_THRESHOLD = 10
 
 /**
- * Creates a [TimelineDayUiState] with moment-based rendering for the Semantic Timeline.
+ * Creates a [TimelineDayUiState] for the Semantic Timeline.
  *
- * This populates the [TimelineDayUiState.moments] and [TimelineDayUiState.dayPresentation]
- * fields while still producing valid legacy section fields for backward compatibility.
+ * Moments are the sole content — no legacy hero/supporting sections, no recap strip.
  *
  * The [moments] parameter should already be mapped to [MomentUiState] by the caller
  * (typically the ViewModel, which has access to domain types).
@@ -255,21 +254,17 @@ fun createSemanticTimelineDayUiState(
             else -> DayPresentation.FLOWING
         }
 
-    // Also produce legacy fields so existing rendering still works during migration.
-    val legacyState =
-        createTimelineDayUiState(
-            summary = summary,
-            date = date,
-            people = people,
-            placesVisited = placesVisited,
-            notes = notes,
-            isLoadingSummary = isLoadingSummary,
-            isLoadingPeople = isLoadingPeople,
-        )
-
-    return legacyState.copy(
+    return TimelineDayUiState(
+        summary = summary,
+        supportingSummary = summary.takeIf { it !in hiddenSummaryValues },
+        date = date,
+        people = people,
+        placesVisited = placesVisited,
+        notes = notes,
         moments = moments,
         dayPresentation = dayPresentation,
+        isLoadingSummary = isLoadingSummary,
+        isLoadingPeople = isLoadingPeople,
     )
 }
 

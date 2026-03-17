@@ -31,6 +31,7 @@ import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
 import app.logdate.client.domain.recommendation.HomeRecommendation
 import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
 import app.logdate.client.domain.timeline.GetTimelinePageUseCase
+import app.logdate.client.domain.timeline.Moment
 import app.logdate.client.domain.timeline.StreamingTimelineRequest
 import app.logdate.client.domain.timeline.Timeline
 import app.logdate.client.domain.timeline.TimelineDay
@@ -50,6 +51,9 @@ import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.HomeTimelineUiState
 import app.logdate.ui.timeline.ImageNoteUiState
 import app.logdate.ui.timeline.MediaObjectUiState
+import app.logdate.ui.timeline.MomentAudioUiState
+import app.logdate.ui.timeline.MomentMediaUiState
+import app.logdate.ui.timeline.MomentUiState
 import app.logdate.ui.timeline.TextNoteUiState
 import app.logdate.ui.timeline.TimelineDaySelection
 import app.logdate.ui.timeline.TimelineDayUiState
@@ -58,7 +62,7 @@ import app.logdate.ui.timeline.TimelinePane
 import app.logdate.ui.timeline.TimelineSuggestionBlock
 import app.logdate.ui.timeline.TimelineUiState
 import app.logdate.ui.timeline.VideoNoteUiState
-import app.logdate.ui.timeline.createTimelineDayUiState
+import app.logdate.ui.timeline.createSemanticTimelineDayUiState
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -75,6 +79,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.create_new_entry
 import org.jetbrains.compose.resources.stringResource
@@ -453,17 +459,54 @@ class HomeViewModel(
             longitude = longitude,
         )
 
-    private fun TimelineDay.toUiState(overrideNotes: List<JournalNote> = entries): TimelineDayUiState =
-        createTimelineDayUiState(
+    private fun TimelineDay.toUiState(overrideNotes: List<JournalNote> = entries): TimelineDayUiState {
+        val noteUiStates = overrideNotes.toUiState()
+        val placeUiStates = placesVisited.map { place -> place.toUiState() }
+        val peopleUiStates = people.map(Person::toUiState)
+        val momentUiStates = moments.toMomentUiStates()
+
+        return createSemanticTimelineDayUiState(
             summary = tldr,
             date = date,
-            people = people.map(Person::toUiState),
-            events = events,
-            placesVisited = placesVisited.map { place -> place.toUiState() },
-            notes = overrideNotes.toUiState(),
+            moments = momentUiStates,
+            people = peopleUiStates,
+            notes = noteUiStates,
+            placesVisited = placeUiStates,
             isLoadingSummary = tldr.isEmpty(),
             isLoadingPeople = people.isEmpty() && tldr.isEmpty(),
         )
+    }
+
+    private fun List<Moment>.toMomentUiStates(): List<MomentUiState> {
+        val heroIndex =
+            indices.maxByOrNull { i ->
+                val m = this[i]
+                m.media.size * 3 + m.textFragments.size * 2 + m.audio.size
+            } ?: 0
+        return mapIndexed { index, moment -> moment.toMomentUiState(isHero = index == heroIndex) }
+    }
+
+    private fun Moment.toMomentUiState(isHero: Boolean): MomentUiState {
+        val timezone = TimeZone.currentSystemDefault()
+        val startLocal = estimatedStart.toLocalDateTime(timezone)
+        val timeOfDay =
+            when (startLocal.hour) {
+                in 0..11 -> "morning"
+                in 12..17 -> "afternoon"
+                else -> "evening"
+            }
+        return MomentUiState(
+            id = id.toString(),
+            label = label,
+            timeOfDay = timeOfDay,
+            textSnippet = textFragments.firstOrNull()?.text?.take(140),
+            media = media.map { MomentMediaUiState(uri = it.uri, isVideo = it.isVideo) },
+            audio = audio.firstOrNull()?.let { MomentAudioUiState(uri = it.uri, durationMs = it.durationMs) },
+            places = places.map { PlaceUiState(id = it.id, title = it.name, latitude = it.latitude, longitude = it.longitude) },
+            people = people,
+            isHero = isHero,
+        )
+    }
 
     private fun List<JournalNote>.toUiState(): List<app.logdate.ui.timeline.NoteUiState> =
         sortedByDescending { note -> note.creationTimestamp }.map { note ->

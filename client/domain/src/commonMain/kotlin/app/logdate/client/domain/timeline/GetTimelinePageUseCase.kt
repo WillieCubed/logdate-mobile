@@ -70,6 +70,7 @@ private fun createBasicTimeline(
 
     val basicDays =
         notesByDay.map { (date, entries) ->
+            val places = extractPlacesVisited(entries)
             TimelineDay(
                 start = entries.minOf { it.creationTimestamp },
                 end = entries.maxOf { it.creationTimestamp },
@@ -77,7 +78,8 @@ private fun createBasicTimeline(
                 date = date,
                 people = emptyList(),
                 events = emptyList(),
-                placesVisited = extractPlacesVisited(entries),
+                placesVisited = places,
+                moments = inferMomentsHeuristically(date, entries, places),
                 parts = extractDayParts(entries),
                 entries = entries.sortedByDescending { it.creationTimestamp },
             )

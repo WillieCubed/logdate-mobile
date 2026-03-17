@@ -31,7 +31,6 @@ import app.logdate.ui.timeline.TimelineLoadingState
 import app.logdate.ui.timeline.TimelineSuggestionBlock
 import app.logdate.ui.timeline.VideoNoteUiState
 import app.logdate.ui.timeline.createSemanticTimelineDayUiState
-import app.logdate.ui.timeline.createTimelineDayUiState
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -201,31 +200,18 @@ class TimelineViewModel(
         val noteUiStates = entries.toUiState()
         val placeUiStates = placesVisited.map { place -> place.toUiState() }
         val peopleUiStates = people.map(Person::toUiState)
+        val momentUiStates = moments.toMomentUiStates()
 
-        return if (moments.isNotEmpty()) {
-            val momentUiStates = moments.toMomentUiStates()
-            createSemanticTimelineDayUiState(
-                summary = tldr,
-                date = date,
-                moments = momentUiStates,
-                people = peopleUiStates,
-                notes = noteUiStates,
-                placesVisited = placeUiStates,
-                isLoadingSummary = tldr.isEmpty(),
-                isLoadingPeople = people.isEmpty() && tldr.isEmpty(),
-            )
-        } else {
-            createTimelineDayUiState(
-                summary = tldr,
-                date = date,
-                people = peopleUiStates,
-                events = events,
-                placesVisited = placeUiStates,
-                notes = noteUiStates,
-                isLoadingSummary = tldr.isEmpty(),
-                isLoadingPeople = people.isEmpty() && tldr.isEmpty(),
-            )
-        }
+        return createSemanticTimelineDayUiState(
+            summary = tldr,
+            date = date,
+            moments = momentUiStates,
+            people = peopleUiStates,
+            notes = noteUiStates,
+            placesVisited = placeUiStates,
+            isLoadingSummary = tldr.isEmpty(),
+            isLoadingPeople = people.isEmpty() && tldr.isEmpty(),
+        )
     }
 
     private fun List<Moment>.toMomentUiStates(): List<MomentUiState> {
