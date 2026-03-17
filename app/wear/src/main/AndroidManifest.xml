@@ -10,6 +10,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <!--
         Remove location permissions merged from client:location (transitive via client:data).
@@ -101,6 +102,16 @@
             android:foregroundServiceType="microphone"
             android:enabled="true"
             android:exported="false" />
+
+        <!-- Audio Playback Service — reused from client:media for voice note playback -->
+        <service
+            android:name="app.logdate.client.media.audio.AudioPlaybackService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
 
         <!-- Data Layer sync listener: receives notes, journals, and associations from paired phone -->
         <service

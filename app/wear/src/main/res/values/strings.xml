@@ -72,6 +72,11 @@
     <string name="wear_day_detail_photo">Photo</string>
     <string name="wear_day_detail_video">Video</string>
 
+    <!-- Audio playback -->
+    <string name="wear_playback_play">Play voice note</string>
+    <string name="wear_playback_stop">Stop</string>
+    <string name="wear_playback_connect_headphones">Connect headphones to listen</string>
+
     <!-- Journal Prompt Notifications -->
     <string name="wear_prompt_channel_name">Journal reminders</string>
     <string name="wear_prompt_channel_description">Morning and evening journaling reminders</string>

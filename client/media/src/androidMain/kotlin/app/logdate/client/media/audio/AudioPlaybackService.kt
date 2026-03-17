@@ -35,6 +35,7 @@ class AudioPlaybackService : MediaSessionService() {
                         .build(),
                     true,
                 ).setHandleAudioBecomingNoisy(true)
+                .setSuppressPlaybackOnUnsuitableOutput(true)
                 .build()
 
         val sessionActivity = createSessionActivity()

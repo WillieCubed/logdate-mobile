@@ -3,7 +3,9 @@ package app.logdate.wear.di
 import android.app.Application
 import android.content.Context
 import android.os.VibratorManager
+import app.logdate.client.media.audio.AndroidAudioPlaybackManager
 import app.logdate.client.media.audio.AndroidAudioStorage
+import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioStorage
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.rewind.RewindRepository
@@ -21,13 +23,14 @@ import app.logdate.wear.presentation.recording.WearRecordingViewModel
 import app.logdate.wear.presentation.rewind.WearRewindViewModel
 import app.logdate.wear.presentation.settings.WearSettingsViewModel
 import app.logdate.wear.presentation.timeline.WearTimelineViewModel
+import app.logdate.wear.playback.WearAudioOutputMonitor
 import app.logdate.wear.recording.WearAudioRecordingManager
 import app.logdate.wear.sync.WearDataLayerClient
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
 /**
- * Koin module for Wear OS audio recording and capture features.
+ * Koin module for Wear OS audio recording, playback, and capture features.
  */
 val wearAudioModule = module {
     single { StorageSpaceChecker(get()) }
@@ -38,6 +41,10 @@ val wearAudioModule = module {
         WearHapticEngine(vibratorManager.defaultVibrator)
     }
     single { WearAudioRecordingManager(get(), get(), get()) }
+
+    // Audio playback — reuses the phone's AndroidAudioPlaybackManager + AudioPlaybackService
+    single { WearAudioOutputMonitor(get()) }
+    single<AudioPlaybackManager> { AndroidAudioPlaybackManager(get()) }
     viewModel {
         AudioRecordingViewModel(
             get<Application>(),
@@ -72,6 +79,8 @@ val wearAudioModule = module {
     viewModel {
         WearTimelineViewModel(
             get<JournalNotesRepository>(),
+            get<AudioPlaybackManager>(),
+            get<WearAudioOutputMonitor>(),
         )
     }
     viewModel {

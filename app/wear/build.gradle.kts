@@ -111,6 +111,11 @@ dependencies {
     implementation(libs.androidx.watchface.complications.data.source.ktx)
     implementation(libs.androidx.health.services.client)
 
+    // Media3 ExoPlayer for voice note playback (reuses AudioPlaybackService from client:media)
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.common)
+    implementation(libs.media3.session)
+
     // Unit test dependencies
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
