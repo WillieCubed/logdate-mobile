@@ -4,6 +4,7 @@ package app.logdate.feature.library.ui.detail
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -46,11 +49,20 @@ import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -318,11 +330,49 @@ private fun MediaDetailLayout(
                 )
             },
         ) { innerPadding ->
+            val focusRequester = FocusRequester()
+            if (presenterState.isPresenting) {
+                LaunchedEffect(Unit) { focusRequester.requestFocus() }
+            }
+
             Column(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .padding(innerPadding),
+                        .padding(innerPadding)
+                        .then(
+                            if (presenterState.isPresenting) {
+                                Modifier
+                                    .focusRequester(focusRequester)
+                                    .focusable()
+                                    .onKeyEvent { event ->
+                                        if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                                        when (event.key) {
+                                            Key.DirectionRight -> {
+                                                val next =
+                                                    (presenterState.currentIndex + 1)
+                                                        .coerceAtMost(presenterState.mediaItems.size - 1)
+                                                onPresentItem(next)
+                                                true
+                                            }
+                                            Key.DirectionLeft -> {
+                                                val prev =
+                                                    (presenterState.currentIndex - 1)
+                                                        .coerceAtLeast(0)
+                                                onPresentItem(prev)
+                                                true
+                                            }
+                                            Key.Escape -> {
+                                                onStopPresenting()
+                                                true
+                                            }
+                                            else -> false
+                                        }
+                                    }
+                            } else {
+                                Modifier
+                            },
+                        ),
             ) {
                 // Presenter navigation strip
                 if (presenterState.isPresenting && presenterState.mediaItems.size > 1) {
@@ -333,15 +383,47 @@ private fun MediaDetailLayout(
                     )
                 }
 
-                Box(
-                    modifier = Modifier.weight(1f).fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    MediaContent(
-                        mediaRef = mediaRef,
-                        isVideo = isVideo,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                if (presenterState.isPresenting && presenterState.mediaItems.size > 1) {
+                    val pagerState =
+                        rememberPagerState(
+                            initialPage = presenterState.currentIndex,
+                            pageCount = { presenterState.mediaItems.size },
+                        )
+
+                    // Sync pager swipes to the presentation
+                    LaunchedEffect(pagerState) {
+                        snapshotFlow { pagerState.currentPage }.collect { page ->
+                            onPresentItem(page)
+                        }
+                    }
+
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier.weight(1f).fillMaxSize(),
+                    ) { page ->
+                        val item = presenterState.mediaItems[page]
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            MediaContent(
+                                mediaRef = item.uri,
+                                isVideo = item.isVideo,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier.weight(1f).fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        MediaContent(
+                            mediaRef = mediaRef,
+                            isVideo = isVideo,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
 
                 // Stop presenting button

@@ -1,6 +1,8 @@
-package app.logdate.client.media.display
+package app.logdate.feature.remotedisplay
 
 import android.content.Context
+import app.logdate.client.media.display.ExternalDisplay
+import app.logdate.client.media.display.RemoteDisplayManager
 import android.hardware.display.DisplayManager
 import android.net.Uri
 import android.view.Display

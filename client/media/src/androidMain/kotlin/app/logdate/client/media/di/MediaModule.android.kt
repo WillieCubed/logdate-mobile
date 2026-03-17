@@ -5,7 +5,7 @@ import app.logdate.client.media.AndroidMediaManager
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.audio.transcription.AndroidTranscriptionManager
 import app.logdate.client.media.audio.transcription.TranscriptionManager
-import app.logdate.client.media.display.AndroidRemoteDisplayManager
+import app.logdate.client.media.display.OnDemandRemoteDisplayManager
 import app.logdate.client.media.display.RemoteDisplayManager
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
@@ -26,5 +26,5 @@ actual val mediaModule: Module =
         single<TranscriptionManager> { AndroidTranscriptionManager(androidContext()) }
 
         // Remote display manager
-        single<RemoteDisplayManager> { AndroidRemoteDisplayManager(androidContext()) }
+        single<RemoteDisplayManager> { OnDemandRemoteDisplayManager(androidContext()) }
     }

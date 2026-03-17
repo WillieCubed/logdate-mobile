@@ -77,6 +77,7 @@ include(":client:feature:location-timeline") // TODO: Probably consolidate into 
 include(":client:feature:onboarding")
 include(":client:feature:search")
 include(":client:feature:library")
+include(":client:feature:remotedisplay")
 // Shared cross-platform modules
 include(":shared:activitypub")
 include(":shared:atproto-crypto")
@@ -90,6 +91,7 @@ include(":shared:atproto-pds")
 include(":shared:atproto-pds-runtime")
 include(":shared:config")
 include(":shared:model")
+
 // Server-specific modules
 include(":server")
 include(":integration:server-client-e2e")

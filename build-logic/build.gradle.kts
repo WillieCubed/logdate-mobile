@@ -25,5 +25,9 @@ gradlePlugin {
             id = "app.logdate.speech-model"
             implementationClass = "app.logdate.SpeechModelPlugin"
         }
+        register("dynamicFeature") {
+            id = "app.logdate.dynamic-feature"
+            implementationClass = "app.logdate.DynamicFeaturePlugin"
+        }
     }
 }

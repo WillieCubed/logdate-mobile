@@ -1,0 +1,39 @@
+package app.logdate
+
+import com.android.build.api.dsl.DynamicFeatureExtension
+import org.gradle.api.JavaVersion
+import org.gradle.api.Plugin
+import org.gradle.api.Project
+
+/**
+ * Convention plugin for dynamic feature modules delivered via Google Play Feature Delivery.
+ *
+ * Applies `com.android.dynamic-feature` and configures standard compile SDK, min SDK,
+ * and Java 17 to match the rest of the project. AGP 9+ provides built-in Kotlin support
+ * so no separate Kotlin plugin is needed.
+ */
+class DynamicFeaturePlugin : Plugin<Project> {
+    override fun apply(target: Project) {
+        with(target) {
+            pluginManager.apply("com.android.dynamic-feature")
+
+            extensions.configure(DynamicFeatureExtension::class.java) {
+                val catalog =
+                    project.rootProject.extensions
+                        .getByType(org.gradle.api.artifacts.VersionCatalogsExtension::class.java)
+                        .named("libs")
+
+                compileSdk = catalog.findVersion("android-compileSdk").get().toString().toInt()
+
+                defaultConfig {
+                    minSdk = catalog.findVersion("android-minSdk").get().toString().toInt()
+                }
+
+                compileOptions {
+                    sourceCompatibility = JavaVersion.VERSION_17
+                    targetCompatibility = JavaVersion.VERSION_17
+                }
+            }
+        }
+    }
+}

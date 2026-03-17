@@ -1,4 +1,4 @@
-package app.logdate.client.media.display
+package app.logdate.feature.remotedisplay
 
 import android.app.Presentation
 import android.content.Context

@@ -74,6 +74,8 @@ kotlin {
             implementation(libs.media3.exoplayer)
             implementation(libs.media3.common)
             implementation(libs.media3.session)
+            implementation(libs.play.feature.delivery.ktx)
+            implementation(libs.kotlinx.coroutines.play.services)
         }
     }
 }

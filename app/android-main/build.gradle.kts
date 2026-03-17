@@ -16,6 +16,7 @@ extensions.configure<ApplicationExtension> {
             .get()
             .toInt()
 
+    dynamicFeatures += setOf(":client:feature:remotedisplay")
     defaultConfig {
         applicationId = "co.reasonabletech.logdate"
         minSdk =

@@ -6,8 +6,12 @@ import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,15 +22,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayCircleFilled
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.library.ui.LibraryMediaItem
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
+import app.logdate.ui.common.noteDragSource
 import app.logdate.ui.common.transitions.TransitionKeys
 import coil3.compose.AsyncImage
 import kotlin.uuid.Uuid
@@ -72,12 +80,22 @@ fun MediaThumbnailItem(
             Modifier
         }
 
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isHovered) 1.05f else 1f,
+        label = "ThumbnailHoverScale",
+    )
+
     Box(
         modifier =
             modifier
                 .aspectRatio(1f)
+                .graphicsLayer(scaleX = scale, scaleY = scale)
                 .then(sharedModifier)
                 .clip(ThumbnailShape)
+                .hoverable(interactionSource)
+                .noteDragSource(item.uri)
                 .clickable { onItemClick(item.uid) },
     ) {
         AsyncImage(
