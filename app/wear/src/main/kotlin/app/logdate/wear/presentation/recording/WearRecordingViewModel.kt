@@ -6,7 +6,9 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.data.storage.StorageSpaceChecker
 import app.logdate.wear.health.NoteHealthAnnotator
+import app.logdate.wear.presentation.common.SaveFeedback
 import app.logdate.wear.recording.WearAudioRecordingManager
+import app.logdate.wear.sync.WearDataLayerClient
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -38,6 +40,7 @@ data class RecordingUiState(
     val audioLevels: List<Float> = emptyList(),
     val savedDurationMs: Long = 0,
     val errorMessage: String? = null,
+    val saveFeedback: SaveFeedback? = null,
 )
 
 sealed interface RecordingScreenEvent {
@@ -49,6 +52,7 @@ class WearRecordingViewModel(
     private val notesRepository: JournalNotesRepository,
     private val storageChecker: StorageSpaceChecker,
     private val noteHealthAnnotator: NoteHealthAnnotator,
+    private val dataLayerClient: WearDataLayerClient,
     private val clock: Clock = Clock.System,
 ) : ViewModel() {
 
@@ -260,10 +264,17 @@ class WearRecordingViewModel(
                 notesRepository.create(audioNote)
                 noteHealthAnnotator.annotate(audioNote.uid)
 
+                val feedback = if (dataLayerClient.isPhoneConnected()) {
+                    SaveFeedback.SYNCING_TO_PHONE
+                } else {
+                    SaveFeedback.SAVED_LOCALLY
+                }
+
                 _uiState.update {
                     it.copy(
                         phase = RecordingPhase.SAVED,
                         savedDurationMs = accumulatedDurationMs,
+                        saveFeedback = feedback,
                     )
                 }
 

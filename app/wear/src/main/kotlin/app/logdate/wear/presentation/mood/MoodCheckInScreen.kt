@@ -28,6 +28,7 @@ import androidx.wear.compose.material3.OutlinedButton
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import app.logdate.wear.R
+import app.logdate.wear.presentation.common.SaveFeedback
 import kotlinx.coroutines.flow.collectLatest
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -57,7 +58,9 @@ fun MoodCheckInScreen(
             onAttachVoice = viewModel::attachVoice,
             onSkip = viewModel::skipVoiceAttachment,
         )
-        MoodCheckInStep.SAVED -> MoodSavedContent()
+        MoodCheckInStep.SAVED -> MoodSavedContent(
+            saveFeedback = uiState.saveFeedback,
+        )
     }
 }
 
@@ -132,7 +135,9 @@ internal fun VoicePromptContent(
 }
 
 @Composable
-internal fun MoodSavedContent() {
+internal fun MoodSavedContent(
+    saveFeedback: SaveFeedback? = null,
+) {
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -144,8 +149,13 @@ internal fun MoodSavedContent() {
             tint = Color(0xFF4CAF50),
             modifier = Modifier.size(48.dp),
         )
+        val feedbackText = when (saveFeedback) {
+            SaveFeedback.SYNCING_TO_PHONE -> stringResource(R.string.wear_saved_syncing_to_phone)
+            SaveFeedback.SAVED_LOCALLY -> stringResource(R.string.wear_saved_on_watch)
+            null -> stringResource(R.string.wear_mood_saved)
+        }
         Text(
-            text = stringResource(R.string.wear_mood_saved),
+            text = feedbackText,
             style = MaterialTheme.typography.titleSmall,
             modifier = Modifier.padding(top = 4.dp),
         )

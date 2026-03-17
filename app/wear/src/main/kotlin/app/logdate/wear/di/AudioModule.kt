@@ -53,16 +53,20 @@ val wearAudioModule = module {
             get<JournalNotesRepository>(),
             get<StorageSpaceChecker>(),
             get<NoteHealthAnnotator>(),
+            get<WearDataLayerClient>(),
         )
     }
     viewModel {
         MoodCheckInViewModel(
             get<JournalNotesRepository>(),
+            get<WearDataLayerClient>(),
         )
     }
     viewModel {
         WearHomeViewModel(
             get<JournalNotesRepository>(),
+            get<SyncManager>(),
+            get<WearDataLayerClient>(),
         )
     }
     viewModel {

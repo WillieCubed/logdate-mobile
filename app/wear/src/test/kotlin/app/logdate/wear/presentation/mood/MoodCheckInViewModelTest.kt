@@ -3,6 +3,7 @@ package app.logdate.wear.presentation.mood
 import app.cash.turbine.test
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.wear.sync.WearDataLayerClient
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -24,14 +25,17 @@ class MoodCheckInViewModelTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var notesRepository: JournalNotesRepository
+    private lateinit var dataLayerClient: WearDataLayerClient
     private lateinit var viewModel: MoodCheckInViewModel
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         notesRepository = mockk(relaxed = true)
+        dataLayerClient = mockk(relaxed = true)
         coEvery { notesRepository.create(any()) } returns Uuid.random()
-        viewModel = MoodCheckInViewModel(notesRepository)
+        coEvery { dataLayerClient.isPhoneConnected(any()) } returns false
+        viewModel = MoodCheckInViewModel(notesRepository, dataLayerClient)
     }
 
     @After
@@ -113,8 +117,10 @@ class MoodCheckInViewModelTest {
     fun `each mood option produces correct tag prefix`() = runTest {
         for (mood in MoodOption.entries) {
             val repo: JournalNotesRepository = mockk(relaxed = true)
+            val dlc: WearDataLayerClient = mockk(relaxed = true)
             coEvery { repo.create(any()) } returns Uuid.random()
-            val vm = MoodCheckInViewModel(repo)
+            coEvery { dlc.isPhoneConnected(any()) } returns false
+            val vm = MoodCheckInViewModel(repo, dlc)
 
             vm.selectMood(mood)
             vm.skipVoiceAttachment()

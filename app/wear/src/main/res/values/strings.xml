@@ -138,6 +138,15 @@
     <string name="wear_onboarding_done_subtitle">Start with a voice note or mood check-in</string>
     <string name="wear_onboarding_done_button">Start Journaling</string>
 
+    <!-- Home sync status -->
+    <string name="wear_home_syncing">Syncing to phone\u2026</string>
+    <string name="wear_home_phone_not_connected">Phone not connected</string>
+    <string name="wear_home_sync_issue">Sync issue — check Settings</string>
+
+    <!-- Post-capture feedback -->
+    <string name="wear_saved_syncing_to_phone">Saved — syncing to phone</string>
+    <string name="wear_saved_on_watch">Saved on watch</string>
+
     <!-- Rewind -->
     <string name="wear_rewind_title">Rewinds</string>
     <string name="wear_rewind_empty">No rewinds yet</string>

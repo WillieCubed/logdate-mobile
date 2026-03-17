@@ -6,6 +6,7 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.data.storage.StorageSpaceChecker
 import app.logdate.wear.health.NoteHealthAnnotator
 import app.logdate.wear.recording.WearAudioRecordingManager
+import app.logdate.wear.sync.WearDataLayerClient
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -41,6 +42,7 @@ class WearRecordingViewModelTest {
     private lateinit var notesRepository: JournalNotesRepository
     private lateinit var storageChecker: StorageSpaceChecker
     private lateinit var noteHealthAnnotator: NoteHealthAnnotator
+    private lateinit var dataLayerClient: WearDataLayerClient
     private lateinit var testClock: TestClock
 
     private val audioLevelFlow = MutableStateFlow(0f)
@@ -56,7 +58,10 @@ class WearRecordingViewModelTest {
         notesRepository = mockk(relaxed = true)
         storageChecker = mockk(relaxed = true)
         noteHealthAnnotator = mockk(relaxed = true)
+        dataLayerClient = mockk(relaxed = true)
         testClock = TestClock()
+
+        coEvery { dataLayerClient.isPhoneConnected(any()) } returns false
 
         every { recordingManager.getAudioLevelFlow() } returns audioLevelFlow
         coEvery { notesRepository.create(any<JournalNote>()) } returns Uuid.random()
@@ -73,7 +78,7 @@ class WearRecordingViewModelTest {
     }
 
     private fun createViewModel(): WearRecordingViewModel {
-        return WearRecordingViewModel(recordingManager, notesRepository, storageChecker, noteHealthAnnotator, testClock)
+        return WearRecordingViewModel(recordingManager, notesRepository, storageChecker, noteHealthAnnotator, dataLayerClient, testClock)
     }
 
     /**

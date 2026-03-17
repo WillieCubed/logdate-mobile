@@ -38,6 +38,7 @@ import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import app.logdate.wear.R
+import app.logdate.wear.presentation.common.SaveFeedback
 import app.logdate.wear.presentation.audio.components.AudioWaveform
 import app.logdate.wear.presentation.audio.components.RecordingTimer
 import kotlinx.coroutines.flow.collectLatest
@@ -109,7 +110,10 @@ fun WearRecordingScreen(
                 onDiscard = viewModel::discard,
             )
             RecordingPhase.SAVING -> SavingContent()
-            RecordingPhase.SAVED -> SavedContent(durationMs = uiState.savedDurationMs)
+            RecordingPhase.SAVED -> SavedContent(
+                durationMs = uiState.savedDurationMs,
+                saveFeedback = uiState.saveFeedback,
+            )
             RecordingPhase.TOO_SHORT -> TooShortContent()
             RecordingPhase.ERROR -> RecordingErrorContent(message = uiState.errorMessage)
         }
@@ -237,7 +241,10 @@ internal fun SavingContent() {
 }
 
 @Composable
-internal fun SavedContent(durationMs: Long) {
+internal fun SavedContent(
+    durationMs: Long,
+    saveFeedback: SaveFeedback? = null,
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -248,8 +255,13 @@ internal fun SavedContent(durationMs: Long) {
             tint = Color.White,
             modifier = Modifier.size(48.dp),
         )
+        val feedbackText = when (saveFeedback) {
+            SaveFeedback.SYNCING_TO_PHONE -> stringResource(R.string.wear_saved_syncing_to_phone)
+            SaveFeedback.SAVED_LOCALLY -> stringResource(R.string.wear_saved_on_watch)
+            null -> stringResource(R.string.wear_recording_saved)
+        }
         Text(
-            text = stringResource(R.string.wear_recording_saved),
+            text = feedbackText,
             style = MaterialTheme.typography.titleSmall,
             color = Color.White,
             modifier = Modifier.padding(top = 4.dp),

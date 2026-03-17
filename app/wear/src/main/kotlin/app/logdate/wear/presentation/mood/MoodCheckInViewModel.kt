@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.wear.presentation.common.SaveFeedback
+import app.logdate.wear.sync.WearDataLayerClient
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -36,6 +38,7 @@ data class MoodCheckInUiState(
     val selectedMood: MoodOption? = null,
     val isSaving: Boolean = false,
     val isSaved: Boolean = false,
+    val saveFeedback: SaveFeedback? = null,
 )
 
 sealed interface MoodCheckInEvent {
@@ -45,6 +48,7 @@ sealed interface MoodCheckInEvent {
 
 class MoodCheckInViewModel(
     private val notesRepository: JournalNotesRepository,
+    private val dataLayerClient: WearDataLayerClient,
 ) : ViewModel() {
 
     companion object {
@@ -82,11 +86,18 @@ class MoodCheckInViewModel(
                 )
                 notesRepository.create(note)
 
+                val feedback = if (dataLayerClient.isPhoneConnected()) {
+                    SaveFeedback.SYNCING_TO_PHONE
+                } else {
+                    SaveFeedback.SAVED_LOCALLY
+                }
+
                 _uiState.update {
                     it.copy(
                         step = MoodCheckInStep.SAVED,
                         isSaving = false,
                         isSaved = true,
+                        saveFeedback = feedback,
                     )
                 }
 
