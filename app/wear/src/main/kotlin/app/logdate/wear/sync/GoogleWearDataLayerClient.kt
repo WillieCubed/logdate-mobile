@@ -71,6 +71,23 @@ class GoogleWearDataLayerClient(
         }
     }
 
+    override suspend fun getConnectedPhoneName(): String? {
+        return try {
+            val result = capabilityClient.getCapability(
+                WearDataLayerClient.PHONE_CAPABILITY,
+                CapabilityClient.FILTER_REACHABLE,
+            ).await()
+            result.nodes.firstOrNull()?.displayName
+        } catch (e: Exception) {
+            try {
+                nodeClient.connectedNodes.await().firstOrNull()?.displayName
+            } catch (e2: Exception) {
+                Napier.w("Failed to get phone name", e2)
+                null
+            }
+        }
+    }
+
     override suspend fun sendMessage(path: String, data: ByteArray): Boolean {
         return try {
             val nodes = nodeClient.connectedNodes.await()

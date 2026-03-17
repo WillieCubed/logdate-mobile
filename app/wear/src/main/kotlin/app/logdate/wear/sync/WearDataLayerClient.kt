@@ -25,6 +25,11 @@ interface WearDataLayerClient {
     suspend fun isPhoneConnected(capability: String = PHONE_CAPABILITY): Boolean
 
     /**
+     * Returns the display name of the connected phone, or null if no phone is reachable.
+     */
+    suspend fun getConnectedPhoneName(): String?
+
+    /**
      * Sends a raw file at [localFilePath] to the connected phone node
      * via a channel at the given [channelPath].
      * Returns true if the transfer completed.
