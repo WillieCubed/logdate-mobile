@@ -18,7 +18,7 @@ data class LocationTrackingSettings(
     /**
      * Capture mode for background activity experiments.
      */
-    val captureMode: LocationCaptureMode = LocationCaptureMode.STABLE,
+    val captureMode: LocationCaptureMode = LocationCaptureMode.PASSIVE,
     /**
      * Whether optional server nudges are enabled for the optimized background path.
      */
@@ -50,13 +50,14 @@ enum class LocationCaptureMode {
      * The app only records a location when another app has already requested one from the
      * system, adding zero extra battery drain.
      */
-    STABLE,
+    PASSIVE,
 
     /**
-     * Experimental capture mode that uses more battery.
+     * Activity-aware capture mode that uses more battery.
      *
-     * Runs an active foreground service that samples location every few seconds, in addition
-     * to the default passive captures from [STABLE].
+     * Runs a foreground service that detects the user's movement (still, walking, driving)
+     * and adjusts GPS accuracy and frequency accordingly. High accuracy when moving,
+     * low-power heartbeat when stationary.
      */
-    EXPERIMENT_MIRRORED,
+    ACTIVE,
 }

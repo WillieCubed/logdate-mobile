@@ -122,20 +122,32 @@ class LocationSettingsViewModel(
         }
     }
 
-    fun toggleMirroredExperiment(enabled: Boolean) {
+    fun toggleActiveTracking(enabled: Boolean) {
         viewModelScope.launch {
             try {
                 settingsRepository.setCaptureMode(
                     if (enabled) {
-                        LocationCaptureMode.EXPERIMENT_MIRRORED
+                        LocationCaptureMode.ACTIVE
                     } else {
-                        LocationCaptureMode.STABLE
+                        LocationCaptureMode.PASSIVE
                     },
                 )
-                Napier.i("Mirrored experiment set to: $enabled")
+                Napier.i("Active tracking set to: $enabled")
             } catch (e: Exception) {
-                Napier.e("Failed to update mirrored experiment", e)
-                errorMessageState.value = "Failed to update experiment: ${e.message}"
+                Napier.e("Failed to update capture mode", e)
+                errorMessageState.value = "Failed to update capture mode: ${e.message}"
+            }
+        }
+    }
+
+    fun setCaptureMode(mode: LocationCaptureMode) {
+        viewModelScope.launch {
+            try {
+                settingsRepository.setCaptureMode(mode)
+                Napier.i("Capture mode set to: $mode")
+            } catch (e: Exception) {
+                Napier.e("Failed to update capture mode", e)
+                errorMessageState.value = "Failed to update capture mode: ${e.message}"
             }
         }
     }

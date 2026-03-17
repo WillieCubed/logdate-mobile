@@ -27,6 +27,7 @@ class IosPermissionManager : PermissionManager {
             PermissionType.CALENDAR -> checkIosCalendarPermission()
             PermissionType.CONTACTS -> checkIosContactsPermission()
             PermissionType.BIOMETRIC -> true // Face ID/Touch ID handled differently
+            PermissionType.ACTIVITY_RECOGNITION -> true // CoreMotion handles this differently on iOS
         }
 
     // Stub implementations of iOS permission checks

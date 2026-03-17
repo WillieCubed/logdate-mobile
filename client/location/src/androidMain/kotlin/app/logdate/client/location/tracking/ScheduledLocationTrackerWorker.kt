@@ -43,7 +43,7 @@ class ScheduledLocationTrackerWorker(
                     }
                 val settings = settingsRepository.getSettings()
                 val pipeline =
-                    if (settings.captureMode == LocationCaptureMode.EXPERIMENT_MIRRORED) {
+                    if (settings.captureMode == LocationCaptureMode.ACTIVE) {
                         LocationCapturePipeline.OPTIMIZED_BACKGROUND
                     } else {
                         LocationCapturePipeline.LEGACY

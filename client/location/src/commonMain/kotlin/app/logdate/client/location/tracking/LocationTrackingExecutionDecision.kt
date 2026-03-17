@@ -8,33 +8,30 @@ internal data class LocationTrackingExecutionDecision(
     val shouldStopScheduledTracking: Boolean,
     val shouldStartOptimizedBackgroundTracking: Boolean,
     val shouldStopOptimizedBackgroundTracking: Boolean,
-    val shouldStartDetailedForegroundTracking: Boolean,
-    val shouldStopDetailedForegroundTracking: Boolean,
+    val shouldStartActivityAwareTracking: Boolean,
+    val shouldStopActivityAwareTracking: Boolean,
 )
 
-internal fun computeLocationTrackingExecutionDecision(
-    settings: LocationTrackingSettings,
-    canStartDetailedForegroundTracking: Boolean,
-): LocationTrackingExecutionDecision {
+internal fun computeLocationTrackingExecutionDecision(settings: LocationTrackingSettings): LocationTrackingExecutionDecision {
     if (!settings.backgroundTrackingEnabled) {
         return LocationTrackingExecutionDecision(
             shouldStartScheduledTracking = false,
             shouldStopScheduledTracking = true,
             shouldStartOptimizedBackgroundTracking = false,
             shouldStopOptimizedBackgroundTracking = true,
-            shouldStartDetailedForegroundTracking = false,
-            shouldStopDetailedForegroundTracking = true,
+            shouldStartActivityAwareTracking = false,
+            shouldStopActivityAwareTracking = true,
         )
     }
 
-    val mirroredModeEnabled = settings.captureMode == LocationCaptureMode.EXPERIMENT_MIRRORED
+    val activeMode = settings.captureMode == LocationCaptureMode.ACTIVE
     return LocationTrackingExecutionDecision(
         shouldStartScheduledTracking = true,
         shouldStopScheduledTracking = false,
-        shouldStartOptimizedBackgroundTracking = mirroredModeEnabled,
-        shouldStopOptimizedBackgroundTracking = !mirroredModeEnabled,
-        shouldStartDetailedForegroundTracking = mirroredModeEnabled && canStartDetailedForegroundTracking,
-        shouldStopDetailedForegroundTracking = !mirroredModeEnabled,
+        shouldStartOptimizedBackgroundTracking = activeMode,
+        shouldStopOptimizedBackgroundTracking = !activeMode,
+        shouldStartActivityAwareTracking = activeMode,
+        shouldStopActivityAwareTracking = !activeMode,
     )
 }
 

@@ -23,12 +23,12 @@ class DefaultLocationTrackingSettingsRepositoryTest {
             val settings = repository.getSettings()
 
             assertEquals(2, settings.minimumPersistIntervalMinutes)
-            assertEquals(LocationCaptureMode.STABLE, settings.captureMode)
+            assertEquals(LocationCaptureMode.PASSIVE, settings.captureMode)
             assertFalse(settings.backgroundTrackingEnabled)
         }
 
     @Test
-    fun `updateSettings persists mirrored experiment values`() =
+    fun `updateSettings persists active mode values`() =
         runTest {
             val storage = InMemoryKeyValueStorage()
             val repository = DefaultLocationTrackingSettingsRepository(storage)
@@ -37,7 +37,7 @@ class DefaultLocationTrackingSettingsRepositoryTest {
                 LocationTrackingSettings(
                     backgroundTrackingEnabled = true,
                     minimumPersistIntervalMinutes = 5,
-                    captureMode = LocationCaptureMode.EXPERIMENT_MIRRORED,
+                    captureMode = LocationCaptureMode.ACTIVE,
                     serverAssistEnabled = true,
                     autoTrackForJournalEntries = false,
                     autoTrackForTimelineReview = false,
@@ -48,10 +48,34 @@ class DefaultLocationTrackingSettingsRepositoryTest {
 
             assertTrue(settings.backgroundTrackingEnabled)
             assertEquals(5, settings.minimumPersistIntervalMinutes)
-            assertEquals(LocationCaptureMode.EXPERIMENT_MIRRORED, settings.captureMode)
+            assertEquals(LocationCaptureMode.ACTIVE, settings.captureMode)
             assertTrue(settings.serverAssistEnabled)
             assertFalse(settings.autoTrackForJournalEntries)
             assertFalse(settings.autoTrackForTimelineReview)
+        }
+
+    @Test
+    fun `old STABLE value migrates to PASSIVE`() =
+        runTest {
+            val storage = InMemoryKeyValueStorage()
+            storage.putString("location_capture_mode", "STABLE")
+
+            val repository = DefaultLocationTrackingSettingsRepository(storage)
+            val settings = repository.getSettings()
+
+            assertEquals(LocationCaptureMode.PASSIVE, settings.captureMode)
+        }
+
+    @Test
+    fun `old EXPERIMENT_MIRRORED value migrates to ACTIVE`() =
+        runTest {
+            val storage = InMemoryKeyValueStorage()
+            storage.putString("location_capture_mode", "EXPERIMENT_MIRRORED")
+
+            val repository = DefaultLocationTrackingSettingsRepository(storage)
+            val settings = repository.getSettings()
+
+            assertEquals(LocationCaptureMode.ACTIVE, settings.captureMode)
         }
 }
 

@@ -75,6 +75,12 @@ class AndroidPermissionManager(
                 arrayOf(
                     Manifest.permission.USE_BIOMETRIC,
                 )
+            PermissionType.ACTIVITY_RECOGNITION ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    arrayOf(Manifest.permission.ACTIVITY_RECOGNITION)
+                } else {
+                    arrayOf()
+                }
         }
 
     override fun isPermissionGranted(type: PermissionType): Boolean {

@@ -143,11 +143,13 @@ class DefaultLocationTrackingSettingsRepository(
     }
 
     private fun parseCaptureMode(value: String?): LocationCaptureMode =
-        runCatching {
-            LocationCaptureMode.valueOf(value ?: LocationCaptureMode.STABLE.name)
-        }.getOrElse {
-            Napier.w("Unknown stored location capture mode '$value'; falling back to STABLE")
-            LocationCaptureMode.STABLE
+        when (value) {
+            "STABLE", "PASSIVE", null -> LocationCaptureMode.PASSIVE
+            "EXPERIMENT_MIRRORED", "ACTIVE" -> LocationCaptureMode.ACTIVE
+            else -> {
+                Napier.w("Unknown stored location capture mode '$value'; falling back to PASSIVE")
+                LocationCaptureMode.PASSIVE
+            }
         }
 
     private data class BaseSettingsSnapshot(

@@ -85,13 +85,15 @@ private fun isForegroundServiceStartNotAllowed(error: Throwable): Boolean {
 private fun isForegroundServiceStartNotAllowedApi31(error: Throwable): Boolean = error is ForegroundServiceStartNotAllowedException
 
 /**
- * Foreground service that actively samples the device location every [SAMPLE_INTERVAL_SECONDS]
- * seconds (currently 15) and saves each sample to [LocationTracker].
+ * Foreground service that actively samples the device location at a fixed interval.
  *
- * This is only used in the [LocationCaptureMode.EXPERIMENT_MIRRORED] capture mode. A persistent
- * notification is shown while the service is running, as required by Android for foreground
- * location services.
+ * @deprecated Replaced by [ActivityAwareLocationService] which adapts GPS accuracy and
+ *   frequency based on detected movement instead of polling at a fixed rate.
  */
+@Deprecated(
+    "Replaced by ActivityAwareLocationService",
+    replaceWith = ReplaceWith("ActivityAwareLocationService"),
+)
 class DetailedLocationTrackingService :
     Service(),
     KoinComponent {

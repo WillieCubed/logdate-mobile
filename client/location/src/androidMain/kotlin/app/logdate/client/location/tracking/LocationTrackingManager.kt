@@ -1,7 +1,6 @@
 package app.logdate.client.location.tracking
 
 import android.content.Context
-import app.logdate.client.location.settings.LocationCaptureMode
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.permissions.PermissionManager
@@ -16,7 +15,12 @@ import kotlinx.coroutines.launch
 
 /**
  * Manager for coordinating location tracking based on user settings.
- * This handles starting and stopping scheduled location tracking based on user preferences.
+ *
+ * Observes setting changes and starts/stops the appropriate tracking services:
+ * - [ScheduledLocationTrackingService] (WorkManager periodic) — always active when tracking is on
+ * - [OptimizedBackgroundLocationRegistrar] (passive FLP) — active in ACTIVE mode as a fallback
+ * - [ActivityAwareLocationService] (foreground service) — active in ACTIVE mode for high-accuracy,
+ *   activity-adaptive tracking
  */
 @OptIn(FlowPreview::class)
 class LocationTrackingManager(
@@ -27,11 +31,9 @@ class LocationTrackingManager(
     private val permissionManager: PermissionManager,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private val foregroundActivityCounter = ForegroundActivityCounter()
     private var latestSettings: LocationTrackingSettings? = null
 
     init {
-        // Listen for changes to tracking settings
         scope.launch {
             locationTrackingSettingsRepository.observeSettings().debounce(1000).collectLatest { settings ->
                 latestSettings = settings
@@ -39,7 +41,6 @@ class LocationTrackingManager(
             }
         }
 
-        // Apply initial settings
         scope.launch {
             val settings = locationTrackingSettingsRepository.getSettings()
             latestSettings = settings
@@ -47,17 +48,9 @@ class LocationTrackingManager(
         }
     }
 
-    /**
-     * Apply tracking settings by starting or stopping tracking services.
-     */
     private fun applyTrackingSettings(settings: LocationTrackingSettings) {
         Napier.i("Applying location tracking settings: $settings")
-        val canStartDetailedForegroundTracking = foregroundActivityCounter.hasForegroundActivities()
-        val decision =
-            computeLocationTrackingExecutionDecision(
-                settings = settings,
-                canStartDetailedForegroundTracking = canStartDetailedForegroundTracking,
-            )
+        val decision = computeLocationTrackingExecutionDecision(settings = settings)
 
         if (decision.shouldStopScheduledTracking) {
             scheduledLocationTrackingService.stopScheduledTracking()
@@ -78,18 +71,12 @@ class LocationTrackingManager(
             optimizedBackgroundLocationRegistrar.stop()
         }
 
-        if (decision.shouldStartDetailedForegroundTracking) {
-            context.startDetailedLocationTrackingService(permissionManager)
-        } else if (
-            settings.backgroundTrackingEnabled &&
-            settings.captureMode == LocationCaptureMode.EXPERIMENT_MIRRORED &&
-            !canStartDetailedForegroundTracking
-        ) {
-            Napier.i("Deferring detailed location tracking until an activity is resumed")
+        if (decision.shouldStartActivityAwareTracking) {
+            context.startActivityAwareLocationService(permissionManager)
         }
 
-        if (decision.shouldStopDetailedForegroundTracking) {
-            context.stopDetailedLocationTrackingService()
+        if (decision.shouldStopActivityAwareTracking) {
+            context.stopActivityAwareLocationService()
         }
     }
 
@@ -104,36 +91,18 @@ class LocationTrackingManager(
         }
     }
 
-    /**
-     * Notifies the manager that an app activity is now resumed and foreground-visible.
-     */
-    fun onActivityResumed() {
-        val transitionedToForeground = foregroundActivityCounter.onActivityResumed()
-        if (!transitionedToForeground) {
-            return
-        }
+    /** No-op — activity-aware tracking no longer depends on foreground activity state. */
+    fun onActivityResumed() = Unit
 
-        scope.launch {
-            val settings = latestSettings ?: locationTrackingSettingsRepository.getSettings()
-            latestSettings = settings
-            applyTrackingSettings(settings)
-        }
-    }
-
-    /**
-     * Notifies the manager that an app activity is paused.
-     */
-    fun onActivityPaused() {
-        foregroundActivityCounter.onActivityPaused()
-    }
+    /** No-op — activity-aware tracking no longer depends on foreground activity state. */
+    fun onActivityPaused() = Unit
 
     /**
      * Explicitly stop location tracking (usually called when the app is being destroyed).
      */
     fun stopTracking() {
-        foregroundActivityCounter.reset()
         scheduledLocationTrackingService.stopScheduledTracking()
         optimizedBackgroundLocationRegistrar.stop()
-        context.stopDetailedLocationTrackingService()
+        context.stopActivityAwareLocationService()
     }
 }

@@ -158,8 +158,11 @@
     <string name="location_privacy">Location Privacy</string>
     <string name="location_services">Location Services</string>
     <string name="location_settings">Location Settings</string>
-    <string name="location_capture_experiment">Mirrored accuracy experiment</string>
-    <string name="location_capture_experiment_description">Run dual capture paths on this device</string>
+    <string name="location_capture_mode">Tracking mode</string>
+    <string name="location_capture_mode_passive">Passive</string>
+    <string name="location_capture_mode_passive_description">Saves battery. Records location only when other apps request it.</string>
+    <string name="location_capture_mode_active">Active</string>
+    <string name="location_capture_mode_active_description">High accuracy. Adapts to your movement — walks, drives, and stops.</string>
     <string name="location_server_assist">Optional server nudges</string>
     <string name="location_server_assist_description">Allow server nudges for background capture</string>
     <string name="location_timeline">Locations</string>
@@ -408,7 +411,7 @@
     <string name="location_track_timeline_review_description">Record location when reviewing timeline</string>
     <string name="location_update_frequency">Minimum persist interval: %1$d minutes</string>
     <string name="text_120_min">120 min</string>
-    <string name="location_tracking_battery_note">More frequent persistence uses more battery. The mirrored experiment allows shorter intervals and a denser detail path.</string>
+    <string name="location_tracking_battery_note">More frequent persistence uses more battery.</string>
     <string name="view_location_timeline">View Locations</string>
     <string name="location_timeline_description">See your saved places and recent movement</string>
     <string name="location_data_stored_on_device">Location data is stored on your device</string>

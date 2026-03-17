@@ -12,68 +12,51 @@ class LocationTrackingExecutionDecisionTest {
         val decision =
             computeLocationTrackingExecutionDecision(
                 settings = LocationTrackingSettings(backgroundTrackingEnabled = false),
-                canStartDetailedForegroundTracking = false,
             )
 
         assertTrue(decision.shouldStopScheduledTracking)
         assertTrue(decision.shouldStopOptimizedBackgroundTracking)
-        assertTrue(decision.shouldStopDetailedForegroundTracking)
+        assertTrue(decision.shouldStopActivityAwareTracking)
         assertFalse(decision.shouldStartScheduledTracking)
         assertFalse(decision.shouldStartOptimizedBackgroundTracking)
-        assertFalse(decision.shouldStartDetailedForegroundTracking)
+        assertFalse(decision.shouldStartActivityAwareTracking)
     }
 
     @Test
-    fun `mirrored mode in background skips detailed start`() {
+    fun `active mode starts all three tracking channels`() {
         val decision =
             computeLocationTrackingExecutionDecision(
                 settings =
                     LocationTrackingSettings(
                         backgroundTrackingEnabled = true,
-                        captureMode = LocationCaptureMode.EXPERIMENT_MIRRORED,
+                        captureMode = LocationCaptureMode.ACTIVE,
                     ),
-                canStartDetailedForegroundTracking = false,
             )
 
         assertTrue(decision.shouldStartScheduledTracking)
         assertTrue(decision.shouldStartOptimizedBackgroundTracking)
-        assertFalse(decision.shouldStartDetailedForegroundTracking)
-        assertFalse(decision.shouldStopDetailedForegroundTracking)
+        assertTrue(decision.shouldStartActivityAwareTracking)
+        assertFalse(decision.shouldStopScheduledTracking)
+        assertFalse(decision.shouldStopOptimizedBackgroundTracking)
+        assertFalse(decision.shouldStopActivityAwareTracking)
     }
 
     @Test
-    fun `mirrored mode in foreground starts detailed tracking`() {
+    fun `passive mode stops activity-aware and optimized tracking`() {
         val decision =
             computeLocationTrackingExecutionDecision(
                 settings =
                     LocationTrackingSettings(
                         backgroundTrackingEnabled = true,
-                        captureMode = LocationCaptureMode.EXPERIMENT_MIRRORED,
+                        captureMode = LocationCaptureMode.PASSIVE,
                     ),
-                canStartDetailedForegroundTracking = true,
-            )
-
-        assertTrue(decision.shouldStartDetailedForegroundTracking)
-        assertFalse(decision.shouldStopDetailedForegroundTracking)
-    }
-
-    @Test
-    fun `stable mode stops detailed and optimized tracking`() {
-        val decision =
-            computeLocationTrackingExecutionDecision(
-                settings =
-                    LocationTrackingSettings(
-                        backgroundTrackingEnabled = true,
-                        captureMode = LocationCaptureMode.STABLE,
-                    ),
-                canStartDetailedForegroundTracking = true,
             )
 
         assertTrue(decision.shouldStartScheduledTracking)
         assertTrue(decision.shouldStopOptimizedBackgroundTracking)
-        assertTrue(decision.shouldStopDetailedForegroundTracking)
+        assertTrue(decision.shouldStopActivityAwareTracking)
         assertFalse(decision.shouldStartOptimizedBackgroundTracking)
-        assertFalse(decision.shouldStartDetailedForegroundTracking)
+        assertFalse(decision.shouldStartActivityAwareTracking)
     }
 }
 
