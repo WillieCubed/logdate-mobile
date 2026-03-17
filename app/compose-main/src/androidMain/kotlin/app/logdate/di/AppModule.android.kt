@@ -13,6 +13,7 @@ import app.logdate.client.intelligence.di.intelligenceModule
 import app.logdate.client.location.di.locationModule
 import app.logdate.client.media.di.audioModule
 import app.logdate.client.networking.di.networkingModule
+import app.logdate.client.sensor.di.sensorModule
 import app.logdate.client.updates.PlayInAppUpdateController
 import app.logdate.feature.core.settings.updates.AppUpdateController
 import org.koin.android.ext.koin.androidContext
@@ -26,6 +27,7 @@ actual val appModule: Module =
     module {
         // Base modules first
         includes(appDataModule)
+        includes(sensorModule)
         includes(networkingModule)
         includes(deviceModule)
 

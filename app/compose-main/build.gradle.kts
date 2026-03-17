@@ -75,6 +75,7 @@ kotlin {
             implementation(projects.client.repository)
             implementation(projects.client.logdateDatastore)
             implementation(projects.client.location)
+            implementation(projects.client.sensor)
             implementation(projects.client.media)
             implementation(projects.client.sharing)
             implementation(projects.client.sync)
